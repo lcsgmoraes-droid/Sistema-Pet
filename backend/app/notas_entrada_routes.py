@@ -445,51 +445,60 @@ def calcular_similaridade(texto1: str, texto2: str) -> float:
     return SequenceMatcher(None, texto1.lower(), texto2.lower()).ratio()
 
 
-def encontrar_produto_similar(descricao: str, codigo: str, db: Session) -> tuple:
+def encontrar_produto_similar(descricao: str, codigo: str, db: Session, fornecedor_id: int = None) -> tuple:
     """
     Encontra produto similar no banco (ativo OU inativo)
     Retorna (produto, confianca, foi_encontrado_inativo)
-    Nota: NÃ£o reativa mais aqui, reativaÃ§Ã£o acontece no processamento
+    
+    REGRAS DE MATCHING (RIGOROSAS):
+    1. SKU exato (codigo) + fornecedor igual = match automático
+    2. EAN exato (codigo_barras) = match automático
+    3. Caso contrário = NÃO vincula (usuário decide manualmente)
+    
+    Matching por similaridade de nome foi REMOVIDO para evitar vínculos errados
     """
-    # 1. Tentar por cÃ³digo exato (busca produtos ativos E inativos)
+    # 1. Tentar por SKU exato (código do produto)
+    if codigo:
+        # Buscar por SKU exato
+        query = db.query(Produto).filter(Produto.codigo == codigo)
+        
+        # Se tem fornecedor, verificar se produto pertence a ele
+        if fornecedor_id:
+            # Buscar produto que pertence ao fornecedor
+            produto_com_fornecedor = query.join(
+                ProdutoFornecedor,
+                ProdutoFornecedor.produto_id == Produto.id
+            ).filter(
+                ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                ProdutoFornecedor.ativo == True
+            ).first()
+            
+            if produto_com_fornecedor:
+                foi_inativo = not produto_com_fornecedor.ativo
+                logger.info(f"✅ Match por SKU + Fornecedor: {produto_com_fornecedor.nome}")
+                return (produto_com_fornecedor, 1.0, foi_inativo)
+        
+        # Se não encontrou com fornecedor, buscar só por SKU
+        produto = query.first()
+        if produto:
+            foi_inativo = not produto.ativo
+            logger.info(f"✅ Match por SKU: {produto.nome}")
+            return (produto, 1.0, foi_inativo)
+    
+    # 2. Tentar por EAN/Código de Barras exato
     if codigo:
         produto = db.query(Produto).filter(
-            or_(
-                Produto.codigo == codigo,
-                Produto.codigo_barras == codigo
-            )
+            Produto.codigo_barras == codigo
         ).first()
         
         if produto:
             foi_inativo = not produto.ativo
-            return (produto, 1.0, foi_inativo)  # ConfianÃ§a 100%
+            logger.info(f"✅ Match por EAN: {produto.nome}")
+            return (produto, 1.0, foi_inativo)
     
-    # 2. Buscar por similaridade de nome (incluindo inativos)
-    produtos = db.query(Produto).all()  # Busca TODOS (ativos e inativos)
-    melhor_produto = None
-    melhor_score = 0
-    
-    for produto in produtos:
-        # Comparar com nome
-        score_nome = calcular_similaridade(descricao, produto.nome)
-        
-        # Comparar com cÃ³digo
-        score_codigo = 0
-        if codigo and produto.codigo:
-            score_codigo = calcular_similaridade(codigo, produto.codigo)
-        
-        # Score final (nome tem mais peso)
-        score_final = (score_nome * 0.7) + (score_codigo * 0.3)
-        
-        if score_final > melhor_score:
-            melhor_score = score_final
-            melhor_produto = produto
-    
-    # SÃ³ retornar se confianÃ§a for >= 70%
-    if melhor_score >= 0.7:
-        foi_inativo = melhor_produto and not melhor_produto.ativo
-        return (melhor_produto, melhor_score, foi_inativo)
-    
+    # 3. NÃO fazer matching automático por nome/similaridade
+    # Usuário deve vincular manualmente para evitar erros
+    logger.info(f"⚠️ Nenhum match encontrado para: {descricao[:50]} (SKU: {codigo})")
     return (None, 0, False)
 
 
@@ -678,11 +687,12 @@ async def upload_xml(
         produtos_reativados = 0
         
         for item_data in dados_nfe['itens']:
-            # Tentar encontrar produto similar
+            # Tentar encontrar produto similar (com fornecedor para matching mais preciso)
             produto, confianca, foi_inativo = encontrar_produto_similar(
                 item_data['descricao'],
                 item_data['codigo_produto'],
-                db
+                db,
+                fornecedor.id if fornecedor else None
             )
             
             if produto:
@@ -1523,33 +1533,50 @@ def preview_processamento(
     preview_itens = []
     
     for item in nota.itens:
-        if not item.produto_id:
-            continue
+        # Dados do item da NF (sempre presente)
+        item_nf = {
+            "item_id": item.id,
+            "codigo_produto_nf": item.codigo_produto,
+            "descricao_nf": item.descricao,
+            "quantidade_nf": item.quantidade,
+            "valor_unitario_nf": item.valor_unitario,
+            "ean_nf": item.ean,
+            "ncm_nf": item.ncm,
+            "vinculado": item.vinculado,
+            "confianca_vinculo": item.confianca_vinculo
+        }
         
-        produto = item.produto
-        custo_atual = produto.preco_custo or 0
-        custo_novo = item.valor_unitario
-        variacao_custo = ((custo_novo - custo_atual) / custo_atual * 100) if custo_atual > 0 else 0
-        
-        # Calcular margem atual
-        preco_venda_atual = produto.preco_venda or 0
-        if preco_venda_atual > 0 and custo_novo > 0:
-            margem_atual = ((preco_venda_atual - custo_novo) / preco_venda_atual) * 100
-        else:
-            margem_atual = 0
+        # Dados do produto vinculado (se houver)
+        produto_vinculado = None
+        if item.produto_id:
+            produto = item.produto
+            custo_atual = produto.preco_custo or 0
+            custo_novo = item.valor_unitario
+            variacao_custo = ((custo_novo - custo_atual) / custo_atual * 100) if custo_atual > 0 else 0
+            
+            # Calcular margem atual
+            preco_venda_atual = produto.preco_venda or 0
+            if preco_venda_atual > 0 and custo_novo > 0:
+                margem_atual = ((preco_venda_atual - custo_novo) / preco_venda_atual) * 100
+            else:
+                margem_atual = 0
+            
+            produto_vinculado = {
+                "produto_id": produto.id,
+                "produto_codigo": produto.codigo,
+                "produto_nome": produto.nome,
+                "produto_ean": produto.codigo_barras,
+                "custo_anterior": custo_atual,
+                "custo_novo": custo_novo,
+                "variacao_custo_percentual": round(variacao_custo, 2),
+                "preco_venda_atual": preco_venda_atual,
+                "margem_atual": round(margem_atual, 2),
+                "estoque_atual": produto.estoque_atual or 0
+            }
         
         preview_itens.append({
-            "item_id": item.id,
-            "produto_id": produto.id,
-            "produto_codigo": produto.codigo,
-            "produto_nome": produto.nome,
-            "quantidade": item.quantidade,
-            "custo_anterior": custo_atual,
-            "custo_novo": custo_novo,
-            "variacao_custo_percentual": round(variacao_custo, 2),
-            "preco_venda_atual": preco_venda_atual,
-            "margem_atual": round(margem_atual, 2),
-            "estoque_atual": produto.estoque_atual or 0
+            **item_nf,
+            "produto_vinculado": produto_vinculado
         })
     
     return {

@@ -28,6 +28,7 @@ const EntradaXML = () => {
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
   const [precosAjustados, setPrecosAjustados] = useState({});
+  const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
   
   // Estados para rateio (APENAS informativo - estoque é UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
@@ -540,21 +541,100 @@ const EntradaXML = () => {
     }
   };
 
-  const desvincularProduto = async (notaId, itemId) => {
+  const desvincularProduto = async (itemId) => {
+    if (!notaSelecionada) return;
+    
     try {
-            await api.post(
-        `/notas-entrada/${notaId}/itens/${itemId}/desvincular`,
+      await api.post(
+        `/notas-entrada/${notaSelecionada.id}/itens/${itemId}/desvincular`,
         {}
       );
       
       toast.success('✅ Produto desvinculado!');
       
-      // Recarregar detalhes
-      const response = await api.get(`/notas-entrada/${notaId}`);
-      setNotaSelecionada(response.data);
+      // Recarregar preview
+      await carregarPreviewProcessamento(notaSelecionada.id);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao desvincular produto');
     }
+  };
+
+  const abrirModalVincularProduto = (item) => {
+    setItemSelecionado(item);
+    setMostrarModalVincular(true);
+  };
+
+  // Detectar divergências entre NF e produto vinculado
+  const detectarDivergencias = (item) => {
+    if (!item.produto_vinculado) return [];
+    
+    const divergencias = [];
+    const descNF = item.descricao_nf.toLowerCase();
+    const descProd = item.produto_vinculado.produto_nome.toLowerCase();
+    
+    // Detectar peso/tamanho
+    const regexPeso = /(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|un|und|unid)/gi;
+    const pesosNF = [...descNF.matchAll(regexPeso)];
+    const pesosProd = [...descProd.matchAll(regexPeso)];
+    
+    if (pesosNF.length > 0 && pesosProd.length > 0) {
+      const pesoNF = pesosNF[0][0];
+      const pesoProd = pesosProd[0][0];
+      if (pesoNF.toLowerCase() !== pesoProd.toLowerCase()) {
+        divergencias.push({
+          tipo: 'peso',
+          mensagem: `Peso/Tamanho diferente: NF="${pesoNF}" vs Produto="${pesoProd}"`,
+          gravidade: 'alta'
+        });
+      }
+    }
+    
+    // Detectar cor
+    const cores = ['preto', 'branco', 'vermelho', 'azul', 'verde', 'amarelo', 'rosa', 'roxo', 'laranja', 'marrom', 'cinza'];
+    const corNF = cores.find(cor => descNF.includes(cor));
+    const corProd = cores.find(cor => descProd.includes(cor));
+    
+    if (corNF && corProd && corNF !== corProd) {
+      divergencias.push({
+        tipo: 'cor',
+        mensagem: `Cor diferente: NF="${corNF}" vs Produto="${corProd}"`,
+        gravidade: 'media'
+      });
+    }
+    
+    // Detectar sabor (para rações)
+    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'atum', 'vegetais'];
+    const saborNF = sabores.find(sabor => descNF.includes(sabor));
+    const saborProd = sabores.find(sabor => descProd.includes(sabor));
+    
+    if (saborNF && saborProd && saborNF !== saborProd) {
+      divergencias.push({
+        tipo: 'sabor',
+        mensagem: `Sabor diferente: NF="${saborNF}" vs Produto="${saborProd}"`,
+        gravidade: 'alta'
+      });
+    }
+    
+    // Detectar animal (cachorro/gato)
+    if ((descNF.includes('cao') || descNF.includes('cachorro') || descNF.includes('dog')) && 
+        (descProd.includes('gato') || descProd.includes('cat'))) {
+      divergencias.push({
+        tipo: 'animal',
+        mensagem: 'Animal diferente: NF parece ser para CACHORRO mas produto é para GATO',
+        gravidade: 'critica'
+      });
+    }
+    
+    if ((descNF.includes('gato') || descNF.includes('cat')) && 
+        (descProd.includes('cao') || descProd.includes('cachorro') || descProd.includes('dog'))) {
+      divergencias.push({
+        tipo: 'animal',
+        mensagem: 'Animal diferente: NF parece ser para GATO mas produto é para CACHORRO',
+        gravidade: 'critica'
+      });
+    }
+    
+    return divergencias;
   };
 
   const abrirModalCriarProduto = async (item) => {
@@ -1968,106 +2048,307 @@ const EntradaXML = () => {
               </p>
             </div>
 
+            {/* Resumo de Alterações */}
+            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-gray-700">Filtrar:</span>
+                {(() => {
+                  const itensVinculados = previewProcessamento.itens.filter(i => i.produto_vinculado);
+                  const aumentos = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual > 0).length;
+                  const reducoes = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual < 0).length;
+                  const iguais = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual === 0).length;
+                  const total = previewProcessamento.itens.length;
+                  
+                  return (
+                    <>
+                      <button
+                        onClick={() => setFiltroCusto('todos')}
+                        className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                          filtroCusto === 'todos' 
+                            ? 'bg-blue-600 text-white shadow-md' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        <span className="text-base">📋</span>
+                        Todos ({total})
+                      </button>
+                      
+                      {aumentos > 0 && (
+                        <button
+                          onClick={() => setFiltroCusto('aumentou')}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                            filtroCusto === 'aumentou' 
+                              ? 'bg-red-600 text-white shadow-md' 
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          <span className="text-base">📈</span>
+                          {aumentos} custo{aumentos > 1 ? 's' : ''} maior{aumentos > 1 ? 'es' : ''}
+                        </button>
+                      )}
+                      
+                      {reducoes > 0 && (
+                        <button
+                          onClick={() => setFiltroCusto('diminuiu')}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                            filtroCusto === 'diminuiu' 
+                              ? 'bg-green-600 text-white shadow-md' 
+                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          }`}
+                        >
+                          <span className="text-base">📉</span>
+                          {reducoes} custo{reducoes > 1 ? 's' : ''} menor{reducoes > 1 ? 'es' : ''}
+                        </button>
+                      )}
+                      
+                      {iguais > 0 && (
+                        <button
+                          onClick={() => setFiltroCusto('igual')}
+                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                            filtroCusto === 'igual' 
+                              ? 'bg-gray-600 text-white shadow-md' 
+                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                          }`}
+                        >
+                          <span className="text-base">➡️</span>
+                          {iguais} sem alteração
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-4">
-                {previewProcessamento.itens.map(item => {
-                  const custoVariacao = item.variacao_custo_percentual;
+              <div className="space-y-6">
+                {previewProcessamento.itens
+                  .filter(item => {
+                    // Filtrar baseado no status de vinculação E variação de custo
+                    const vinculado = item.produto_vinculado !== null;
+                    const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || 0;
+                    
+                    if (filtroCusto === 'todos') return true;
+                    if (filtroCusto === 'aumentou') return vinculado && custoVariacao > 0;
+                    if (filtroCusto === 'diminuiu') return vinculado && custoVariacao < 0;
+                    if (filtroCusto === 'igual') return vinculado && custoVariacao === 0;
+                    return true;
+                  })
+                  .map((item) => {
+                  const vinculado = item.produto_vinculado !== null;
+                  const produtoVinc = item.produto_vinculado;
+                  
+                  // Se vinculado, usar dados do produto vinculado para variação
+                  const custoVariacao = produtoVinc?.variacao_custo_percentual || 0;
                   const custoAumentou = custoVariacao > 0;
-                  const precosAtuais = precosAjustados[item.produto_id] || {
-                    preco_venda: item.preco_venda_atual,
-                    margem: item.margem_atual
-                  };
+                  
+                  const precosAtuais = vinculado ? (precosAjustados[produtoVinc.produto_id] || {
+                    preco_venda: produtoVinc.preco_venda_atual,
+                    margem: produtoVinc.margem_atual
+                  }) : null;
 
                   return (
-                    <div key={item.produto_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      {/* Cabeçalho do produto */}
-                      <div className="mb-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-bold text-lg text-gray-800">{item.produto_nome}</h3>
-                            <p className="text-sm text-gray-600">SKU: {item.produto_codigo}</p>
+                    <div key={item.item_id} className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                      
+                      {/* Alertas de Divergência */}
+                      {vinculado && (() => {
+                        const divs = detectarDivergencias(item);
+                        if (divs.length === 0) return null;
+                        
+                        return (
+                          <div className="bg-yellow-50 border-b-2 border-yellow-300 p-3">
+                            <div className="flex items-start gap-2">
+                              <span className="text-xl">⚠️</span>
+                              <div className="flex-1">
+                                <div className="font-bold text-yellow-800 mb-1">Possíveis Divergências Detectadas:</div>
+                                <ul className="space-y-1">
+                                  {divs.map((div, idx) => (
+                                    <li key={idx} className={`text-sm ${
+                                      div.gravidade === 'critica' ? 'text-red-700 font-bold' :
+                                      div.gravidade === 'alta' ? 'text-orange-700 font-semibold' :
+                                      'text-yellow-700'
+                                    }`}>
+                                      • {div.mensagem}
+                                    </li>
+                                  ))}
+                                </ul>
+                                <p className="text-xs text-yellow-700 mt-2">
+                                  ⚠️ Verifique se o produto vinculado está correto!
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => buscarHistoricoPrecos(item.produto_id, item.produto_nome)}
-                              className="px-3 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-semibold transition-colors"
-                              title="Ver histórico de alterações"
-                            >
-                              📊 Histórico
-                            </button>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-600">Quantidade</div>
-                              <div className="text-xl font-bold text-blue-600">{item.quantidade}</div>
+                        );
+                      })()}
+                      
+                      {/* Layout de Duas Colunas */}
+                      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
+                        
+                        {/* COLUNA ESQUERDA: Dados da NF */}
+                        <div className="p-4 bg-blue-50 border-r border-gray-300">
+                          <div className="flex items-start gap-2 mb-2">
+                            <span className="text-2xl">📄</span>
+                            <div className="flex-1">
+                              <div className="text-xs font-semibold text-blue-700 mb-1">NOTA FISCAL</div>
+                              <h3 className="font-bold text-base text-gray-800">{item.descricao_nf}</h3>
+                              <div className="mt-2 space-y-1">
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-semibold">SKU Fornecedor:</span> {item.codigo_produto_nf || 'N/A'}
+                                </p>
+                                {item.ean_nf && (
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-semibold">EAN:</span> {item.ean_nf}
+                                  </p>
+                                )}
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-semibold">Quantidade:</span> {item.quantidade_nf}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-semibold">Valor Unit.:</span> R$ {item.valor_unitario_nf.toFixed(2)}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </div>
+
+                        {/* COLUNA CENTRAL: Ícone de Conexão */}
+                        <div className="flex items-center justify-center bg-gray-100 px-4">
+                          {vinculado ? (
+                            <button
+                              onClick={() => desvincularProduto(item.item_id)}
+                              className="group relative"
+                              title="Clique para desvincular"
+                            >
+                              <div className="w-12 h-12 rounded-full bg-green-500 hover:bg-red-500 transition-colors flex items-center justify-center shadow-lg">
+                                <span className="text-2xl group-hover:hidden">✓</span>
+                                <span className="text-2xl hidden group-hover:inline">✕</span>
+                              </div>
+                              <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Desvincular
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
+                              <span className="text-2xl text-gray-500">✕</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COLUNA DIREITA: Produto Vinculado */}
+                        <div className={`p-4 ${vinculado ? 'bg-green-50' : 'bg-gray-50'}`}>
+                          {vinculado ? (
+                            <div className="flex items-start gap-2">
+                              <span className="text-2xl">📦</span>
+                              <div className="flex-1">
+                                <div className="text-xs font-semibold text-green-700 mb-1">PRODUTO VINCULADO</div>
+                                <h3 className="font-bold text-base text-gray-800">{produtoVinc.produto_nome}</h3>
+                                <div className="mt-2 space-y-1">
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-semibold">SKU Sistema:</span> {produtoVinc.produto_codigo}
+                                  </p>
+                                  {produtoVinc.produto_ean && (
+                                    <p className="text-xs text-gray-600">
+                                      <span className="font-semibold">EAN:</span> {produtoVinc.produto_ean}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-semibold">Estoque:</span> {produtoVinc.estoque_atual}
+                                  </p>
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-semibold">Custo Atual:</span> R$ {produtoVinc.custo_anterior.toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center">
+                              <span className="text-4xl mb-2">❓</span>
+                              <p className="text-sm font-semibold text-gray-600 mb-3">Produto não vinculado</p>
+                              <button
+                                onClick={() => abrirModalVincularProduto(item)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                              >
+                                🔗 Vincular Produto
+                              </button>
+                              <button
+                                onClick={() => abrirModalCriarProduto(item)}
+                                className="mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                              >
+                                ✨ Criar Novo
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Comparação de Custos */}
-                      <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded">
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
-                          <div className="text-lg font-semibold text-gray-700">
-                            R$ {item.custo_anterior.toFixed(2)}
+                      {/* Seção de Custos e Preços (só aparece se vinculado) */}
+                      {vinculado && (
+                        <div className="p-4 bg-white border-t-2 border-gray-200">
+                          {/* Comparação de Custos */}
+                          <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded">
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
+                              <div className="text-lg font-semibold text-gray-700">
+                                R$ {produtoVinc.custo_anterior.toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">🆕 Custo Novo</div>
+                              <div className="text-lg font-semibold text-blue-600">
+                                R$ {produtoVinc.custo_novo.toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-gray-600 mb-1">📊 Variação</div>
+                              <div className={`text-lg font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                                {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">🆕 Custo Novo</div>
-                          <div className="text-lg font-semibold text-blue-600">
-                            R$ {item.custo_novo.toFixed(2)}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">📊 Variação</div>
-                          <div className={`text-lg font-bold ${custoAumentou ? 'text-red-600' : 'text-green-600'}`}>
-                            {custoAumentou ? '↗' : '↘'} {Math.abs(custoVariacao).toFixed(1)}%
-                          </div>
-                        </div>
-                      </div>
 
-                      {/* Ajuste de Preços */}
-                      <div className="grid grid-cols-2 gap-4 p-4 bg-purple-50 border border-purple-200 rounded">
-                        {/* Preço de Venda */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            💰 Preço de Venda
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">R$</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={precosAtuais.preco_venda}
-                              onChange={(e) => atualizarPrecoVenda(
-                                item.produto_id,
-                                parseFloat(e.target.value) || 0,
-                                item.custo_novo
-                              )}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
-                            />
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500">
-                            Anterior: R$ {item.preco_venda_atual.toFixed(2)}
-                          </div>
-                        </div>
+                          {/* Ajuste de Preços */}
+                          <div className="grid grid-cols-2 gap-4 p-4 bg-purple-50 border border-purple-200 rounded">
+                            {/* Preço de Venda */}
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                💰 Preço de Venda
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">R$</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={precosAtuais.preco_venda}
+                                  onChange={(e) => atualizarPrecoVenda(
+                                    produtoVinc.produto_id,
+                                    parseFloat(e.target.value) || 0,
+                                    produtoVinc.custo_novo
+                                  )}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
+                                />
+                              </div>
+                              <div className="mt-1 text-xs text-gray-500">
+                                Anterior: R$ {produtoVinc.preco_venda_atual.toFixed(2)}
+                              </div>
+                            </div>
 
-                        {/* Margem */}
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            📈 Margem de Lucro
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={precosAtuais.margem}
-                              onChange={(e) => atualizarMargem(
-                                item.produto_id,
-                                parseFloat(e.target.value) || 0,
-                                item.custo_novo
-                              )}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
+                            {/* Margem */}
+                            <div>
+                              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                📈 Margem de Lucro
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={precosAtuais.margem}
+                                  onChange={(e) => atualizarMargem(
+                                    produtoVinc.produto_id,
+                                    parseFloat(e.target.value) || 0,
+                                    produtoVinc.custo_novo
+                                  )}
+                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
                             />
                             <span className="text-lg">%</span>
                           </div>
