@@ -1,0 +1,604 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Contrato de API - Módulo de Demonstrativo de Comissões",
+  "description": "Documentação oficial das respostas dos endpoints de comissões. Este contrato descreve EXATAMENTE os campos retornados pelas rotas do backend.",
+  "version": "1.0.0",
+  "last_updated": "2026-01-22",
+  "base_url": "/api/comissoes",
+  
+  "endpoints": {
+    
+    "GET_/comissoes": {
+      "description": "Lista comissões com filtros opcionais (histórico completo)",
+      "method": "GET",
+      "path": "/comissoes",
+      "query_parameters": {
+        "funcionario_id": {
+          "type": "integer",
+          "required": false,
+          "description": "Filtrar por ID do funcionário"
+        },
+        "data_inicio": {
+          "type": "date",
+          "format": "YYYY-MM-DD",
+          "required": false,
+          "description": "Data inicial do período"
+        },
+        "data_fim": {
+          "type": "date",
+          "format": "YYYY-MM-DD",
+          "required": false,
+          "description": "Data final do período"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pendente", "pago", "estornado"],
+          "required": false,
+          "description": "Filtrar por status da comissão"
+        },
+        "venda_id": {
+          "type": "integer",
+          "required": false,
+          "description": "Filtrar por ID de venda específica"
+        }
+      },
+      "response_structure": {
+        "success": {
+          "type": "boolean",
+          "description": "Indica se a requisição foi bem-sucedida"
+        },
+        "lista": {
+          "type": "array",
+          "description": "Array de objetos de comissão",
+          "items": {
+            "id": {
+              "type": "integer",
+              "description": "ID único da comissão (chave primária)"
+            },
+            "venda_id": {
+              "type": "integer",
+              "description": "ID da venda que gerou esta comissão"
+            },
+            "data_venda": {
+              "type": "string",
+              "format": "ISO 8601",
+              "description": "Data em que a venda foi realizada (YYYY-MM-DD HH:MM:SS)"
+            },
+            "funcionario_id": {
+              "type": "integer",
+              "description": "ID do funcionário que receberá a comissão"
+            },
+            "produto_id": {
+              "type": "integer",
+              "description": "ID do produto vendido"
+            },
+            "parcela_numero": {
+              "type": "integer",
+              "description": "Número da parcela (1 = venda à vista ou primeira parcela, 2+ = parcelas seguintes)"
+            },
+            "valor_base_calculo": {
+              "type": "number",
+              "format": "float",
+              "description": "Valor sobre o qual a comissão foi calculada (após todas as deduções)"
+            },
+            "percentual_comissao": {
+              "type": "number",
+              "format": "float",
+              "description": "Percentual de comissão aplicado (ex: 10.0 = 10%)"
+            },
+            "valor_comissao_gerada": {
+              "type": "number",
+              "format": "float",
+              "description": "Valor final da comissão gerada (pode ser proporcional em vendas parciais)"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pendente", "pago", "estornado"],
+              "description": "Status atual da comissão"
+            },
+            "data_estorno": {
+              "type": "string",
+              "format": "ISO 8601",
+              "nullable": true,
+              "description": "Data do estorno (null se não foi estornada)"
+            },
+            "motivo_estorno": {
+              "type": "string",
+              "nullable": true,
+              "description": "Motivo do estorno (null se não foi estornada)"
+            },
+            "tipo_calculo": {
+              "type": "string",
+              "enum": ["percentual", "lucro"],
+              "description": "Tipo de cálculo usado: 'percentual' (sobre valor de venda) ou 'lucro' (sobre margem)"
+            },
+            "quantidade": {
+              "type": "number",
+              "format": "float",
+              "description": "Quantidade do produto vendida"
+            }
+          }
+        },
+        "total": {
+          "type": "integer",
+          "description": "Total de registros retornados"
+        },
+        "filtros_aplicados": {
+          "type": "object",
+          "description": "Resumo dos filtros que foram aplicados na consulta",
+          "properties": {
+            "funcionario_id": {
+              "type": "integer",
+              "nullable": true
+            },
+            "data_inicio": {
+              "type": "string",
+              "nullable": true
+            },
+            "data_fim": {
+              "type": "string",
+              "nullable": true
+            },
+            "status": {
+              "type": "string",
+              "nullable": true
+            },
+            "venda_id": {
+              "type": "integer",
+              "nullable": true
+            }
+          }
+        }
+      },
+      "example_response": {
+        "success": true,
+        "lista": [
+          {
+            "id": 123,
+            "venda_id": 456,
+            "data_venda": "2026-01-22 14:30:00",
+            "funcionario_id": 5,
+            "produto_id": 78,
+            "parcela_numero": 1,
+            "valor_base_calculo": 85.50,
+            "percentual_comissao": 10.0,
+            "valor_comissao_gerada": 8.55,
+            "status": "pendente",
+            "data_estorno": null,
+            "motivo_estorno": null,
+            "tipo_calculo": "lucro",
+            "quantidade": 2.0
+          },
+          {
+            "id": 124,
+            "venda_id": 457,
+            "data_venda": "2026-01-21 10:15:00",
+            "funcionario_id": 5,
+            "produto_id": 92,
+            "parcela_numero": 1,
+            "valor_base_calculo": 150.00,
+            "percentual_comissao": 8.0,
+            "valor_comissao_gerada": 12.00,
+            "status": "pago",
+            "data_estorno": null,
+            "motivo_estorno": null,
+            "tipo_calculo": "percentual",
+            "quantidade": 1.0
+          }
+        ],
+        "total": 2,
+        "filtros_aplicados": {
+          "funcionario_id": 5,
+          "data_inicio": "2026-01-01",
+          "data_fim": "2026-01-31",
+          "status": null,
+          "venda_id": null
+        }
+      }
+    },
+    
+    "GET_/comissoes_resumo": {
+      "description": "Retorna resumo financeiro das comissões (totalizadores para cards/dashboard)",
+      "method": "GET",
+      "path": "/comissoes/resumo",
+      "query_parameters": {
+        "funcionario_id": {
+          "type": "integer",
+          "required": true,
+          "description": "ID do funcionário (OBRIGATÓRIO)"
+        },
+        "data_inicio": {
+          "type": "date",
+          "format": "YYYY-MM-DD",
+          "required": false,
+          "description": "Data inicial do período (opcional)"
+        },
+        "data_fim": {
+          "type": "date",
+          "format": "YYYY-MM-DD",
+          "required": false,
+          "description": "Data final do período (opcional)"
+        }
+      },
+      "response_structure": {
+        "success": {
+          "type": "boolean",
+          "description": "Indica se a requisição foi bem-sucedida"
+        },
+        "funcionario_id": {
+          "type": "integer",
+          "description": "ID do funcionário consultado"
+        },
+        "resumo": {
+          "type": "object",
+          "description": "Objeto com totalizadores financeiros",
+          "properties": {
+            "total_gerado": {
+              "type": "number",
+              "format": "float",
+              "description": "Soma de todas as comissões geradas (exceto estornadas)"
+            },
+            "total_pago": {
+              "type": "number",
+              "format": "float",
+              "description": "Soma das comissões com status='pago'"
+            },
+            "total_pendente": {
+              "type": "number",
+              "format": "float",
+              "description": "Soma das comissões com status='pendente'"
+            },
+            "total_estornado": {
+              "type": "number",
+              "format": "float",
+              "description": "Soma das comissões com status='estornado'"
+            },
+            "saldo_a_pagar": {
+              "type": "number",
+              "format": "float",
+              "description": "Valor total a pagar ao funcionário (igual a total_pendente)"
+            },
+            "quantidade_comissoes": {
+              "type": "integer",
+              "description": "Quantidade total de registros de comissão"
+            }
+          }
+        },
+        "periodo": {
+          "type": "object",
+          "description": "Período consultado",
+          "properties": {
+            "data_inicio": {
+              "type": "string",
+              "nullable": true,
+              "description": "Data inicial aplicada (null se não foi filtrado)"
+            },
+            "data_fim": {
+              "type": "string",
+              "nullable": true,
+              "description": "Data final aplicada (null se não foi filtrado)"
+            }
+          }
+        }
+      },
+      "example_response": {
+        "success": true,
+        "funcionario_id": 5,
+        "resumo": {
+          "total_gerado": 1250.50,
+          "total_pago": 800.00,
+          "total_pendente": 450.50,
+          "total_estornado": 25.00,
+          "saldo_a_pagar": 450.50,
+          "quantidade_comissoes": 45
+        },
+        "periodo": {
+          "data_inicio": "2026-01-01",
+          "data_fim": "2026-01-31"
+        }
+      }
+    },
+    
+    "GET_/comissoes_id": {
+      "description": "Retorna detalhes COMPLETOS de uma comissão específica (todos os campos do snapshot imutável)",
+      "method": "GET",
+      "path": "/comissoes/{comissao_id}",
+      "path_parameters": {
+        "comissao_id": {
+          "type": "integer",
+          "required": true,
+          "description": "ID da comissão"
+        }
+      },
+      "response_structure": {
+        "success": {
+          "type": "boolean",
+          "description": "Indica se a requisição foi bem-sucedida"
+        },
+        "comissao": {
+          "type": "object",
+          "description": "Objeto completo com TODOS os campos financeiros do snapshot",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "ID único da comissão"
+            },
+            "venda_id": {
+              "type": "integer",
+              "description": "ID da venda"
+            },
+            "data_venda": {
+              "type": "string",
+              "format": "ISO 8601",
+              "description": "Data da venda"
+            },
+            "funcionario_id": {
+              "type": "integer",
+              "description": "ID do funcionário"
+            },
+            "produto_id": {
+              "type": "integer",
+              "description": "ID do produto"
+            },
+            "quantidade": {
+              "type": "number",
+              "format": "float",
+              "description": "Quantidade vendida"
+            },
+            "parcela_numero": {
+              "type": "integer",
+              "description": "Número da parcela"
+            },
+            "valores_financeiros": {
+              "type": "object",
+              "description": "Snapshot de valores financeiros no momento da venda",
+              "properties": {
+                "valor_venda": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Valor de venda do item (preço × quantidade)"
+                },
+                "valor_custo": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Custo do item no momento da venda"
+                },
+                "desconto_proporcional": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Desconto proporcional aplicado a este item"
+                },
+                "taxa_cartao_proporcional": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Taxa de cartão proporcional deduzida deste item"
+                },
+                "taxa_entrega_proporcional": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Taxa de entrega proporcional deduzida deste item"
+                },
+                "imposto_proporcional": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Imposto proporcional deduzido deste item"
+                }
+              }
+            },
+            "calculo": {
+              "type": "object",
+              "description": "Detalhes do cálculo da comissão",
+              "properties": {
+                "tipo_calculo": {
+                  "type": "string",
+                  "enum": ["percentual", "lucro"],
+                  "description": "Tipo de cálculo: 'percentual' ou 'lucro'"
+                },
+                "valor_base_calculo": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Valor final sobre o qual a comissão foi calculada"
+                },
+                "percentual_comissao": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Percentual aplicado (ex: 10.0 = 10%)"
+                },
+                "valor_comissao": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Valor total da comissão (antes de proporcionalização)"
+                },
+                "valor_comissao_gerada": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Valor da comissão efetivamente gerada (pode ser proporcional)"
+                }
+              }
+            },
+            "pagamento": {
+              "type": "object",
+              "description": "Controle de pagamento (para vendas parciais)",
+              "properties": {
+                "percentual_pago": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Percentual da venda que foi pago (ex: 50.0 = 50%)"
+                },
+                "valor_pago_referencia": {
+                  "type": "number",
+                  "format": "float",
+                  "description": "Valor pago que gerou esta parcela de comissão"
+                }
+              }
+            },
+            "status": {
+              "type": "object",
+              "description": "Status e controle",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["pendente", "pago", "estornado"],
+                  "description": "Status atual da comissão"
+                },
+                "data_estorno": {
+                  "type": "string",
+                  "format": "ISO 8601",
+                  "nullable": true,
+                  "description": "Data do estorno (null se não estornada)"
+                },
+                "motivo_estorno": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Motivo do estorno (null se não estornada)"
+                }
+              }
+            }
+          }
+        },
+        "snapshot_imutavel": {
+          "type": "boolean",
+          "description": "Indica que estes valores são imutáveis (snapshot do momento da venda)"
+        },
+        "mensagem": {
+          "type": "string",
+          "description": "Mensagem explicativa sobre a imutabilidade dos dados"
+        }
+      },
+      "example_response": {
+        "success": true,
+        "comissao": {
+          "id": 123,
+          "venda_id": 456,
+          "data_venda": "2026-01-22 14:30:00",
+          "funcionario_id": 5,
+          "produto_id": 78,
+          "quantidade": 2.0,
+          "parcela_numero": 1,
+          "valores_financeiros": {
+            "valor_venda": 100.00,
+            "valor_custo": 60.00,
+            "desconto_proporcional": 5.00,
+            "taxa_cartao_proporcional": 2.50,
+            "taxa_entrega_proporcional": 1.50,
+            "imposto_proporcional": 3.00
+          },
+          "calculo": {
+            "tipo_calculo": "lucro",
+            "valor_base_calculo": 28.00,
+            "percentual_comissao": 10.0,
+            "valor_comissao": 2.80,
+            "valor_comissao_gerada": 2.80
+          },
+          "pagamento": {
+            "percentual_pago": 100.0,
+            "valor_pago_referencia": 100.00
+          },
+          "status": {
+            "status": "pendente",
+            "data_estorno": null,
+            "motivo_estorno": null
+          }
+        },
+        "snapshot_imutavel": true,
+        "mensagem": "Estes valores refletem o momento exato da venda e NÃO podem ser alterados"
+      }
+    },
+    
+    "GET_/comissoes_funcionarios": {
+      "description": "Lista funcionários que possuem comissões registradas (para filtro por nome)",
+      "method": "GET",
+      "path": "/comissoes/funcionarios",
+      "query_parameters": {},
+      "response_structure": {
+        "success": {
+          "type": "boolean",
+          "description": "Indica se a requisição foi bem-sucedida"
+        },
+        "lista": {
+          "type": "array",
+          "description": "Array de funcionários com comissões",
+          "items": {
+            "id": {
+              "type": "integer",
+              "description": "ID do funcionário"
+            },
+            "nome": {
+              "type": "string",
+              "description": "Nome do funcionário"
+            }
+          }
+        },
+        "total": {
+          "type": "integer",
+          "description": "Total de funcionários retornados"
+        }
+      },
+      "example_response": {
+        "success": true,
+        "lista": [
+          {
+            "id": 14,
+            "nome": "Lucas"
+          },
+          {
+            "id": 5,
+            "nome": "Maria Silva"
+          },
+          {
+            "id": 8,
+            "nome": "João Santos"
+          }
+        ],
+        "total": 3
+      },
+      "observacoes": [
+        "Retorna APENAS funcionários que possuem registros na tabela comissoes_itens",
+        "Ordenado alfabeticamente por nome",
+        "Sem duplicatas (DISTINCT)",
+        "Útil para autocomplete/filtro por nome no frontend"
+      ]
+    }
+  },
+  
+  "observacoes_importantes": {
+    "snapshot_imutavel": "Todos os endpoints retornam dados de um snapshot imutável. Os valores refletem exatamente o momento da venda e NÃO são recalculados.",
+    "valores_numericos": "Todos os valores monetários são retornados como float (number), NÃO como string.",
+    "datas": "Todas as datas seguem formato ISO 8601 (YYYY-MM-DD HH:MM:SS).",
+    "status_possiveis": ["pendente", "pago", "estornado"],
+    "tipo_calculo_possiveis": ["percentual", "lucro"],
+    "campos_nulos": "Campos como data_estorno, motivo_estorno são null quando não aplicáveis.",
+    "percentuais": "Percentuais são armazenados como números (10.0 = 10%, não 0.1)."
+  },
+  
+  "casos_de_uso": {
+    "listar_comissoes_pendentes": {
+      "descricao": "Buscar todas as comissões pendentes de um funcionário",
+      "endpoint": "GET /comissoes",
+      "params": {
+        "funcionario_id": 5,
+        "status": "pendente"
+      }
+    },
+    "total_a_pagar_mes_atual": {
+      "descricao": "Ver quanto a empresa deve pagar ao funcionário no mês",
+      "endpoint": "GET /comissoes/resumo",
+      "params": {
+        "funcionario_id": 5,
+        "data_inicio": "2026-01-01",
+        "data_fim": "2026-01-31"
+      },
+      "campo_relevante": "resumo.saldo_a_pagar"
+    },
+    "auditoria_comissao": {
+      "descricao": "Verificar como uma comissão foi calculada",
+      "endpoint": "GET /comissoes/{comissao_id}",
+      "retorna": "Todos os campos financeiros do snapshot para transparência total"
+    },
+    "listar_funcionarios_filtro": {
+      "descricao": "Obter lista de funcionários para filtro/autocomplete",
+      "endpoint": "GET /comissoes/funcionarios",
+      "uso": "Popular dropdown ou autocomplete no filtro de funcionários"
+    }
+  }
+}

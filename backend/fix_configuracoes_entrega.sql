@@ -1,0 +1,9 @@
+-- Adicionar colunas de endereço à tabela configuracoes_entrega
+ALTER TABLE configuracoes_entrega 
+ADD COLUMN IF NOT EXISTS logradouro VARCHAR(300),
+ADD COLUMN IF NOT EXISTS cep VARCHAR(9),
+ADD COLUMN IF NOT EXISTS numero VARCHAR(20),
+ADD COLUMN IF NOT EXISTS complemento VARCHAR(100),
+ADD COLUMN IF NOT EXISTS bairro VARCHAR(100),
+ADD COLUMN IF NOT EXISTS cidade VARCHAR(100),
+ADD COLUMN IF NOT EXISTS estado VARCHAR(2);

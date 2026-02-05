@@ -1,0 +1,65 @@
+/* Skeleton Loading - Animação suave e profissional */
+
+@keyframes pulse {
+  0% { 
+    opacity: 0.6; 
+  }
+  50% { 
+    opacity: 1; 
+  }
+  100% { 
+    opacity: 0.6; 
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Skeleton básico (pulse) */
+.skeleton {
+  background: #e0e0e0;
+  border-radius: 8px;
+  animation: pulse 1.5s infinite;
+}
+
+/* Skeleton com shimmer (efeito de brilho) */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg, 
+    #e0e0e0 25%, 
+    #f0f0f0 50%, 
+    #e0e0e0 75%
+  );
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Variações de tamanho */
+.skeleton-kpi {
+  height: 110px;
+}
+
+.skeleton-chart {
+  height: 300px;
+}
+
+.skeleton-analyse {
+  height: 80px;
+}
+
+.skeleton-text {
+  height: 20px;
+  width: 100%;
+}
+
+.skeleton-text-short {
+  height: 20px;
+  width: 40%;
+}

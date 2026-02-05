@@ -1,0 +1,192 @@
+# ============================================================================
+# DOCKER COMPOSE - STAGING
+# Sistema Pet Shop Pro - Ambiente de Staging (Produção Simulada)
+# FASE 8.4 - Docker Endurecido
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # POSTGRESQL - Banco de dados
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: petshop-staging-postgres
+    environment:
+      # Credenciais do banco (MUDAR EM PRODUÇÃO!)
+      - POSTGRES_USER=${POSTGRES_USER:-petshop_staging}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-staging_pass_2026}
+      - POSTGRES_DB=${POSTGRES_DB:-petshop_staging_db}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    volumes:
+      # Volume persistente para dados do PostgreSQL
+      - postgres-staging-data:/var/lib/postgresql/data
+    networks:
+      - staging-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-petshop_staging} -d ${POSTGRES_DB:-petshop_staging_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Porta exposta para desenvolvimento local
+    ports:
+      - "5432:5432"
+
+  # ==========================================================================
+  # BACKEND - FastAPI + SQLAlchemy
+  # ==========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petshop-staging-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # ====== CONFIGURAÇÕES DE AMBIENTE ======
+      - ENVIRONMENT=staging
+      - DEBUG=false
+      - RUNNING_IN_DOCKER=true
+      
+      # ====== DATABASE ======
+      # Usar variáveis para evitar hardcode
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-petshop_staging}:${POSTGRES_PASSWORD:-staging_pass_2026}@postgres:5432/${POSTGRES_DB:-petshop_staging_db}
+      
+      # ====== SEGURANÇA ======
+      # IMPORTANTE: Configurar via variáveis de ambiente externas
+      # Nunca fazer commit com valores reais!
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE_THIS_IN_PRODUCTION_MINIMUM_32_CHARS}
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-CHANGE_ADMIN_TOKEN}
+      
+      # ====== CORS ======
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:5173}
+      
+      # ====== INTEGRAÇÕES EXTERNAS ======
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - BLING_CLIENT_ID=${BLING_CLIENT_ID:-}
+      - BLING_CLIENT_SECRET=${BLING_CLIENT_SECRET:-}
+      
+      # ====== RATE LIMITING (FASE 8.3) ======
+      - RATE_LIMIT_ENABLED=true
+    volumes:
+      # Volume para uploads (persistente)
+      - uploads-staging:/app/uploads
+      
+      # NÃO montar código em staging (imutável)
+      # Usar a imagem Docker construída
+    networks:
+      - staging-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Logs vão para stdout (Docker gerencia)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================================
+  # MIGRATE - Execução isolada de migrations (SEM importar app)
+  # ==========================================================================
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petshop-staging-migrate
+    environment:
+      # ====== DATABASE ======
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-petshop_staging}:${POSTGRES_PASSWORD:-staging_pass_2026}@postgres:5432/${POSTGRES_DB:-petshop_staging_db}
+      - ENVIRONMENT=staging
+    networks:
+      - staging-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # ⚠️ IMPORTANTE: Sobrescreve o CMD padrão para rodar apenas Alembic
+    # Não importa models, não sobe FastAPI, não registra ENUMs
+    command: ["alembic", "upgrade", "head"]
+    # Perfil para rodar apenas quando explicitamente chamado
+    profiles:
+      - migration
+
+  # ==========================================================================
+  # BACKUP - Backup automático do PostgreSQL
+  # ==========================================================================
+  backup:
+    image: postgres:16-alpine
+    container_name: petshop-staging-backup
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-petshop_staging}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-staging_pass_2026}
+      - POSTGRES_DB=${POSTGRES_DB:-petshop_staging_db}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-staging_pass_2026}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    networks:
+      - staging-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Backup diário às 2:00 AM + limpeza de backups antigos
+    command: >
+      sh -c "
+      echo 'Backup service started. Running daily at 02:00 AM...';
+      while true; do
+        TIMESTAMP=$$(date +%Y%m%d_%H%M%S);
+        echo '[$(date)] Starting backup...';
+        pg_dump -h postgres -U $${POSTGRES_USER} -d $${POSTGRES_DB} -F c -f /backups/backup_$${TIMESTAMP}.dump;
+        if [ $$? -eq 0 ]; then
+          echo '[$(date)] Backup completed: backup_$${TIMESTAMP}.dump';
+          gzip /backups/backup_$${TIMESTAMP}.dump;
+          find /backups -name 'backup_*.dump.gz' -mtime +$${BACKUP_RETENTION_DAYS:-7} -delete;
+          echo '[$(date)] Old backups cleaned (retention: $${BACKUP_RETENTION_DAYS:-7} days)';
+        else
+          echo '[$(date)] ERROR: Backup failed!';
+        fi;
+        sleep 86400;
+      done
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /backups/backup_*.dump.gz"]
+      interval: 1h
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+# ==========================================================================
+# NETWORKS - Rede isolada para staging
+# ==========================================================================
+networks:
+  staging-network:
+    driver: bridge
+    name: petshop-staging-network
+
+# ==========================================================================
+# VOLUMES - Persistência de dados
+# ==========================================================================
+volumes:
+  postgres-staging-data:
+    driver: local
+    name: petshop-staging-postgres-data
+  uploads-staging:
+    driver: local
+    name: petshop-staging-uploads

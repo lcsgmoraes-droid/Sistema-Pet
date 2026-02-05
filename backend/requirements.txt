@@ -1,0 +1,77 @@
+# Framework
+fastapi>=0.109.0
+uvicorn==0.22.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+websockets>=16.0  # WebSocket support
+
+# Banco de Dados
+sqlalchemy==2.0.15
+psycopg2-binary==2.9.6  # PostgreSQL (opcional)
+alembic==1.13.1  # Migrations
+
+# Autenticação
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pyotp==2.9.0  # 2FA
+qrcode==7.4.2  # QR Code para 2FA
+
+# Validação
+pydantic>=2.0.0
+pydantic-settings>=2.2.1
+email-validator==2.3.0
+
+# HTTP Client
+requests==2.31.0
+httpx==0.27.0
+
+# Processamento de Dados
+pandas==2.0.3
+numpy==1.24.3
+openpyxl==3.1.2  # Excel
+
+# IA
+openai==1.54.3  # Atualizado para versão estável
+groq==1.0.0
+tiktoken==0.8.0  # Token counting para OpenAI
+
+# NLP e Machine Learning
+spacy==3.7.2
+nltk==3.8.1
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.21.1
+
+# Forecasting e Data Science
+prophet==1.1.5
+scikit-learn==1.3.2
+scipy==1.11.4
+
+# Google Maps (ABA 8)
+googlemaps==4.10.0
+
+# WhatsApp / Webhooks / Notificações
+APScheduler==3.10.4
+aiosmtplib==3.0.1
+
+# Email
+python-multipart==0.0.6
+jinja2==3.1.2
+
+# SMS (Twilio) - opcional
+twilio==8.10.0
+
+# Utilitários
+aiofiles==23.2.1
+cryptography==41.0.7
+reportlab==4.2.5  # Geração de PDFs
+psutil==5.9.8
+
+# Rate Limiting
+slowapi==0.1.9
+# Retry e Concorrência
+tenacity==8.2.3  # Retry logic robusto e configurável
+asyncio-throttle==1.0.2  # Controle de concorrência para operações assíncronas
+
+# Cache (Redis opcional - melhora muito performance)
+redis==5.0.1
+hiredis==2.2.3  # Parser Redis mais rápido

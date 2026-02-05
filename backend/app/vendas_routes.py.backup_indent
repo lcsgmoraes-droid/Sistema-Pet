@@ -1,0 +1,2092 @@
+# -*- coding: utf-8 -*-
+"""
+Rotas da API para o módulo de Vendas (PDV)
+"""
+
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, or_, func, desc
+from datetime import datetime, timedelta, date
+from decimal import Decimal
+from typing import List, Optional
+from pydantic import BaseModel, Field
+import json
+
+from .db import get_session
+from .auth import get_current_user
+from .vendas_models import (
+    Venda, VendaItem, VendaPagamento, VendaBaixa, ConfiguracaoEntrega
+)
+from .models import Cliente, User
+from .produtos_models import Produto, ProdutoLote, EstoqueMovimentacao
+from .financeiro_models import ContaReceber, FormaPagamento, LancamentoManual
+from .audit_log import log_action
+
+router = APIRouter(prefix="/vendas", tags=["vendas"])
+
+# Configurar logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+# ============================================================================
+# SCHEMAS PYDANTIC
+# ============================================================================
+
+class VendaItemSchema(BaseModel):
+    tipo: str  # 'produto' ou 'servico'
+    produto_id: Optional[int] = None
+    servico_descricao: Optional[str] = None
+    quantidade: float
+    preco_unitario: float
+    desconto_item: Optional[float] = 0
+    subtotal: float
+    lote_id: Optional[int] = None
+    pet_id: Optional[int] = None  # Vincular item a um pet específico
+
+class VendaPagamentoSchema(BaseModel):
+    forma_pagamento: str
+    valor: float
+    bandeira: Optional[str] = None
+    numero_parcelas: Optional[int] = 1  # Número de parcelas para cartão de crédito
+    numero_transacao: Optional[str] = None
+    numero_autorizacao: Optional[str] = None
+    valor_recebido: Optional[float] = None
+    troco: Optional[float] = None
+
+class CriarVendaRequest(BaseModel):
+    cliente_id: Optional[int] = None
+    vendedor_id: Optional[int] = None
+    funcionario_id: Optional[int] = None  # Funcionário/Veterinário que recebe comissão
+    itens: List[VendaItemSchema]
+    desconto_valor: Optional[float] = 0
+    desconto_percentual: Optional[float] = 0
+    observacoes: Optional[str] = None
+    tem_entrega: bool = False
+    taxa_entrega: Optional[float] = 0
+    entregador_id: Optional[int] = None
+    loja_origem: Optional[str] = None
+    endereco_entrega: Optional[str] = None
+    distancia_km: Optional[float] = None
+    valor_por_km: Optional[float] = None
+    observacoes_entrega: Optional[str] = None
+
+class FinalizarVendaRequest(BaseModel):
+    pagamentos: List[VendaPagamentoSchema]
+
+class CancelarVendaRequest(BaseModel):
+    motivo: str
+
+class ConfiguracaoEntregaSchema(BaseModel):
+    valor_por_km: Optional[float] = None
+    taxa_minima: Optional[float] = None
+    raio_maximo_km: Optional[float] = None
+    lojas: Optional[List[str]] = []
+    google_maps_api_key: Optional[str] = None
+
+
+# ============================================================================
+# UTILITÁRIOS
+# ============================================================================
+
+def gerar_numero_venda(db: Session, user_id: int) -> str:
+    """Gera um número sequencial para a venda"""
+    hoje = datetime.now()
+    prefixo = hoje.strftime('%Y%m%d')
+    
+    # Buscar última venda do dia
+    ultima_venda = db.query(Venda).filter(
+        Venda.numero_venda.like(f'{prefixo}%'),
+        Venda.user_id == user_id
+    ).order_by(desc(Venda.numero_venda)).first()
+    
+    if ultima_venda:
+        try:
+            seq = int(ultima_venda.numero_venda[-4:]) + 1
+        except:
+            seq = 1
+    else:
+        seq = 1
+    
+    return f'{prefixo}{seq:04d}'
+
+
+def calcular_totais_venda(itens: List[VendaItemSchema], desconto_valor=0, desconto_percentual=0, taxa_entrega=0):
+    """
+    Calcula os totais da venda
+    
+    🧠 REGRA DE OURO: Frontend calcula desconto, Backend apenas soma
+    - Subtotal dos itens JÁ vem com desconto aplicado
+    - Backend NÃO recalcula desconto
+    - Backend apenas soma: subtotal_itens + frete
+    """
+    print(f"\n🧮 CALCULAR TOTAIS:")
+    print(f"   Quantidade de itens: {len(itens)}")
+    for idx, item in enumerate(itens):
+        print(f"   Item {idx+1}: subtotal={item.subtotal}, qtd={item.quantidade}, preco={item.preco_unitario}")
+    
+    # ✅ FRONTEND JÁ CALCULOU: Apenas soma subtotais (já com desconto aplicado)
+    subtotal_itens = sum(item.subtotal for item in itens)
+    print(f"   Subtotal itens (já com desconto): R$ {subtotal_itens:.2f}")
+    print(f"   Frete: R$ {taxa_entrega:.2f}")
+    
+    # ✅ Backend NÃO recalcula desconto - apenas soma
+    total = subtotal_itens + taxa_entrega
+    print(f"   Total final da venda: R$ {total:.2f}")
+    
+    return {
+        'subtotal': float(subtotal_itens),
+        'desconto_valor': 0,  # Desconto já está embutido no subtotal dos itens
+        'total': float(total)
+    }
+
+
+def criar_contas_receber_da_venda(venda: Venda, pagamentos: List, db: Session, user_id: int):
+    """
+    Cria contas a receber automaticamente com base nos pagamentos da venda
+    Considera prazo de recebimento de cada forma de pagamento
+    Para cartão parcelado, cria múltiplas contas (uma por parcela) + lançamentos manuais previstos
+    """
+    from decimal import Decimal
+    from datetime import date, timedelta
+    
+    contas_criadas = []
+    
+    for pag in pagamentos:
+        # Buscar configuração da forma de pagamento
+        forma_pag = db.query(FormaPagamento).filter(
+            FormaPagamento.nome.ilike(f"%{pag.forma_pagamento}%")
+        ).first()
+        
+        # Verificar se é cartão parcelado
+        numero_parcelas = getattr(pag, 'numero_parcelas', 1) or 1
+        eh_cartao_parcelado = (
+            forma_pag and 
+            forma_pag.tipo == 'cartao_credito' and 
+            numero_parcelas > 1
+        )
+        
+        if eh_cartao_parcelado:
+            # CARTÃO PARCELADO: Criar múltiplas contas + lançamentos
+            # 🐛 FIX: Usar pag.valor (valor pago no cartão) ao invés de venda.total
+            valor_total = Decimal(str(pag.valor))
+            valor_parcela = valor_total / numero_parcelas
+            
+            # Buscar categoria de receitas (criar se não existir)
+            from .financeiro_models import CategoriaFinanceira
+            categoria_receitas = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.nome.ilike('%vendas%'),
+                CategoriaFinanceira.tipo == 'receita'
+            ).first()
+            
+            if not categoria_receitas:
+                categoria_receitas = CategoriaFinanceira(
+                    nome="Receitas de Vendas",
+                    tipo="receita",
+                    user_id=user_id
+                )
+                db.add(categoria_receitas)
+                db.flush()
+            
+            for i in range(1, numero_parcelas + 1):
+                data_vencimento = date.today() + timedelta(days=30 * i)
+                
+                # Criar lançamento manual previsto
+                lancamento = LancamentoManual(
+                    tipo='entrada',
+                    valor=valor_parcela,
+                    descricao=f"Venda {venda.numero_venda} - Parcela {i}/{numero_parcelas} - {forma_pag.nome}",
+                    data_lancamento=data_vencimento,
+                    status='previsto',
+                    categoria_id=categoria_receitas.id,
+                    documento=f"VENDA-{venda.id}",
+                    fornecedor_cliente=venda.cliente.nome if venda.cliente else None,
+                    user_id=user_id
+                )
+                db.add(lancamento)
+                db.flush()
+                
+                # Criar conta a receber
+                conta = ContaReceber(
+                    descricao=f"Venda {venda.numero_venda} - Parcela {i}/{numero_parcelas}",
+                    cliente_id=venda.cliente_id,
+                    forma_pagamento_id=forma_pag.id,
+                    valor_original=valor_parcela,
+                    valor_final=valor_parcela,
+                    data_emissao=date.today(),
+                    data_vencimento=data_vencimento,
+                    venda_id=venda.id,
+                    documento=f"VENDA-{venda.id}",
+                    numero_parcela=i,
+                    total_parcelas=numero_parcelas,
+                    status='pendente',
+                    user_id=user_id
+                )
+                
+                db.add(conta)
+                db.flush()
+                contas_criadas.append(conta.id)
+                
+                print(f"💳 Parcela {i}/{numero_parcelas}: R$ {float(valor_parcela):.2f} - Venc: {data_vencimento}")
+        
+        else:
+            # PAGAMENTO À VISTA: Criar conta única APENAS SE FOR A PRAZO
+            # Determinar data de vencimento
+            prazo_dias = 0
+            if forma_pag and forma_pag.prazo_dias:
+                prazo_dias = forma_pag.prazo_dias
+            elif pag.forma_pagamento.lower() in ['credito', 'crédito', 'cartao_credito']:
+                prazo_dias = 30  # Padrão cartão de crédito
+            elif pag.forma_pagamento.lower() in ['debito', 'débito', 'pix', 'dinheiro']:
+                prazo_dias = 0  # Recebimento imediato
+            
+            # 🆕 LÓGICA CORRIGIDA:
+            # - À vista (prazo=0): NÃO cria ContasReceber, só LancamentoManual
+            # - A prazo (prazo>0): Cria ContasReceber + LancamentoManual previsto
+            
+            # CRIAR LANÇAMENTO MANUAL NO FLUXO DE CAIXA (sempre)
+            from .financeiro_models import CategoriaFinanceira
+            
+            categoria_receitas = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.nome.ilike('%vendas%'),
+                CategoriaFinanceira.tipo == 'receita'
+            ).first()
+            
+            if not categoria_receitas:
+                categoria_receitas = CategoriaFinanceira(
+                    nome="Receitas de Vendas",
+                    tipo="receita",
+                    user_id=user_id
+                )
+                db.add(categoria_receitas)
+                db.flush()
+            
+            # Status: realizado se prazo=0, previsto se tem prazo
+            status_lancamento = 'realizado' if prazo_dias == 0 else 'previsto'
+            data_lancamento = date.today() if prazo_dias == 0 else (date.today() + timedelta(days=prazo_dias))
+            
+            lancamento = LancamentoManual(
+                tipo='entrada',
+                valor=Decimal(str(pag.valor)),
+                descricao=f"Venda {venda.numero_venda} - {pag.forma_pagamento}",
+                data_lancamento=data_lancamento,
+                status=status_lancamento,
+                categoria_id=categoria_receitas.id,
+                documento=f"VENDA-{venda.id}",
+                fornecedor_cliente=venda.cliente.nome if venda.cliente else None,
+                user_id=user_id
+            )
+            db.add(lancamento)
+            db.flush()
+            
+            print(f"💰 Lançamento {status_lancamento}: R$ {pag.valor:.2f} - {pag.forma_pagamento}")
+            
+            # CRIAR CONTA A RECEBER APENAS SE FOR A PRAZO (prazo > 0)
+            if prazo_dias > 0:
+                data_vencimento = date.today() + timedelta(days=prazo_dias)
+                
+                conta = ContaReceber(
+                    descricao=f"Venda {venda.numero_venda} - {pag.forma_pagamento}",
+                    cliente_id=venda.cliente_id,
+                    forma_pagamento_id=forma_pag.id if forma_pag else None,
+                    valor_original=Decimal(str(pag.valor)),
+                    valor_recebido=Decimal('0'),
+                    valor_final=Decimal(str(pag.valor)),
+                    data_emissao=date.today(),
+                    data_vencimento=data_vencimento,
+                    data_recebimento=None,
+                    status='pendente',
+                    venda_id=venda.id,
+                    user_id=user_id
+                )
+                db.add(conta)
+                db.flush()
+                contas_criadas.append(conta.id)
+                print(f"📋 ContaReceber criada: R$ {pag.valor:.2f} - Venc: {data_vencimento}")
+            else:
+                # À vista: não cria ContasReceber
+                print(f"✅ Pagamento à vista: R$ {pag.valor:.2f} - Sem ContasReceber")
+            
+            # 🏦 CRIAR MOVIMENTAÇÃO BANCÁRIA (se tiver conta bancária vinculada)
+            if forma_pag and forma_pag.conta_bancaria_destino_id and prazo_dias == 0:
+                from .financeiro_models import MovimentacaoFinanceira, ContaBancaria
+                
+                conta_bancaria = db.query(ContaBancaria).get(forma_pag.conta_bancaria_destino_id)
+                if conta_bancaria:
+                    # Criar movimentação na conta bancária
+                    movimentacao = MovimentacaoFinanceira(
+                        conta_bancaria_id=conta_bancaria.id,
+                        tipo='entrada',
+                        valor=Decimal(str(pag.valor)),
+                        descricao=f"Venda {venda.numero_venda} - {pag.forma_pagamento}",
+                        data_movimento=date.today(),
+                        categoria_id=categoria_receitas.id,
+                        status='realizado',
+                        forma_pagamento_id=forma_pag.id,
+                        documento=f"VENDA-{venda.id}",
+                        origem_tipo='venda',
+                        origem_id=venda.id,
+                        origem_venda='fisica',
+                        user_id=user_id
+                    )
+                    db.add(movimentacao)
+                    
+                    # Atualizar saldo da conta bancária
+                    conta_bancaria.saldo_atual += Decimal(str(pag.valor))
+                    
+                    print(f"🏦 Movimentação bancária: {conta_bancaria.nome} +R$ {pag.valor:.2f}")
+    
+    return contas_criadas
+
+
+# ============================================================================
+# ENDPOINTS - CONFIGURAÇÕES DE ENTREGA
+# ============================================================================
+
+@router.get('/configuracoes-entrega')
+def get_configuracao_entrega(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Busca as configurações de entrega"""
+    config = db.query(ConfiguracaoEntrega).filter_by(user_id=current_user.id).first()
+    
+    if not config:
+        return {
+            'valor_por_km': None,
+            'taxa_minima': None,
+            'raio_maximo_km': None,
+            'lojas': [],
+            'google_maps_api_key': None
+        }
+    
+    return config.to_dict()
+
+
+@router.post('/configuracoes-entrega')
+@router.put('/configuracoes-entrega')
+def salvar_configuracao_entrega(
+    dados: ConfiguracaoEntregaSchema,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Salva ou atualiza as configurações de entrega"""
+    config = db.query(ConfiguracaoEntrega).filter_by(user_id=current_user.id).first()
+    
+    if config:
+        # Atualizar
+        config.valor_por_km = dados.valor_por_km
+        config.taxa_minima = dados.taxa_minima
+        config.raio_maximo_km = dados.raio_maximo_km
+        config.lojas = dados.lojas or []
+        config.google_maps_api_key = dados.google_maps_api_key
+        config.updated_at = datetime.now()
+        
+        log_action(db, current_user.id, 'UPDATE', 'configuracoes_entrega', config.id,
+                   details='Configurações de entrega atualizadas')
+    else:
+        # Criar
+        config = ConfiguracaoEntrega(
+            user_id=current_user.id,
+            valor_por_km=dados.valor_por_km,
+            taxa_minima=dados.taxa_minima,
+            raio_maximo_km=dados.raio_maximo_km,
+            lojas=dados.lojas or [],
+            google_maps_api_key=dados.google_maps_api_key
+        )
+        db.add(config)
+        
+        log_action(db, current_user.id, 'CREATE', 'configuracoes_entrega', None,
+                   details='Configurações de entrega criadas')
+    
+    db.commit()
+    db.refresh(config)
+    
+    return config.to_dict()
+
+
+# ============================================================================
+# ENDPOINTS - VENDAS CRUD
+# ============================================================================
+
+@router.get('')
+def listar_vendas(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=5000),  # Aumentado limite para relatórios
+    status: Optional[str] = None,
+    cliente_id: Optional[int] = None,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    busca: Optional[str] = None,
+    tem_entrega: Optional[bool] = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Lista as vendas com filtros"""
+    try:
+        query = db.query(Venda).options(
+            joinedload(Venda.pagamentos),
+            joinedload(Venda.cliente)  # Carregar relacionamento com cliente
+        ).filter_by(user_id=current_user.id)
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar query base: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar query: {str(e)}")
+    
+    # Aplicar filtros
+    if status:
+        query = query.filter_by(status=status)
+    
+    if cliente_id:
+        query = query.filter_by(cliente_id=cliente_id)
+    
+    if tem_entrega is not None:
+        query = query.filter_by(tem_entrega=tem_entrega)
+    
+    if data_inicio:
+        data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        query = query.filter(Venda.data_venda >= data_inicio_dt)
+    
+    if data_fim:
+        data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+        data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+        query = query.filter(Venda.data_venda <= data_fim_dt)
+    
+    if busca:
+        try:
+            # Buscar por número da venda, observações OU nome do cliente
+            # SQLite: usar LIKE com lower() para case-insensitive
+            busca_lower = f'%{busca.lower()}%'
+            query = query.outerjoin(Cliente, Venda.cliente_id == Cliente.id).filter(
+                or_(
+                    Venda.numero_venda.contains(busca),
+                    func.lower(Cliente.nome).like(busca_lower)
+                )
+            )
+        except Exception as e:
+            logger.error(f"❌ Erro ao aplicar filtro de busca: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erro na busca: {str(e)}")
+    
+    # Ordenar por data mais recente
+    query = query.order_by(desc(Venda.data_venda))
+    
+    # Contar total
+    total = query.count()
+    
+    # Paginar
+    vendas = query.offset((page - 1) * per_page).limit(per_page).all()
+    
+    return {
+        'vendas': [v.to_dict() for v in vendas],
+        'total': total,
+        'pages': (total + per_page - 1) // per_page,
+        'current_page': page
+    }
+
+
+@router.get('/{venda_id}')
+def buscar_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Busca uma venda específica"""
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    return venda.to_dict()
+
+
+@router.post('')
+def criar_venda(
+    dados: CriarVendaRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Cria uma nova venda"""
+    # Validações
+    if not dados.itens or len(dados.itens) == 0:
+        raise HTTPException(status_code=400, detail='A venda deve ter pelo menos um item')
+    
+    print(f"\n📥 DADOS RECEBIDOS NO BACKEND:")
+    print(f"   🧠 Frontend já calculou descontos - Backend apenas valida e soma")
+    print(f"   🔍 DEBUG funcionario_id recebido: {dados.funcionario_id}")
+    print(f"   🔍 DEBUG tipo: {type(dados.funcionario_id)}")
+    print(f"   Funcionário/Veterinário (comissão): {dados.funcionario_id or 'Nenhum'}")
+    print(f"   Quantidade de itens: {len(dados.itens)}")
+    for idx, item in enumerate(dados.itens):
+        print(f"   Item {idx+1}: subtotal={item.subtotal} (já com desconto aplicado)")
+    
+    # Gerar número da venda
+    numero_venda = gerar_numero_venda(db, current_user.id)
+    
+    # Calcular totais
+    totais = calcular_totais_venda(
+        dados.itens,
+        dados.desconto_valor or 0,
+        dados.desconto_percentual or 0,
+        dados.taxa_entrega or 0
+    )
+    
+    # Criar venda
+    print(f"\n🏗️ CRIANDO VENDA:")
+    print(f"   funcionario_id que será salvo: {dados.funcionario_id}")
+    
+    venda = Venda(
+        numero_venda=numero_venda,
+        cliente_id=dados.cliente_id,
+        vendedor_id=dados.vendedor_id or current_user.id,
+        funcionario_id=dados.funcionario_id,  # Funcionário/Veterinário que recebe comissão
+        subtotal=totais['subtotal'],
+        desconto_valor=totais['desconto_valor'],
+        desconto_percentual=dados.desconto_percentual or 0,
+        total=totais['total'],
+        observacoes=dados.observacoes,
+        tem_entrega=dados.tem_entrega,
+        taxa_entrega=dados.taxa_entrega or 0,
+        entregador_id=dados.entregador_id,
+        loja_origem=dados.loja_origem,
+        endereco_entrega=dados.endereco_entrega,
+        distancia_km=dados.distancia_km,
+        valor_por_km=dados.valor_por_km,
+        observacoes_entrega=dados.observacoes_entrega,
+        status_entrega='pendente' if dados.tem_entrega else None,
+        status='aberta',
+        data_venda=datetime.now(),
+        user_id=current_user.id
+    )
+    
+    db.add(venda)
+    db.flush()  # Para obter o ID
+    
+    print(f"\n✅ VENDA CRIADA:")
+    print(f"   ID: {venda.id}")
+    print(f"   funcionario_id salvo: {venda.funcionario_id}")
+    
+    # Criar itens
+    for item_data in dados.itens:
+        item = VendaItem(
+            venda_id=venda.id,
+            tipo=item_data.tipo,
+            produto_id=item_data.produto_id,
+            servico_descricao=item_data.servico_descricao,
+            quantidade=item_data.quantidade,
+            preco_unitario=item_data.preco_unitario,
+            desconto_item=item_data.desconto_item or 0,
+            subtotal=item_data.subtotal,
+            lote_id=item_data.lote_id,
+            pet_id=item_data.pet_id  # Vincular item ao pet
+        )
+        db.add(item)
+    
+    db.commit()
+    db.refresh(venda)
+    
+    print(f"\n🔍 APÓS PRIMEIRO COMMIT:")
+    print(f"   funcionario_id da venda: {venda.funcionario_id}")
+    
+    # 🆕 CRIAR CONTAS A RECEBER E LANÇAMENTO PREVISTO PARA VENDA EM ABERTO
+    # Quando venda é salva sem pagamento, já registra a expectativa de recebimento
+    from decimal import Decimal
+    from datetime import date, timedelta
+    from app.financeiro_models import ContaReceber, LancamentoManual, CategoriaFinanceira
+    
+    # Buscar categoria de receitas
+    categoria_receitas = db.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.nome.ilike('%vendas%'),
+        CategoriaFinanceira.tipo == 'receita'
+    ).first()
+    
+    if not categoria_receitas:
+        categoria_receitas = CategoriaFinanceira(
+            nome="Receitas de Vendas",
+            tipo="receita",
+            user_id=current_user.id
+        )
+        db.add(categoria_receitas)
+        db.flush()
+    
+    # Criar lançamento previsto (30 dias)
+    prazo_dias = 30
+    data_prevista = date.today() + timedelta(days=prazo_dias)
+    
+    lancamento = LancamentoManual(
+        tipo='entrada',
+        valor=Decimal(str(venda.total)),
+        descricao=f"Venda {venda.numero_venda} - A receber",
+        data_lancamento=data_prevista,
+        status='previsto',
+        categoria_id=categoria_receitas.id,
+        documento=f"VENDA-{venda.id}",
+        fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+        user_id=current_user.id
+    )
+    db.add(lancamento)
+    db.flush()
+    
+    # Criar conta a receber
+    conta_receber = ContaReceber(
+        descricao=f"Venda {venda.numero_venda}",
+        cliente_id=venda.cliente_id,
+        valor_original=Decimal(str(venda.total)),
+        valor_recebido=Decimal('0'),
+        valor_final=Decimal(str(venda.total)),
+        data_emissao=date.today(),
+        data_vencimento=data_prevista,
+        status='pendente',
+        venda_id=venda.id,
+        user_id=current_user.id
+    )
+    db.add(conta_receber)
+    db.commit()
+    
+    print(f"📊 Venda em aberto: ContasReceber + Lançamento previsto criados (R$ {venda.total:.2f} em {data_prevista})")
+    
+    log_action(db, current_user.id, 'CREATE', 'vendas', venda.id,
+               details=f'Venda {numero_venda} criada - Total: R$ {totais["total"]:.2f}')
+    
+    return venda.to_dict()
+
+
+@router.put('/{venda_id}')
+def atualizar_venda(
+    venda_id: int,
+    dados: CriarVendaRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Atualiza uma venda existente (somente vendas abertas)"""
+    # Buscar venda
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    # Só permite atualizar vendas abertas
+    if venda.status != 'aberta':
+        raise HTTPException(
+            status_code=400, 
+            detail=f'Não é possível atualizar venda com status "{venda.status}". Apenas vendas abertas podem ser atualizadas.'
+        )
+    
+    # Validações
+    if not dados.itens or len(dados.itens) == 0:
+        raise HTTPException(status_code=400, detail='A venda deve ter pelo menos um item')
+    
+    # Calcular novos totais
+    totais = calcular_totais_venda(
+        dados.itens,
+        dados.desconto_valor or 0,
+        dados.desconto_percentual or 0,
+        dados.taxa_entrega or 0
+    )
+    
+    print(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
+    print(f"   funcionario_id recebido: {dados.funcionario_id}")
+    print(f"   funcionario_id anterior: {venda.funcionario_id}")
+    
+    # Atualizar campos da venda
+    venda.cliente_id = dados.cliente_id
+    venda.vendedor_id = dados.vendedor_id or current_user.id
+    venda.funcionario_id = dados.funcionario_id  # ✅ Funcionário/Veterinário que recebe comissão
+    
+    print(f"   funcionario_id novo: {venda.funcionario_id}")
+    
+    venda.subtotal = totais['subtotal']
+    venda.desconto_valor = totais['desconto_valor']
+    venda.desconto_percentual = dados.desconto_percentual or 0
+    venda.total = totais['total']
+    venda.observacoes = dados.observacoes
+    venda.tem_entrega = dados.tem_entrega
+    venda.taxa_entrega = dados.taxa_entrega or 0
+    venda.entregador_id = dados.entregador_id
+    venda.loja_origem = dados.loja_origem
+    venda.endereco_entrega = dados.endereco_entrega
+    venda.distancia_km = dados.distancia_km
+    venda.valor_por_km = dados.valor_por_km
+    venda.observacoes_entrega = dados.observacoes_entrega
+    venda.status_entrega = 'pendente' if dados.tem_entrega else None
+    venda.updated_at = datetime.now()
+    
+    # Excluir itens antigos
+    db.query(VendaItem).filter_by(venda_id=venda.id).delete()
+    
+    # Criar novos itens
+    for item_data in dados.itens:
+        item = VendaItem(
+            venda_id=venda.id,
+            tipo=item_data.tipo,
+            produto_id=item_data.produto_id,
+            servico_descricao=item_data.servico_descricao,
+            quantidade=item_data.quantidade,
+            preco_unitario=item_data.preco_unitario,
+            desconto_item=item_data.desconto_item or 0,
+            subtotal=item_data.subtotal,
+            lote_id=item_data.lote_id,
+            pet_id=item_data.pet_id
+        )
+        db.add(item)
+    
+    db.commit()
+    db.refresh(venda)
+    
+    log_action(db, current_user.id, 'update', 'vendas', venda.id,
+               details=f'Venda {venda.numero_venda} atualizada - Total: R$ {totais["total"]:.2f}')
+    
+    return venda.to_dict()
+
+
+@router.post('/{venda_id}/finalizar')
+def finalizar_venda(
+    venda_id: int,
+    dados: FinalizarVendaRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Finaliza uma venda com os pagamentos"""
+    
+    # 🔒 HARDENING 1: Transação atômica com rollback automático
+    logger.info(f"🔄 FINALIZE_START - Venda #{venda_id} | User: {current_user.id}")
+    
+    try:
+        # ⚠️ VALIDAÇÃO CRÍTICA: Verificar se há caixa aberto ANTES de qualquer operação
+        from app.caixa_models import Caixa, MovimentacaoCaixa
+        
+        caixa_aberto = db.query(Caixa).filter(
+            Caixa.usuario_id == current_user.id,
+            Caixa.status == 'aberto'
+        ).first()
+        
+        if not caixa_aberto:
+            raise HTTPException(
+                status_code=400,
+                detail='Não é possível finalizar vendas sem um caixa aberto. Por favor, abra o caixa primeiro.'
+            )
+        
+        venda = db.query(Venda).filter_by(
+            id=venda_id,
+            user_id=current_user.id
+        ).first()
+        
+        if not venda:
+            raise HTTPException(status_code=404, detail='Venda não encontrada')
+        
+        # 🔒 VALIDAÇÃO: Bloquear finalização duplicada via status
+        logger.info(f"📊 Venda #{venda_id} - Status atual: {venda.status}")
+        
+        if venda.status not in ['aberta', 'baixa_parcial']:
+            logger.warning(f"⚠️ Tentativa de finalizar venda #{venda_id} com status '{venda.status}'")
+            raise HTTPException(status_code=400, detail=f'Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})')
+        
+        if not dados.pagamentos:
+            raise HTTPException(status_code=400, detail='Informe pelo menos uma forma de pagamento')
+        
+        # Calcular total já pago anteriormente
+        pagamentos_existentes = db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
+        total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+        
+        # Calcular valor restante a pagar
+        total_venda = float(venda.total)
+        valor_restante = total_venda - total_ja_pago
+        
+        # Verificar se venda já está totalmente paga
+        if abs(valor_restante) < 0.01:
+            raise HTTPException(status_code=400, detail='Venda já está totalmente paga')
+        
+        # Calcular novo total de pagamentos
+        total_novos_pagamentos = sum(p.valor for p in dados.pagamentos)
+        
+        # Verificar se não está pagando a mais
+        if total_novos_pagamentos > valor_restante + 0.01:
+            logger.error(f"❌ ERRO: Pagamento maior que restante - Venda #{venda_id}")
+            logger.error(f"   Total venda: R$ {total_venda:.2f}")
+            logger.error(f"   Já pago: R$ {total_ja_pago:.2f}")
+            logger.error(f"   Restante: R$ {valor_restante:.2f}")
+            logger.error(f"   Novos pagamentos: R$ {total_novos_pagamentos:.2f}")
+            raise HTTPException(
+                status_code=400, 
+                detail=f'Valor dos pagamentos (R$ {total_novos_pagamentos:.2f}) ultrapassa o valor restante (R$ {valor_restante:.2f})'
+            )
+        
+        total_pagamentos = total_ja_pago + total_novos_pagamentos
+        
+        # Criar novos pagamentos E registrar no caixa
+        # (caixa_aberto já foi validado no início da função)
+        
+        for pag_data in dados.pagamentos:
+        pagamento = VendaPagamento(
+            venda_id=venda.id,
+            forma_pagamento=pag_data.forma_pagamento,
+            valor=pag_data.valor,
+            bandeira=pag_data.bandeira,
+            numero_parcelas=pag_data.numero_parcelas or 1,
+            numero_transacao=pag_data.numero_transacao,
+            numero_autorizacao=pag_data.numero_autorizacao,
+            valor_recebido=pag_data.valor_recebido,
+            troco=pag_data.troco,
+            status='confirmado',
+            data_pagamento=datetime.now()
+        )
+        db.add(pagamento)
+        
+        # 🎁 CRÉDITO CLIENTE: Deduzir do saldo sem movimentações
+        forma_eh_credito = (
+            pag_data.forma_pagamento == 'credito_cliente' or
+            pag_data.forma_pagamento == 'Crédito Cliente' or
+            str(pag_data.forma_pagamento).lower() == 'credito_cliente'
+        )
+        
+        if forma_eh_credito:
+            # Validar que venda possui cliente
+            if not venda.cliente_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail='Crédito só pode ser usado em vendas com cliente vinculado'
+                )
+            
+            # Validar saldo de crédito
+            cliente = db.query(Cliente).filter_by(id=venda.cliente_id).first()
+            if not cliente:
+                raise HTTPException(status_code=404, detail='Cliente não encontrado')
+            
+            credito_disponivel = float(cliente.credito or 0)
+            
+            if pag_data.valor > credito_disponivel + 0.01:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f'Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}'
+                )
+            
+            # Deduzir do crédito do cliente
+            cliente.credito = Decimal(str(credito_disponivel - pag_data.valor))
+            db.add(cliente)
+            
+            logger.info(f"🎁 Crédito utilizado: R$ {pag_data.valor:.2f} - Saldo restante: R$ {float(cliente.credito):.2f}")
+            
+            # NÃO criar MovimentacaoCaixa nem LancamentoManual para crédito
+            continue
+        
+        # 🔧 CORREÇÃO: Registrar movimentação no caixa APENAS para DINHEIRO EM ESPÉCIE
+        # Caixa físico = apenas dinheiro. PIX/Débito/Crédito vão para banco/financeiro
+        
+        # Verificar se é dinheiro (pode vir como ID=1 ou nome="Dinheiro")
+        forma_eh_dinheiro = (
+            pag_data.forma_pagamento == 'Dinheiro' or 
+            pag_data.forma_pagamento == 1 or
+            str(pag_data.forma_pagamento) == '1'
+        )
+        
+        logger.debug(f"DEBUG CAIXA: forma={pag_data.forma_pagamento}, eh_dinheiro={forma_eh_dinheiro}, caixa_aberto={caixa_aberto.id if caixa_aberto else None}")
+        
+        if caixa_aberto and forma_eh_dinheiro:
+            movimentacao_caixa = MovimentacaoCaixa(
+                caixa_id=caixa_aberto.id,
+                tipo='venda',
+                valor=pag_data.valor,
+                forma_pagamento='Dinheiro',  # Sempre salvar como "Dinheiro" (não ID)
+                descricao=f'Venda #{venda.numero_venda}',
+                venda_id=venda.id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome
+            )
+            db.add(movimentacao_caixa)
+            logger.info(f"✅ Movimentação de caixa registrada: Dinheiro - R$ {pag_data.valor:.2f}")
+    
+    # Atualizar status da venda
+    if abs(total_pagamentos - total_venda) < 0.01:
+        # Pagamento completo
+        venda.status = 'finalizada'
+        venda.data_finalizacao = datetime.now()
+        # Vincular venda ao caixa
+        if not venda.caixa_id:
+            venda.caixa_id = caixa_aberto.id
+    elif total_pagamentos > 0:
+        # Pagamento parcial - criar lançamento previsto para o saldo
+        venda.status = 'baixa_parcial'
+        # Vincular venda ao caixa também em baixa parcial
+        if not venda.caixa_id:
+            venda.caixa_id = caixa_aberto.id
+        
+        # 🆕 CRIAR LANÇAMENTO PREVISTO PARA O SALDO EM ABERTO
+        from app.financeiro_models import LancamentoManual, CategoriaFinanceira
+        
+        saldo_em_aberto = total_venda - total_pagamentos
+        
+        if saldo_em_aberto > 0.01:  # Evitar centavos
+            # Buscar categoria de receitas
+            categoria_receitas = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.nome.ilike('%vendas%'),
+                CategoriaFinanceira.tipo == 'receita'
+            ).first()
+            
+            if not categoria_receitas:
+                categoria_receitas = CategoriaFinanceira(
+                    nome="Receitas de Vendas",
+                    tipo="receita",
+                    user_id=current_user.id
+                )
+                db.add(categoria_receitas)
+                db.flush()
+            
+            # Criar lançamento previsto (30 dias padrão)
+            prazo_dias = 30
+            data_prevista = date.today() + timedelta(days=prazo_dias)
+            
+            lancamento_saldo = LancamentoManual(
+                tipo='entrada',
+                valor=Decimal(str(saldo_em_aberto)),
+                descricao=f"Venda {venda.numero_venda} - Saldo em aberto",
+                data_lancamento=data_prevista,
+                status='previsto',
+                categoria_id=categoria_receitas.id,
+                documento=f"VENDA-{venda.id}-SALDO",
+                fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                user_id=current_user.id
+            )
+            db.add(lancamento_saldo)
+            logger.info(f"📊 Lançamento previsto criado para saldo: R$ {saldo_em_aberto:.2f} em {data_prevista}")
+    else:
+        # Permanece aberta
+        venda.status = 'aberta'
+    
+    venda.updated_at = datetime.now()
+    
+    # Baixar estoque dos produtos E criar movimentações
+    for item in venda.itens:
+        if item.tipo == 'produto' and item.produto_id:
+            produto = db.query(Produto).get(item.produto_id)
+            if produto:
+                estoque_anterior = produto.estoque_atual or 0
+                quantidade_vendida = float(item.quantidade)
+                
+                # FIFO: Consumir lotes se existirem
+                lotes_consumidos = []
+                lotes_ativos = db.query(ProdutoLote).filter(
+                    ProdutoLote.produto_id == produto.id,
+                    ProdutoLote.quantidade_disponivel > 0,
+                    ProdutoLote.status == 'ativo'
+                ).order_by(ProdutoLote.ordem_entrada).all()
+                
+                if lotes_ativos:
+                    quantidade_restante = quantidade_vendida
+                    for lote in lotes_ativos:
+                        if quantidade_restante <= 0:
+                            break
+                        
+                        saldo_anterior = lote.quantidade_disponivel  # Guardar saldo antes de consumir
+                        qtd_consumir = min(lote.quantidade_disponivel, quantidade_restante)
+                        lote.quantidade_disponivel -= qtd_consumir
+                        quantidade_restante -= qtd_consumir
+                        
+                        if lote.quantidade_disponivel == 0:
+                            lote.status = 'esgotado'
+                        
+                        lotes_consumidos.append({
+                            "lote_id": lote.id,
+                            "nome_lote": lote.nome_lote,
+                            "quantidade": qtd_consumir,
+                            "saldo_anterior": saldo_anterior  # Para mostrar (X/Y)
+                        })
+                
+                # Baixar estoque
+                produto.estoque_atual -= quantidade_vendida
+                
+                # Criar movimentação de estoque
+                movimentacao = EstoqueMovimentacao(
+                    produto_id=produto.id,
+                    tipo='saida',
+                    motivo='venda',
+                    quantidade=quantidade_vendida,
+                    quantidade_anterior=estoque_anterior,
+                    quantidade_nova=produto.estoque_atual,
+                    custo_unitario=produto.preco_custo,
+                    valor_total=quantidade_vendida * (produto.preco_custo or 0),
+                    lotes_consumidos=json.dumps(lotes_consumidos) if lotes_consumidos else None,
+                    documento=None,  # Só preencher quando houver NF emitida
+                    referencia_id=venda.id,
+                    referencia_tipo='venda',
+                    observacao=None,  # Observação fica vazia para vendas
+                    user_id=current_user.id
+                )
+                db.add(movimentacao)
+    
+    # 🆕 BAIXAR CONTAS A RECEBER E LANÇAMENTOS ORIGINAIS (se venda estava em aberto)
+    # Quando venda é finalizada/parcialmente paga, baixar os lançamentos previstos originais
+    from app.financeiro_models import ContaReceber, LancamentoManual, Recebimento, FormaPagamento
+    
+    # Buscar TODAS as contas relacionadas à venda que não estão totalmente pagas
+    contas_originais = db.query(ContaReceber).filter(
+        ContaReceber.venda_id == venda.id,
+        ContaReceber.status.in_(['pendente', 'parcial', 'vencido'])
+    ).all()
+    
+    if contas_originais:
+        # Calcular quanto ainda resta pagar após os pagamentos existentes anteriores
+        saldo_venda = total_venda - total_ja_pago
+        valor_disponivel_baixa = total_novos_pagamentos
+        
+        logger.info(f"💰 Baixando contas: saldo_venda={saldo_venda:.2f}, novos_pagamentos={valor_disponivel_baixa:.2f}")
+        
+        for conta in contas_originais:
+            if valor_disponivel_baixa <= 0:
+                break
+                
+            # Calcular quanto ainda falta nesta conta
+            valor_pendente_conta = float(conta.valor_final) - float(conta.valor_recebido or 0)
+            
+            # Calcular quanto pode baixar desta conta
+            valor_a_baixar = min(valor_pendente_conta, valor_disponivel_baixa)
+            
+            if valor_a_baixar > 0.01:
+                # Atualizar valor recebido
+                novo_valor_recebido = float(conta.valor_recebido or 0) + valor_a_baixar
+                conta.valor_recebido = Decimal(str(novo_valor_recebido))
+                
+                # 🆕 CRIAR REGISTRO DE RECEBIMENTO (para aparecer no fluxo de caixa)
+                # Buscar forma de pagamento (usar a primeira do pagamento)
+                forma_pag_id = None
+                if dados.pagamentos:
+                    primeiro_pag = dados.pagamentos[0]
+                    forma_pag = db.query(FormaPagamento).filter(
+                        FormaPagamento.nome.ilike(f"%{primeiro_pag.forma_pagamento}%")
+                    ).first()
+                    if forma_pag:
+                        forma_pag_id = forma_pag.id
+                
+                recebimento = Recebimento(
+                    conta_receber_id=conta.id,
+                    valor_recebido=Decimal(str(valor_a_baixar)),
+                    data_recebimento=date.today(),
+                    forma_pagamento_id=forma_pag_id,
+                    observacoes=f"Recebimento venda #{venda.numero_venda}",
+                    user_id=current_user.id
+                )
+                db.add(recebimento)
+                db.flush()
+                
+                # Atualizar status
+                if abs(novo_valor_recebido - float(conta.valor_final)) < 0.01:
+                    # Conta totalmente paga
+                    conta.status = 'recebido'
+                    conta.data_recebimento = date.today()
+                    logger.info(f"✅ ContaReceber #{conta.id} TOTALMENTE baixada - R$ {valor_a_baixar:.2f} (Recebimento #{recebimento.id} criado)")
+                else:
+                    # Conta parcialmente paga
+                    conta.status = 'parcial'
+                    logger.info(f"📊 ContaReceber #{conta.id} baixa PARCIAL - R$ {valor_a_baixar:.2f} (total recebido: R$ {novo_valor_recebido:.2f}, Recebimento #{recebimento.id} criado)")
+                
+                # Diminuir valor disponível para próximas contas
+                valor_disponivel_baixa -= valor_a_baixar
+                db.add(conta)
+        
+        logger.info(f"🎯 Contas a receber atualizadas - {len(contas_originais)} conta(s) processada(s)")
+        
+        # 🆕 BAIXAR LANÇAMENTOS MANUAIS PREVISTOS (associados à venda)
+        # Buscar lançamentos previstos criados quando a venda foi salva em aberto
+        lancamentos_previstos = db.query(LancamentoManual).filter(
+            LancamentoManual.documento == f"VENDA-{venda.id}",
+            LancamentoManual.status == 'previsto',
+            LancamentoManual.tipo == 'entrada'
+        ).all()
+        
+        if lancamentos_previstos:
+            # Calcular quanto do lançamento previsto foi realizado
+            total_recebido_venda = total_ja_pago + total_novos_pagamentos
+            
+            for lanc_prev in lancamentos_previstos:
+                valor_previsto_original = float(lanc_prev.valor)
+                
+                # Se recebeu tudo, marcar como realizado
+                if abs(total_recebido_venda - total_venda) < 0.01:
+                    lanc_prev.status = 'realizado'
+                    lanc_prev.data_lancamento = date.today()
+                    db.add(lanc_prev)
+                    logger.info(f"✅ Lançamento previsto #{lanc_prev.id} marcado como REALIZADO (venda totalmente paga)")
+                
+                # Se recebeu parcialmente, criar novo lançamento realizado proporcional
+                elif total_recebido_venda > 0.01:
+                    # Criar lançamento realizado com o valor recebido
+                    lanc_realizado = LancamentoManual(
+                        tipo='entrada',
+                        valor=Decimal(str(total_recebido_venda)),
+                        descricao=f"Venda {venda.numero_venda} - Recebido (parcial)",
+                        data_lancamento=date.today(),
+                        status='realizado',
+                        categoria_id=lanc_prev.categoria_id,
+                        documento=f"VENDA-{venda.id}-REALIZADO",
+                        fornecedor_cliente=lanc_prev.fornecedor_cliente,
+                        user_id=current_user.id
+                    )
+                    db.add(lanc_realizado)
+                    
+                    # Ajustar o lançamento previsto para o saldo restante
+                    saldo_restante = total_venda - total_recebido_venda
+                    if saldo_restante > 0.01:
+                        lanc_prev.valor = Decimal(str(saldo_restante))
+                        db.add(lanc_prev)
+                        logger.info(f"📊 Lançamento previsto #{lanc_prev.id} ajustado para R$ {saldo_restante:.2f} (saldo restante)")
+                        logger.info(f"✅ Lançamento realizado #{lanc_realizado.id} criado - R$ {total_recebido_venda:.2f}")
+                    else:
+                        # Excluir lançamento previsto se não há mais saldo
+                        db.delete(lanc_prev)
+                        logger.info(f"🗑️ Lançamento previsto #{lanc_prev.id} excluído (venda totalmente paga)")
+                        logger.info(f"✅ Lançamento realizado #{lanc_realizado.id} criado - R$ {total_recebido_venda:.2f}")
+    
+    # ⚖️ COMMIT PARCIAL - Operações essenciais (venda, pagamentos, estoque, caixa)
+    # Se commit falhar aqui, tudo deve ser revertido
+    db.commit()
+    logger.info(f"✅ Operações essenciais commitadas - Venda #{venda_id}")
+    
+    # 🔒 Operações SECUNDÁRIAS (podem falhar sem abortar a venda)
+    # CRIAR CONTAS A RECEBER automaticamente
+    contas_ids = []
+    try:
+        contas_ids = criar_contas_receber_da_venda(venda, dados.pagamentos, db, current_user.id)
+        logger.info(f"✅ {len(contas_ids)} contas a receber criadas para venda {venda.numero_venda}")
+    except Exception as e:
+        logger.error(f"⚠️ Erro ao criar contas a receber (venda {venda.id}): {str(e)}", exc_info=True)
+        # Não abortar a finalização da venda por erro nas contas
+    
+    # 🆕 GERAR COMISSÕES AUTOMATICAMENTE (apenas se funcionário/veterinário foi selecionado)
+    if venda.funcionario_id:
+        try:
+            from app.comissoes_service import gerar_comissoes_venda
+            
+            # Se foi pagamento parcial, passar valor pago
+            valor_pago_agora = Decimal(str(total_novos_pagamentos)) if total_novos_pagamentos > 0 else None
+            
+            logger.info(f"🔄 Gerando comissões - Venda #{venda.id} | Funcionário: {venda.funcionario_id}")
+            
+            resultado = gerar_comissoes_venda(
+                venda_id=venda.id,
+                funcionario_id=venda.funcionario_id,
+                valor_pago=valor_pago_agora,
+                db=db
+            )
+            
+            if resultado and resultado.get('success'):
+                total_com = resultado.get('total_comissao', 0)
+                logger.info(f"✅ Comissões geradas: R$ {total_com:.2f}")
+                if resultado.get('duplicated'):
+                    logger.warning(f"⚠️ Comissões já existiam (idempotente) - Venda #{venda.id}")
+            else:
+                logger.info("ℹ️  Nenhuma comissão gerada (sem configuração)")
+                
+        except Exception as e:
+            logger.error(f"⚠️ Erro ao gerar comissões (venda {venda.id}): {str(e)}", exc_info=True)
+            # Não abortar a finalização da venda por erro nas comissões
+    else:
+        logger.info("ℹ️  Venda sem funcionário - comissões não geradas")
+    
+    # 🔔 SISTEMA DE RECORRÊNCIA - Criar/Atualizar lembretes automaticamente
+    from app.produtos_models import Lembrete
+    from app.models import Pet
+    
+    lembretes_criados = []
+    lembretes_atualizados = []
+    
+    try:
+        for item in venda.itens:
+            # Apenas produtos com pet_id vinculado e que tenham recorrência
+            if item.tipo == 'produto' and item.produto_id and item.pet_id:
+                produto = db.query(Produto).get(item.produto_id)
+                pet = db.query(Pet).get(item.pet_id)
+                
+                if produto and pet and produto.tem_recorrencia and produto.intervalo_dias:
+                    # Verificar se já existe lembrete PENDENTE para este produto+pet
+                    lembrete_existente = db.query(Lembrete).filter(
+                        Lembrete.cliente_id == venda.cliente_id,
+                        Lembrete.pet_id == item.pet_id,
+                        Lembrete.produto_id == item.produto_id,
+                        Lembrete.status.in_(['pendente', 'notificado'])
+                    ).first()
+                    
+                    if lembrete_existente:
+                        # ✅ CLIENTE JÁ TINHA LEMBRETE - DAR CHECK AUTOMÁTICO
+                        historico = json.loads(lembrete_existente.historico_doses) if lembrete_existente.historico_doses else []
+                        historico.append({
+                            "dose": lembrete_existente.dose_atual,
+                            "data": datetime.utcnow().isoformat(),
+                            "comprou": True,
+                            "status": "completado",
+                            "venda_id": venda.id
+                        })
+                        
+                        # Marcar como completado
+                        lembrete_existente.status = 'completado'
+                        lembrete_existente.data_completado = datetime.utcnow()
+                        lembrete_existente.historico_doses = json.dumps(historico)
+                        
+                        # Verificar se é a última dose
+                        if lembrete_existente.dose_total and lembrete_existente.dose_atual >= lembrete_existente.dose_total:
+                            # Última dose - NÃO criar novo lembrete
+                            lembretes_atualizados.append({
+                                "acao": "finalizado",
+                                "produto": produto.nome,
+                                "pet": pet.nome,
+                                "dose": f"{lembrete_existente.dose_atual}/{lembrete_existente.dose_total}"
+                            })
+                        else:
+                            # Criar novo lembrete para próxima dose
+                            data_proxima = datetime.utcnow() + timedelta(days=produto.intervalo_dias)
+                            data_notificacao = data_proxima - timedelta(days=7)
+                            
+                            novo_lembrete = Lembrete(
+                                user_id=current_user.id,
+                                cliente_id=venda.cliente_id,
+                                pet_id=item.pet_id,
+                                produto_id=item.produto_id,
+                                venda_id=venda.id,
+                                data_compra=datetime.utcnow(),
+                                data_proxima_dose=data_proxima,
+                                data_notificacao_7_dias=data_notificacao,
+                                status='pendente',
+                                quantidade_recomendada=float(item.quantidade),
+                                preco_estimado=produto.preco_venda,
+                                dose_atual=lembrete_existente.dose_atual + 1,
+                                dose_total=lembrete_existente.dose_total,
+                                historico_doses=json.dumps(historico)
+                            )
+                            db.add(novo_lembrete)
+                            
+                            lembretes_atualizados.append({
+                                "acao": "renovado",
+                                "produto": produto.nome,
+                                "pet": pet.nome,
+                                "dose": f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total or '∞'}"
+                            })
+                    else:
+                        # ✨ PRIMEIRA VENDA COM RECORRÊNCIA - CRIAR LEMBRETE
+                        data_proxima = datetime.utcnow() + timedelta(days=produto.intervalo_dias)
+                        data_notificacao = data_proxima - timedelta(days=7)
+                        
+                        historico_inicial = [{
+                            "dose": 1,
+                            "data": datetime.utcnow().isoformat(),
+                            "comprou": True,
+                            "status": "criado",
+                            "venda_id": venda.id
+                        }]
+                        
+                        novo_lembrete = Lembrete(
+                            user_id=current_user.id,
+                            cliente_id=venda.cliente_id,
+                            pet_id=item.pet_id,
+                            produto_id=item.produto_id,
+                            venda_id=venda.id,
+                            data_compra=datetime.utcnow(),
+                            data_proxima_dose=data_proxima,
+                            data_notificacao_7_dias=data_notificacao,
+                            status='pendente',
+                            quantidade_recomendada=float(item.quantidade),
+                            preco_estimado=produto.preco_venda,
+                            dose_atual=1,
+                            dose_total=produto.numero_doses,
+                            historico_doses=json.dumps(historico_inicial)
+                        )
+                        db.add(novo_lembrete)
+                        
+                        lembretes_criados.append({
+                            "produto": produto.nome,
+                            "pet": pet.nome,
+                            "proxima_dose": data_proxima.strftime("%d/%m/%Y"),
+                            "dose_total": produto.numero_doses or "∞"
+                        })
+        
+        if lembretes_criados or lembretes_atualizados:
+            logger.info(f"🔔 Lembretes: {len(lembretes_criados)} criados, {len(lembretes_atualizados)} atualizados")
+    
+    except Exception as e:
+        logger.error(f"⚠️ Erro ao processar lembretes: {str(e)}")
+        # Não abortar a venda por erro nos lembretes
+    
+    db.commit()
+    db.refresh(venda)
+    
+    log_action(db, current_user.id, 'UPDATE', 'vendas', venda.id,
+               details=f'Venda {venda.numero_venda} finalizada - Total: R$ {float(venda.total):.2f}')
+    
+    # ✅ LOG DE SUCESSO
+    logger.info(f"✅ FINALIZE_SUCCESS - Venda #{venda_id} | Status: {venda.status} | Total: R$ {float(venda.total):.2f} | Pago: R$ {total_pagamentos:.2f}")
+    
+    # Adicionar informações de lembretes no retorno
+    venda_dict = venda.to_dict()
+    if lembretes_criados or lembretes_atualizados:
+        venda_dict['lembretes'] = {
+            "criados": lembretes_criados,
+            "atualizados": lembretes_atualizados
+        }
+    
+    return venda_dict
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions (validações de negócio)
+        raise
+    except Exception as e:
+        # 🔒 ROLLBACK AUTOMÁTICO em erro crítico
+        db.rollback()
+        logger.error(f"❌ ERRO CRÍTICO ao finalizar venda #{venda_id}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao finalizar venda: {str(e)}"
+        )
+
+
+@router.post('/{venda_id}/cancelar')
+def cancelar_venda(
+    venda_id: int,
+    dados: CancelarVendaRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Cancela uma venda"""
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    if venda.status == 'cancelada':
+        raise HTTPException(status_code=400, detail='Venda já está cancelada')
+    
+    venda.status = 'cancelada'
+    venda.cancelada_por = current_user.id
+    venda.motivo_cancelamento = dados.motivo
+    venda.updated_at = datetime.now()
+    
+    db.commit()
+    db.refresh(venda)
+    
+    log_action(db, current_user.id, 'UPDATE', 'vendas', venda.id,
+               details=f'Venda {venda.numero_venda} cancelada - Motivo: {dados.motivo}')
+    
+    return venda.to_dict()
+
+
+@router.post('/{venda_id}/reabrir')
+def reabrir_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Reabre uma venda finalizada (muda status para aberta)"""
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    # Impedir reabertura de vendas com NF emitida
+    if venda.status == 'pago_nf':
+        raise HTTPException(
+            status_code=400, 
+            detail='Não é possível reabrir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+        )
+    
+    # Permitir reabrir vendas finalizadas ou parcialmente pagas
+    if venda.status not in ['finalizada', 'baixa_parcial']:
+        raise HTTPException(
+            status_code=400, 
+            detail='Apenas vendas finalizadas ou com baixa parcial podem ser reabertas'
+        )
+    
+    # Guardar status anterior para log
+    status_anterior = venda.status
+    
+    # Mudar status para aberta
+    venda.status = 'aberta'
+    venda.data_finalizacao = None
+    venda.updated_at = datetime.now()
+    
+    db.commit()
+    db.refresh(venda)
+    
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action='update',
+        entity_type='vendas',
+        entity_id=venda.id,
+        details=f'Venda #{venda.id} reaberta (status: {status_anterior} → aberta)'
+    )
+    
+    return venda.to_dict()
+
+
+@router.patch('/{venda_id}/status')
+def atualizar_status_venda(
+    venda_id: int,
+    status_data: dict,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Atualiza apenas o status da venda"""
+    # Buscar a venda
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    # Extrair status do body
+    novo_status = status_data.get('status')
+    if not novo_status:
+        raise HTTPException(status_code=400, detail='Status não informado')
+    
+    status_anterior = venda.status
+    venda.status = novo_status
+    venda.updated_at = datetime.now()
+    
+    # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
+    if novo_status == 'finalizada' and status_anterior != 'finalizada' and venda.funcionario_id:
+        try:
+            from app.comissoes_service import gerar_comissoes_venda
+            
+            resultado = gerar_comissoes_venda(
+                venda_id=venda.id,
+                funcionario_id=venda.funcionario_id,  # Usar funcionario_id, não vendedor_id
+                valor_pago=None,  # Considera venda totalmente paga
+                db=db
+            )
+            
+            if resultado and resultado.get('success'):
+                total_com = resultado.get('total_comissao', 0)
+                print(f"💰 Comissões geradas: R$ {total_com:.2f}")
+            else:
+                print("ℹ️  Nenhuma comissão gerada (sem configuração)")
+                
+        except Exception as e:
+            print(f"⚠️ Erro ao gerar comissões para venda {venda.id}: {str(e)}")
+            # Não abortar a atualização por erro nas comissões
+    
+    db.commit()
+    db.refresh(venda)
+    
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action='update',
+        entity_type='vendas',
+        entity_id=venda.id,
+        details=f'Status da venda #{venda.id} alterado: {status_anterior} → {novo_status}'
+    )
+    
+    return {'success': True, 'status': novo_status}
+    
+    return {'message': 'Status atualizado com sucesso', 'status': venda.status}
+
+
+@router.get('/{venda_id}/pagamentos')
+def listar_pagamentos_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Lista todos os pagamentos de uma venda"""
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        user_id=current_user.id
+    ).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    pagamentos = db.query(VendaPagamento).filter_by(venda_id=venda.id).order_by(VendaPagamento.data_pagamento).all()
+    
+    total_pago = sum(float(p.valor) for p in pagamentos)
+    valor_restante = float(venda.total) - total_pago
+    
+    return {
+        'venda_id': venda.id,
+        'numero_venda': venda.numero_venda,
+        'total_venda': float(venda.total),
+        'total_pago': total_pago,
+        'valor_restante': max(0, valor_restante),
+        'status': venda.status,
+        'pagamentos': [p.to_dict() for p in pagamentos]
+    }
+
+
+@router.delete('/pagamentos/{pagamento_id}')
+def excluir_pagamento(
+    pagamento_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Excluir um pagamento de uma venda"""
+    # Buscar o pagamento
+    pagamento = db.query(VendaPagamento).filter_by(id=pagamento_id).first()
+    
+    if not pagamento:
+        raise HTTPException(status_code=404, detail='Pagamento não encontrado')
+    
+    # Buscar a venda
+    venda = db.query(Venda).filter_by(id=pagamento.venda_id, user_id=current_user.id).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    # Impedir exclusão de pagamento em vendas com NF emitida
+    if venda.status == 'pago_nf':
+        raise HTTPException(
+            status_code=400,
+            detail='Não é possível excluir pagamentos de uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+        )
+    
+    # ⚠️ IMPORTANTE: Se venda está finalizada/baixa_parcial, não pode excluir pagamento
+    # Usuário deve REABRIR a venda primeiro!
+    if venda.status in ['finalizada', 'baixa_parcial']:
+        raise HTTPException(
+            status_code=400,
+            detail='Não é possível excluir pagamentos de uma venda finalizada. Reabra a venda primeiro através do botão "Reabrir Venda".'
+        )
+    
+    # Registrar auditoria
+    try:
+        log_action(
+            db=db,
+            user_id=current_user.id,
+            action='delete',
+            entity_type='venda_pagamentos',
+            entity_id=pagamento.id,
+            details=f'Excluído pagamento de R$ {pagamento.valor} ({pagamento.forma_pagamento}) da venda #{venda.id}'
+        )
+    except Exception as e:
+        print(f"⚠️ Erro ao registrar auditoria: {e}")
+    
+    # Sincronizar exclusão com contas a receber e lançamentos manuais
+    try:
+        contas = db.query(ContaReceber).filter(ContaReceber.venda_id == venda.id).all()
+        
+        for conta in contas:
+            # Deletar conta a receber
+            try:
+                db.delete(conta)
+                print(f"🗑️ Conta a receber {conta.id} excluída")
+            except Exception as e:
+                print(f"⚠️ Erro ao deletar conta: {e}")
+    except Exception as e:
+        print(f"⚠️ Erro ao buscar contas a receber: {e}")
+    
+    # Excluir o pagamento
+    db.delete(pagamento)
+    db.flush()  # Garantir que o delete seja processado antes da query
+    
+    # Recalcular total pago
+    pagamentos_restantes = db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
+    total_pago = sum(float(p.valor) for p in pagamentos_restantes)
+    total_venda = float(venda.total)
+    
+    print(f"DEBUG excluir_pagamento: total_pago={total_pago}, total_venda={total_venda}")
+    
+    # Atualizar status da venda
+    if total_pago == 0:
+        venda.status = 'aberta'
+        print(f"DEBUG: Mudou status para ABERTA (total_pago = 0)")
+    elif total_pago >= total_venda:
+        venda.status = 'finalizada'
+        print(f"DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
+    else:
+        venda.status = 'baixa_parcial'
+        print(f"DEBUG: Mudou status para BAIXA_PARCIAL")
+    
+    db.commit()
+    
+    return {
+        'message': 'Pagamento excluído com sucesso',
+        'venda_id': venda.id,
+        'novo_status': venda.status,
+        'total_pago': total_pago,
+        'valor_restante': max(0, total_venda - total_pago)
+    }
+
+
+@router.delete('/{venda_id}')
+def excluir_venda(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Excluir uma venda e devolver estoque"""
+    # Buscar a venda
+    venda = db.query(Venda).filter_by(id=venda_id, user_id=current_user.id).first()
+    
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda não encontrada')
+    
+    # Verificar se a venda tem NF emitida
+    if venda.status == 'pago_nf':
+        raise HTTPException(
+            status_code=400,
+            detail='Não é possível excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+        )
+    
+    # Verificar se a venda está finalizada
+    if venda.status == 'finalizada':
+        raise HTTPException(
+            status_code=400, 
+            detail='Não é possível excluir uma venda finalizada. Estorne os pagamentos primeiro.'
+        )
+    
+    # Devolver estoque dos produtos
+    itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
+    
+    for item in itens:
+        produto = db.query(Produto).filter_by(id=item.produto_id).first()
+        if produto:
+            # 🔧 FIX: Converter para float para evitar erro de tipo
+            produto.estoque_atual += float(item.quantidade)
+            
+            # Registrar auditoria do estoque
+            log_action(
+                db=db,
+                user_id=current_user.id,
+                action='update',
+                entity_type='produtos',
+                entity_id=produto.id,
+                details=f'Estorno de estoque (+{item.quantidade}) - Venda #{venda_id} excluída'
+            )
+    
+    # Registrar auditoria da venda
+    log_action(
+        db=db,
+        user_id=current_user.id,
+        action='delete',
+        entity_type='vendas',
+        entity_id=venda.id,
+        details=f'Venda #{venda.id} excluída - Total: R$ {venda.total} - {len(itens)} itens'
+    )
+    
+    # 💰 IMPORTANTE: Excluir movimentações de caixa relacionadas
+    from app.caixa_models import MovimentacaoCaixa
+    movimentacoes = db.query(MovimentacaoCaixa).filter_by(venda_id=venda_id).all()
+    for mov in movimentacoes:
+        print(f"🗑️ Removendo movimentação de caixa: R$ {mov.valor} ({mov.tipo})")
+        db.delete(mov)
+    
+    # 🏦 ESTORNAR MOVIMENTAÇÕES BANCÁRIAS
+    from app.financeiro_models import MovimentacaoFinanceira, ContaBancaria, LancamentoManual
+    
+    movimentacoes_bancarias = db.query(MovimentacaoFinanceira).filter_by(venda_id=venda_id).all()
+    for mov_banc in movimentacoes_bancarias:
+        # Estornar saldo da conta bancária
+        conta_bancaria = db.query(ContaBancaria).get(mov_banc.conta_bancaria_id)
+        if conta_bancaria:
+            if mov_banc.tipo == 'receita':
+                conta_bancaria.saldo_atual -= mov_banc.valor
+                print(f"🏦 Estornando saldo bancário: {conta_bancaria.nome} -R$ {mov_banc.valor}")
+            elif mov_banc.tipo == 'despesa':
+                conta_bancaria.saldo_atual += mov_banc.valor
+                print(f"🏦 Estornando saldo bancário: {conta_bancaria.nome} +R$ {mov_banc.valor}")
+        
+        db.delete(mov_banc)
+    
+    # 📊 CANCELAR LANÇAMENTOS MANUAIS (Fluxo de Caixa)
+    # Buscar por documento VENDA-{id} ou por venda vinculada
+    lancamentos = db.query(LancamentoManual).filter(
+        or_(
+            LancamentoManual.documento == f"VENDA-{venda_id}",
+            LancamentoManual.documento.like(f"VENDA-{venda_id}-%")
+        )
+    ).all()
+    
+    for lanc in lancamentos:
+        if lanc.status == 'previsto':
+            # Apenas remover se ainda não foi realizado
+            print(f"📊 Removendo lançamento previsto: {lanc.descricao} - R$ {lanc.valor}")
+            db.delete(lanc)
+        elif lanc.status == 'realizado':
+            # Marcar como cancelado (manter histórico)
+            lanc.status = 'cancelado'
+            print(f"📊 Cancelando lançamento realizado: {lanc.descricao} - R$ {lanc.valor}")
+    
+    # Excluir pagamentos (se houver)
+    db.query(VendaPagamento).filter_by(venda_id=venda_id).delete()
+    
+    # Excluir/Cancelar contas a receber vinculadas
+    contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
+    for conta in contas_receber:
+        if conta.status == 'pendente' or conta.status == 'parcial':
+            # Pode excluir contas pendentes
+            print(f"💳 Removendo conta a receber: {conta.descricao} - R$ {conta.valor_original}")
+            db.delete(conta)
+        elif conta.status == 'recebido':
+            # Marcar como cancelada (manter histórico)
+            conta.status = 'cancelado'
+            print(f"💳 Cancelando conta já recebida: {conta.descricao} - R$ {conta.valor_recebido}")
+    
+    # Excluir itens
+    db.query(VendaItem).filter_by(venda_id=venda_id).delete()
+    
+    # Excluir venda
+    db.delete(venda)
+    db.commit()
+    
+    return {
+        'message': 'Venda excluída com sucesso',
+        'itens_devolvidos': len(itens)
+    }
+
+
+@router.post('/{venda_id}/devolucao')
+def registrar_devolucao(
+    venda_id: int,
+    dados: dict,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Registrar devolução de itens de uma venda"""
+    try:
+        print(f"\n{'='*80}")
+        print(f"🔄 INICIANDO DEVOLUÇÃO - Venda #{venda_id}")
+        print(f"{'='*80}")
+        print(f"📦 Dados recebidos: {dados}")
+        print(f"👤 Usuário: {current_user.nome} (ID: {current_user.id})")
+        
+        # Buscar a venda
+        venda = db.query(Venda).filter_by(id=venda_id, user_id=current_user.id).first()
+        
+        if not venda:
+            print(f"❌ Venda #{venda_id} não encontrada")
+            raise HTTPException(status_code=404, detail='Venda não encontrada')
+        
+        print(f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}")
+        
+        caixa_id = dados.get('caixa_id')
+        itens_devolucao = dados.get('itens', [])
+        motivo = dados.get('motivo', '')
+        gerar_credito = dados.get('gerar_credito', False)  # 🆕 Nova opção
+        
+        print(f"💰 Modo: {'CRÉDITO ao cliente' if gerar_credito else 'DINHEIRO'}")
+        print(f"📝 Motivo: {motivo}")
+        print(f"📦 Itens para devolução: {len(itens_devolucao)}")
+        
+        if not caixa_id and not gerar_credito:
+            print(f"❌ Caixa ID não fornecido para devolução em dinheiro")
+            raise HTTPException(status_code=400, detail='ID do caixa é obrigatório para devolução em dinheiro')
+        
+        if not itens_devolucao:
+            print(f"❌ Nenhum item selecionado")
+            raise HTTPException(status_code=400, detail='Nenhum item selecionado para devolução')
+        
+        if not motivo:
+            print(f"❌ Motivo não fornecido")
+            raise HTTPException(status_code=400, detail='Motivo da devolução é obrigatório')
+        
+        # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
+        from app.caixa_models import Caixa, MovimentacaoCaixa
+        caixa = None
+        if not gerar_credito:
+            caixa = db.query(Caixa).filter_by(id=caixa_id, status='aberto').first()
+            
+            if not caixa:
+                raise HTTPException(status_code=400, detail='Caixa não encontrado ou não está aberto')
+        
+        valor_total_devolucao = 0
+        itens_devolvidos = []
+        
+        # Processar cada item devolvido
+        for item_dev in itens_devolucao:
+            item_id = item_dev.get('item_id')
+            quantidade_devolvida = float(item_dev.get('quantidade', 0))
+            
+            if quantidade_devolvida <= 0:
+                continue
+            
+            # Buscar o item da venda
+            item_venda = db.query(VendaItem).filter_by(id=item_id, venda_id=venda_id).first()
+            
+            if not item_venda:
+                raise HTTPException(status_code=404, detail=f'Item {item_id} não encontrado na venda')
+            
+            if quantidade_devolvida > item_venda.quantidade:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f'Quantidade devolvida ({quantidade_devolvida}) maior que quantidade vendida ({item_venda.quantidade})'
+                )
+            
+            # Devolver ao estoque
+            produto = db.query(Produto).filter_by(id=item_venda.produto_id).first()
+            if produto:
+                produto.estoque_atual += quantidade_devolvida
+                
+                # Registrar auditoria
+                log_action(
+                    db=db,
+                    user_id=current_user.id,
+                    action='update',
+                    entity_type='produtos',
+                    entity_id=produto.id,
+                    details=f'Devolução de estoque (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}'
+                )
+            
+            # Calcular valor devolvido
+            valor_item = item_venda.preco_unitario * Decimal(str(quantidade_devolvida))
+            valor_total_devolucao += valor_item
+            
+            itens_devolvidos.append({
+                'produto_id': item_venda.produto_id,
+                'produto_nome': item_venda.produto.nome if item_venda.produto else item_venda.servico_descricao,
+                'quantidade': quantidade_devolvida,
+                'valor_unitario': item_venda.preco_unitario,
+                'valor_total': valor_item
+            })
+        
+        # 💰 OPÇÃO 1: GERAR CRÉDITO PARA O CLIENTE
+        if gerar_credito:
+            if not venda.cliente_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail='Não é possível gerar crédito para venda sem cliente cadastrado'
+                )
+            
+            from app.models import Cliente
+            cliente = db.query(Cliente).get(venda.cliente_id)
+            if not cliente:
+                raise HTTPException(status_code=404, detail='Cliente não encontrado')
+            
+            # Adicionar crédito ao cliente
+            cliente.credito = (cliente.credito or Decimal('0')) + Decimal(str(valor_total_devolucao))
+            print(f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_total_devolucao:.2f} (Total: R$ {cliente.credito:.2f})")
+            
+            # Não cria MovimentacaoCaixa nem LancamentoManual (apenas crédito)
+            
+        # 💵 OPÇÃO 2: DEVOLUÇÃO EM DINHEIRO
+        else:
+            # Verificar se o caixa existe e está aberto
+            from app.caixa_models import Caixa
+            caixa = db.query(Caixa).filter_by(id=caixa_id, status='aberto').first()
+            
+            if not caixa:
+                raise HTTPException(status_code=400, detail='Caixa não encontrado ou não está aberto')
+            
+            # Registrar movimentação no caixa (devolução em dinheiro)
+            movimentacao = MovimentacaoCaixa(
+                caixa_id=caixa_id,
+                tipo='devolucao',
+                valor=valor_total_devolucao,
+                forma_pagamento='Dinheiro',
+                descricao=f'Devolução da venda #{venda.numero_venda} - {motivo}',
+                venda_id=venda_id,
+                usuario_id=current_user.id,
+                usuario_nome=current_user.nome
+            )
+            db.add(movimentacao)
+            
+            # Criar lançamento manual de saída (estorno no fluxo de caixa)
+            from app.financeiro_models import LancamentoManual, CategoriaFinanceira
+            
+            categoria_devolucoes = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.nome.ilike('%devolução%'),
+                CategoriaFinanceira.tipo == 'despesa'
+            ).first()
+            
+            if not categoria_devolucoes:
+                categoria_devolucoes = CategoriaFinanceira(
+                    nome="Devoluções de Vendas",
+                    tipo="despesa",
+                    user_id=current_user.id
+                )
+                db.add(categoria_devolucoes)
+                db.flush()
+            
+            lancamento_devolucao = LancamentoManual(
+                tipo='saida',
+                valor=Decimal(str(valor_total_devolucao)),
+                descricao=f"Devolução venda {venda.numero_venda} - {motivo}",
+                data_lancamento=date.today(),
+                status='realizado',
+                categoria_id=categoria_devolucoes.id,
+                documento=f"DEVOLUCAO-{venda_id}",
+                fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                user_id=current_user.id
+            )
+            db.add(lancamento_devolucao)
+            print(f"📊 Lançamento de devolução criado: R$ {valor_total_devolucao:.2f}")
+        
+        # 🆕 AJUSTAR CONTAS A RECEBER (sempre, independente de crédito ou dinheiro)
+        from app.financeiro_models import ContaReceber, LancamentoManual, CategoriaFinanceira
+        
+        contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
+        if contas_receber:
+            # Reduzir proporcionalmente o valor das contas pendentes ou estornar pagas
+            for conta in contas_receber:
+                if conta.status in ['pendente', 'parcial']:
+                    proporcao = valor_total_devolucao / float(venda.total)
+                    reducao = float(conta.valor_original) * proporcao
+                    
+                    conta.valor_original -= Decimal(str(reducao))
+                    conta.valor_final -= Decimal(str(reducao))
+                    
+                    # Se ficou zerada, marcar como cancelada
+                    if conta.valor_final <= 0:
+                        conta.status = 'cancelada'
+                    
+                    print(f"💳 Ajustando ContaReceber #{conta.id}: -R$ {reducao:.2f}")
+                elif conta.status == 'pago':
+                    # Cancelar a conta paga (estorno)
+                    conta.status = 'estornada'
+                    print(f"💳 Estornando ContaReceber #{conta.id} (paga)")
+        
+        # 🆕 ESTORNAR LANÇAMENTOS MANUAIS REALIZADOS (Fluxo de Caixa)
+        lancamentos = db.query(LancamentoManual).filter(
+            LancamentoManual.documento == f"VENDA-{venda_id}",
+            LancamentoManual.status == 'realizado'
+        ).all()
+        
+        if lancamentos:
+            # Buscar ou criar categoria de devoluções
+            categoria_devolucoes = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.nome.ilike('%devolução%'),
+                CategoriaFinanceira.tipo == 'despesa',
+                CategoriaFinanceira.user_id == current_user.id
+            ).first()
+            
+            if not categoria_devolucoes:
+                categoria_devolucoes = CategoriaFinanceira(
+                    nome="Devoluções de Vendas",
+                    tipo="despesa",
+                    user_id=current_user.id
+                )
+                db.add(categoria_devolucoes)
+                db.flush()
+            
+            for lanc in lancamentos:
+                proporcao = valor_total_devolucao / float(venda.total)
+                estorno = float(lanc.valor) * proporcao
+                
+                # Criar lançamento de estorno (saída)
+                estorno_lanc = LancamentoManual(
+                    tipo='saida',
+                    valor=Decimal(str(estorno)),
+                    descricao=f"Estorno devolução venda {venda.numero_venda} - {motivo}",
+                    data_lancamento=date.today(),
+                    status='realizado',
+                    categoria_id=categoria_devolucoes.id,
+                    documento=f"ESTORNO-VENDA-{venda_id}",
+                    fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                    user_id=current_user.id
+                )
+                db.add(estorno_lanc)
+                print(f"💸 Estorno criado no LancamentoManual: -R$ {estorno:.2f}")
+        
+        # 🆕 ATUALIZAR STATUS DA VENDA
+        if valor_total_devolucao >= float(venda.total) * 0.99:  # 99% devolvido = total
+            venda.status = 'finalizada_devolucao_total'
+        else:
+            venda.status = 'finalizada_devolucao_parcial'
+        
+        # Registrar auditoria da devolução
+        tipo_devolucao = "Crédito ao cliente" if gerar_credito else "Dinheiro"
+        log_action(
+            db=db,
+            user_id=current_user.id,
+            action='devolucao',
+            entity_type='vendas',
+            entity_id=venda_id,
+            details=f'Devolução registrada ({tipo_devolucao}) - Venda #{venda_id} - R$ {valor_total_devolucao:.2f} - Motivo: {motivo}'
+        )
+        
+        db.commit()
+        
+        resultado = {
+            'message': 'Devolução registrada com sucesso',
+            'venda_id': venda_id,
+            'valor_total_devolucao': valor_total_devolucao,
+            'tipo_devolucao': tipo_devolucao,
+            'status_venda': venda.status,
+            'itens_devolvidos': itens_devolvidos
+        }
+        
+        if gerar_credito:
+            from app.models import Cliente
+            cliente = db.query(Cliente).get(venda.cliente_id)
+            resultado['credito_cliente'] = float(cliente.credito)
+            resultado['cliente_nome'] = cliente.nome
+        else:
+            resultado['movimentacao_caixa_id'] = movimentacao.id
+        
+        print(f"✅ Devolução concluída com sucesso!")
+        print(f"{'='*80}\n")
+        return resultado
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"\n{'='*80}")
+        print(f"🚨 ERRO CRÍTICO NA DEVOLUÇÃO:")
+        print(f"{'='*80}")
+        print(f"Tipo: {type(e).__name__}")
+        print(f"Mensagem: {str(e)}")
+        import traceback
+        print(f"Traceback completo:")
+        traceback.print_exc()
+        print(f"{'='*80}\n")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao processar devolução: {str(e)}")
+
+
+# ============================================================================
+# ENDPOINTS - RELATÓRIOS
+# ============================================================================
+
+@router.get('/relatorios/resumo')
+def relatorio_resumo(
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """Relatório resumo de vendas"""
+    query = db.query(Venda).filter_by(user_id=current_user.id)
+    
+    if data_inicio:
+        data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        query = query.filter(Venda.data_venda >= data_inicio_dt)
+    
+    if data_fim:
+        data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+        data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+        query = query.filter(Venda.data_venda <= data_fim_dt)
+    
+    vendas = query.all()
+    
+    # Calcular resumo
+    total_vendas = len(vendas)
+    total_valor = sum(float(v.total) for v in vendas if v.status != 'cancelada')
+    total_canceladas = sum(1 for v in vendas if v.status == 'cancelada')
+    
+    # Por forma de pagamento
+    pagamentos_resumo = {}
+    for venda in vendas:
+        if venda.status != 'cancelada':
+            for pag in venda.pagamentos:
+                forma = pag.forma_pagamento
+                if forma not in pagamentos_resumo:
+                    pagamentos_resumo[forma] = 0
+                pagamentos_resumo[forma] += float(pag.valor)
+    
+    return {
+        'total_vendas': total_vendas,
+        'total_valor': total_valor,
+        'total_canceladas': total_canceladas,
+        'pagamentos_resumo': pagamentos_resumo,
+        'periodo': {
+            'inicio': data_inicio if data_inicio else None,
+            'fim': data_fim if data_fim else None
+        }
+    }
