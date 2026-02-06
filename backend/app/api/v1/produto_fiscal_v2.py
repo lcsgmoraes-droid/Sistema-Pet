@@ -210,17 +210,23 @@ def put_fiscal_produto(
         db.add(fiscal)
 
     # Campos fiscais
-    fiscal.origem_mercadoria = payload.get("origem_mercadoria")
-    fiscal.ncm = payload.get("ncm")
-    fiscal.cest = payload.get("cest")
-    fiscal.cfop_venda = payload.get("cfop")
+    fiscal.origem_mercadoria = payload.get("origem_mercadoria") or None
+    fiscal.ncm = payload.get("ncm") or None
+    fiscal.cest = payload.get("cest") or None
+    fiscal.cfop_venda = payload.get("cfop") or None
 
-    fiscal.cst_icms = payload.get("cst_icms")
-    fiscal.icms_aliquota = payload.get("icms_aliquota")
+    fiscal.cst_icms = payload.get("cst_icms") or None
+    # Converter strings vazias para None em campos numéricos
+    icms_aliq = payload.get("icms_aliquota")
+    fiscal.icms_aliquota = float(icms_aliq) if icms_aliq and str(icms_aliq).strip() else None
     fiscal.icms_st = payload.get("icms_st")
 
-    fiscal.pis_aliquota = payload.get("pis_aliquota")
-    fiscal.cofins_aliquota = payload.get("cofins_aliquota")
+    # Converter strings vazias para None em campos numéricos
+    pis_aliq = payload.get("pis_aliquota")
+    fiscal.pis_aliquota = float(pis_aliq) if pis_aliq and str(pis_aliq).strip() else None
+    
+    cofins_aliq = payload.get("cofins_aliquota")
+    fiscal.cofins_aliquota = float(cofins_aliq) if cofins_aliq and str(cofins_aliq).strip() else None
 
     fiscal.herdado_da_empresa = False
 

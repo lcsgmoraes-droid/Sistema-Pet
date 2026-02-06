@@ -15,7 +15,7 @@ class ProdutoConfigFiscal(Base):
     tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Vínculo com produto
-    produto_id = Column(Integer, ForeignKey("produto.id"), nullable=False, unique=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, unique=True)
 
     # Herança
     herdado_da_empresa = Column(Boolean, nullable=False, default=True)

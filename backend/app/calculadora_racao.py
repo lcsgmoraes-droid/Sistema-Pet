@@ -391,11 +391,18 @@ async def comparar_racoes(
         if not produtos:
             raise HTTPException(status_code=404, detail="Nenhuma ração encontrada com os filtros")
         
-        # Calcular para cada produto
+        # Calcular para cada produto usando SUA PRÓPRIA tabela de consumo
         resultados = []
-        quantidade_diaria_g = calcular_quantidade_diaria(peso_pet_kg, idade_meses, nivel_atividade)
         
         for produto in produtos:
+            # IMPORTANTE: Calcular quantidade diária ESPECÍFICA deste produto
+            quantidade_diaria_g = calcular_quantidade_diaria(
+                peso_pet_kg=peso_pet_kg,
+                idade_meses=idade_meses,
+                nivel_atividade=nivel_atividade,
+                tabela_consumo_json=produto.tabela_consumo  # ← USAR TABELA DO PRODUTO!
+            )
+            
             resultado = calcular_resultado(
                 peso_embalagem_kg=produto.peso_embalagem,
                 preco=produto.preco_venda,

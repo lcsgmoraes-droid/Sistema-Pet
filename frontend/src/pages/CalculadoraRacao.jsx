@@ -232,9 +232,16 @@ export default function CalculadoraRacao() {
                         }
                     );
                     
-                    // Mostrar SOMENTE essas duas rações
-                    setComparativo([calcPrincipal.data, racaoComparar]);
-                    toast.success(`Comparando 2 rações selecionadas!`);
+                    // Evitar duplicatas: se selecionou a mesma ração
+                    if (calcPrincipal.data.produto_id === racaoComparar.produto_id) {
+                        setComparativo([calcPrincipal.data]);
+                        toast.success(`Mostrando cálculo da ração selecionada`);
+                    } else {
+                        // Mostrar SOMENTE essas duas rações: selecionada primeiro, depois a comparada
+                        const duasRacoes = [calcPrincipal.data, racaoComparar];
+                        setComparativo(duasRacoes);
+                        toast.success(`Comparando 2 rações selecionadas!`);
+                    }
                 } else {
                     // Se não tem ração principal, mostrar só a do comparativo
                     setComparativo([racaoComparar]);
@@ -278,7 +285,10 @@ export default function CalculadoraRacao() {
                     
                     const racaoPrincipal = calcPrincipal.data;
                     
-                    // Adicionar a ração principal no início
+                    // ORDENAR só as outras rações por custo-benefício
+                    todasRacoes.sort((a, b) => a.custo_por_dia - b.custo_por_dia);
+                    
+                    // Colocar ração principal SEMPRE no topo
                     todasRacoes = [racaoPrincipal, ...todasRacoes];
                 }
                 
@@ -626,26 +636,43 @@ export default function CalculadoraRacao() {
                             <p className="subtitle">Ordenado por melhor custo-benefício (menor custo diário)</p>
 
                             <div className="comparativo-list">
-                                {comparativo.map((item, index) => {
-                                    const isSelecionada = form.produto_comparar_id && item.produto_id === parseInt(form.produto_comparar_id);
-                                    const isMelhor = index === 0 && !isSelecionada;
+                                {(() => {
+                                    // Encontrar menor custo diário
+                                    const menorCusto = Math.min(...comparativo.map(r => r.custo_por_dia));
                                     
-                                    return (
-                                        <div 
-                                            key={item.produto_id} 
-                                            className={`comparativo-item ${isMelhor ? 'melhor' : ''} ${isSelecionada ? 'selecionada' : ''}`}
-                                        >
-                                            {isSelecionada && <span className="badge-selecionada">⭐ Ração Selecionada para Comparação</span>}
-                                            {isMelhor && <span className="badge-melhor">🏆 Melhor Custo-Benefício</span>}
+                                    return comparativo.map((item, index) => {
+                                        // ⭐ Ração BASE (do campo "Selecionar Ração")
+                                        const isSelecionada = form.produto_id && item.produto_id === parseInt(form.produto_id);
+                                        // 🏆 Melhor custo-benefício
+                                        const isMelhor = item.custo_por_dia === menorCusto;
+                                        
+                                        return (
+                                            <div 
+                                                key={item.produto_id} 
+                                                className={`comparativo-item ${isMelhor ? 'melhor' : ''} ${isSelecionada ? 'selecionada' : ''}`}
+                                            >
+                                                {isSelecionada && <span className="badge-selecionada">⭐ Ração Selecionada para Comparação</span>}
+                                                {isMelhor && <span className="badge-melhor">🏆 Melhor Custo-Benefício</span>}
                                             
                                             <div className="item-header">
                                                 <div>
                                                 <h4>{item.produto_nome}</h4>
-                                                {item.classificacao && (
-                                                    <span className={`badge badge-${item.classificacao}`}>
-                                                        {item.classificacao.replace('_', ' ')}
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                                                    {item.classificacao && (
+                                                        <span className={`badge badge-${item.classificacao}`}>
+                                                            {item.classificacao.replace('_', ' ')}
+                                                        </span>
+                                                    )}
+                                                    <span style={{ 
+                                                        fontSize: '13px', 
+                                                        color: '#64748b',
+                                                        backgroundColor: '#f1f5f9',
+                                                        padding: '2px 8px',
+                                                        borderRadius: '4px'
+                                                    }}>
+                                                        🍽️ {item.quantidade_diaria_g}g/dia
                                                     </span>
-                                                )}
+                                                </div>
                                             </div>
                                             <div className="item-price">
                                                 R$ {item.preco.toFixed(2)}
@@ -670,11 +697,53 @@ export default function CalculadoraRacao() {
                                                 <span>R$ {item.custo_mensal.toFixed(2)}</span>
                                             </div>
                                         </div>
+
+                                        {/* Explicação detalhada para o melhor */}
+                                        {isMelhor && comparativo.length > 1 && (
+                                            <div style={{
+                                                marginTop: '12px',
+                                                padding: '12px',
+                                                backgroundColor: '#ecfdf5',
+                                                borderLeft: '3px solid #10b981',
+                                                borderRadius: '4px'
+                                            }}>
+                                                <p style={{ 
+                                                    margin: '0 0 6px 0', 
+                                                    fontSize: '13px', 
+                                                    fontWeight: '600',
+                                                    color: '#065f46'
+                                                }}>
+                                                    ✨ Por que esta é a melhor opção?
+                                                </p>
+                                                <p style={{ 
+                                                    margin: '0', 
+                                                    fontSize: '13px', 
+                                                    color: '#047857',
+                                                    lineHeight: '1.5'
+                                                }}>
+                                                    Apesar de {item.classificacao === 'premium' || item.classificacao === 'super_premium' ? 
+                                                        `ter um preço mais alto (R$ ${item.preco.toFixed(2)})` : 
+                                                        `custar R$ ${item.preco.toFixed(2)}`}, 
+                                                    esta ração {item.classificacao === 'super_premium' ? 
+                                                        'super premium é muito concentrada em nutrientes' : 
+                                                        item.classificacao === 'premium' ? 
+                                                        'premium tem melhor densidade nutricional' : 
+                                                        'tem excelente eficiência alimentar'}, 
+                                                    então seu pet consome apenas <strong>{item.quantidade_diaria_g}g por dia</strong>.
+                                                    {comparativo[1] && (
+                                                        <> Em comparação, a segunda opção requer <strong>{comparativo[1].quantidade_diaria_g}g/dia</strong>, 
+                                                        resultando em um custo diário <strong>R$ {(comparativo[1].custo_por_dia - item.custo_por_dia).toFixed(2)} maior</strong> 
+                                                        (R$ {item.custo_por_dia.toFixed(2)} vs R$ {comparativo[1].custo_por_dia.toFixed(2)}).</>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
-                                );
-                            })}
+                                        );
+                                    });
+                                })()}
+                            </div>
                         </div>
-                    </div>
                     )}
                 </div>
             </div>
