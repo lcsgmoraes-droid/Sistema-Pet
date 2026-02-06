@@ -1252,7 +1252,7 @@ async def get_resumo_financeiro_cliente(
     # Verificar se cliente existe
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
-        Cliente.user_id == user.id
+        Cliente.tenant_id == tenant_id
     ).first()
     
     if not cliente:
@@ -1266,7 +1266,7 @@ async def get_resumo_financeiro_cliente(
     # 1. Total de vendas no período
     total_vendas = db.query(func.sum(Venda.total)).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id,
+        Venda.tenant_id == tenant_id,
         Venda.status.notin_(['cancelada', 'devolvida']),
         Venda.data_venda >= data_limite
     ).scalar() or 0
@@ -1274,7 +1274,7 @@ async def get_resumo_financeiro_cliente(
     # 2. Quantidade de vendas no período
     qtd_vendas = db.query(func.count(Venda.id)).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id,
+        Venda.tenant_id == tenant_id,
         Venda.status.notin_(['cancelada', 'devolvida']),
         Venda.data_venda >= data_limite
     ).scalar() or 0
@@ -1284,7 +1284,7 @@ async def get_resumo_financeiro_cliente(
         func.sum(ContaReceber.valor_original - func.coalesce(ContaReceber.valor_recebido, 0))
     ).filter(
         ContaReceber.cliente_id == cliente_id,
-        ContaReceber.user_id == user.id,
+        ContaReceber.tenant_id == tenant_id,
         ContaReceber.status == 'pendente'
     ).scalar() or 0
     
@@ -1293,7 +1293,7 @@ async def get_resumo_financeiro_cliente(
         func.sum(ContaReceber.valor_original - func.coalesce(ContaReceber.valor_recebido, 0))
     ).filter(
         ContaReceber.cliente_id == cliente_id,
-        ContaReceber.user_id == user.id,
+        ContaReceber.tenant_id == tenant_id,
         ContaReceber.status == 'pendente',
         ContaReceber.data_vencimento < date.today()
     ).scalar() or 0
@@ -1301,7 +1301,7 @@ async def get_resumo_financeiro_cliente(
     # 5. Última compra (só buscar 1 registro)
     ultima_venda = db.query(Venda).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id,
+        Venda.tenant_id == tenant_id,
         Venda.status.notin_(['cancelada', 'devolvida'])
     ).order_by(desc(Venda.data_venda)).first()
     
@@ -1321,7 +1321,7 @@ async def get_resumo_financeiro_cliente(
     # 7. Contagem total de transações no histórico (para saber se tem histórico completo)
     total_transacoes = db.query(func.count(Venda.id)).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id
+        Venda.tenant_id == tenant_id
     ).scalar() or 0
     
     return {

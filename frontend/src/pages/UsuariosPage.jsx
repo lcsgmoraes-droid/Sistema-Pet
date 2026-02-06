@@ -242,7 +242,7 @@ export default function UsuariosPage() {
                           {role.nome}
                         </option>
                       ))
-                    )}ion>
+                    )}
                     <option value="manager">Gerente</option>
                   </select>
                 </div>

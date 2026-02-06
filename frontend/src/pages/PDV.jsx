@@ -36,7 +36,8 @@ import {
   Star,
   RefreshCw,
   Scale,
-  Calculator
+  Calculator,
+  Bell
 } from 'lucide-react';
 import { criarVenda, finalizarVenda, listarVendas, buscarVenda } from '../api/vendas';
 import { getProdutos, getProdutosVendaveis } from '../api/produtos';
@@ -51,6 +52,7 @@ import HistoricoCliente from '../components/pdv/HistoricoCliente';
 import ClienteInfoWidget from '../components/ClienteInfoWidget';
 import AnaliseVendaDrawer from '../components/AnaliseVendaDrawer';
 import ModalCalculadoraRacaoPDV from '../components/pdv/ModalCalculadoraRacaoPDV';
+import ModalPendenciasEstoque from '../components/pdv/ModalPendenciasEstoque';
 import api from '../api';
 import { formatarVariacao, nomeCompletoVariacao } from '../utils/variacoes';
 import { ehRacao, contarRacoes, obterUltimaRacao } from '../helpers/deteccaoRacao';
@@ -75,6 +77,7 @@ export default function PDV() {
     total: 0,
     observacoes: '',
     funcionario_id: null,  // ✅ Funcionário para comissão
+    entregador_id: null,  // 🚚 Entregador para entrega
     tem_entrega: false,
     entrega: {
       endereco_completo: '',
@@ -97,6 +100,8 @@ export default function PDV() {
   const [mostrarModalAbrirCaixa, setMostrarModalAbrirCaixa] = useState(false);
   const [mostrarVendasEmAberto, setMostrarVendasEmAberto] = useState(false);
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
+  const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] = useState(false);
+  const [pendenciasCount, setPendenciasCount] = useState(0);
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [vendasRecentes, setVendasRecentes] = useState([]);
   const [filtroVendas, setFiltroVendas] = useState('24h');
@@ -104,6 +109,7 @@ export default function PDV() {
   const [filtroTemEntrega, setFiltroTemEntrega] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
+  const [searchVendaQuery, setSearchVendaQuery] = useState('');
   const [caixaKey, setCaixaKey] = useState(0); // Para forçar recarga do MenuCaixa
   const [temCaixaAberto, setTemCaixaAberto] = useState(false);
   
@@ -126,6 +132,11 @@ export default function PDV() {
   const [buscaFuncionario, setBuscaFuncionario] = useState('');  // Texto de busca
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);  // Guardar status antes de reabrir
   
+  // 🚚 Estados para Entregadores e Custo Operacional (DECLARAR ANTES DOS useEffects)
+  const [entregadores, setEntregadores] = useState([]);
+  const [entregadorSelecionado, setEntregadorSelecionado] = useState(null);
+  const [custoOperacionalEntrega, setCustoOperacionalEntrega] = useState(0);
+  
   // ✅ Sincronizar funcionario_id com vendaAtual sempre que mudar
   useEffect(() => {
     setVendaAtual(prev => ({
@@ -133,6 +144,15 @@ export default function PDV() {
       funcionario_id: funcionarioComissao?.id || null
     }));
   }, [funcionarioComissao]);
+
+  // ✅ Sincronizar entregador_id com vendaAtual sempre que mudar
+  useEffect(() => {
+    console.log('🔄 Sincronizando entregador_id:', entregadorSelecionado?.id || null);
+    setVendaAtual(prev => ({
+      ...prev,
+      entregador_id: entregadorSelecionado?.id || null
+    }));
+  }, [entregadorSelecionado]);
 
   // Estados do drawer de análise de venda
   const [mostrarAnaliseVenda, setMostrarAnaliseVenda] = useState(false);
@@ -174,6 +194,13 @@ export default function PDV() {
     localStorage.setItem('pdv_painel_vendas_aberto', JSON.stringify(painelVendasAberto));
   }, [painelVendasAberto]);
 
+  // Carregar pendências quando o cliente mudar
+  useEffect(() => {
+    if (vendaAtual.cliente) {
+      carregarPendencias();
+    }
+  }, [vendaAtual.cliente]);
+
   // Salvar dados do carrinho no sessionStorage para a calculadora universal
   useEffect(() => {
     if (vendaAtual.itens && vendaAtual.itens.length > 0) {
@@ -201,6 +228,130 @@ export default function PDV() {
       setTemCaixaAberto(!!response.data); // true se houver caixa, false se não
     } catch (error) {
       setTemCaixaAberto(false);
+    }
+  };
+  
+  // 🚚 Carregar entregadores disponíveis ao iniciar
+  useEffect(() => {
+    console.log('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
+    carregarEntregadores();
+  }, []);
+  
+  const carregarEntregadores = async () => {
+    console.log('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
+    try {
+      console.log('📦 Fazendo request para /clientes...');
+      const response = await api.get('/clientes', {
+        params: {
+          is_entregador: true,
+          incluir_inativos: false,
+          limit: 100
+        }
+      });
+      
+      console.log('✅ Response recebido:', response.data);
+      const entregadoresList = response.data.clientes || response.data || [];
+      console.log('📋 Total de entregadores carregados:', entregadoresList.length);
+      console.log('📋 Lista completa:', entregadoresList);
+      setEntregadores(entregadoresList);
+      
+      // Pré-selecionar entregador padrão
+      const entregadorPadrao = entregadoresList.find(e => {
+        console.log('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
+        return e.entregador_padrao === true;
+      });
+      
+      console.log('🔍 Resultado da busca do padrão:', entregadorPadrao);
+      
+      if (entregadorPadrao) {
+        console.log('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
+        setEntregadorSelecionado(entregadorPadrao);
+        // ✅ Setar IMEDIATAMENTE no vendaAtual também (evitar race condition)
+        setVendaAtual(prev => {
+          console.log('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
+          return {
+            ...prev,
+            entregador_id: entregadorPadrao.id
+          };
+        });
+        calcularCustoOperacional(entregadorPadrao);
+      } else {
+        console.error('❌❌❌ NENHUM ENTREGADOR PADRÃO ENCONTRADO!');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar entregadores:', error);
+      toast.error('Erro ao carregar lista de entregadores');
+    }
+  };
+  
+  // 🚚 Calcular custo operacional baseado no entregador selecionado
+  const calcularCustoOperacional = async (entregador) => {
+    if (!entregador) {
+      setCustoOperacionalEntrega(0);
+      return;
+    }
+    
+    let custo = 0;
+    
+    // Modelo 1: Taxa Fixa
+    if (entregador.modelo_custo_entrega === 'taxa_fixa' && entregador.taxa_fixa_entrega) {
+      custo = Number(entregador.taxa_fixa_entrega);
+    }
+    // Modelo 2: Por KM (precisaria da distância - por enquanto usar taxa fixa ou 0)
+    else if (entregador.modelo_custo_entrega === 'por_km' && entregador.valor_por_km_entrega) {
+      // TODO: Integrar com cálculo de distância da API de mapas
+      // Por enquanto, assumir 0 ou usar valor fixo como fallback
+      custo = 0;
+      console.log('⚠️ Modelo por KM requer cálculo de distância');
+    }
+    // Modelo 3: Rateio RH (buscar do backend)
+    else if (entregador.modelo_custo_entrega === 'rateio_rh' && entregador.controla_rh) {
+      try {
+        // Buscar custo calculado pelo backend
+        const response = await api.get(`/entregadores/${entregador.id}/custo-operacional`);
+        custo = response.data.custo_por_entrega || 0;
+      } catch (error) {
+        console.error('Erro ao buscar custo RH:', error);
+        // Fallback: usar custo_rh_ajustado se disponível
+        custo = entregador.custo_rh_ajustado || 0;
+      }
+    }
+    // Fallback: buscar da configuração global
+    else {
+      try {
+        const response = await api.get('/configuracoes/entregas');
+        custo = response.data.taxa_fixa || 0;
+      } catch (error) {
+        console.error('Erro ao buscar configuração de entrega:', error);
+        custo = 10; // Valor padrão
+      }
+    }
+    
+    setCustoOperacionalEntrega(custo);
+  };
+  
+  // 🚚 Atualizar custo operacional quando entregador mudar
+  useEffect(() => {
+    if (vendaAtual.tem_entrega && entregadorSelecionado) {
+      calcularCustoOperacional(entregadorSelecionado);
+    } else {
+      setCustoOperacionalEntrega(0);
+    }
+  }, [entregadorSelecionado, vendaAtual.tem_entrega]);
+
+  // Carregar pendências de estoque do cliente
+  const carregarPendencias = async () => {
+    if (!vendaAtual.cliente) {
+      setPendenciasCount(0);
+      return;
+    }
+    
+    try {
+      const response = await api.get(`/pendencias-estoque/cliente/${vendaAtual.cliente.id}`);
+      const pendenciasAtivas = response.data.filter(p => p.status === 'pendente' || p.status === 'notificado');
+      setPendenciasCount(pendenciasAtivas.length);
+    } catch (error) {
+      setPendenciasCount(0);
     }
   };
 
@@ -612,6 +763,7 @@ export default function PDV() {
         total: venda.total || 0,
         observacoes: venda.observacoes || '',
         funcionario_id: venda.funcionario_id || null,  // ✅ Funcionário de comissão
+        entregador_id: venda.entregador_id || null,  // ✅ Entregador
         tem_entrega: venda.tem_entrega || false,
         entrega: venda.entrega || {
           endereco_completo: '',
@@ -627,6 +779,14 @@ export default function PDV() {
       setVendaAtual(vendaCarregada);
       setModoVisualizacao(true); // Modo leitura para venda existente
       
+      // 🚚 Sincronizar entregador selecionado se a venda tem entregador
+      if (venda.entregador_id) {
+        const entregador = entregadores.find(e => e.id === venda.entregador_id);
+        if (entregador) {
+          setEntregadorSelecionado(entregador);
+        }
+      }
+      
       // 🆕 Se foi solicitado, abre o modal de pagamento após carregar
       if (abrirModalPagamento) {
         setTimeout(() => {
@@ -637,6 +797,69 @@ export default function PDV() {
     } catch (error) {
       console.error('Erro ao carregar venda:', error);
       alert('Erro ao carregar venda: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Buscar venda por número ou termo de busca
+  const handleBuscarVenda = async () => {
+    if (!searchVendaQuery.trim()) return;
+    
+    try {
+      setLoading(true);
+      
+      // Extrair apenas números da query (exemplo: "VEN-0011" -> "0011")
+      const numeroLimpo = searchVendaQuery.replace(/\D/g, '');
+      
+      if (!numeroLimpo) {
+        alert('Digite um número de venda válido');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('🔍 Buscando venda com número:', numeroLimpo);
+      
+      // Buscar diretamente usando o parâmetro 'busca' do backend
+      const resultado = await listarVendas({ 
+        busca: numeroLimpo,
+        per_page: 50
+      });
+      
+      console.log('📊 Vendas encontradas:', resultado.vendas?.length);
+      
+      if (!resultado.vendas || resultado.vendas.length === 0) {
+        alert(`Nenhuma venda encontrada com "${numeroLimpo}"`);
+        setLoading(false);
+        return;
+      }
+      
+      // Se encontrou apenas uma, carregar direto
+      if (resultado.vendas.length === 1) {
+        await carregarVendaEspecifica(resultado.vendas[0].id);
+        setSearchVendaQuery(''); // Limpar campo após buscar
+        return;
+      }
+      
+      // Se encontrou múltiplas, mostrar lista para escolher
+      const escolha = resultado.vendas
+        .slice(0, 10) // Mostrar no máximo 10
+        .map((v, i) => `${i + 1}. ${v.numero_venda} - ${v.cliente_nome || 'Sem cliente'} - ${v.status}`)
+        .join('\n');
+      
+      const numeroEscolhido = prompt(
+        `Encontradas ${resultado.vendas.length} vendas. Digite o número da opção:\n\n${escolha}`
+      );
+      
+      const indice = parseInt(numeroEscolhido) - 1;
+      if (indice >= 0 && indice < resultado.vendas.length) {
+        await carregarVendaEspecifica(resultado.vendas[indice].id);
+        setSearchVendaQuery(''); // Limpar campo após buscar
+      }
+      
+    } catch (error) {
+      console.error('Erro ao buscar venda:', error);
+      alert('Erro ao buscar venda: ' + (error.message || 'Erro desconhecido'));
     } finally {
       setLoading(false);
     }
@@ -905,7 +1128,13 @@ export default function PDV() {
           distancia_km: vendaAtual.entrega?.distancia_km,
           valor_por_km: vendaAtual.entrega?.valor_por_km,
           loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: vendaAtual.entrega?.entregador_id
+          entregador_id: vendaAtual.entregador_id
+        });
+        
+        console.log('🚨 DEBUG - Payload sendo enviado:', {
+          tem_entrega: vendaAtual.tem_entrega,
+          entregador_id: vendaAtual.entregador_id,
+          vendaAtual_completo: vendaAtual
         });
         
         // Buscar pagamentos atualizados
@@ -951,7 +1180,7 @@ export default function PDV() {
           console.error('⚠️ ERRO: Checkbox marcado mas funcionário não selecionado!');
         }
         
-        await criarVenda({
+        const payloadVenda = {
           cliente_id: vendaAtual.cliente?.id,
           funcionario_id: vendaAtual.funcionario_id,  // ✅ Usar do vendaAtual (sincronizado via useEffect)
           itens: vendaAtual.itens.map(item => ({
@@ -975,8 +1204,18 @@ export default function PDV() {
           distancia_km: vendaAtual.entrega?.distancia_km,
           valor_por_km: vendaAtual.entrega?.valor_por_km,
           loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: vendaAtual.entrega?.entregador_id
+          entregador_id: vendaAtual.entregador_id
+        };
+
+        console.log('📦 PAYLOAD COMPLETO antes de enviar:', JSON.stringify(payloadVenda, null, 2));
+        console.log('🚚 Dados de entrega:', {
+          tem_entrega: vendaAtual.tem_entrega,
+          entregador_id: vendaAtual.entregador_id,
+          entregadorSelecionado: entregadorSelecionado?.id,
+          vendaAtual_completo: vendaAtual
         });
+
+        await criarVenda(payloadVenda);
 
         alert('Venda salva com sucesso!');
         limparVenda();
@@ -984,8 +1223,13 @@ export default function PDV() {
       
       carregarVendasRecentes();
     } catch (error) {
-      console.error('Erro ao salvar venda:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar venda');
+      console.error('❌ Erro ao salvar venda:', error);
+      console.error('❌ Resposta do servidor:', error.response?.data);
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ Headers:', error.response?.headers);
+      const errorDetail = error.response?.data?.detail || error.response?.data?.message || 'Erro ao salvar venda';
+      console.error('❌ Detalhes do erro:', errorDetail);
+      alert(`Erro ao salvar venda: ${errorDetail}`);
     } finally {
       setLoading(false);
     }
@@ -1124,6 +1368,7 @@ export default function PDV() {
       total: 0,
       observacoes: '',
       funcionario_id: null,  // ✅ Limpar funcionário de comissão
+      entregador_id: entregadorSelecionado?.id || null,  // 🚚 Manter entregador padrão
       tem_entrega: false,
       entrega: {
         endereco_completo: '',
@@ -1384,10 +1629,52 @@ export default function PDV() {
                   })}
                 </p>
               </div>
+              
+              {/* Busca Rápida de Venda */}
+              <div className="flex items-center gap-2 ml-6">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar venda (Ex: 0011)"
+                    value={searchVendaQuery}
+                    onChange={(e) => setSearchVendaQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && searchVendaQuery.trim()) {
+                        handleBuscarVenda();
+                      }
+                    }}
+                    className="pl-10 pr-4 py-2 w-64 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                  />
+                  <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+                </div>
+                <button
+                  onClick={handleBuscarVenda}
+                  disabled={!searchVendaQuery.trim() || loading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Buscar
+                </button>
+              </div>
             </div>
 
             {/* Ações rápidas */}
             <div className="flex items-center space-x-3">
+              {/* Botão Pendências de Estoque */}
+              {vendaAtual.cliente && (
+                <button
+                  onClick={() => setMostrarPendenciasEstoque(true)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-orange-50 border-2 border-orange-400 rounded-lg transition-colors relative"
+                  title="Lista de espera - Produtos sem estoque"
+                >
+                  <Bell className="w-5 h-5 text-orange-500" />
+                  {pendenciasCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                      {pendenciasCount}
+                    </span>
+                  )}
+                </button>
+              )}
+              
               {/* Botão Oportunidades Inteligentes - D4 Backend Integration */}
               {/* ✅ RULE: Botão só aparece se cliente selecionado */}
               {vendaAtual.cliente && (
@@ -2198,6 +2485,47 @@ export default function PDV() {
                       rows={3}
                     />
                   </div>
+                  
+                  {/* 🚚 Seletor de Entregador */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Entregador
+                    </label>
+                    <select
+                      value={entregadorSelecionado?.id || ''}
+                      onChange={(e) => {
+                        const entregador = entregadores.find(ent => ent.id === parseInt(e.target.value));
+                        setEntregadorSelecionado(entregador);
+                        setVendaAtual({
+                          ...vendaAtual,
+                          entregador_id: entregador?.id || null
+                        });
+                        if (entregador) {
+                          calcularCustoOperacional(entregador);
+                        }
+                      }}
+                      disabled={modoVisualizacao}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Selecione um entregador</option>
+                      {entregadores.map(entregador => (
+                        <option key={entregador.id} value={entregador.id}>
+                          {entregador.nome_fantasia || entregador.nome}
+                          {entregador.entregador_padrao && ' (Padrão)'}
+                        </option>
+                      ))}
+                    </select>
+                    {entregadorSelecionado && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Modelo: {
+                          entregadorSelecionado.modelo_custo_entrega === 'taxa_fixa' ? '💵 Taxa Fixa' :
+                          entregadorSelecionado.modelo_custo_entrega === 'por_km' ? '🚗 Por KM' :
+                          entregadorSelecionado.modelo_custo_entrega === 'rateio_rh' ? '👔 Rateio RH' :
+                          '⚙️ Configuração Global'
+                        }
+                      </p>
+                    )}
+                  </div>
 
                   {/* Taxas de Entrega */}
                   <div className="space-y-3">
@@ -2307,19 +2635,27 @@ export default function PDV() {
                       Preencha a taxa total e depois divida entre loja e entregador. Ao alterar uma, a outra é calculada automaticamente.
                     </p>
                     
-                    {/* 💼 Indicador de Custo Operacional (discreto) */}
-                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-amber-600">💼</span>
-                          <span className="text-sm font-medium text-amber-900">Custo Operacional</span>
+                    {/* 💼 Indicador de Custo Operacional (dinâmico) */}
+                    {entregadorSelecionado && custoOperacionalEntrega > 0 && (
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-600">💼</span>
+                            <span className="text-sm font-medium text-amber-900">Custo Operacional</span>
+                          </div>
+                          <span className="text-sm font-semibold text-amber-700">
+                            R$ {custoOperacionalEntrega.toFixed(2)}
+                          </span>
                         </div>
-                        <span className="text-sm font-semibold text-amber-700">R$ 10,00</span>
+                        <p className="text-xs text-amber-600 mt-1 italic">
+                          {entregadorSelecionado.nome_fantasia || entregadorSelecionado.nome} - 
+                          {entregadorSelecionado.modelo_custo_entrega === 'taxa_fixa' && ' Taxa Fixa'}
+                          {entregadorSelecionado.modelo_custo_entrega === 'por_km' && ' Valor por KM'}
+                          {entregadorSelecionado.modelo_custo_entrega === 'rateio_rh' && ' Rateio de RH'}
+                          {' '}(não aparece no cupom)
+                        </p>
                       </div>
-                      <p className="text-xs text-amber-600 mt-1 italic">
-                        Taxa deduzida do lucro para cálculo de comissões (não aparece no cupom)
-                      </p>
-                    </div>
+                    )}
                   </div>
 
                   <div>
@@ -3003,6 +3339,16 @@ export default function PDV() {
             }
             setMostrarCalculadoraRacao(false);
           }}
+        />
+      )}
+
+      {/* Modal de Pendências de Estoque */}
+      {mostrarPendenciasEstoque && vendaAtual.cliente && (
+        <ModalPendenciasEstoque
+          isOpen={mostrarPendenciasEstoque}
+          onClose={() => setMostrarPendenciasEstoque(false)}
+          clienteId={vendaAtual.cliente.id}
+          onPendenciaAdicionada={() => carregarPendencias()}
         />
       )}
 

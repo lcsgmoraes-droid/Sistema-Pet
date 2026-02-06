@@ -32,21 +32,181 @@ def listar_rotas(
 ):
     """
     Lista rotas de entrega do tenant.
+    
+    OTIMIZAÇÃO: Não otimiza automaticamente para economizar chamadas à API.
+    Use POST /rotas-entrega/otimizar para otimizar manualmente.
     """
+    from sqlalchemy.orm import joinedload
+    
     user, tenant_id = user_and_tenant
     
-    query = db.query(RotaEntrega).filter(RotaEntrega.tenant_id == tenant_id)
+    query = db.query(RotaEntrega).options(
+        joinedload(RotaEntrega.entregador),
+        joinedload(RotaEntrega.paradas)
+    ).filter(RotaEntrega.tenant_id == tenant_id)
     
     if status:
         query = query.filter(RotaEntrega.status == status)
     
-    rotas = query.order_by(RotaEntrega.created_at.desc()).all()
+    # Ordenar: rotas com paradas otimizadas primeiro, depois por data
+    rotas = query.order_by(RotaEntrega.created_at.asc()).all()
     
-    # Carregar entregador para cada rota
+    # Se a rota tem paradas, ordenar internamente pelas paradas.ordem
     for rota in rotas:
-        rota.entregador = db.query(Cliente).filter(Cliente.id == rota.entregador_id).first()
+        if rota.paradas:
+            rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
     
     return rotas
+
+
+@router.get("/vendas-pendentes/listar")
+def listar_vendas_pendentes_entrega(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Lista vendas com entrega pendente (sem rota criada ainda).
+    
+    CRITÉRIO: tem_entrega = true E status_entrega não é 'entregue' ou 'cancelada'
+    Não importa se a venda está aberta ou finalizada (pode pagar na entrega).
+    
+    Retorna em ordem:
+    1. Vendas com ordem_entrega_otimizada (já otimizadas)
+    2. Vendas novas sem ordem (cronológico)
+    
+    Economiza chamadas à API: só otimiza quando usuário clicar no botão.
+    """
+    user, tenant_id = user_and_tenant
+    
+    # Buscar vendas com entrega pendente
+    # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
+    vendas = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.tem_entrega == True,
+        # Aceita vendas abertas OU finalizadas
+        # Só exclui se já foi entregue ou cancelada
+        ~Venda.status_entrega.in_(["entregue", "cancelada"])
+    ).order_by(
+        # Primeiro: vendas com ordem otimizada
+        Venda.ordem_entrega_otimizada.asc().nullslast(),
+        # Depois: vendas novas por data
+        Venda.created_at.asc()
+    ).all()
+    
+    return [{
+        "id": v.id,
+        "numero_venda": v.numero_venda,
+        "cliente_id": v.cliente_id,
+        "cliente_nome": v.cliente.nome if v.cliente else "Cliente não cadastrado",
+        "endereco_entrega": v.endereco_entrega,
+        "taxa_entrega": float(v.taxa_entrega) if v.taxa_entrega else 0,
+        "distancia_km": float(v.distancia_km) if v.distancia_km else None,
+        "ordem_otimizada": v.ordem_entrega_otimizada,
+        "data_venda": v.data_venda.isoformat() if v.data_venda else None,
+        "total": float(v.total) if v.total else 0,
+        "entregador_id": v.entregador_id,
+        "entregador_nome": v.entregador.nome if v.entregador else None,
+    } for v in vendas]
+
+
+@router.post("/vendas-pendentes/otimizar")
+def otimizar_vendas_pendentes(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Otimiza ordem de entrega das vendas pendentes usando Google Maps.
+    Salva a ordem no banco para evitar chamadas futuras à API.
+    
+    Esta é a ÚNICA vez que chama o Google Maps - depois só lê do banco!
+    """
+    from app.services.google_maps_service import calcular_rota_otimizada
+    
+    user, tenant_id = user_and_tenant
+    
+    # Buscar configuração para ponto inicial
+    config = db.query(ConfiguracaoEntrega).filter(
+        ConfiguracaoEntrega.tenant_id == tenant_id
+    ).first()
+    
+    if not config or not config.logradouro:
+        raise HTTPException(
+            status_code=400, 
+            detail="Configure o endereço da loja em Configurações > Entregas primeiro"
+        )
+    
+    # Montar endereço completo
+    origem = ", ".join(filter(None, [
+        config.logradouro,
+        config.numero,
+        config.bairro,
+        config.cidade,
+        config.estado,
+        config.cep
+    ]))
+    
+    logger.info(f"📍 Ponto de origem: {origem}")
+    
+    # Buscar TODAS as vendas pendentes (incluindo as já otimizadas - RE-otimizar)
+    # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
+    vendas = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.tem_entrega == True,
+        ~Venda.status_entrega.in_(["entregue", "cancelada"]),
+        Venda.endereco_entrega.isnot(None)
+    ).order_by(Venda.created_at.asc()).all()
+    
+    if not vendas:
+        raise HTTPException(status_code=404, detail="Nenhuma venda pendente para otimizar")
+    
+    logger.info(f"📦 Encontradas {len(vendas)} vendas para otimizar")
+    
+    if len(vendas) == 1:
+        # Se só tem 1, não precisa otimizar
+        vendas[0].ordem_entrega_otimizada = 1
+        db.commit()
+        logger.info("✅ Apenas 1 venda, ordem definida como 1")
+        return {"message": "Apenas 1 venda, ordem definida como 1", "total_otimizado": 1}
+    
+    try:
+        # Extrair endereços
+        destinos = [v.endereco_entrega for v in vendas]
+        
+        logger.info(f"🗺️ Chamando Google Maps para otimizar {len(destinos)} entregas...")
+        logger.info(f"📍 Origem: {origem}")
+        for i, dest in enumerate(destinos, 1):
+            logger.info(f"   {i}. {dest}")
+        
+        # Chamar Google Maps UMA VEZ
+        ordem_indices, legs = calcular_rota_otimizada(origem, destinos)
+        
+        logger.info(f"🎯 Google Maps retornou ordem: {ordem_indices}")
+        
+        # Salvar ordem otimizada no banco
+        for posicao, indice_original in enumerate(ordem_indices, start=1):
+            if indice_original < len(vendas):
+                venda = vendas[indice_original]
+                venda.ordem_entrega_otimizada = posicao
+                logger.info(f"   Posição {posicao}: Venda {venda.numero_venda} (índice {indice_original})")
+        
+        db.commit()
+        
+        logger.info(f"✅ Ordem salva! {len(ordem_indices)} vendas otimizadas")
+        
+        # Retornar ordem legível
+        ordem_vendas = [vendas[i].numero_venda for i in ordem_indices]
+        logger.info(f"📋 Ordem final: {ordem_vendas}")
+        
+        return {
+            "message": f"Rotas otimizadas com sucesso! Ordem salva no banco.",
+            "total_otimizado": len(ordem_indices),
+            "ordem": ordem_vendas
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao otimizar rotas: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao otimizar rotas: {str(e)}")
 
 
 @router.get("/{rota_id}", response_model=RotaEntregaResponse)

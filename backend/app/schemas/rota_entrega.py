@@ -7,6 +7,16 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+class ClienteEntregadorResponse(BaseModel):
+    """Schema simplificado de Cliente para entregador"""
+    id: int
+    nome: str
+    telefone: Optional[str] = None
+    celular: Optional[str] = None
+    
+    model_config = {"from_attributes": True}
+
+
 class RotaEntregaBase(BaseModel):
     """Schema base para rotas de entrega"""
     venda_id: Optional[int] = None
@@ -78,6 +88,9 @@ class RotaEntregaResponse(RotaEntregaBase):
     
     # ETAPA 9.3: Incluir paradas ordenadas
     paradas: Optional[List[RotaEntregaParadaResponse]] = []
+    
+    # Incluir dados do entregador
+    entregador: Optional[ClienteEntregadorResponse] = None
 
     model_config = {"from_attributes": True}
 

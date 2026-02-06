@@ -73,6 +73,7 @@ const Pessoas = () => {
     // Campos de entrega (Sprint 1 - Bloco 4)
     is_entregador: false,
     entregador_ativo: true,
+    entregador_padrao: false,
     tipo_vinculo_entrega: '',
     // Funcionário com controla RH
     controla_rh: false,
@@ -360,6 +361,10 @@ const Pessoas = () => {
         clienteData.tipo_cadastro = 'cliente';
       }
       
+      // 🐛 DEBUG: Verificar entregador_padrao
+      console.log('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
+      console.log('🐛 is_entregador:', clienteData.is_entregador);
+      
       console.log('Dados enviados:', clienteData);
       
       let clienteId;
@@ -493,6 +498,16 @@ const Pessoas = () => {
   const openModal = (cliente = null, tipo = null, petIdToEdit = null) => {
     if (cliente) {
       setEditingCliente(cliente);
+      
+      // 🐛 DEBUG: Verificar o que vem do backend
+      console.log('🐛 Cliente carregado do backend:', {
+        id: cliente.id,
+        nome: cliente.nome,
+        is_entregador: cliente.is_entregador,
+        entregador_padrao: cliente.entregador_padrao,
+        entregador_padrao_tipo: typeof cliente.entregador_padrao
+      });
+      
       setFormData({
         tipo_cadastro: cliente.tipo_cadastro || 'cliente',
         tipo_pessoa: cliente.tipo_pessoa || 'PF',
@@ -524,9 +539,11 @@ const Pessoas = () => {
         // Campos de entrega
         is_entregador: cliente.is_entregador || false,
         entregador_ativo: cliente.entregador_ativo !== undefined ? cliente.entregador_ativo : true,
+        entregador_padrao: cliente.entregador_padrao || false,
         tipo_vinculo_entrega: cliente.tipo_vinculo_entrega || '',
         // Funcionário com controla RH
         controla_rh: cliente.controla_rh || false,
+        gera_conta_pagar_custo_entrega: cliente.gera_conta_pagar_custo_entrega || false,
         media_entregas_configurada: cliente.media_entregas_configurada || '',
         custo_rh_ajustado: cliente.custo_rh_ajustado || '',
         // Terceirizado/Eventual
@@ -613,7 +630,6 @@ const Pessoas = () => {
         is_terceirizado: false,
         recebe_repasse: false,
         gera_conta_pagar: false,
-        tipo_vinculo_entrega: '',
         observacoes: '',
         tags: ''
       });
@@ -1539,6 +1555,30 @@ const Pessoas = () => {
                                   <p className="text-[10px] text-gray-500 mt-0.5">Custo rateado na folha (não gera contas a pagar)</p>
                                 </div>
                               </label>
+
+                              {/* MÉDIA DE ENTREGAS POR MÊS - Só aparece se controla RH */}
+                              {formData.controla_rh && (
+                                <div className="ml-5 pl-3 border-l-2 border-blue-300">
+                                  <label className="block">
+                                    <span className="text-xs text-gray-700 font-medium">Média de entregas por mês</span>
+                                    <p className="text-[10px] text-gray-500 mt-0.5 mb-1">
+                                      Define o rateio inicial do custo do funcionário por entrega. Será ajustado automaticamente no final do mês.
+                                    </p>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={formData.media_entregas_configurada || ''}
+                                      onChange={(e) => setFormData({...formData, media_entregas_configurada: e.target.value})}
+                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                                      placeholder="Ex: 100 entregas/mês"
+                                    />
+                                    <p className="text-[10px] text-blue-600 mt-1">
+                                      💡 Exemplo: Se o custo mensal é R$ 3.000 e média é 100 entregas, cada entrega custará R$ 30,00 inicialmente
+                                    </p>
+                                  </label>
+                                </div>
+                              )}
 
                               {/* GERAR CONTAS A PAGAR - Só aparece se NÃO controla RH */}
                               {!formData.controla_rh && (

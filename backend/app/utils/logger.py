@@ -85,21 +85,65 @@ class StructuredLogger:
         log_json = json.dumps(log_dict, ensure_ascii=False, default=str)
         self.logger.log(level, log_json)
     
-    def info(self, event: str, message: str, **kwargs):
+    def info(self, event_or_message: str = None, message: Optional[str] = None, **kwargs):
         """Log de informação (fluxo normal)"""
-        self._log(logging.INFO, event, message, kwargs if kwargs else None)
+        # Compatibilidade: aceita múltiplos formatos de chamada
+        if event_or_message is None and 'event' in kwargs:
+            # Formato: logger.info(event="x", message="y", ...)
+            event = kwargs.pop('event')
+            msg = kwargs.pop('message', '')
+            self._log(logging.INFO, event, msg, kwargs if kwargs else None)
+        elif message is None:
+            # Uso simples: logger.info("mensagem")
+            self._log(logging.INFO, "info", event_or_message, kwargs if kwargs else None)
+        else:
+            # Uso estruturado: logger.info("evento", "mensagem")
+            self._log(logging.INFO, event_or_message, message, kwargs if kwargs else None)
     
-    def warning(self, event: str, message: str, **kwargs):
+    def warning(self, event_or_message: str = None, message: Optional[str] = None, **kwargs):
         """Log de warning (algo evitado, duplicação, inconsistência)"""
-        self._log(logging.WARNING, event, message, kwargs if kwargs else None)
+        # Compatibilidade: aceita múltiplos formatos de chamada
+        if event_or_message is None and 'event' in kwargs:
+            # Formato: logger.warning(event="x", message="y", ...)
+            event = kwargs.pop('event')
+            msg = kwargs.pop('message', '')
+            self._log(logging.WARNING, event, msg, kwargs if kwargs else None)
+        elif message is None:
+            # Uso simples: logger.warning("mensagem")
+            self._log(logging.WARNING, "warning", event_or_message, kwargs if kwargs else None)
+        else:
+            # Uso estruturado: logger.warning("evento", "mensagem")
+            self._log(logging.WARNING, event_or_message, message, kwargs if kwargs else None)
     
-    def error(self, event: str, message: str, **kwargs):
+    def error(self, event_or_message: str = None, message: Optional[str] = None, **kwargs):
         """Log de erro (exceção, falha técnica)"""
-        self._log(logging.ERROR, event, message, kwargs if kwargs else None)
+        # Compatibilidade: aceita múltiplos formatos de chamada
+        if event_or_message is None and 'event' in kwargs:
+            # Formato: logger.error(event="x", message="y", ...)
+            event = kwargs.pop('event')
+            msg = kwargs.pop('message', '')
+            self._log(logging.ERROR, event, msg, kwargs if kwargs else None)
+        elif message is None:
+            # Uso simples: logger.error("mensagem")
+            self._log(logging.ERROR, "error", event_or_message, kwargs if kwargs else None)
+        else:
+            # Uso estruturado: logger.error("evento", "mensagem")
+            self._log(logging.ERROR, event_or_message, message, kwargs if kwargs else None)
     
-    def debug(self, event: str, message: str, **kwargs):
+    def debug(self, event_or_message: str = None, message: Optional[str] = None, **kwargs):
         """Log de debug (desenvolvimento)"""
-        self._log(logging.DEBUG, event, message, kwargs if kwargs else None)
+        # Compatibilidade: aceita múltiplos formatos de chamada
+        if event_or_message is None and 'event' in kwargs:
+            # Formato: logger.debug(event="x", message="y", ...)
+            event = kwargs.pop('event')
+            msg = kwargs.pop('message', '')
+            self._log(logging.DEBUG, event, msg, kwargs if kwargs else None)
+        elif message is None:
+            # Uso simples: logger.debug("mensagem")
+            self._log(logging.DEBUG, "debug", event_or_message, kwargs if kwargs else None)
+        else:
+            # Uso estruturado: logger.debug("evento", "mensagem")
+            self._log(logging.DEBUG, event_or_message, message, kwargs if kwargs else None)
 
 
 # Instância global do logger

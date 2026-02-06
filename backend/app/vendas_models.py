@@ -38,7 +38,7 @@ class Venda(BaseTenantModel):
     # Entrega
     tem_entrega = Column(Boolean, default=False)
     taxa_entrega = Column(DECIMAL(10, 2), default=0)
-    entregador_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    entregador_id = Column(Integer, ForeignKey('clientes.id'), nullable=True)
     loja_origem = Column(String(100), nullable=True)
     endereco_entrega = Column(Text, nullable=True)
     distancia_km = Column(DECIMAL(10, 2), nullable=True)
@@ -46,6 +46,7 @@ class Venda(BaseTenantModel):
     observacoes_entrega = Column(Text, nullable=True)
     status_entrega = Column(String(20), nullable=True)  # pendente, em_rota, entregue, cancelado
     data_entrega = Column(DateTime, nullable=True)
+    ordem_entrega_otimizada = Column(Integer, nullable=True, index=True)  # Ordem otimizada pelo Google Maps (economiza chamadas à API)
     
     # Observações da Venda
     observacoes = Column(Text, nullable=True)
@@ -93,7 +94,7 @@ class Venda(BaseTenantModel):
     # Relacionamentos
     cliente = relationship("Cliente", foreign_keys=[cliente_id], backref="vendas")
     vendedor = relationship("User", foreign_keys=[vendedor_id], backref="vendas_realizadas")
-    entregador = relationship("User", foreign_keys=[entregador_id], backref="entregas")
+    entregador = relationship("Cliente", foreign_keys=[entregador_id], backref="entregas_realizadas")
     cancelador = relationship("User", foreign_keys=[cancelada_por], backref="vendas_canceladas")
     usuario = relationship("User", foreign_keys=[user_id], backref="vendas_empresa")
     

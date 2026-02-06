@@ -44,9 +44,19 @@ class AcertoScheduler:
             replace_existing=True
         )
         
+        # Job 3: Ajustar média de entregas (último dia do mês às 23:00)
+        self.scheduler.add_job(
+            func=self.ajustar_media_entregas_mensal,
+            trigger=CronTrigger(day='last', hour=23, minute=0),
+            id='ajustar_media_entregas',
+            name='Ajustar Média de Entregas Mensal',
+            replace_existing=True
+        )
+        
         logger.info("[OK] Jobs de acertos configurados:")
         logger.info("   - Acertos diarios: 00:05")
         logger.info("   - Fila de emails: a cada 5 minutos")
+        logger.info("   - Ajuste media entregas: último dia do mês às 23:00")
     
     def processar_acertos_diarios(self):
         """
@@ -175,6 +185,61 @@ class AcertoScheduler:
         
         except Exception as e:
             logger.error(f"[ERROR] Erro ao processar fila de emails: {str(e)}")
+        
+        finally:
+            db.close()
+    
+    def ajustar_media_entregas_mensal(self):
+        """
+        Job executado no último dia do mês às 23:00.
+        Ajusta a média de entregas configurada para entregadores funcionários com controla_rh.
+        """
+        from app.services.acerto_entrega_service import ajustar_media_entregas_mensal
+        from app.models import Tenant
+        
+        logger.info("[SCHEDULER] Iniciando ajuste de média de entregas mensal...")
+        
+        db = SessionLocal()
+        hoje = datetime.now()
+        
+        try:
+            # Busca todos os tenants ativos
+            tenants = db.query(Tenant).filter(Tenant.status == 'active').all()
+            
+            total_ajustados = 0
+            
+            for tenant in tenants:
+                try:
+                    logger.info(f"   Processando tenant: {tenant.name} (ID: {tenant.id})")
+                    
+                    resultados = ajustar_media_entregas_mensal(
+                        db=db,
+                        tenant_id=tenant.id,
+                        mes=hoje.month,
+                        ano=hoje.year
+                    )
+                    
+                    ajustados = sum(1 for r in resultados if r["ajustado"])
+                    total_ajustados += ajustados
+                    
+                    if ajustados > 0:
+                        logger.info(f"      [OK] {ajustados} entregadores ajustados")
+                        for r in resultados:
+                            if r["ajustado"]:
+                                logger.info(
+                                    f"         - {r['entregador']}: "
+                                    f"{r['media_anterior']} → {r['nova_media']} entregas/mês "
+                                    f"({r['diferenca_percentual']}% diferença)"
+                                )
+                    
+                except Exception as e:
+                    logger.error(f"      [ERROR] Erro no tenant {tenant.id}: {str(e)}")
+                    continue
+            
+            logger.info(f"[OK] Ajuste concluído. Total de entregadores ajustados: {total_ajustados}")
+            
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao ajustar média de entregas: {str(e)}")
         
         finally:
             db.close()

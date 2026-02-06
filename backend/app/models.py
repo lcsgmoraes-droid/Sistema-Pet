@@ -625,9 +625,6 @@ class ConfiguracaoEntrega(BaseTenantModel):
     """
     __tablename__ = "configuracoes_entrega"
     
-    # FK para o usuário que criou/gerencia a configuração
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    
     # Entregador padrão (FK para clientes.id que é Integer)
     entregador_padrao_id = Column(Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True)
     

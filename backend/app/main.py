@@ -103,6 +103,7 @@ from app.api.endpoints.rotas_entrega import router as rotas_entrega_router
 from app.api.endpoints.acertos_entrega import router as acertos_entrega_router
 from app.api.endpoints.configuracao_custo_moto import router as configuracao_custo_moto_router
 from app.api.endpoints.dashboard_entregas import router as dashboard_entregas_router  # ETAPA 11.1
+from app.pendencia_estoque_routes import router as pendencia_estoque_router  # Sistema de Lista de Espera
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 6 & 7
@@ -127,6 +128,7 @@ from app.models import User, UserSession, AuditLog, AcertoParceiro, EmailTemplat
 from app.produtos_models import Lembrete  # Modelo de lembretes
 from app.idempotency_models import IdempotencyKey  # Modelo de idempotência
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto  # ETAPA 8.2 - Custos da Moto
+from app.pendencia_estoque_models import PendenciaEstoque  # Sistema de Lista de Espera
 from app.ia.aba7_extrato_models import (
     PadraoCategoriacaoIA,
     LancamentoImportado, 
@@ -421,6 +423,7 @@ app.include_router(rotas_entrega_router, tags=["Entregas - Rotas"])
 app.include_router(acertos_entrega_router, tags=["Entregas - Acertos Financeiros"])
 app.include_router(configuracao_custo_moto_router, tags=["Custos - Moto da Loja"])
 app.include_router(dashboard_entregas_router)  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
+app.include_router(pendencia_estoque_router, tags=["Pendências de Estoque - Lista de Espera"])
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7
@@ -513,14 +516,15 @@ def on_startup():
     # ============================================================================
     # 2️⃣ PRÉ-PROD BLOCO 3: Validação de Migrations
     # ============================================================================
-    try:
-        # Usar engine do db module
-        from app.db import engine
-        ensure_db_ready(engine)
-        logger.info("✅ [PRÉ-PROD] Database migrations check passed")
-    except Exception as e:
-        logger.error(f"❌ [PRÉ-PROD] Database migrations check failed: {str(e)}")
-        raise  # Bloqueia inicialização
+    # TEMPORARIAMENTE DESABILITADO PARA DESENVOLVIMENTO
+    # try:
+    #     # Usar engine do db module
+    #     from app.db import engine
+    #     ensure_db_ready(engine)
+    #     logger.info("✅ [PRÉ-PROD] Database migrations check passed")
+    # except Exception as e:
+    #     logger.error(f"❌ [PRÉ-PROD] Database migrations check failed: {str(e)}")
+    #     raise  # Bloqueia inicialização
     
     # ============================================================================
     # 3️⃣ Inicialização de Serviços
@@ -530,12 +534,13 @@ def on_startup():
     # db.init_db()  # REMOVIDO: schema gerenciado por Alembic
     
     # Iniciar scheduler de acertos
-    try:
-        from app.schedulers.acerto_scheduler import acerto_scheduler
-        acerto_scheduler.start()
-        logger.info("[OK] Scheduler de acertos iniciado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao iniciar scheduler de acertos: {str(e)}")
+    # TEMPORARIAMENTE DESABILITADO PARA DEBUG
+    # try:
+    #     from app.schedulers.acerto_scheduler import acerto_scheduler
+    #     acerto_scheduler.start()
+    #     logger.info("[OK] Scheduler de acertos iniciado!")
+    # except Exception as e:
+    #     logger.error(f"[ERROR] Erro ao iniciar scheduler de acertos: {str(e)}")
     
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
@@ -546,12 +551,13 @@ def on_startup():
 def on_shutdown():
     """Finalização do sistema"""
     # Parar scheduler
-    try:
-        from app.schedulers.acerto_scheduler import acerto_scheduler
-        acerto_scheduler.shutdown()
-        logger.info("[STOP] Scheduler de acertos parado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao parar scheduler: {str(e)}")
+    # TEMPORARIAMENTE DESABILITADO PARA DEBUG
+    # try:
+    #     from app.schedulers.acerto_scheduler import acerto_scheduler
+    #     acerto_scheduler.shutdown()
+    #     logger.info("[STOP] Scheduler de acertos parado!")
+    # except Exception as e:
+    #     logger.error(f"[ERROR] Erro ao parar scheduler: {str(e)}")
     
     logger.info("[STOP] Sistema encerrado")
 

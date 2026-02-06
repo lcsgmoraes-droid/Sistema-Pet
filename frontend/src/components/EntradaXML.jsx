@@ -248,6 +248,10 @@ const EntradaXML = () => {
   const abrirDetalhes = async (notaId) => {
     try {
             const response = await api.get(`/notas-entrada/${notaId}`);
+      // Ordenar itens por ID para manter ordem consistente
+      if (response.data.itens) {
+        response.data.itens.sort((a, b) => a.id - b.id);
+      }
       setNotaSelecionada(response.data);
       setMostrarDetalhes(true);
       
@@ -278,6 +282,10 @@ const EntradaXML = () => {
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
+      // Ordenar itens por ID para manter ordem consistente
+      if (response.data.itens) {
+        response.data.itens.sort((a, b) => a.id - b.id);
+      }
       setNotaSelecionada(response.data);
     } catch (error) {
       console.error('❌ Erro ao vincular produto:', error);
@@ -366,20 +374,25 @@ const EntradaXML = () => {
   const processarNota = async (notaId) => {
     // Primeiro, buscar preview
     try {
-            const response = await api.get(
+      const response = await api.get(
         `/notas-entrada/${notaId}/preview-processamento`
       );
       
       setPreviewProcessamento(response.data);
       setMostrarRevisaoPrecos(true);
       
-      // Inicializar preços ajustados com valores atuais
+      // FECHAR o modal de detalhes quando abrir o de revisão
+      setMostrarDetalhes(false);
+      
+      // Inicializar preços ajustados com valores atuais (adaptar para nova estrutura)
       const precosIniciais = {};
       response.data.itens.forEach(item => {
-        precosIniciais[item.produto_id] = {
-          preco_venda: item.preco_venda_atual,
-          margem: item.margem_atual
-        };
+        if (item.produto_vinculado) {
+          precosIniciais[item.produto_vinculado.produto_id] = {
+            preco_venda: item.produto_vinculado.preco_venda_atual,
+            margem: item.produto_vinculado.margem_atual
+          };
+        }
       });
       setPrecosAjustados(precosIniciais);
       
@@ -388,14 +401,20 @@ const EntradaXML = () => {
     }
   };
 
+  // Alias para melhor semântica
+  const carregarPreviewProcessamento = processarNota;
+
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
-            // Atualizar preços se houver alterações
+      // Atualizar preços se houver alterações (adaptar para nova estrutura)
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
-        const itemOriginal = previewProcessamento.itens.find(i => i.produto_id == produtoId);
-        if (itemOriginal && dados.preco_venda !== itemOriginal.preco_venda_atual) {
+        const itemOriginal = previewProcessamento.itens.find(i => 
+          i.produto_vinculado && i.produto_vinculado.produto_id == produtoId
+        );
+        if (itemOriginal && itemOriginal.produto_vinculado && 
+            dados.preco_venda !== itemOriginal.produto_vinculado.preco_venda_atual) {
           precosParaAtualizar.push({
             produto_id: parseInt(produtoId),
             preco_venda: dados.preco_venda
@@ -541,19 +560,19 @@ const EntradaXML = () => {
     }
   };
 
-  const desvincularProduto = async (itemId) => {
-    if (!notaSelecionada) return;
-    
+  const desvincularProduto = async (notaId, itemId) => {
     try {
-      await api.post(
-        `/notas-entrada/${notaSelecionada.id}/itens/${itemId}/desvincular`,
-        {}
-      );
+      await api.post(`/notas-entrada/${notaId}/itens/${itemId}/desvincular`);
       
       toast.success('✅ Produto desvinculado!');
       
-      // Recarregar preview
-      await carregarPreviewProcessamento(notaSelecionada.id);
+      // Recarregar detalhes da nota
+      const response = await api.get(`/notas-entrada/${notaId}`);
+      // Ordenar itens por ID para manter ordem consistente
+      if (response.data.itens) {
+        response.data.itens.sort((a, b) => a.id - b.id);
+      }
+      setNotaSelecionada(response.data);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao desvincular produto');
     }
@@ -566,72 +585,59 @@ const EntradaXML = () => {
 
   // Detectar divergências entre NF e produto vinculado
   const detectarDivergencias = (item) => {
-    if (!item.produto_vinculado) return [];
+    // Verificar se tem produto vinculado (pode estar em produto_vinculado ou produto_nome)
+    const produtoNome = item.produto_vinculado?.produto_nome || item.produto_nome;
+    if (!produtoNome) return [];
     
     const divergencias = [];
-    const descNF = item.descricao_nf.toLowerCase();
-    const descProd = item.produto_vinculado.produto_nome.toLowerCase();
+    const descNF = item.descricao_nf || item.descricao || '';
+    const descProd = produtoNome || '';
+    
+    if (!descNF || !descProd) return [];
+    
+    const descNFLower = descNF.toLowerCase();
+    const descProdLower = descProd.toLowerCase();
     
     // Detectar peso/tamanho
     const regexPeso = /(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|un|und|unid)/gi;
-    const pesosNF = [...descNF.matchAll(regexPeso)];
-    const pesosProd = [...descProd.matchAll(regexPeso)];
+    const pesosNF = [...descNFLower.matchAll(regexPeso)];
+    const pesosProd = [...descProdLower.matchAll(regexPeso)];
     
     if (pesosNF.length > 0 && pesosProd.length > 0) {
       const pesoNF = pesosNF[0][0];
       const pesoProd = pesosProd[0][0];
-      if (pesoNF.toLowerCase() !== pesoProd.toLowerCase()) {
-        divergencias.push({
-          tipo: 'peso',
-          mensagem: `Peso/Tamanho diferente: NF="${pesoNF}" vs Produto="${pesoProd}"`,
-          gravidade: 'alta'
-        });
+      if (pesoNF !== pesoProd) {
+        divergencias.push(`Peso/Tamanho diferente: NF="${pesoNF}" vs Produto="${pesoProd}"`);
       }
     }
     
     // Detectar cor
     const cores = ['preto', 'branco', 'vermelho', 'azul', 'verde', 'amarelo', 'rosa', 'roxo', 'laranja', 'marrom', 'cinza'];
-    const corNF = cores.find(cor => descNF.includes(cor));
-    const corProd = cores.find(cor => descProd.includes(cor));
+    const corNF = cores.find(cor => descNFLower.includes(cor));
+    const corProd = cores.find(cor => descProdLower.includes(cor));
     
     if (corNF && corProd && corNF !== corProd) {
-      divergencias.push({
-        tipo: 'cor',
-        mensagem: `Cor diferente: NF="${corNF}" vs Produto="${corProd}"`,
-        gravidade: 'media'
-      });
+      divergencias.push(`Cor diferente: NF="${corNF}" vs Produto="${corProd}"`);
     }
     
     // Detectar sabor (para rações)
-    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'atum', 'vegetais'];
-    const saborNF = sabores.find(sabor => descNF.includes(sabor));
-    const saborProd = sabores.find(sabor => descProd.includes(sabor));
+    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmão', 'atum', 'vegetais'];
+    const saborNF = sabores.find(sabor => descNFLower.includes(sabor));
+    const saborProd = sabores.find(sabor => descProdLower.includes(sabor));
     
     if (saborNF && saborProd && saborNF !== saborProd) {
-      divergencias.push({
-        tipo: 'sabor',
-        mensagem: `Sabor diferente: NF="${saborNF}" vs Produto="${saborProd}"`,
-        gravidade: 'alta'
-      });
+      divergencias.push(`Sabor diferente: NF="${saborNF}" vs Produto="${saborProd}"`);
     }
     
     // Detectar animal (cachorro/gato)
-    if ((descNF.includes('cao') || descNF.includes('cachorro') || descNF.includes('dog')) && 
-        (descProd.includes('gato') || descProd.includes('cat'))) {
-      divergencias.push({
-        tipo: 'animal',
-        mensagem: 'Animal diferente: NF parece ser para CACHORRO mas produto é para GATO',
-        gravidade: 'critica'
-      });
+    if ((descNFLower.includes('cao') || descNFLower.includes('cachorro') || descNFLower.includes('dog')) && 
+        (descProdLower.includes('gato') || descProdLower.includes('cat'))) {
+      divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
     }
     
-    if ((descNF.includes('gato') || descNF.includes('cat')) && 
-        (descProd.includes('cao') || descProd.includes('cachorro') || descProd.includes('dog'))) {
-      divergencias.push({
-        tipo: 'animal',
-        mensagem: 'Animal diferente: NF parece ser para GATO mas produto é para CACHORRO',
-        gravidade: 'critica'
-      });
+    if ((descNFLower.includes('gato') || descNFLower.includes('cat')) && 
+        (descProdLower.includes('cao') || descProdLower.includes('cachorro') || descProdLower.includes('dog'))) {
+      divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
     }
     
     return divergencias;
@@ -1169,202 +1175,281 @@ const EntradaXML = () => {
               </div>
               
               <div className="space-y-3">
-                {notaSelecionada.itens.map(item => (
-                  <div key={item.id} className="border-2 border-gray-400 rounded-lg p-4 bg-white shadow-sm">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-lg">{item.descricao}</div>
-                        <div className="text-sm text-gray-600 space-x-4">
-                          <span>Código: <span className="font-mono">{item.codigo_produto}</span></span>
-                          <span>NCM: <span className="font-mono">{item.ncm}</span></span>
-                          {item.ean && item.ean !== 'SEM GTIN' && <span>EAN: <span className="font-mono">{item.ean}</span></span>}
-                        </div>
-                      </div>
-                      {getConfiancaBadge(item.confianca_vinculo)}
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-4 mb-3 text-sm">
-                      <div>
-                        <span className="text-gray-600">Quantidade:</span>
-                        <div className="font-semibold">{item.quantidade}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Valor Unit.:</span>
-                        <div className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Valor Total:</span>
-                        <div className="font-semibold text-green-600">R$ {item.valor_total.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">CFOP:</span>
-                        <div className="font-semibold">{item.cfop}</div>
-                      </div>
-                    </div>
-
-                    {/* Lote e Validade */}
-                    {(item.lote || item.data_validade) && (
-                      <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
-                        {item.lote && (
-                          <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                            <span className="text-gray-600">📦 Lote:</span>
-                            <div className="font-semibold text-purple-800">{item.lote}</div>
+                {notaSelecionada.itens.map(item => {
+                  const divergencias = detectarDivergencias(item);
+                  const temDivergencia = divergencias.length > 0;
+                  
+                  return (
+                    <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
+                      {/* Grade de 2 Colunas: NF-e (esquerda) | Conexão | Produto Sistema (direita) */}
+                      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
+                        {/* COLUNA ESQUERDA: Dados da NF-e */}
+                        <div className="bg-blue-50 border-r-2 border-gray-300 p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">NF-e</div>
+                            {getConfiancaBadge(item.confianca_vinculo)}
                           </div>
-                        )}
-                        {item.data_validade && (
-                          <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                            <span className="text-gray-600">📅 Validade:</span>
-                            <div className="font-semibold text-orange-800">
-                              {new Date(item.data_validade).toLocaleDateString('pt-BR')}
+                          
+                          <div className="font-semibold text-base mb-2 text-blue-900">{item.descricao}</div>
+                          
+                          <div className="space-y-1.5 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Código:</span>
+                              <span className="font-mono font-semibold">{item.codigo_produto}</span>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Mostrar descrição completa do item da NF-e */}
-                    {item.descricao && (
-                      <div className="mb-3 p-2 bg-blue-50 rounded text-sm">
-                        <span className="text-gray-600">📄 Descrição NF-e:</span>
-                        <div className="font-semibold text-blue-900">{item.descricao}</div>
-                      </div>
-                    )}
-
-                    {/* Vinculação de Produto */}
-                    {notaSelecionada.status === 'pendente' && (
-                      <div className="mt-3 pt-3 border-t">
-                        {item.produto_id ? (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <span className="text-green-800 font-semibold">✅ Vinculado ao produto:</span>
-                                <span className="ml-2">{item.produto_nome}</span>
-                              </div>
-                              <button
-                                onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
-                                className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-semibold"
-                                title="Remover vinculação"
-                              >
-                                ❌ Desvincular
-                              </button>
-                            </div>
-                            <div className="text-xs text-green-700 mb-2">
-                              💡 Para alterar, selecione outro produto abaixo ou clique em desvincular
-                            </div>
-                            <select
-                              value={item.produto_id}
-                              onChange={(e) => {
-                                if (e.target.value && e.target.value != item.produto_id) {
-                                  vincularProduto(notaSelecionada.id, item.id, e.target.value);
-                                }
-                              }}
-                              className="w-full px-3 py-1 border border-gray-300 rounded text-sm"
-                            >
-                              <option value={item.produto_id}>{item.produto_nome}</option>
-                              {Array.isArray(produtos) && produtos
-                                .filter(p => p.id !== item.produto_id)
-                                .map(p => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.codigo} - {p.nome} {p.descricao ? `| ${p.descricao.substring(0, 50)}...` : ''} (Est: {p.estoque_atual || 0})
-                                  </option>
-                                ))}
-                            </select>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="text-orange-600 font-semibold">⚠️ Produto não vinculado - selecione manualmente:</div>
-                            
-                            {/* Campo de pesquisa */}
-                            <input
-                              type="text"
-                              placeholder="🔍 Digite para pesquisar por nome ou SKU..."
-                              value={filtroProduto[item.id] || ''}
-                              onChange={(e) => setFiltroProduto({...filtroProduto, [item.id]: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-sm"
-                            />
-                            
-                            {/* Lista de produtos filtrados - só aparece quando digitar */}
-                            {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
-                              <div className="border border-gray-300 rounded max-h-60 overflow-y-auto">
-                                {Array.isArray(produtos) && produtos
-                                  .filter(p => {
-                                    const filtro = filtroProduto[item.id].toLowerCase();
-                                    return (
-                                      p.nome?.toLowerCase().includes(filtro) ||
-                                      p.codigo?.toLowerCase().includes(filtro) ||
-                                      p.descricao?.toLowerCase().includes(filtro)
-                                    );
-                                  })
-                                  .sort((a, b) => {
-                                    // Produtos ativos aparecem primeiro
-                                    if (a.ativo === b.ativo) return 0;
-                                    return a.ativo ? -1 : 1;
-                                  })
-                                  .slice(0, 20) // Limitar a 20 resultados
-                                  .map(p => (
-                                    <button
-                                      key={`produto-${item.id}-${p.id}`}
-                                      type="button"
-                                      onClick={() => {
-                                        vincularProduto(notaSelecionada.id, item.id, p.id);
-                                        setFiltroProduto({...filtroProduto, [item.id]: ''}); // Limpar apenas o filtro deste item
-                                      }}
-                                      className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-sm ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
-                                    >
-                                      {!p.ativo && '🔴 '}{p.codigo} - {p.nome} {p.descricao ? `| ${p.descricao.substring(0, 40)}...` : ''} 
-                                      {!p.ativo && ' [INATIVO]'} 
-                                      <span className="text-gray-500 ml-2">(Est: {p.estoque_atual || 0})</span>
-                                    </button>
-                                  ))}
-                                {produtos.filter(p => {
-                                  const filtro = filtroProduto[item.id].toLowerCase();
-                                  return (
-                                    p.nome?.toLowerCase().includes(filtro) ||
-                                    p.codigo?.toLowerCase().includes(filtro) ||
-                                    p.descricao?.toLowerCase().includes(filtro)
-                                  );
-                                }).length === 0 && (
-                                  <div className="px-3 py-4 text-center text-gray-500">
-                                    ❌ Nenhum produto encontrado
-                                  </div>
-                                )}
+                            {item.ean && item.ean !== 'SEM GTIN' && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">EAN:</span>
+                                <span className="font-mono font-semibold">{item.ean}</span>
                               </div>
                             )}
-                            
-                            <div className="text-center text-sm text-gray-600">
-                              ou
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">NCM:</span>
+                              <span className="font-mono font-semibold">{item.ncm}</span>
                             </div>
-                            <button
-                              onClick={() => abrirModalCriarProduto(item)}
-                              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700"
-                            >
-                              ➕ Produto não existe? Criar novo
-                            </button>
+                            <div className="flex justify-between border-t pt-1.5 mt-1.5">
+                              <span className="text-gray-600">Qtd:</span>
+                              <span className="font-semibold">{item.quantidade}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Valor Unit.:</span>
+                              <span className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Total:</span>
+                              <span className="font-semibold text-green-600">R$ {item.valor_total.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">CFOP:</span>
+                              <span className="font-semibold">{item.cfop}</span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* Rateio de Estoque (se modo PARCIAL) */}
-                    {notaSelecionada.status === 'pendente' && 
-                     tipoRateio === 'parcial' && 
-                     item.produto_id && (
-                      <div className="mt-3 pt-3 border-t">
-                        <div className="bg-gray-50 border border-gray-300 rounded p-3">
-                          <h4 className="font-medium text-gray-700 mb-2 flex items-center text-sm">
+                          {/* Lote e Validade */}
+                          {(item.lote || item.data_validade) && (
+                            <div className="mt-3 pt-3 border-t space-y-2">
+                              {item.lote && (
+                                <div className="text-xs">
+                                  <span className="text-gray-600">📦 Lote:</span>
+                                  <div className="font-semibold text-purple-800">{item.lote}</div>
+                                </div>
+                              )}
+                              {item.data_validade && (
+                                <div className="text-xs">
+                                  <span className="text-gray-600">📅 Validade:</span>
+                                  <div className="font-semibold text-orange-800">
+                                    {new Date(item.data_validade).toLocaleDateString('pt-BR')}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COLUNA CENTRAL: Ícone de Conexão + Alerta de Divergência */}
+                        <div className="flex flex-col items-center justify-center bg-gray-100 px-2 py-4">
+                          {item.produto_id ? (
+                            <>
+                              <button
+                                onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
+                                className="text-3xl text-green-600 hover:text-red-600 transition-colors mb-2"
+                                title="✅ Vinculado - Clique para desvincular"
+                              >
+                                ✓
+                              </button>
+                              {temDivergencia && (
+                                <div className="bg-red-100 border-2 border-red-500 rounded-lg p-2 max-w-[200px]">
+                                  <div className="text-center">
+                                    <div className="text-2xl mb-1">⚠️</div>
+                                    <div className="font-bold text-red-700 text-xs mb-1">
+                                      DIVERGÊNCIA!
+                                    </div>
+                                    <div className="text-[10px] text-red-600 space-y-0.5">
+                                      {divergencias.map((div, idx) => (
+                                        <div key={idx}>• {div}</div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="text-3xl text-gray-400" title="❌ Não vinculado">
+                              ✕
+                            </div>
+                          )}
+                        </div>
+
+                        {/* COLUNA DIREITA: Produto do Sistema */}
+                        <div className={`p-4 ${item.produto_id ? 'bg-green-50' : 'bg-gray-50'}`}>
+
+                        {/* COLUNA DIREITA: Produto do Sistema */}
+                        <div className={`p-4 ${item.produto_id ? 'bg-green-50' : 'bg-gray-50'}`}>
+                          {notaSelecionada.status === 'pendente' ? (
+                            <>
+                              {item.produto_id ? (
+                                <>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                      ✅ PRODUTO SISTEMA
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="font-semibold text-base mb-3 text-green-900">
+                                    {item.produto_nome}
+                                  </div>
+
+                                  <div className="text-xs text-green-700 mb-3 italic">
+                                    💡 Para alterar o vínculo, selecione outro produto ou clique no ✓ para desvincular
+                                  </div>
+
+                                  {/* Select para trocar produto */}
+                                  <select
+                                    value={item.produto_id}
+                                    onChange={(e) => {
+                                      if (e.target.value && e.target.value != item.produto_id) {
+                                        vincularProduto(notaSelecionada.id, item.id, e.target.value);
+                                      }
+                                    }}
+                                    className="w-full px-3 py-2 border-2 border-green-400 rounded text-sm focus:ring-2 focus:ring-green-500"
+                                  >
+                                    <option value={item.produto_id}>{item.produto_nome}</option>
+                                    {Array.isArray(produtos) && produtos
+                                      .filter(p => p.id !== item.produto_id)
+                                      .map(p => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.codigo} - {p.nome} {p.descricao ? `| ${p.descricao.substring(0, 50)}...` : ''} (Est: {p.estoque_atual || 0})
+                                        </option>
+                                      ))}
+                                  </select>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
+                                      ⚠️ NÃO VINCULADO
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="space-y-3">
+                                    {/* Campo de pesquisa */}
+                                    <div>
+                                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                                        🔍 Pesquisar produto existente:
+                                      </label>
+                                      <input
+                                        type="text"
+                                        placeholder="Digite nome ou SKU..."
+                                        value={filtroProduto[item.id] || ''}
+                                        onChange={(e) => setFiltroProduto({...filtroProduto, [item.id]: e.target.value})}
+                                        className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
+                                      />
+                                    </div>
+                                    
+                                    {/* Lista de produtos filtrados */}
+                                    {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
+                                      <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
+                                        {Array.isArray(produtos) && produtos
+                                          .filter(p => {
+                                            const filtro = filtroProduto[item.id].toLowerCase();
+                                            return (
+                                              p.nome?.toLowerCase().includes(filtro) ||
+                                              p.codigo?.toLowerCase().includes(filtro) ||
+                                              p.descricao?.toLowerCase().includes(filtro)
+                                            );
+                                          })
+                                          .sort((a, b) => {
+                                            if (a.ativo === b.ativo) return 0;
+                                            return a.ativo ? -1 : 1;
+                                          })
+                                          .slice(0, 15)
+                                          .map(p => (
+                                            <button
+                                              key={`produto-${item.id}-${p.id}`}
+                                              type="button"
+                                              onClick={() => {
+                                                vincularProduto(notaSelecionada.id, item.id, p.id);
+                                                setFiltroProduto({...filtroProduto, [item.id]: ''});
+                                              }}
+                                              className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
+                                            >
+                                              {!p.ativo && '🔴 '}{p.codigo} - {p.nome}
+                                              {!p.ativo && ' [INATIVO]'} 
+                                              <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
+                                            </button>
+                                          ))}
+                                        {produtos.filter(p => {
+                                          const filtro = filtroProduto[item.id].toLowerCase();
+                                          return (
+                                            p.nome?.toLowerCase().includes(filtro) ||
+                                            p.codigo?.toLowerCase().includes(filtro) ||
+                                            p.descricao?.toLowerCase().includes(filtro)
+                                          );
+                                        }).length === 0 && (
+                                          <div className="px-3 py-4 text-center text-gray-500 text-xs">
+                                            ❌ Nenhum produto encontrado
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 border-t border-gray-300"></div>
+                                      <span className="text-xs text-gray-500">ou</span>
+                                      <div className="flex-1 border-t border-gray-300"></div>
+                                    </div>
+
+                                    <button
+                                      onClick={() => abrirModalCriarProduto(item)}
+                                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-sm"
+                                    >
+                                      ➕ Criar Novo Produto
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            // Nota já processada - apenas visualização
+                            <div>
+                              {item.produto_id ? (
+                                <>
+                                  <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
+                                    ✅ VINCULADO
+                                  </div>
+                                  <div className="font-semibold text-base text-green-900">
+                                    {item.produto_nome}
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
+                                  ⚠️ NÃO VINCULADO
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rateio de Estoque (se modo PARCIAL) - Expande por toda a largura */}
+                      {notaSelecionada.status === 'pendente' && 
+                       tipoRateio === 'parcial' && 
+                       item.produto_id && (
+                        <div className="col-span-3 p-4 border-t-2 border-gray-300 bg-gradient-to-r from-blue-50 via-gray-50 to-green-50">
+                          <h4 className="font-medium text-gray-700 mb-3 flex items-center text-sm">
                             📦 Quantidade destinada ao estoque online
                           </h4>
                           
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-3 gap-4">
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">
-                                Total NF
+                                📋 Total NF
                               </label>
                               <input
                                 type="number"
                                 value={item.quantidade}
                                 disabled
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded bg-gray-100 text-sm font-medium"
+                                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-base font-semibold"
                               />
                             </div>
                             
@@ -1385,7 +1470,7 @@ const EntradaXML = () => {
                                     [item.id]: Math.min(valor, item.quantidade)
                                   });
                                 }}
-                                className="w-full px-2 py-1.5 border-2 border-gray-400 rounded focus:ring-2 focus:ring-gray-500 focus:border-gray-500 text-sm font-medium"
+                                className="w-full px-3 py-2 border-2 border-blue-400 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold"
                                 placeholder="0"
                               />
                             </div>
@@ -1398,13 +1483,13 @@ const EntradaXML = () => {
                                 type="number"
                                 value={(item.quantidade - (quantidadesOnline[item.id] ?? item.quantidade_online ?? 0)).toFixed(2)}
                                 disabled
-                                className="w-full px-2 py-1.5 border border-gray-300 rounded bg-gray-100 text-sm font-medium"
+                                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-base font-semibold"
                               />
                             </div>
                           </div>
                           
-                          <div className="mt-2 text-xs text-gray-600 bg-white rounded p-2 border border-gray-200">
-                            Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
+                          <div className="mt-3 text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-300 font-medium">
+                            💵 Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
                           </div>
                           
                           {(quantidadesOnline[item.id] !== undefined && 
@@ -1415,20 +1500,20 @@ const EntradaXML = () => {
                                 item.id, 
                                 quantidadesOnline[item.id]
                               )}
-                              className="w-full px-3 py-1.5 bg-gray-800 text-white rounded font-medium hover:bg-gray-900 mt-2 text-sm"
+                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 mt-3 text-sm"
                             >
-                              💾 Salvar
+                              💾 Salvar Distribuição
                             </button>
                           ) : (
                             item.quantidade_online !== null && item.quantidade_online !== undefined && (
-                              <div className="mt-2 text-xs text-green-700 bg-green-50 rounded p-2 border border-green-200 flex items-center justify-center">
+                              <div className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3 border border-green-200 flex items-center justify-center font-medium">
                                 ✅ Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
                               </div>
                             )
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {notaSelecionada.status === 'processada' && item.produto_id && (
                       <div className="mt-3 pt-3 border-t bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1437,7 +1522,8 @@ const EntradaXML = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -1533,7 +1619,7 @@ const EntradaXML = () => {
                         {notaSelecionada.itens.some(i => i.produto_id) && (
                           <>
                             <button
-                              onClick={() => processarNota(notaSelecionada.id)}
+                              onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
                               disabled={loading}
                               className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                             >
@@ -2053,11 +2139,23 @@ const EntradaXML = () => {
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-semibold text-gray-700">Filtrar:</span>
                 {(() => {
-                  const itensVinculados = previewProcessamento.itens.filter(i => i.produto_vinculado);
-                  const aumentos = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual > 0).length;
-                  const reducoes = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual < 0).length;
-                  const iguais = itensVinculados.filter(i => i.produto_vinculado.variacao_custo_percentual === 0).length;
-                  const total = previewProcessamento.itens.length;
+                  // Adaptar para estrutura flat ou aninhada
+                  const itensVinculados = previewProcessamento.itens.filter(i => 
+                    i.produto_vinculado !== null || i.produto_id !== null
+                  );
+                  const aumentos = itensVinculados.filter(i => {
+                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    return variacao > 0;
+                  }).length;
+                  const reducoes = itensVinculados.filter(i => {
+                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    return variacao < 0;
+                  }).length;
+                  const iguais = itensVinculados.filter(i => {
+                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    return variacao === 0;
+                  }).length;
+                  const total = itensVinculados.length;
                   
                   return (
                     <>
@@ -2125,327 +2223,169 @@ const EntradaXML = () => {
               <div className="space-y-6">
                 {previewProcessamento.itens
                   .filter(item => {
-                    // Filtrar baseado no status de vinculação E variação de custo
-                    const vinculado = item.produto_vinculado !== null;
-                    const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || 0;
+                    // Verificar se tem produto vinculado (pode estar em produto_vinculado ou produto_id)
+                    const vinculado = item.produto_vinculado !== null || item.produto_id !== null;
+                    
+                    if (!vinculado) return false;
+                    
+                    // Pegar variação de custo (pode estar em produto_vinculado ou diretamente no item)
+                    const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || item.variacao_custo_percentual || 0;
                     
                     if (filtroCusto === 'todos') return true;
-                    if (filtroCusto === 'aumentou') return vinculado && custoVariacao > 0;
-                    if (filtroCusto === 'diminuiu') return vinculado && custoVariacao < 0;
-                    if (filtroCusto === 'igual') return vinculado && custoVariacao === 0;
+                    if (filtroCusto === 'aumentou') return custoVariacao > 0;
+                    if (filtroCusto === 'diminuiu') return custoVariacao < 0;
+                    if (filtroCusto === 'igual') return custoVariacao === 0;
                     return true;
                   })
                   .map((item) => {
-                  const vinculado = item.produto_vinculado !== null;
-                  const produtoVinc = item.produto_vinculado;
+                  // Adaptar para estrutura flat ou aninhada
+                  const produtoVinc = item.produto_vinculado || {
+                    produto_id: item.produto_id,
+                    produto_nome: item.produto_nome,
+                    produto_codigo: item.produto_codigo,
+                    produto_ean: item.produto_ean,
+                    custo_anterior: item.custo_anterior,
+                    custo_novo: item.custo_novo,
+                    variacao_custo_percentual: item.variacao_custo_percentual,
+                    preco_venda_atual: item.preco_venda_atual,
+                    margem_atual: item.margem_atual,
+                    estoque_atual: item.estoque_atual
+                  };
                   
-                  // Se vinculado, usar dados do produto vinculado para variação
-                  const custoVariacao = produtoVinc?.variacao_custo_percentual || 0;
+                  if (!produtoVinc.produto_id) return null;
+                  
+                  if (!produtoVinc.produto_id) return null;
+                  
+                  const custoVariacao = produtoVinc.variacao_custo_percentual || 0;
                   const custoAumentou = custoVariacao > 0;
                   
-                  const precosAtuais = vinculado ? (precosAjustados[produtoVinc.produto_id] || {
-                    preco_venda: produtoVinc.preco_venda_atual,
-                    margem: produtoVinc.margem_atual
-                  }) : null;
+                  const precosAtuais = precosAjustados[produtoVinc.produto_id] || {
+                    preco_venda: produtoVinc.preco_venda_atual || 0,
+                    margem: produtoVinc.margem_atual || 0
+                  };
 
                   return (
-                    <div key={item.item_id} className="border-2 border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-                      
-                      {/* Alertas de Divergência */}
-                      {vinculado && (() => {
-                        const divs = detectarDivergencias(item);
-                        if (divs.length === 0) return null;
-                        
-                        return (
-                          <div className="bg-yellow-50 border-b-2 border-yellow-300 p-3">
-                            <div className="flex items-start gap-2">
-                              <span className="text-xl">⚠️</span>
-                              <div className="flex-1">
-                                <div className="font-bold text-yellow-800 mb-1">Possíveis Divergências Detectadas:</div>
-                                <ul className="space-y-1">
-                                  {divs.map((div, idx) => (
-                                    <li key={idx} className={`text-sm ${
-                                      div.gravidade === 'critica' ? 'text-red-700 font-bold' :
-                                      div.gravidade === 'alta' ? 'text-orange-700 font-semibold' :
-                                      'text-yellow-700'
-                                    }`}>
-                                      • {div.mensagem}
-                                    </li>
-                                  ))}
-                                </ul>
-                                <p className="text-xs text-yellow-700 mt-2">
-                                  ⚠️ Verifique se o produto vinculado está correto!
-                                </p>
-                              </div>
-                            </div>
+                    <div key={item.item_id} className="border-2 border-gray-300 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all">
+                      {/* Header com nome do produto e quantidade */}
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-bold text-xl mb-1">{produtoVinc.produto_nome}</h3>
+                            <p className="text-sm text-blue-100">SKU: {produtoVinc.produto_codigo}</p>
                           </div>
-                        );
-                      })()}
-                      
-                      {/* Layout de Duas Colunas */}
-                      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
-                        
-                        {/* COLUNA ESQUERDA: Dados da NF */}
-                        <div className="p-4 bg-blue-50 border-r border-gray-300">
-                          <div className="flex items-start gap-2 mb-2">
-                            <span className="text-2xl">📄</span>
-                            <div className="flex-1">
-                              <div className="text-xs font-semibold text-blue-700 mb-1">NOTA FISCAL</div>
-                              <h3 className="font-bold text-base text-gray-800">{item.descricao_nf}</h3>
-                              <div className="mt-2 space-y-1">
-                                <p className="text-xs text-gray-600">
-                                  <span className="font-semibold">SKU Fornecedor:</span> {item.codigo_produto_nf || 'N/A'}
-                                </p>
-                                {item.ean_nf && (
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-semibold">EAN:</span> {item.ean_nf}
-                                  </p>
-                                )}
-                                <p className="text-xs text-gray-600">
-                                  <span className="font-semibold">Quantidade:</span> {item.quantidade_nf}
-                                </p>
-                                <p className="text-xs text-gray-600">
-                                  <span className="font-semibold">Valor Unit.:</span> R$ {item.valor_unitario_nf.toFixed(2)}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* COLUNA CENTRAL: Ícone de Conexão */}
-                        <div className="flex items-center justify-center bg-gray-100 px-4">
-                          {vinculado ? (
+                          <div className="text-right">
                             <button
-                              onClick={() => desvincularProduto(item.item_id)}
-                              className="group relative"
-                              title="Clique para desvincular"
+                              onClick={() => buscarHistoricoPrecos(produtoVinc.produto_id, produtoVinc.produto_nome)}
+                              className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
                             >
-                              <div className="w-12 h-12 rounded-full bg-green-500 hover:bg-red-500 transition-colors flex items-center justify-center shadow-lg">
-                                <span className="text-2xl group-hover:hidden">✓</span>
-                                <span className="text-2xl hidden group-hover:inline">✕</span>
-                              </div>
-                              <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-xs text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                Desvincular
-                              </div>
+                              📊 Histórico
                             </button>
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gray-300 flex items-center justify-center">
-                              <span className="text-2xl text-gray-500">✕</span>
+                            <div className="mt-1 text-sm">
+                              Quantidade <strong>{item.quantidade || item.quantidade_nf || 0}</strong>
                             </div>
-                          )}
-                        </div>
-
-                        {/* COLUNA DIREITA: Produto Vinculado */}
-                        <div className={`p-4 ${vinculado ? 'bg-green-50' : 'bg-gray-50'}`}>
-                          {vinculado ? (
-                            <div className="flex items-start gap-2">
-                              <span className="text-2xl">📦</span>
-                              <div className="flex-1">
-                                <div className="text-xs font-semibold text-green-700 mb-1">PRODUTO VINCULADO</div>
-                                <h3 className="font-bold text-base text-gray-800">{produtoVinc.produto_nome}</h3>
-                                <div className="mt-2 space-y-1">
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-semibold">SKU Sistema:</span> {produtoVinc.produto_codigo}
-                                  </p>
-                                  {produtoVinc.produto_ean && (
-                                    <p className="text-xs text-gray-600">
-                                      <span className="font-semibold">EAN:</span> {produtoVinc.produto_ean}
-                                    </p>
-                                  )}
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-semibold">Estoque:</span> {produtoVinc.estoque_atual}
-                                  </p>
-                                  <p className="text-xs text-gray-600">
-                                    <span className="font-semibold">Custo Atual:</span> R$ {produtoVinc.custo_anterior.toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-center">
-                              <span className="text-4xl mb-2">❓</span>
-                              <p className="text-sm font-semibold text-gray-600 mb-3">Produto não vinculado</p>
-                              <button
-                                onClick={() => abrirModalVincularProduto(item)}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                              >
-                                🔗 Vincular Produto
-                              </button>
-                              <button
-                                onClick={() => abrirModalCriarProduto(item)}
-                                className="mt-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                              >
-                                ✨ Criar Novo
-                              </button>
-                            </div>
-                          )}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Seção de Custos e Preços (só aparece se vinculado) */}
-                      {vinculado && (
-                        <div className="p-4 bg-white border-t-2 border-gray-200">
-                          {/* Comparação de Custos */}
-                          <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded">
+                      <div className="p-5 bg-white space-y-4">
+                        {/* Comparação de Custos */}
+                        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">💵 Custo Anterior</div>
+                            <div className="text-2xl font-bold text-gray-700">
+                              R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">🆕 Custo Novo</div>
+                            <div className="text-2xl font-bold text-blue-600">
+                              R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-500 mb-1">📊 Variação</div>
+                            <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                              {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Campos de Preço e Margem */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              💰 Preço de Venda
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={precosAtuais.preco_venda}
+                                onChange={(e) => atualizarPrecoVenda(
+                                  produtoVinc.produto_id,
+                                  parseFloat(e.target.value) || 0,
+                                  produtoVinc.custo_novo
+                                )}
+                                className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              Anterior: R$ {produtoVinc.preco_venda_atual.toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                              📈 Margem de Lucro
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                step="0.1"
+                                value={precosAtuais.margem}
+                                onChange={(e) => atualizarMargem(
+                                  produtoVinc.produto_id,
+                                  parseFloat(e.target.value) || 0,
+                                  produtoVinc.custo_novo
+                                )}
+                                className="w-full pr-10 pl-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              Com o novo custo
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Análise Comparativa */}
+                        <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                          <h4 className="text-sm font-semibold text-purple-800 mb-3">📊 Análise Comparativa (Valores Anteriores)</h4>
+                          <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
                               <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
-                              <div className="text-lg font-semibold text-gray-700">
-                                R$ {produtoVinc.custo_anterior.toFixed(2)}
-                              </div>
+                              <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">🆕 Custo Novo</div>
-                              <div className="text-lg font-semibold text-blue-600">
-                                R$ {produtoVinc.custo_novo.toFixed(2)}
-                              </div>
+                              <div className="text-xs text-gray-600 mb-1">💰 Preço Anterior</div>
+                              <div className="text-lg font-bold text-blue-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">📊 Variação</div>
-                              <div className={`text-lg font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                                {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
-                              </div>
+                              <div className="text-xs text-gray-600 mb-1">📈 Margem Anterior</div>
+                              <div className="text-lg font-bold text-purple-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
                             </div>
-                          </div>
-
-                          {/* Ajuste de Preços */}
-                          <div className="grid grid-cols-2 gap-4 p-4 bg-purple-50 border border-purple-200 rounded">
-                            {/* Preço de Venda */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                💰 Preço de Venda
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">R$</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={precosAtuais.preco_venda}
-                                  onChange={(e) => atualizarPrecoVenda(
-                                    produtoVinc.produto_id,
-                                    parseFloat(e.target.value) || 0,
-                                    produtoVinc.custo_novo
-                                  )}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
-                                />
-                              </div>
-                              <div className="mt-1 text-xs text-gray-500">
-                                Anterior: R$ {produtoVinc.preco_venda_atual.toFixed(2)}
-                              </div>
-                            </div>
-
-                            {/* Margem */}
-                            <div>
-                              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                📈 Margem de Lucro
-                              </label>
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  value={precosAtuais.margem}
-                                  onChange={(e) => atualizarMargem(
-                                    produtoVinc.produto_id,
-                                    parseFloat(e.target.value) || 0,
-                                    produtoVinc.custo_novo
-                                  )}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-purple-500"
-                            />
-                            <span className="text-lg">%</span>
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500">
-                            (Com o novo custo)
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Análise: Valores ANTERIORES com cores */}
-                      <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-300 rounded-lg">
-                        <div className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                          📊 Análise Comparativa (Valores Anteriores)
-                          <span className="text-xs font-normal text-gray-500">
-                            - Comparação do cenário antigo vs novo
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-3">
-                          {/* Custo Anterior */}
-                          {(() => {
-                            const custoAnterior = parseFloat(item.custo_anterior) || 0;
-                            const custoNovo = parseFloat(item.custo_novo) || 0;
-                            const corInfo = getCorComparacao(custoNovo, custoAnterior, 'custo');
-                            return (
-                              <div className={`${corInfo.bg} border-2 ${corInfo.border} rounded-lg p-3`}>
-                                <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
-                                <div className={`text-base font-bold ${corInfo.cor} flex items-center gap-1`}>
-                                  <span>{corInfo.label}</span>
-                                  <span>R$ {custoAnterior.toFixed(2)}</span>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Preço de Venda Anterior */}
-                          {(() => {
-                            const precoAtual = parseFloat(item.preco_venda_atual) || 0;
-                            const precoNovo = parseFloat(precosAtuais.preco_venda) || 0;
-                            const corInfo = getCorComparacao(precoNovo, precoAtual, 'preco');
-                            return (
-                              <div className={`${corInfo.bg} border-2 ${corInfo.border} rounded-lg p-3`}>
-                                <div className="text-xs text-gray-600 mb-1">💰 Preço Anterior</div>
-                                <div className={`text-base font-bold ${corInfo.cor} flex items-center gap-1`}>
-                                  <span>{corInfo.label}</span>
-                                  <span>R$ {precoAtual.toFixed(2)}</span>
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* Margem Anterior */}
-                          {(() => {
-                            const custoAnterior = parseFloat(item.custo_anterior) || 0;
-                            const precoVendaAnterior = parseFloat(item.preco_venda_atual) || 0;
-                            // Fórmula: (preço - custo) / preço * 100 (margem sobre venda)
-                            const margemAnterior = precoVendaAnterior > 0 
-                              ? ((precoVendaAnterior - custoAnterior) / precoVendaAnterior * 100)
-                              : 0;
-                            const margemNova = parseFloat(precosAtuais.margem) || 0;
-                            const corInfo = getCorComparacao(margemNova, margemAnterior, 'margem');
-                            return (
-                              <div className={`${corInfo.bg} border-2 ${corInfo.border} rounded-lg p-3`}>
-                                <div className="text-xs text-gray-600 mb-1">📈 Margem Anterior</div>
-                                <div className={`text-base font-bold ${corInfo.cor} flex items-center gap-1`}>
-                                  <span>{corInfo.label}</span>
-                                  <span>{margemAnterior.toFixed(2)}%</span>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Legenda de cores */}
-                        <div className="mt-3 pt-3 border-t border-gray-300 flex items-center gap-4 text-xs">
-                          <div className="flex items-center gap-1">
-                            <span className="text-green-600 font-bold">↑</span>
-                            <span className="text-gray-600">Vantagem</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-blue-600 font-bold">=</span>
-                            <span className="text-gray-600">Igual</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span className="text-red-600 font-bold">↓</span>
-                            <span className="text-gray-600">Desvantagem</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   );
-                })}
+                }).filter(Boolean)}
               </div>
             </div>
 
             {/* Footer */}
-            <div className="border-t p-6 bg-gray-50 flex justify-between items-center">
+            <div className="border-t border-gray-200 p-6 bg-gray-50 flex justify-between items-center">
               <button
                 onClick={() => {
                   setMostrarRevisaoPrecos(false);

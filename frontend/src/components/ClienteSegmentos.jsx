@@ -154,8 +154,9 @@ export function ClienteSegmentos({ clienteId, compact = false }) {
       setSegmento(response.data);
     } catch (err) {
       if (err.response?.status === 404) {
-        // Cliente ainda não foi segmentado - isso é normal, não logar erro
+        // Cliente ainda não foi segmentado - isso é normal, não é erro
         setError('not_calculated');
+        // Não logar no console pois é comportamento esperado
       } else {
         setError('Erro ao carregar segmentação');
         console.error('Erro ao carregar segmentação:', err);

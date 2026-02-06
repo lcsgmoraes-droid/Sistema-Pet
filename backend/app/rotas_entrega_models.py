@@ -62,6 +62,9 @@ class RotaEntrega(BaseTenantModel):
     
     # ETAPA 9.3: Relacionamento com paradas (ordem otimizada)
     paradas = relationship("RotaEntregaParada", back_populates="rota", cascade="all, delete-orphan")
+    
+    # Relacionamento com entregador
+    entregador = relationship("Cliente", foreign_keys=[entregador_id], lazy="joined")
 
 
 class RotaEntregaParada(BaseTenantModel):

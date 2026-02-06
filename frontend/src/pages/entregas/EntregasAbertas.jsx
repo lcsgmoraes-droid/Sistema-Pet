@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { api } from "../../services/api";
 import "./Entregas.css";
 
@@ -6,19 +6,8 @@ export default function EntregasAbertas() {
   const [loading, setLoading] = useState(true);
   const [vendas, setVendas] = useState([]);
   const [selecionadas, setSelecionadas] = useState([]);
-  const [entregadores, setEntregadores] = useState([]);
   const [configEntrega, setConfigEntrega] = useState(null);
-  
-  // Modal criar rota
-  const [showModal, setShowModal] = useState(false);
-  const [vendaSelecionada, setVendaSelecionada] = useState(null);
-  const [formRota, setFormRota] = useState({
-    entregador_id: "",
-    endereco_destino: "",
-    distancia_prevista: "",
-    moto_da_loja: false,
-    observacoes: "",
-  });
+  const [otimizando, setOtimizando] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -27,34 +16,67 @@ export default function EntregasAbertas() {
   async function carregarDados() {
     setLoading(true);
     try {
-      const [vendasRes, entregadoresRes, configRes] = await Promise.all([
-        api.get("/vendas", { params: { tem_entrega: true, sem_rota: true } }),
-        api.get("/clientes", { 
-          params: { 
-            is_entregador: true, 
-            entregador_ativo: true 
-          } 
-        }),
+      const [vendasRes, configRes] = await Promise.all([
+        api.get("/rotas-entrega/vendas-pendentes/listar"),
         api.get("/configuracoes/entregas").catch(() => ({ data: null })),
       ]);
 
-      // Garantir que vendas seja sempre um array
-      const vendasData = vendasRes.data;
-      setVendas(Array.isArray(vendasData) ? vendasData : []);
-      
-      // Garantir que entregadores seja sempre um array
-      const entregadoresData = entregadoresRes.data;
-      setEntregadores(Array.isArray(entregadoresData) ? entregadoresData : []);
-      
+      setVendas(Array.isArray(vendasRes.data) ? vendasRes.data : []);
       setConfigEntrega(configRes.data);
     } catch (err) {
       console.error(err);
-      alert("Erro ao carregar vendas com entrega");
-      // Resetar para arrays vazios em caso de erro
+      alert("Erro ao carregar vendas pendentes");
       setVendas([]);
-      setEntregadores([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleOtimizarRotas() {
+    if (vendas.length === 0) {
+      alert("Não há vendas para otimizar");
+      return;
+    }
+
+    if (!configEntrega || !configEntrega.logradouro) {
+      alert("⚠️ Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      return;
+    }
+
+    const custoEstimado = "5 centavos";
+    const confirmar = confirm(
+      `⚠️ ATENÇÃO - ESTA OPERAÇÃO TEM CUSTO!\n\n` +
+      `💵 Custo estimado: ${custoEstimado}\n` +
+      `📍 Entregas a otimizar: ${vendas.length}\n` +
+      `🗺️ Será feita 1 chamada ao Google Maps API\n` +
+      `💾 A ordem será salva no banco (não cobra novamente)\n\n` +
+      `Deseja continuar?`
+    );
+    
+    if (!confirmar) {
+      return;
+    }
+
+    setOtimizando(true);
+    try {
+      console.log("🗺️ Chamando endpoint de otimização...");
+      const response = await api.post("/rotas-entrega/vendas-pendentes/otimizar");
+      console.log("✅ Resposta da otimização:", response.data);
+      
+      alert(
+        `✅ ROTAS OTIMIZADAS COM SUCESSO!\n\n` +
+        `${response.data.message}\n\n` +
+        `Total otimizado: ${response.data.total_otimizado || vendas.length} entregas`
+      );
+      
+      await carregarDados();
+    } catch (err) {
+      console.error("❌ Erro ao otimizar:", err);
+      console.error("Detalhes:", err.response?.data);
+      const errorMsg = err.response?.data?.detail || "Erro ao otimizar rotas. Verifique se o Google Maps está configurado.";
+      alert(`❌ ERRO AO OTIMIZAR ROTAS\n\n${errorMsg}`);
+    } finally {
+      setOtimizando(false);
     }
   }
 
@@ -66,74 +88,42 @@ export default function EntregasAbertas() {
     );
   }
 
-  function abrirModalCriarRota() {
+  async function handleCriarRota() {
     if (selecionadas.length === 0) {
-      alert("Selecione pelo menos uma venda");
+      alert("Selecione pelo menos uma entrega");
       return;
     }
 
-    // Por enquanto, criar uma rota por venda
-    const venda = vendas.find((v) => v.id === selecionadas[0]);
-    setVendaSelecionada(venda);
-
-    // Pré-preencher formulário
-    const entregadorPadrao = configEntrega?.entregador_padrao_id || "";
-    const entregador = entregadores.find((e) => e.id === entregadorPadrao);
-
-    setFormRota({
-      entregador_id: entregadorPadrao,
-      endereco_destino: venda.endereco_entrega || "",
-      distancia_prevista: venda.distancia_km || "",
-      moto_da_loja: entregador?.moto_propria === false,
-      observacoes: "",
-    });
-
-    setShowModal(true);
-  }
-
-  async function handleCriarRota(e) {
-    e.preventDefault();
-
-    if (!formRota.entregador_id) {
-      alert("Selecione um entregador");
-      return;
-    }
-
-    if (!formRota.distancia_prevista || parseFloat(formRota.distancia_prevista) <= 0) {
-      alert("Informe a distância prevista");
+    if (!confirm(`Deseja criar uma rota com ${selecionadas.length} entrega(s)?`)) {
       return;
     }
 
     try {
-      await api.post("/rotas-entrega", {
-        venda_id: vendaSelecionada.id,
-        entregador_id: parseInt(formRota.entregador_id),
-        endereco_destino: formRota.endereco_destino,
-        distancia_prevista: parseFloat(formRota.distancia_prevista),
-        moto_da_loja: formRota.moto_da_loja,
-        observacoes: formRota.observacoes,
+      setLoading(true);
+      
+      const vendasSelecionadas = vendas.filter(v => selecionadas.includes(v.id));
+      
+      const semEntregador = vendasSelecionadas.filter(v => !v.entregador_id);
+      if (semEntregador.length > 0) {
+        alert(`❌ As seguintes vendas não têm entregador atribuído:\n${semEntregador.map(v => v.numero_venda).join(', ')}\n\nAtribua um entregador antes de criar a rota.`);
+        setLoading(false);
+        return;
+      }
+      
+      await api.post("/rotas-entrega/", {
+        vendas_ids: selecionadas,
+        entregador_id: vendasSelecionadas[0].entregador_id,
+        moto_da_loja: false
       });
 
-      alert("Rota criada com sucesso!");
-      setShowModal(false);
+      alert(`✅ Rota criada com ${selecionadas.length} entrega(s)!\n\nAs entregas foram movidas para "Rotas de Entrega"`);
       setSelecionadas([]);
       carregarDados();
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.detail || "Erro ao criar rota");
-    }
-  }
-
-  function handleChangeEntregador(entregadorId) {
-    setFormRota((prev) => ({ ...prev, entregador_id: entregadorId }));
-
-    // Atualizar moto da loja baseado no entregador
-    const entregador = entregadores.find((e) => e.id === parseInt(entregadorId));
-    if (entregador) {
-      setFormRota((prev) => ({
-        ...prev,
-        moto_da_loja: entregador.moto_propria === false,
-      }));
+      alert(err.response?.data?.detail || "Erro ao criar rota. Verifique se todas as entregas têm entregador atribuído.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -143,7 +133,7 @@ export default function EntregasAbertas() {
     <div className="page">
       <h1>Entregas em Aberto</h1>
       <p style={{ color: "#666", marginBottom: 20 }}>
-        Vendas finalizadas com entrega que ainda não possuem rota criada
+        Vendas com entrega que estão aguardando iniciar a rota
       </p>
 
       {!Array.isArray(vendas) || vendas.length === 0 ? (
@@ -152,13 +142,30 @@ export default function EntregasAbertas() {
         </div>
       ) : (
         <>
+          <div style={{ marginBottom: 20, display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              onClick={handleOtimizarRotas}
+              disabled={otimizando || loading}
+              className="btn-secondary"
+              title="Reorganizar entregas usando Google Maps para menor distância"
+            >
+              {otimizando ? "🔄 Otimizando..." : "🗺️ Otimizar Rotas"}
+            </button>
+            <span style={{ color: "#666", fontSize: "0.9em" }}>
+              ℹ️ {vendas.filter(v => v.ordem_otimizada).length > 0 
+                ? `${vendas.filter(v => v.ordem_otimizada).length} entregas já otimizadas. ` 
+                : ""}
+              Clique para ordenar pela rota mais eficiente
+            </span>
+          </div>
+
           <table className="table-entregas">
             <thead>
               <tr>
                 <th style={{ width: 40 }}>
                   <input
                     type="checkbox"
-                    checked={selecionadas.length === vendas.length}
+                    checked={selecionadas.length === vendas.length && vendas.length > 0}
                     onChange={(e) =>
                       setSelecionadas(
                         e.target.checked ? vendas.map((v) => v.id) : []
@@ -166,16 +173,24 @@ export default function EntregasAbertas() {
                     }
                   />
                 </th>
+                <th>Ordem</th>
                 <th>Venda</th>
+                <th>Data da Venda</th>
                 <th>Cliente</th>
+                <th>Entregador</th>
                 <th>Endereço</th>
-                <th>Distância (km)</th>
-                <th>Valor Total</th>
+                <th>Taxa Entrega</th>
+                <th>Total</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              {vendas.map((venda) => (
-                <tr key={venda.id}>
+              {vendas.map((venda, index) => (
+                <tr key={venda.id} style={{ 
+                  backgroundColor: selecionadas.includes(venda.id) 
+                    ? "#e3f2fd" 
+                    : venda.ordem_otimizada ? "#f0f8ff" : "white" 
+                }}>
                   <td>
                     <input
                       type="checkbox"
@@ -183,124 +198,65 @@ export default function EntregasAbertas() {
                       onChange={() => toggleVenda(venda.id)}
                     />
                   </td>
-                  <td>#{venda.numero || venda.id}</td>
-                  <td>{venda.cliente_nome || "N/A"}</td>
-                  <td>{venda.endereco_entrega || "N/A"}</td>
-                  <td>{venda.distancia_km || "-"}</td>
+                  <td>
+                    <strong style={{ 
+                      color: venda.ordem_otimizada ? "#007bff" : "#999", 
+                      fontSize: "1.1em" 
+                    }}>
+                      {index + 1}
+                      {venda.ordem_otimizada && " 🗺️"}
+                    </strong>
+                  </td>
+                  <td>{venda.numero_venda}</td>
+                  <td style={{ fontSize: "0.9em" }}>
+                    {venda.data_venda ? new Date(venda.data_venda).toLocaleDateString('pt-BR') : 'N/A'}
+                  </td>
+                  <td>{venda.cliente_nome}</td>
+                  <td>
+                    <span style={{ 
+                      color: venda.entregador_nome ? "#28a745" : "#999",
+                      fontWeight: venda.entregador_nome ? "600" : "normal"
+                    }}>
+                      {venda.entregador_nome || "Não atribuído"}
+                    </span>
+                  </td>
+                  <td style={{ maxWidth: 300, fontSize: "0.9em" }}>{venda.endereco_entrega || "N/A"}</td>
+                  <td>R$ {parseFloat(venda.taxa_entrega || 0).toFixed(2)}</td>
                   <td>R$ {parseFloat(venda.total || 0).toFixed(2)}</td>
+                  <td>
+                    <span style={{ 
+                      padding: "4px 8px", 
+                      borderRadius: 4, 
+                      fontSize: 12, 
+                      fontWeight: "bold",
+                      color: "#fff",
+                      backgroundColor: "#ffa500"
+                    }}>
+                      AGUARDANDO
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          <div style={{ marginTop: 20 }}>
+          <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
             <button
-              onClick={abrirModalCriarRota}
-              disabled={selecionadas.length === 0}
+              onClick={handleCriarRota}
+              disabled={selecionadas.length === 0 || loading}
               className="btn-primary"
+              style={{ 
+                backgroundColor: selecionadas.length > 0 ? "#28a745" : "#ccc",
+                cursor: selecionadas.length > 0 ? "pointer" : "not-allowed"
+              }}
             >
-              Criar Rota ({selecionadas.length} selecionada{selecionadas.length !== 1 ? "s" : ""})
+              ✅ Criar Rota ({selecionadas.length} selecionada{selecionadas.length !== 1 ? "s" : ""})
             </button>
+            <span style={{ color: "#666", fontSize: "0.9em", alignSelf: "center" }}>
+              💡 Selecione as entregas e clique para criar uma rota
+            </span>
           </div>
         </>
-      )}
-
-      {/* Modal Criar Rota */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Criar Rota de Entrega</h2>
-
-            <form onSubmit={handleCriarRota}>
-              <div className="form-group">
-                <label>Venda</label>
-                <input
-                  type="text"
-                  value={`#${vendaSelecionada.numero || vendaSelecionada.id} - ${vendaSelecionada.cliente_nome}`}
-                  disabled
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Entregador *</label>
-                <select
-                  value={formRota.entregador_id}
-                  onChange={(e) => handleChangeEntregador(e.target.value)}
-                  required
-                >
-                  <option value="">Selecione...</option>
-                  {entregadores.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Endereço de Destino</label>
-                <input
-                  type="text"
-                  value={formRota.endereco_destino}
-                  onChange={(e) =>
-                    setFormRota({ ...formRota, endereco_destino: e.target.value })
-                  }
-                  placeholder="Endereço completo"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Distância Prevista (km) *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={formRota.distancia_prevista}
-                  onChange={(e) =>
-                    setFormRota({ ...formRota, distancia_prevista: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={formRota.moto_da_loja}
-                    onChange={(e) =>
-                      setFormRota({ ...formRota, moto_da_loja: e.target.checked })
-                    }
-                  />
-                  {" "}Moto da loja?
-                </label>
-                <small style={{ display: "block", color: "#666", marginTop: 5 }}>
-                  Herdado do cadastro do entregador, mas pode ser alterado
-                </small>
-              </div>
-
-              <div className="form-group">
-                <label>Observações</label>
-                <textarea
-                  value={formRota.observacoes}
-                  onChange={(e) =>
-                    setFormRota({ ...formRota, observacoes: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShowModal(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary">
-                  Criar Rota
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );

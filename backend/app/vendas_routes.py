@@ -334,6 +334,24 @@ async def criar_venda(
                     detail=f"❌ Produto '{produto.nome}' possui variações e não pode ser vendido diretamente. Selecione uma variação específica (cor, tamanho, etc.) para adicionar ao carrinho."
                 )
     
+    # ========================================
+    # 🔒 TRAVA 2 — VALIDAÇÃO: ENDEREÇO OBRIGATÓRIO QUANDO TEM ENTREGA
+    # ========================================
+    if dados.tem_entrega and not dados.endereco_entrega:
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo."
+        )
+    
+    # ========================================
+    # 🔒 TRAVA 3 — VALIDAÇÃO: ENTREGADOR OBRIGATÓRIO QUANDO TEM ENTREGA
+    # ========================================
+    if dados.tem_entrega and not dados.entregador_id:
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
+        )
+    
     # Preparar payload para o service
     payload = {
         'cliente_id': dados.cliente_id,
@@ -432,6 +450,20 @@ def atualizar_venda(
     if not dados.itens or len(dados.itens) == 0:
         raise HTTPException(status_code=400, detail='A venda deve ter pelo menos um item')
     
+    # Validar endereço obrigatório quando tem entrega
+    if dados.tem_entrega and not dados.endereco_entrega:
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo."
+        )
+    
+    # Validar entregador obrigatório quando tem entrega
+    if dados.tem_entrega and not dados.entregador_id:
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
+        )
+    
     # Calcular novos totais
     totais = calcular_totais_venda(
         dados.itens,
@@ -493,6 +525,76 @@ def atualizar_venda(
     
     log_action(db, current_user.id, 'update', 'vendas', venda.id,
                details=f'Venda {venda.numero_venda} atualizada - Total: R$ {totais["total"]:.2f}')
+    
+    # ============================================================================
+    # 🚚 CRIAR ROTA DE ENTREGA SE NECESSÁRIO (e não existir)
+    # ============================================================================
+    if venda.tem_entrega and venda.endereco_entrega:
+        from app.rotas_entrega_models import RotaEntrega
+        from app.models import Cliente, ConfiguracaoEntrega
+        
+        # Verificar se já existe rota para esta venda
+        rota_existente = db.query(RotaEntrega).filter(
+            RotaEntrega.venda_id == venda.id,
+            RotaEntrega.tenant_id == tenant_id
+        ).first()
+        
+        if not rota_existente:
+            try:
+                # Buscar entregador padrão
+                entregador_padrao = db.query(Cliente).filter(
+                    Cliente.tenant_id == tenant_id,
+                    Cliente.entregador_padrao == True,
+                    Cliente.entregador_ativo == True,
+                    Cliente.ativo == True
+                ).first()
+                
+                if entregador_padrao:
+                    from app.utils.timezone import now_brasilia
+                    
+                    # Criar rota de entrega
+                    rota = RotaEntrega(
+                        tenant_id=tenant_id,
+                        venda_id=venda.id,
+                        entregador_id=entregador_padrao.id,
+                        endereco_destino=venda.endereco_entrega,
+                        taxa_entrega_cliente=float(venda.taxa_entrega) if venda.taxa_entrega else 0,
+                        status="pendente",
+                        created_by=current_user.id,
+                        moto_da_loja=not entregador_padrao.moto_propria,
+                        created_at=now_brasilia(),
+                        updated_at=now_brasilia()
+                    )
+                    rota.numero = f"ROTA-{now_brasilia().strftime('%Y%m%d%H%M%S')}"
+                    
+                    # Buscar configuração de entrega para ponto inicial
+                    config_entrega = db.query(ConfiguracaoEntrega).filter(
+                        ConfiguracaoEntrega.tenant_id == tenant_id
+                    ).first()
+                    
+                    if config_entrega:
+                        ponto_inicial = (
+                            f"{config_entrega.logradouro or ''}"
+                            f"{', ' + config_entrega.numero if config_entrega.numero else ''}"
+                            f"{' - ' + config_entrega.bairro if config_entrega.bairro else ''}"
+                            f"{' - ' + config_entrega.cidade if config_entrega.cidade else ''}"
+                            f"/{config_entrega.estado if config_entrega.estado else ''}"
+                        ).strip()
+                        rota.ponto_inicial_rota = ponto_inicial
+                        rota.ponto_final_rota = ponto_inicial
+                        rota.retorna_origem = True
+                    
+                    db.add(rota)
+                    db.commit()
+                    logger.info(f"🚚 Rota de entrega criada ao atualizar venda: {rota.numero} (ID={rota.id}, Entregador={entregador_padrao.nome})")
+                else:
+                    logger.warning(f"⚠️ Venda #{venda.numero_venda} atualizada com entrega mas não há entregador padrão configurado")
+                    
+            except Exception as e:
+                logger.error(f"❌ Erro ao criar rota de entrega ao atualizar venda: {e}")
+                # Não falha a atualização da venda por erro na criação da rota
+        else:
+            logger.info(f"ℹ️ Venda {venda.numero_venda} já possui rota (ID={rota_existente.id}), não criando nova")
     
     # ============================================================================
     # 🆕 REGENERAR COMISSÕES SE VENDA JÁ ESTAVA FINALIZADA
@@ -624,6 +726,16 @@ async def finalizar_venda(
         venda_id=venda_id,
         total_pagamentos=len(dados.pagamentos) if dados and dados.pagamentos else 0
     )
+    
+    # ========================================
+    # 🔒 VALIDAÇÃO: ENTREGADOR OBRIGATÓRIO QUANDO TEM ENTREGA
+    # ========================================
+    venda_temp = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+    if venda_temp and venda_temp.tem_entrega and not venda_temp.entregador_id:
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Não é possível finalizar. Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar."
+        )
     
     # ============================================================
     # 🔥 ORQUESTRAÇÃO ATÔMICA VIA VendaService

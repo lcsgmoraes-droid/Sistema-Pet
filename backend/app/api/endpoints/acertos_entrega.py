@@ -1,14 +1,15 @@
 """
 Endpoints de Acerto Financeiro de Entregas
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import date
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.services.acerto_entrega_service import (
     executar_acerto_entregador,
-    processar_acertos_do_dia
+    processar_acertos_do_dia,
+    ajustar_media_entregas_mensal
 )
 from app.models import Cliente
 
@@ -168,4 +169,36 @@ def historico_acerto(
             }
             for cp in contas
         ]
+    }
+
+
+@router.post("/ajustar-media-entregas")
+def ajustar_media_entregas(
+    mes: int = Query(..., ge=1, le=12, description="Mês a analisar (1-12)"),
+    ano: int = Query(..., ge=2020, le=2100, description="Ano a analisar"),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Ajusta a média de entregas configurada para entregadores funcionários com controla_rh.
+    
+    Baseado nas entregas realmente realizadas no mês especificado.
+    Se a diferença for maior que 20%, atualiza automaticamente a média configurada.
+    
+    Args:
+        mes: Mês a analisar (1-12)
+        ano: Ano a analisar
+    """
+    user, tenant = user_and_tenant
+    
+    resultados = ajustar_media_entregas_mensal(db, tenant.id, mes, ano)
+    
+    total_ajustados = sum(1 for r in resultados if r["ajustado"])
+    
+    return {
+        "mes": mes,
+        "ano": ano,
+        "total_analisados": len(resultados),
+        "total_ajustados": total_ajustados,
+        "detalhes": resultados
     }

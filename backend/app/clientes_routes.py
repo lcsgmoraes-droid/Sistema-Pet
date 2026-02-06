@@ -14,6 +14,7 @@ from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
 from pydantic import BaseModel, EmailStr, validator
+import logging
 
 from app.db import get_session
 from app.models import User, Cliente, Pet, Raca
@@ -21,6 +22,8 @@ from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
 from app.security.permissions_decorator import require_permission
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
@@ -188,6 +191,7 @@ class ClienteCreate(BaseModel):
     
     # 🚚 ENTREGADOR (SPRINT 1)
     is_entregador: bool = False
+    entregador_padrao: bool = False
     is_terceirizado: bool = False
     recebe_repasse: bool = False
     gera_conta_pagar: bool = False
@@ -279,7 +283,9 @@ class ClienteUpdate(BaseModel):
     
     # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: Optional[bool] = None
+    entregador_padrao: Optional[bool] = None
     controla_rh: Optional[bool] = None
+    gera_conta_pagar_custo_entrega: Optional[bool] = None
     media_entregas_configurada: Optional[int] = None
     media_entregas_real: Optional[int] = None
     custo_rh_ajustado: Optional[Decimal] = None
@@ -361,7 +367,9 @@ class ClienteResponse(BaseModel):
     
     # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: bool = True
+    entregador_padrao: bool = False
     controla_rh: bool = False
+    gera_conta_pagar_custo_entrega: bool = False
     media_entregas_configurada: Optional[int] = None
     media_entregas_real: Optional[int] = None
     custo_rh_ajustado: Optional[Decimal] = None
@@ -509,6 +517,23 @@ def create_cliente(
     
     # Preparar dados do cliente
     dados_cliente = cliente_data.model_dump()
+    
+    # 🚚 VALIDAÇÃO: Apenas 1 entregador padrão por vez
+    if dados_cliente.get('entregador_padrao') is True:
+        # Verificar se já existe outro entregador padrão
+        entregador_padrao_atual = db.query(Cliente).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.entregador_padrao == True,
+            Cliente.ativo == True
+        ).first()
+        
+        if entregador_padrao_atual:
+            # Desmarcar o antigo como padrão
+            entregador_padrao_atual.entregador_padrao = False
+            entregador_padrao_atual.updated_at = dt.utcnow()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"🚚 Entregador padrão removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
     
     # Serializar enderecos_adicionais para JSON (SQLite armazena como TEXT)
     if dados_cliente.get('enderecos_adicionais'):
@@ -809,6 +834,7 @@ def update_cliente(
     import logging
     logger = logging.getLogger(__name__)
     logger.info(f"[DEBUG update_cliente] ID={cliente_id}, tenant_id={tenant_id}, data_fechamento_comissao={cliente_data.data_fechamento_comissao}")
+    logger.info(f"[DEBUG] entregador_padrao={cliente_data.entregador_padrao}, gera_conta_pagar_custo_entrega={cliente_data.gera_conta_pagar_custo_entrega}")
     
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
@@ -884,6 +910,22 @@ def update_cliente(
     
     # Atualizar campos
     update_data = cliente_data.model_dump(exclude_unset=True)
+    
+    # 🚚 VALIDAÇÃO: Apenas 1 entregador padrão por vez
+    if 'entregador_padrao' in update_data and update_data['entregador_padrao'] is True:
+        # Verificar se já existe outro entregador padrão
+        entregador_padrao_atual = db.query(Cliente).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.entregador_padrao == True,
+            Cliente.id != cliente_id,
+            Cliente.ativo == True
+        ).first()
+        
+        if entregador_padrao_atual:
+            # Desmarcar o antigo como padrão
+            entregador_padrao_atual.entregador_padrao = False
+            entregador_padrao_atual.updated_at = dt.utcnow()
+            logger.info(f"🚚 Entregador padrão removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
     
     # Serializar enderecos_adicionais para JSON (SQLite armazena como TEXT)
     if 'enderecos_adicionais' in update_data and update_data['enderecos_adicionais'] is not None:
@@ -2296,3 +2338,86 @@ def obter_timeline_fornecedor(
     
     return _obter_timeline("fornecedor_timeline", fornecedor_id, tipo_evento, None, limit)
 
+
+# ============================================================
+# 🚚 ENTREGADORES - Custo Operacional
+# ============================================================
+
+@router.get("/entregadores/{entregador_id}/custo-operacional")
+def obter_custo_operacional_entregador(
+    entregador_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Retorna o custo operacional calculado para o entregador.
+    
+    Para modelo 'rateio_rh':
+    - Calcula custo_por_entrega = custo_rh_ajustado / media_entregas_real (se disponível)
+    - Senão usa media_entregas_configurada como fallback
+    
+    Para modelo 'taxa_fixa':
+    - Retorna taxa_fixa_entrega
+    
+    Para modelo 'por_km':
+    - Retorna valor_por_km_entrega (frontend precisa multiplicar pela distância)
+    """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    
+    # Buscar entregador
+    entregador = db.query(Cliente).filter(
+        Cliente.id == entregador_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.is_entregador == True
+    ).first()
+    
+    if not entregador:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Entregador não encontrado"
+        )
+    
+    custo_por_entrega = 0
+    modelo = entregador.modelo_custo_entrega
+    detalhes = {}
+    
+    if modelo == 'rateio_rh' and entregador.controla_rh:
+        # Usar custo_rh_ajustado se disponível
+        if entregador.custo_rh_ajustado:
+            custo_rh = float(entregador.custo_rh_ajustado)
+            # Usar média real se disponível, senão configurada
+            media_entregas = entregador.media_entregas_real or entregador.media_entregas_configurada or 1
+            custo_por_entrega = custo_rh / media_entregas if media_entregas > 0 else 0
+            
+            detalhes = {
+                "custo_rh": custo_rh,
+                "media_entregas": media_entregas,
+                "tipo_media": "real" if entregador.media_entregas_real else "configurada"
+            }
+        else:
+            # Sem custo RH configurado
+            custo_por_entrega = 0
+            detalhes = {"aviso": "Custo RH não configurado"}
+    
+    elif modelo == 'taxa_fixa':
+        custo_por_entrega = float(entregador.taxa_fixa_entrega or 0)
+        detalhes = {"taxa_fixa": custo_por_entrega}
+    
+    elif modelo == 'por_km':
+        custo_por_entrega = float(entregador.valor_por_km_entrega or 0)
+        detalhes = {
+            "valor_por_km": custo_por_entrega,
+            "observacao": "Requer cálculo de distância no frontend"
+        }
+    
+    else:
+        # Sem modelo configurado
+        detalhes = {"aviso": "Modelo de custo não configurado"}
+    
+    return {
+        "entregador_id": entregador_id,
+        "nome": entregador.nome_fantasia or entregador.nome,
+        "modelo_custo": modelo,
+        "custo_por_entrega": round(custo_por_entrega, 2),
+        "detalhes": detalhes
+    }

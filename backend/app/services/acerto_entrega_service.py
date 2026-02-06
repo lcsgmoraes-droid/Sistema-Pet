@@ -234,3 +234,83 @@ def processar_acertos_do_dia(db: Session, tenant_id: int) -> list[Dict]:
             resultados.append(resultado)
     
     return resultados
+
+
+def ajustar_media_entregas_mensal(db: Session, tenant_id: int, mes: int, ano: int) -> list[Dict]:
+    """
+    Ajusta a média de entregas configurada baseado nas entregas reais do mês.
+    
+    Deve ser executado no último dia do mês (ou início do próximo mês).
+    
+    Args:
+        db: Sessão do banco
+        tenant_id: ID do tenant
+        mes: Mês a analisar (1-12)
+        ano: Ano a analisar
+    
+    Returns:
+        Lista com resumo dos ajustes realizados
+    """
+    from datetime import date
+    from calendar import monthrange
+    
+    # Define o período do mês
+    primeiro_dia = date(ano, mes, 1)
+    ultimo_dia = date(ano, mes, monthrange(ano, mes)[1])
+    
+    # Busca entregadores funcionários com controla_rh ativo
+    entregadores = db.query(Cliente).filter(
+        and_(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "funcionario",
+            Cliente.is_entregador == True,
+            Cliente.controla_rh == True,
+            Cliente.media_entregas_configurada.isnot(None)
+        )
+    ).all()
+    
+    resultados = []
+    
+    for entregador in entregadores:
+        # Conta entregas concluídas no mês
+        entregas_mes = db.query(RotaEntrega).filter(
+            and_(
+                RotaEntrega.entregador_id == entregador.id,
+                RotaEntrega.tenant_id == tenant_id,
+                RotaEntrega.status == "concluida",
+                RotaEntrega.data_conclusao >= primeiro_dia,
+                RotaEntrega.data_conclusao <= ultimo_dia
+            )
+        ).count()
+        
+        # Atualiza média real
+        media_anterior = entregador.media_entregas_configurada
+        entregador.media_entregas_real = entregas_mes
+        
+        # Se a diferença for significativa (>20%), sugere ajuste
+        if entregas_mes > 0:
+            diferenca_percentual = abs(entregas_mes - media_anterior) / media_anterior * 100
+            
+            if diferenca_percentual > 20:
+                # Atualiza a média configurada com a média real
+                entregador.media_entregas_configurada = entregas_mes
+                ajustado = True
+            else:
+                ajustado = False
+        else:
+            ajustado = False
+            diferenca_percentual = 0
+        
+        resultados.append({
+            "entregador_id": entregador.id,
+            "entregador": entregador.nome,
+            "media_anterior": media_anterior,
+            "entregas_realizadas": entregas_mes,
+            "diferenca_percentual": round(diferenca_percentual, 2),
+            "ajustado": ajustado,
+            "nova_media": entregador.media_entregas_configurada if ajustado else media_anterior
+        })
+    
+    db.commit()
+    
+    return resultados

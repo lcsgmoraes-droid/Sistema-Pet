@@ -44,11 +44,19 @@ def get_configuracao_entrega(
     )
 
     if not config:
-        # Cria configuração padrão
+        # Buscar entregador padrão automaticamente
+        from app.models import Cliente
+        entregador_padrao = db.query(Cliente).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.entregador_padrao == True,
+            Cliente.entregador_ativo == True,
+            Cliente.ativo == True
+        ).first()
+        
+        # Cria configuração padrão com entregador padrão se existir
         config = ConfiguracaoEntrega(
-            user_id=current_user.id,
             tenant_id=tenant_id,
-            entregador_padrao_id=None,
+            entregador_padrao_id=entregador_padrao.id if entregador_padrao else None,
             logradouro=None,
             cep=None,
             numero=None,
@@ -60,6 +68,20 @@ def get_configuracao_entrega(
         db.add(config)
         db.commit()
         db.refresh(config)
+    elif config.entregador_padrao_id is None:
+        # Se já existe mas não tem entregador padrão definido, buscar automaticamente
+        from app.models import Cliente
+        entregador_padrao = db.query(Cliente).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.entregador_padrao == True,
+            Cliente.entregador_ativo == True,
+            Cliente.ativo == True
+        ).first()
+        
+        if entregador_padrao:
+            config.entregador_padrao_id = entregador_padrao.id
+            db.commit()
+            db.refresh(config)
 
     return config
 
@@ -94,7 +116,6 @@ def update_configuracao_entrega(
     if not config:
         # Cria se não existe
         config = ConfiguracaoEntrega(
-            user_id=current_user.id,
             tenant_id=tenant_id
         )
         db.add(config)

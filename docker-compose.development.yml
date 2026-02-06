@@ -28,7 +28,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Mapeado para 5433 no host para compatibilidade
 
   # ==========================================================================
   # BACKEND - FastAPI + SQLAlchemy
@@ -49,7 +49,7 @@ services:
       - ADMIN_TOKEN=dev_admin_token
       - FRONTEND_URL=http://localhost:5173
       - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8000
-      - GOOGLE_MAPS_API_KEY=
+      - GOOGLE_MAPS_API_KEY=AIzaSyClc2jpIcrb2PrCaOBkzQc4XCmEVFlWiO0
       - OPENAI_API_KEY=
       - BLING_CLIENT_ID=
       - BLING_CLIENT_SECRET=

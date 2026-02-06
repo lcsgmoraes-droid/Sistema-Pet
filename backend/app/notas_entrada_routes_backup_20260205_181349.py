@@ -1905,24 +1905,6 @@ def processar_entrada_estoque(
     
     db.commit()
     
-    # VERIFICAR E NOTIFICAR PENDÊNCIAS DE ESTOQUE
-    from app.services.pendencia_estoque_service import verificar_e_notificar_pendencias
-    try:
-        for item_proc in itens_processados:
-            produto_id = item_proc['produto_id']
-            quantidade = item_proc['quantidade']
-            notificacoes = verificar_e_notificar_pendencias(
-                db=db,
-                tenant_id=tenant_id,
-                produto_id=produto_id,
-                quantidade_entrada=quantidade
-            )
-            if notificacoes > 0:
-                logger.info(f"WhatsApp: {notificacoes} clientes notificados sobre {item_proc['produto']}")
-    except Exception as e:
-        logger.error(f"Erro ao notificar pendencias: {str(e)}")
-        # Não abortar, apenas logar o erro
-    
     logger.info(f"âœ… Entrada processada: {len(itens_processados)} produtos")
     
     return {
@@ -1997,94 +1979,86 @@ def reverter_entrada_estoque(
             if not item.produto_id:
                 continue
             
-            try:
-                produto = item.produto
-                
-                # Buscar lote criado para esta entrada
-                nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
-                lote = db.query(ProdutoLote).filter(
-                    ProdutoLote.produto_id == produto.id,
-                    ProdutoLote.nome_lote == nome_lote,
-                    ProdutoLote.tenant_id == tenant_id
-                ).first()
-                
-                if lote:
-                    # REVERTER PREÇO DE CUSTO se foi alterado
-                    try:
-                        historico_preco = db.query(ProdutoHistoricoPreco).filter(
-                            ProdutoHistoricoPreco.produto_id == produto.id,
-                            ProdutoHistoricoPreco.nota_entrada_id == nota.id,
-                            ProdutoHistoricoPreco.motivo.in_(["nfe_entrada", "nfe_revisao_precos"]),
-                            ProdutoHistoricoPreco.tenant_id == tenant_id
-                        ).first()
-                        
-                        if historico_preco:
-                            # Reverter preços anteriores (com fallback para 0 se None)
-                            preco_custo_revertido = float(historico_preco.preco_custo_anterior or 0)
-                            preco_venda_revertido = float(historico_preco.preco_venda_anterior or 0)
-                            
-                            try:
-                                logger.info(f"  💰 Revertendo preço de custo: R$ {float(produto.preco_custo or 0):.2f} → R$ {preco_custo_revertido:.2f}")
-                            except:
-                                logger.info(f"  💰 Revertendo preços do produto {produto.id}")
-                            
-                            produto.preco_custo = preco_custo_revertido
-                            produto.preco_venda = preco_venda_revertido
-                            
-                            # Excluir histórico
-                            db.delete(historico_preco)
-                    except Exception as e:
-                        logger.warning(f"  ⚠️ Erro ao reverter preços: {str(e)}")
-                    
-                    # Remover quantidade do estoque
-                    estoque_anterior = produto.estoque_atual or 0
-                    produto.estoque_atual = max(0, estoque_anterior - item.quantidade)
-                    
-                    # Registrar movimentação de estorno
-                    try:
-                        movimentacao_estorno = EstoqueMovimentacao(
-                            produto_id=produto.id,
-                            lote_id=lote.id,
-                            tipo="saida",
-                            motivo="ajuste",
-                            quantidade=float(item.quantidade or 0),
-                            quantidade_anterior=float(estoque_anterior),
-                            quantidade_nova=float(produto.estoque_atual or 0),
-                            custo_unitario=float(item.valor_unitario or 0),
-                            valor_total=float(item.valor_total or 0),
-                            documento=nota.chave_acesso or "",
-                            referencia_tipo="estorno_nota_entrada",
-                            referencia_id=nota.id,
-                            observacao=f"Estorno NF-e {nota.numero_nota} - {item.descricao or ''}",
-                            user_id=current_user.id,
-                            tenant_id=tenant_id
-                        )
-                        db.add(movimentacao_estorno)
-                    except Exception as e:
-                        logger.warning(f"  ⚠️ Erro ao criar movimentação: {str(e)}")
-                    
-                    # Excluir lote
-                    db.delete(lote)
-                    
-                    # Adicionar à lista de revertidos
-                    itens_revertidos.append({
-                        "produto_id": produto.id,
-                        "produto_nome": produto.nome,
-                        "quantidade_removida": float(item.quantidade or 0),
-                        "estoque_atual": float(produto.estoque_atual or 0)
-                    })
-                    
-                    logger.info(
-                        f"  ↩️  {produto.nome}: -{item.quantidade} unidades "
-                        f"(estoque: {estoque_anterior} → {produto.estoque_atual})"
-                    )
-                
-                # Restaurar status do item
-                item.status = 'vinculado'
+            produto = item.produto
             
-            except Exception as e:
-                logger.error(f"  ❌ Erro ao reverter item {item.id}: {str(e)}")
-                # Continuar com próximo item ao invés de parar tudo
+            # Buscar lote criado para esta entrada
+            nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
+            lote = db.query(ProdutoLote).filter(
+                ProdutoLote.produto_id == produto.id,
+                ProdutoLote.nome_lote == nome_lote,
+                ProdutoLote.tenant_id == tenant_id
+            ).first()
+            
+            if lote:
+                # REVERTER PREÃ‡O DE CUSTO se foi alterado
+                try:
+                    historico_preco = db.query(ProdutoHistoricoPreco).filter(
+                                        ProdutoHistoricoPreco.produto_id == produto.id,
+                        ProdutoHistoricoPreco.nota_entrada_id == nota.id,
+                        ProdutoHistoricoPreco.motivo.in_(["nfe_entrada", "nfe_revisao_precos"]),
+                        ProdutoHistoricoPreco.tenant_id == tenant_id
+                        ).first()
+                    
+                    if historico_preco:
+                        # Reverter preÃ§os anteriores (com fallback para 0 se None)
+                    preco_custo_revertido = float(historico_preco.preco_custo_anterior) if historico_preco.preco_custo_anterior is not None else 0.0
+                        preco_venda_revertido = float(historico_preco.preco_venda_anterior) if historico_preco.preco_venda_anterior is not None else 0.0
+                    
+                        logger.info(f"  ðŸ’° Revertendo preÃ§o de custo: R$ {float(produto.preco_custo) if produto.preco_custo is not None else 0.0:.2f} â†’ R$ {preco_custo_revertido:.2f}")
+                        produto.preco_custo = preco_custo_revertido
+                        produto.preco_venda = preco_venda_revertido
+                    
+                        # Excluir histÃ³rico
+                    db.delete(historico_preco)
+                
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Erro ao reverter preços do produto {produto.id}: {str(e)}")
+                
+                # Remover quantidade do estoque
+                estoque_anterior = produto.estoque_atual or 0
+                produto.estoque_atual = max(0, estoque_anterior - item.quantidade)
+                
+                # Registrar movimentaÃ§Ã£o de estorno
+                try:
+                    movimentacao_estorno = EstoqueMovimentacao(
+                    produto_id=produto.id,
+                    lote_id=lote.id,
+                    tipo="saida",
+                    motivo="ajuste",
+                    quantidade=item.quantidade,
+                    quantidade_anterior=estoque_anterior,
+                    quantidade_nova=produto.estoque_atual,
+                    custo_unitario=float(item.valor_unitario) if item.valor_unitario is not None else 0.0,
+                    valor_total=float(item.valor_total) if item.valor_total is not None else 0.0,
+                    documento=nota.chave_acesso,
+                    referencia_tipo="estorno_nota_entrada",
+                    referencia_id=nota.id,
+                    observacao=f"Estorno NF-e {nota.numero_nota} - {item.descricao}",
+                    user_id=current_user.id,
+                    tenant_id=tenant_id
+                )
+                db.add(movimentacao_estorno)
+                
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Erro ao criar movimentação de estorno: {str(e)}")
+                
+                # Excluir lote
+                db.delete(lote)
+                
+                itens_revertidos.append({
+                    "produto_id": produto.id,
+                    "produto_nome": produto.nome,
+                    "quantidade_removida": item.quantidade,
+                    "estoque_atual": produto.estoque_atual
+                })
+                
+                logger.info(
+                    f"  â†©ï¸  {produto.nome}: -{item.quantidade} unidades "
+                    f"(estoque: {estoque_anterior} â†’ {produto.estoque_atual})"
+                )
+            
+            # Restaurar status do item
+            item.status = 'vinculado'
         
         # Atualizar status da nota
         nota.status = 'pendente'

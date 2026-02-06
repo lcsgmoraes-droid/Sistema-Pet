@@ -13,7 +13,6 @@ class Caixa(BaseTenantModel):
     """Model para controle de caixas"""
     __tablename__ = 'caixas'
     
-    id = Column(Integer, primary_key=True, index=True)
     numero_caixa = Column(Integer, nullable=False)
     usuario_id = Column(Integer, nullable=False)
     usuario_nome = Column(String(200), nullable=False)
@@ -28,8 +27,6 @@ class Caixa(BaseTenantModel):
     conta_origem_nome = Column(String(200))
     observacoes_abertura = Column(Text)
     observacoes_fechamento = Column(Text)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relacionamentos
     movimentacoes = relationship("MovimentacaoCaixa", back_populates="caixa", cascade="all, delete-orphan")
@@ -61,7 +58,6 @@ class MovimentacaoCaixa(BaseTenantModel):
     """Model para movimentações de caixa"""
     __tablename__ = 'movimentacoes_caixa'
     
-    id = Column(Integer, primary_key=True, index=True)
     caixa_id = Column(Integer, ForeignKey('caixas.id', ondelete='CASCADE'), nullable=False)
     tipo = Column(String(50), nullable=False)  # venda, suprimento, sangria, despesa, transferencia, devolucao
     valor = Column(Float, nullable=False)
@@ -79,7 +75,6 @@ class MovimentacaoCaixa(BaseTenantModel):
     usuario_id = Column(Integer, nullable=False)
     usuario_nome = Column(String(200), nullable=False)
     data_movimento = Column(DateTime, default=datetime.now, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
     
     # Relacionamentos
     caixa = relationship("Caixa", back_populates="movimentacoes")
