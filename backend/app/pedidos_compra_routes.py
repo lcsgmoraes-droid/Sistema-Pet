@@ -41,8 +41,9 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Cliente
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
-    PedidoCompra, PedidoCompraItem
+    PedidoCompra, PedidoCompraItem, ProdutoFornecedor
 )
+from .vendas_models import VendaItem, Venda
 
 import logging
 logger = logging.getLogger(__name__)
@@ -300,7 +301,8 @@ def criar_pedido(
         sugestao_ia=request.sugestao_ia,
         confianca_ia=request.confianca_ia,
         dados_ia=request.dados_ia,
-        user_id=current_user.id
+        user_id=current_user.id,
+        tenant_id=tenant_id
     )
     
     db.add(pedido)
@@ -1026,3 +1028,243 @@ def reverter_status(
         "status_anterior": status_anterior,
         "status_atual": pedido.status
     }
+
+
+# ============================================================================
+# 💡 SUGESTÃO INTELIGENTE DE PEDIDO
+# ============================================================================
+
+@router.get("/sugestao/{fornecedor_id}")
+def sugerir_pedido_inteligente(
+    fornecedor_id: int,
+    periodo_dias: int = Query(default=90, ge=7, le=365, description="Período de análise (7-365 dias)"),
+    dias_cobertura: int = Query(default=30, ge=7, le=180, description="Dias de estoque que o pedido deve cobrir (7-180)"),
+    apenas_criticos: bool = Query(default=False, description="Apenas produtos críticos (estoque < 7 dias)"),
+    incluir_alerta: bool = Query(default=True, description="Incluir produtos em alerta"),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    📊 Sugestão Inteligente de Pedido de Compra
+    
+    Analisa histórico de vendas, estoque atual e lead time do fornecedor
+    para sugerir quantidade ideal a pedir de cada produto.
+    
+    Algoritmo:
+    1. Calcula consumo médio diário baseado em vendas do período
+    2. Verifica estoque atual e dias de cobertura restantes
+    3. Considera lead time do fornecedor (prazo de entrega)
+    4. Sugere quantidade para cobrir: lead_time + dias_cobertura + margem de segurança
+    5. Prioriza produtos críticos (estoque baixo) e em alerta
+    
+    Parâmetros:
+    - periodo_dias: Base de cálculo (30/60/90/180 dias)
+    - dias_cobertura: Quantos dias de estoque o pedido deve garantir (15/30/45/60/90)
+    - apenas_criticos: Filtrar apenas produtos com < 7 dias de estoque
+    - incluir_alerta: Incluir produtos que atingiram estoque mínimo
+    """
+    user, tenant_id = user_and_tenant
+    
+    logger.info(f"💡 Gerando sugestão de pedido - Fornecedor: {fornecedor_id} | Período: {periodo_dias} dias")
+    
+    # Validar fornecedor
+    fornecedor = db.query(Cliente).filter(
+        Cliente.id == fornecedor_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == 'fornecedor'
+    ).first()
+    
+    if not fornecedor:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+    
+    # Data inicial para análise
+    data_inicio = datetime.now() - timedelta(days=periodo_dias)
+    
+    # Buscar produtos do fornecedor com relacionamento
+    produtos_fornecedor = db.query(
+        Produto,
+        ProdutoFornecedor
+    ).join(
+        ProdutoFornecedor,
+        Produto.id == ProdutoFornecedor.produto_id
+    ).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.ativo == True,
+        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+        ProdutoFornecedor.ativo == True
+    ).all()
+    
+    if not produtos_fornecedor:
+        return {
+            "fornecedor": {
+                "id": fornecedor.id,
+                "nome": fornecedor.nome
+            },
+            "periodo_dias": periodo_dias,
+            "sugestoes": [],
+            "resumo": {
+                "total_produtos": 0,
+                "produtos_criticos": 0,
+                "produtos_alerta": 0,
+                "valor_total_estimado": 0
+            },
+            "mensagem": "Nenhum produto vinculado a este fornecedor"
+        }
+    
+    sugestoes = []
+    total_criticos = 0
+    total_alerta = 0
+    valor_total = 0
+    
+    for produto, produto_fornecedor in produtos_fornecedor:
+        # Calcular vendas no período
+        vendas_periodo = db.query(
+            func.sum(VendaItem.quantidade).label('total_vendido')
+        ).join(
+            VendaItem.venda
+        ).filter(
+            VendaItem.produto_id == produto.id,
+            VendaItem.tenant_id == tenant_id,
+            VendaItem.venda.has(Venda.data_venda >= data_inicio)
+        ).scalar() or 0
+        
+        # Consumo médio diário
+        consumo_diario = float(vendas_periodo) / periodo_dias if vendas_periodo > 0 else 0
+        
+        # Estoque atual
+        estoque_atual = float(produto.estoque_atual or 0)
+        estoque_minimo = float(produto.estoque_minimo or 0)
+        
+        # Dias de estoque restante
+        dias_estoque = (estoque_atual / consumo_diario) if consumo_diario > 0 else 999
+        
+        # Lead time do fornecedor (padrão 7 dias se não configurado)
+        lead_time = produto_fornecedor.prazo_entrega or 7
+        
+        # Calcular quantidade sugerida
+        # Cobrir: lead_time + dias_cobertura (escolhido pelo usuário) + margem de segurança (7 dias)
+        dias_total_cobertura = lead_time + dias_cobertura + 7
+        quantidade_ideal = consumo_diario * dias_total_cobertura
+        quantidade_sugerida = max(0, quantidade_ideal - estoque_atual)
+        
+        # Classificação de prioridade
+        if dias_estoque < 7:
+            prioridade = "CRÍTICO"
+            total_criticos += 1
+        elif estoque_atual <= estoque_minimo:
+            prioridade = "ALERTA"
+            total_alerta += 1
+        elif dias_estoque < lead_time + 7:
+            prioridade = "ATENÇÃO"
+        else:
+            prioridade = "NORMAL"
+        
+        # Tendência de vendas (comparar últimos 30 dias vs período todo)
+        if periodo_dias >= 60:
+            data_recente = datetime.now() - timedelta(days=30)
+            vendas_recentes = db.query(
+                func.sum(VendaItem.quantidade).label('total_vendido')
+            ).join(
+                VendaItem.venda
+            ).filter(
+                VendaItem.produto_id == produto.id,
+                VendaItem.tenant_id == tenant_id,
+                VendaItem.venda.has(Venda.data_venda >= data_recente)
+            ).scalar() or 0
+            
+            consumo_recente = float(vendas_recentes) / 30
+            
+            if consumo_recente > consumo_diario * 1.2:
+                tendencia = "CRESCIMENTO"
+            elif consumo_recente < consumo_diario * 0.8:
+                tendencia = "QUEDA"
+            else:
+                tendencia = "ESTÁVEL"
+        else:
+            tendencia = "N/A"
+        
+        # Preço unitário
+        preco_unitario = float(produto_fornecedor.preco_custo or produto.preco_custo or 0)
+        valor_sugestao = quantidade_sugerida * preco_unitario
+        
+        # Aplicar filtros
+        incluir_produto = True
+        
+        if apenas_criticos and prioridade != "CRÍTICO":
+            incluir_produto = False
+        
+        if not incluir_alerta and prioridade == "ALERTA":
+            incluir_produto = False
+        
+        # Adicionar à lista (mesmo com qtd 0 para visibilidade se estoque alto)
+        if incluir_produto or quantidade_sugerida > 0:
+            sugestao = {
+                "produto_id": produto.id,
+                "produto_nome": produto.nome,
+                "produto_sku": produto.codigo,
+                "produto_codigo_barras": produto.codigo_barras,
+                "estoque_atual": float(estoque_atual),
+                "estoque_minimo": float(estoque_minimo),
+                "consumo_diario": round(consumo_diario, 2),
+                "vendas_periodo": float(vendas_periodo),
+                "dias_estoque": round(dias_estoque, 1) if dias_estoque < 999 else None,
+                "lead_time": lead_time,
+                "quantidade_sugerida": round(quantidade_sugerida, 2),
+                "preco_unitario": float(preco_unitario),
+                "valor_total": round(valor_sugestao, 2),
+                "prioridade": prioridade,
+                "tendencia": tendencia,
+                "observacao": _gerar_observacao(prioridade, dias_estoque, tendencia, consumo_diario)
+            }
+            
+            sugestoes.append(sugestao)
+            valor_total += valor_sugestao
+    
+    # Ordenar por prioridade (CRÍTICO > ALERTA > ATENÇÃO > NORMAL)
+    ordem_prioridade = {"CRÍTICO": 0, "ALERTA": 1, "ATENÇÃO": 2, "NORMAL": 3}
+    sugestoes.sort(key=lambda x: (ordem_prioridade.get(x["prioridade"], 4), -x["valor_total"]))
+    
+    logger.info(f"✅ Sugestão gerada: {len(sugestoes)} produtos | {total_criticos} críticos | {total_alerta} em alerta")
+    
+    return {
+        "fornecedor": {
+            "id": fornecedor.id,
+            "nome": fornecedor.nome
+        },
+        "periodo_dias": periodo_dias,
+        "dias_cobertura": dias_cobertura,
+        "data_analise_inicio": data_inicio.isoformat(),
+        "data_analise_fim": datetime.now().isoformat(),
+        "sugestoes": sugestoes,
+        "resumo": {
+            "total_produtos": len(sugestoes),
+            "produtos_criticos": total_criticos,
+            "produtos_alerta": total_alerta,
+            "produtos_atencao": len([s for s in sugestoes if s["prioridade"] == "ATENÇÃO"]),
+            "valor_total_estimado": round(valor_total, 2)
+        }
+    }
+
+
+def _gerar_observacao(prioridade: str, dias_estoque: float, tendencia: str, consumo_diario: float) -> str:
+    """Gera observação inteligente baseada nos dados"""
+    observacoes = []
+    
+    if prioridade == "CRÍTICO":
+        if dias_estoque < 3:
+            observacoes.append("🔴 URGENTE - Estoque zerado em menos de 3 dias!")
+        else:
+            observacoes.append(f"🔴 CRÍTICO - Estoque para apenas {dias_estoque:.1f} dias")
+    elif prioridade == "ALERTA":
+        observacoes.append("⚠️ Estoque abaixo do mínimo configurado")
+    
+    if tendencia == "CRESCIMENTO":
+        observacoes.append("📈 Vendas em crescimento - considerar pedir mais")
+    elif tendencia == "QUEDA":
+        observacoes.append("📉 Vendas em queda - avaliar estoque")
+    
+    if consumo_diario == 0:
+        observacoes.append("ℹ️ Sem vendas no período analisado")
+    
+    return " | ".join(observacoes) if observacoes else "✅ Estoque adequado"
+

@@ -145,6 +145,13 @@ async def listar_funcionarios_com_comissao(
     try:
         from .db import SessionLocal
         from sqlalchemy import text
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id do contexto
+        current_user, tenant_id = user_and_tenant
+        
+        # 🔒 CRÍTICO: Garantir que contexto está configurado
+        set_tenant_context(tenant_id)
         
         db = SessionLocal()
         try:
@@ -160,10 +167,10 @@ async def listar_funcionarios_com_comissao(
                     COUNT(CASE WHEN cc.tipo = 'subcategoria' THEN 1 END) as subcategorias,
                     COUNT(CASE WHEN cc.tipo = 'produto' THEN 1 END) as produtos
                 FROM clientes c
-                LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true
+                LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true AND cc.tenant_id = c.tenant_id
                 WHERE c.parceiro_ativo = true
                 AND c.tipo_cadastro IN ('funcionario', 'veterinario', 'outro')
-                AND {tenant_filter}
+                AND c.{tenant_filter}
                 GROUP BY c.id, c.nome, c.email, c.tipo_cadastro
                 ORDER BY c.nome
             """, {})
@@ -206,6 +213,11 @@ async def buscar_configuracoes_funcionario(
     """
     try:
         from .db import SessionLocal
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id e configurar contexto
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
         
         db = SessionLocal()
         try:
@@ -231,11 +243,11 @@ async def buscar_configuracoes_funcionario(
                         WHEN cc.tipo = 'produto' THEN p.nome
                     END as nome_item
                 FROM comissoes_configuracao cc
-                LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id
-                LEFT JOIN categorias sc ON cc.tipo = 'subcategoria' AND cc.referencia_id = sc.id
-                LEFT JOIN produtos p ON cc.tipo = 'produto' AND cc.referencia_id = p.id
+                LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id AND c.tenant_id = cc.tenant_id
+                LEFT JOIN categorias sc ON cc.tipo = 'subcategoria' AND cc.referencia_id = sc.id AND sc.tenant_id = cc.tenant_id
+                LEFT JOIN produtos p ON cc.tipo = 'produto' AND cc.referencia_id = p.id AND p.tenant_id = cc.tenant_id
                 WHERE cc.funcionario_id = :func_id AND cc.ativo = true
-                AND {tenant_filter}
+                AND cc.{tenant_filter}
                 ORDER BY cc.tipo, nome_item
             """, {'func_id': funcionario_id})
             
@@ -286,6 +298,11 @@ async def criar_configuracao(
     try:
         from .db import SessionLocal
         from .models import Cliente
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id e configurar contexto
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
         
         db = SessionLocal()
         try:
@@ -343,8 +360,7 @@ async def criar_configuracao(
                         comissao_venda_parcial = :venda_parcial,
                         permite_edicao_venda = :permite_edicao,
                         observacoes = :obs,
-                        ativo = true, 
-                        updated_at = CURRENT_TIMESTAMP
+                        ativo = true
                     WHERE id = :id
                     AND {tenant_filter}
                 """, {
@@ -369,7 +385,7 @@ async def criar_configuracao(
                      permite_edicao_venda, observacoes, ativo, tenant_id)
                     VALUES (:func_id, :tipo, :ref_id, :perc, :perc_loja, :tipo_calc,
                             :desc_cartao, :desc_impostos, :desc_entrega, :venda_parcial,
-                            :permite_edicao, :obs, true, {tenant_id})
+                            :permite_edicao, :obs, true, :tenant_id)
                     RETURNING id
                 """, {
                     'func_id': config.funcionario_id,
@@ -383,8 +399,9 @@ async def criar_configuracao(
                     'desc_entrega': config.desconta_custo_entrega,
                     'venda_parcial': config.comissao_venda_parcial,
                     'permite_edicao': config.permite_edicao_venda,
-                    'obs': config.observacoes or ''
-                })
+                    'obs': config.observacoes or '',
+                    'tenant_id': tenant_id
+                }, require_tenant=False)
                 config_id = result.fetchone()[0]
             
             db.commit()
@@ -419,6 +436,11 @@ async def criar_configuracoes_batch(
     try:
         from .db import SessionLocal
         from sqlalchemy.exc import OperationalError
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id e configurar contexto
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
         
         if not batch.configuracoes:
             raise HTTPException(
@@ -466,21 +488,25 @@ async def criar_configuracoes_batch(
                 
                 if result:
                     # Atualizar
-                    db.execute(
-                        text("""UPDATE comissoes_configuracao SET
-                            percentual = :p, ativo = true, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = :id"""),
-                        {"p": config.percentual, "id": result[0]}
-                    )
+                    execute_tenant_safe(db, """
+                        UPDATE comissoes_configuracao SET
+                            percentual = :p, ativo = true
+                            WHERE id = :id AND {tenant_filter}
+                    """, {"p": config.percentual, "id": result[0]})
                     config_ids.append(result[0])
                 else:
                     # Criar
-                    result = db.execute(
-                        text("""INSERT INTO comissoes_configuracao (
-                            funcionario_id, tipo, referencia_id, percentual, ativo
-                        ) VALUES (:f, :t, :r, :p, true) RETURNING id"""),
-                        {"f": config.funcionario_id, "t": config.tipo, "r": config.referencia_id, "p": config.percentual}
-                    )
+                    result = execute_tenant_safe(db, """
+                        INSERT INTO comissoes_configuracao (
+                            funcionario_id, tipo, referencia_id, percentual, ativo, tenant_id
+                        ) VALUES (:f, :t, :r, :p, true, :tenant_id) RETURNING id
+                    """, {
+                        "f": config.funcionario_id, 
+                        "t": config.tipo, 
+                        "r": config.referencia_id, 
+                        "p": config.percentual,
+                        "tenant_id": tenant_id
+                    }, require_tenant=False)
                     config_ids.append(result.fetchone()[0])
             
             db.commit()
@@ -563,6 +589,11 @@ async def duplicar_configuracao(
     try:
         # 🔒 VALIDAR SE DESTINO É PARCEIRO
         from .db import SessionLocal
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id e configurar contexto
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
         
         db = SessionLocal()
         try:
@@ -773,6 +804,11 @@ async def get_arvore_produtos(
     try:
         from .db import SessionLocal
         from sqlalchemy import text
+        from .tenancy.context import set_tenant_context
+        
+        # Extrair tenant_id e configurar contexto
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
         
         db = SessionLocal()
         try:

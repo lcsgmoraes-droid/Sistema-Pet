@@ -99,8 +99,6 @@ export default function CalculadoraRacao() {
             } else if (racoes.length === 0) {
                 console.log('ℹ️ Nenhum produto encontrado');
                 toast.error('Nenhum produto encontrado. Cadastre produtos primeiro.');
-            } else {
-                toast.success(`${racoes.length} rações carregadas!`);
             }
         } catch (error) {
             console.error('❌ Erro ao carregar produtos:', error);
@@ -115,9 +113,6 @@ export default function CalculadoraRacao() {
             const listaPets = Array.isArray(response.data) ? response.data : [];
             setPets(listaPets);
             console.log('🐾 Pets carregados:', listaPets.length);
-            if (listaPets.length > 0) {
-                toast.success(`${listaPets.length} pets encontrados!`);
-            }
         } catch (error) {
             console.error('❌ Erro ao carregar pets:', error);
             // Não mostrar erro para não incomodar se não tiver pets
@@ -301,10 +296,6 @@ export default function CalculadoraRacao() {
                 const totalRacoes = todasRacoes.length;
                 if (totalRacoes === 0) {
                     toast.error('Nenhuma ração encontrada com esses filtros. Tente outros critérios.');
-                } else if (totalRacoes > 10) {
-                    toast.success(`Mostrando 10 de ${totalRacoes} rações encontradas`);
-                } else {
-                    toast.success(`${totalRacoes} rações comparadas!`);
                 }
             }
         } catch (error) {
@@ -590,11 +581,7 @@ export default function CalculadoraRacao() {
                                     <span className="label">Preço</span>
                                     <span className="value">R$ {resultado.preco.toFixed(2)}</span>
                                 </div>
-                                <div className="stat">
-                                    <span className="label">Quantidade Diária</span>
-                                <span className="value">{resultado.quantidade_diaria_g}g</span>
                             </div>
-                        </div>
 
                         <div className="result-details">
                             <div className="detail-item">
@@ -605,16 +592,23 @@ export default function CalculadoraRacao() {
                                 </div>
                             </div>
                             <div className="detail-item">
+                                <span className="icon">🥫</span>
+                                <div>
+                                    <strong>Consumo diário</strong>
+                                    <p>{resultado.quantidade_diaria_g}g</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
                                 <span className="icon">💰</span>
                                 <div>
-                                    <strong>Custo por kg</strong>
+                                    <strong>Custo/kg</strong>
                                     <p>R$ {resultado.custo_por_kg.toFixed(2)}</p>
                                 </div>
                             </div>
                             <div className="detail-item">
                                 <span className="icon">📅</span>
                                 <div>
-                                    <strong>Custo por dia</strong>
+                                    <strong>Custo/dia</strong>
                                     <p>R$ {resultado.custo_por_dia.toFixed(2)}</p>
                                 </div>
                             </div>
@@ -650,8 +644,24 @@ export default function CalculadoraRacao() {
                                             <div 
                                                 key={item.produto_id} 
                                                 className={`comparativo-item ${isMelhor ? 'melhor' : ''} ${isSelecionada ? 'selecionada' : ''}`}
+                                                style={{ position: 'relative' }}
                                             >
-                                                {isSelecionada && <span className="badge-selecionada">⭐ Ração Selecionada para Comparação</span>}
+                                                {isSelecionada && (
+                                                    <span 
+                                                        className="badge-selecionada" 
+                                                        style={{ 
+                                                            position: 'absolute', 
+                                                            left: '10px', 
+                                                            top: '10px',
+                                                            zIndex: 10,
+                                                            fontSize: '11px',
+                                                            padding: '4px 8px',
+                                                            whiteSpace: 'nowrap'
+                                                        }}
+                                                    >
+                                                        ⭐ Selecionada
+                                                    </span>
+                                                )}
                                                 {isMelhor && <span className="badge-melhor">🏆 Melhor Custo-Benefício</span>}
                                             
                                             <div className="item-header">

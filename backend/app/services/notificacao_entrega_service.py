@@ -144,23 +144,24 @@ def notificar_inicio_rota(db: Session, rota_id: int, tenant_id: int) -> int:
         if not produtos:
             produtos = ["Pedido sem itens especificados"]
         
-        # AJUSTE FINO #2: Calcular tempo estimado (normalizado no service)
-        minutos = 0
+        # AJUSTE FINO #2: Calcular tempo estimado APENAS se rota foi otimizada
+        minutos = None
         if primeira_parada.tempo_acumulado:
             minutos = int(primeira_parada.tempo_acumulado / 60)
         elif primeira_parada.tempo_estimado:
             minutos = int(primeira_parada.tempo_estimado / 60)
         
+        # Se minutos == 0, manter None (não enviar tempo fictício)
         if minutos == 0:
-            minutos = 30  # Default se não calculado
+            minutos = None
         
-        # Montar mensagem padrão (já com ajustes finos aplicados)
+        # Montar mensagem padrão (com ou sem tempo, dependendo da otimização)
         mensagem = montar_mensagem_entrega(
             cliente_nome=cliente.nome,
             numero_pedido=str(venda.id),
             produtos=produtos,
             forma_pagamento=venda.forma_pagamento or "Não informado",
-            minutos=minutos
+            minutos=minutos  # None se não otimizada, int se otimizada
         )
         
         # AJUSTE FINO #4: Enviar via WhatsApp (com tratamento de falha)
@@ -271,26 +272,35 @@ def notificar_proximo_cliente(db: Session, rota_id: int, parada_entregue_ordem: 
         origem = parada_atual.endereco
         destino = proxima_parada.endereco
         
-        minutos = 15  # Default
+        minutos = None  # Iniciar sem tempo (só enviar se conseguir calcular)
         
         try:
             # Tentar calcular tempo real via Google Maps
             tempo_segundos = calcular_tempo_estimado(origem, destino)
-            if tempo_segundos:
+            if tempo_segundos and tempo_segundos > 0:
                 minutos = max(5, int(tempo_segundos / 60))  # Mínimo 5 minutos (realista)
         except Exception as e:
-            logger.warning(f"Erro ao calcular tempo real: {e}. Usando estimativa.")
+            logger.warning(f"Erro ao calcular tempo real via Maps: {e}. Tentando fallback.")
             # Fallback: usar tempo da parada se disponível
-            if proxima_parada.tempo_estimado:
+            if proxima_parada.tempo_estimado and proxima_parada.tempo_estimado > 0:
                 minutos = int(proxima_parada.tempo_estimado / 60)
+            elif proxima_parada.tempo_acumulado and proxima_parada.tempo_acumulado > 0:
+                # Calcular diferença do tempo acumulado
+                tempo_diff = proxima_parada.tempo_acumulado - (parada_atual.tempo_acumulado or 0)
+                if tempo_diff > 0:
+                    minutos = int(tempo_diff / 60)
         
-        # Montar mensagem padrão (com ajustes finos)
+        # Se não conseguiu calcular tempo, enviar mensagem sem estimativa (mais honesto)
+        if minutos and minutos == 0:
+            minutos = None
+        
+        # Montar mensagem padrão (com ou sem tempo, dependendo do cálculo)
         mensagem = montar_mensagem_entrega(
             cliente_nome=cliente.nome,
             numero_pedido=str(venda.id),
             produtos=produtos,
             forma_pagamento=venda.forma_pagamento or "Não informado",
-            minutos=minutos
+            minutos=minutos  # None se não calculou, int se calculou
         )
         
         # AJUSTE FINO #4: Enviar via WhatsApp (com tratamento de falha)

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
-import { FiArrowLeft, FiSave, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiAlertCircle, FiCheckCircle, FiPlus } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import CampoIdadeInteligente from '../components/CampoIdadeInteligente';
+import QuickAddModal from '../components/QuickAddModal';
+import './EspeciesRacas.css'; // Para estilos do botão de adicionar rápido
 
 const PetForm = () => {
   const { petId } = useParams();
@@ -19,7 +21,12 @@ const PetForm = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [clientes, setClientes] = useState([]);
+  const [especies, setEspecies] = useState([]);
   const [racas, setRacas] = useState([]);
+  
+  // Estados para modal rápido
+  const [showQuickAddModal, setShowQuickAddModal] = useState(false);
+  const [quickAddTipo, setQuickAddTipo] = useState(null); // 'especie' ou 'raca'
 
   const [formData, setFormData] = useState({
     cliente_id: clienteIdFromState || '',  // Preenche automaticamente se vier do state
@@ -44,12 +51,24 @@ const PetForm = () => {
   });
 
   useEffect(() => {
-    loadClientes();
-    loadRacas();
-    if (isEditing) {
-      loadPet();
-    }
+    const loadData = async () => {
+      await loadClientes();
+      await loadEspecies();
+      if (isEditing) {
+        await loadPet();
+      }
+    };
+    loadData();
   }, [petId]);
+
+  // Carregar raças quando espécie mudar
+  useEffect(() => {
+    if (formData.especie) {
+      loadRacasPorEspecie(formData.especie);
+    } else {
+      setRacas([]);
+    }
+  }, [formData.especie]);
 
   const loadClientes = async () => {
     try {
@@ -60,12 +79,28 @@ const PetForm = () => {
     }
   };
 
-  const loadRacas = async () => {
+  const loadEspecies = async () => {
     try {
-      const response = await api.get('/racas');
+      const response = await api.get('/cadastros/especies', { params: { ativo: true } });
+      setEspecies(response.data);
+    } catch (err) {
+      console.error('Erro ao carregar espécies:', err);
+    }
+  };
+
+  const loadRacasPorEspecie = async (especieId) => {
+    try {
+      // Buscar pelo ID da espécie
+      const response = await api.get('/cadastros/racas', {
+        params: {
+          ativo: true,
+          especie_id: especieId
+        }
+      });
       setRacas(response.data);
     } catch (err) {
       console.error('Erro ao carregar raças:', err);
+      setRacas([]);
     }
   };
 
@@ -75,10 +110,13 @@ const PetForm = () => {
       const response = await api.get(`/pets/${petId}`);
       const pet = response.data;
       
+      // Converter nome da espécie para ID
+      const especieEncontrada = especies.find(e => e.nome === pet.especie);
+      
       setFormData({
         cliente_id: pet.cliente_id || '',
         nome: pet.nome || '',
-        especie: pet.especie || '',
+        especie: especieEncontrada ? especieEncontrada.id.toString() : '',
         raca: pet.raca || '',
         sexo: pet.sexo || '',
         castrado: pet.castrado || false,
@@ -112,6 +150,33 @@ const PetForm = () => {
     }));
   };
 
+  // Funções para Quick Add
+  const abrirQuickAdd = (tipo) => {
+    setQuickAddTipo(tipo);
+    setShowQuickAddModal(true);
+  };
+
+  const fecharQuickAdd = () => {
+    setShowQuickAddModal(false);
+    setQuickAddTipo(null);
+  };
+
+  const handleQuickAddSuccess = (novoItem) => {
+    if (quickAddTipo === 'especie') {
+      // Recarregar espécies e selecionar a nova
+      loadEspecies().then(() => {
+        setFormData(prev => ({ ...prev, especie: novoItem.id.toString() }));
+      });
+    } else if (quickAddTipo === 'raca') {
+      // Recarregar raças e selecionar a nova
+      if (formData.especie) {
+        loadRacasPorEspecie(formData.especie).then(() => {
+          setFormData(prev => ({ ...prev, raca: novoItem.nome }));
+        });
+      }
+    }
+  };
+
   const validateForm = () => {
     if (!formData.nome.trim()) {
       setError('Nome do pet é obrigatório');
@@ -140,9 +205,13 @@ const PetForm = () => {
     try {
       setSaving(true);
       
+      // Converter ID da espécie para nome (já que o backend espera nome)
+      const especieSelecionada = especies.find(e => e.id === parseInt(formData.especie));
+      
       // Preparar dados para envio
       const dataToSend = {
         ...formData,
+        especie: especieSelecionada?.nome || formData.especie,
         cliente_id: parseInt(formData.cliente_id),
         peso: formData.peso ? parseFloat(formData.peso) : null,
         idade_aproximada: formData.idade_aproximada ? parseInt(formData.idade_aproximada) : null,
@@ -280,42 +349,71 @@ const PetForm = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Espécie *
               </label>
-              <select
-                name="especie"
-                value={formData.especie}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              >
-                <option value="">Selecione...</option>
-                <option value="Cão">Cão</option>
-                <option value="Gato">Gato</option>
-                <option value="Ave">Ave</option>
-                <option value="Roedor">Roedor</option>
-                <option value="Réptil">Réptil</option>
-                <option value="Outro">Outro</option>
-              </select>
+              <div className="field-with-action">
+                <select
+                  name="especie"
+                  value={formData.especie}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                >
+                  <option value="">Selecione...</option>
+                  {especies.map((especie) => (
+                    <option key={especie.id} value={especie.id}>
+                      {especie.nome}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-add-quick"
+                  onClick={() => abrirQuickAdd('especie')}
+                  title="Adicionar nova espécie"
+                >
+                  <FiPlus /> Nova
+                </button>
+              </div>
+              {especies.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Nenhuma espécie cadastrada. Cadastre em Cadastros → Espécies e Raças.
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Raça
               </label>
-              <input
-                type="text"
-                name="raca"
-                value={formData.raca}
-                onChange={handleChange}
-                list="racas-list"
-                placeholder="Ex: SRD, Poodle, Siamês"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-              <datalist id="racas-list">
-                <option value="SRD (Sem Raça Definida)" />
-                {racas.map((raca) => (
-                  <option key={raca.id} value={raca.nome} />
-                ))}
-              </datalist>
+              <div className="field-with-action">
+                <select
+                  name="raca"
+                  value={formData.raca}
+                  onChange={handleChange}
+                  disabled={!formData.especie}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">{!formData.especie ? 'Selecione uma espécie primeiro' : 'Selecione uma raça...'}</option>
+                  {racas.map((raca) => (
+                    <option key={raca.id} value={raca.nome}>
+                      {raca.nome}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn-add-quick"
+                  onClick={() => abrirQuickAdd('raca')}
+                  title="Adicionar nova raça"
+                  disabled={!formData.especie}
+                >
+                  <FiPlus /> Nova
+                </button>
+              </div>
+              {formData.especie && racas.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Nenhuma raça cadastrada para {formData.especie}. Cadastre em Cadastros → Espécies e Raças.
+                </p>
+              )}
             </div>
 
             <div>
@@ -573,6 +671,17 @@ const PetForm = () => {
           </button>
         </div>
       </form>
+
+      {/* Modal de Adicionar Rápido */}
+      {showQuickAddModal && (
+        <QuickAddModal
+          tipo={quickAddTipo}
+          especieId={quickAddTipo === 'raca' ? parseInt(formData.especie) : null}
+          especieNome={quickAddTipo === 'raca' ? especies.find(e => e.id === parseInt(formData.especie))?.nome : null}
+          onSuccess={handleQuickAddSuccess}
+          onClose={fecharQuickAdd}
+        />
+      )}
     </div>
   );
 };

@@ -18,6 +18,12 @@ class RacaoCalculadoraInput(BaseModel):
     - Enums restritos aos valores permitidos
     """
     
+    # NOVO: Produto opcional (se fornecido, busca dados do produto)
+    produto_id: Optional[int] = Field(
+        None,
+        description="ID do produto (ração). Se fornecido, dados da ração são buscados do cadastro"
+    )
+    
     especie: Literal["cao", "gato"] = Field(
         ...,
         description="Espécie do animal"
@@ -27,6 +33,11 @@ class RacaoCalculadoraInput(BaseModel):
         ...,
         gt=0,
         description="Peso do animal em kg (deve ser maior que 0)"
+    )
+    
+    idade_meses: Optional[int] = Field(
+        None,
+        description="Idade do animal em meses (obrigatório para filhotes com tabela de consumo)"
     )
     
     fase: Literal["filhote", "adulto", "idoso"] = Field(
@@ -44,16 +55,16 @@ class RacaoCalculadoraInput(BaseModel):
         description="Tipo/qualidade da ração"
     )
     
-    peso_pacote_kg: float = Field(
-        ...,
+    peso_pacote_kg: Optional[float] = Field(
+        None,
         gt=0,
-        description="Peso do pacote de ração em kg (deve ser maior que 0)"
+        description="Peso do pacote de ração em kg. Opcional se produto_id fornecido"
     )
     
-    preco_pacote: float = Field(
-        ...,
+    preco_pacote: Optional[float] = Field(
+        None,
         ge=0,
-        description="Preço do pacote de ração (não pode ser negativo)"
+        description="Preço do pacote de ração. Opcional se produto_id fornecido"
     )
     
     @field_validator('peso_kg')

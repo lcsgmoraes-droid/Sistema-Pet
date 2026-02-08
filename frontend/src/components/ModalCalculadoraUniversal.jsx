@@ -44,6 +44,11 @@ export default function ModalCalculadoraUniversal({
     nivel_atividade: 'normal'
   });
 
+  // Estados para arrastar o modal
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
   // Filtrar rações do carrinho (modo PDV)
   const racoesCarrinho = estaNoPDV 
     ? (() => {
@@ -88,6 +93,13 @@ export default function ModalCalculadoraUniversal({
       setRacoesDisponiveis([]);
     }
   }, [buscaRacao, estaNoPDV]);
+
+  // Resetar posição quando o modal fecha
+  useEffect(() => {
+    if (!isOpen) {
+      setPosition({ x: 0, y: 0 });
+    }
+  }, [isOpen]);
 
   // Selecionar última ração ao abrir (modo PDV)
   useEffect(() => {
@@ -137,18 +149,6 @@ export default function ModalCalculadoraUniversal({
       return;
     }
 
-    const pesoEmbalagem = racao.peso_embalagem || racao.peso_pacote_kg;
-    const precoVenda = racao.preco_venda || racao.preco_unitario;
-    
-    console.log('⚖️ Peso embalagem:', pesoEmbalagem);
-    console.log('💰 Preço:', precoVenda);
-    
-    if (!pesoEmbalagem || !precoVenda) {
-      console.log('❌ Dados incompletos da ração');
-      toast.error('Dados da ração incompletos');
-      return;
-    }
-
     if (!form.peso_pet_kg) {
       console.log('❌ Peso do pet não informado');
       toast.error('Informe o peso do pet');
@@ -161,21 +161,27 @@ export default function ModalCalculadoraUniversal({
       setResultados(null);
 
       const payload = {
-        especie: 'cao',
-        peso_kg: parseFloat(form.peso_pet_kg),
-        fase: 'adulto',
-        porte: 'medio',
-        tipo_racao: 'premium',
-        peso_pacote_kg: parseFloat(pesoEmbalagem),
-        preco_pacote: parseFloat(precoVenda)
+        produto_id: racaoSelecionada.produto_id || racaoSelecionada.id,
+        peso_pet_kg: parseFloat(form.peso_pet_kg),
+        idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
+        nivel_atividade: form.nivel_atividade
       };
 
       console.log('📤 Enviando payload:', payload);
-      const response = await api.post('/internal/racao/calcular', payload);
+      const response = await api.post('/api/produtos/calculadora-racao', payload);
       
       console.log('📥 Resposta recebida:', response.data);
       if (response.data) {
-        setResultados(response.data);
+        // Mapear campos da nova API para o formato esperado pelo componente
+        const resultadoMapeado = {
+          duracao_pacote_dias: response.data.duracao_dias,
+          duracao_meses: response.data.duracao_meses,
+          consumo_diario_gramas: response.data.quantidade_diaria_g,
+          custo_por_kg: response.data.custo_por_kg,
+          custo_diario: response.data.custo_por_dia,
+          custo_mensal: response.data.custo_mensal
+        };
+        setResultados(resultadoMapeado);
         toast.success('Cálculo realizado!');
       }
     } catch (error) {
@@ -194,14 +200,61 @@ export default function ModalCalculadoraUniversal({
     setMostraDropdown(false);
   };
 
+  // Handlers para arrastar o modal
+  const handleMouseDown = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return; // Não arrastar se clicar em botões, inputs ou selects
+    }
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+  };
+
+  // Adicionar listeners globais para mouse move e up
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragOffset.x,
+          y: e.clientY - dragOffset.y
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div 
+        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          cursor: isDragging ? 'grabbing' : 'default'
+        }}
+      >
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 flex items-center justify-between">
+        <div 
+          className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 flex items-center justify-between"
+          onMouseDown={handleMouseDown}
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        >
           <div className="flex items-center gap-3">
             <span className="text-3xl">🥫</span>
             <div>
@@ -382,33 +435,40 @@ export default function ModalCalculadoraUniversal({
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Duração</div>
+                  <div className="text-sm text-gray-600">⏱️ Duração</div>
                   <div className="text-2xl font-bold text-gray-900">
                     {Math.floor(resultados.duracao_pacote_dias)} dias
                   </div>
                   <div className="text-xs text-gray-500">
-                    {(resultados.duracao_pacote_dias / 30).toFixed(1)} meses
+                    {resultados.duracao_meses?.toFixed(1)} meses
                   </div>
                 </div>
 
                 <div className="bg-white rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Custo/dia</div>
+                  <div className="text-sm text-gray-600">🥫 Consumo diário</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {resultados.consumo_diario_gramas?.toFixed(0)}g
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg p-4">
+                  <div className="text-sm text-gray-600">💰 Custo/kg</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    R$ {resultados.custo_por_kg?.toFixed(2)}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg p-4">
+                  <div className="text-sm text-gray-600">📅 Custo/dia</div>
                   <div className="text-2xl font-bold text-gray-900">
                     R$ {resultados.custo_diario?.toFixed(2)}
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Custo/mês</div>
+                <div className="bg-white rounded-lg p-4 col-span-2">
+                  <div className="text-sm text-gray-600">📆 Custo mensal</div>
                   <div className="text-2xl font-bold text-gray-900">
                     R$ {resultados.custo_mensal?.toFixed(2)}
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg p-4">
-                  <div className="text-sm text-gray-600">Consumo diário</div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {resultados.consumo_diario_gramas?.toFixed(0)}g
                   </div>
                 </div>
               </div>

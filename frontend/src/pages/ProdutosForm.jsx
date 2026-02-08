@@ -10,6 +10,7 @@ import {
   updateProduto,
   getCategorias,
   getMarcas,
+  getDepartamentos,
   gerarSKU,
   uploadImagemProduto,
   deleteImagemProduto,
@@ -37,6 +38,7 @@ export default function ProdutosForm() {
   // Listas auxiliares
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
   const [clientes, setClientes] = useState([]);
   
   // Dados do produto
@@ -46,6 +48,8 @@ export default function ProdutosForm() {
     descricao: '',
     categoria_id: '',
     marca_id: '',
+    departamento_id: '',
+    tipo: 'produto',
     preco_custo: '',
     preco_venda: '',
     margem_lucro: '',
@@ -79,6 +83,7 @@ export default function ProdutosForm() {
   useEffect(() => {
     carregarCategorias();
     carregarMarcas();
+    carregarDepartamentos();
     carregarClientes();
     
     if (isEdit) {
@@ -95,12 +100,78 @@ export default function ProdutosForm() {
     }
   };
   
+  // Função para organizar categorias hierarquicamente
+  const organizarCategoriasHierarquicas = (categorias) => {
+    if (!categorias || categorias.length === 0) return [];
+    
+    // Criar um mapa de categorias por ID para fácil acesso
+    const categoriasMap = {};
+    categorias.forEach(cat => {
+      categoriasMap[cat.id] = { ...cat, filhas: [] };
+    });
+    
+    // Identificar raízes e construir árvore
+    const raizes = [];
+    categorias.forEach(cat => {
+      if (cat.categoria_pai_id) {
+        // Adicionar como filha da categoria pai
+        if (categoriasMap[cat.categoria_pai_id]) {
+          categoriasMap[cat.categoria_pai_id].filhas.push(categoriasMap[cat.id]);
+        }
+      } else {
+        // É uma categoria raiz
+        raizes.push(categoriasMap[cat.id]);
+      }
+    });
+    
+    // Função recursiva para achatar a árvore com nível de indentação
+    const aplanar = (categorias, nivel = 0) => {
+      let resultado = [];
+      categorias.forEach(cat => {
+        resultado.push({ ...cat, nivel });
+        if (cat.filhas && cat.filhas.length > 0) {
+          resultado = resultado.concat(aplanar(cat.filhas, nivel + 1));
+        }
+      });
+      return resultado;
+    };
+    
+    const resultado = aplanar(raizes);
+    console.log('Categorias organizadas:', resultado);
+    return resultado;
+  };
+  
   const carregarMarcas = async () => {
     try {
       const response = await getMarcas({ apenas_ativas: true });
       setMarcas(response.data);
     } catch (error) {
       console.error('Erro ao carregar marcas:', error);
+    }
+  };
+  
+  // Função auxiliar para formatar valores monetários
+  const formatarValorMonetario = (valor) => {
+    if (!valor || valor === '') return 'R$ 0,00';
+    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+    if (isNaN(numero)) return 'R$ 0,00';
+    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+  };
+  
+  // Função auxiliar para formatar porcentagem
+  const formatarPorcentagem = (valor) => {
+    if (!valor || valor === '') return '0,00%';
+    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
+    if (isNaN(numero)) return '0,00%';
+    return `${numero.toFixed(2).replace('.', ',')}%`;
+  };
+  
+  const carregarDepartamentos = async () => {
+    try {
+      const response = await getDepartamentos({ apenas_ativos: true });
+      setDepartamentos(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar departamentos:', error);
     }
   };
   
@@ -127,6 +198,8 @@ export default function ProdutosForm() {
         descricao: prod.descricao || '',
         categoria_id: prod.categoria_id || '',
         marca_id: prod.marca_id || '',
+        departamento_id: prod.departamento_id || '',
+        tipo: prod.tipo || 'produto',
         preco_custo: prod.preco_custo || '',
         preco_venda: prod.preco_venda || '',
         margem_lucro: prod.margem_lucro || '',
@@ -538,8 +611,9 @@ export default function ProdutosForm() {
                   name="codigo"
                   value={produto.codigo}
                   onChange={handleChange}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 px-3 py-2 border-4 border-red-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="SKU-001"
+                  style={{ borderColor: 'red', borderWidth: '3px' }}
                 />
                 <button
                   type="button"
@@ -583,8 +657,8 @@ export default function ProdutosForm() {
             />
           </div>
           
-          {/* Categoria e Marca */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Categoria, Marca, Departamento e Tipo */}
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Categoria
@@ -596,9 +670,9 @@ export default function ProdutosForm() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Selecione...</option>
-                {categorias.map(cat => (
+                {organizarCategoriasHierarquicas(categorias).map(cat => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.nome}
+                    {'\u00a0\u00a0\u00a0\u00a0'.repeat(cat.nivel)}{cat.nivel > 0 ? '\u2192 ' : ''}{cat.nome}
                   </option>
                 ))}
               </select>
@@ -622,6 +696,41 @@ export default function ProdutosForm() {
                 ))}
               </select>
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Departamento
+              </label>
+              <select
+                name="departamento_id"
+                value={produto.departamento_id}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Selecione...</option>
+                {departamentos.map(depto => (
+                  <option key={depto.id} value={depto.id}>
+                    {depto.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tipo
+              </label>
+              <select
+                name="tipo"
+                value={produto.tipo}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="produto">Produto</option>
+                <option value="servico">Serviço</option>
+                <option value="produto_servico">Produto e Serviço</option>
+              </select>
+            </div>
           </div>
           
           {/* Preços e Margem */}
@@ -630,52 +739,70 @@ export default function ProdutosForm() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Preço de Custo
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                <input
-                  type="number"
-                  name="preco_custo"
-                  value={produto.preco_custo}
-                  onChange={handleChange}
-                  step="0.01"
-                  min="0"
-                  className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0,00"
-                />
-              </div>
+              <input
+                type="text"
+                name="preco_custo"
+                value={formatarValorMonetario(produto.preco_custo)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                  setProduto({ ...produto, preco_custo: value || '' });
+                }}
+                onFocus={(e) => {
+                  if (produto.preco_custo) {
+                    const numero = parseFloat(produto.preco_custo);
+                    e.target.value = isNaN(numero) ? '' : numero.toFixed(2).replace('.', ',');
+                    e.target.select();
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  setProduto({ ...produto, preco_custo: value || '' });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="R$ 0,00"
+              />
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Preço de Venda *
               </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                <input
-                  type="number"
-                  name="preco_venda"
-                  value={produto.preco_venda}
-                  onChange={handleChange}
-                  step="0.01"
-                  min="0"
-                  required
-                  className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="0,00"
-                />
-              </div>
+              <input
+                type="text"
+                name="preco_venda"
+                value={formatarValorMonetario(produto.preco_venda)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                  setProduto({ ...produto, preco_venda: value || '' });
+                }}
+                onFocus={(e) => {
+                  if (produto.preco_venda) {
+                    const numero = parseFloat(produto.preco_venda);
+                    e.target.value = isNaN(numero) ? '' : numero.toFixed(2).replace('.', ',');
+                    e.target.select();
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value.replace(',', '.');
+                  setProduto({ ...produto, preco_venda: value || '' });
+                }}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="R$ 0,00"
+              />
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Margem de Lucro (%)
+                Margem de Lucro
               </label>
               <input
-                type="number"
+                type="text"
                 name="margem_lucro"
-                value={produto.margem_lucro}
+                value={formatarPorcentagem(produto.margem_lucro)}
                 readOnly
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                placeholder="0,00"
+                placeholder="0,00%"
               />
             </div>
           </div>

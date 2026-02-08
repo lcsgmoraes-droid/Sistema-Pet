@@ -1410,6 +1410,16 @@ def excluir_venda(
             logger.info(f"🗑️ Removendo movimentação de caixa: R$ {mov.valor} ({mov.tipo})")
             db.delete(mov)
         
+        # 🚚 IMPORTANTE: Excluir paradas de entrega relacionadas e reverter status da venda
+        from app.rotas_entrega_models import RotaEntregaParada
+        paradas = db.query(RotaEntregaParada).filter_by(venda_id=venda_id).all()
+        for parada in paradas:
+            logger.info(f"🚚 Removendo parada de entrega da rota #{parada.rota_id}")
+            db.delete(parada)
+        
+        # Reverter status de entrega para None (venda excluída não precisa de entrega)
+        venda.status_entrega = None
+        
         # 🏦 ESTORNAR MOVIMENTAÇÕES BANCÁRIAS
         from app.financeiro_models import MovimentacaoFinanceira, ContaBancaria, LancamentoManual
         

@@ -955,6 +955,24 @@ class VendaService:
             logger.info(f"🏦 Total de movimentações bancárias estornadas: {movimentacoes_estornadas}")
             
             # ============================================================
+            # ETAPA 6.5: REMOVER PARADAS DE ENTREGA
+            # ============================================================
+            
+            from app.rotas_entrega_models import RotaEntregaParada
+            paradas_removidas = 0
+            
+            paradas = db.query(RotaEntregaParada).filter_by(venda_id=venda_id).all()
+            for parada in paradas:
+                logger.info(f"🚚 Removendo parada de entrega da rota #{parada.rota_id}")
+                db.delete(parada)
+                paradas_removidas += 1
+            
+            if paradas_removidas > 0:
+                logger.info(f"📋 Total de paradas de entrega removidas: {paradas_removidas}")
+                # Reverter status de entrega
+                venda.status_entrega = None
+            
+            # ============================================================
             # ETAPA 7: ESTORNAR COMISSÕES
             # ============================================================
             

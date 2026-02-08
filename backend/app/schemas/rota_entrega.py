@@ -51,6 +51,8 @@ class RotaEntregaUpdate(BaseModel):
     tentativas: Optional[int] = None
     observacoes: Optional[str] = None
     status: Optional[str] = None
+    km_inicial: Optional[Decimal] = None
+    km_final: Optional[Decimal] = None
 
 
 class RotaEntregaParadaResponse(BaseModel):
@@ -64,7 +66,14 @@ class RotaEntregaParadaResponse(BaseModel):
     tempo_acumulado: Optional[int] = None
     status: str = "pendente"  # ETAPA 9.4: pendente | entregue | tentativa
     data_entrega: Optional[datetime] = None  # ETAPA 9.4
+    observacoes: Optional[str] = None  # Observações sobre a entrega
+    km_entrega: Optional[Decimal] = None  # KM da moto ao entregar
     created_at: datetime
+    
+    # Informações do cliente para facilitar visualização
+    cliente_nome: Optional[str] = None
+    cliente_telefone: Optional[str] = None
+    cliente_celular: Optional[str] = None
     
     model_config = {"from_attributes": True}
 
@@ -78,6 +87,10 @@ class RotaEntregaResponse(RotaEntregaBase):
     distancia_real: Optional[Decimal] = None
     custo_real: Optional[Decimal] = None
     tentativas: int
+    
+    # Controle de KM da moto (opcional)
+    km_inicial: Optional[Decimal] = None
+    km_final: Optional[Decimal] = None
     
     taxa_entrega_cliente: Optional[Decimal] = None
     valor_repasse_entregador: Optional[Decimal] = None

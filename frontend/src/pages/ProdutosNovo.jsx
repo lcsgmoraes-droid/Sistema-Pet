@@ -70,6 +70,10 @@ export default function ProdutosNovo() {
     e_kit_fisico: false, // Se false, estoque é virtual (calculado)
     composicao_kit: [], // Array de {produto_id, produto_nome, quantidade}
     
+    // Sistema Predecessor/Sucessor
+    produto_predecessor_id: null,
+    motivo_descontinuacao: '',
+    
     // Aba 3: Estoque
     controle_lote: true,
     estoque_minimo: '',
@@ -145,6 +149,14 @@ export default function ProdutosNovo() {
   const [produtoKitSelecionado, setProdutoKitSelecionado] = useState('');
   const [quantidadeKit, setQuantidadeKit] = useState('');
   const [estoqueVirtualKit, setEstoqueVirtualKit] = useState(0);
+  
+  // Estados para predecessor/sucessor
+  const [mostrarBuscaPredecessor, setMostrarBuscaPredecessor] = useState(false);
+  const [produtosBusca, setProdutosBusca] = useState([]);
+  const [buscaPredecessor, setBuscaPredecessor] = useState('');
+  const [predecessorSelecionado, setPredecessorSelecionado] = useState(null);
+  const [predecessorInfo, setPredecessorInfo] = useState(null); // Info do predecessor ao editar
+  const [sucessorInfo, setSucessorInfo] = useState(null); // Info do sucessor (se descontinuado)
   
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -247,8 +259,8 @@ export default function ProdutosNovo() {
     const filhos = cats.filter(c => c.categoria_pai_id === parentId);
     
     filhos.forEach((cat) => {
-      // Usar espaços e seta para indicar nível
-      const indentacao = '  '.repeat(nivel); // 2 espaços por nível
+      // Usar espaços não-quebráveis (\u00a0) e seta para indicar nível
+      const indentacao = '\u00a0\u00a0\u00a0\u00a0'.repeat(nivel); // 4 espaços não-quebráveis por nível
       const seta = nivel > 0 ? '→ ' : '';
       
       resultado.push({
@@ -268,6 +280,11 @@ export default function ProdutosNovo() {
   const carregarProduto = async () => {
     try {
       setLoading(true);
+      
+      // 🧹 Limpar estados de predecessor/sucessor ao carregar novo produto
+      setPredecessorInfo(null);
+      setSucessorInfo(null);
+      
       const response = await getProduto(id);
       const produto = response.data;
       
@@ -328,6 +345,51 @@ export default function ProdutosNovo() {
         categoria_racao: produto.categoria_racao || '',
         especies_indicadas: produto.especies_indicadas || 'both',
       });
+
+      // 🔗 Carregar informações do predecessor
+      if (produto.produto_predecessor_id) {
+        try {
+          const predecessorRes = await getProduto(produto.produto_predecessor_id);
+          setPredecessorInfo({
+            id: predecessorRes.data.id,
+            codigo: predecessorRes.data.codigo,
+            nome: predecessorRes.data.nome,
+            motivo_descontinuacao: produto.motivo_descontinuacao,
+            data_descontinuacao: produto.predecessor?.data_descontinuacao
+          });
+        } catch (error) {
+          console.error('Erro ao carregar predecessor:', error);
+        }
+      }
+
+      // 🔗 Carregar informações do sucessor (se produto foi descontinuado)
+      if (produto.data_descontinuacao) {
+        try {
+          // Buscar produtos que têm este como predecessor
+          const response = await api.get('/produtos/', {
+            params: { 
+              produto_predecessor_id: produto.id,
+              ativo: null // Incluir ativos e inativos
+            }
+          });
+          
+          // A API pode retornar um array direto ou um objeto paginado
+          const sucessores = Array.isArray(response.data) ? response.data : (response.data.items || []);
+          
+          if (sucessores && sucessores.length > 0) {
+            const sucessor = sucessores[0];
+            setSucessorInfo({
+              id: sucessor.id,
+              codigo: sucessor.codigo,
+              nome: sucessor.nome,
+              motivo_descontinuacao: produto.motivo_descontinuacao,
+              data_descontinuacao: produto.data_descontinuacao
+            });
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar sucessor:', error);
+        }
+      }
 
       // Carregar imagens do endpoint específico
       try {
@@ -905,6 +967,9 @@ export default function ProdutosNovo() {
         composicao_kit: (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) 
           ? formData.composicao_kit 
           : null,
+        // Sistema Predecessor/Sucessor
+        produto_predecessor_id: formData.produto_predecessor_id || null,
+        motivo_descontinuacao: formData.motivo_descontinuacao || null,
         // ❌ Tributação: NÃO enviar mais para produtos (agora via Fiscal V2)
         // Recorrência (Fase 1)
         tem_recorrencia: formData.tem_recorrencia || false,
@@ -1040,6 +1105,84 @@ export default function ProdutosNovo() {
         </nav>
       </div>
 
+      {/* 🔗 Banner: Produto é continuação de outro (Edit Mode) */}
+      {isEdicao && predecessorInfo && (
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-5 rounded-lg shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  🔗 Este produto é continuação de outro
+                </h3>
+              </div>
+              <p className="text-sm text-gray-700 mb-3">
+                Este produto substitui:{' '}
+                <button
+                  type="button"
+                  onClick={() => navigate(`/produtos/${predecessorInfo.id}/editar`)}
+                  className="font-bold text-blue-700 hover:text-blue-900 hover:underline"
+                >
+                  {predecessorInfo.codigo} - {predecessorInfo.nome}
+                </button>
+              </p>
+              {predecessorInfo.motivo_descontinuacao && (
+                <div className="bg-white/70 rounded-md px-3 py-2 text-sm">
+                  <span className="font-medium text-gray-700">Motivo da substituição:</span>{' '}
+                  <span className="text-gray-900">{predecessorInfo.motivo_descontinuacao}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ Banner: Produto foi descontinuado (Edit Mode) */}
+      {isEdicao && sucessorInfo && (
+        <div className="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-5 rounded-lg shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  ⚠️ Este produto foi descontinuado
+                </h3>
+              </div>
+              <p className="text-sm text-gray-700 mb-3">
+                Descontinuado em{' '}
+                <span className="font-semibold">
+                  {new Date(sucessorInfo.data_descontinuacao).toLocaleDateString('pt-BR')}
+                </span>
+              </p>
+              <p className="text-sm text-gray-700 mb-3">
+                Substituído por:{' '}
+                <button
+                  type="button"
+                  onClick={() => navigate(`/produtos/${sucessorInfo.id}/editar`)}
+                  className="font-bold text-red-700 hover:text-red-900 hover:underline"
+                >
+                  {sucessorInfo.codigo} - {sucessorInfo.nome}
+                </button>
+              </p>
+              {sucessorInfo.motivo_descontinuacao && (
+                <div className="bg-white/70 rounded-md px-3 py-2 text-sm">
+                  <span className="font-medium text-gray-700">Motivo:</span>{' '}
+                  <span className="text-gray-900">{sucessorInfo.motivo_descontinuacao}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* FormulÃ¡rio */}
       <form onSubmit={handleSubmit}>
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -1171,8 +1314,8 @@ export default function ProdutosNovo() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="produto">Produto</option>
-                    <option value="servico">ServiÃ§o</option>
-                    <option value="ambos">Ambos</option>
+                    <option value="servico">Serviço</option>
+                    <option value="ambos">Produto e Serviço</option>
                   </select>
                 </div>
               </div>
@@ -1220,30 +1363,51 @@ export default function ProdutosNovo() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Preço de Custo
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.preco_custo}
-                        onChange={(e) => handleChange('preco_custo', e.target.value)}
-                        className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0,00"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={formData.preco_custo ? `R$ ${Number(formData.preco_custo).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        handleChange('preco_custo', value);
+                      }}
+                      onFocus={(e) => {
+                        if (formData.preco_custo) {
+                          e.target.value = Number(formData.preco_custo).toFixed(2).replace('.', ',');
+                          e.target.select();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        handleChange('preco_custo', value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="R$ 0,00"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Markup (%)
+                      Markup
                     </label>
                     <input
-                      type="number"
-                      step="0.01"
-                      value={formData.markup}
-                      onChange={(e) => handleChange('markup', e.target.value)}
+                      type="text"
+                      value={formData.markup ? `${Number(formData.markup).toFixed(2).replace('.', ',')}%` : '0,00%'}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        handleChange('markup', value);
+                      }}
+                      onFocus={(e) => {
+                        if (formData.markup) {
+                          e.target.value = Number(formData.markup).toFixed(2).replace('.', ',');
+                          e.target.select();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        handleChange('markup', value);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0,00"
+                      placeholder="0,00%"
                     />
                   </div>
 
@@ -1251,35 +1415,53 @@ export default function ProdutosNovo() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Preço de Venda *
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.preco_venda}
-                        onChange={(e) => handleChange('preco_venda', e.target.value)}
-                        className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0,00"
-                        required
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={formData.preco_venda ? `R$ ${Number(formData.preco_venda).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        handleChange('preco_venda', value);
+                      }}
+                      onFocus={(e) => {
+                        if (formData.preco_venda) {
+                          e.target.value = Number(formData.preco_venda).toFixed(2).replace('.', ',');
+                          e.target.select();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        handleChange('preco_venda', value);
+                      }}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="R$ 0,00"
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Preço Promocional
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.preco_promocional}
-                        onChange={(e) => handleChange('preco_promocional', e.target.value)}
-                        className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0,00"
-                      />
-                    </div>
+                    <input
+                      type="text"
+                      value={formData.preco_promocional ? `R$ ${Number(formData.preco_promocional).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        handleChange('preco_promocional', value);
+                      }}
+                      onFocus={(e) => {
+                        if (formData.preco_promocional) {
+                          e.target.value = Number(formData.preco_promocional).toFixed(2).replace('.', ',');
+                          e.target.select();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value.replace(',', '.');
+                        handleChange('preco_promocional', value);
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="R$ 0,00"
+                    />
                   </div>
                 </div>
               )}
@@ -1309,6 +1491,170 @@ export default function ProdutosNovo() {
                       onChange={(e) => handleChange('data_fim_promocao', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+                </div>
+              )}
+              
+              {/* =========================================
+                  SISTEMA PREDECESSOR/SUCESSOR
+                  ========================================= */}
+              {!isEdicao && (
+                <div className="border-t pt-6 mt-6">
+                  <div className="p-6 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Evolução do Produto
+                        </h3>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mostrarBuscaPredecessor}
+                          onChange={(e) => {
+                            setMostrarBuscaPredecessor(e.target.checked);
+                            if (!e.target.checked) {
+                              setPredecessorSelecionado(null);
+                              handleChange('produto_predecessor_id', null);
+                              handleChange('motivo_descontinuacao', '');
+                            }
+                          }}
+                          className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Este produto substitui outro</span>
+                      </label>
+                    </div>
+                    
+                    {mostrarBuscaPredecessor && (
+                      <div className="space-y-4">
+                        <div className="p-4 bg-white rounded-lg border-2 border-amber-300">
+                          {/* Busca de Produto */}
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            🔍 Buscar Produto Anterior
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Digite o nome ou código do produto..."
+                            value={buscaPredecessor}
+                            onChange={async (e) => {
+                              setBuscaPredecessor(e.target.value);
+                              if (e.target.value.length >= 2) {
+                                try {
+                                  const response = await api.get('/produtos/', {
+                                    params: { busca: e.target.value, page_size: 10 }
+                                  });
+                                  setProdutosBusca(response.data.items || []);
+                                } catch (err) {
+                                  console.error('Erro ao buscar produtos:', err);
+                                }
+                              } else {
+                                setProdutosBusca([]);
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                          />
+                          
+                          {/* Resultados da Busca */}
+                          {produtosBusca.length > 0 && (
+                            <div className="mt-2 max-h-48 overflow-y-auto border border-gray-300 rounded-lg">
+                              {produtosBusca.map(produto => (
+                                <div
+                                  key={produto.id}
+                                  onClick={() => {
+                                    setPredecessorSelecionado(produto);
+                                    handleChange('produto_predecessor_id', produto.id);
+                                    setBuscaPredecessor('');
+                                    setProdutosBusca([]);
+                                  }}
+                                  className="p-3 hover:bg-amber-50 cursor-pointer border-b border-gray-200 last:border-0"
+                                >
+                                  <div className="font-medium text-gray-900">{produto.nome}</div>
+                                  <div className="text-sm text-gray-600">
+                                    SKU: {produto.codigo} | Preço: R$ {produto.preco_venda?.toFixed(2)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Produto Selecionado */}
+                          {predecessorSelecionado && (
+                            <div className="mt-3 p-3 bg-green-50 border border-green-300 rounded-lg">
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-green-800">✅ Produto Selecionado:</div>
+                                  <div className="font-semibold text-gray-900 mt-1">{predecessorSelecionado.nome}</div>
+                                  <div className="text-sm text-gray-600">SKU: {predecessorSelecionado.codigo}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPredecessorSelecionado(null);
+                                    handleChange('produto_predecessor_id', null);
+                                  }}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Motivo da Substituição */}
+                        {predecessorSelecionado && (
+                          <div className="p-4 bg-white rounded-lg border-2 border-amber-300">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              📝 Motivo da Substituição
+                            </label>
+                            <select
+                              value={formData.motivo_descontinuacao}
+                              onChange={(e) => handleChange('motivo_descontinuacao', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent mb-2"
+                            >
+                              <option value="">Selecione o motivo...</option>
+                              <option value="Mudança de embalagem">Mudança de embalagem</option>
+                              <option value="Mudança de peso/gramatura">Mudança de peso/gramatura</option>
+                              <option value="Reformulação do produto">Reformulação do produto</option>
+                              <option value="Mudança de fornecedor">Mudança de fornecedor</option>
+                              <option value="Upgrade de linha">Upgrade de linha</option>
+                              <option value="Outro">Outro (descrever abaixo)</option>
+                            </select>
+                            
+                            {formData.motivo_descontinuacao === 'Outro' && (
+                              <textarea
+                                value={formData.motivo_descontinuacao}
+                                onChange={(e) => handleChange('motivo_descontinuacao', e.target.value)}
+                                placeholder="Descreva o motivo..."
+                                rows="2"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                              />
+                            )}
+                            
+                            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                              <strong>ℹ️ O que acontecerá:</strong>
+                              <ul className="mt-2 space-y-1 list-disc list-inside">
+                                <li>O produto "<strong>{predecessorSelecionado.nome}</strong>" será marcado como <strong>descontinuado</strong></li>
+                                <li>Todo o histórico de vendas será mantido e poderá ser consultado</li>
+                                <li>Você poderá gerar relatórios consolidados somando ambos os produtos</li>
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {!mostrarBuscaPredecessor && (
+                      <p className="text-sm text-gray-600 mt-2">
+                        Marque esta opção se este produto substitui outro já cadastrado (ex: mudança de embalagem de 350g para 300g).
+                        Isso permite manter o histórico consolidado de vendas.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

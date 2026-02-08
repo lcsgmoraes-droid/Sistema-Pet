@@ -17,6 +17,7 @@ from typing import Dict, Any
 
 from app.db import get_session
 from app.auth import get_current_user
+from app.produtos_models import Produto
 from app.schemas.racao_calculadora import RacaoCalculadoraInput, RacaoCalculadoraOutput
 from app.services.racao_calculadora_service import calcular_racao
 
@@ -70,14 +71,64 @@ async def calcular_consumo_racao(
         user_id = current_user.id if hasattr(current_user, 'id') else None
         logger.info(
             f"Calculadora de ração chamada - Tenant: {tenant_id}, User: {user_id}, "
-            f"Espécie: {payload.especie}, Peso: {payload.peso_kg}kg"
+            f"Espécie: {payload.especie}, Peso: {payload.peso_kg}kg, Produto ID: {payload.produto_id}"
         )
         
-        # Converte Pydantic para dict (serviço espera dict)
+        # 🔍 NOVO: Buscar produto se produto_id fornecido
+        tabela_consumo_json = None
+        peso_pacote_kg = payload.peso_pacote_kg
+        preco_pacote = payload.preco_pacote
+        
+        if payload.produto_id:
+            logger.info(f"🔍 Buscando produto ID {payload.produto_id} no banco...")
+            produto = db.query(Produto).filter(
+                Produto.id == payload.produto_id,
+                Produto.tenant_id == tenant_id
+            ).first()
+            
+            if not produto:
+                logger.warning(f"⚠️ Produto ID {payload.produto_id} não encontrado")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Produto ID {payload.produto_id} não encontrado"
+                )
+            
+            # Extrair dados do produto
+            if produto.peso_embalagem:
+                peso_pacote_kg = produto.peso_embalagem
+                logger.info(f"✅ Peso da embalagem do produto: {peso_pacote_kg}kg")
+            
+            if produto.preco_venda:
+                preco_pacote = produto.preco_venda
+                logger.info(f"✅ Preço do produto: R$ {preco_pacote}")
+            
+            if produto.tabela_consumo:
+                tabela_consumo_json = produto.tabela_consumo
+                logger.info(f"✅ Tabela de consumo encontrada (tamanho: {len(tabela_consumo_json)} chars)")
+            else:
+                logger.info("ℹ️ Produto não tem tabela de consumo cadastrada, usando cálculo genérico")
+        
+        # Validar peso_pacote_kg e preco_pacote
+        if not peso_pacote_kg or peso_pacote_kg <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="peso_pacote_kg é obrigatório e deve ser maior que zero"
+            )
+        
+        if preco_pacote is None or preco_pacote < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="preco_pacote é obrigatório e não pode ser negativo"
+            )
+        
+        # Atualizar payload com dados do produto
         payload_dict = payload.model_dump()
+        payload_dict['peso_pacote_kg'] = peso_pacote_kg
+        payload_dict['preco_pacote'] = preco_pacote
         
         # Chama o serviço de cálculo (fail-safe interno)
-        resultado = calcular_racao(payload_dict)
+        # 🆕 PASSA A TABELA DE CONSUMO
+        resultado = calcular_racao(payload_dict, tabela_consumo_json=tabela_consumo_json)
         
         # Valida se houve erro no cálculo
         if resultado.get("consumo_diario_gramas", 0) == 0:

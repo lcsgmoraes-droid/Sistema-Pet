@@ -117,7 +117,6 @@ const Layout = () => {
         { path: '/comissoes/relatorios', label: '📊 Relatórios Analíticos' },
       ]
     },
-    { path: '/relatorios', icon: FiBarChart2, label: 'Relatórios', permission: 'relatorios.gerencial' },
     { 
       path: '/entregas', 
       icon: FiTruck, 
@@ -125,8 +124,7 @@ const Layout = () => {
       permission: 'vendas.visualizar', // Vinculado a vendas
       submenu: [
         { path: '/entregas/abertas', label: 'Entregas em Aberto' },
-        { path: '/entregas/rotas', label: 'Rotas de Entrega' },
-        { path: '/entregas/financeiro', label: '📊 Dashboard Financeiro' },
+        { path: '/entregas/rotas', label: 'Rotas de Entrega' },        { path: '/entregas/historico', label: '📜 Histórico' },        { path: '/entregas/financeiro', label: '📊 Dashboard Financeiro' },
       ]
     },
     { 
@@ -138,6 +136,7 @@ const Layout = () => {
         { path: '/cadastros/cargos', label: 'Cargos' },
         { path: '/cadastros/categorias', label: 'Categorias de Produtos' },
         { path: '/cadastros/categorias-financeiras', label: 'Categorias Financeiras' },
+        { path: '/cadastros/especies-racas', label: 'Espécies e Raças' },
       ]
     },
     { 

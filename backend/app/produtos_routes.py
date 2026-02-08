@@ -310,6 +310,9 @@ class ProdutoBase(BaseModel):
     # Sprint 4: Produtos KIT
     tipo_kit: Optional[str] = 'VIRTUAL'  # VIRTUAL (estoque calculado) ou FISICO (estoque próprio)
     e_kit_fisico: Optional[bool] = False  # Alias para tipo_kit (usado pelo frontend)
+    # Sistema Predecessor/Sucessor
+    produto_predecessor_id: Optional[int] = None  # ID do produto que este substitui
+    motivo_descontinuacao: Optional[str] = None  # Motivo da substituição
 
 
 class ProdutoCreate(ProdutoBase):
@@ -374,6 +377,9 @@ class ProdutoUpdate(BaseModel):
     tipo_kit: Optional[str] = None
     e_kit_fisico: Optional[bool] = None
     composicao_kit: Optional[List[KitComponenteCreate]] = None
+    # Sistema Predecessor/Sucessor
+    produto_predecessor_id: Optional[int] = None
+    motivo_descontinuacao: Optional[str] = None
 
 
 # ==========================================
@@ -433,6 +439,10 @@ class ProdutoResponse(ProdutoBase):
     # Sprint 4: KIT - Composição e estoque virtual
     composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
+    # Sistema Predecessor/Sucessor
+    data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
+    predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
+    sucessor_nome: Optional[str] = None  # Nome do sucessor (se existir)
     
     @field_validator('categoria_nome', mode='before')
     @classmethod
@@ -550,7 +560,8 @@ def criar_categoria(
     # Criar categoria
     nova_categoria = Categoria(
         **categoria.model_dump(),
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
+        user_id=current_user.id
     )
     
     db.add(nova_categoria)
@@ -1307,6 +1318,30 @@ def criar_produto(
             )
     
     # ========================================
+    # 🔒 PREDECESSOR/SUCESSOR: Marcar predecessor como descontinuado
+    # ========================================
+    if produto.produto_predecessor_id:
+        predecessor = db.query(Produto).filter(
+            Produto.id == produto.produto_predecessor_id,
+            Produto.tenant_id == tenant_id
+        ).first()
+        
+        if not predecessor:
+            raise HTTPException(
+                status_code=404,
+                detail="Produto predecessor não encontrado"
+            )
+        
+        # Marcar predecessor como descontinuado
+        predecessor.data_descontinuacao = datetime.utcnow()
+        if produto.motivo_descontinuacao:
+            predecessor.motivo_descontinuacao = produto.motivo_descontinuacao
+        else:
+            predecessor.motivo_descontinuacao = f"Substituído por: {produto.nome}"
+        
+        logger.info(f"📦 Produto predecessor {predecessor.id} marcado como descontinuado")
+    
+    # ========================================
     # DELEGAR PARA SERVICE LAYER
     # ========================================
     
@@ -1392,7 +1427,14 @@ def listar_produtos_vendaveis(
         query = query.filter(Produto.departamento_id == departamento_id)
     
     if fornecedor_id:
-        query = query.filter(Produto.fornecedor_id == fornecedor_id)
+        # JOIN com tabela produto_fornecedores (relacionamento muitos-para-muitos)
+        query = query.join(
+            ProdutoFornecedor,
+            Produto.id == ProdutoFornecedor.produto_id
+        ).filter(
+            ProdutoFornecedor.fornecedor_id == fornecedor_id,
+            ProdutoFornecedor.ativo == True
+        )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
@@ -1480,6 +1522,7 @@ def listar_produtos(
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
+    produto_predecessor_id: Optional[int] = None,  # Buscar sucessores de um produto
     include_variations: Optional[bool] = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
@@ -1498,7 +1541,14 @@ def listar_produtos(
     # QUERY BASE - Buscar apenas produtos principais (SIMPLES, PAI e KIT)
     # VARIACAO não aparecem sozinhas, apenas agrupadas com o PAI
     # EXCEÇÃO: Se filtrar explicitamente por tipo_produto, respeita o filtro
-    if tipo_produto:
+    # EXCEÇÃO 2: Se filtrar por produto_predecessor_id, buscar apenas sucessores (qualquer tipo)
+    if produto_predecessor_id:
+        # Buscar produtos que são sucessores do produto especificado
+        query = db.query(Produto).filter(
+            Produto.tenant_id == tenant_id,
+            Produto.produto_predecessor_id == produto_predecessor_id
+        )
+    elif tipo_produto:
         query = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
             Produto.tipo_produto == tipo_produto  # Filtro específico
@@ -1535,7 +1585,14 @@ def listar_produtos(
         query = query.filter(Produto.departamento_id == departamento_id)
     
     if fornecedor_id:
-        query = query.filter(Produto.fornecedor_id == fornecedor_id)
+        # JOIN com tabela produto_fornecedores (relacionamento muitos-para-muitos)
+        query = query.join(
+            ProdutoFornecedor, 
+            Produto.id == ProdutoFornecedor.produto_id
+        ).filter(
+            ProdutoFornecedor.fornecedor_id == fornecedor_id,
+            ProdutoFornecedor.ativo == True
+        )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)

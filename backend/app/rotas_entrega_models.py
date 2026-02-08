@@ -48,6 +48,10 @@ class RotaEntrega(BaseTenantModel):
     tentativas = Column(Integer, nullable=False, default=1)
     moto_da_loja = Column(Boolean, nullable=False, default=False)
     
+    # Controle de KM da moto (opcional)
+    km_inicial = Column(Numeric(10, 2), nullable=True)  # KM ao iniciar rota
+    km_final = Column(Numeric(10, 2), nullable=True)  # KM ao finalizar rota
+    
     # Status
     status = Column(String(20), nullable=False, default="pendente", index=True)
     # pendente | em_rota | concluida | cancelada
@@ -90,8 +94,11 @@ class RotaEntregaParada(BaseTenantModel):
     status = Column(String(20), nullable=False, default="pendente", index=True)
     # pendente | entregue | tentativa
     data_entrega = Column(DateTime, nullable=True)
+    observacoes = Column(Text, nullable=True)  # Observações sobre a entrega
+    km_entrega = Column(Numeric(10, 2), nullable=True)  # KM da moto ao entregar (opcional)
     
     # Relacionamentos
     rota = relationship("RotaEntrega", back_populates="paradas")
+    venda = relationship("Venda", backref="paradas_rota")
     
     # created_at herdado de BaseTenantModel

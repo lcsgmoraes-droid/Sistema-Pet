@@ -1,0 +1,301 @@
+/* ===================================
+   PÁGINA DE ESPÉCIES E RAÇAS
+   =================================== */
+
+.especies-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.especie-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.especie-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.especie-card.inactive {
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+/* Header da Espécie */
+.especie-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.especie-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.expand-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  transform: scale(1.1);
+}
+
+.especie-icon {
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.especie-nome {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.racas-count {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.especie-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Lista de Raças */
+.racas-list {
+  padding: 16px 20px;
+  background: white;
+  border-top: 1px solid #f1f5f9;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 1000px;
+  }
+}
+
+.raca-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.raca-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: translateX(4px);
+}
+
+.raca-item:last-child {
+  margin-bottom: 0;
+}
+
+.raca-item.inactive {
+  opacity: 0.5;
+  background: #fafafa;
+}
+
+.raca-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.raca-icon {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.raca-nome {
+  font-size: 15px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.raca-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.empty-racas {
+  text-align: center;
+  padding: 32px 20px;
+  color: #64748b;
+}
+
+.empty-racas p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+/* Botões Pequenos */
+.btn-icon-sm {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon-sm.btn-edit {
+  color: #3b82f6;
+}
+
+.btn-icon-sm.btn-edit:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.btn-icon-sm.btn-delete {
+  color: #ef4444;
+}
+
+.btn-icon-sm.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.btn-icon.btn-success {
+  color: #64748b;
+  background: transparent;
+}
+
+.btn-icon.btn-success:hover {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+/* Badge Pequeno */
+.badge-sm {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+/* Modal Subtitle */
+.modal-header .subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #64748b;
+  margin-left: 8px;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .especie-header {
+    padding: 12px 16px;
+  }
+
+  .especie-nome {
+    font-size: 16px;
+  }
+
+  .racas-count {
+    font-size: 12px;
+  }
+
+  .racas-list {
+    padding: 12px 16px;
+  }
+
+  .raca-item {
+    padding: 10px 12px;
+  }
+
+  .raca-nome {
+    font-size: 14px;
+  }
+}
+
+/* ===================================
+   BOTÃO ADICIONAR RÁPIDO
+   =================================== */
+
+.field-with-action {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.field-with-action > div {
+  flex: 1;
+}
+
+.btn-add-quick {
+  padding: 8px 12px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);
+  height: 38px;
+  flex-shrink: 0;
+}
+
+.btn-add-quick:hover {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(16, 185, 129, 0.3);
+}
+
+.btn-add-quick:active {
+  transform: translateY(0);
+}
+
+.btn-add-quick:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-add-quick svg {
+  width: 14px;
+  height: 14px;
+}

@@ -123,6 +123,9 @@ class Venda(BaseTenantModel):
             cliente_dict = {
                 'id': self.cliente.id,
                 'nome': self.cliente.nome,
+                'telefone': self.cliente.telefone,
+                'celular': self.cliente.celular,
+                'email': self.cliente.email,
                 'endereco': self.cliente.endereco,
                 'numero': self.cliente.numero,
                 'complemento': self.cliente.complemento,
@@ -137,6 +140,7 @@ class Venda(BaseTenantModel):
             'numero_venda': self.numero_venda,
             'cliente_id': self.cliente_id,
             'cliente_nome': self.cliente.nome if self.cliente else None,
+            'nome_cliente': self.cliente.nome if self.cliente else None,
             'cliente': cliente_dict,
             'vendedor_id': self.vendedor_id,
             'funcionario_id': self.funcionario_id,
@@ -144,6 +148,7 @@ class Venda(BaseTenantModel):
             'desconto_valor': safe_decimal_to_float(self.desconto_valor) or 0,
             'desconto_percentual': safe_decimal_to_float(self.desconto_percentual) or 0,
             'total': safe_decimal_to_float(self.total),
+            'valor_total': safe_decimal_to_float(self.total),  # Alias para compatibilidade
             'valor_pago': valor_pago,
             'valor_restante': safe_decimal_to_float(self.total) - valor_pago,
             'tem_entrega': self.tem_entrega,
@@ -160,10 +165,13 @@ class Venda(BaseTenantModel):
             } if self.tem_entrega else None,
             'status': self.status,
             'status_entrega': self.status_entrega,
+            'status_pagamento': 'pago' if valor_pago >= safe_decimal_to_float(self.total) else 'parcial' if valor_pago > 0 else 'pendente',
+            'forma_pagamento': self.pagamentos[0].forma_pagamento if (hasattr(self, 'pagamentos') and self.pagamentos and len(self.pagamentos) > 0) else None,
             'data_venda': safe_datetime_to_iso(self.data_venda),
             'data_finalizacao': safe_datetime_to_iso(self.data_finalizacao),
             'observacoes': self.observacoes,
             'observacoes_entrega': self.observacoes_entrega,
+            'endereco_entrega': self.endereco_entrega,
             'itens': [item.to_dict() for item in self.itens] if hasattr(self, 'itens') else [],
             'pagamentos': [pag.to_dict() for pag in self.pagamentos] if hasattr(self, 'pagamentos') else [],
         }
@@ -228,12 +236,27 @@ class VendaItem(BaseTenantModel):
             'servico_descricao': self.servico_descricao,
             'quantidade': safe_decimal_to_float(self.quantidade),
             'preco_unitario': safe_decimal_to_float(self.preco_unitario),
+            'valor_unitario': safe_decimal_to_float(self.preco_unitario),  # Alias para compatibilidade
             'desconto_item': safe_decimal_to_float(self.desconto_item) or 0,
             'subtotal': safe_decimal_to_float(self.subtotal),
             'pet_id': self.pet_id,
             'pet_nome': self.pet.nome if self.pet else None,
             'pet_codigo': self.pet.codigo if self.pet else None,
         }
+        
+        # Incluir detalhes do produto se disponível
+        if self.produto:
+            result['produto'] = {
+                'id': self.produto.id,
+                'nome': self.produto.nome,
+                'codigo': self.produto.codigo if hasattr(self.produto, 'codigo') else None,
+            }
+        
+        # Incluir detalhes do serviço se for serviço
+        if self.tipo == 'servico' and self.servico_descricao:
+            result['servico'] = {
+                'nome': self.servico_descricao,
+            }
         
         # Adicionar informações de KIT se o produto for um KIT
         if self.produto:

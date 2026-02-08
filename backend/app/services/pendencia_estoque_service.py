@@ -9,7 +9,8 @@ from typing import List, Dict
 import logging
 
 from app.pendencia_estoque_models import PendenciaEstoque
-from app.models import Produto, Cliente
+from app.produtos_models import Produto
+from app.clientes_models import Cliente
 
 logger = logging.getLogger(__name__)
 

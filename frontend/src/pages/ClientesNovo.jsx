@@ -299,6 +299,41 @@ const Pessoas = () => {
     setError('');
 
     try {
+      // ✅ VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS
+      const errosValidacao = [];
+      
+      // Nome é obrigatório para todos
+      if (!formData.nome || formData.nome.trim() === '') {
+        errosValidacao.push('Nome');
+      }
+      
+      // Validações específicas para Pessoa Jurídica
+      if (formData.tipo_pessoa === 'PJ') {
+        if (!formData.cnpj || formData.cnpj.trim() === '') {
+          errosValidacao.push('CNPJ');
+        }
+        if (!formData.razao_social || formData.razao_social.trim() === '') {
+          errosValidacao.push('Razão Social');
+        }
+      }
+      
+      // Validações específicas para Pessoa Física
+      if (formData.tipo_pessoa === 'PF') {
+        if (formData.tipo_cadastro === 'cliente' && (!formData.cpf || formData.cpf.trim() === '')) {
+          // CPF opcional para clientes PF (muitos não têm)
+          // Removido pois é opcional
+        }
+      }
+      
+      // Se houver erros de validação, mostrar e parar
+      if (errosValidacao.length > 0) {
+        const mensagem = '❌ Faltam os seguintes campos obrigatórios:\n\n' + 
+                         errosValidacao.map(campo => `• ${campo}`).join('\n');
+        alert(mensagem);
+        setError(mensagem);
+        return;
+      }
+      
       // ✅ VALIDAÇÕES DE ENTREGADOR (ETAPA 4)
       if (formData.is_entregador) {
         // Validar tipo de acerto
@@ -423,19 +458,70 @@ const Pessoas = () => {
       closeModal();
     } catch (err) {
       const errorDetails = err.response?.data?.details;
-      setError(err.response?.data?.message || 'Erro ao salvar cliente');
       console.error('Erro completo:', err.response?.data);
       console.error('Detalhes de validação:', errorDetails);
       
-      // Mostrar cada erro de campo
+      // 🔍 Mapeamento de campos técnicos para nomes amigáveis
+      const camposPtBr = {
+        'nome': 'Nome',
+        'cpf': 'CPF',
+        'cnpj': 'CNPJ',
+        'razao_social': 'Razão Social',
+        'nome_fantasia': 'Nome Fantasia',
+        'inscricao_estadual': 'Inscrição Estadual',
+        'responsavel': 'Responsável',
+        'telefone': 'Telefone',
+        'celular': 'Celular',
+        'email': 'E-mail',
+        'cep': 'CEP',
+        'endereco': 'Endereço',
+        'numero': 'Número',
+        'bairro': 'Bairro',
+        'cidade': 'Cidade',
+        'estado': 'Estado',
+        'tipo_pessoa': 'Tipo de Pessoa',
+        'tipo_cadastro': 'Tipo de Cadastro',
+        'crmv': 'CRMV',
+        'tipo_acerto_entrega': 'Tipo de Acerto',
+        'dia_semana_acerto': 'Dia da Semana para Acerto',
+        'dia_mes_acerto': 'Dia do Mês para Acerto',
+        'tipo_vinculo_entrega': 'Tipo de Vínculo'
+      };
+      
+      // ✅ Processar erros de validação do backend
+      let mensagemErro = '';
+      
       if (errorDetails && Array.isArray(errorDetails)) {
-        errorDetails.forEach((detail, index) => {
-          console.error(`Erro ${index + 1}:`, {
-            campo: detail.loc,
-            tipo: detail.type,
-            mensagem: detail.msg
-          });
+        const camposFaltando = [];
+        
+        errorDetails.forEach((detail) => {
+          // Extrair nome do campo (último elemento do array loc)
+          const campo = detail.loc[detail.loc.length - 1];
+          const nomeCampo = camposPtBr[campo] || campo;
+          
+          // Identificar o tipo de erro
+          if (detail.type === 'missing' || detail.type === 'value_error.missing') {
+            camposFaltando.push(nomeCampo);
+          } else if (detail.msg) {
+            camposFaltando.push(`${nomeCampo}: ${detail.msg}`);
+          }
+          
+          console.error(`Campo: ${nomeCampo} | Tipo: ${detail.type} | Mensagem: ${detail.msg}`);
         });
+        
+        if (camposFaltando.length > 0) {
+          mensagemErro = '❌ Faltam os seguintes campos obrigatórios:\n\n' + 
+                         camposFaltando.map(campo => `• ${campo}`).join('\n');
+        }
+      }
+      
+      // Usar a mensagem personalizada ou a genérica
+      const errorMessage = mensagemErro || err.response?.data?.message || 'Erro ao salvar cliente';
+      setError(errorMessage);
+      
+      // Mostrar alert para maior visibilidade
+      if (mensagemErro) {
+        alert(mensagemErro);
       }
     }
   };

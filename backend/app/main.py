@@ -35,6 +35,7 @@ from app.utils.logger import generate_trace_id, set_trace_id, set_endpoint, get_
 from app.auth_routes_multitenant import router as auth_router
 from app.clientes_routes import router as clientes_router
 from app.pets_routes import router as pets_router  # Módulo dedicado de pets
+from app.cadastros_routes import router as cadastros_router  # Espécies e Raças
 from app.produtos_routes import router as produtos_router
 from app.variacoes_routes import router as variacoes_router  # Sprint 2: Variações
 from app.vendas_routes import router as vendas_router
@@ -358,6 +359,7 @@ app.include_router(roles_router, tags=["Roles & RBAC"])
 app.include_router(permissions_router, tags=["Permissions & RBAC"])
 app.include_router(clientes_router, tags=["Clientes & Pets"])
 app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
+app.include_router(cadastros_router, tags=["Cadastros - Espécies & Raças"])  # Cadastros básicos
 app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
 app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!
 app.include_router(importacao_pessoas_router, tags=["Importação de Pessoas"])

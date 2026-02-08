@@ -173,6 +173,11 @@ const PRODUTOS_COLUNAS = [
                       (Kit • Físico)
                     </span>
                   )}
+                  {produto.data_descontinuacao && (
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                      ⚠️ Descontinuado
+                    </span>
+                  )}
                 </div>
               </div>
               {produto.descricao && (
@@ -483,6 +488,10 @@ export default function Produtos() {
     em_promocao: false,
   });
 
+  // Paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [itensPorPagina, setItensPorPagina] = useState(20);
+
   // ========================================
   // ORGANIZAR PRODUTOS HIERARQUICAMENTE (useMemo para performance)
   // ========================================
@@ -519,13 +528,13 @@ export default function Produtos() {
   // APLICAR FILTROS (useMemo para performance)
   // ========================================
   // Aplica filtros de busca, categoria, marca, estoque e promoção
-  const produtos = useMemo(() => {
-    let produtosFiltrados = [...produtosOrganizados];
+  const produtosFiltrados = useMemo(() => {
+    let produtosTemp = [...produtosOrganizados];
 
     // Filtro de busca (nome ou código)
     if (filtros.busca.trim()) {
       const termo = filtros.busca.toLowerCase();
-      produtosFiltrados = produtosFiltrados.filter(p =>
+      produtosTemp = produtosTemp.filter(p =>
         (p.nome && p.nome.toLowerCase().includes(termo)) ||
         (p.codigo && p.codigo.toLowerCase().includes(termo))
       );
@@ -533,21 +542,21 @@ export default function Produtos() {
 
     // Filtro de categoria
     if (filtros.categoria_id) {
-      produtosFiltrados = produtosFiltrados.filter(p => 
+      produtosTemp = produtosTemp.filter(p => 
         p.categoria_id == filtros.categoria_id
       );
     }
 
     // Filtro de marca
     if (filtros.marca_id) {
-      produtosFiltrados = produtosFiltrados.filter(p => 
+      produtosTemp = produtosTemp.filter(p => 
         p.marca_id == filtros.marca_id
       );
     }
 
     // Filtro de estoque baixo
     if (filtros.estoque_baixo) {
-      produtosFiltrados = produtosFiltrados.filter(p => {
+      produtosTemp = produtosTemp.filter(p => {
         const estoque = p.tipo_produto === 'KIT' && p.tipo_kit === 'VIRTUAL'
           ? (p.estoque_virtual ?? 0)
           : (p.estoque_atual || 0);
@@ -558,13 +567,35 @@ export default function Produtos() {
 
     // Filtro de em promoção
     if (filtros.em_promocao) {
-      produtosFiltrados = produtosFiltrados.filter(p => 
+      produtosTemp = produtosTemp.filter(p => 
         p.promocao_ativa === true
       );
     }
 
-    return produtosFiltrados;
+    return produtosTemp;
   }, [produtosOrganizados, filtros]);
+
+  // Calcular produtos paginados
+  const { produtosPaginados, totalPaginas, totalItens } = useMemo(() => {
+    const total = Math.ceil(produtosFiltrados.length / itensPorPagina);
+    const inicio = (paginaAtual - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+    const paginados = produtosFiltrados.slice(inicio, fim);
+    
+    return {
+      produtosPaginados: paginados,
+      totalPaginas: total,
+      totalItens: produtosFiltrados.length
+    };
+  }, [produtosFiltrados, paginaAtual, itensPorPagina]);
+
+  // Alias para manter compatibilidade com o resto do código
+  const produtos = produtosPaginados;
+
+  // Resetar para página 1 quando filtros mudarem
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [filtros]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -1138,14 +1169,98 @@ export default function Produtos() {
           </table>
         </div>
 
-        {/* Footer - Informações */}
-        {!loading && produtos.length > 0 && (
+        {/* Paginação */}
+        {!loading && totalItens > 0 && (
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a {Math.min(paginaAtual * itensPorPagina, totalItens)} de {totalItens} produtos
+              </span>
+              <select
+                value={itensPorPagina}
+                onChange={(e) => {
+                  setItensPorPagina(Number(e.target.value));
+                  setPaginaAtual(1);
+                }}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value={10}>10 por página</option>
+                <option value={20}>20 por página</option>
+                <option value={30}>30 por página</option>
+                <option value={50}>50 por página</option>
+                <option value={100}>100 por página</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaAtual(1)}
+                disabled={paginaAtual === 1}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Primeira
+              </button>
+              <button
+                onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                disabled={paginaAtual === 1}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+
+              {/* Páginas numeradas */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(totalPaginas, 5) }, (_, i) => {
+                  let pageNum;
+                  if (totalPaginas <= 5) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual <= 3) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual >= totalPaginas - 2) {
+                    pageNum = totalPaginas - 4 + i;
+                  } else {
+                    pageNum = paginaAtual - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPaginaAtual(pageNum)}
+                      className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                        paginaAtual === pageNum
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+                disabled={paginaAtual === totalPaginas}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+              <button
+                onClick={() => setPaginaAtual(totalPaginas)}
+                disabled={paginaAtual === totalPaginas}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Última
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer - Informações de seleção */}
+        {!loading && selecionados.length > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>Total: {produtos.length} produtos</span>
-              {selecionados.length > 0 && (
-                <span>{selecionados.length} selecionados</span>
-              )}
+              <span>{selecionados.length} produto{selecionados.length > 1 ? 's' : ''} selecionado{selecionados.length > 1 ? 's' : ''}</span>
             </div>
           </div>
         )}

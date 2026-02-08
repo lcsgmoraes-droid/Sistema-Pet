@@ -447,7 +447,7 @@ def get_fluxo_caixa(
     else:
         # Todas as contas do usuário e tenant
         contas = db.query(ContaBancaria).filter(
-            ContaBancaria.user_id == user.id,
+            ContaBancaria.user_id == current_user.id,
             ContaBancaria.tenant_id == tenant_id
         ).all()
         filtro_conta = [c.id for c in contas]
@@ -458,7 +458,7 @@ def get_fluxo_caixa(
         contas_obj = db.query(ContaBancaria).filter(
             and_(
                 ContaBancaria.id.in_(filtro_conta),
-                ContaBancaria.user_id == user.id,
+                ContaBancaria.user_id == current_user.id,
                 ContaBancaria.tenant_id == tenant_id
             )
         ).all()
@@ -472,7 +472,7 @@ def get_fluxo_caixa(
     # 1. VENDAS REALIZADAS (Entradas Realizadas)
     vendas = db.query(Venda).filter(
         and_(
-            Venda.user_id == user.id,
+            Venda.user_id == current_user.id,
             Venda.tenant_id == tenant_id,
             Venda.data_venda >= dt_inicio,
             Venda.data_venda <= dt_fim,
@@ -531,7 +531,7 @@ def get_fluxo_caixa(
     # 3. CONTAS A PAGAR PAGAS (Saídas Realizadas)
     contas_pagas = db.query(ContaPagar).filter(
         and_(
-            ContaPagar.user_id == user.id,
+            ContaPagar.user_id == current_user.id,
             ContaPagar.data_pagamento >= dt_inicio,
             ContaPagar.data_pagamento <= dt_fim,
             ContaPagar.status == 'pago'
@@ -581,7 +581,7 @@ def get_fluxo_caixa(
     
     fluxos_realizados = db.query(FluxoCaixa).filter(
         and_(
-            FluxoCaixa.usuario_id == user.id,
+            FluxoCaixa.usuario_id == current_user.id,
             FluxoCaixa.data_movimentacao >= dt_inicio_datetime,
             FluxoCaixa.data_movimentacao <= dt_fim_datetime,
             FluxoCaixa.status == 'realizado'
@@ -651,7 +651,7 @@ def get_fluxo_caixa(
     # 6. CONTAS A PAGAR PENDENTES (Saídas Previstas)
     contas_pagar_pendentes = db.query(ContaPagar).filter(
         and_(
-            ContaPagar.user_id == user.id,
+            ContaPagar.user_id == current_user.id,
             ContaPagar.data_vencimento >= dt_inicio,
             ContaPagar.data_vencimento <= dt_fim,
             ContaPagar.status.in_(['pendente', 'atrasado'])
@@ -697,7 +697,7 @@ def get_fluxo_caixa(
     # 🆕 LANÇAMENTOS DA TABELA FLUXO_CAIXA (PREVISTOS)
     fluxos_previstos = db.query(FluxoCaixa).filter(
         and_(
-            FluxoCaixa.usuario_id == user.id,
+            FluxoCaixa.usuario_id == current_user.id,
             FluxoCaixa.data_prevista >= dt_inicio_datetime,
             FluxoCaixa.data_prevista <= dt_fim_datetime,
             FluxoCaixa.status == 'previsto'
@@ -731,7 +731,7 @@ def get_fluxo_caixa(
         # Buscar IDs das vendas que correspondem ao número
         vendas_filtro = db.query(Venda.id).filter(
             and_(
-                Venda.user_id == user.id,
+                Venda.user_id == current_user.id,
                 Venda.numero_venda.like(f'%{numero_venda}%')
             )
         ).all()

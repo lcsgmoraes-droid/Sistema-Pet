@@ -2062,6 +2062,7 @@ async def get_cliente_historico(
     - Recebimentos
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    user = current_user  # Definir variável user para uso posterior
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
     # Importar modelos necessários
@@ -2275,28 +2276,29 @@ def _obter_timeline(view_name: str, entity_id: int, tipo_evento: Optional[str], 
     query += " ORDER BY data_evento DESC LIMIT :limit"
     params["limit"] = limit
     
-    # Executar query
-    from app.db import get_db_connection
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(query, params)
+    # Executar query com SQLAlchemy
+    from app.db import SessionLocal
+    from sqlalchemy import text
     
-    eventos = []
-    for row in cursor.fetchall():
-        eventos.append(TimelineEvento(
-            tipo_evento=row['tipo_evento'],
-            evento_id=row['evento_id'],
-            cliente_id=row['entity_id'],
-            pet_id=row['pet_id'],
-            data_evento=datetime.fromisoformat(row['data_evento']) if isinstance(row['data_evento'], str) else row['data_evento'],
-            titulo=row['titulo'],
-            descricao=row['descricao'],
-            status=row['status'],
-            cor_badge=row['cor_badge']
-        ))
-    
-    cursor.close()
-    conn.close()
+    db = SessionLocal()
+    try:
+        result = db.execute(text(query), params)
+        
+        eventos = []
+        for row in result:
+            eventos.append(TimelineEvento(
+                tipo_evento=row.tipo_evento,
+                evento_id=row.evento_id,
+                cliente_id=row.entity_id,
+                pet_id=row.pet_id,
+                data_evento=datetime.fromisoformat(row.data_evento) if isinstance(row.data_evento, str) else row.data_evento,
+                titulo=row.titulo,
+                descricao=row.descricao,
+                status=row.status,
+                cor_badge=row.cor_badge
+            ))
+    finally:
+        db.close()
     
     return eventos
 

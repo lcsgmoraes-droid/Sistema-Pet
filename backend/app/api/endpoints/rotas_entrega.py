@@ -37,24 +37,36 @@ def listar_rotas(
     Use POST /rotas-entrega/otimizar para otimizar manualmente.
     """
     from sqlalchemy.orm import joinedload
+    from app.vendas_models import Venda
+    from app.models import Cliente
     
     user, tenant_id = user_and_tenant
     
     query = db.query(RotaEntrega).options(
         joinedload(RotaEntrega.entregador),
-        joinedload(RotaEntrega.paradas)
+        joinedload(RotaEntrega.paradas).joinedload(RotaEntregaParada.venda).joinedload(Venda.cliente)
     ).filter(RotaEntrega.tenant_id == tenant_id)
     
     if status:
         query = query.filter(RotaEntrega.status == status)
+    else:
+        # Se não especificou status, mostra apenas rotas ativas (exclui concluídas)
+        query = query.filter(RotaEntrega.status.in_(['pendente', 'em_rota', 'em_andamento']))
     
     # Ordenar: rotas com paradas otimizadas primeiro, depois por data
     rotas = query.order_by(RotaEntrega.created_at.asc()).all()
     
     # Se a rota tem paradas, ordenar internamente pelas paradas.ordem
+    # E incluir dados do cliente para exibição
     for rota in rotas:
         if rota.paradas:
             rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
+            # Adicionar informações do cliente em cada parada
+            for parada in rota.paradas:
+                if parada.venda and parada.venda.cliente:
+                    parada.cliente_nome = parada.venda.cliente.nome
+                    parada.cliente_telefone = parada.venda.cliente.telefone
+                    parada.cliente_celular = parada.venda.cliente.celular
     
     return rotas
 
@@ -67,8 +79,8 @@ def listar_vendas_pendentes_entrega(
     """
     Lista vendas com entrega pendente (sem rota criada ainda).
     
-    CRITÉRIO: tem_entrega = true E status_entrega não é 'entregue' ou 'cancelada'
-    Não importa se a venda está aberta ou finalizada (pode pagar na entrega).
+    CRITÉRIO: tem_entrega = true E status_entrega = 'pendente' ou NULL
+    Exclui vendas que já estão em rota, entregues ou canceladas.
     
     Retorna em ordem:
     1. Vendas com ordem_entrega_otimizada (já otimizadas)
@@ -79,13 +91,13 @@ def listar_vendas_pendentes_entrega(
     user, tenant_id = user_and_tenant
     
     # Buscar vendas com entrega pendente
-    # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
+    # CRITÉRIO: tem_entrega = true E status_entrega = 'pendente' ou NULL
+    # Exclui: 'em_rota', 'entregue', 'cancelada'
     vendas = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
         Venda.tem_entrega == True,
-        # Aceita vendas abertas OU finalizadas
-        # Só exclui se já foi entregue ou cancelada
-        ~Venda.status_entrega.in_(["entregue", "cancelada"])
+        # Aceita apenas vendas pendentes (ainda não entraram em rota)
+        (Venda.status_entrega == 'pendente') | (Venda.status_entrega == None)
     ).order_by(
         # Primeiro: vendas com ordem otimizada
         Venda.ordem_entrega_otimizada.asc().nullslast(),
@@ -328,6 +340,12 @@ def criar_rota(
         )
         rota.numero = f"ROTA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
+        # Somar taxas de entrega de todas as vendas
+        taxa_total = sum(v.taxa_entrega for v in vendas if v.taxa_entrega)
+        
+        rota.taxa_entrega_cliente = taxa_total if taxa_total > 0 else None
+        # valor_repasse_entregador será calculado posteriormente (não existe na venda)
+        
         # Definir pontos inicial e final
         # Montar endereço completo do ponto inicial a partir da configuração
         if config_entrega:
@@ -416,8 +434,13 @@ def criar_rota(
                 )
                 db.add(parada)
         
+        # Marcar vendas como "em_rota"
+        for venda in vendas:
+            venda.status_entrega = "em_rota"
+        
         db.commit()
         db.refresh(rota)
+        
         return rota
     
     # Modo tradicional: rota com 1 venda apenas
@@ -466,6 +489,10 @@ def criar_rota(
     rota.numero = f"ROTA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
     db.add(rota)
+    
+    # Marcar venda como "em_rota"
+    venda.status_entrega = "em_rota"
+    
     db.commit()
     db.refresh(rota)
 
@@ -481,6 +508,8 @@ def fechar_rota(
 ):
     """
     Fecha uma rota de entrega, calculando o custo real.
+    
+    Se km_inicial e km_final forem informados, calcula distancia_real automaticamente.
     """
     user, tenant_id = user_and_tenant
     
@@ -499,8 +528,25 @@ def fechar_rota(
         Cliente.id == rota.entregador_id,
         Cliente.tenant_id == tenant_id
     ).first()
+    
+    # Atualizar campos
+    if payload.km_final is not None:
+        rota.km_final = payload.km_final
+        logger.info(f"KM final da rota: {payload.km_final}")
+        
+        # Se tem km_inicial e km_final, calcular distancia_real automaticamente
+        if rota.km_inicial is not None:
+            distancia_calculada = payload.km_final - rota.km_inicial
+            if distancia_calculada > 0:
+                rota.distancia_real = distancia_calculada
+                logger.info(f"Distância calculada: {distancia_calculada} km")
+            else:
+                logger.warning(f"KM final ({payload.km_final}) menor que inicial ({rota.km_inicial})")
+    
+    # Se não calculou automaticamente, usar valor informado
+    if payload.distancia_real is not None and rota.distancia_real is None:
+        rota.distancia_real = payload.distancia_real
 
-    rota.distancia_real = payload.distancia_real
     rota.tentativas = payload.tentativas or 1
     rota.observacoes = payload.observacoes
     rota.status = "concluida"
@@ -627,6 +673,7 @@ def reordenar_paradas(
 @router.post("/{rota_id}/iniciar", response_model=RotaEntregaResponse)
 def iniciar_rota(
     rota_id: int,
+    km_inicial: Optional[float] = None,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -635,6 +682,7 @@ def iniciar_rota(
     
     - Marca status como em_rota
     - Registra data_inicio
+    - Registra KM inicial da moto (opcional)
     - Dispara eventos de mensagens
     """
     user, tenant_id = user_and_tenant
@@ -669,6 +717,11 @@ def iniciar_rota(
     rota.status = "em_rota"
     rota.data_inicio = datetime.now()
     
+    # Registrar KM inicial (opcional)
+    if km_inicial is not None:
+        rota.km_inicial = Decimal(str(km_inicial))
+        logger.info(f"KM inicial da rota: {km_inicial}")
+    
     db.commit()
     db.refresh(rota)
     
@@ -684,11 +737,64 @@ def iniciar_rota(
     return rota
 
 
+@router.post("/{rota_id}/reverter-inicio", response_model=RotaEntregaResponse)
+def reverter_inicio_rota(
+    rota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Reverte o início de uma rota, voltando para status pendente.
+    Só permite se nenhuma entrega foi realizada ainda.
+    Útil quando inicia a rota mas precisa adicionar mais entregas antes de sair.
+    """
+    user, tenant_id = user_and_tenant
+    
+    # Validar rota
+    rota = db.query(RotaEntrega).filter(
+        RotaEntrega.id == rota_id,
+        RotaEntrega.tenant_id == tenant_id
+    ).first()
+    
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota não encontrada")
+    
+    if rota.status != "em_rota":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Rota não pode ser revertida. Status atual: {rota.status}"
+        )
+    
+    # Verificar se alguma parada já foi entregue
+    paradas_entregues = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.status == "entregue"
+    ).count()
+    
+    if paradas_entregues > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Não é possível reverter. {paradas_entregues} entrega(s) já foi(foram) realizada(s)."
+        )
+    
+    # Reverter status
+    rota.status = "pendente"
+    rota.data_inicio = None
+    
+    db.commit()
+    db.refresh(rota)
+    
+    logger.info(f"Rota #{rota_id} revertida para pendente")
+    
+    return rota
+
+
 @router.post("/{rota_id}/paradas/{parada_id}/marcar-entregue")
 def marcar_parada_entregue(
     rota_id: int,
     parada_id: int,
     tentativa: bool = False,
+    km_entrega: Optional[float] = None,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -697,6 +803,7 @@ def marcar_parada_entregue(
     
     Args:
         tentativa: True se cliente ausente (não entregue)
+        km_entrega: KM da moto no momento da entrega (opcional)
     """
     user, tenant_id = user_and_tenant
     
@@ -733,6 +840,12 @@ def marcar_parada_entregue(
     else:
         parada.status = "entregue"
         parada.data_entrega = datetime.now()
+        
+        # Registrar KM da entrega (opcional)
+        if km_entrega is not None:
+            parada.km_entrega = Decimal(str(km_entrega))
+            logger.info(f"KM da entrega {parada_id}: {km_entrega}")
+        
         mensagem = "Parada marcada como entregue!"
         
         # ETAPA 9.4: Disparar mensagem para próximo cliente
@@ -756,3 +869,153 @@ def marcar_parada_entregue(
         mensagem += " Todas as paradas foram concluídas. Feche a rota."
     
     return {"message": mensagem, "paradas_pendentes": paradas_pendentes}
+
+
+@router.put("/{rota_id}/paradas/{parada_id}/observacao")
+def adicionar_observacao_parada(
+    rota_id: int,
+    parada_id: int,
+    observacao: str,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Adiciona ou atualiza observação sobre uma parada/entrega.
+    Usado para aprendizado do sistema (ex: "Sempre entregar no vizinho").
+    """
+    user, tenant_id = user_and_tenant
+    
+    # Validar parada
+    parada = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.id == parada_id,
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.tenant_id == tenant_id
+    ).first()
+    
+    if not parada:
+        raise HTTPException(status_code=404, detail="Parada não encontrada")
+    
+    parada.observacoes = observacao
+    db.commit()
+    
+    return {"message": "Observação salva com sucesso", "observacoes": observacao}
+
+
+@router.post("/{rota_id}/paradas/{parada_id}/nao-entregue")
+def marcar_parada_nao_entregue(
+    rota_id: int,
+    parada_id: int,
+    motivo: str = None,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Marca parada como não entregue e reverte venda para status 'aberto'.
+    Usada quando entrega não pode ser realizada (cliente ausente, cartão recusado, etc).
+    """
+    user, tenant_id = user_and_tenant
+    
+    # Validar rota
+    rota = db.query(RotaEntrega).filter(
+        RotaEntrega.id == rota_id,
+        RotaEntrega.tenant_id == tenant_id
+    ).first()
+    
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota não encontrada")
+    
+    # Validar parada
+    parada = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.id == parada_id,
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.tenant_id == tenant_id
+    ).first()
+    
+    if not parada:
+        raise HTTPException(status_code=404, detail="Parada não encontrada")
+    
+    # Salvar motivo como observação
+    if motivo:
+        obs_existente = parada.observacoes or ""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        parada.observacoes = f"{obs_existente}\n[{timestamp}] Não entregue: {motivo}".strip()
+    
+    # Reverter venda para status pendente (para aparecer na lista de entregas em aberto)
+    venda = db.query(Venda).filter(Venda.id == parada.venda_id).first()
+    if venda:
+        venda.status_entrega = "pendente"
+    
+    # Remover parada da rota
+    db.delete(parada)
+    db.commit()
+    
+    logger.info(f"Parada {parada_id} marcada como não entregue. Venda {parada.venda_id} voltou para entregas em aberto.")
+    
+    return {
+        "message": "Entrega marcada como não realizada. Venda voltou para entregas em aberto.",
+        "venda_id": parada.venda_id
+    }
+
+
+@router.delete("/{rota_id}")
+def excluir_rota(
+    rota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Exclui uma rota e reverte as vendas para status 'aberto' (voltam para listagem de entregas pendentes).
+    
+    IMPORTANTE:
+    - Apenas rotas com status 'pendente' ou 'em_rota' podem ser excluídas
+    - Rotas 'concluida' ou 'cancelada' não podem ser excluídas
+    - Todas as vendas da rota voltam para status_entrega = 'aberto'
+    """
+    user, tenant_id = user_and_tenant
+    
+    # Buscar rota
+    rota = db.query(RotaEntrega).filter(
+        RotaEntrega.id == rota_id,
+        RotaEntrega.tenant_id == tenant_id
+    ).first()
+    
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota não encontrada")
+    
+    # Validar se pode excluir
+    if rota.status in ["concluida", "cancelada"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Não é possível excluir rota com status '{rota.status}'"
+        )
+    
+    # Buscar todas as paradas da rota
+    paradas = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.tenant_id == tenant_id
+    ).all()
+    
+    # Reverter status das vendas para "aberto"
+    vendas_liberadas = []
+    for parada in paradas:
+        if parada.venda_id:
+            venda = db.query(Venda).filter(Venda.id == parada.venda_id).first()
+            if venda:
+                venda.status_entrega = "aberto"
+                vendas_liberadas.append(venda.id)
+    
+    # Deletar paradas
+    for parada in paradas:
+        db.delete(parada)
+    
+    # Deletar rota
+    db.delete(rota)
+    db.commit()
+    
+    logger.info(f"Rota #{rota_id} excluída. {len(vendas_liberadas)} vendas voltaram para listagem de entregas pendentes.")
+    
+    return {
+        "message": "Rota excluída com sucesso",
+        "vendas_liberadas": vendas_liberadas,
+        "total_vendas": len(vendas_liberadas)
+    }

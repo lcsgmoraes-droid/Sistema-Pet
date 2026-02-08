@@ -67,7 +67,7 @@ def montar_mensagem_entrega(
     numero_pedido: str,
     produtos: list[str],
     forma_pagamento: str,
-    minutos: int,
+    minutos: int = None,
 ) -> str:
     """
     Monta mensagem padrão de entrega - VERSÃO PROFISSIONAL.
@@ -75,7 +75,7 @@ def montar_mensagem_entrega(
     Melhorias:
     - Menos emoji (reduz bloqueio WhatsApp)
     - Linguagem objetiva
-    - Tempo normalizado (aprox.)
+    - Tempo normalizado (aprox.) - APENAS se rota foi otimizada
     - Lista limitada anti-spam
     - Pedido educado no final
     
@@ -84,31 +84,36 @@ def montar_mensagem_entrega(
         numero_pedido: Número do pedido (ex: "123")
         produtos: Lista de produtos (ex: ["Ração Premium 15kg", "Shampoo Pet 500ml"])
         forma_pagamento: Forma de pagamento (ex: "Dinheiro", "Cartão de Crédito")
-        minutos: Tempo estimado em minutos
+        minutos: Tempo estimado em minutos (opcional - None se rota não foi otimizada)
         
     Returns:
         Mensagem formatada pronta para envio
     """
-    # Normalizar tempo
-    minutos_norm = normalizar_tempo(minutos)
-    
     # Normalizar forma de pagamento
     pagamento_norm = normalizar_forma_pagamento(forma_pagamento)
     
     # Formatar produtos (máx 5 linhas)
     lista_produtos = formatar_lista_produtos(produtos, max_linhas=5)
     
-    return f"""🛵 Olá, {cliente_nome}!
+    # Mensagem base
+    mensagem = f"""🛵 Olá, {cliente_nome}!
 
-Seu pedido #{numero_pedido} já saiu para entrega.
+Seu pedido #{numero_pedido} já está a caminho!
 
 📦 Itens:
 {lista_produtos}
 
 💳 Pagamento:
-{pagamento_norm}
+{pagamento_norm}"""
+    
+    # Adicionar tempo estimado APENAS se rota foi otimizada
+    if minutos and minutos > 0:
+        minutos_norm = normalizar_tempo(minutos)
+        mensagem += f"""
 
 ⏱️ Previsão de chegada:
-aprox. {minutos_norm} minutos.
-
-Por favor, mantenha alguém disponível para receber.""".strip()
+aprox. {minutos_norm} minutos."""
+    
+    mensagem += "\n\nPor favor, mantenha alguém disponível para receber."
+    
+    return mensagem.strip()

@@ -238,6 +238,13 @@ class Produto(BaseTenantModel):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = Column(DateTime, nullable=True)  # Soft delete - data de exclus�o
     
+    # ========== SISTEMA DE PREDECESSOR/SUCESSOR ==========
+    # Permite vincular produtos que substituem outros, mantendo histórico consolidado
+    # Ex: Ração 350g → Ração 300g (mudança de embalagem)
+    produto_predecessor_id = Column(Integer, ForeignKey('produtos.id'), nullable=True)  # Produto que este substitui
+    data_descontinuacao = Column(DateTime, nullable=True)  # Quando foi substituído por outro
+    motivo_descontinuacao = Column(String(255), nullable=True)  # Ex: Mudança de embalagem, Reformulação
+    
     # Relationships
     categoria = relationship("Categoria", back_populates="produtos")
     marca = relationship("Marca", back_populates="produtos")
@@ -251,9 +258,15 @@ class Produto(BaseTenantModel):
     bling_sync = relationship("ProdutoBlingSync", back_populates="produto", uselist=False)
     user = relationship("User")
     
+    # ========== PREDECESSOR/SUCESSOR ==========
+    # Relacionamento para cadeia de evolução de produtos
+    predecessor = relationship("Produto", remote_side=[id], foreign_keys=[produto_predecessor_id], backref="sucessores")
+    # Acesso: produto.predecessor (produto anterior)
+    # Acesso: produto.sucessores (lista de produtos que substituem este)
+    
     # ========== SPRINT 2: VARIA��ES ==========
     # Relacionamento pai/filhos para produtos com varia��o
-    produto_pai = relationship("Produto", remote_side=[id], backref="variacoes")
+    produto_pai = relationship("Produto", remote_side=[id], foreign_keys=[produto_pai_id], backref="variacoes")
     # Acesso via: produto_pai.variacoes (lista de varia��es)
     
     # ? DESABILITADO: ProductVariation n�o existe mais

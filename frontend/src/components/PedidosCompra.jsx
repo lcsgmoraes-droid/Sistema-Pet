@@ -25,6 +25,17 @@ const PedidosCompra = () => {
     }
   });
 
+  // 💡 Modal de Sugestão Inteligente
+  const [mostrarSugestao, setMostrarSugestao] = useState(false);
+  const [sugestoes, setSugestoes] = useState([]);
+  const [loadingSugestao, setLoadingSugestao] = useState(false);
+  const [periodoSugestao, setPeriodoSugestao] = useState(90);
+  const [diasCobertura, setDiasCobertura] = useState(30);
+  const [apenasCriticos, setApenasCriticos] = useState(false);
+  const [incluirAlerta, setIncluirAlerta] = useState(true);
+  const [produtosSelecionados, setProdutosSelecionados] = useState([]);
+  const [quantidadesEditadas, setQuantidadesEditadas] = useState({});
+
   const [formData, setFormData] = useState({
     fornecedor_id: '',
     data_prevista_entrega: '',
@@ -50,15 +61,24 @@ const PedidosCompra = () => {
 
   const carregarDados = async () => {
     try {
-      const [pedidosRes, fornecedoresRes, produtosRes] = await Promise.all([
+      const [pedidosRes, fornecedoresRes] = await Promise.all([
         api.get('/pedidos-compra/'),
-        api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true'),
-        api.get('/produtos/')
+        api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true')
       ]);
 
-      setPedidos(Array.isArray(pedidosRes.data) ? pedidosRes.data : []);
-      setFornecedores(Array.isArray(fornecedoresRes.data) ? fornecedoresRes.data : []);
-      setProdutos(Array.isArray(produtosRes.data) ? produtosRes.data : []);
+      // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
+      const pedidosData = Array.isArray(pedidosRes.data) 
+        ? pedidosRes.data 
+        : (pedidosRes.data.items || pedidosRes.data.pedidos || []);
+      
+      // Tratar resposta dos fornecedores
+      const fornecedoresData = Array.isArray(fornecedoresRes.data) 
+        ? fornecedoresRes.data 
+        : (fornecedoresRes.data.items || fornecedoresRes.data.clientes || []);
+
+      setPedidos(pedidosData);
+      setFornecedores(fornecedoresData);
+      // NÃO carregar produtos aqui - apenas quando fornecedor for selecionado
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
@@ -74,7 +94,24 @@ const PedidosCompra = () => {
       const response = await api.get(
         `/produtos/?fornecedor_id=${fornecedorId}`
       );
-      setProdutos(Array.isArray(response.data) ? response.data : []);
+      
+      // API pode retornar array direto ou objeto paginado
+      let produtosData;
+      if (Array.isArray(response.data)) {
+        produtosData = response.data;
+      } else if (response.data.items) {
+        produtosData = response.data.items;
+      } else if (response.data.produtos) {
+        produtosData = response.data.produtos;
+      } else {
+        produtosData = [];
+      }
+      
+      if (produtosData.length === 0) {
+        toast.warning('⚠️ Este fornecedor não possui produtos vinculados. Edite os produtos para vincular ao fornecedor.');
+      }
+      
+      setProdutos(produtosData);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos do fornecedor');
@@ -171,6 +208,8 @@ const PedidosCompra = () => {
       ]
     });
 
+    // Limpar apenas os campos do item, mantendo o texto do produto limpo
+    setProdutoTexto('');
     setItemForm({
       produto_id: '',
       quantidade_pedida: '',
@@ -191,6 +230,110 @@ const PedidosCompra = () => {
     const desconto = parseFloat(formData.valor_desconto || 0);
     return subtotal + frete - desconto;
   };
+
+  // 💡 FUNÇÕES DE SUGESTÃO INTELIGENTE
+  const buscarSugestoes = async () => {
+    if (!formData.fornecedor_id) {
+      toast.error('Selecione um fornecedor primeiro');
+      return;
+    }
+
+    setLoadingSugestao(true);
+    try {
+      const response = await api.get(
+        `/pedidos-compra/sugestao/${formData.fornecedor_id}`,
+        {
+          params: {
+            periodo_dias: periodoSugestao,
+            dias_cobertura: diasCobertura,
+            apenas_criticos: apenasCriticos,
+            incluir_alerta: incluirAlerta
+          }
+        }
+      );
+
+      setSugestoes(response.data.sugestoes || []);
+      setProdutosSelecionados([]);
+      setQuantidadesEditadas({});
+
+      if (response.data.sugestoes.length === 0) {
+        toast.info('Nenhuma sugestão encontrada com os filtros aplicados');
+      } else {
+        toast.success(`${response.data.sugestoes.length} produtos analisados`);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error);
+      toast.error('Erro ao gerar sugestões');
+    } finally {
+      setLoadingSugestao(false);
+    }
+  };
+
+  const toggleSelecionarProduto = (produtoId) => {
+    setProdutosSelecionados(prev => 
+      prev.includes(produtoId)
+        ? prev.filter(id => id !== produtoId)
+        : [...prev, produtoId]
+    );
+  };
+
+  const atualizarQuantidadeSugerida = (produtoId, novaQuantidade) => {
+    setQuantidadesEditadas(prev => ({
+      ...prev,
+      [produtoId]: parseFloat(novaQuantidade) || 0
+    }));
+  };
+
+  const obterQuantidadeFinal = (sugestao) => {
+    return quantidadesEditadas[sugestao.produto_id] !== undefined 
+      ? quantidadesEditadas[sugestao.produto_id] 
+      : sugestao.quantidade_sugerida;
+  };
+
+  const fecharModalSugestao = () => {
+    setMostrarSugestao(false);
+    setProdutosSelecionados([]);
+    setQuantidadesEditadas({});
+  };
+
+  const selecionarTodosCriticos = () => {
+    const criticos = sugestoes
+      .filter(s => s.prioridade === 'CRÍTICO' && s.quantidade_sugerida > 0)
+      .map(s => s.produto_id);
+    setProdutosSelecionados(criticos);
+  };
+
+  const adicionarSugestoesAoPedido = () => {
+    if (produtosSelecionados.length === 0) {
+      toast.error('Selecione pelo menos um produto');
+      return;
+    }
+
+    const produtosParaAdicionar = sugestoes.filter(s => 
+      produtosSelecionados.includes(s.produto_id)
+    );
+
+    const novosItens = produtosParaAdicionar.map(sugestao => {
+      const quantidade = obterQuantidadeFinal(sugestao);
+      return {
+        produto_id: sugestao.produto_id,
+        produto_nome: sugestao.produto_nome,
+        quantidade_pedida: Math.ceil(quantidade),
+        preco_unitario: sugestao.preco_unitario,
+        desconto_item: 0,
+        total: Math.ceil(quantidade) * sugestao.preco_unitario
+      };
+    });
+
+    setFormData({
+      ...formData,
+      itens: [...formData.itens, ...novosItens]
+    });
+
+    toast.success(`${novosItens.length} produtos adicionados ao pedido`);
+    fecharModalSugestao();
+  };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -565,6 +708,18 @@ const PedidosCompra = () => {
                   ))}
                 </datalist>
                 <p className="text-xs text-gray-500 mt-1">Digite ou selecione um fornecedor para carregar seus produtos</p>
+                {formData.fornecedor_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarSugestao(true);
+                      buscarSugestoes();
+                    }}
+                    className="mt-2 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    💡 Sugestão Inteligente de Pedido
+                  </button>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -605,7 +760,7 @@ const PedidosCompra = () => {
                 <datalist id="produtos-list">
                   {produtos.map(p => (
                     <option key={p.id} value={p.nome}>
-                      {`${p.codigo || p.sku || ''} ${p.codigo_barras ? `(${p.codigo_barras})` : ''}`}
+                      {`SKU: ${p.sku || p.codigo || 'N/A'} | Barras: ${p.codigo_barras || 'N/A'} | Estoque: ${p.estoque_atual || 0}`}
                     </option>
                   ))}
                 </datalist>
@@ -852,6 +1007,285 @@ const PedidosCompra = () => {
           dadosEnvio={dadosEnvio}
           setDadosEnvio={setDadosEnvio}
         />
+      )}
+
+      {/* 💡 MODAL DE SUGESTÃO INTELIGENTE */}
+      {mostrarSugestao && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">💡 Sugestão Inteligente de Pedido</h2>
+                  <p className="text-purple-100">Análise baseada em vendas e estoque atual</p>
+                </div>
+                <button
+                  onClick={fecharModalSugestao}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2"
+                >
+                  ✖️
+                </button>
+              </div>
+
+              {/* Filtros */}
+              <div className="mt-4 grid grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-sm text-purple-100 mb-1">Período de Análise</label>
+                  <select
+                    value={periodoSugestao}
+                    onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
+                  >
+                    <option value={30}>Últimos 30 dias</option>
+                    <option value={60}>Últimos 60 dias</option>
+                    <option value={90}>Últimos 90 dias</option>
+                    <option value={180}>Últimos 180 dias</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-purple-100 mb-1">Cobertura de Estoque</label>
+                  <select
+                    value={diasCobertura}
+                    onChange={(e) => setDiasCobertura(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
+                  >
+                    <option value={15}>15 dias</option>
+                    <option value={30}>30 dias</option>
+                    <option value={45}>45 dias</option>
+                    <option value={60}>60 dias</option>
+                    <option value={90}>90 dias</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-white cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={apenasCriticos}
+                      onChange={(e) => setApenasCriticos(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>Apenas Críticos</span>
+                  </label>
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 text-white cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={incluirAlerta}
+                      onChange={(e) => setIncluirAlerta(e.target.checked)}
+                      className="w-4 h-4 rounded"
+                    />
+                    <span>Incluir Alertas</span>
+                  </label>
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    onClick={buscarSugestoes}
+                    disabled={loadingSugestao}
+                    className="w-full bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-purple-50 disabled:opacity-50"
+                  >
+                    {loadingSugestao ? '🔄 Analisando...' : '🔍 Atualizar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela de Sugestões */}
+            <div className="flex-1 overflow-auto p-6">
+              {loadingSugestao ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Analisando produtos e calculando sugestões...</p>
+                  </div>
+                </div>
+              ) : sugestoes.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">Nenhuma sugestão encontrada com os filtros aplicados</p>
+                  <p className="text-gray-400 text-sm mt-2">Tente ajustar os filtros acima</p>
+                </div>
+              ) : (
+                <>
+                  {/* Ações Rápidas */}
+                  <div className="mb-4 flex gap-3">
+                    <button
+                      onClick={selecionarTodosCriticos}
+                      className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
+                    >
+                      🔴 Selecionar Todos Críticos
+                    </button>
+                    <div className="flex-1"></div>
+                    <span className="text-gray-600">
+                      {produtosSelecionados.length} de {sugestoes.length} produtos selecionados
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                            <input
+                              type="checkbox"
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setProdutosSelecionados(sugestoes.map(s => s.produto_id));
+                                } else {
+                                  setProdutosSelecionados([]);
+                                }
+                              }}
+                              checked={produtosSelecionados.length === sugestoes.length}
+                              className="w-4 h-4 rounded"
+                            />
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Prioridade</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Produto</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Estoque</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Consumo/dia</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Dias Restantes</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Qtd Sugerida</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Preço Unit.</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tendência</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {sugestoes.map((sugestao) => (
+                          <tr
+                            key={sugestao.produto_id}
+                            className={`hover:bg-gray-50 ${
+                              produtosSelecionados.includes(sugestao.produto_id) ? 'bg-purple-50' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={produtosSelecionados.includes(sugestao.produto_id)}
+                                onChange={() => toggleSelecionarProduto(sugestao.produto_id)}
+                                className="w-4 h-4 rounded"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                sugestao.prioridade === 'CRÍTICO' ? 'bg-red-100 text-red-700' :
+                                sugestao.prioridade === 'ALERTA' ? 'bg-yellow-100 text-yellow-700' :
+                                sugestao.prioridade === 'ATENÇÃO' ? 'bg-orange-100 text-orange-700' :
+                                'bg-green-100 text-green-700'
+                              }`}>
+                                {sugestao.prioridade}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div>
+                                <div className="font-medium text-gray-900">{sugestao.produto_nome}</div>
+                                <div className="text-xs text-gray-500">
+                                  SKU: {sugestao.produto_sku || 'N/A'} | 
+                                  Barras: {sugestao.produto_codigo_barras || 'N/A'}
+                                </div>
+                                {sugestao.observacao && (
+                                  <div className="text-xs text-gray-600 mt-1 italic">{sugestao.observacao}</div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="font-medium">{sugestao.estoque_atual}</div>
+                              <div className="text-xs text-gray-500">Mín: {sugestao.estoque_minimo}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium">
+                              {sugestao.consumo_diario.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={`font-semibold ${
+                                sugestao.dias_estoque && sugestao.dias_estoque < 7 ? 'text-red-600' :
+                                sugestao.dias_estoque && sugestao.dias_estoque < 14 ? 'text-yellow-600' :
+                                'text-green-600'
+                              }`}>
+                                {sugestao.dias_estoque ? `${sugestao.dias_estoque} dias` : '∞'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={Math.ceil(obterQuantidadeFinal(sugestao))}
+                                onChange={(e) => atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)}
+                                className="w-20 px-2 py-1 text-right font-bold text-purple-600 border rounded focus:ring-2 focus:ring-purple-300"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              R$ {sugestao.preco_unitario.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3 text-right font-semibold">
+                              R$ {(obterQuantidadeFinal(sugestao) * sugestao.preco_unitario).toFixed(2)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`text-xs ${
+                                sugestao.tendencia === 'CRESCIMENTO' ? 'text-green-600' :
+                                sugestao.tendencia === 'QUEDA' ? 'text-red-600' :
+                                'text-gray-600'
+                              }`}>
+                                {sugestao.tendencia === 'CRESCIMENTO' ? '📈' :
+                                 sugestao.tendencia === 'QUEDA' ? '📉' :
+                                 sugestao.tendencia === 'ESTÁVEL' ? '➡️' : '—'}
+                                {sugestao.tendencia}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer com Ações */}
+            {!loadingSugestao && sugestoes.length > 0 && (
+              <div className="border-t p-6 bg-gray-50">
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-600">
+                    <div className="font-semibold mb-1">Resumo da Sugestão:</div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        🔴 <strong>{sugestoes.filter(s => s.prioridade === 'CRÍTICO').length}</strong> críticos
+                      </div>
+                      <div>
+                        ⚠️ <strong>{sugestoes.filter(s => s.prioridade === 'ALERTA').length}</strong> em alerta
+                      </div>
+                      <div>
+                        💰 Total: <strong>R$ {sugestoes
+                          .filter(s => produtosSelecionados.includes(s.produto_id))
+                          .reduce((sum, s) => sum + (obterQuantidadeFinal(s) * s.preco_unitario), 0)
+                          .toFixed(2)}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={fecharModalSugestao}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-100"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={adicionarSugestoesAoPedido}
+                      disabled={produtosSelecionados.length === 0}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ✅ Adicionar {produtosSelecionados.length} Produtos ao Pedido
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

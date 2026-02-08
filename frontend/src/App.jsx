@@ -23,7 +23,6 @@ import ProdutosNovo from './pages/ProdutosNovo';
 import ProdutosRelatorio from './pages/ProdutosRelatorio';
 import Lembretes from './pages/Lembretes';
 import CalculadoraRacao from './pages/CalculadoraRacao';
-import CalculadoraRacaoNova from './pages/CalculadoraRacaoNova';
 
 // Componentes de Pets
 import GerenciamentoPets from './pages/GerenciamentoPets';
@@ -73,6 +72,7 @@ import RelatoriosComissoes from './pages/comissoes/RelatoriosComissoes';
 import Subcategorias from './pages/Subcategorias';
 import Categorias from './pages/Cadastros/Categorias';
 import CategoriasFinanceiras from './pages/CategoriasFinanceiras';
+import EspeciesRacas from './pages/EspeciesRacas';
 import ClienteFinanceiro from './pages/ClienteFinanceiro';
 import DashboardGerencial from './pages/DashboardGerencial';
 import UsuariosPage from './pages/UsuariosPage.jsx';
@@ -89,6 +89,7 @@ import Cargos from './pages/Cadastros/Cargos';
 import Funcionarios from './pages/RH/Funcionarios';
 import EntregasAbertas from './pages/entregas/EntregasAbertas';
 import RotasEntrega from './pages/entregas/RotasEntrega';
+import HistoricoEntregas from './pages/entregas/HistoricoEntregas';
 import DashEntregasFinanceiro from './pages/entregas/DashEntregasFinanceiro';
 
 function App() {
@@ -167,8 +168,7 @@ function App() {
             <Route path="produtos/relatorio" element={<ProdutosRelatorio />} />
             <Route path="lembretes" element={<Lembretes />} />
             <Route path="calculadora-racao" element={<CalculadoraRacao />} />
-            <Route path="calculadora-racao-nova" element={<CalculadoraRacaoNova />} />
-            
+
             {/* Rotas de Vendas */}
             <Route path="pdv" element={
               <ProtectedRoute permission="vendas.criar">
@@ -265,6 +265,7 @@ function App() {
             {/* Rotas de Cadastros */}
             <Route path="cadastros/categorias" element={<Categorias />} />
             <Route path="cadastros/categorias-financeiras" element={<CategoriasFinanceiras />} />
+            <Route path="cadastros/especies-racas" element={<EspeciesRacas />} />
             <Route path="subcategorias" element={<Subcategorias />} />
             
             {/* Rotas de Administração */}
@@ -292,6 +293,7 @@ function App() {
             {/* Rotas de Entregas */}
             <Route path="entregas/abertas" element={<EntregasAbertas />} />
             <Route path="entregas/rotas" element={<RotasEntrega />} />
+            <Route path="entregas/historico" element={<HistoricoEntregas />} />
             <Route path="entregas/financeiro" element={<DashEntregasFinanceiro />} />
 
             <Route path="ia/fluxo-caixa" element={

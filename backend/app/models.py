@@ -235,16 +235,35 @@ class Cliente(BaseTenantModel):
     pets = relationship("Pet", back_populates="cliente", cascade="all, delete-orphan")
 
 
+class Especie(BaseTenantModel):
+    """Espécies de animais (Cão, Gato, Ave, etc.)"""
+    __tablename__ = "especies"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False, index=True)  # Cão, Gato, Ave, Réptil, etc
+    ativo = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relacionamentos
+    racas = relationship("Raca", back_populates="especie_obj", cascade="all, delete-orphan")
+
+
 class Raca(BaseTenantModel):
     """Raças de animais"""
     __tablename__ = "racas"
     
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False, index=True)
-    especie = Column(String(50), nullable=False, index=True)  # Cão, Gato, Ave, etc
+    especie_id = Column(Integer, ForeignKey("especies.id"), nullable=False, index=True)
     ativo = Column(Boolean, default=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relacionamentos
+    especie_obj = relationship("Especie", back_populates="racas")
 
 
 class Pet(BaseTenantModel):

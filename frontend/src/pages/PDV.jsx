@@ -781,10 +781,32 @@ export default function PDV() {
       
       // 🚚 Sincronizar entregador selecionado se a venda tem entregador
       if (venda.entregador_id) {
-        const entregador = entregadores.find(e => e.id === venda.entregador_id);
-        if (entregador) {
-          setEntregadorSelecionado(entregador);
+        console.log('🔍 Venda tem entregador_id:', venda.entregador_id);
+        try {
+          // Buscar entregador direto da API (evita race condition com array entregadores)
+          const responseEntregador = await api.get(`/clientes/${venda.entregador_id}`);
+          const entregadorCarregado = responseEntregador.data;
+          
+          if (entregadorCarregado && entregadorCarregado.is_entregador) {
+            console.log('✅ Entregador carregado:', entregadorCarregado.nome);
+            setEntregadorSelecionado(entregadorCarregado);
+            calcularCustoOperacional(entregadorCarregado);
+          } else {
+            console.warn('⚠️ Cliente ID', venda.entregador_id, 'não é um entregador válido');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar entregador:', error);
+          // Se falhar, tentar do array como fallback
+          const entregador = entregadores.find(e => e.id === venda.entregador_id);
+          if (entregador) {
+            console.log('✅ Entregador encontrado no array (fallback):', entregador.nome);
+            setEntregadorSelecionado(entregador);
+            calcularCustoOperacional(entregador);
+          }
         }
+      } else {
+        console.log('ℹ️ Venda sem entregador_id - limpando entregadorSelecionado');
+        setEntregadorSelecionado(null);
       }
       
       // 🆕 Se foi solicitado, abre o modal de pagamento após carregar
