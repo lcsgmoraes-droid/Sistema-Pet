@@ -159,7 +159,8 @@ async def listar_funcionarios(
             "telefone": func.telefone,
             "cpf": func.cpf,
             "cargo": cargo_dict,
-            "ativo": func.ativo
+            "ativo": func.ativo,
+            "data_fechamento_comissao": func.data_fechamento_comissao
         }
         result.append(FuncionarioResponse(**func_dict))
     

@@ -40,7 +40,7 @@ class NativeWebSocketService {
     
     // Use a mesma URL base da API
     // @ts-ignore - Vite env variables
-    const baseUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:8001';
+    const baseUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:8000';
     const wsUrl = baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
     const url = `${wsUrl}/ws/whatsapp/${agentId}?token=${token}`;
     

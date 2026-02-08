@@ -63,7 +63,7 @@ export default function ConfiguracaoFiscalEmpresa() {
         if (resFiscal.data.cnae_descricao) {
           setCnaePrincipalDescricao(resFiscal.data.cnae_descricao);
         }
-        if (resFiscal.data.cnaes_secundarios) {
+        if (resFiscal.data.cnaes_secundarios && Array.isArray(resFiscal.data.cnaes_secundarios)) {
           setCnaesSecundarios(resFiscal.data.cnaes_secundarios);
         }
         
