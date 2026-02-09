@@ -318,7 +318,9 @@ async def resumo_comissoes(
 # ==================== ENDPOINT: COMISSÕES EM ABERTO ====================
 
 @router.get("/abertas", summary="Listar funcionários com comissões pendentes")
-def listar_comissoes_abertas():
+def listar_comissoes_abertas(
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
     """
     SPRINT 6 - PASSO 1/5: COMISSÕES EM ABERTO
     
@@ -340,6 +342,11 @@ def listar_comissoes_abertas():
     Ordenação: total_pendente DESC
     """
     try:
+        # Extrair tenant_id e configurar contexto
+        from app.tenancy.context import set_tenant_context
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
+        
         struct_logger.info(
             "COMMISSION_OPEN_LIST",
             "Consultando funcionários com comissões em aberto"
@@ -552,7 +559,8 @@ def listar_comissoes_funcionario_para_fechamento(
 @router.get("/comissao/{comissao_id}", summary="Detalhe completo de uma comissão (transparência total)")
 async def detalhe_comissao(
     comissao_id: int,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ) -> Dict[str, Any]:
     """
     Retorna TODOS os campos financeiros do snapshot de uma comissão específica.
@@ -572,6 +580,11 @@ async def detalhe_comissao(
     - Status e controle
     """
     
+    # Extrair tenant_id e configurar contexto
+    from app.tenancy.context import set_tenant_context
+    current_user, tenant_id = user_and_tenant
+    set_tenant_context(tenant_id)
+    
     struct_logger.info(
         "COMMISSION_DETAIL_REQUEST",
         "Consulta de detalhes de comissão específica",
@@ -585,6 +598,7 @@ async def detalhe_comissao(
                 ci.id,
                 ci.venda_id,
                 v.numero_venda,
+                v.total as total_venda,
                 ci.data_venda,
                 ci.funcionario_id,
                 ci.produto_id,
@@ -595,11 +609,6 @@ async def detalhe_comissao(
                 ci.valor_custo,
                 ci.valor_base_original,
                 ci.valor_base_comissionada,
-                -- Deduções detalhadas
-                ci.taxa_cartao_item,
-                ci.imposto_item,
-                ci.custo_entrega_item,
-                ci.desconto_item,
                 -- Cálculo da comissão
                 ci.tipo_calculo,
                 ci.valor_base_calculo,
@@ -623,13 +632,20 @@ async def detalhe_comissao(
                 vp.forma_pagamento as forma_pagamento_venda,
                 vp.numero_parcelas,
                 fp.taxa_percentual,
-                fp.taxas_por_parcela
+                fp.taxas_por_parcela,
+                -- Deduções detalhadas (snapshot)
+                ci.taxa_cartao_item,
+                ci.impostos_item,
+                ci.taxa_entregador_item,
+                ci.custo_operacional_item,
+                ci.receita_taxa_entrega_item,
+                ci.percentual_impostos
             FROM comissoes_itens ci
             INNER JOIN vendas v ON v.id = ci.venda_id
             LEFT JOIN venda_pagamentos vp ON vp.venda_id = v.id
             LEFT JOIN formas_pagamento fp ON fp.nome = vp.forma_pagamento
-            WHERE ci.id = :comissao_id
-            AND {tenant_filter}
+            WHERE ci.{tenant_filter}
+            AND ci.id = :comissao_id
             LIMIT 1
         """, {"comissao_id": comissao_id})
         
@@ -640,10 +656,17 @@ async def detalhe_comissao(
         
         # Converter para dict com todos os campos (usar _mapping para acesso por nome)
         r = row._mapping
+        
+        # Calcular as deduções para mostrar a origem da base de cálculo
+        valor_venda = decimal_to_float(r['valor_venda']) or 0.0
+        valor_base_calculo = decimal_to_float(r['valor_base_calculo']) or 0.0
+        total_deducoes = valor_venda - valor_base_calculo
+        
         detalhe = {
             'id': r['id'],
             'venda_id': r['venda_id'],
             'numero_venda': r['numero_venda'],
+            'total_venda': decimal_to_float(r['total_venda']),  # ✅ Valor total da venda (produtos)
             'data_venda': str(r['data_venda']) if r['data_venda'] else None,
             'funcionario_id': r['funcionario_id'],
             'produto_id': r['produto_id'],
@@ -652,20 +675,29 @@ async def detalhe_comissao(
             
             # Valores financeiros (snapshot do momento da venda)
             'valores_financeiros': {
-                'valor_venda': decimal_to_float(r['valor_venda']),
+                'valor_venda': valor_venda,
                 'valor_custo': decimal_to_float(r['valor_custo']),
                 'valor_base_original': decimal_to_float(r['valor_base_original']),
                 'valor_base_comissionada': decimal_to_float(r['valor_base_comissionada'])
             },
             
-            # Deduções detalhadas aplicadas
+            # EXPLICAÇÃO DO CÁLCULO DA BASE
+            'origem_base_calculo': {
+                'valor_inicial': valor_venda,
+                'deducoes_aplicadas': total_deducoes,
+                'valor_final': valor_base_calculo,
+                'explicacao': f'Base de cálculo = Valor de Venda (R$ {valor_venda:.2f}) - Deduções (R$ {total_deducoes:.2f}) = R$ {valor_base_calculo:.2f}'
+            },
+            
+            # DEDUÇÕES DETALHADAS (breakdown completo do cálculo)
             'deducoes': {
-                'taxa_cartao': decimal_to_float(r['taxa_cartao_item']),
-                'imposto': decimal_to_float(r['imposto_item']),
-                'custo_entrega': decimal_to_float(r['custo_entrega_item']),
-                'desconto': decimal_to_float(r['desconto_item']),
-                # Informações extras para exibição detalhada
-                'forma_pagamento': r.get('forma_pagamento_venda'),
+                'taxa_cartao': decimal_to_float(r.get('taxa_cartao_item')) if r.get('taxa_cartao_item') else 0.0,
+                'imposto': decimal_to_float(r.get('impostos_item')) if r.get('impostos_item') else 0.0,
+                'taxa_entregador': decimal_to_float(r.get('taxa_entregador_item')) if r.get('taxa_entregador_item') else 0.0,
+                'custo_operacional': decimal_to_float(r.get('custo_operacional_item')) if r.get('custo_operacional_item') else 0.0,
+                'receita_taxa_entrega': decimal_to_float(r.get('receita_taxa_entrega_item')) if r.get('receita_taxa_entrega_item') else 0.0,
+                'percentual_impostos': decimal_to_float(r.get('percentual_impostos')) if r.get('percentual_impostos') else 0.0,
+                'forma_pagamento': r.get('forma_pagamento'),  # ✅ Usar forma_pagamento da comissao
                 'numero_parcelas': r.get('numero_parcelas'),
                 'taxa_percentual': decimal_to_float(r.get('taxa_percentual')) if r.get('taxa_percentual') else None,
                 'taxas_por_parcela': r.get('taxas_por_parcela')
@@ -674,7 +706,7 @@ async def detalhe_comissao(
             # Cálculo da comissão
             'calculo': {
                 'tipo_calculo': r['tipo_calculo'],
-                'valor_base_calculo': decimal_to_float(r['valor_base_calculo']),
+                'valor_base_calculo': valor_base_calculo,
                 'percentual_comissao': decimal_to_float(r['percentual_comissao']),
                 'percentual_aplicado': decimal_to_float(r['percentual_aplicado']),
                 'valor_comissao': decimal_to_float(r['valor_comissao']),
@@ -717,7 +749,10 @@ async def detalhe_comissao(
 
 
 @router.get("/funcionarios", summary="Listar funcionários com comissões")
-async def listar_funcionarios_comissoes() -> Dict[str, Any]:
+async def listar_funcionarios_comissoes(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+) -> Dict[str, Any]:
     """
     Retorna lista de funcionários que possuem comissões registradas.
     
@@ -740,8 +775,6 @@ async def listar_funcionarios_comissoes() -> Dict[str, Any]:
     )
     
     try:
-        db = SessionLocal()
-        
         # Buscar funcionários que aparecem em comissoes_itens
         # Assumindo que funcionarios estão na tabela 'clientes' (conforme padrão do sistema)
         result = execute_tenant_safe(db, """
@@ -760,16 +793,13 @@ async def listar_funcionarios_comissoes() -> Dict[str, Any]:
         """, {})
         rows = result.fetchall()
         
-        try:
-            # Converter para lista de dicts
-            funcionarios = []
-            for row in rows:
-                funcionarios.append({
-                    'id': row[0],
-                    'nome': row[1]
-                })
-        finally:
-            db.close()
+        # Converter para lista de dicts
+        funcionarios = []
+        for row in rows:
+            funcionarios.append({
+                'id': row[0],
+                'nome': row[1]
+            })
         
         logger.info(f"Retornando {len(funcionarios)} funcionários com comissões")
         

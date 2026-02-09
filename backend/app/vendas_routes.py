@@ -608,60 +608,15 @@ def atualizar_venda(
             logger.info(f"ℹ️ Venda {venda.numero_venda} já possui rota (ID={rota_existente.id}), não criando nova")
     
     # ============================================================================
-    # 🆕 REGENERAR COMISSÕES SE VENDA JÁ ESTAVA FINALIZADA
+    # ❌ REMOVIDO: Não regenerar comissões no endpoint de edição
     # ============================================================================
-    # Se a venda tinha status finalizada/baixa_parcial E tem funcionário, regenerar comissões
-    if venda.status in ['finalizada', 'baixa_parcial'] and venda.funcionario_id:
-        try:
-            from app.comissoes_service import gerar_comissoes_venda
-            from sqlalchemy import text
-            
-            # 1. Excluir comissões antigas dessa venda
-            db.execute(text("DELETE FROM comissoes_itens WHERE venda_id = :venda_id"), 
-                      {'venda_id': venda.id})
-            db.commit()
-            
-            struct_logger.info(
-                event="COMMISSION_REGENERATE",
-                message=f"Regenerando comissões para venda {venda.numero_venda}",
-                venda_id=venda.id,
-                funcionario_id=venda.funcionario_id
-            )
-            
-            # 2. Calcular valor total pago (se houver)
-            total_pago = db.execute(text("""
-                SELECT COALESCE(SUM(valor), 0)
-                FROM venda_pagamentos
-                WHERE venda_id = :venda_id
-            """), {'venda_id': venda.id}).scalar()
-            
-            valor_pago = Decimal(str(total_pago)) if total_pago > 0 else None
-            
-            # 3. Gerar novas comissões
-            gerar_comissoes_venda(
-                venda_id=venda.id,
-                funcionario_id=venda.funcionario_id,
-                valor_pago=valor_pago,
-                parcela_numero=1,
-                db=db
-            )
-            
-            struct_logger.info(
-                event="COMMISSION_REGENERATED",
-                message=f"Comissões regeneradas com sucesso",
-                venda_id=venda.id,
-                valor_pago=float(valor_pago) if valor_pago else None
-            )
-            
-        except Exception as e:
-            struct_logger.error(
-                event="COMMISSION_REGENERATE_ERROR",
-                message=f"Erro ao regenerar comissões: {str(e)}",
-                venda_id=venda.id,
-                error=str(e)
-            )
-            # Não falhar a atualização da venda por erro nas comissões
-            pass
+    # MOTIVO: Quando uma venda tem múltiplos pagamentos (baixa parcial + nova baixa),
+    # deletar e regenerar cria apenas UMA comissão com o total, perdendo o histórico
+    # de comissões por parcela.
+    # 
+    # SOLUÇÃO: Comissões são geradas APENAS no endpoint /finalizar, incrementalmente,
+    # com parcela_numero correto para cada pagamento.
+    # ============================================================================
     
     # ============================================================================
     # 🤖 PROCESSAMENTO PASSIVO DE OPORTUNIDADES (background, não-bloqueante)
@@ -800,44 +755,87 @@ async def finalizar_venda(
     if venda.funcionario_id:
         try:
             from app.comissoes_service import gerar_comissoes_venda
+            from sqlalchemy import text
             
-            # Calcular valor pago agora (para baixa parcial)
-            total_novos_pagamentos = sum(p['valor'] for p in pagamentos_list)
-            valor_pago_agora = Decimal(str(total_novos_pagamentos)) if total_novos_pagamentos > 0 else None
+            # � BUSCAR TODOS OS PAGAMENTOS DA VENDA (não só os novos!)
+            # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
+            todos_pagamentos = db.execute(text("""
+                SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
+                FROM venda_pagamentos vp
+                WHERE vp.venda_id = :venda_id
+                ORDER BY vp.data_pagamento ASC
+            """), {'venda_id': venda.id}).fetchall()
             
-            struct_logger.info(
-                event="COMMISSION_START",
-                message="Iniciando geração de comissões",
-                venda_id=venda.id,
-                funcionario_id=venda.funcionario_id,
-                valor_pago=float(valor_pago_agora) if valor_pago_agora else None
-            )
-            
-            resultado = gerar_comissoes_venda(
-                venda_id=venda.id,
-                funcionario_id=venda.funcionario_id,
-                valor_pago=valor_pago_agora,
-                db=db
-            )
-            
-            if resultado and resultado.get('success'):
-                total_com = resultado.get('total_comissao', 0)
-                if resultado.get('duplicated'):
-                    struct_logger.warning(
-                        event="COMMISSION_DUPLICATED",
-                        message="Comissões já existiam (proteção idempotente ativada)",
-                        venda_id=venda.id,
-                        total_comissao=float(total_com)
-                    )
-                else:
-                    struct_logger.info(
-                        event="COMMISSION_GENERATED",
-                        message="Comissões geradas com sucesso",
-                        venda_id=venda.id,
-                        total_comissao=float(total_com)
-                    )
+            if not todos_pagamentos:
+                logger.info("ℹ️  Nenhum pagamento encontrado na venda")
             else:
-                logger.info("ℹ️  Nenhuma comissão gerada (sem configuração)")
+                # 🔢 Verificar quais pagamentos já têm comissão
+                comissoes_existentes = db.execute(text("""
+                    SELECT DISTINCT parcela_numero
+                    FROM comissoes_itens
+                    WHERE venda_id = :venda_id AND funcionario_id = :funcionario_id
+                """), {'venda_id': venda.id, 'funcionario_id': venda.funcionario_id}).fetchall()
+                
+                parcelas_com_comissao = {row[0] for row in comissoes_existentes}
+                logger.info(f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão")
+                
+                # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
+                comissoes_geradas = 0
+                total_comissoes = Decimal('0')
+                
+                for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
+                    parcela_numero = idx
+                    
+                    # Pular se já tem comissão
+                    if parcela_numero in parcelas_com_comissao:
+                        logger.info(f"⏭️  Parcela {parcela_numero} já tem comissão - pulando")
+                        continue
+                    
+                    valor_pagamento = Decimal(str(pagamento_row[2]))
+                    forma_pagamento = pagamento_row[1]
+                    
+                    struct_logger.info(
+                        event="COMMISSION_START",
+                        message="Gerando comissão para pagamento",
+                        venda_id=venda.id,
+                        funcionario_id=venda.funcionario_id,
+                        valor_pago=float(valor_pagamento),
+                        forma_pagamento=forma_pagamento,
+                        parcela_numero=parcela_numero
+                    )
+                    
+                    resultado = gerar_comissoes_venda(
+                        venda_id=venda.id,
+                        funcionario_id=venda.funcionario_id,
+                        valor_pago=valor_pagamento,
+                        forma_pagamento=forma_pagamento,  # ✅ Passa forma de pagamento correta
+                        parcela_numero=parcela_numero,
+                        db=db
+                    )
+                    
+                    if resultado and resultado.get('success'):
+                        if not resultado.get('duplicated'):
+                            comissoes_geradas += 1
+                            total_comissoes += Decimal(str(resultado.get('total_comissao', 0)))
+                            struct_logger.info(
+                                event="COMMISSION_GENERATED",
+                                message="Comissão gerada para pagamento",
+                                venda_id=venda.id,
+                                parcela_numero=parcela_numero,
+                                valor_comissao=float(resultado.get('total_comissao', 0))
+                            )
+                        else:
+                            struct_logger.warning(
+                                event="COMMISSION_DUPLICATED",
+                                message="Comissão já existia (proteção idempotente)",
+                                venda_id=venda.id,
+                                parcela_numero=parcela_numero
+                            )
+                
+                if comissoes_geradas > 0:
+                    logger.info(f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes}")
+                else:
+                    logger.info("ℹ️  Nenhuma comissão nova gerada (todas já existiam)")
                 
         except Exception as e:
             logger.error(f"⚠️ Erro ao gerar comissões (venda {venda.id}): {str(e)}", exc_info=True)
@@ -1121,6 +1119,61 @@ def reabrir_venda(
     # Guardar status anterior para log
     status_anterior = venda.status
     
+    # ============================================================================
+    # 🧹 CANCELAR/REMOVER COMISSÕES EXISTENTES
+    # ============================================================================
+    comissoes_removidas = 0
+    if venda.funcionario_id:
+        try:
+            from sqlalchemy import text
+            
+            # Contar comissões antes de remover
+            result = db.execute(text("""
+                SELECT COUNT(*) FROM comissoes_itens 
+                WHERE venda_id = :venda_id
+            """), {'venda_id': venda.id})
+            comissoes_removidas = result.scalar() or 0
+            
+            if comissoes_removidas > 0:
+                struct_logger.info(
+                    event="COMMISSION_CANCEL_START",
+                    message=f"Cancelando {comissoes_removidas} comissões por reabertura de venda",
+                    venda_id=venda.id,
+                    funcionario_id=venda.funcionario_id,
+                    count=comissoes_removidas
+                )
+                
+                # Remover comissões
+                db.execute(text("""
+                    DELETE FROM comissoes_itens WHERE venda_id = :venda_id
+                """), {'venda_id': venda.id})
+                
+                # Também remover provisões de comissão em contas_pagar
+                db.execute(text("""
+                    DELETE FROM contas_pagar 
+                    WHERE descricao LIKE :descricao 
+                    AND status = 'pendente'
+                """), {'descricao': f'%Comissão - Venda #{venda.id}%'})
+                
+                struct_logger.info(
+                    event="COMMISSION_CANCELLED",
+                    message=f"Comissões canceladas com sucesso",
+                    venda_id=venda.id,
+                    count=comissoes_removidas
+                )
+            else:
+                logger.info(f"ℹ️  Venda #{venda.id} não tinha comissões para cancelar")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao cancelar comissões da venda {venda.id}: {e}", exc_info=True)
+            struct_logger.error(
+                event="COMMISSION_CANCEL_ERROR",
+                message=f"Erro ao cancelar comissões: {str(e)}",
+                venda_id=venda.id,
+                error=str(e)
+            )
+            # Prosseguir com reabertura mesmo se falhar cancelamento de comissões
+    
     # Mudar status para aberta
     venda.status = 'aberta'
     venda.data_finalizacao = None
@@ -1135,7 +1188,7 @@ def reabrir_venda(
         action='update',
         entity_type='vendas',
         entity_id=venda.id,
-        details=f'Venda #{venda.id} reaberta (status: {status_anterior} → aberta)'
+        details=f'Venda #{venda.id} reaberta (status: {status_anterior} → aberta, comissões canceladas: {comissoes_removidas})'
     )
     
     return venda.to_dict()
@@ -1174,6 +1227,14 @@ def atualizar_status_venda(
         try:
             from app.comissoes_service import gerar_comissoes_venda
             
+            struct_logger.info(
+                event="COMMISSION_START",
+                message=f"Gerando comissões via PATCH /status (status: {status_anterior} → {novo_status})",
+                venda_id=venda.id,
+                funcionario_id=venda.funcionario_id,
+                trigger="status_change"
+            )
+            
             resultado = gerar_comissoes_venda(
                 venda_id=venda.id,
                 funcionario_id=venda.funcionario_id,  # Usar funcionario_id, não vendedor_id
@@ -1183,12 +1244,34 @@ def atualizar_status_venda(
             
             if resultado and resultado.get('success'):
                 total_com = resultado.get('total_comissao', 0)
-                logger.info(f"💰 Comissões geradas: R$ {total_com:.2f}")
+                if resultado.get('duplicated'):
+                    struct_logger.warning(
+                        event="COMMISSION_DUPLICATED",
+                        message="Comissões já existiam (proteção idempotente)",
+                        venda_id=venda.id,
+                        total_comissao=float(total_com),
+                        trigger="status_change"
+                    )
+                else:
+                    struct_logger.info(
+                        event="COMMISSION_GENERATED",
+                        message="Comissões geradas com sucesso",
+                        venda_id=venda.id,
+                        total_comissao=float(total_com),
+                        trigger="status_change"
+                    )
             else:
                 logger.info("ℹ️  Nenhuma comissão gerada (sem configuração)")
                 
         except Exception as e:
-            logger.info(f"⚠️ Erro ao gerar comissões para venda {venda.id}: {str(e)}")
+            logger.error(f"❌ Erro ao gerar comissões para venda {venda.id}: {str(e)}", exc_info=True)
+            struct_logger.error(
+                event="COMMISSION_ERROR",
+                message=f"Erro ao gerar comissões: {str(e)}",
+                venda_id=venda.id,
+                error=str(e),
+                trigger="status_change"
+            )
             # Não abortar a atualização por erro nas comissões
     
     db.commit()
@@ -1348,31 +1431,55 @@ def excluir_venda(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Excluir uma venda e devolver estoque"""
+    from sqlalchemy.exc import IntegrityError
+    from app.rotas_entrega_models import RotaEntrega
+    
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    with transactional_session(db):
-        # Buscar a venda
-        venda = db.query(Venda).filter_by(
-            id=venda_id,
-            tenant_id=tenant_id
-        ).first()
-        
-        if not venda:
-            raise HTTPException(status_code=404, detail='Venda não encontrada')
-        
-        # Verificar se a venda tem NF emitida
-        if venda.status == 'pago_nf':
-            raise HTTPException(
-                status_code=400,
-                detail='Não é possível excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
-            )
-        
-        # Verificar se a venda está finalizada
-        if venda.status == 'finalizada':
-            raise HTTPException(
-                status_code=400, 
-                detail='Não é possível excluir uma venda finalizada. Estorne os pagamentos primeiro.'
-            )
+    try:
+        with transactional_session(db):
+            # Buscar a venda
+            venda = db.query(Venda).filter_by(
+                id=venda_id,
+                tenant_id=tenant_id
+            ).first()
+            
+            if not venda:
+                raise HTTPException(status_code=404, detail='Venda não encontrada')
+            
+            # Verificar se a venda tem NF emitida
+            if venda.status == 'pago_nf':
+                raise HTTPException(
+                    status_code=400,
+                    detail='Não é possível excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+                )
+            
+            # Verificar se a venda está finalizada
+            if venda.status == 'finalizada':
+                raise HTTPException(
+                    status_code=400, 
+                    detail='Não é possível excluir uma venda finalizada. Estorne os pagamentos primeiro.'
+                )
+            
+            # ✅ NOVO: Verificar se a venda está vinculada a uma rota de entrega
+            rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
+            if rota_vinculada:
+                passos_resolucao = [
+                    f"1. Acesse a rota de entrega #{rota_vinculada.id}",
+                    "2. Remova esta venda da rota",
+                    "3. Tente excluir a venda novamente"
+                ]
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        'erro': 'Venda vinculada a uma rota de entrega',
+                        'mensagem': f'Esta venda está associada à Rota #{rota_vinculada.id} (Status: {rota_vinculada.status})',
+                        'solucao': 'Para excluir esta venda, primeiro remova-a da rota de entrega.',
+                        'passos': passos_resolucao,
+                        'rota_id': rota_vinculada.id,
+                        'rota_status': rota_vinculada.status
+                    }
+                )
         
         # Devolver estoque dos produtos
         itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
@@ -1498,10 +1605,66 @@ def excluir_venda(
         db.delete(venda)
         # Commit automático pelo context manager
     
-    return {
-        'message': 'Venda excluída com sucesso',
-        'itens_devolvidos': len(itens)
-    }
+        return {
+            'message': 'Venda excluída com sucesso',
+            'itens_devolvidos': len(itens)
+        }
+    
+    except IntegrityError as e:
+        # ✅ Tratamento amigável para erros de integridade referencial
+        db.rollback()
+        
+        erro_msg = str(e.orig)
+        
+        # Identificar tipo de violação
+        if 'rotas_entrega' in erro_msg:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    'erro': 'Venda vinculada a uma rota de entrega',
+                    'mensagem': 'Esta venda ainda está associada a uma ou mais rotas de entrega.',
+                    'solucao': 'Remova a venda da rota de entrega antes de excluí-la.',
+                    'passos': [
+                        '1. Acesse o menu de Rotas de Entrega',
+                        '2. Encontre a rota que contém esta venda',
+                        '3. Remova a venda da rota',
+                        '4. Tente excluir a venda novamente'
+                    ],
+                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
+                }
+            )
+        elif 'contas_receber' in erro_msg:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    'erro': 'Venda possui contas a receber vinculadas',
+                    'mensagem': 'Esta venda possui contas a receber que precisam ser tratadas.',
+                    'solucao': 'Cancele ou exclua as contas a receber vinculadas antes de excluir a venda.',
+                    'passos': [
+                        '1. Acesse Financeiro > Contas a Receber',
+                        '2. Filtre pela venda',
+                        '3. Cancele ou exclua as contas pendentes',
+                        '4. Tente excluir a venda novamente'
+                    ],
+                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
+                }
+            )
+        else:
+            # Erro genérico de integridade
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    'erro': 'Não é possível excluir esta venda',
+                    'mensagem': 'Esta venda está vinculada a outros registros no sistema.',
+                    'solucao': 'Remova ou cancele os vínculos antes de excluir a venda.',
+                    'passos': [
+                        '1. Verifique se existem rotas de entrega vinculadas',
+                        '2. Verifique contas a receber pendentes',
+                        '3. Entre em contato com o suporte se o problema persistir'
+                    ],
+                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
+                }
+            )
 
 
 @router.post('/{venda_id}/devolucao')

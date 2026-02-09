@@ -200,6 +200,34 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
 
               {/* SEÇÃO 2: Valores Financeiros */}
               <Secao titulo="💰 Valores Financeiros (Snapshot)" cor="green">
+                {/* CONTEXTO DA VENDA E PAGAMENTO */}
+                <div className="mb-4 p-4 bg-blue-50 border border-blue-300 rounded-lg">
+                  <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Contexto do Pagamento
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white p-3 rounded border border-blue-200">
+                      <span className="text-xs text-gray-600 block mb-1">Valor Total da Venda (Produtos)</span>
+                      <span className="text-lg font-bold text-blue-700">{formatarMoeda(comissao.total_venda || 0)}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded border border-green-200">
+                      <span className="text-xs text-gray-600 block mb-1">Valor Pago (Parcela {comissao.parcela_numero})</span>
+                      <span className="text-lg font-bold text-green-600">{formatarMoeda(comissao.pagamento?.valor_pago_referencia || 0)}</span>
+                      {comissao.pagamento?.forma_pagamento && (
+                        <span className="text-xs text-gray-500 block mt-1">via {comissao.pagamento.forma_pagamento}</span>
+                      )}
+                    </div>
+                  </div>
+                  {comissao.pagamento?.percentual_pago < 100 && (
+                    <div className="mt-2 text-xs text-blue-700">
+                      ℹ️ Comissão calculada proporcionalmente ({formatarPercentual(comissao.pagamento.percentual_pago)} do total)
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Campo
                     label="Valor de Venda"
@@ -228,11 +256,23 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                     Como chegamos na Base de Cálculo?
                   </h4>
                   <div className="space-y-2 text-sm font-mono bg-white p-4 rounded border border-blue-200">
-                    {/* Valor inicial */}
-                    <div className="flex justify-between pb-2">
-                      <span className="text-gray-700 font-semibold">Valor de Venda:</span>
-                      <span className="font-bold text-green-600">{formatarMoeda(comissao.valores_financeiros.valor_venda)}</span>
+                    {/* Valor pago como ponto de partida */}
+                    <div className="flex justify-between pb-2 border-b border-gray-200">
+                      <span className="text-gray-700 font-semibold">
+                        Valor Pago (Parcela {comissao.parcela_numero || 1}):
+                      </span>
+                      <span className="font-bold text-blue-600">
+                        {formatarMoeda(comissao.pagamento?.valor_pago_referencia || comissao.valores_financeiros.valor_venda)}
+                      </span>
                     </div>
+                    
+                    {/* RECEITA: Taxa de entrega */}
+                    {comissao.deducoes && comissao.deducoes.receita_taxa_entrega > 0 && (
+                      <div className="flex justify-between text-green-600 pl-4">
+                        <span>(+) Taxa de Entrega (Receita):</span>
+                        <span className="font-medium">+ {formatarMoeda(comissao.deducoes.receita_taxa_entrega)}</span>
+                      </div>
+                    )}
                     
                     {/* Deduções linha por linha */}
                     {comissao.deducoes && (
@@ -281,14 +321,20 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                         )}
                         {comissao.deducoes.imposto > 0 && (
                           <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Impostos:</span>
+                            <span>(-) Impostos ({comissao.deducoes.percentual_impostos ? comissao.deducoes.percentual_impostos.toFixed(1) + '%' : ''}):</span>
                             <span className="font-medium">- {formatarMoeda(comissao.deducoes.imposto)}</span>
                           </div>
                         )}
-                        {comissao.deducoes.custo_entrega > 0 && (
+                        {comissao.deducoes.taxa_entregador > 0 && (
                           <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Custo de Entrega:</span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.custo_entrega)}</span>
+                            <span>(-) Taxa paga ao Entregador:</span>
+                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.taxa_entregador)}</span>
+                          </div>
+                        )}
+                        {comissao.deducoes.custo_operacional > 0 && (
+                          <div className="flex justify-between text-red-600 pl-4">
+                            <span>(-) Custo Operacional de Entrega:</span>
+                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.custo_operacional)}</span>
                           </div>
                         )}
                         {comissao.deducoes.desconto > 0 && (
@@ -453,8 +499,12 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                 </h3>
                 <div className="space-y-3 font-mono text-sm">
                   <div className="flex justify-between items-center border-b border-white/20 pb-2">
-                    <span className="text-blue-100">Valor de Venda:</span>
-                    <span className="font-bold text-lg">{formatarMoeda(comissao.valores_financeiros.valor_venda)}</span>
+                    <span className="text-blue-100">
+                      Valor Pago (Parcela {comissao.parcela_numero || 1}):
+                    </span>
+                    <span className="font-bold text-lg">
+                      {formatarMoeda(comissao.pagamento?.valor_pago_referencia || comissao.valores_financeiros.valor_venda)}
+                    </span>
                   </div>
                   
                   {/* Deduções detalhadas */}
