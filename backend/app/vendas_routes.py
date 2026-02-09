@@ -120,6 +120,8 @@ class CriarVendaRequest(BaseModel):
     observacoes: Optional[str] = None
     tem_entrega: bool = False
     taxa_entrega: Optional[float] = 0
+    percentual_taxa_loja: Optional[float] = 100  # Percentual 0-100
+    percentual_taxa_entregador: Optional[float] = 0  # Percentual 0-100
     entregador_id: Optional[int] = None
     loja_origem: Optional[str] = None
     endereco_entrega: Optional[str] = None
@@ -297,6 +299,13 @@ def buscar_venda(
     if not venda:
         raise HTTPException(status_code=404, detail='Venda não encontrada')
     
+    # 🐛 DEBUG: Log dos valores de entrega
+    logger.info(
+        f"🔍 GET venda/{venda_id}: percentual_loja={venda.percentual_taxa_loja}, "
+        f"percentual_entregador={venda.percentual_taxa_entregador}, "
+        f"valor_loja={venda.valor_taxa_loja}, valor_entregador={venda.valor_taxa_entregador}"
+    )
+    
     return venda.to_dict()
 
 
@@ -363,6 +372,8 @@ async def criar_venda(
         'observacoes': dados.observacoes,
         'tem_entrega': dados.tem_entrega,
         'taxa_entrega': dados.taxa_entrega,
+        'percentual_taxa_loja': dados.percentual_taxa_loja,
+        'percentual_taxa_entregador': dados.percentual_taxa_entregador,
         'entregador_id': dados.entregador_id,
         'loja_origem': dados.loja_origem,
         'endereco_entrega': dados.endereco_entrega,

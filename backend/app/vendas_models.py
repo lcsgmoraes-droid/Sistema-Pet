@@ -38,6 +38,13 @@ class Venda(BaseTenantModel):
     # Entrega
     tem_entrega = Column(Boolean, default=False)
     taxa_entrega = Column(DECIMAL(10, 2), default=0)
+    
+    # 📊 Distribuição da taxa de entrega (quanto vai para quem)
+    percentual_taxa_entregador = Column(DECIMAL(5, 2), default=0)  # % da taxa que vai para o entregador (0-100)
+    percentual_taxa_loja = Column(DECIMAL(5, 2), default=100)  # % da taxa que fica para a loja (0-100)
+    valor_taxa_entregador = Column(DECIMAL(10, 2), default=0)  # Valor calculado para o entregador (gera conta a pagar)
+    valor_taxa_loja = Column(DECIMAL(10, 2), default=0)  # Valor calculado que fica para a loja (receita líquida)
+    
     entregador_id = Column(Integer, ForeignKey('clientes.id'), nullable=True)
     loja_origem = Column(String(100), nullable=True)
     endereco_entrega = Column(Text, nullable=True)
@@ -156,6 +163,10 @@ class Venda(BaseTenantModel):
             'entrega': {
                 'endereco_completo': self.endereco_entrega,
                 'taxa_entrega_total': safe_decimal_to_float(self.taxa_entrega) or 0,
+                'taxa_loja': safe_decimal_to_float(self.valor_taxa_loja) if self.valor_taxa_loja else 0,
+                'taxa_entregador': safe_decimal_to_float(self.valor_taxa_entregador) if self.valor_taxa_entregador else 0,
+                'percentual_taxa_loja': safe_decimal_to_float(self.percentual_taxa_loja) if self.percentual_taxa_loja else 0,
+                'percentual_taxa_entregador': safe_decimal_to_float(self.percentual_taxa_entregador) if self.percentual_taxa_entregador else 0,
                 'distancia_km': safe_decimal_to_float(self.distancia_km),
                 'valor_por_km': safe_decimal_to_float(self.valor_por_km),
                 'loja_origem': self.loja_origem,

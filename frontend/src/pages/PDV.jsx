@@ -1202,6 +1202,13 @@ export default function PDV() {
           console.error('⚠️ ERRO: Checkbox marcado mas funcionário não selecionado!');
         }
         
+        // 🚚 Calcular percentuais de taxa de entrega
+        const taxaTotal = vendaAtual.entrega?.taxa_entrega_total || 0;
+        const taxaLoja = vendaAtual.entrega?.taxa_loja || 0;
+        const taxaEntregador = vendaAtual.entrega?.taxa_entregador || 0;
+        const percentualLoja = taxaTotal > 0 ? ((taxaLoja / taxaTotal) * 100) : 100;
+        const percentualEntregador = taxaTotal > 0 ? ((taxaEntregador / taxaTotal) * 100) : 0;
+
         const payloadVenda = {
           cliente_id: vendaAtual.cliente?.id,
           funcionario_id: vendaAtual.funcionario_id,  // ✅ Usar do vendaAtual (sincronizado via useEffect)
@@ -1221,6 +1228,8 @@ export default function PDV() {
           observacoes: vendaAtual.observacoes,
           tem_entrega: vendaAtual.tem_entrega,
           taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
+          percentual_taxa_loja: percentualLoja,
+          percentual_taxa_entregador: percentualEntregador,
           endereco_entrega: vendaAtual.entrega?.endereco_completo,
           observacoes_entrega: vendaAtual.entrega?.observacoes_entrega,
           distancia_km: vendaAtual.entrega?.distancia_km,
@@ -1235,6 +1244,13 @@ export default function PDV() {
           entregador_id: vendaAtual.entregador_id,
           entregadorSelecionado: entregadorSelecionado?.id,
           vendaAtual_completo: vendaAtual
+        });
+        console.log('💰 Percentuais calculados:', {
+          taxaTotal,
+          taxaLoja,
+          taxaEntregador,
+          percentualLoja: `${percentualLoja.toFixed(2)}%`,
+          percentualEntregador: `${percentualEntregador.toFixed(2)}%`
         });
 
         await criarVenda(payloadVenda);
@@ -1469,12 +1485,13 @@ export default function PDV() {
         observacoes: vendaCompleta.observacoes || '',
         status: vendaCompleta.status,
         tem_entrega: vendaCompleta.tem_entrega || false,
+        entregador_id: vendaCompleta.entregador_id || null,
         entrega: {
           endereco_completo: vendaCompleta.endereco_entrega || '',
           endereco_id: vendaCompleta.endereco_id || null,
           taxa_entrega_total: parseFloat((parseFloat(vendaCompleta.taxa_entrega || 0)).toFixed(2)),
-          taxa_loja: parseFloat((parseFloat(vendaCompleta.taxa_loja || 0)).toFixed(2)),
-          taxa_entregador: parseFloat((parseFloat(vendaCompleta.taxa_entregador || 0)).toFixed(2)),
+          taxa_loja: parseFloat((parseFloat(vendaCompleta.entrega?.taxa_loja || 0)).toFixed(2)),
+          taxa_entregador: parseFloat((parseFloat(vendaCompleta.entrega?.taxa_entregador || 0)).toFixed(2)),
           observacoes_entrega: vendaCompleta.observacoes_entrega || '',
           distancia_km: vendaCompleta.distancia_km || 0,
           valor_por_km: vendaCompleta.valor_por_km || 0,

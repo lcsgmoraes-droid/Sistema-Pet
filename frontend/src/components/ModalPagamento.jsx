@@ -526,6 +526,14 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       let vendaId = venda.id;
       
       if (!vendaId) {
+        // Calcular percentuais baseado nos valores inseridos
+        const taxaTotal = venda.entrega?.taxa_entrega_total || 0;
+        const taxaLoja = venda.entrega?.taxa_loja || 0;
+        const taxaEntregador = venda.entrega?.taxa_entregador || 0;
+        
+        const percentualLoja = taxaTotal > 0 ? ((taxaLoja / taxaTotal) * 100).toFixed(2) : 100;
+        const percentualEntregador = taxaTotal > 0 ? ((taxaEntregador / taxaTotal) * 100).toFixed(2) : 0;
+        
         const vendaCriada = await criarVenda({
           cliente_id: venda.cliente?.id,
           funcionario_id: venda.funcionario_id,  // ✅ Funcionário para comissão
@@ -535,7 +543,10 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
           observacoes: venda.observacoes,
           // Campos de entrega
           tem_entrega: venda.tem_entrega,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
+          taxa_entrega: taxaTotal,
+          percentual_taxa_loja: parseFloat(percentualLoja),
+          percentual_taxa_entregador: parseFloat(percentualEntregador),
+          entregador_id: venda.entregador_id,  // ✅ Entregador (direto em venda, não em venda.entrega)
           endereco_entrega: venda.entrega?.endereco_completo,
           observacoes_entrega: venda.entrega?.observacoes_entrega
         });

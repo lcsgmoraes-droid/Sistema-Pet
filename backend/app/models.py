@@ -51,6 +51,12 @@ class User(BaseTenantModel):
     endereco_loja = Column(Text, nullable=True)
     telefone_loja = Column(String(50), nullable=True)
     
+    # 🚚 Custo operacional de entregador (para contas a pagar)
+    custo_operacional_tipo = Column(String(20), nullable=True)  # 'km_rodado', 'fixo', 'controla_rh'
+    custo_operacional_valor = Column(DECIMAL(10, 2), nullable=True)  # Valor fixo por entrega ou valor por KM
+    custo_operacional_controla_rh_id = Column(String(100), nullable=True)  # ID na API do Controla RH
+    periodicidade_acerto_dias = Column(Integer, nullable=True, default=7)  # Dias para acerto (7=semanal, 15=quinzenal, 30=mensal)
+    
     # Configurações de comissão
     data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento
     

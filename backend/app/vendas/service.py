@@ -213,10 +213,29 @@ class VendaService:
             taxa_entrega = payload.get('taxa_entrega', 0) or 0
             total = subtotal_itens + taxa_entrega
             
+            # 🚚 Calcular distribuição da taxa de entrega
+            percentual_taxa_entregador = payload.get('percentual_taxa_entregador', 0) or 0
+            percentual_taxa_loja = payload.get('percentual_taxa_loja', 100)
+            
+            logger.info(f"📥 PAYLOAD RECEBIDO - percentual_taxa_entregador: {percentual_taxa_entregador}, percentual_taxa_loja: {percentual_taxa_loja}")
+            
+            # Se não foi informado percentual mas tem taxa, assumir 100% para loja (compatibilidade)
+            if taxa_entrega > 0 and percentual_taxa_entregador == 0 and percentual_taxa_loja == 0:
+                percentual_taxa_loja = 100
+            
+            # Calcular valores baseados nos percentuais
+            valor_taxa_entregador = (taxa_entrega * percentual_taxa_entregador / 100) if taxa_entrega > 0 else 0
+            valor_taxa_loja = (taxa_entrega * percentual_taxa_loja / 100) if taxa_entrega > 0 else 0
+            
             logger.info(
                 f"💰 Totais: Subtotal=R$ {subtotal_itens:.2f}, "
                 f"Frete=R$ {taxa_entrega:.2f}, Total=R$ {total:.2f}"
             )
+            if taxa_entrega > 0:
+                logger.info(
+                    f"🚚 Taxa entrega: Loja {percentual_taxa_loja}% (R$ {valor_taxa_loja:.2f}), "
+                    f"Entregador {percentual_taxa_entregador}% (R$ {valor_taxa_entregador:.2f})"
+                )
             
             # ============================================================
             # ETAPA 4: CRIAR VENDA
@@ -234,6 +253,10 @@ class VendaService:
                 observacoes=payload.get('observacoes'),
                 tem_entrega=payload.get('tem_entrega', False),
                 taxa_entrega=float(taxa_entrega),
+                percentual_taxa_entregador=float(percentual_taxa_entregador),
+                percentual_taxa_loja=float(percentual_taxa_loja),
+                valor_taxa_entregador=float(valor_taxa_entregador),
+                valor_taxa_loja=float(valor_taxa_loja),
                 entregador_id=payload.get('entregador_id'),
                 loja_origem=payload.get('loja_origem'),
                 endereco_entrega=payload.get('endereco_entrega'),
@@ -1654,7 +1677,7 @@ class VendaService:
                             tipo_produto=resultado.get('tipo_produto', 'SIMPLES'),
                             quantidade=float(resultado.get('quantidade')),
                             preco_unitario=float(item_venda.preco_unitario or 0),
-                            preco_total=float(item_venda.preco_total or 0),
+                            preco_total=float(item_venda.subtotal or 0),
                             estoque_anterior=float(resultado.get('estoque_anterior')),
                             estoque_novo=float(resultado.get('estoque_novo')),
                             user_id=user_id
@@ -1718,6 +1741,26 @@ class VendaService:
                 )
             except Exception as e:
                 logger.error(f"⚠️ Erro ao criar contas a receber: {str(e)}", exc_info=True)
+                db.rollback()  # Rollback apenas das contas (venda já commitada)
+            
+            # 🚚 Criar contas a pagar de entrega (taxa entregador + custo operacional)
+            contas_pagar_entrega_ids = []
+            try:
+                resultado_entrega = processar_contas_pagar_entrega(
+                    venda=venda,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    db=db
+                )
+                if resultado_entrega['success']:
+                    contas_pagar_entrega_ids = resultado_entrega['contas_criadas']
+                    db.commit()  # Commit separado para contas a pagar
+                    logger.info(
+                        f"🚚 Contas a pagar de entrega criadas: {resultado_entrega['total_contas']} conta(s), "
+                        f"R$ {resultado_entrega['valor_total']:.2f}"
+                    )
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao criar contas a pagar de entrega: {str(e)}", exc_info=True)
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
             
             # Preparar retorno
@@ -1879,6 +1922,152 @@ def processar_lembretes_venda(
         
     except Exception as e:
         logger.error(f"⚠️ Erro ao processar lembretes (venda {venda_id}): {str(e)}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+def processar_contas_pagar_entrega(
+    venda: 'Venda',
+    user_id: int,
+    tenant_id: str,
+    db: Session
+) -> Dict[str, Any]:
+    """
+    Cria contas a pagar relacionadas à entrega (operação pós-commit).
+    
+    Cria 2 tipos de contas a pagar:
+    1. Taxa do entregador (parte da taxa de entrega que vai para ele)
+    2. Custo operacional (fixo ou controla_rh - KM rodado é criado ao fechar rota)
+    
+    Args:
+        venda: Objeto Venda (já commitada)
+        user_id: ID do usuário
+        tenant_id: UUID do tenant
+        db: Sessão do SQLAlchemy
+        
+    Returns:
+        Dict com resultado:
+        {
+            'success': bool,
+            'total_contas': int,
+            'valor_total': float,
+            'contas_criadas': List[int],
+            'detalhes': List[str]
+        }
+    """
+    from app.financeiro_models import ContaPagar
+    from app.models import User
+    from decimal import Decimal
+    from datetime import date, timedelta
+    
+    if not venda.tem_entrega or not venda.entregador_id:
+        return {
+            'success': True,
+            'total_contas': 0,
+            'valor_total': 0.0,
+            'contas_criadas': [],
+            'detalhes': ['Venda sem entrega ou sem entregador']
+        }
+    
+    contas_criadas_ids = []
+    valor_total = Decimal('0')
+    detalhes = []
+    
+    try:
+        # Buscar entregador
+        entregador = db.query(User).filter_by(id=venda.entregador_id, tenant_id=tenant_id).first()
+        if not entregador:
+            logger.warning(f"⚠️ Entregador ID {venda.entregador_id} não encontrado")
+            return {
+                'success': False,
+                'message': f'Entregador ID {venda.entregador_id} não encontrado'
+            }
+        
+        # Calcula a próxima segunda-feira de pagamento
+        # Lógica: Vendas de domingo a sábado são pagas na segunda-feira seguinte
+        # Ex: Venda em 08/02 (domingo) → Fecha 14/02 (sábado) → Paga 16/02 (segunda)
+        data_venda = date.today()
+        dia_semana = data_venda.weekday()  # 0=Segunda, 6=Domingo
+        
+        # Calcular dias até o próximo sábado (fim da semana)
+        if dia_semana == 6:  # Domingo
+            dias_ate_sabado = 6
+        elif dia_semana == 5:  # Sábado
+            dias_ate_sabado = 0
+        else:  # Segunda a Sexta
+            dias_ate_sabado = 5 - dia_semana
+        
+        proximo_sabado = data_venda + timedelta(days=dias_ate_sabado)
+        data_vencimento = proximo_sabado + timedelta(days=2)  # Segunda-feira = sábado + 2
+        
+        # 1️⃣ CONTA A PAGAR: Taxa do entregador
+        if venda.valor_taxa_entregador and float(venda.valor_taxa_entregador) > 0:
+            conta_taxa = ContaPagar(
+                descricao=f"Taxa de entrega - {entregador.nome} - Venda {venda.numero_venda}",
+                fornecedor_id=venda.entregador_id,
+                valor_original=venda.valor_taxa_entregador,
+                valor_final=venda.valor_taxa_entregador,
+                data_emissao=date.today(),
+                data_vencimento=data_vencimento,
+                status='pendente',
+                user_id=user_id,
+                tenant_id=tenant_id,
+                dre_subcategoria_id=None,  # TODO: Definir subcategoria DRE para despesas com entrega
+                observacoes=f"Taxa de entrega ref. venda {venda.numero_venda} - {venda.percentual_taxa_entregador}% da taxa de R$ {venda.taxa_entrega} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})"
+            )
+            db.add(conta_taxa)
+            db.flush()
+            contas_criadas_ids.append(conta_taxa.id)
+            valor_total += venda.valor_taxa_entregador
+            detalhes.append(f"Taxa entregador: R$ {venda.valor_taxa_entregador:.2f}")
+            logger.info(f"✅ Conta a pagar criada: Taxa entregador R$ {venda.valor_taxa_entregador:.2f}")
+        
+        # 2️⃣ CONTA A PAGAR: Custo operacional (apenas fixo ou controla_rh)
+        if entregador.custo_operacional_tipo in ['fixo', 'controla_rh']:
+            if entregador.custo_operacional_valor and float(entregador.custo_operacional_valor) > 0:
+                tipo_descricao = 'Custo fixo' if entregador.custo_operacional_tipo == 'fixo' else 'Controla RH'
+                
+                observacoes = f"Custo operacional ({entregador.custo_operacional_tipo}) ref. venda {venda.numero_venda} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})"
+                if entregador.custo_operacional_tipo == 'controla_rh' and entregador.custo_operacional_controla_rh_id:
+                    observacoes += f" - ID Controla RH: {entregador.custo_operacional_controla_rh_id}"
+                
+                conta_custo = ContaPagar(
+                    descricao=f"{tipo_descricao} entrega - {entregador.nome} - Venda {venda.numero_venda}",
+                    fornecedor_id=venda.entregador_id,
+                    valor_original=entregador.custo_operacional_valor,
+                    valor_final=entregador.custo_operacional_valor,
+                    data_emissao=date.today(),
+                    data_vencimento=data_vencimento,
+                    status='pendente',
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    dre_subcategoria_id=None,  # TODO: Definir subcategoria DRE para custos operacionais de entrega
+                    observacoes=observacoes
+                )
+                
+                db.add(conta_custo)
+                db.flush()
+                contas_criadas_ids.append(conta_custo.id)
+                valor_total += entregador.custo_operacional_valor
+                detalhes.append(f"{tipo_descricao}: R$ {entregador.custo_operacional_valor:.2f}")
+                logger.info(f"✅ Conta a pagar criada: {tipo_descricao} R$ {entregador.custo_operacional_valor:.2f}")
+        
+        # Nota: KM rodado será criado ao fechar a rota, não aqui
+        if entregador.custo_operacional_tipo == 'km_rodado':
+            detalhes.append(f"Custo por KM (R$ {entregador.custo_operacional_valor:.2f}/km) - será criado ao fechar rota")
+        
+        return {
+            'success': True,
+            'total_contas': len(contas_criadas_ids),
+            'valor_total': float(valor_total),
+            'contas_criadas': contas_criadas_ids,
+            'detalhes': detalhes
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar contas a pagar de entrega (venda {venda.id}): {str(e)}", exc_info=True)
         return {
             'success': False,
             'error': str(e)

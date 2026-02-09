@@ -294,6 +294,9 @@ class Recebimento(BaseTenantModel):
     __tablename__ = "recebimentos"
     __table_args__ = {'extend_existing': True}
     
+    # Override BaseTenantModel's updated_at since this table doesn't have it
+    updated_at = None
+    
     id = Column(Integer, primary_key=True, index=True)
     conta_receber_id = Column(Integer, ForeignKey('contas_receber.id', ondelete='CASCADE'), nullable=False, index=True)
     forma_pagamento_id = Column(Integer, ForeignKey('formas_pagamento.id'))
@@ -322,7 +325,7 @@ class ContaBancaria(BaseTenantModel):
     __tablename__ = "contas_bancarias"
     __table_args__ = {'extend_existing': True}
     
-    id = Column(Integer, primary_key=True, index=True)
+    # id, tenant_id, created_at, updated_at já vêm de BaseTenantModel
     nome = Column(String(100), nullable=False)
     tipo = Column(String(20), nullable=False, index=True)  # corrente, poupanca, caixa_fisico, carteira_digital
     banco = Column(String(50))
@@ -335,10 +338,8 @@ class ContaBancaria(BaseTenantModel):
     ativa = Column(Boolean, default=True, index=True)
     observacoes = Column(Text)
     
-    # Auditoria
+    # Auditoria - quem criou a conta
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     movimentacoes = relationship("MovimentacaoFinanceira", back_populates="conta_bancaria", cascade="all, delete-orphan")
