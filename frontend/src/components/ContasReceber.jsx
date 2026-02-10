@@ -415,40 +415,67 @@ const ContasReceber = () => {
                     <td className="px-4 py-3 text-sm">
                       {conta.status !== 'recebido' && (
                         <>
-                          {conta.venda_id || conta.descricao?.includes('Venda') ? (
-                            // Se é uma conta de venda, redireciona para o PDV
-                            <button
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs mr-2"
-                              onClick={() => {
-                                console.log('Conta:', conta); // DEBUG
-                                if (conta.venda_id) {
-                                  abrirVendaNoPDV(conta.venda_id);
-                                } else {
-                                  // Tenta extrair ID da descrição se não tem venda_id
-                                  const match = conta.descricao?.match(/Venda\s+(\d+)/);
-                                  if (match) {
-                                    const vendaId = parseInt(match[1]);
-                                    abrirVendaNoPDV(vendaId);
+                          {/* NSU informado - É transação de cartão */}
+                          {conta.nsu && !conta.conciliado ? (
+                            <>
+                              {/* Link para conciliação */}
+                              <button
+                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs mr-2"
+                                onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
+                                title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
+                              >
+                                🔄 Conciliar
+                              </button>
+                              {/* Recebimento manual para cartão */}
+                              <button
+                                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs mr-2"
+                                onClick={() => abrirModalRecebimento(conta)}
+                                title="Receber manual (caso não consiga conciliar)"
+                              >
+                                💳 Manual
+                              </button>
+                            </>
+                          ) : conta.venda_id && !conta.nsu ? (
+                            /* Venda sem NSU - pode receber no PDV OU manual */
+                            <>
+                              <button
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs mr-2"
+                                onClick={() => {
+                                  console.log('Conta:', conta); // DEBUG
+                                  if (conta.venda_id) {
+                                    abrirVendaNoPDV(conta.venda_id);
                                   } else {
                                     abrirModalRecebimento(conta);
                                   }
-                                }
-                              }}
-                              title="Receber no PDV (movimenta caixa)"
-                            >
-                              💵 Receber no PDV
-                            </button>
+                                }}
+                                title="Receber no PDV (movimenta caixa)"
+                              >
+                                💵 PDV
+                              </button>
+                              <button
+                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
+                                onClick={() => abrirModalRecebimento(conta)}
+                                title="Receber manual (sem PDV)"
+                              >
+                                💰 Manual
+                              </button>
+                            </>
                           ) : (
-                            // Se não é venda, usa o modal tradicional
+                            /* Lançamento manual ou outros - recebimento manual */
                             <button
                               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
                               onClick={() => abrirModalRecebimento(conta)}
-                              title="Registrar Recebimento"
+                              title="Registrar recebimento manual"
                             >
-                              💰 Receber
+                              💰 Receber Manual
                             </button>
                           )}
                         </>
+                      )}
+                      {conta.conciliado && (
+                        <span className="text-xs text-green-600 font-semibold mr-2" title={`Conciliado em ${conta.data_conciliacao}`}>
+                          ✓ Conciliado
+                        </span>
                       )}
                       <button
                         className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs"

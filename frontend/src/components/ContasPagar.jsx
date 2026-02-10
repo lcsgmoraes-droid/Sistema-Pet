@@ -31,8 +31,8 @@ const ContasPagar = () => {
   const [dadosPagamento, setDadosPagamento] = useState({
     valor_pago: 0,
     data_pagamento: new Date().toISOString().split('T')[0],
-    forma_pagamento_id: null,
-    conta_bancaria_id: null,
+    forma_pagamento_id: '',
+    conta_bancaria_id: '',
     valor_juros: 0,
     valor_multa: 0,
     valor_desconto: 0,
@@ -93,8 +93,8 @@ const ContasPagar = () => {
     const formaDefault = formasPagamento.find(f => f.id === conta.forma_pagamento_id);
     setDadosPagamento({
       valor_pago: conta.valor_final - conta.valor_pago,
-      forma_pagamento_id: conta.forma_pagamento_id || null,
-      conta_bancaria_id: formaDefault?.conta_bancaria_destino_id || null,
+      forma_pagamento_id: conta.forma_pagamento_id || '',
+      conta_bancaria_id: formaDefault?.conta_bancaria_destino_id || '',
       valor_juros: 0,
       valor_multa: 0,
       valor_desconto: 0,
@@ -137,8 +137,8 @@ const ContasPagar = () => {
     const forma = formasPagamento.find(f => f.id === parseInt(formaId));
     setDadosPagamento({
       ...dadosPagamento,
-      forma_pagamento_id: parseInt(formaId) || null,
-      conta_bancaria_id: forma?.conta_bancaria_destino_id || dadosPagamento.conta_bancaria_id
+      forma_pagamento_id: parseInt(formaId) || '',
+      conta_bancaria_id: forma?.conta_bancaria_destino_id || dadosPagamento.conta_bancaria_id || ''
     });
   };
   const salvarNovaForma = async () => {

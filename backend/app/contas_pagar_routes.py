@@ -693,7 +693,8 @@ async def registrar_pagamento(
         valor_pago=pagamento.valor_pago,
         data_pagamento=pagamento.data_pagamento,
         observacoes=pagamento.observacoes,
-        user_id=current_user.id
+        user_id=current_user.id,
+        tenant_id=tenant_id
     )
     db.add(novo_pagamento)
     
@@ -736,7 +737,8 @@ async def registrar_pagamento(
             origem_tipo='conta_pagar',
             origem_id=conta.id,
             observacoes=pagamento.observacoes,
-            user_id=current_user.id
+            user_id=current_user.id,
+            tenant_id=tenant_id
         )
         db.add(movimentacao)
         

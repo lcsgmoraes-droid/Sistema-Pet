@@ -93,6 +93,14 @@ class ContaReceberResponse(BaseModel):
     venda_id: Optional[int] = None
     numero_venda: Optional[str] = None  # ✅ CAMPO ADICIONADO
     
+    # ============================
+    # CONCILIAÇÃO DE CARTÃO
+    # ============================
+    nsu: Optional[str] = None
+    adquirente: Optional[str] = None
+    conciliado: bool = False
+    data_conciliacao: Optional[date] = None
+    
     model_config = {"from_attributes": True}
 
 
@@ -434,7 +442,12 @@ def listar_contas_receber(
             "documento": conta.documento,
             "venda_id": conta.venda_id,
             "numero_venda": numero_venda,
-            "observacoes": conta.observacoes
+            "observacoes": conta.observacoes,
+            # Conciliação de cartão
+            "nsu": conta.nsu,
+            "adquirente": conta.adquirente,
+            "conciliado": conta.conciliado,
+            "data_conciliacao": conta.data_conciliacao
         })
     
     return resultado
