@@ -408,7 +408,7 @@ class LoteResponse(BaseModel):
     produto_id: int
     nome_lote: str
     data_fabricacao: Optional[datetime] = None
-    data_validade: datetime
+    data_validade: Optional[datetime] = None
     deposito: Optional[str] = None
     quantidade_inicial: float
     quantidade_disponivel: float
@@ -486,7 +486,7 @@ class LoteBase(BaseModel):
     nome_lote: str
     quantidade_inicial: float
     data_fabricacao: Optional[datetime] = None
-    data_validade: datetime
+    data_validade: Optional[datetime] = None
     custo_unitario: Optional[float] = None
 
 

@@ -2040,11 +2040,11 @@ def reverter_entrada_estoque(
                     estoque_anterior = produto.estoque_atual or 0
                     produto.estoque_atual = max(0, estoque_anterior - item.quantidade)
                     
-                    # Registrar movimentação de estorno
+                    # Registrar movimentação de estorno (sem referência ao lote que será deletado)
                     try:
                         movimentacao_estorno = EstoqueMovimentacao(
                             produto_id=produto.id,
-                            lote_id=lote.id,
+                            lote_id=None,  # Não referenciar o lote que será deletado
                             tipo="saida",
                             motivo="ajuste",
                             quantidade=float(item.quantidade or 0),
@@ -2062,6 +2062,18 @@ def reverter_entrada_estoque(
                         db.add(movimentacao_estorno)
                     except Exception as e:
                         logger.warning(f"  ⚠️ Erro ao criar movimentação: {str(e)}")
+                    
+                    # Excluir movimentações de estoque vinculadas ao lote (antes de deletar o lote)
+                    movimentacoes_lote = db.query(EstoqueMovimentacao).filter(
+                        EstoqueMovimentacao.lote_id == lote.id,
+                        EstoqueMovimentacao.tenant_id == tenant_id
+                    ).all()
+                    
+                    for mov in movimentacoes_lote:
+                        db.delete(mov)
+                    
+                    if movimentacoes_lote:
+                        logger.info(f"  🗑️  {len(movimentacoes_lote)} movimentações do lote excluídas")
                     
                     # Excluir lote
                     db.delete(lote)

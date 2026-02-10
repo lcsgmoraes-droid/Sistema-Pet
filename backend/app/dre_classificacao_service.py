@@ -70,6 +70,20 @@ class ClassificadorDRE:
         if not lancamento:
             return []
         
+        # ================================================================
+        # VERIFICAR SE FORNECEDOR/CLIENTE CONTROLA DRE
+        # Fornecedores de produtos para revenda (Buendia, etc) não vão para DRE
+        # ================================================================
+        if tipo == 'pagar' and hasattr(lancamento, 'fornecedor') and lancamento.fornecedor:
+            if not lancamento.fornecedor.controla_dre:
+                # Retorna lista vazia - esse fornecedor não controla DRE
+                return []
+        
+        if tipo == 'receber' and hasattr(lancamento, 'cliente') and lancamento.cliente:
+            if not lancamento.cliente.controla_dre:
+                # Retorna lista vazia - esse cliente não controla DRE
+                return []
+        
         # Buscar regras aplicáveis
         sugestoes = []
         
@@ -81,7 +95,12 @@ class ClassificadorDRE:
             sugestoes.extend(self._aplicar_regras_nota_entrada(lancamento))
         
         # 2. Regras por beneficiário
-        if lancamento.beneficiario:
+        # Verificar se tem fornecedor (ContaPagar) ou cliente (ContaReceber)
+        tem_beneficiario = (
+            (hasattr(lancamento, 'fornecedor') and lancamento.fornecedor) or 
+            (hasattr(lancamento, 'cliente') and lancamento.cliente)
+        )
+        if tem_beneficiario:
             sugestoes.extend(self._aplicar_regras_beneficiario(lancamento))
         
         # 3. Regras por palavra-chave
@@ -148,7 +167,14 @@ class ClassificadorDRE:
     
     def _aplicar_regras_beneficiario(self, lancamento) -> List[Dict]:
         """Aplica regras baseadas no nome do beneficiário"""
-        if not lancamento.beneficiario:
+        # Obter beneficiário do relacionamento correto
+        beneficiario = None
+        if hasattr(lancamento, 'fornecedor') and lancamento.fornecedor:
+            beneficiario = lancamento.fornecedor.nome
+        elif hasattr(lancamento, 'cliente') and lancamento.cliente:
+            beneficiario = lancamento.cliente.nome
+        
+        if not beneficiario:
             return []
         
         regras = self.db.query(RegraClassificacaoDRE).filter(
@@ -158,7 +184,7 @@ class ClassificadorDRE:
         ).all()
         
         sugestoes = []
-        beneficiario_lower = lancamento.beneficiario.lower()
+        beneficiario_lower = beneficiario.lower()
         
         for regra in regras:
             criterios = regra.criterios or {}
@@ -171,7 +197,7 @@ class ClassificadorDRE:
                     'confianca': regra.confianca,
                     'regra_id': regra.id,
                     'regra_nome': regra.nome,
-                    'motivo': f'Beneficiário: {lancamento.beneficiario}',
+                    'motivo': f'Beneficiário: {beneficiario}',
                     'aplicar_automaticamente': not regra.sugerir_apenas
                 })
         
@@ -263,6 +289,13 @@ class ClassificadorDRE:
         sugestoes = []
         descricao_lower = lancamento.descricao.lower()
         
+        # Obter beneficiário do relacionamento correto
+        beneficiario = None
+        if hasattr(lancamento, 'fornecedor') and lancamento.fornecedor:
+            beneficiario = lancamento.fornecedor.nome
+        elif hasattr(lancamento, 'cliente') and lancamento.cliente:
+            beneficiario = lancamento.cliente.nome
+        
         for regra in regras:
             criterios = regra.criterios or {}
             score = 0
@@ -272,9 +305,9 @@ class ClassificadorDRE:
             # Checar beneficiário
             if 'beneficiario' in criterios:
                 total_criterios += 1
-                if lancamento.beneficiario and criterios['beneficiario'].lower() in lancamento.beneficiario.lower():
+                if beneficiario and criterios['beneficiario'].lower() in beneficiario.lower():
                     score += 1
-                    motivos.append(f"Beneficiário: {lancamento.beneficiario}")
+                    motivos.append(f"Beneficiário: {beneficiario}")
             
             # Checar palavras-chave
             if 'palavras' in criterios:
@@ -320,9 +353,15 @@ class ClassificadorDRE:
         )
         
         # Filtrar por beneficiário se existir
-        if lancamento.beneficiario:
+        beneficiario = None
+        if hasattr(lancamento, 'fornecedor') and lancamento.fornecedor:
+            beneficiario = lancamento.fornecedor.nome
+        elif hasattr(lancamento, 'cliente') and lancamento.cliente:
+            beneficiario = lancamento.cliente.nome
+        
+        if beneficiario:
             historicos = historicos.filter(
-                HistoricoClassificacao.beneficiario.ilike(f'%{lancamento.beneficiario}%')
+                HistoricoClassificacao.beneficiario.ilike(f'%{beneficiario}%')
             )
         
         # Agrupar por subcategoria e contar
@@ -477,14 +516,21 @@ class ClassificadorDRE:
         Avalia se deve criar uma regra automática baseada em padrões
         Cria regra se houver 3+ lançamentos similares com mesma classificação
         """
-        if not lancamento.beneficiario:
+        # Obter beneficiário do relacionamento correto
+        beneficiario = None
+        if hasattr(lancamento, 'fornecedor') and lancamento.fornecedor:
+            beneficiario = lancamento.fornecedor.nome
+        elif hasattr(lancamento, 'cliente') and lancamento.cliente:
+            beneficiario = lancamento.cliente.nome
+        
+        if not beneficiario:
             return
         
         # Contar lançamentos similares
         count = self.db.query(HistoricoClassificacao).filter(
             HistoricoClassificacao.tenant_id == self.tenant_id,
             HistoricoClassificacao.tipo_lancamento == tipo,
-            HistoricoClassificacao.beneficiario == lancamento.beneficiario,
+            HistoricoClassificacao.beneficiario == beneficiario,
             HistoricoClassificacao.dre_subcategoria_id == dre_subcategoria_id,
             HistoricoClassificacao.usuario_aceitou.is_(True)
         ).count()
@@ -494,18 +540,18 @@ class ClassificadorDRE:
             regra_existente = self.db.query(RegraClassificacaoDRE).filter(
                 RegraClassificacaoDRE.tenant_id == self.tenant_id,
                 RegraClassificacaoDRE.tipo_regra == TipoRegraClassificacao.BENEFICIARIO,
-                RegraClassificacaoDRE.criterios['beneficiario'].astext == lancamento.beneficiario
+                RegraClassificacaoDRE.criterios['beneficiario'].astext == beneficiario
             ).first()
             
             if not regra_existente:
                 # Criar nova regra
                 nova_regra = RegraClassificacaoDRE(
                     tenant_id=self.tenant_id,
-                    nome=f"Pagamentos para {lancamento.beneficiario}",
+                    nome=f"Pagamentos para {beneficiario}",
                     descricao=f"Regra criada automaticamente após {count} classificações",
                     tipo_regra=TipoRegraClassificacao.BENEFICIARIO,
                     origem=OrigemRegra.APRENDIZADO,
-                    criterios={'beneficiario': lancamento.beneficiario},
+                    criterios={'beneficiario': beneficiario},
                     dre_subcategoria_id=dre_subcategoria_id,
                     prioridade=80,
                     confianca=70 + min(count * 5, 25),  # 70-95%
@@ -545,17 +591,35 @@ class ClassificadorDRE:
         
         # Contas a Pagar
         if tipo is None or tipo == 'pagar':
-            pendentes_pagar = self.db.query(ContaPagar).filter(
+            # FILTRAR: Apenas lançamentos de fornecedores que CONTROLAM DRE
+            # (Exclui fornecedores de produtos para revenda como Buendia)
+            from app.models import Cliente
+            pendentes_pagar = self.db.query(ContaPagar).outerjoin(
+                Cliente,
+                ContaPagar.fornecedor_id == Cliente.id
+            ).filter(
                 ContaPagar.tenant_id == self.tenant_id,
                 ContaPagar.dre_subcategoria_id.is_(None),
-                ContaPagar.status != 'cancelado'
+                ContaPagar.status != 'cancelado',
+                or_(
+                    Cliente.controla_dre.is_(True),  # Fornecedor controla DRE
+                    ContaPagar.fornecedor_id.is_(None)  # Sem fornecedor = controla DRE
+                )
             ).order_by(ContaPagar.data_vencimento.desc()).limit(limit).all()
             
             for cp in pendentes_pagar:
+                # Obter nome do fornecedor se existir
+                beneficiario = None
+                fornecedor_id = None
+                if cp.fornecedor:
+                    beneficiario = cp.fornecedor.nome
+                    fornecedor_id = cp.fornecedor_id
+                
                 resultado['contas_pagar'].append({
                     'id': cp.id,
                     'descricao': cp.descricao,
-                    'beneficiario': cp.beneficiario,
+                    'beneficiario': beneficiario,
+                    'fornecedor_id': fornecedor_id,
                     'valor': float(cp.valor_original),
                     'data_vencimento': cp.data_vencimento.isoformat() if cp.data_vencimento else None,
                     'tipo_documento': getattr(cp, 'tipo_documento', None),
@@ -564,17 +628,34 @@ class ClassificadorDRE:
         
         # Contas a Receber
         if tipo is None or tipo == 'receber':
-            pendentes_receber = self.db.query(ContaReceber).filter(
+            # FILTRAR: Apenas lançamentos de clientes que CONTROLAM DRE
+            from app.models import Cliente
+            pendentes_receber = self.db.query(ContaReceber).outerjoin(
+                Cliente,
+                ContaReceber.cliente_id == Cliente.id
+            ).filter(
                 ContaReceber.tenant_id == self.tenant_id,
                 ContaReceber.dre_subcategoria_id.is_(None),
-                ContaReceber.status != 'cancelado'
+                ContaReceber.status != 'cancelado',
+                or_(
+                    Cliente.controla_dre.is_(True),  # Cliente controla DRE
+                    ContaReceber.cliente_id.is_(None)  # Sem cliente = controla DRE
+                )
             ).order_by(ContaReceber.data_vencimento.desc()).limit(limit).all()
             
             for cr in pendentes_receber:
+                # Obter nome do cliente se existir
+                beneficiario = None
+                cliente_id = None
+                if cr.cliente:
+                    beneficiario = cr.cliente.nome
+                    cliente_id = cr.cliente_id
+                
                 resultado['contas_receber'].append({
                     'id': cr.id,
                     'descricao': cr.descricao,
-                    'beneficiario': cr.beneficiario,
+                    'beneficiario': beneficiario,
+                    'cliente_id': cliente_id,
                     'valor': float(cr.valor_original),
                     'data_vencimento': cr.data_vencimento.isoformat() if cr.data_vencimento else None,
                     'tipo_documento': getattr(cr, 'tipo_documento', None),

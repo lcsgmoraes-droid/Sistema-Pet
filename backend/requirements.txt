@@ -8,6 +8,7 @@ fastapi==0.109.2
 uvicorn[standard]==0.27.1
 pydantic==2.6.1
 pydantic-settings==2.1.0
+email-validator==2.2.0
 
 # Banco de Dados
 sqlalchemy==2.0.25
@@ -27,6 +28,9 @@ slowapi==0.1.9
 httpx==0.26.0
 requests==2.31.0
 
+# IA e Machine Learning
+openai==1.12.0
+
 # Utilitários
 python-dotenv==1.0.1
 python-dateutil==2.8.2
@@ -45,8 +49,9 @@ reportlab==4.0.9
 matplotlib==3.8.2
 plotly==5.18.0
 
-# Logs
+# Logs e Monitoramento
 colorlog==6.8.2
+psutil==5.9.8
 
 # Background Tasks
 celery==5.3.6

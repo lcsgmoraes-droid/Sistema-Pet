@@ -24,7 +24,7 @@ router = APIRouter(prefix="/financeiro", tags=["Financeiro - Conciliação"])
 class ConciliacaoCartaoIn(BaseModel):
     """Schema de entrada para conciliação de cartão"""
     nsu: str = Field(..., min_length=1, max_length=100, description="NSU da transação")
-    valor: Decimal = Field(..., gt=0, decimal_places=2, description="Valor da transação")
+    valor: Decimal = Field(..., gt=0, description="Valor da transação")
     data_recebimento: date = Field(..., description="Data de recebimento do valor")
     adquirente: str = Field(..., min_length=1, max_length=50, description="Nome da adquirente (Stone, Cielo, etc)")
     forma_pagamento_id: int | None = Field(None, description="ID da forma de pagamento (opcional)")

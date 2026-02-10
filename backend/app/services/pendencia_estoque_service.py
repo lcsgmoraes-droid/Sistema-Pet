@@ -10,7 +10,7 @@ import logging
 
 from app.pendencia_estoque_models import PendenciaEstoque
 from app.produtos_models import Produto
-from app.clientes_models import Cliente
+from app.models import Cliente
 
 logger = logging.getLogger(__name__)
 

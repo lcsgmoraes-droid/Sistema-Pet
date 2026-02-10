@@ -408,7 +408,7 @@ class ProdutoLote(BaseTenantModel):
     
     nome_lote = Column(String(50), nullable=False)
     data_fabricacao = Column(DateTime, nullable=True)
-    data_validade = Column(DateTime, nullable=False)
+    data_validade = Column(DateTime, nullable=True)
     deposito = Column(String(50), nullable=True)
     
     # Quantidades

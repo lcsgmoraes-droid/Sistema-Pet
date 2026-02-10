@@ -226,6 +226,10 @@ class Cliente(BaseTenantModel):
     dia_mes_acerto = Column(Integer, nullable=True)  # 1-28 (para mensal)
     data_ultimo_acerto = Column(Date, nullable=True)  # Controle interno
     
+    # 📊 DRE - Controle de classificação (NOVO)
+    # Para fornecedores de produtos (revenda/estoque) que não impactam DRE diretamente
+    controla_dre = Column(Boolean, nullable=False, default=True, server_default='1')  # True = vai para DRE, False = não classifica (produtos p/ revenda)
+    
     # Outros
     observacoes = Column(Text, nullable=True)
     ativo = Column(Boolean, default=True)

@@ -21,7 +21,7 @@ router = APIRouter(prefix="/cargos", tags=["RH - Cargos"])
 class CargoCreate(BaseModel):
     nome: str = Field(..., min_length=1, max_length=100)
     descricao: Optional[str] = None
-    salario_base: Decimal = Field(..., gt=0, decimal_places=2)
+    salario_base: Decimal = Field(..., gt=0)
     inss_patronal_percentual: Optional[Decimal] = Field(default=Decimal("20.00"), ge=0, le=100)
     fgts_percentual: Optional[Decimal] = Field(default=Decimal("8.00"), ge=0, le=100)
     gera_ferias: bool = True
@@ -34,7 +34,7 @@ class CargoCreate(BaseModel):
 class CargoUpdate(BaseModel):
     nome: Optional[str] = Field(None, min_length=1, max_length=100)
     descricao: Optional[str] = None
-    salario_base: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
+    salario_base: Optional[Decimal] = Field(None, gt=0)
     inss_patronal_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
     fgts_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
     gera_ferias: Optional[bool] = None

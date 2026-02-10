@@ -22,6 +22,9 @@ from app.ia.aba5_models import FluxoCaixa, IndicesSaudeCaixa, ProjecaoFluxoCaixa
 from app.ia_config import Aba5Config, AlertasConfig
 from app.models import User
 
+# Logger
+logger = logging.getLogger(__name__)
+
 # Prophet para forecasting
 try:
     from prophet import Prophet
@@ -29,8 +32,6 @@ try:
 except ImportError:
     PROPHET_AVAILABLE = False
     logger.warning("⚠️ Prophet não instalado. Instale com: pip install prophet")
-
-logger = logging.getLogger(__name__)
 
 
 # ============================================================================

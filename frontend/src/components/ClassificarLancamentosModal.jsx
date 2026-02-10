@@ -14,12 +14,24 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
   const [classificados, setClassificados] = useState(new Set());
   const [filtro, setFiltro] = useState('todos'); // todos, pagar, receber
   const [autoClassificando, setAutoClassificando] = useState(false);
+  const [categoriasDRE, setCategoriasDRE] = useState([]);
+  const [classificacaoManual, setClassificacaoManual] = useState({}); // { lancamento_key: subcategoria_id }
 
   useEffect(() => {
     if (isOpen) {
       carregarPendentes();
+      carregarCategoriasDRE();
     }
   }, [isOpen]);
+
+  const carregarCategoriasDRE = async () => {
+    try {
+      const response = await api.get('/dre/subcategorias');
+      setCategoriasDRE(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar categorias DRE:', error);
+    }
+  };
 
   const carregarPendentes = async () => {
     setLoading(true);
@@ -123,6 +135,100 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
       toast.error('Erro ao executar auto-classificação');
     } finally {
       setAutoClassificando(false);
+    }
+  };
+
+  const aplicarClassificacaoManual = async (tipo, lancamentoId, subcategoriaId) => {
+    if (!subcategoriaId) {
+      toast.error('Selecione uma categoria DRE');
+      return;
+    }
+
+    setProcessando(true);
+    try {
+      const subcategoria = categoriasDRE.find(cat => cat.id === parseInt(subcategoriaId));
+      
+      await api.post('/dre/classificar/aplicar', {
+        tipo,
+        lancamento_id: lancamentoId,
+        dre_subcategoria_id: parseInt(subcategoriaId),
+        canal: null,
+        regra_id: null,
+        forma_classificacao: 'manual'
+      });
+      
+      // Marcar como classificado
+      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
+      
+      // Limpar seleção
+      setClassificacaoManual(prev => {
+        const newState = { ...prev };
+        delete newState[`${tipo}_${lancamentoId}`];
+        return newState;
+      });
+      
+      toast.success(`✅ Classificado manualmente: ${subcategoria?.nome || 'Categoria'}`);
+    } catch (error) {
+      console.error('Erro ao aplicar classificação manual:', error);
+      toast.error('Erro ao aplicar classificação manual');
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const marcarComoNaoDRE = async (tipo, lancamentoId) => {
+    setProcessando(true);
+    try {
+      // Apenas remover da lista sem classificar (lançamentos de estoque/produtos)
+      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
+      
+      toast.success('📦 Marcado como "Não Controla DRE" (Estoque/Produtos)');
+    } catch (error) {
+      console.error('Erro ao marcar como não-DRE:', error);
+      toast.error('Erro ao processar');
+    } finally {
+      setProcessando(false);
+    }
+  };
+
+  const marcarFornecedorNaoDRE = async (tipo, lancamentoId, beneficiario, fornecedorId, clienteId) => {
+    if (!beneficiario) {
+      toast.error('Lançamento sem fornecedor/cliente vinculado');
+      return;
+    }
+
+    const id = fornecedorId || clienteId;
+    if (!id) {
+      toast.error('ID do fornecedor/cliente não encontrado');
+      return;
+    }
+
+    if (!window.confirm(
+      `Deseja marcar "${beneficiario}" como fornecedor de produtos (Não Controla DRE)?\n\n` +
+      `Todos os lançamentos deste fornecedor serão automaticamente ignorados no DRE.`
+    )) {
+      return;
+    }
+
+    setProcessando(true);
+    try {
+      // Chamar endpoint para atualizar controla_dre do fornecedor/cliente
+      await api.patch(`/clientes/${id}/controla-dre?controla_dre=false`);
+      
+      // Marcar este lançamento como processado
+      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
+      
+      toast.success(`✅ Fornecedor "${beneficiario}" marcado como "Não Controla DRE"\n\nTodos os lançamentos futuros serão ignorados automaticamente.`, {
+        duration: 6000
+      });
+      
+      // Recarregar pendentes para remover outros lançamentos do mesmo fornecedor
+      setTimeout(() => carregarPendentes(), 1000);
+    } catch (error) {
+      console.error('Erro ao marcar fornecedor:', error);
+      toast.error('Erro ao marcar fornecedor como Não DRE');
+    } finally {
+      setProcessando(false);
     }
   };
 
@@ -307,11 +413,70 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
 
                     {/* Sugestões */}
                     {sugestoesLancamento.length === 0 ? (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-2">
-                        <FiAlertCircle className="text-yellow-600" size={20} />
-                        <span className="text-sm text-yellow-700">
-                          Nenhuma sugestão automática. Classifique manualmente.
-                        </span>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FiAlertCircle className="text-yellow-600" size={20} />
+                          <span className="text-sm text-yellow-700 font-semibold">
+                            Nenhuma sugestão automática. Classifique manualmente.
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <select
+                              value={classificacaoManual[key] || ''}
+                              onChange={(e) => setClassificacaoManual(prev => ({
+                                ...prev,
+                                [key]: e.target.value
+                              }))}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="">Selecione uma categoria DRE...</option>
+                              {categoriasDRE.map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.categoria_nome} → {cat.nome}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => aplicarClassificacaoManual(
+                                lancamento.tipo,
+                                lancamento.id,
+                                classificacaoManual[key]
+                              )}
+                              disabled={processando || !classificacaoManual[key]}
+                              className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            >
+                              <FiCheck size={18} />
+                              Classificar
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => marcarComoNaoDRE(lancamento.tipo, lancamento.id)}
+                              disabled={processando}
+                              className="flex-1 flex items-center justify-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Marca apenas ESTE lançamento como Não DRE"
+                            >
+                              📦 Este Lançamento
+                            </button>
+                            {lancamento.beneficiario && (
+                              <button
+                                onClick={() => marcarFornecedorNaoDRE(
+                                  lancamento.tipo, 
+                                  lancamento.id, 
+                                  lancamento.beneficiario,
+                                  lancamento.fornecedor_id,
+                                  lancamento.cliente_id
+                                )}
+                                disabled={processando}
+                                className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title={`Marca TODOS os lançamentos de ${lancamento.beneficiario} como Não DRE`}
+                              >
+                                🏪 Todo Fornecedor "{lancamento.beneficiario}"
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="space-y-2">

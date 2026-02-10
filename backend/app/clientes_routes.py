@@ -300,6 +300,9 @@ class ClienteUpdate(BaseModel):
     dia_mes_acerto: Optional[int] = None  # 1 a 28
     data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
     
+    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
+    controla_dre: Optional[bool] = None  # True = vai para DRE, False = não classifica (produtos p/ revenda)
+    
     observacoes: Optional[str] = None
     ativo: Optional[bool] = None
 
@@ -383,6 +386,9 @@ class ClienteResponse(BaseModel):
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
     data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
+    
+    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
+    controla_dre: bool = True  # True = vai para DRE, False = não classifica (produtos p/ revenda)
     
     observacoes: Optional[str] = None
     ativo: bool = True
@@ -1173,6 +1179,53 @@ def toggle_parceiro(
             "parceiro_observacoes": cliente.parceiro_observacoes,
             "foi_reativacao": acao == "reativacao",
             "historico_preservado": cliente.parceiro_desde is not None
+        }
+    }
+
+
+@router.patch("/{cliente_id}/controla-dre")
+def atualizar_controla_dre(
+    cliente_id: int,
+    controla_dre: bool,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Atualizar o controle DRE de um cliente/fornecedor.
+    
+    - controla_dre=True: Lançamentos deste fornecedor/cliente VÃO para DRE (padrão)
+    - controla_dre=False: Lançamentos NÃO vão para DRE (ex: fornecedor de produtos para revenda como Buendia)
+    
+    Quando controla_dre=False, os lançamentos deste fornecedor/cliente:
+    - NÃO aparecem na lista de pendentes de classificação
+    - NÃO geram sugestões de classificação DRE
+    - São automaticamente ignorados no processo de classificação
+    """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    
+    # Atualizar campo
+    old_value = cliente.controla_dre
+    cliente.controla_dre = controla_dre
+    cliente.updated_at = dt.utcnow()
+    
+    db.commit()
+    db.refresh(cliente)
+    
+    # Log de auditoria
+    log_update(db, current_user.id, "cliente_controla_dre", cliente.id, 
+        {"controla_dre": old_value}, 
+        {"controla_dre": controla_dre}
+    )
+    
+    return {
+        "success": True,
+        "message": f"{'Ativado' if controla_dre else 'Desativado'} controle DRE para {cliente.nome}",
+        "data": {
+            "id": cliente.id,
+            "nome": cliente.nome,
+            "tipo_cadastro": cliente.tipo_cadastro,
+            "controla_dre": cliente.controla_dre
         }
     }
 
