@@ -86,9 +86,9 @@ class FormaPagamentoResponse(BaseModel):
     permite_parcelamento: bool
     parcelas_maximas: int
     taxas_por_parcela: Optional[str]
-    permite_antecipacao: bool
-    dias_recebimento_antecipado: Optional[int]
-    taxa_antecipacao_percentual: Optional[float]
+    permite_antecipacao: Optional[bool] = False
+    dias_recebimento_antecipado: Optional[int] = None
+    taxa_antecipacao_percentual: Optional[float] = None
     icone: Optional[str]
     cor: Optional[str]
     
@@ -279,7 +279,7 @@ def criar_forma_pagamento(
         taxa_antecipacao_percentual=forma.taxa_antecipacao_percentual,
         icone=forma.icone,
         cor=forma.cor,
-        user_id=user.id,
+        user_id=current_user.id,
         tenant_id=tenant_id
     )
     
@@ -341,6 +341,32 @@ def atualizar_forma_pagamento(
     f.taxa_fixa = f.taxa_fixa / 100
     
     return f
+
+
+@router.delete("/formas-pagamento/{forma_id}", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_forma_pagamento(
+    forma_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Exclui permanentemente uma forma de pagamento
+    """
+    current_user, tenant_id = current_user_and_tenant
+    
+    forma = db.query(FormaPagamento).filter(
+        FormaPagamento.id == forma_id,
+        FormaPagamento.tenant_id == tenant_id
+    ).first()
+    
+    if not forma:
+        raise HTTPException(status_code=404, detail="Forma de pagamento não encontrada")
+    
+    # Hard delete - remove permanentemente do banco
+    db.delete(forma)
+    db.commit()
+    
+    return None
 
 
 # ============================================================================
@@ -1017,17 +1043,20 @@ async def get_historico_financeiro_cliente(
     from app.vendas_models import Venda
     from app.financeiro_models import ContaReceber, Recebimento
     
+    # Extrair usuário e tenant
+    current_user, tenant_id = user_and_tenant
+    
     # Validar paginação
     if page < 1:
         raise HTTPException(status_code=400, detail="Página deve ser >= 1")
     if per_page < 1 or per_page > 100:
         raise HTTPException(status_code=400, detail="per_page deve estar entre 1 e 100")
     
-    # Verificar se cliente existe e pertence ao usuário
+    # Verificar se cliente existe e pertence ao tenant
     from app.models import Cliente
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
-        Cliente.user_id == user.id
+        Cliente.tenant_id == tenant_id
     ).first()
     
     if not cliente:
@@ -1058,7 +1087,7 @@ async def get_historico_financeiro_cliente(
     if not tipo or tipo == "venda":
         query_vendas = db.query(Venda).filter(
             Venda.cliente_id == cliente_id,
-            Venda.user_id == user.id,
+            Venda.tenant_id == tenant_id,
             Venda.status.notin_(['cancelada', 'devolvida'])
         ).options(
             joinedload(Venda.pagamentos)  # Carregar pagamentos para obter forma de pagamento
@@ -1102,7 +1131,7 @@ async def get_historico_financeiro_cliente(
     if not tipo or tipo == "devolucao":
         query_devolucoes = db.query(Venda).filter(
             Venda.cliente_id == cliente_id,
-            Venda.user_id == user.id,
+            Venda.tenant_id == tenant_id,
             Venda.status.in_(['cancelada', 'devolvida'])
         ).options(
             joinedload(Venda.pagamentos)
@@ -1156,7 +1185,7 @@ async def get_historico_financeiro_cliente(
     # Total de vendas (últimos 90 dias)
     total_vendas = db.query(func.sum(Venda.total)).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id,
+        Venda.tenant_id == tenant_id,
         Venda.status.notin_(['cancelada', 'devolvida']),
         Venda.data_venda >= data_90_dias_atras
     ).scalar() or 0
@@ -1166,14 +1195,14 @@ async def get_historico_financeiro_cliente(
         func.sum(ContaReceber.valor_original - func.coalesce(ContaReceber.valor_recebido, 0))
     ).filter(
         ContaReceber.cliente_id == cliente_id,
-        ContaReceber.user_id == user.id,
+        ContaReceber.tenant_id == tenant_id,
         ContaReceber.status == 'pendente'
     ).scalar() or 0
     
     # Última compra
     ultima_venda = db.query(Venda).filter(
         Venda.cliente_id == cliente_id,
-        Venda.user_id == user.id,
+        Venda.tenant_id == tenant_id,
         Venda.status.notin_(['cancelada', 'devolvida'])
     ).order_by(desc(Venda.data_venda)).first()
     

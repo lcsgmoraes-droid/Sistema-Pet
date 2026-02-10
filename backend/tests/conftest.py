@@ -22,6 +22,15 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_rate_limit_store():
+    """Limpa o rate limit store antes de cada teste."""
+    from app.middlewares.rate_limit import rate_limit_store
+    rate_limit_store.clear()
+    yield
+    rate_limit_store.clear()
+
+
 @pytest.fixture
 def dummy_fixture():
     """Dummy fixture to ensure conftest is loaded."""

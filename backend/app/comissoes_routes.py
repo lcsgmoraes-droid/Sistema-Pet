@@ -555,6 +555,11 @@ async def deletar_configuracao(
     Deleta (desativa) uma configuração de comissão
     """
     try:
+        # Extrair tenant_id e configurar contexto
+        from .tenancy.context import set_tenant_context
+        current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
+        
         success = ComissoesConfig.deletar(config_id)
         
         if not success:

@@ -397,10 +397,10 @@ const Pessoas = () => {
       }
       
       // 🐛 DEBUG: Verificar entregador_padrao
-      console.log('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
-      console.log('🐛 is_entregador:', clienteData.is_entregador);
+      // console.log('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
+      // console.log('🐛 is_entregador:', clienteData.is_entregador);
       
-      console.log('Dados enviados:', clienteData);
+      // console.log('Dados enviados:', clienteData);
       
       let clienteId;
       
@@ -792,6 +792,11 @@ const Pessoas = () => {
     }
   };
 
+  // Verificar se o campo é um documento único (não pode ser transferido)
+  const isDocumentoUnico = (campo) => {
+    return ['cpf', 'cnpj', 'crmv'].includes(campo);
+  };
+
   const continuarMesmoDuplicado = () => {
     // Mostrar confirmação de remoção
     setShowConfirmacaoRemocao(true);
@@ -843,6 +848,19 @@ const Pessoas = () => {
       setTimeout(() => {
         elemento.classList.remove('ring-4', 'ring-yellow-400');
       }, 3000);
+    }
+  };
+
+  const editarClienteExistente = () => {
+    // Carregar o cliente existente para edição
+    const clienteParaEditar = clientes.find(c => c.id === clienteDuplicado.cliente.id);
+    if (clienteParaEditar) {
+      // Fechar aviso de duplicata
+      setShowDuplicadoWarning(false);
+      setClienteDuplicado(null);
+      setShowConfirmacaoRemocao(false);
+      // Abrir modal com o cliente para edição
+      openModal(clienteParaEditar);
     }
   };
 
@@ -1470,51 +1488,82 @@ const Pessoas = () => {
                         )}
                       </div>
 
-                      {/* Confirmação de remoção */}
-                      {showConfirmacaoRemocao ? (
-                        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
-                          <p className="text-sm font-semibold text-red-900 mb-2">
-                            ⚠️ Atenção!
-                          </p>
-                          <p className="text-sm text-red-800 mb-3">
-                            O <strong>{clienteDuplicado.campo}</strong> será removido do cadastro do cliente <strong>{clienteDuplicado.cliente.nome}</strong> (Código {clienteDuplicado.cliente.codigo}) 
-                            e uma observação será adicionada informando a transferência.
-                          </p>
-                          <p className="text-xs text-red-700 mb-3">
-                            No cadastro antigo ficará registrado: "Sem número por cadastro novo do cliente código {editingCliente?.codigo || (clientes.length > 0 ? Math.max(...clientes.map(c => c.codigo)) + 1 : 1)}"
-                          </p>
+                      {/* Se for documento único (CPF/CNPJ/CRMV): BLOQUEAR criação */}
+                      {isDocumentoUnico(clienteDuplicado.campo) ? (
+                        <div>
+                          <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-3">
+                            <p className="text-sm font-semibold text-red-900 mb-2">
+                              🚫 Não é possível criar novo cadastro
+                            </p>
+                            <p className="text-sm text-red-800 mb-2">
+                              {clienteDuplicado.campo.toUpperCase()} é um documento único e já está cadastrado.
+                            </p>
+                            <p className="text-sm text-red-700">
+                              Você pode editar o cadastro existente ou visualizá-lo.
+                            </p>
+                          </div>
                           <div className="flex gap-2">
                             <button
-                              onClick={confirmarRemocaoEContinuar}
-                              disabled={loading}
-                              className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              onClick={editarClienteExistente}
+                              className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                             >
-                              {loading ? 'Processando...' : 'Confirmar e continuar'}
+                              ✏️ Editar cadastro existente
                             </button>
                             <button
-                              onClick={cancelarRemocao}
-                              disabled={loading}
-                              className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              onClick={irParaClienteExistente}
+                              className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
                             >
-                              Cancelar
+                              👁️ Ver cadastro
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={irParaClienteExistente}
-                            className="flex-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Ver cadastro existente
-                          </button>
-                          <button
-                            onClick={continuarMesmoDuplicado}
-                            className="flex-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Continuar mesmo assim
-                          </button>
-                        </div>
+                        /* Se for contato (telefone/celular): PERMITIR transferência */
+                        showConfirmacaoRemocao ? (
+                          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
+                            <p className="text-sm font-semibold text-red-900 mb-2">
+                              ⚠️ Atenção!
+                            </p>
+                            <p className="text-sm text-red-800 mb-3">
+                              O <strong>{clienteDuplicado.campo}</strong> será removido do cadastro do cliente <strong>{clienteDuplicado.cliente.nome}</strong> (Código {clienteDuplicado.cliente.codigo}) 
+                              e uma observação será adicionada informando a transferência.
+                            </p>
+                            <p className="text-xs text-red-700 mb-3">
+                              No cadastro antigo ficará registrado: "Sem número por cadastro novo do cliente código {editingCliente?.codigo || (clientes.length > 0 ? Math.max(...clientes.map(c => c.codigo)) + 1 : 1)}"
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={confirmarRemocaoEContinuar}
+                                disabled={loading}
+                                className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              >
+                                {loading ? 'Processando...' : 'Confirmar e continuar'}
+                              </button>
+                              <button
+                                onClick={cancelarRemocao}
+                                disabled={loading}
+                                className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={irParaClienteExistente}
+                              className="flex-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                              Ver cadastro existente
+                            </button>
+                            <button
+                              onClick={continuarMesmoDuplicado}
+                              className="flex-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
+                            >
+                              Transferir {clienteDuplicado.campo}
+                            </button>
+                          </div>
+                        )
                       )}
                     </div>
                   </div>
@@ -1941,7 +1990,11 @@ const Pessoas = () => {
                         <input
                           type="text"
                           value={formData.cpf}
-                          onChange={(e) => setFormData({...formData, cpf: e.target.value})}
+                          onChange={(e) => {
+                            setFormData({...formData, cpf: e.target.value});
+                            setShowDuplicadoWarning(false);
+                            setClienteDuplicado(null);
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                           placeholder="000.000.000-00"
                           maxLength="14"
@@ -1957,7 +2010,11 @@ const Pessoas = () => {
                           <input
                             type="text"
                             value={formData.crmv}
-                            onChange={(e) => setFormData({...formData, crmv: e.target.value})}
+                            onChange={(e) => {
+                              setFormData({...formData, crmv: e.target.value});
+                              setShowDuplicadoWarning(false);
+                              setClienteDuplicado(null);
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                             placeholder="CRMV XX 1234"
                             maxLength="20"
@@ -2005,7 +2062,11 @@ const Pessoas = () => {
                           <input
                             type="text"
                             value={formData.cnpj}
-                            onChange={(e) => setFormData({...formData, cnpj: e.target.value})}
+                            onChange={(e) => {
+                              setFormData({...formData, cnpj: e.target.value});
+                              setShowDuplicadoWarning(false);
+                              setClienteDuplicado(null);
+                            }}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                             placeholder="00.000.000/0000-00"
                             maxLength="18"
@@ -2055,7 +2116,11 @@ const Pessoas = () => {
                     <input
                       type="text"
                       value={formData.celular}
-                      onChange={(e) => setFormData({...formData, celular: e.target.value})}
+                      onChange={(e) => {
+                        setFormData({...formData, celular: e.target.value});
+                        setShowDuplicadoWarning(false);
+                        setClienteDuplicado(null);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="(00) 00000-0000"
                     />
@@ -2092,7 +2157,11 @@ const Pessoas = () => {
                     <input
                       type="text"
                       value={formData.telefone}
-                      onChange={(e) => setFormData({...formData, telefone: e.target.value})}
+                      onChange={(e) => {
+                        setFormData({...formData, telefone: e.target.value});
+                        setShowDuplicadoWarning(false);
+                        setClienteDuplicado(null);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="(00) 0000-0000"
                     />

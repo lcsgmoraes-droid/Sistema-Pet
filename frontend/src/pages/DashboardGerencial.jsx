@@ -163,7 +163,21 @@ export default function DashboardGerencial() {
       
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
-      alert('Erro ao carregar dashboard gerencial');
+      
+      // Definir métricas vazias para evitar erro de renderização
+      setMetricas({
+        vips_inativos: { quantidade: 0, clientes: [], impacto: 'R$ 0' },
+        clientes_inativos: { quantidade: 0, clientes: [], diasMedia: 0 },
+        clientes_novos: { quantidade: 0, clientes: [] },
+        oportunidades_upsell: { quantidade: 0, clientes: [], potencial: 'R$ 0' },
+        clientes_risco_churn: { quantidade: 0, clientes: [], diasMedia: 0 }
+      });
+      
+      if (err.response?.status === 403) {
+        alert('Você não tem permissão para acessar o dashboard gerencial');
+      } else {
+        alert('Erro ao carregar dashboard gerencial');
+      }
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,7 @@ Review Events - Eventos de domínio para Human-in-the-Loop
 
 Eventos publicados quando humanos revisam decisões de IA.
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Literal
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -37,7 +37,7 @@ class DecisionReviewedEvent(BaseModel):
         )
     """
     # Evento
-    event_type: str = Field(default="decision_reviewed", const=True)
+    event_type: Literal["decision_reviewed"] = "decision_reviewed"
     event_id: str = Field(..., description="ID único do evento")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
@@ -123,7 +123,7 @@ class DecisionAppliedEvent(BaseModel):
     Permite rastreabilidade completa:
     IA sugeriu → Humano revisou → Sistema aplicou
     """
-    event_type: str = Field(default="decision_applied", const=True)
+    event_type: Literal["decision_applied"] = "decision_applied"
     event_id: str = Field(..., description="ID único do evento")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
@@ -177,7 +177,7 @@ class AIAlertEvent(BaseModel):
     - EMERGENCY: Bloqueia TODA IA para tenant/módulo
     """
     # Evento
-    event_type: str = Field(default="ai_alert", const=True)
+    event_type: Literal["ai_alert"] = "ai_alert"
     event_id: str = Field(..., description="ID único do evento")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     

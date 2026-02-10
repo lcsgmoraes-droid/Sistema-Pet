@@ -23,42 +23,247 @@ from app.utils.logger import logger
 
 
 PLANO_CONTAS = [
+    # =================================================================
+    # 1. RECEITAS (Todas entradas de dinheiro)
+    # =================================================================
     {
-        "categoria": "Receitas",
+        "categoria": "Receitas de Vendas",
         "natureza": NaturezaDRE.RECEITA,
         "ordem": 1,
         "subcategorias": [
-            ("Vendas Loja Física", TipoCusto.DIRETO, None),
-            ("Serviços (Banho e Tosa)", TipoCusto.DIRETO, None),
-            ("Outras Receitas", TipoCusto.DIRETO, None),
+            # Produtos
+            ("Vendas de Produtos - Pet Food", TipoCusto.DIRETO, None),
+            ("Vendas de Produtos - Acessórios", TipoCusto.DIRETO, None),
+            ("Vendas de Produtos - Higiene", TipoCusto.DIRETO, None),
+            ("Vendas de Produtos - Medicamentos", TipoCusto.DIRETO, None),
+            # Serviços
+            ("Serviços - Banho e Tosa", TipoCusto.DIRETO, None),
+            ("Serviços - Veterinário", TipoCusto.DIRETO, None),
+            ("Serviços - Hotel/Day Care", TipoCusto.DIRETO, None),
+            ("Serviços - Adestramento", TipoCusto.DIRETO, None),
         ],
     },
     {
-        "categoria": "Custos",
-        "natureza": NaturezaDRE.CUSTO,
+        "categoria": "Outras Receitas",
+        "natureza": NaturezaDRE.RECEITA,
         "ordem": 2,
         "subcategorias": [
-            ("Custo das Mercadorias Vendidas (CMV)", TipoCusto.DIRETO, None),
-            ("Comissões de Vendas", TipoCusto.DIRETO, None),
-            ("Fretes sobre Vendas", TipoCusto.DIRETO, None),
+            ("Receitas Financeiras", TipoCusto.DIRETO, None),
+            ("Descontos Obtidos", TipoCusto.DIRETO, None),
+            ("Bonificações de Fornecedores", TipoCusto.DIRETO, None),
+            ("Outras Receitas Operacionais", TipoCusto.DIRETO, None),
         ],
     },
+    
+    # =================================================================
+    # 2. DEDUÇÕES DA RECEITA
+    # =================================================================
     {
-        "categoria": "Despesas Operacionais",
+        "categoria": "Deduções da Receita",
         "natureza": NaturezaDRE.DESPESA,
         "ordem": 3,
         "subcategorias": [
-            ("Aluguel", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Salários", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Encargos Trabalhistas", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Devoluções e Cancelamentos", TipoCusto.DIRETO, None),
+            ("Descontos Concedidos", TipoCusto.DIRETO, None),
+            ("Abatimentos", TipoCusto.DIRETO, None),
+        ],
+    },
+    
+    # =================================================================
+    # 3. CUSTOS DIRETOS (Custos variáveis ligados às vendas)
+    # =================================================================
+    {
+        "categoria": "Custo das Mercadorias Vendidas (CMV)",
+        "natureza": NaturezaDRE.CUSTO,
+        "ordem": 4,
+        "subcategorias": [
+            ("CMV - Pet Food", TipoCusto.DIRETO, None),
+            ("CMV - Acessórios", TipoCusto.DIRETO, None),
+            ("CMV - Higiene", TipoCusto.DIRETO, None),
+            ("CMV - Medicamentos", TipoCusto.DIRETO, None),
+            ("CMV - Materiais Serviços", TipoCusto.DIRETO, None),
+        ],
+    },
+    {
+        "categoria": "Custos Diretos de Venda",
+        "natureza": NaturezaDRE.CUSTO,
+        "ordem": 5,
+        "subcategorias": [
+            ("Fretes sobre Vendas", TipoCusto.DIRETO, None),
+            ("Embalagens", TipoCusto.DIRETO, None),
+            ("Taxas de Marketplace - Mercado Livre", TipoCusto.DIRETO, None),
+            ("Taxas de Marketplace - Shopee", TipoCusto.DIRETO, None),
+            ("Taxas de Marketplace - Amazon", TipoCusto.DIRETO, None),
+            ("Taxas de Cartão de Crédito", TipoCusto.DIRETO, None),
+            ("Taxas de Cartão de Débito", TipoCusto.DIRETO, None),
+            ("Taxas PIX/Boleto", TipoCusto.DIRETO, None),
+            ("Comissões de Vendas - Vendedores", TipoCusto.DIRETO, None),
+            ("Comissões de Vendas - Afiliados", TipoCusto.DIRETO, None),
+        ],
+    },
+    
+    # =================================================================
+    # 4. DESPESAS OPERACIONAIS - PESSOAL
+    # =================================================================
+    {
+        "categoria": "Despesas com Pessoal",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 6,
+        "subcategorias": [
+            # Salários
+            ("Salários - Administrativo", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Salários - Vendas", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Salários - Operacional", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Pró-Labore Sócios", TipoCusto.CORPORATIVO, None),
+            # Encargos
+            ("INSS Patronal", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("FGTS", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("PIS sobre Folha", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("IRRF sobre Folha", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Contribuição Sindical", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            # Benefícios
+            ("Vale Transporte", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Vale Alimentação/Refeição", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Plano de Saúde", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Seguro de Vida", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Auxílio Creche", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            # Outros
+            ("Férias e 13º Salário", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Rescisões", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Treinamento e Capacitação", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Uniformes", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+        ],
+    },
+    
+    # =================================================================
+    # 5. DESPESAS OPERACIONAIS - OCUPAÇÃO
+    # =================================================================
+    {
+        "categoria": "Despesas de Ocupação",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 7,
+        "subcategorias": [
+            ("Aluguel - Loja", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Aluguel - Escritório", TipoCusto.CORPORATIVO, None),
+            ("Condomínio", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("IPTU", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Energia Elétrica", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Água", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Água e Esgoto", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Gás", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Internet e Telefonia", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Marketing", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Sistema / Software", TipoCusto.CORPORATIVO, None),
+            ("Segurança e Alarme", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Limpeza e Conservação", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Manutenção Predial", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+        ],
+    },
+    
+    # =================================================================
+    # 6. DESPESAS OPERACIONAIS - COMERCIAL/MARKETING
+    # =================================================================
+    {
+        "categoria": "Despesas Comerciais",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 8,
+        "subcategorias": [
+            ("Marketing Digital - Google Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Marketing Digital - Facebook/Instagram Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Marketing Digital - TikTok Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Marketing Tradicional - Panfletos/Outdoor", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Brindes e Amostras Grátis", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Programas de Fidelidade", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Eventos e Patrocínios", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Material de Ponto de Venda", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Agência de Marketing", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+        ],
+    },
+    
+    # =================================================================
+    # 7. DESPESAS OPERACIONAIS - ADMINISTRATIVAS
+    # =================================================================
+    {
+        "categoria": "Despesas Administrativas",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 9,
+        "subcategorias": [
             ("Contabilidade", TipoCusto.CORPORATIVO, None),
-            ("Despesas Bancárias", TipoCusto.CORPORATIVO, None),
-            ("Outras Despesas", TipoCusto.CORPORATIVO, None),
+            ("Assessoria Jurídica", TipoCusto.CORPORATIVO, None),
+            ("Softwares e Sistemas - ERP", TipoCusto.CORPORATIVO, None),
+            ("Softwares e Sistemas - E-commerce", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Softwares e Sistemas - Gestão", TipoCusto.CORPORATIVO, None),
+            ("Correios e Sedex", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Material de Escritório", TipoCusto.CORPORATIVO, None),
+            ("Material de Limpeza", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Cópias e Impressões", TipoCusto.CORPORATIVO, None),
+            ("Assinaturas e Anuidades", TipoCusto.CORPORATIVO, None),
+            ("Taxas e Certificados Digitais", TipoCusto.CORPORATIVO, None),
+        ],
+    },
+    
+    # =================================================================
+    # 8. DESPESAS OPERACIONAIS - VEÍCULOS E LOGÍSTICA
+    # =================================================================
+    {
+        "categoria": "Despesas com Veículos",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 10,
+        "subcategorias": [
+            ("Combustível", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Manutenção de Veículos", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("IPVA", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Seguro de Veículos", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Licenciamento", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Estacionamento", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Pedágios", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+        ],
+    },
+    
+    # =================================================================
+    # 9. DESPESAS OPERACIONAIS - TRIBUTOS
+    # =================================================================
+    {
+        "categoria": "Tributos sobre Vendas",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 11,
+        "subcategorias": [
+            ("Simples Nacional", TipoCusto.DIRETO, None),
+            ("ICMS", TipoCusto.DIRETO, None),
+            ("PIS/COFINS", TipoCusto.DIRETO, None),
+            ("ISS", TipoCusto.DIRETO, None),
+        ],
+    },
+    
+    # =================================================================
+    # 10. DESPESAS FINANCEIRAS
+    # =================================================================
+    {
+        "categoria": "Despesas Financeiras",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 12,
+        "subcategorias": [
+            ("Juros de Empréstimos", TipoCusto.CORPORATIVO, None),
+            ("Juros de Financiamentos", TipoCusto.CORPORATIVO, None),
+            ("Tarifas Bancárias", TipoCusto.CORPORATIVO, None),
+            ("IOF", TipoCusto.CORPORATIVO, None),
+            ("Multas e Juros por Atraso", TipoCusto.CORPORATIVO, None),
+            ("Descontos Concedidos Financeiros", TipoCusto.CORPORATIVO, None),
+        ],
+    },
+    
+    # =================================================================
+    # 11. OUTRAS DESPESAS
+    # =================================================================
+    {
+        "categoria": "Outras Despesas Operacionais",
+        "natureza": NaturezaDRE.DESPESA,
+        "ordem": 13,
+        "subcategorias": [
+            ("Depreciação", TipoCusto.CORPORATIVO, None),
+            ("Amortização", TipoCusto.CORPORATIVO, None),
+            ("Perdas com Créditos Incobráveis", TipoCusto.CORPORATIVO, None),
+            ("Seguros Gerais", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            ("Doações", TipoCusto.CORPORATIVO, None),
+            ("Multas e Penalidades", TipoCusto.CORPORATIVO, None),
+            ("Despesas Não Operacionais", TipoCusto.CORPORATIVO, None),
         ],
     },
 ]

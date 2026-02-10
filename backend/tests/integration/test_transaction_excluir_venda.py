@@ -32,8 +32,7 @@ from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.financeiro_models import ContaReceber, MovimentacaoFinanceira, ContaBancaria, LancamentoManual
 from app.caixa_models import MovimentacaoCaixa
-from app.models import User
-from app.auth.models import Tenant
+from app.models import User, Tenant
 
 
 # Configuração do banco de dados de teste
@@ -511,7 +510,7 @@ class TestTransactionRollbackExcluirVenda:
         ).first()
         saldo_bancario_depois = float(conta_bancaria_depois.saldo_atual)
         assert saldo_bancario_depois == saldo_bancario_antes, \
-            f"❌ FALHA: Saldo bancário foi alterado (R$ {saldo_bancario_antes} → R$ {saldo_bancario_depois})"
+            f"❌ FALHA: Saldo bancário foi alterado (R$ {saldo_bancario_antes} --> R$ {saldo_bancario_depois})"
         print(f"✅ Saldo bancário NÃO foi alterado (R$ {saldo_bancario_depois})")
         
         # 7. Movimentação bancária NÃO foi excluída
@@ -527,7 +526,7 @@ class TestTransactionRollbackExcluirVenda:
         ).first()
         assert lancamento_depois is not None, "❌ FALHA: Lançamento manual foi excluído"
         assert lancamento_depois.status == lancamento_antes.status, \
-            f"❌ FALHA: Status do lançamento mudou ({lancamento_antes.status} → {lancamento_depois.status})"
+            f"❌ FALHA: Status do lançamento mudou ({lancamento_antes.status} --> {lancamento_depois.status})"
         print(f"✅ Lançamento manual NÃO foi alterado (status: {lancamento_depois.status})")
         
         print("\n" + "="*80)

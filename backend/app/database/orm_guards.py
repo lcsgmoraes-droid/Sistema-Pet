@@ -16,9 +16,15 @@ def force_identity_ids(session, flush_context, instances):
     Qualquer entidade nova com atributo "id" DEVE ter id=None
     para o PostgreSQL gerar via IDENTITY.
     
+    EXCEÇÃO: Tenant usa UUID manual (String), não IDENTITY.
+    
     Isso previne erros de UniqueViolation causados por sequences dessincronizadas.
     """
     for obj in session.new:
+        # Pular Tenant - usa UUID manual
+        if obj.__class__.__name__ == 'Tenant':
+            continue
+            
         # Qualquer entidade nova com atributo "id"
         # DEVE ter id=None para o PostgreSQL gerar via IDENTITY
         if hasattr(obj, "id"):

@@ -6,6 +6,20 @@ export default function ConfiguracaoFiscalEmpresa() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
+
+  const normalizeCnaesSecundarios = (value) => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
   
   // Informações de CNAE
   const [cnaePrincipalDescricao, setCnaePrincipalDescricao] = useState("");
@@ -48,6 +62,10 @@ export default function ConfiguracaoFiscalEmpresa() {
         const resFiscal = await api.get("/empresa/fiscal");
         console.log('📊 Dados fiscais carregados:', resFiscal.data);
         
+        const cnaesSecundarios = normalizeCnaesSecundarios(
+          resFiscal.data.cnaes_secundarios
+        );
+
         setForm({
           regime_tributario: resFiscal.data.regime_tributario || "",
           simples_anexo: resFiscal.data.simples_anexo || "I",
@@ -55,7 +73,7 @@ export default function ConfiguracaoFiscalEmpresa() {
           aliquota_simples_sugerida: resFiscal.data.aliquota_simples_sugerida ?? 0,
           cnae_principal: resFiscal.data.cnae_principal || "",
           cnae_descricao: resFiscal.data.cnae_descricao || "",
-          cnaes_secundarios: resFiscal.data.cnaes_secundarios || [],
+          cnaes_secundarios: cnaesSecundarios,
           uf: resFiscal.data.uf || ""
         });
         
@@ -63,8 +81,8 @@ export default function ConfiguracaoFiscalEmpresa() {
         if (resFiscal.data.cnae_descricao) {
           setCnaePrincipalDescricao(resFiscal.data.cnae_descricao);
         }
-        if (resFiscal.data.cnaes_secundarios && Array.isArray(resFiscal.data.cnaes_secundarios)) {
-          setCnaesSecundarios(resFiscal.data.cnaes_secundarios);
+        if (cnaesSecundarios.length > 0) {
+          setCnaesSecundarios(cnaesSecundarios);
         }
         
         // Tentar carregar dados cadastrais (se endpoint existir)
@@ -184,11 +202,15 @@ export default function ConfiguracaoFiscalEmpresa() {
         const cnaeNumero = dados.cnae_fiscal.toString();
         console.log('✅ CNAE encontrado:', cnaeNumero);
         
+        const cnaesSecundarios = normalizeCnaesSecundarios(
+          dados.cnaes_secundarios
+        );
+
         setForm(prev => ({
           ...prev,
           cnae_principal: cnaeNumero,
           cnae_descricao: dados.cnae_fiscal_descricao || "",
-          cnaes_secundarios: dados.cnaes_secundarios || []
+          cnaes_secundarios: cnaesSecundarios
         }));
         
         // Atualizar estados para exibição
@@ -196,9 +218,9 @@ export default function ConfiguracaoFiscalEmpresa() {
           setCnaePrincipalDescricao(dados.cnae_fiscal_descricao);
         }
         
-        if (dados.cnaes_secundarios && Array.isArray(dados.cnaes_secundarios)) {
-          setCnaesSecundarios(dados.cnaes_secundarios);
-          console.log(`📋 Encontrados ${dados.cnaes_secundarios.length} CNAEs secundários`);
+        if (cnaesSecundarios.length > 0) {
+          setCnaesSecundarios(cnaesSecundarios);
+          console.log(`📋 Encontrados ${cnaesSecundarios.length} CNAEs secundários`);
         }
       }
       
@@ -214,12 +236,17 @@ export default function ConfiguracaoFiscalEmpresa() {
   async function salvar() {
     setSalvando(true);
     try {
-      console.log('💾 Salvando dados fiscais:', form);
+      const payload = {
+        ...form,
+        cnaes_secundarios: normalizeCnaesSecundarios(form.cnaes_secundarios)
+      };
+
+      console.log('💾 Salvando dados fiscais:', payload);
       console.log('📋 CNAE Descrição no form:', form.cnae_descricao);
       console.log('📋 CNAEs Secundários no form:', form.cnaes_secundarios);
       
       // Salvar dados fiscais
-      const response = await api.put("/empresa/fiscal", form);
+      const response = await api.put("/empresa/fiscal", payload);
       console.log('✅ Resposta do servidor (fiscal):', response.data);
       
       // Salvar dados cadastrais (se endpoint existir)

@@ -581,17 +581,17 @@ def test_query_sem_contexto_retorna_vazio(db_session, tenant_a_id):
     REALIDADE DA ARQUITETURA:
     ✅ TenantSecurityMiddleware: BLOQUEIA requests sem tenant_id (403 Forbidden)
     ✅ get_current_user_and_tenant(): GARANTE contexto antes de qualquer query
-    ✅ Middleware multi-layer: TraceID → TenantContext → TenantSecurity → Tenancy
+    ✓ Middleware multi-layer: TraceID --> TenantContext --> TenantSecurity --> Tenancy
     
     POR QUE QUERIES SEM CONTEXTO NÃO ACONTECEM EM PRODUÇÃO:
     1. Todo request HTTP passa pelo TenantSecurityMiddleware
        - Valida JWT e extrai tenant_id
-       - Se não houver tenant_id no JWT → 403 Forbidden
+       - Se não houver tenant_id no JWT --> 403 Forbidden
        - Request NUNCA chega nas rotas sem tenant
     
     2. Todas as rotas de negócio usam get_current_user_and_tenant()
        - Dependência FastAPI que GARANTE contexto
-       - Se não houver tenant → 401/403 antes de qualquer query
+       - Se não houver tenant --> 401/403 antes de qualquer query
     
     3. Queries diretas ao banco SÓ ocorrem dentro de rotas protegidas
        - Contexto sempre está estabelecido

@@ -155,13 +155,17 @@ class ContasReceberService:
             logger.info(f"📁 Categoria 'Receitas de Vendas' criada automaticamente")
         
         for pag in pagamentos:
+            # Suportar tanto dict quanto objeto
+            forma_pag_nome = pag.get('forma_pagamento') if isinstance(pag, dict) else getattr(pag, 'forma_pagamento', None)
+            
             # Buscar configuração da forma de pagamento
             forma_pag = db.query(FormaPagamento).filter(
-                FormaPagamento.nome.ilike(f"%{pag.forma_pagamento}%")
+                FormaPagamento.nome.ilike(f"%{forma_pag_nome}%")
             ).first()
             
             # Verificar se é cartão parcelado
-            numero_parcelas = getattr(pag, 'numero_parcelas', 1) or 1
+            numero_parcelas = pag.get('numero_parcelas', 1) if isinstance(pag, dict) else getattr(pag, 'numero_parcelas', 1)
+            numero_parcelas = numero_parcelas or 1
             eh_cartao_parcelado = (
                 forma_pag and 
                 forma_pag.tipo == 'cartao_credito' and 
@@ -229,7 +233,8 @@ class ContasReceberService:
         """
         from app.financeiro_models import ContaReceber, LancamentoManual
         
-        valor_total = Decimal(str(pagamento.valor))
+        valor = pagamento.get('valor') if isinstance(pagamento, dict) else getattr(pagamento, 'valor', 0)
+        valor_total = Decimal(str(valor))
         valor_parcela = valor_total / numero_parcelas
         
         contas_ids = []
@@ -253,7 +258,8 @@ class ContasReceberService:
                 categoria_id=categoria_receitas.id,
                 documento=f"VENDA-{venda.id}",
                 fornecedor_cliente=venda.cliente.nome if venda.cliente else None,
-                user_id=user_id
+                user_id=user_id,
+                tenant_id=getattr(venda, 'tenant_id', None)
             )
             db.add(lancamento)
             db.flush()
@@ -315,16 +321,20 @@ class ContasReceberService:
         """
         from app.financeiro_models import ContaReceber, LancamentoManual
         
+        # Suportar tanto dict quanto objeto
+        valor = pagamento.get('valor') if isinstance(pagamento, dict) else getattr(pagamento, 'valor', 0)
+        forma_pag_nome = pagamento.get('forma_pagamento') if isinstance(pagamento, dict) else getattr(pagamento, 'forma_pagamento', '')
+        
         # Determinar prazo
         prazo_dias = 0
         if forma_pag and forma_pag.prazo_dias:
             prazo_dias = forma_pag.prazo_dias
-        elif pagamento.forma_pagamento.lower() in ['credito', 'crédito', 'cartao_credito']:
+        elif forma_pag_nome.lower() in ['credito', 'crédito', 'cartao_credito']:
             prazo_dias = 30  # Padrão cartão de crédito
-        elif pagamento.forma_pagamento.lower() in ['debito', 'débito', 'pix', 'dinheiro']:
+        elif forma_pag_nome.lower() in ['debito', 'débito', 'pix', 'dinheiro']:
             prazo_dias = 0  # Recebimento imediato
         
-        valor = Decimal(str(pagamento.valor))
+        valor = Decimal(str(valor))
         
         # Status do lançamento: realizado se prazo=0, previsto se tem prazo
         status_lancamento = 'realizado' if prazo_dias == 0 else 'previsto'
@@ -334,18 +344,19 @@ class ContasReceberService:
         lancamento = LancamentoManual(
             tipo='entrada',
             valor=valor,
-            descricao=f"Venda {venda.numero_venda} - {pagamento.forma_pagamento}",
+            descricao=f"Venda {venda.numero_venda} - {forma_pag_nome}",
             data_lancamento=data_lancamento,
             status=status_lancamento,
             categoria_id=categoria_receitas.id,
             documento=f"VENDA-{venda.id}",
             fornecedor_cliente=venda.cliente.nome if venda.cliente else None,
-            user_id=user_id
+            user_id=user_id,
+            tenant_id=getattr(venda, 'tenant_id', None)
         )
         db.add(lancamento)
         db.flush()
         
-        logger.debug(f"💰 Lançamento {status_lancamento}: R$ {float(valor):.2f} - {pagamento.forma_pagamento}")
+        logger.debug(f"💰 Lançamento {status_lancamento}: R$ {float(valor):.2f} - {forma_pag_nome}")
         
         # SEMPRE criar conta a receber (inclusive à vista, para rastreabilidade)
         data_vencimento = date.today() if prazo_dias == 0 else (date.today() + timedelta(days=prazo_dias))
@@ -367,7 +378,7 @@ class ContasReceberService:
         dre_subcategoria = 1  # TODO: Mapear por forma_pagamento ou categoria
         
         conta = ContaReceber(
-            descricao=f"Venda {venda.numero_venda} - {pagamento.forma_pagamento}",
+            descricao=f"Venda {venda.numero_venda} - {forma_pag_nome}",
             cliente_id=venda.cliente_id,
             forma_pagamento_id=forma_pag.id if forma_pag else None,
             # ====== CAMPOS OBRIGATÓRIOS DRE ======
@@ -402,7 +413,8 @@ class ContasReceberService:
                 data_recebimento=date.today(),
                 forma_pagamento_id=forma_pag.id if forma_pag else None,
                 observacoes=f"Recebimento automático - Venda à vista #{venda.numero_venda}",
-                user_id=user_id
+                user_id=user_id,
+                tenant_id=getattr(venda, 'tenant_id', None)
             )
             db.add(recebimento)
             db.flush()

@@ -18,16 +18,42 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    console.log('📝 Submit do formulário - Email:', email);
+    // console.log('📝 Submit do formulário - Email:', email);
 
     try {
       const result = await login(email, password);
       
-      console.log('📊 Resultado do login:', result);
+      // console.log('📊 Resultado do login:', result);
 
       if (result.success) {
-        console.log('✅ Login bem-sucedido! Navegando para /dashboard');
-        navigate('/dashboard');
+        // console.log('✅ Login bem-sucedido!');
+        
+        // Redirecionar baseado na role do usuário
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          const user = JSON.parse(savedUser);
+          const roleName = user.role?.name?.toLowerCase();
+          
+          console.log('👤 Role do usuário:', roleName);
+          console.log('👤 Permissões:', user.permissions);
+          
+          // Se for apenas caixa, vai direto pro PDV
+          if (roleName === 'caixa') {
+            console.log('🎯 Usuário caixa - Navegando para /pdv');
+            navigate('/pdv');
+          } else if (roleName === 'admin' || roleName === 'gerente') {
+            // Admin/Gerente vão para dashboard
+            console.log('🎯 Usuário gerencial - Navegando para /dashboard');
+            navigate('/dashboard');
+          } else {
+            // Outros vão para lembretes (página inicial padrão)
+            console.log('🎯 Redirecionando para /lembretes');
+            navigate('/lembretes');
+          }
+        } else {
+          // Fallback padrão
+          navigate('/lembretes');
+        }
       } else {
         console.error('❌ Login falhou:', result.error);
         setError(result.error || 'Erro desconhecido ao fazer login');

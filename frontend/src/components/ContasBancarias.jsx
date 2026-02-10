@@ -11,6 +11,13 @@ const TIPOS_CONTA = [
   { value: 'digital', label: 'Carteira Digital', icon: CreditCard, cor_padrao: '#2563eb' }
 ];
 
+const ICONES_DISPONIVEIS = [
+  '🏦', '💰', '💳', '💵', '💸', '🏧',
+  '🪙', '💴', '💶', '💷', '🤑', '💲',
+  '🔒', '🏦', '🏪', '🏢', '🏭', '🎯',
+  '📊', '📈', '💼', '👛', '🎁', '⚡'
+];
+
 function ContasBancarias() {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,17 +102,32 @@ function ContasBancarias() {
     e.preventDefault();
     
     try {
+      // Garantir que os dados estão no formato correto
+      const dadosEnvio = {
+        nome: formData.nome.trim(),
+        tipo: formData.tipo,
+        banco: formData.banco?.trim() || null,
+        saldo_inicial: Number(formData.saldo_inicial) || 0,
+        cor: formData.cor,
+        icone: formData.icone || '🏦',
+        ativa: Boolean(formData.ativa)
+      };
+
+      console.log('Enviando dados:', dadosEnvio);
+      
       if (contaSelecionada) {
-        await api.put(`/api/contas-bancarias/${contaSelecionada.id}`, formData);
+        await api.put(`/api/contas-bancarias/${contaSelecionada.id}`, dadosEnvio);
       } else {
-        await api.post('/api/contas-bancarias', formData);
+        await api.post('/api/contas-bancarias', dadosEnvio);
       }
       
       await carregarContas();
       setModalAberto(false);
+      setErro('');
     } catch (error) {
-      console.error('Erro:', error);
-      setErro(error.response?.data?.detail || 'Erro ao salvar conta');
+      console.error('Erro completo:', error);
+      console.error('Response:', error.response);
+      setErro(error.response?.data?.detail || error.message || 'Erro ao salvar conta');
     }
   };
 
@@ -397,14 +419,33 @@ function ContasBancarias() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ícone (Emoji)</label>
-                  <input
-                    type="text"
-                    value={formData.icone}
-                    onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl"
-                    maxLength={2}
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ícone Atual</label>
+                  <div 
+                    className="w-full h-10 border border-gray-300 rounded-lg flex items-center justify-center text-2xl bg-white"
+                    style={{ backgroundColor: `${formData.cor}10` }}
+                  >
+                    {formData.icone}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Escolher Ícone</label>
+                <div className="grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-32 overflow-y-auto">
+                  {ICONES_DISPONIVEIS.map((icone, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, icone })}
+                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition hover:scale-110 ${
+                        formData.icone === icone 
+                          ? 'bg-blue-100 border-2 border-blue-500 ring-2 ring-blue-200' 
+                          : 'bg-white border border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {icone}
+                    </button>
+                  ))}
                 </div>
               </div>
 

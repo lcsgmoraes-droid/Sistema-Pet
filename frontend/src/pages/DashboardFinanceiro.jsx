@@ -10,11 +10,13 @@ import {
   TrendingUp, TrendingDown, DollarSign, AlertCircle, 
   ShoppingCart, FileText, Package, Store, Sparkles
 } from 'lucide-react';
+import ClassificarLancamentosModal from '../components/ClassificarLancamentosModal';
 
 const DashboardFinanceiro = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [periodoDias, setPeriodoDias] = useState(30);
+  const [modalClassificarOpen, setModalClassificarOpen] = useState(false);
   const [resumo, setResumo] = useState({
     saldo_atual: 0,
     contas_receber: { total: 0, vencidas: 0 },
@@ -144,21 +146,32 @@ const DashboardFinanceiro = () => {
           <p className="text-gray-600 mt-1">Visão consolidada do seu negócio</p>
         </div>
         
-        {/* Seletor de período */}
-        <div className="flex gap-2">
-          {[7, 15, 30, 60, 90].map(dias => (
-            <button
-              key={dias}
-              onClick={() => setPeriodoDias(dias)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                periodoDias === dias
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              {dias} dias
-            </button>
-          ))}
+        <div className="flex gap-3 items-center">
+          {/* Botão Classificar Lançamentos */}
+          <button
+            onClick={() => setModalClassificarOpen(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+          >
+            <span className="text-xl">🏷️</span>
+            Classificar DRE
+          </button>
+          
+          {/* Seletor de período */}
+          <div className="flex gap-2">
+            {[7, 15, 30, 60, 90].map(dias => (
+              <button
+                key={dias}
+                onClick={() => setPeriodoDias(dias)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  periodoDias === dias
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                {dias} dias
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -488,6 +501,12 @@ const DashboardFinanceiro = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Classificação DRE */}
+      <ClassificarLancamentosModal 
+        isOpen={modalClassificarOpen}
+        onClose={() => setModalClassificarOpen(false)}
+      />
     </div>
   );
 };

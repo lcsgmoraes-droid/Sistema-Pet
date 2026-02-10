@@ -29,8 +29,7 @@ if backend_dir not in sys.path:
 
 from app.comissoes_estorno import estornar_comissoes_venda
 from app.vendas_models import Venda, VendaItem
-from app.models import User
-from app.auth.models import Tenant
+from app.models import User, Tenant
 
 
 # Configuração do banco de dados de teste
@@ -371,8 +370,8 @@ class TestTransactionRollbackEstornoComissoes:
         
         # 1. Quantidade de comissões não mudou
         assert len(comissoes_depois) == len(comissoes_antes), \
-            f"❌ FALHA: Quantidade de comissões mudou ({len(comissoes_antes)} → {len(comissoes_depois)})"
-        print(f"✅ Quantidade de comissões NÃO mudou (total: {len(comissoes_depois)})")
+            f"❌ FALHA: Quantidade de comissões mudou ({len(comissoes_antes)} --> {len(comissoes_depois)})"
+        print(f"✓ Quantidade de comissões NÃO mudou (total: {len(comissoes_depois)})")
         
         # 2. Verificar que NENHUMA comissão foi estornada
         for i, comissao_depois in enumerate(comissoes_depois):
@@ -380,7 +379,7 @@ class TestTransactionRollbackEstornoComissoes:
             
             # Status não mudou
             assert comissao_depois[1] == comissao_antes[1], \
-                f"❌ FALHA: Status da comissão {comissao_depois[0]} mudou ({comissao_antes[1]} → {comissao_depois[1]})"
+                f"❌ FALHA: Status da comissão {comissao_depois[0]} mudou ({comissao_antes[1]} --> {comissao_depois[1]})"
             assert comissao_depois[1] == 'pendente', \
                 f"❌ FALHA: Status da comissão {comissao_depois[0]} deveria ser 'pendente', mas é '{comissao_depois[1]}'"
             

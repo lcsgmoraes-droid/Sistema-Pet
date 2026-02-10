@@ -214,7 +214,7 @@ def conferencia_com_filtros_avancados(
                 comissao_dict = ComissaoItem(
                     id=row.id,
                     venda_id=row.venda_id,
-                    data_venda=row.data_venda,
+                    data_venda=row.data_venda.isoformat() if row.data_venda else None,
                     produto_id=row.produto_id,
                     nome_produto=row.nome_produto or f'Produto #{row.produto_id}',
                     cliente_nome=cliente_nome,

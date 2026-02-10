@@ -137,6 +137,7 @@ def get_resumo_diario(
     }
     ```
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("resumo-diario", current_user.id, {"data": data or date.today()})
     return queries.obter_resumo_diario_ou_vazio(db, data)
 
@@ -177,6 +178,7 @@ def get_receita_mensal(
     }
     ```
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("receita-mensal", current_user.id, {"mes_referencia": mes_referencia or date.today()})
     return queries.obter_receita_mensal_ou_vazia(db, mes_referencia)
 
@@ -229,6 +231,7 @@ def get_ranking_parceiros(
     ]
     ```
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("ranking-parceiros", current_user.id, {"mes_referencia": mes_referencia, "limite": limite})
     return queries.obter_ranking_parceiros(db, mes_referencia=mes_referencia, limite=limite)
 
@@ -253,6 +256,7 @@ def get_estatisticas_gerais(
     
     **Ideal para:** Dashboards gerenciais, home screens
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("estatisticas-gerais", current_user.id, {})
     return queries.obter_estatisticas_gerais(db)
 
@@ -282,6 +286,7 @@ def get_ultimos_dias(
     
     **Uso comum:** Gráficos de tendência, análise temporal
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("ultimos-dias", current_user.id, {"quantidade": quantidade})
     return queries.obter_ultimos_dias(db, quantidade_dias=quantidade)
 
@@ -311,6 +316,7 @@ def get_resumo_periodo(
     - `data_fim`: Data final (inclusiva)
     """
     validate_date_range(data_inicio, data_fim)
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("periodo", current_user.id, {"data_inicio": data_inicio, "data_fim": data_fim})
     return queries.obter_resumo_periodo(db, data_inicio, data_fim)
 
@@ -340,6 +346,7 @@ def get_comparativo_receita(
     
     **Uso comum:** Gráficos de evolução, projeções, análise de tendência
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("comparativo-receita", current_user.id, {"meses": meses})
     return queries.obter_comparativo_mensal(db, meses=meses)
 
@@ -372,6 +379,7 @@ def get_performance_funcionario(
     - `funcionario_id`: ID do funcionário (path parameter)
     - `mes_referencia`: Mês desejado (query parameter, padrão: atual)
     """
+    current_user, tenant_id = user_and_tenant
     log_analytics_request("performance-funcionario", current_user.id, {"funcionario_id": funcionario_id, "mes_referencia": mes_referencia})
     
     performance = queries.obter_performance_funcionario(

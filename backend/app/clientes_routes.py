@@ -1446,10 +1446,10 @@ def remover_campo_duplicado(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
     # Validar campo
-    if campo not in ["telefone", "celular", "cpf"]:
+    if campo not in ["telefone", "celular", "cpf", "cnpj"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campo inválido. Use: telefone, celular ou cpf"
+            detail="Campo inválido. Use: telefone, celular, cpf ou cnpj"
         )
     
     # Buscar cliente antigo
@@ -2237,10 +2237,10 @@ def obter_timeline_cliente(
             detail="Cliente não encontrado"
         )
     
-    return _obter_timeline("cliente_timeline", cliente_id, tipo_evento, pet_id, limit)
+    return _obter_timeline(db, "cliente_timeline", cliente_id, tipo_evento, pet_id, limit)
 
 
-def _obter_timeline(view_name: str, entity_id: int, tipo_evento: Optional[str], pet_id: Optional[int], limit: int):
+def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Optional[str], pet_id: Optional[int], limit: int):
     """Função auxiliar para buscar timeline de qualquer entidade"""
     # Query na VIEW otimizada
     id_column = "cliente_id" if "cliente" in view_name else "fornecedor_id"
@@ -2277,28 +2277,23 @@ def _obter_timeline(view_name: str, entity_id: int, tipo_evento: Optional[str], 
     params["limit"] = limit
     
     # Executar query com SQLAlchemy
-    from app.db import SessionLocal
     from sqlalchemy import text
     
-    db = SessionLocal()
-    try:
-        result = db.execute(text(query), params)
-        
-        eventos = []
-        for row in result:
-            eventos.append(TimelineEvento(
-                tipo_evento=row.tipo_evento,
-                evento_id=row.evento_id,
-                cliente_id=row.entity_id,
-                pet_id=row.pet_id,
-                data_evento=datetime.fromisoformat(row.data_evento) if isinstance(row.data_evento, str) else row.data_evento,
-                titulo=row.titulo,
-                descricao=row.descricao,
-                status=row.status,
-                cor_badge=row.cor_badge
-            ))
-    finally:
-        db.close()
+    result = db.execute(text(query), params)
+    
+    eventos = []
+    for row in result:
+        eventos.append(TimelineEvento(
+            tipo_evento=row.tipo_evento,
+            evento_id=row.evento_id,
+            cliente_id=row.entity_id,
+            pet_id=row.pet_id,
+            data_evento=datetime.fromisoformat(row.data_evento) if isinstance(row.data_evento, str) else row.data_evento,
+            titulo=row.titulo,
+            descricao=row.descricao,
+            status=row.status,
+            cor_badge=row.cor_badge
+        ))
     
     return eventos
 
@@ -2338,7 +2333,7 @@ def obter_timeline_fornecedor(
             detail="Fornecedor não encontrado"
         )
     
-    return _obter_timeline("fornecedor_timeline", fornecedor_id, tipo_evento, None, limit)
+    return _obter_timeline(db, "fornecedor_timeline", fornecedor_id, tipo_evento, None, limit)
 
 
 # ============================================================

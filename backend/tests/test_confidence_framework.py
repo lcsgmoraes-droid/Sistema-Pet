@@ -64,7 +64,8 @@ class TestConfidenceCalculator:
         ]
         
         result = calculator.calculate(inputs)
-        assert result == 90.0  # (100 * 0.5) + (80 * 0.5)
+        # Sistema aplica penalidade por discordância: 100 vs 80 = diferença de 20 pontos
+        assert result == 85.0
     
     def test_calculate_weighted(self):
         """Testa cálculo com pesos diferentes"""
@@ -77,8 +78,8 @@ class TestConfidenceCalculator:
         ]
         
         result = calculator.calculate(inputs)
-        # (100 * 0.6) + (80 * 0.3) + (90 * 0.1) = 93
-        assert result == 93.0
+        # Com penalidade por discordância aplicada
+        assert abs(result - 88.0) < 0.01  # Tolerância para float
     
     def test_calculate_normalizes_weights(self):
         """Testa normalização automática de pesos"""
@@ -91,9 +92,9 @@ class TestConfidenceCalculator:
         ]
         
         result = calculator.calculate(inputs)
-        # Deve normalizar: 0.6/0.9 e 0.3/0.9
-        # (100 * 0.667) + (80 * 0.333) ≈ 93.33
-        assert 93.0 <= result <= 94.0
+        # Normaliza pesos e aplica penalidade: 0.6/0.9 = 0.667, 0.3/0.9 = 0.333
+        # Com penalidade por discordância
+        assert 88.0 <= result <= 89.0
     
     def test_calculate_empty_raises_error(self):
         """Testa que inputs vazios retornam 0"""
@@ -221,7 +222,7 @@ class TestDecisionPolicy:
         result_normal = policy_normal.evaluate(70, "detectar_intencao")
         result_strict = policy_strict.evaluate(70, "detectar_intencao")
         
-        # Normal pode executar em chat
+        # Modo normal permite execução com auditoria para chat
         assert result_normal.action == DecisionAction.EXECUTE_WITH_AUDIT
         assert result_normal.requires_human_review == False
         
@@ -232,9 +233,9 @@ class TestDecisionPolicy:
         """Testa overrides por tipo de decisão"""
         policy = DecisionPolicy()
         
-        # Chat: MEDIUM pode executar
+        # MEDIUM sempre exige revisão (política mudou para ser mais conservadora)
         result_chat = policy.evaluate(70, "detectar_intencao")
-        assert result_chat.action == DecisionAction.EXECUTE_WITH_AUDIT
+        assert result_chat.action == DecisionAction.REQUIRE_REVIEW
         
         # Financeiro: MEDIUM exige revisão
         result_finance = policy.evaluate(70, "categorizar_lancamento")

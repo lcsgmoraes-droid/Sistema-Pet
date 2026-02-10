@@ -58,6 +58,7 @@ from app.relatorio_vendas_routes import router as relatorio_vendas_router
 from app.dre_routes import router as dre_router
 from app.dre_canais_routes import router as dre_canais_router
 from app.dre_plano_contas_routes import router as dre_plano_contas_router
+from app.dre_classificacao_routes import router as dre_classificacao_router
 from app.ia_routes import router as ia_router
 from app.chat_routes import router as chat_router
 from app.dre_ia_routes import router as dre_ia_router
@@ -74,6 +75,7 @@ from app.comissoes_routes import router as comissoes_router
 from app.analytics.api import router as analytics_router
 from app.comissoes_demonstrativo_routes import router as comissoes_demonstrativo_router
 from app.comissoes_avancadas_routes import router as comissoes_avancadas_router
+from app.comissoes_diagnostico_routes import router as comissoes_diagnostico_router
 from app.routers.relatorios_comissoes import router as relatorios_comissoes_router
 from app.routes.acertos_routes import router as acertos_router
 from app.audit.api import router as audit_router
@@ -98,6 +100,8 @@ from app.projecao_caixa_routes import router as projecao_caixa_router
 from app.simulacao_contratacao_routes import router as simulacao_contratacao_router
 from app.cargos_routes import router as cargos_router
 from app.funcionarios_routes import router as funcionarios_router
+from app.empresa_config_routes import router as empresa_config_router
+from app.pdv_indicadores_routes import router as pdv_indicadores_router
 from app.empresa_routes import router as empresa_router
 from app.api.endpoints.configuracoes_entrega import router as configuracoes_entrega_router
 from app.api.endpoints.rotas_entrega import router as rotas_entrega_router
@@ -207,11 +211,15 @@ app = FastAPI(
 from app.middlewares.request_context import RequestContextMiddleware
 app.add_middleware(RequestContextMiddleware)
 
-# 2️⃣ Request Logging (legacy) - mantido para compatibilidade
+# 2️⃣ Security Audit - detecção de ataques (SQL injection, XSS, etc)
+from app.middlewares.security_audit import SecurityAuditMiddleware
+app.add_middleware(SecurityAuditMiddleware)
+
+# 3️⃣ Request Logging (legacy) - mantido para compatibilidade
 from app.middlewares.request_logging import RequestLoggingMiddleware
 app.add_middleware(RequestLoggingMiddleware)
 
-# 3️⃣ Rate Limit - protege contra brute force e spam
+# 4️⃣ Rate Limit - protege contra brute force e spam
 from app.middlewares.rate_limit import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware)
 
@@ -310,6 +318,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     # Log estruturado de erro (ERROR)
     from app.utils.logger import logger as structured_logger
+    from app.config import ENVIRONMENT
+    
     structured_logger.error(
         event="unhandled_exception",
         message=f"Erro 500: {str(exc)}",
@@ -319,13 +329,36 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
     logger.error(f"❌ Erro 500: {str(exc)}", exc_info=True)
     
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "internal_server_error",
-            "message": "Erro interno no servidor",
-            "detail": str(exc) if app.debug else "Entre em contato com o suporte"
-        },
+    # Sanitização de erros em produção
+    # Em produção: NÃO expor detalhes internos
+    # Em dev/staging: Mostrar detalhes para debugging
+    is_production = ENVIRONMENT.lower() in ["production", "prod"]
+    
+    if is_production:
+        # Produção: Mensagem genérica (sem detalhes)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "internal_server_error",
+                "message": "Erro interno no servidor. Nossa equipe foi notificada.",
+            },
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Allow-Methods": "*",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    else:
+        # Dev/Staging: Mostrar detalhes para debugging
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "internal_server_error",
+                "message": "Erro interno no servidor",
+                "detail": str(exc),  # Apenas em dev
+                "type": type(exc).__name__,  # Apenas em dev
+            },
         headers={
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Credentials": "true",
@@ -382,12 +415,14 @@ app.include_router(formas_pagamento_router, tags=["Formas de Pagamento & PDV"])
 app.include_router(comissoes_router, tags=["Comissões"])
 app.include_router(comissoes_demonstrativo_router, tags=["Comissões - Demonstrativo"])
 app.include_router(comissoes_avancadas_router, tags=["Comissões - Avançadas"])
+app.include_router(comissoes_diagnostico_router, tags=["Comissões - Diagnóstico"])
 app.include_router(relatorios_comissoes_router, tags=["Comissões - Relatórios Analíticos"])
 app.include_router(acertos_router, prefix="/acertos", tags=["Acertos Financeiros de Parceiros"])
 
 app.include_router(dre_router, tags=["Financeiro - DRE"])
 app.include_router(dre_canais_router, tags=["Financeiro - DRE por Canal"])
 app.include_router(dre_plano_contas_router)
+app.include_router(dre_classificacao_router, tags=["DRE - Classificação Automática"])
 app.include_router(contas_bancarias_router, tags=["Financeiro - Contas Bancárias"])
 app.include_router(financeiro_router, tags=["Financeiro - Configurações"])
 app.include_router(lancamentos_router, tags=["Financeiro - Lançamentos"])
@@ -419,6 +454,8 @@ app.include_router(projecao_caixa_router, tags=["Projeção de Caixa - IA Determ
 app.include_router(simulacao_contratacao_router, tags=["Simulação de Contratação - IA Determinística"])
 app.include_router(cargos_router, tags=["RH - Cargos"])
 app.include_router(funcionarios_router, tags=["RH - Funcionários"])
+app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
+app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
 app.include_router(empresa_router, tags=["Empresa - Configurações"])
 app.include_router(configuracoes_entrega_router, tags=["Configurações - Entregas"])
 app.include_router(rotas_entrega_router, tags=["Entregas - Rotas"])

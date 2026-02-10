@@ -31,7 +31,6 @@ const Layout = () => {
     
     // Verifica se a permissão específica existe
     const hasAccess = user.permissions.includes(permission);
-    console.log(`${hasAccess ? '✅' : '❌'} Permissão ${permission}: ${hasAccess}`);
     return hasAccess;
   };
   
@@ -81,9 +80,9 @@ const Layout = () => {
       label: 'Compras',
       permission: 'compras.gerenciar',
       submenu: [
-        { path: '/compras/pedidos', label: 'Pedidos de Compra' },
-        { path: '/compras/entrada-xml', label: 'Entrada por XML' },
-        { path: '/compras/bling', label: 'Sinc. Bling' },
+        { path: '/compras/pedidos', label: 'Pedidos de Compra', permission: 'compras.pedidos' },
+        { path: '/compras/entrada-xml', label: 'Entrada por XML', permission: 'compras.entrada_xml' },
+        { path: '/compras/bling', label: 'Sinc. Bling', permission: 'compras.sincronizacao_bling' },
       ]
     },
     { 
@@ -92,16 +91,16 @@ const Layout = () => {
       label: 'Financeiro/Contábil',
       permission: 'relatorios.financeiro',
       submenu: [
-        { path: '/financeiro', label: 'Dashboard' },
-        { path: '/financeiro/vendas', label: 'Vendas' },
-        { path: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa' },
-        { path: '/financeiro/dre', label: 'DRE' },
-        { path: '/financeiro/contas-pagar', label: 'Contas a Pagar' },
-        { path: '/financeiro/contas-receber', label: 'Contas a Receber' },
-        { path: '/financeiro/contas', label: 'Contas Bancárias' },
-        { path: '/financeiro/formas-pagamento', label: 'Formas de Pagamento' },
-        { path: '/financeiro/relatorio-taxas', label: 'Relatório de Taxas' },
-        { path: '/financeiro/conciliacao-cartao', label: 'Conciliação de Cartão' },
+        { path: '/financeiro', label: 'Dashboard', permission: 'financeiro.dashboard' },
+        { path: '/financeiro/vendas', label: 'Vendas', permission: 'financeiro.vendas' },
+        { path: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa', permission: 'financeiro.fluxo_caixa' },
+        { path: '/financeiro/dre', label: 'DRE', permission: 'financeiro.dre' },
+        { path: '/financeiro/contas-pagar', label: 'Contas a Pagar', permission: 'financeiro.contas_pagar' },
+        { path: '/financeiro/contas-receber', label: 'Contas a Receber', permission: 'financeiro.contas_receber' },
+        { path: '/financeiro/contas', label: 'Contas Bancárias', permission: 'financeiro.contas_bancarias' },
+        { path: '/financeiro/formas-pagamento', label: 'Formas de Pagamento', permission: 'financeiro.formas_pagamento' },
+        { path: '/financeiro/relatorio-taxas', label: 'Relatório de Taxas', permission: 'financeiro.relatorio_taxas' },
+        { path: '/financeiro/conciliacao-cartao', label: 'Conciliação de Cartão', permission: 'financeiro.conciliacao_cartao' },
       ]
     },
     { 
@@ -110,11 +109,11 @@ const Layout = () => {
       label: 'Comissões',
       permission: 'relatorios.financeiro', // Vinculado a relatórios financeiros
       submenu: [
-        { path: '/comissoes', label: 'Configuração' },
-        { path: '/comissoes/demonstrativo', label: 'Demonstrativo' },
-        { path: '/comissoes/abertas', label: 'Comissões em Aberto' },
-        { path: '/comissoes/fechamentos', label: 'Histórico de Fechamentos' },
-        { path: '/comissoes/relatorios', label: '📊 Relatórios Analíticos' },
+        { path: '/comissoes', label: 'Configuração', permission: 'comissoes.configurar' },
+        { path: '/comissoes/demonstrativo', label: 'Demonstrativo', permission: 'comissoes.demonstrativo' },
+        { path: '/comissoes/abertas', label: 'Comissões em Aberto', permission: 'comissoes.abertas' },
+        { path: '/comissoes/fechamentos', label: 'Histórico de Fechamentos', permission: 'comissoes.fechamentos' },
+        { path: '/comissoes/relatorios', label: '📊 Relatórios Analíticos', permission: 'comissoes.relatorios' },
       ]
     },
     { 
@@ -123,8 +122,10 @@ const Layout = () => {
       label: 'Entregas',
       permission: 'vendas.visualizar', // Vinculado a vendas
       submenu: [
-        { path: '/entregas/abertas', label: 'Entregas em Aberto' },
-        { path: '/entregas/rotas', label: 'Rotas de Entrega' },        { path: '/entregas/historico', label: '📜 Histórico' },        { path: '/entregas/financeiro', label: '📊 Dashboard Financeiro' },
+        { path: '/entregas/abertas', label: 'Entregas em Aberto', permission: 'entregas.abertas' },
+        { path: '/entregas/rotas', label: 'Rotas de Entrega', permission: 'entregas.rotas' },
+        { path: '/entregas/historico', label: '📜 Histórico', permission: 'entregas.historico' },
+        { path: '/entregas/financeiro', label: '📊 Dashboard Financeiro', permission: 'entregas.dashboard' },
       ]
     },
     { 
@@ -133,10 +134,10 @@ const Layout = () => {
       label: 'Cadastros',
       permission: 'configuracoes.editar', // Vinculado a configurações
       submenu: [
-        { path: '/cadastros/cargos', label: 'Cargos' },
-        { path: '/cadastros/categorias', label: 'Categorias de Produtos' },
-        { path: '/cadastros/categorias-financeiras', label: 'Categorias Financeiras' },
-        { path: '/cadastros/especies-racas', label: 'Espécies e Raças' },
+        { path: '/cadastros/cargos', label: 'Cargos', permission: 'cadastros.cargos' },
+        { path: '/cadastros/categorias', label: 'Categorias de Produtos', permission: 'cadastros.categorias_produtos' },
+        { path: '/cadastros/categorias-financeiras', label: 'Categorias Financeiras', permission: 'cadastros.categorias_financeiras' },
+        { path: '/cadastros/especies-racas', label: 'Espécies e Raças', permission: 'cadastros.especies_racas' },
       ]
     },
     { 
@@ -145,7 +146,7 @@ const Layout = () => {
       label: 'Recursos Humanos',
       permission: 'usuarios.manage', // Vinculado a gerenciar usuários
       submenu: [
-        { path: '/rh/funcionarios', label: 'Funcionários' },
+        { path: '/rh/funcionarios', label: 'Funcionários', permission: 'rh.funcionarios' },
       ]
     },
     { 
@@ -165,8 +166,8 @@ const Layout = () => {
       label: 'Administração',
       permission: 'usuarios.manage',
       submenu: [
-        { path: '/admin/usuarios', label: 'Usuários' },
-        { path: '/admin/roles', label: 'Roles & Permissões' },
+        { path: '/admin/usuarios', label: 'Usuários', permission: 'usuarios.manage' },
+        { path: '/admin/roles', label: 'Roles & Permissões', permission: 'usuarios.manage' },
       ]
     },
     { 
@@ -175,10 +176,10 @@ const Layout = () => {
       label: 'Configurações',
       permission: 'configuracoes.editar',
       submenu: [
-        { path: '/configuracoes/fiscal', label: 'Configuração da Empresa' },
-        { path: '/configuracoes/entregas', label: 'Entregas' },
-        { path: '/configuracoes/custos-moto', label: 'Custos da Moto' },
-        { path: '/configuracoes/simples/fechamento', label: 'Fechamento Mensal' },
+        { path: '/configuracoes/fiscal', label: 'Configuração da Empresa', permission: 'configuracoes.empresa' },
+        { path: '/configuracoes/entregas', label: 'Entregas', permission: 'configuracoes.entregas' },
+        { path: '/configuracoes/custos-moto', label: 'Custos da Moto', permission: 'configuracoes.custos_moto' },
+        { path: '/configuracoes/simples/fechamento', label: 'Fechamento Mensal', permission: 'configuracoes.fechamento_mensal' },
       ]
     },
   ];

@@ -49,7 +49,9 @@ def get_current_user_and_tenant(
         # Decodificar token novamente para extrair tenant_id
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         tenant_id_str = payload.get("tenant_id")
+        user_email = payload.get("sub")  # email do usuário
         
+        logger.warning(f"🔐 [AUTH] User: {user_email} | Tenant ID no JWT: {tenant_id_str}")
         logger.debug(f"[get_current_user_and_tenant] tenant_id no JWT: {tenant_id_str}")
         
         if not tenant_id_str:

@@ -1,5 +1,5 @@
 """
-"""DecisionService - Orquestrador de decisões com Framework Global de Confiança
+DecisionService - Orquestrador de decisões com Framework Global de Confiança
 """
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
@@ -34,7 +34,7 @@ class DecisionService:
     1. Engine gera decisão inicial
     2. Calculator calcula confiança agregada
     3. Policy decide ação (EXECUTE, REVIEW, SUGGEST, IGNORE)
-    4. Se REVIEW necessário → adiciona à Review Queue
+    4. Se REVIEW necessário --> adiciona à Review Queue
     5. Decisão é logada
     6. Sistema decide o que fazer (não o AI CORE)
     """
@@ -72,7 +72,7 @@ class DecisionService:
             pattern_type=self._get_pattern_type(context.decision_type.value)
         )
         
-        # 2. Tentar engines em ordem de performance (rápido → lento)
+        # 2. Tentar engines em ordem de performance (rápido --> lento)
         sorted_engines = sorted(self.engines, key=lambda e: e.tier)
         
         result = None
@@ -81,7 +81,7 @@ class DecisionService:
                 continue
             
             try:
-                logger.info(f"  → Tentando {engine.name} (tier {engine.tier})...")
+                logger.info(f"  --> Tentando {engine.name} (tier {engine.tier})...")
                 result = await engine.decide(context, user_patterns)
                 
                 # Se confiança alta suficiente, para aqui
@@ -261,7 +261,7 @@ class DecisionService:
         """
         Cria resumo legível da decisão para o revisor.
         
-        Formato: "Tipo: valor → sugestão"
+        Formato: "Tipo: valor --> sugestão"
         """
         decision_type = result.decision_type.replace("_", " ").title()
         
@@ -275,7 +275,6 @@ class DecisionService:
                     break
         
         return f"{decision_type}: {main_value} (confiança: {result.confidence_score}%)"
-            return None
     
     def _create_fallback_result(self, context: DecisionContext) -> DecisionResult:
         """Cria resultado de fallback quando tudo falha"""

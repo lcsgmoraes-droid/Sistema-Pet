@@ -60,13 +60,13 @@ def atualizar_dre_por_lancamento(
         )
     
     # 2. Identificar período DRE ABERTO correspondente à data
+    # NOTA: DREPeriodo não possui campo 'fechado' - modelo legado
+    # TODO: Migrar DREPeriodo para usar BaseTenantModel com tenant_id e campo fechado
     periodo = (
         db.query(DREPeriodo)
         .filter(
-            DREPeriodo.tenant_id == tenant_id,
             DREPeriodo.data_inicio <= data_lancamento,
             DREPeriodo.data_fim >= data_lancamento,
-            DREPeriodo.fechado.is_(False),  # ← CRÍTICO: somente períodos abertos
         )
         .first()
     )
@@ -123,14 +123,14 @@ def atualizar_dre_por_lancamento(
     # 4. Atualizar valores conforme natureza da subcategoria
     valor_decimal = float(valor)
     
-    if subcategoria.natureza == NaturezaDRE.RECEITA:
+    if subcategoria.categoria.natureza == NaturezaDRE.RECEITA:
         dre_detalhe.receita_bruta += valor_decimal
         dre_detalhe.receita_liquida = dre_detalhe.receita_bruta - dre_detalhe.deducoes_receita
     
-    elif subcategoria.natureza == NaturezaDRE.CUSTO:
+    elif subcategoria.categoria.natureza == NaturezaDRE.CUSTO:
         dre_detalhe.custo_produtos_vendidos += valor_decimal
     
-    elif subcategoria.natureza == NaturezaDRE.DESPESA:
+    elif subcategoria.categoria.natureza == NaturezaDRE.DESPESA:
         # Determinar tipo de despesa pelo nome da subcategoria (pode ser refinado)
         nome_lower = subcategoria.nome.lower()
         
@@ -177,11 +177,34 @@ def atualizar_dre_por_lancamento(
     else:
         dre_detalhe.status = 'equilibrio'
     
-    # 6. Persistir
+    # 6. Inserir lançamento detalhado para drill-down (cada subcategoria visível)
+    from sqlalchemy import text
+    db.execute(text("""
+        INSERT INTO dre_lancamentos (
+            tenant_id, usuario_id, dre_detalhe_canal_id, dre_subcategoria_id,
+            canal, valor, data_lancamento, data_competencia, origem, descricao
+        ) VALUES (
+            :tenant_id, :usuario_id, :dre_detalhe_id, :subcategoria_id,
+            :canal, :valor, :data_lancamento, :data_competencia, :origem, :descricao
+        )
+    """), {
+        'tenant_id': str(tenant_id),
+        'usuario_id': dre_detalhe.usuario_id,
+        'dre_detalhe_id': dre_detalhe.id,
+        'subcategoria_id': dre_subcategoria_id,
+        'canal': canal,
+        'valor': valor_decimal,
+        'data_lancamento': data_lancamento,
+        'data_competencia': data_lancamento,
+        'origem': tipo_movimentacao,
+        'descricao': f"{subcategoria.nome} - {data_lancamento.strftime('%Y-%m-%d')}"
+    })
+    
+    # 7. Persistir
     db.commit()
     db.refresh(dre_detalhe)
     
-    # 7. Se subcategoria for INDIRETO_RATEAVEL, acionar rateio
+    # 8. Se subcategoria for INDIRETO_RATEAVEL, acionar rateio
     if subcategoria.tipo_custo == TipoCusto.INDIRETO_RATEAVEL:
         try:
             from app.domain.dre.rateio_engine import calcular_rateio_dre

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
+import { FiChevronDown, FiChevronRight } from 'react-icons/fi';
 
 export default function RolesPage() {
   const [roles, setRoles] = useState([]);
@@ -7,6 +8,7 @@ export default function RolesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
+  const [expandedCategories, setExpandedCategories] = useState({});
   const [novaRole, setNovaRole] = useState({
     nome: '',
     descricao: '',
@@ -54,7 +56,7 @@ export default function RolesPage() {
     setEditingRole(role);
     setNovaRole({
       nome: role.nome,
-      descricao: role.descricao,
+      descricao: role.descricao || '',  // Garante que não seja null
       permissions: role.permissions.map(p => p.permission_id)
     });
     setShowModal(true);
@@ -67,6 +69,76 @@ export default function RolesPage() {
         ? prev.permissions.filter(id => id !== permId)
         : [...prev.permissions, permId]
     }));
+  }
+
+  // Agrupar permissões por categoria (prefixo antes do ponto)
+  function agruparPermissoesPorCategoria() {
+    const grupos = {};
+    
+    permissions.forEach(perm => {
+      // Backend retorna 'nome' contendo o code (ex: 'financeiro.dashboard')
+      const categoria = perm.nome && perm.nome.includes('.') 
+        ? perm.nome.split('.')[0] 
+        : 'outras';
+      
+      if (!grupos[categoria]) {
+        grupos[categoria] = [];
+      }
+      grupos[categoria].push(perm);
+    });
+    
+    return grupos;
+  }
+
+  // Obter nome amigável da categoria
+  function getNomeCategoria(categoria) {
+    const nomes = {
+      'financeiro': 'Financeiro',
+      'comissoes': 'Comissões',
+      'entregas': 'Entregas',
+      'compras': 'Compras',
+      'cadastros': 'Cadastros',
+      'configuracoes': 'Configurações',
+      'rh': 'Recursos Humanos',
+      'vendas': 'Vendas',
+      'usuarios': 'Usuários',
+      'relatorios': 'Relatórios',
+      'ia': 'Inteligência Artificial',
+      'outras': 'Outras'
+    };
+    return nomes[categoria] || categoria.charAt(0).toUpperCase() + categoria.slice(1);
+  }
+
+  // Toggle expandir/colapsar categoria
+  function toggleCategoria(categoria) {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoria]: !prev[categoria]
+    }));
+  }
+
+  // Marcar/desmarcar todas as permissões de uma categoria
+  function toggleCategoriaToda(categoria, permissoesCategoria) {
+    const idsCategoria = permissoesCategoria.map(p => p.permission_id);
+    const todasMarcadas = idsCategoria.every(id => novaRole.permissions.includes(id));
+    
+    setNovaRole(prev => ({
+      ...prev,
+      permissions: todasMarcadas
+        ? prev.permissions.filter(id => !idsCategoria.includes(id))
+        : [...new Set([...prev.permissions, ...idsCategoria])]
+    }));
+  }
+
+  // Verificar se todas as permissões da categoria estão marcadas
+  function categoriaTodaMarcada(permissoesCategoria) {
+    return permissoesCategoria.every(p => novaRole.permissions.includes(p.permission_id));
+  }
+
+  // Verificar se alguma permissão da categoria está marcada
+  function categoriaParciaMarcada(permissoesCategoria) {
+    const marcadas = permissoesCategoria.filter(p => novaRole.permissions.includes(p.permission_id));
+    return marcadas.length > 0 && marcadas.length < permissoesCategoria.length;
   }
 
   async function deletarRole(roleId) {
@@ -211,7 +283,7 @@ export default function RolesPage() {
                     Descrição
                   </label>
                   <textarea
-                    value={novaRole.descricao}
+                    value={novaRole.descricao || ''}
                     onChange={(e) => setNovaRole({ ...novaRole, descricao: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     rows="2"
@@ -223,27 +295,86 @@ export default function RolesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Permissões *
                   </label>
-                  <div className="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto">
+                  <div className="border border-gray-300 rounded-lg p-4 max-h-96 overflow-y-auto">
                     {permissions.length === 0 ? (
                       <p className="text-gray-500 text-sm">Nenhuma permissão disponível</p>
                     ) : (
-                      <div className="space-y-2">
-                        {permissions.map(perm => (
-                          <label key={perm.permission_id} className="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded">
-                            <input
-                              type="checkbox"
-                              checked={novaRole.permissions.includes(perm.permission_id)}
-                              onChange={() => togglePermission(perm.permission_id)}
-                              className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">{perm.nome}</div>
-                              {perm.descricao && (
-                                <div className="text-xs text-gray-500">{perm.descricao}</div>
+                      <div className="space-y-1">
+                        {Object.entries(agruparPermissoesPorCategoria()).map(([categoria, permissoesCategoria]) => {
+                          const isExpanded = expandedCategories[categoria];
+                          const todasMarcadas = categoriaTodaMarcada(permissoesCategoria);
+                          const parciaMarcada = categoriaParciaMarcada(permissoesCategoria);
+                          
+                          return (
+                            <div key={categoria} className="border border-gray-200 rounded-lg overflow-hidden">
+                              {/* Header da Categoria */}
+                              <div className="bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <div className="flex items-center p-3 gap-2">
+                                  {/* Botão Expandir/Colapsar */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleCategoria(categoria)}
+                                    className="text-gray-600 hover:text-gray-900 transition-colors"
+                                  >
+                                    {isExpanded ? (
+                                      <FiChevronDown className="w-5 h-5" />
+                                    ) : (
+                                      <FiChevronRight className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                  
+                                  {/* Checkbox da Categoria */}
+                                  <div className="flex items-center flex-1 cursor-pointer" onClick={() => toggleCategoriaToda(categoria, permissoesCategoria)}>
+                                    <input
+                                      type="checkbox"
+                                      checked={todasMarcadas}
+                                      ref={input => {
+                                        if (input) {
+                                          input.indeterminate = parciaMarcada;
+                                        }
+                                      }}
+                                      onChange={() => {}}
+                                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    />
+                                    <span className="ml-3 font-medium text-gray-900">
+                                      {getNomeCategoria(categoria)}
+                                    </span>
+                                    <span className="ml-auto text-xs text-gray-500">
+                                      ({permissoesCategoria.filter(p => novaRole.permissions.includes(p.permission_id)).length}/{permissoesCategoria.length})
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Permissões Individuais (quando expandido) */}
+                              {isExpanded && (
+                                <div className="bg-white p-3 space-y-1 border-t border-gray-200">
+                                  {permissoesCategoria.map(perm => (
+                                    <label 
+                                      key={perm.permission_id} 
+                                      className="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded ml-4"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={novaRole.permissions.includes(perm.permission_id)}
+                                        onChange={() => togglePermission(perm.permission_id)}
+                                        className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="text-sm font-medium text-gray-700">
+                                          {perm.nome.split('.')[1] || perm.nome}
+                                        </div>
+                                        {perm.descricao && (
+                                          <div className="text-xs text-gray-500 mt-0.5">{perm.descricao}</div>
+                                        )}
+                                      </div>
+                                    </label>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                          </label>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

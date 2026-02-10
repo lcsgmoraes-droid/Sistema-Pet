@@ -649,6 +649,9 @@ class ConfiguracaoEntrega(BaseTenantModel):
     Um único registro por tenant.
     """
     __tablename__ = "configuracoes_entrega"
+
+    # Usuario dono da configuracao (legacy schema exige NOT NULL)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # Entregador padrão (FK para clientes.id que é Integer)
     entregador_padrao_id = Column(Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True)

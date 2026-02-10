@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.db import get_session
@@ -53,8 +54,8 @@ class ContaBancariaResponse(BaseModel):
     cor: Optional[str]
     icone: Optional[str]
     ativa: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     model_config = {"from_attributes": True}
 
@@ -94,10 +95,10 @@ def listar_contas(
     
     contas = query.order_by(ContaBancaria.nome).all()
     
-    # Converter saldos (centavos → reais)
+    # Converter saldos (centavos → reais) - force float para JSON
     for conta in contas:
-        conta.saldo_inicial = conta.saldo_inicial / 100
-        conta.saldo_atual = conta.saldo_atual / 100
+        conta.saldo_inicial = float(conta.saldo_inicial) / 100
+        conta.saldo_atual = float(conta.saldo_atual) / 100
     
     return contas
 
@@ -120,9 +121,9 @@ def obter_conta(
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
     
-    # Converter saldos (centavos → reais)
-    conta.saldo_inicial = conta.saldo_inicial / 100
-    conta.saldo_atual = conta.saldo_atual / 100
+    # Converter saldos (centavos → reais) - force float para JSON
+    conta.saldo_inicial = float(conta.saldo_inicial) / 100
+    conta.saldo_atual = float(conta.saldo_atual) / 100
     
     return conta
 
@@ -134,59 +135,89 @@ def criar_conta(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Cria uma nova conta bancária"""
-    current_user, tenant_id = user_and_tenant
-    
-    # Verificar se já existe conta com mesmo nome
-    existe = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.nome == conta_data.nome,
-            ContaBancaria.tenant_id == tenant_id
-        )
-    ).first()
-    
-    if existe:
-        raise HTTPException(status_code=400, detail="Já existe uma conta com este nome")
-    
-    # Converter saldo (reais → centavos)
-    saldo_centavos = int(conta_data.saldo_inicial * 100)
-    
-    # Criar conta
-    nova_conta = ContaBancaria(
-        nome=conta_data.nome,
-        tipo=conta_data.tipo,
-        banco=conta_data.banco,
-        saldo_inicial=saldo_centavos,
-        saldo_atual=saldo_centavos,
-        cor=conta_data.cor,
-        icone=conta_data.icone,
-        ativa=conta_data.ativa,
-        tenant_id=tenant_id
-    )
-    
-    db.add(nova_conta)
-    db.commit()
-    db.refresh(nova_conta)
-    
-    # Se saldo inicial > 0, criar movimentação de abertura
-    if saldo_centavos > 0:
-        movimentacao = MovimentacaoFinanceira(
-            data_movimento=datetime.utcnow(),
-            tipo="entrada",
-            valor=saldo_centavos,
-            conta_bancaria_id=nova_conta.id,
-            origem_tipo="abertura_conta",
-            status="realizado",
-            descricao=f"Saldo inicial da conta {nova_conta.nome}",
+    try:
+        current_user, tenant_id = user_and_tenant
+        
+        # Log para debug MELHORADO
+        print(f"[DEBUG] user_and_tenant type: {type(user_and_tenant)}")
+        print(f"[DEBUG] current_user type: {type(current_user)}")
+        print(f"[DEBUG] current_user: {current_user}")
+        print(f"[DEBUG] current_user.id: {getattr(current_user, 'id', 'NO ID ATTRIBUTE')}")
+        print(f"[DEBUG] tenant_id: {tenant_id}")
+        print(f"[DEBUG] Dados: {conta_data.model_dump()}")
+        
+        # Verificar se já existe conta com mesmo nome
+        existe = db.query(ContaBancaria).filter(
+            and_(
+                ContaBancaria.nome == conta_data.nome,
+                ContaBancaria.tenant_id == tenant_id
+            )
+        ).first()
+        
+        if existe:
+            raise HTTPException(status_code=400, detail="Já existe uma conta com este nome")
+        
+        # Converter saldo (reais → centavos) usando Decimal para compatibilidade com Numeric
+        # CORREÇÃO: Não multiplicar por 100 - o banco já aceita decimal direto
+        saldo_decimal = Decimal(str(conta_data.saldo_inicial))
+        
+        # CORREÇÃO CRÍTICA: Garantir que user_id não seja None
+        user_id = current_user.id if hasattr(current_user, 'id') else None
+        if user_id is None:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro interno: user_id não disponível. current_user={current_user}"
+            )
+        
+        # Criar conta
+        # NOTA: tenant_id deve ser passado explicitamente (não há auto-inject configurado)
+        nova_conta = ContaBancaria(
+            nome=conta_data.nome,
+            tipo=conta_data.tipo,
+            banco=conta_data.banco,
+            saldo_inicial=saldo_decimal,
+            saldo_atual=saldo_decimal,
+            cor=conta_data.cor,
+            icone=conta_data.icone,
+            ativa=conta_data.ativa,
+            user_id=user_id,
             tenant_id=tenant_id
         )
-        db.add(movimentacao)
+        
+        db.add(nova_conta)
         db.commit()
-    
-    # Converter para resposta (centavos → reais)
-    nova_conta.saldo_inicial = nova_conta.saldo_inicial / 100
-    nova_conta.saldo_atual = nova_conta.saldo_atual / 100
-    
-    return nova_conta
+        db.refresh(nova_conta)
+        
+        # Se saldo inicial > 0, criar movimentação de abertura
+        if saldo_decimal > 0:
+            movimentacao = MovimentacaoFinanceira(
+                data_movimento=datetime.utcnow(),
+                tipo="entrada",
+                valor=saldo_decimal,
+                conta_bancaria_id=nova_conta.id,
+                origem_tipo="abertura_conta",
+                status="realizado",
+                descricao=f"Saldo inicial da conta {nova_conta.nome}",
+                tenant_id=tenant_id
+            )
+            db.add(movimentacao)
+            db.commit()
+        
+        # Converter para resposta - já está em formato correto (Decimal)
+        nova_conta.saldo_inicial = float(nova_conta.saldo_inicial)
+        nova_conta.saldo_atual = float(nova_conta.saldo_atual)
+        
+        print(f"[DEBUG] Conta criada com sucesso - ID: {nova_conta.id}")
+        return nova_conta
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Erro ao criar conta: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro interno ao criar conta: {str(e)}")
 
 
 @router.put("/{conta_id}", response_model=ContaBancariaResponse)
@@ -197,33 +228,44 @@ def atualizar_conta(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Atualiza dados de uma conta bancária (não altera saldo)"""
-    current_user, tenant_id = user_and_tenant
-    
-    conta = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.id == conta_id,
-            ContaBancaria.tenant_id == tenant_id
-        )
-    ).first()
-    
-    if not conta:
-        raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
-    # Atualizar campos
-    update_data = conta_data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(conta, field, value)
-    
-    conta.updated_at = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(conta)
-    
-    # Converter saldos (centavos → reais)
-    conta.saldo_inicial = conta.saldo_inicial / 100
-    conta.saldo_atual = conta.saldo_atual / 100
-    
-    return conta
+    try:
+        current_user, tenant_id = user_and_tenant
+        
+        print(f"[DEBUG] Atualizando conta {conta_id} - User: {current_user.id}, Tenant: {tenant_id}")
+        
+        conta = db.query(ContaBancaria).filter(
+            and_(
+                ContaBancaria.id == conta_id,
+                ContaBancaria.tenant_id == tenant_id
+            )
+        ).first()
+        
+        if not conta:
+            raise HTTPException(status_code=404, detail="Conta não encontrada")
+        
+        # Atualizar campos
+        update_data = conta_data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(conta, field, value)
+        
+        db.commit()
+        db.refresh(conta)
+        
+        # Converter saldos (centavos → reais) - force float para JSON
+        conta.saldo_inicial = float(conta.saldo_inicial) / 100
+        conta.saldo_atual = float(conta.saldo_atual) / 100
+        
+        print(f"[DEBUG] Conta {conta_id} atualizada com sucesso")
+        return conta
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Erro ao atualizar conta: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro interno ao atualizar conta: {str(e)}")
 
 
 @router.delete("/{conta_id}")
@@ -253,7 +295,6 @@ def excluir_conta(
     if tem_movimentacoes:
         # Soft delete - apenas desativar
         conta.ativa = False
-        conta.updated_at = datetime.utcnow()
         db.commit()
         return {"message": "Conta desativada com sucesso (possui movimentações)"}
     else:
@@ -283,8 +324,8 @@ def ajustar_saldo(
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
     
-    # Converter novo saldo (reais → centavos)
-    novo_saldo_centavos = int(ajuste.novo_saldo * 100)
+    # Converter novo saldo (reais → centavos) usando Decimal
+    novo_saldo_centavos = Decimal(str(ajuste.novo_saldo * 100))
     saldo_atual_centavos = conta.saldo_atual
     
     # Calcular diferença
@@ -313,16 +354,15 @@ def ajustar_saldo(
     
     # Atualizar saldo da conta
     conta.saldo_atual = novo_saldo_centavos
-    conta.updated_at = datetime.utcnow()
     
     db.commit()
     db.refresh(conta)
     
     return {
         "message": "Saldo ajustado com sucesso",
-        "saldo_anterior": saldo_atual_centavos / 100,
-        "saldo_novo": novo_saldo_centavos / 100,
-        "diferenca": diferenca / 100,
+        "saldo_anterior": float(saldo_atual_centavos) / 100,
+        "saldo_novo": float(novo_saldo_centavos) / 100,
+        "diferenca": float(diferenca) / 100,
         "movimentacao_id": movimentacao.id
     }
 
@@ -366,9 +406,9 @@ def listar_movimentacoes(
         desc(MovimentacaoFinanceira.data_movimento)
     ).offset(offset).limit(limit).all()
     
-    # Converter valores (centavos → reais)
+    # Converter valores (centavos → reais) - force float para JSON
     for mov in movimentacoes:
-        mov.valor = mov.valor / 100
+        mov.valor = float(mov.valor) / 100
     
     return movimentacoes
 
@@ -399,7 +439,7 @@ def resumo_saldos(
     }
     
     for conta in contas:
-        saldo_reais = conta.saldo_atual / 100
+        saldo_reais = float(conta.saldo_atual) / 100
         resumo["total_geral"] += saldo_reais
         
         # Usar get para evitar KeyError com tipos não mapeados

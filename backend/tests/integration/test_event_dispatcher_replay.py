@@ -153,17 +153,17 @@ class TestReplayProtectionEdgeCases:
         self.dispatcher.subscribe(MockTestEvent, handler)
         event = MockTestEvent(data="test")
         
-        # Normal → funciona
+        # Normal --> funciona
         self.dispatcher.publish(event)
         assert handler.call_count == 1
         
-        # Replay → bloqueado
+        # Replay --> bloqueado
         enable_replay_mode()
         with pytest.raises(ReplayViolationError):
             self.dispatcher.publish(event)
         assert handler.call_count == 1  # Não incrementou
         
-        # Normal novamente → funciona
+        # Normal novamente --> funciona
         disable_replay_mode()
         self.dispatcher.publish(event)
         assert handler.call_count == 2

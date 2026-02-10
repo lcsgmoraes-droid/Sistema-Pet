@@ -475,9 +475,7 @@ def listar_contas_pagar(
     """
     current_user, tenant_id = user_and_tenant
     
-    query = db.query(ContaPagar).options(
-        joinedload(ContaPagar.categoria)
-    ).filter(ContaPagar.user_id == current_user.id)
+    query = db.query(ContaPagar).filter(ContaPagar.tenant_id == tenant_id)
     
     # Filtros
     if status:
@@ -513,15 +511,20 @@ def listar_contas_pagar(
     # Montar response
     resultado = []
     for conta in contas:
+        status_value = conta.status or 'pendente'
+
         # Calcular dias para vencimento
         dias_venc = None
-        if conta.status == 'pendente':
+        if status_value == 'pendente':
             dias_venc = (conta.data_vencimento - date.today()).days
         
         # Buscar nome do fornecedor
         fornecedor_nome = None
         if conta.fornecedor_id:
-            fornecedor = db.query(Cliente).filter(Cliente.id == conta.fornecedor_id).first()
+            fornecedor = db.query(Cliente).filter(
+                Cliente.id == conta.fornecedor_id,
+                Cliente.tenant_id == tenant_id
+            ).first()
             if fornecedor:
                 fornecedor_nome = fornecedor.nome
         
@@ -530,15 +533,15 @@ def listar_contas_pagar(
             "descricao": conta.descricao,
             "fornecedor_nome": fornecedor_nome,
             "categoria_nome": conta.categoria.nome if conta.categoria else None,
-            "valor_original": float(conta.valor_original),
-            "valor_pago": float(conta.valor_pago),
-            "valor_final": float(conta.valor_final),
+            "valor_original": float(conta.valor_original) if conta.valor_original is not None else 0.0,
+            "valor_pago": float(conta.valor_pago) if conta.valor_pago is not None else 0.0,
+            "valor_final": float(conta.valor_final) if conta.valor_final is not None else 0.0,
             "data_emissao": conta.data_emissao,
             "data_vencimento": conta.data_vencimento,
             "data_pagamento": conta.data_pagamento,
-            "status": conta.status,
+            "status": status_value,
             "dias_vencimento": dias_venc,
-            "eh_parcelado": conta.eh_parcelado,
+            "eh_parcelado": conta.eh_parcelado if conta.eh_parcelado is not None else False,
             "numero_parcela": conta.numero_parcela,
             "total_parcelas": conta.total_parcelas,
             "documento": conta.documento,
@@ -613,7 +616,7 @@ def buscar_conta_pagar(
         },
         "status": conta.status,
         "parcelamento": {
-            "eh_parcelado": conta.eh_parcelado,
+            "eh_parcelado": conta.eh_parcelado if conta.eh_parcelado is not None else False,
             "numero_parcela": conta.numero_parcela,
             "total_parcelas": conta.total_parcelas
         } if conta.eh_parcelado else None,

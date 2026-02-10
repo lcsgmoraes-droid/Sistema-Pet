@@ -7,6 +7,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
   const [clientes, setClientes] = useState([]);
   const [categorias, setCategorias] = useState([]);
+  const [subcategoriasDRE, setSubcategoriasDRE] = useState([]);
   const [previewParcelas, setPreviewParcelas] = useState([]);
   const [intervaloParcelas, setIntervaloParcelas] = useState(30);
   const [showModalCategoria, setShowModalCategoria] = useState(false);
@@ -24,6 +25,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
     descricao: '',
     cliente_id: null,
     categoria_id: null,
+    dre_subcategoria_id: null,
     valor_original: '',
     data_emissao: new Date().toISOString().split('T')[0],
     data_vencimento: new Date().toISOString().split('T')[0],
@@ -51,9 +53,10 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const [clientesRes, categoriasRes] = await Promise.all([
+      const [clientesRes, categoriasRes, subcategoriasDRERes] = await Promise.all([
         api.get('/clientes/?tipo_cadastro=cliente'),
-        api.get('/api/categorias-financeiras/')
+        api.get('/api/categorias-financeiras/'),
+        api.get('/dre/subcategorias')
       ]);
       
       console.log('📦 Categorias recebidas:', categoriasRes.data);
@@ -76,9 +79,11 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
       });
       
       setCategorias(categoriasReceita);
+      setSubcategoriasDRE(subcategoriasDRERes.data || []);
       
       console.log('✅ Categorias de RECEITA setadas:', categoriasReceita.length);
       console.log('📋 Lista completa:', categoriasReceita);
+      console.log('📊 Subcategorias DRE carregadas:', subcategoriasDRERes.data?.length);
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
       toast.error('Erro ao carregar formulário');
@@ -365,6 +370,23 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     <Plus size={16} /> Adicionar
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  🏷️ Subcategoria DRE (Demonstrativo de Resultado)
+                </label>
+                <select
+                  value={dados.dre_subcategoria_id || ''}
+                  onChange={(e) => setDados({...dados, dre_subcategoria_id: e.target.value ? parseInt(e.target.value) : null})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sem classificação DRE</option>
+                  {subcategoriasDRE.map(sub => (
+                    <option key={sub.id} value={sub.id}>{sub.nome}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Classifique para melhor análise gerencial</p>
               </div>
 
               <div>

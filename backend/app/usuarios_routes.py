@@ -15,6 +15,7 @@ router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
+    role_id: int  # Role a ser vinculada ao usuário
 
 
 class UsuarioListResponse(BaseModel):
@@ -76,6 +77,14 @@ def criar_usuario(
             detail="Usuário com este email já existe",
         )
 
+    # Validar que a role existe
+    role = db.query(Role).filter(Role.id == payload.role_id).first()
+    if not role:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Role com ID {payload.role_id} não encontrada",
+        )
+
     # Criar usuário
     user = User(
         email=payload.email,
@@ -86,19 +95,11 @@ def criar_usuario(
     db.add(user)
     db.flush()  # Garante que user.id seja gerado
 
-    # Buscar role padrão "admin" (não existe 'user' no sistema)
-    role_admin = db.query(Role).filter(Role.name == "admin").first()
-    if not role_admin:
-        raise HTTPException(
-            status_code=500,
-            detail="Role 'admin' não encontrada no sistema",
-        )
-
-    # Criar vínculo UserTenant para o usuário aparecer na lista
+    # Criar vínculo UserTenant com a role selecionada
     vinculo = UserTenant(
         user_id=user.id,
         tenant_id=tenant_id,
-        role_id=role_admin.id,
+        role_id=payload.role_id,  # Usa a role enviada no payload
         is_active=True,
     )
     db.add(vinculo)

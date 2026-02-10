@@ -61,8 +61,15 @@ const ClienteTimeline = ({
       const response = await api.get(`${endpoint}?limit=${limit}`);
       setEventos(response.data);
     } catch (err) {
-      console.error('Erro ao carregar timeline:', err);
-      setError('Erro ao carregar timeline');
+      // Silenciar erros 500 (VIEW ainda não criada) e 404 (endpoint não existe)
+      if (err.response?.status === 500 || err.response?.status === 404) {
+        console.warn('Timeline não disponível:', err.response?.status);
+        setEventos([]);
+        setError(''); // Não mostrar erro ao usuário
+      } else {
+        console.error('Erro ao carregar timeline:', err);
+        setError('Erro ao carregar timeline');
+      }
     } finally {
       setLoading(false);
     }

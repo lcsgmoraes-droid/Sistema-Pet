@@ -40,7 +40,7 @@ class ContaReceberCreate(BaseModel):
     # ============================
     # DRE - CAMPOS OBRIGATORIOS
     # ============================
-    dre_subcategoria_id: int  # OBRIGATORIO - fonte da verdade contabil
+    dre_subcategoria_id: Optional[int] = None  # OPCIONAL - será classificado automaticamente se não fornecido
     canal: str = 'loja_fisica'  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
     
     valor_original: float
@@ -596,7 +596,51 @@ async def registrar_recebimento(
     
     logger.info(f"✅ Recebimento registrado: R$ {recebimento.valor_recebido} - Conta {conta_id}")
     
-    return {
+    # ============================================================================
+    # 💰 GERAR COMISSÃO SE CONTA VINCULADA A VENDA
+    # ============================================================================
+    comissao_gerada = False
+    comissao_info = None
+    
+    if conta.venda_id:
+        try:
+            from app.comissoes_service import gerar_comissoes_venda
+            from app.vendas_models import Venda
+            
+            # Buscar venda para verificar se tem funcionário
+            venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+            
+            if venda and venda.funcionario_id:
+                logger.info(f"💰 Gerando comissão para venda #{venda.numero_venda} (baixa de conta a receber)")
+                
+                # Gerar comissão proporcional ao valor recebido NESTA baixa
+                resultado = gerar_comissoes_venda(
+                    venda_id=venda.id,
+                    funcionario_id=venda.funcionario_id,
+                    valor_pago=Decimal(str(recebimento.valor_recebido)),  # Apenas o valor DESTA baixa
+                    parcela_numero=1,  # Usar parcela 1 para pagamentos via contas a receber
+                    db=db
+                )
+                
+                if resultado.get('success'):
+                    comissao_gerada = True
+                    comissao_info = {
+                        'venda_id': venda.id,
+                        'numero_venda': venda.numero_venda,
+                        'valor_comissao': resultado.get('total_comissao', 0)
+                    }
+                    logger.info(f"✅ Comissão gerada com sucesso: R$ {resultado.get('total_comissao', 0):.2f}")
+                else:
+                    logger.warning(f"⚠️ Falha ao gerar comissão: {resultado.get('error', 'Erro desconhecido')}")
+            else:
+                logger.info(f"ℹ️ Venda #{conta.venda_id} sem funcionário configurado, comissão não gerada")
+                
+        except Exception as e:
+            logger.error(f"❌ Erro ao gerar comissão para venda #{conta.venda_id}: {e}")
+            # Não falha o recebimento por erro na comissão
+            pass
+    
+    response = {
         "message": "Recebimento registrado com sucesso",
         "conta_id": conta.id,
         "status": conta.status,
@@ -604,6 +648,11 @@ async def registrar_recebimento(
         "valor_final": float(conta.valor_final),
         "saldo_restante": float(conta.valor_final - conta.valor_recebido)
     }
+    
+    if comissao_gerada and comissao_info:
+        response['comissao'] = comissao_info
+    
+    return response
 
 
 # ============================================================================

@@ -10,7 +10,7 @@ export default function UsuariosPage() {
   const [novoUsuario, setNovoUsuario] = useState({
     email: '',
     password: '',
-    role: 'user'
+    role_id: null  // Mudado de role para role_id
   });
 
   async function carregarUsuarios() {
@@ -53,7 +53,7 @@ export default function UsuariosPage() {
       await api.post('/usuarios', novoUsuario);
       alert('Usuário criado com sucesso!');
       setShowModal(false);
-      setNovoUsuario({ email: '', password: '', role: 'user' });
+      setNovoUsuario({ email: '', password: '', role_id: null });
       carregarUsuarios();
     } catch (error) {
       console.error('Erro ao criar usuário:', error);
@@ -75,7 +75,7 @@ export default function UsuariosPage() {
         </div>
         <button
           onClick={() => {
-            setNovoUsuario({ email: '', password: '', role: 'user' });
+            setNovoUsuario({ email: '', password: '', role_id: null });
             setShowPassword(false);
             setShowModal(true);
           }}
@@ -231,19 +231,22 @@ export default function UsuariosPage() {
                     Role *
                   </label>
                   <select
-                    value={novoUsuario.role}
-                    onChange={(e) => setNovoUsuario({ ...novoUsuario, role: e.target.value })}
+                    value={novoUsuario.role_id || ''}
+                    onChange={(e) => setNovoUsuario({ ...novoUsuario, role_id: parseInt(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
                   >{roles.length === 0 ? (
                       <option value="">Carregando...</option>
                     ) : (
-                      roles.map((role) => (
-                        <option key={role.role_id} value={role.nome}>
-                          {role.nome}
-                        </option>
-                      ))
+                      <>
+                        <option value="">Selecione uma role...</option>
+                        {roles.map((role) => (
+                          <option key={role.role_id} value={role.role_id}>
+                            {role.nome}
+                          </option>
+                        ))}
+                      </>
                     )}
-                    <option value="manager">Gerente</option>
                   </select>
                 </div>
 
@@ -252,7 +255,7 @@ export default function UsuariosPage() {
                     type="button"
                     onClick={() => {
                       setShowModal(false);
-                      setNovoUsuario({ email: '', password: '', role: 'user' });
+                      setNovoUsuario({ email: '', password: '', role_id: null });
                     }}
                     className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                   >

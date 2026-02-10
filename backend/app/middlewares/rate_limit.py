@@ -23,15 +23,29 @@ from fastapi.responses import JSONResponse
 # CONFIGURAÇÃO DE RATE LIMIT
 # ============================================================================
 
-RATE_LIMIT_MAX = 10      # Máximo de requests por janela
-RATE_LIMIT_WINDOW = 60   # Janela em segundos (60s = 1 minuto)
+# Limites por tipo de rota
+RATE_LIMIT_AUTH_MAX = 5          # Auth: 5 req/min (brute force protection)
+RATE_LIMIT_AUTH_WINDOW = 60
 
-# Rotas protegidas (aplicar rate limit)
-PROTECTED_ROUTES = [
+RATE_LIMIT_API_MAX = 100         # APIs: 100 req/min (uso normal)
+RATE_LIMIT_API_WINDOW = 60
+
+# Rotas de autenticação (limite mais restritivo)
+AUTH_ROUTES = [
     "/auth/login-multitenant",
     "/auth/login",
     "/auth/refresh",
     "/auth/select-tenant"
+]
+
+# Rotas de API (limite menos restritivo)
+API_ROUTES = [
+    "/analytics/",
+    "/api/",
+    "/vendas/",
+    "/produtos/",
+    "/clientes/",
+    "/funcionarios/",
 ]
 
 # Rotas excluídas (NUNCA aplicar rate limit)
@@ -62,13 +76,23 @@ class RateLimitStore:
     def __init__(self):
         self.store: Dict[str, Tuple[float, int]] = {}
     
+    def clear(self):
+        """Limpa todos os dados do store (útil para testes)"""
+        self.store.clear()
+    
     def get_key(self, ip: str, path: str) -> str:
         """Gera chave única para IP + path"""
         return f"{ip}:{path}"
     
-    def check_limit(self, ip: str, path: str) -> Tuple[bool, int]:
+    def check_limit(self, ip: str, path: str, max_requests: int, window: int) -> Tuple[bool, int]:
         """
         Verifica se IP excedeu limite para o path.
+        
+        Args:
+            ip: IP do cliente
+            path: Path da requisição
+            max_requests: Máximo de requisições permitidas
+            window: Janela de tempo em segundos
         
         Returns:
             (is_allowed, remaining_requests)
@@ -81,21 +105,21 @@ class RateLimitStore:
             window_start, count = self.store[key]
             
             # Janela expirou? Resetar
-            if now - window_start >= RATE_LIMIT_WINDOW:
+            if now - window_start >= window:
                 self.store[key] = (now, 1)
-                return True, RATE_LIMIT_MAX - 1
+                return True, max_requests - 1
             
             # Dentro da janela
-            if count >= RATE_LIMIT_MAX:
+            if count >= max_requests:
                 return False, 0  # Limite excedido
             
             # Incrementar contador
             self.store[key] = (window_start, count + 1)
-            return True, RATE_LIMIT_MAX - (count + 1)
+            return True, max_requests - (count + 1)
         
         # Primeira request nesta janela
         self.store[key] = (now, 1)
-        return True, RATE_LIMIT_MAX - 1
+        return True, max_requests - 1
     
     def cleanup_expired(self):
         """Remove entradas expiradas (executar periodicamente)"""
@@ -118,10 +142,13 @@ rate_limit_store = RateLimitStore()
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
-    Middleware de rate limiting por IP para rotas sensíveis.
+    Middleware de rate limiting por IP com limites diferenciados.
     
-    Aplica SOMENTE em rotas de autenticação.
-    Exclui explicitamente health checks e docs.
+    Limites:
+    - Autenticação: 5 req/min (proteção contra brute force)
+    - APIs gerais: 100 req/min (uso normal)
+    
+    Exclui: health checks, docs.
     """
     
     async def dispatch(self, request: Request, call_next):
@@ -131,29 +158,49 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(excluded) for excluded in EXCLUDED_ROUTES):
             return await call_next(request)
         
-        # Aplicar rate limit somente em rotas protegidas
-        if not any(path.startswith(protected) for protected in PROTECTED_ROUTES):
+        # Determinar tipo de rota e limites
+        max_requests = None
+        window = None
+        route_type = None
+        
+        # Rotas de autenticação (limite restritivo)
+        if any(path.startswith(auth_route) for auth_route in AUTH_ROUTES):
+            max_requests = RATE_LIMIT_AUTH_MAX
+            window = RATE_LIMIT_AUTH_WINDOW
+            route_type = "auth"
+        
+        # Rotas de API (limite normal)
+        elif any(path.startswith(api_route) for api_route in API_ROUTES):
+            max_requests = RATE_LIMIT_API_MAX
+            window = RATE_LIMIT_API_WINDOW
+            route_type = "api"
+        
+        # Sem rate limit para outras rotas
+        if max_requests is None:
             return await call_next(request)
         
         # Extrair IP do cliente
         client_ip = request.client.host if request.client else "unknown"
         
         # Verificar limite
-        is_allowed, remaining = rate_limit_store.check_limit(client_ip, path)
+        is_allowed, remaining = rate_limit_store.check_limit(
+            client_ip, path, max_requests, window
+        )
         
         if not is_allowed:
             # Rate limit excedido - retornar 429
             return JSONResponse(
                 status_code=429,
                 content={
-                    "detail": "Too many requests",
-                    "message": f"Limite de {RATE_LIMIT_MAX} requisições por {RATE_LIMIT_WINDOW}s excedido. Aguarde e tente novamente."
+                    "error": "rate_limit_exceeded",
+                    "message": f"Limite de {max_requests} requisições por minuto excedido. Aguarde e tente novamente.",
+                    "retry_after": window
                 },
                 headers={
-                    "Retry-After": str(RATE_LIMIT_WINDOW),
-                    "X-RateLimit-Limit": str(RATE_LIMIT_MAX),
+                    "Retry-After": str(window),
+                    "X-RateLimit-Limit": str(max_requests),
                     "X-RateLimit-Remaining": "0",
-                    "X-RateLimit-Reset": str(int(time.time()) + RATE_LIMIT_WINDOW)
+                    "X-RateLimit-Reset": str(int(time.time()) + window)
                 }
             )
         
@@ -161,7 +208,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Adicionar headers de rate limit
-        response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_MAX)
+        response.headers["X-RateLimit-Limit"] = str(max_requests)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         
         return response

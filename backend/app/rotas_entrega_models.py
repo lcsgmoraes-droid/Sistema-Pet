@@ -6,6 +6,10 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.base_models import BaseTenantModel
 
+# Import necessário para resolver relacionamento com Venda
+# Colocado depois dos imports base para evitar circular dependency
+import app.vendas_models  # noqa: F401 - import necessário para SQLAlchemy resolver relationship("Venda")
+
 
 class RotaEntrega(BaseTenantModel):
     """
@@ -99,6 +103,7 @@ class RotaEntregaParada(BaseTenantModel):
     
     # Relacionamentos
     rota = relationship("RotaEntrega", back_populates="paradas")
-    venda = relationship("Venda", backref="paradas_rota")
+    # Usando lazy='select' para evitar problemas de inicialização de mapper
+    venda = relationship("Venda", backref="paradas_rota", lazy="select")
     
     # created_at herdado de BaseTenantModel

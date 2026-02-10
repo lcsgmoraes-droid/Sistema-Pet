@@ -100,15 +100,15 @@ def provisionar_comissoes_venda(
         # ETAPA 2: BUSCAR COMISSÕES NÃO PROVISIONADAS
         # ============================================================
         
-        result_comissoes = execute_tenant_safe(db, """
+        result_comissoes = db.execute(text("""
             SELECT 
                 id, funcionario_id, valor_comissao_gerada, produto_id
             FROM comissoes_itens
             WHERE venda_id = :venda_id
-              AND comissao_provisionada = 0
+              AND status = 'pendente'
               AND valor_comissao_gerada > 0
-              AND {tenant_filter}
-        """, {'venda_id': venda_id})
+              AND tenant_id = CAST(:tenant_id AS UUID)
+        """), {'venda_id': venda_id, 'tenant_id': str(tenant_id)})
         
         comissoes_pendentes = result_comissoes.fetchall()
         
@@ -127,23 +127,23 @@ def provisionar_comissoes_venda(
         )
         
         # ============================================================
-        # ETAPA 3: BUSCAR SUBCATEGORIA DRE "Comissões"
+        # ETAPA 3: BUSCAR SUBCATEGORIA DRE "Comissões de Vendas"
         # ============================================================
         
-        result_subcat = execute_tenant_safe(db, """
+        result_subcat = db.execute(text("""
             SELECT id
             FROM dre_subcategorias
-            WHERE nome = 'Comissões'
-              AND ativo = 1
-              AND {tenant_filter}
+            WHERE nome LIKE '%Vendedores%'
+              AND ativo = true
+              AND tenant_id = CAST(:tenant_id AS UUID)
             LIMIT 1
-        """, {})
+        """), {'tenant_id': str(tenant_id)})
         
         subcat_comissoes = result_subcat.fetchone()
         
         if not subcat_comissoes:
             logger.error(
-                f"⚠️ Subcategoria DRE 'Comissões' não encontrada para tenant {tenant_id}"
+                f"⚠️ Subcategoria DRE 'Comissões de Vendas' não encontrada para tenant {tenant_id}"
             )
             return {
                 'success': False,
@@ -153,7 +153,7 @@ def provisionar_comissoes_venda(
                 'message': 'Subcategoria DRE Comissões não configurada'
             }
         
-        dre_subcategoria_id = subcat_comissoes.id
+        dre_subcategoria_id = subcat_comissoes[0]
         
         # ============================================================
         # ETAPA 4: PROCESSAR CADA COMISSÃO
@@ -164,25 +164,25 @@ def provisionar_comissoes_venda(
         comissoes_provisionadas_count = 0
         
         for comissao in comissoes_pendentes:
-            comissao_id = comissao.id
-            funcionario_id = comissao.funcionario_id
-            valor_comissao = Decimal(str(comissao.valor_comissao_gerada))
+            comissao_id = comissao[0]
+            funcionario_id = comissao[1]
+            valor_comissao = Decimal(str(comissao[2]))
             
             # Buscar dados do funcionário
-            result_func = execute_tenant_safe(db, """
+            result_func = db.execute(text("""
                 SELECT nome, data_fechamento_comissao
                 FROM users
                 WHERE id = :funcionario_id
-                AND {tenant_filter}
-            """, {'funcionario_id': funcionario_id})
+                AND tenant_id = CAST(:tenant_id AS UUID)
+            """), {'funcionario_id': funcionario_id, 'tenant_id': str(tenant_id)})
             
             funcionario = result_func.fetchone()
-            funcionario_nome = funcionario.nome if funcionario else f"Funcionário #{funcionario_id}"
+            funcionario_nome = funcionario[0] if funcionario else f"Funcionário #{funcionario_id}"
             
             # Calcular data de vencimento (baseado em data_fechamento_comissao ou padrão 30 dias)
-            if funcionario and funcionario.data_fechamento_comissao:
+            if funcionario and funcionario[1]:
                 # Calcular próxima data de fechamento após a data da venda
-                dia_fechamento = funcionario.data_fechamento_comissao
+                dia_fechamento = funcionario[1]
                 if data_competencia.day <= dia_fechamento:
                     # Mesmo mês
                     data_vencimento = data_competencia.replace(day=dia_fechamento)
@@ -213,7 +213,7 @@ def provisionar_comissoes_venda(
             
             # Inserir conta a pagar
             # 🔒 CAMPO CRÍTICO: fornecedor_id = funcionario_id (comissionado)
-            execute_tenant_safe(db, """
+            result_insert = db.execute(text("""
                 INSERT INTO contas_pagar (
                     descricao,
                     fornecedor_id,
@@ -245,11 +245,11 @@ def provisionar_comissoes_venda(
                     :documento,
                     :observacoes,
                     :user_id,
-                    {tenant_id},
+                    CAST(:tenant_id AS UUID),
                     CURRENT_TIMESTAMP,
                     CURRENT_TIMESTAMP
-                )
-            """, {
+                ) RETURNING id
+            """), {
                 'descricao': descricao_conta,
                 'fornecedor_id': funcionario_id,  # ✅ Comissionado é o fornecedor
                 'dre_subcategoria_id': dre_subcategoria_id,
@@ -259,12 +259,12 @@ def provisionar_comissoes_venda(
                 'data_vencimento': data_vencimento,
                 'documento': f"COMISSAO-VENDA-{venda_id}-{comissao_id}",
                 'observacoes': f"Provisão automática - Comissão venda {venda.numero_venda}",
-                'user_id': funcionario_id  # Pode ser ajustado conforme lógica do sistema
+                'user_id': funcionario_id,  # Pode ser ajustado conforme lógica do sistema
+                'tenant_id': str(tenant_id)
             })
             
             # Obter ID da conta criada
-            result_conta_id = execute_tenant_safe(db, "SELECT last_insert_rowid()", {}, require_tenant=False)
-            conta_pagar_id = result_conta_id.fetchone()[0]
+            conta_pagar_id = result_insert.fetchone()[0]
             
             contas_criadas.append(conta_pagar_id)
             
@@ -296,17 +296,18 @@ def provisionar_comissoes_venda(
             # 4.3: Marcar comissão como provisionada
             # --------------------------------------------------------
             
-            execute_tenant_safe(db, """
+            db.execute(text("""
                 UPDATE comissoes_itens
-                SET comissao_provisionada = 1,
+                SET comissao_provisionada = TRUE,
                     conta_pagar_id = :conta_pagar_id,
                     data_provisao = :data_provisao
                 WHERE id = :comissao_id
-                AND {tenant_filter}
-            """, {
+                AND tenant_id = CAST(:tenant_id AS UUID)
+            """), {
                 'conta_pagar_id': conta_pagar_id,
                 'data_provisao': date.today(),
-                'comissao_id': comissao_id
+                'comissao_id': comissao_id,
+                'tenant_id': str(tenant_id)
             })
             
             total_provisionado += valor_comissao

@@ -33,8 +33,7 @@ from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.financeiro_models import ContaReceber, MovimentacaoFinanceira, ContaBancaria, LancamentoManual
 from app.caixa_models import MovimentacaoCaixa
-from app.models import User
-from app.auth.models import Tenant
+from app.models import User, Tenant
 
 
 # Configuração do banco de dados de teste
@@ -488,21 +487,21 @@ class TestTransactionRollbackCancelarVenda:
         venda_depois = db_session.query(Venda).filter_by(id=cenario['venda_id']).first()
         assert venda_depois is not None, "❌ FALHA: Venda foi excluída"
         assert venda_depois.status == venda_antes.status, \
-            f"❌ FALHA: Status da venda mudou ({venda_antes.status} → {venda_depois.status})"
+            f"❌ FALHA: Status da venda mudou ({venda_antes.status} --> {venda_depois.status})"
         assert venda_depois.status == 'finalizada', "❌ FALHA: Status deveria continuar 'finalizada'"
-        print(f"✅ Status da venda NÃO mudou (status: {venda_depois.status})")
+        print(f"✓ Status da venda NÃO mudou (status: {venda_depois.status})")
         
         # 2. Itens NÃO foram excluídos
         itens_depois = db_session.query(VendaItem).filter_by(venda_id=cenario['venda_id']).count()
-        assert itens_depois == itens_antes, f"❌ FALHA: Itens foram alterados ({itens_antes} → {itens_depois})"
+        assert itens_depois == itens_antes, f"❌ FALHA: Itens foram alterados ({itens_antes} --> {itens_depois})"
         print(f"✅ Itens NÃO foram alterados (quantidade: {itens_depois})")
         
         # 3. Estoque NÃO foi alterado
         produto_depois = db_session.query(Produto).filter_by(id=cenario['produto_id']).first()
         estoque_depois = float(produto_depois.estoque_atual)
         assert estoque_depois == estoque_antes, \
-            f"❌ FALHA: Estoque foi alterado ({estoque_antes} → {estoque_depois})"
-        print(f"✅ Estoque NÃO foi alterado (quantidade: {estoque_depois})")
+            f"❌ FALHA: Estoque foi alterado ({estoque_antes} --> {estoque_depois})"
+        print(f"✓ Estoque NÃO foi alterado (quantidade: {estoque_depois})")
         
         # 4. Conta a receber NÃO foi cancelada
         conta_receber_depois = db_session.query(ContaReceber).filter_by(
@@ -510,7 +509,7 @@ class TestTransactionRollbackCancelarVenda:
         ).first()
         assert conta_receber_depois is not None, "❌ FALHA: Conta a receber foi excluída"
         assert conta_receber_depois.status == conta_receber_antes.status, \
-            f"❌ FALHA: Status da conta mudou ({conta_receber_antes.status} → {conta_receber_depois.status})"
+            f"❌ FALHA: Status da conta mudou ({conta_receber_antes.status} --> {conta_receber_depois.status})"
         print(f"✅ Conta a receber NÃO foi alterada (status: {conta_receber_depois.status})")
         
         # 5. Movimentação de caixa NÃO foi removida

@@ -233,14 +233,14 @@ export default function PDV() {
   
   // 🚚 Carregar entregadores disponíveis ao iniciar
   useEffect(() => {
-    console.log('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
+    // console.log('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
     carregarEntregadores();
   }, []);
   
   const carregarEntregadores = async () => {
-    console.log('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
+    // console.log('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
     try {
-      console.log('📦 Fazendo request para /clientes...');
+      // console.log('📦 Fazendo request para /clientes...');
       const response = await api.get('/clientes', {
         params: {
           is_entregador: true,
@@ -249,26 +249,26 @@ export default function PDV() {
         }
       });
       
-      console.log('✅ Response recebido:', response.data);
+      // console.log('✅ Response recebido:', response.data);
       const entregadoresList = response.data.clientes || response.data || [];
-      console.log('📋 Total de entregadores carregados:', entregadoresList.length);
-      console.log('📋 Lista completa:', entregadoresList);
+      // console.log('📋 Total de entregadores carregados:', entregadoresList.length);
+      // console.log('📋 Lista completa:', entregadoresList);
       setEntregadores(entregadoresList);
       
       // Pré-selecionar entregador padrão
       const entregadorPadrao = entregadoresList.find(e => {
-        console.log('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
+        // console.log('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
         return e.entregador_padrao === true;
       });
       
-      console.log('🔍 Resultado da busca do padrão:', entregadorPadrao);
+      // console.log('🔍 Resultado da busca do padrão:', entregadorPadrao);
       
       if (entregadorPadrao) {
-        console.log('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
+        // console.log('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
         setEntregadorSelecionado(entregadorPadrao);
         // ✅ Setar IMEDIATAMENTE no vendaAtual também (evitar race condition)
         setVendaAtual(prev => {
-          console.log('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
+          // console.log('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
           return {
             ...prev,
             entregador_id: entregadorPadrao.id
@@ -276,10 +276,10 @@ export default function PDV() {
         });
         calcularCustoOperacional(entregadorPadrao);
       } else {
-        console.error('❌❌❌ NENHUM ENTREGADOR PADRÃO ENCONTRADO!');
+        // console.error('❌❌❌ NENHUM ENTREGADOR PADRÃO ENCONTRADO!');
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar entregadores:', error);
+      console.error('Erro ao carregar entregadores:', error);
       toast.error('Erro ao carregar lista de entregadores');
     }
   };
@@ -302,7 +302,7 @@ export default function PDV() {
       // TODO: Integrar com cálculo de distância da API de mapas
       // Por enquanto, assumir 0 ou usar valor fixo como fallback
       custo = 0;
-      console.log('⚠️ Modelo por KM requer cálculo de distância');
+      // console.log('⚠️ Modelo por KM requer cálculo de distância');
     }
     // Modelo 3: Rateio RH (buscar do backend)
     else if (entregador.modelo_custo_entrega === 'rateio_rh' && entregador.controla_rh) {
@@ -678,9 +678,9 @@ export default function PDV() {
         params.tem_entrega = true;
       }
 
-      console.log('Parâmetros de busca:', params);
+      // console.log('Parâmetros de busca:', params);
       const resultado = await listarVendas(params);
-      console.log('Vendas encontradas:', resultado.vendas?.length);
+      // console.log('Vendas encontradas:', resultado.vendas?.length);
 
       setVendasRecentes(resultado.vendas || []);
     } catch (error) {
@@ -1571,7 +1571,41 @@ export default function PDV() {
       alert('Venda excluída com sucesso!');
     } catch (error) {
       console.error('Erro ao excluir venda:', error);
-      alert(error.response?.data?.detail || 'Erro ao excluir venda');
+      
+      // Tratamento amigável de erros estruturados
+      const errorData = error.response?.data?.detail;
+      
+      if (errorData && typeof errorData === 'object') {
+        // Erro estruturado com passos
+        let mensagem = `❌ ${errorData.erro || 'Erro ao excluir venda'}\n\n`;
+        mensagem += `${errorData.mensagem || ''}\n\n`;
+        
+        if (errorData.solucao) {
+          mensagem += `💡 Solução:\n${errorData.solucao}\n\n`;
+        }
+        
+        if (errorData.passos && Array.isArray(errorData.passos)) {
+          mensagem += `📋 Passos para resolver:\n`;
+          errorData.passos.forEach(passo => {
+            mensagem += `${passo}\n`;
+          });
+        }
+        
+        if (errorData.rota_id) {
+          mensagem += `\n🚚 Rota ID: ${errorData.rota_id}`;
+          if (errorData.rota_status) {
+            mensagem += ` (${errorData.rota_status})`;
+          }
+        }
+        
+        alert(mensagem);
+      } else if (typeof errorData === 'string') {
+        // Erro simples (string)
+        alert(errorData);
+      } else {
+        // Fallback
+        alert('Erro ao excluir venda. Verifique se não há vínculos pendentes.');
+      }
     } finally {
       setLoading(false);
     }

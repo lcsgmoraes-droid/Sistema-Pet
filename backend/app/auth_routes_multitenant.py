@@ -15,13 +15,15 @@ from app import models
 from app.auth import (
     verify_password, 
     create_access_token, 
-    get_current_user
+    get_current_user,
+    hash_password
 )
 from app.auth.permission_dependencies import expand_permissions
 from app.config import JWT_SECRET_KEY as SECRET_KEY
 from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
 from app.session_manager import create_session, validate_session, revoke_session, get_active_sessions, get_session_by_jti
 from app.auth.dependencies import get_current_user_and_tenant
+from app.tenancy.context import set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
 security = HTTPBearer()
@@ -31,6 +33,13 @@ router = APIRouter(prefix="/auth", tags=["auth-multitenant"])
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    nome: Optional[str] = None
+    nome_loja: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
@@ -48,6 +57,126 @@ class SelectTenantResponse(BaseModel):
     access_token: str
     token_type: str
     tenant: dict
+
+
+@router.post("/register", response_model=LoginResponse)
+def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_session)):
+    """
+    Registra novo usuário e cria tenant automaticamente.
+    
+    - **email**: Email único
+    - **password**: Senha (min 6 caracteres)
+    - **nome**: Nome do usuário (opcional)
+    - **nome_loja**: Nome da loja/empresa (opcional)
+    """
+    # Verificar se email já existe
+    existing = db.query(models.User).filter(models.User.email == payload.email).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email já cadastrado"
+        )
+    
+    # Validar senha
+    if len(payload.password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha deve ter no mínimo 6 caracteres"
+        )
+    
+    # Criar tenant primeiro
+    tenant_name = payload.nome_loja or f"Loja de {payload.nome or payload.email}"
+    tenant_id = uuid.uuid4()  # Gerar UUID
+    tenant = models.Tenant(
+        id=str(tenant_id),
+        name=tenant_name,
+        status='active',
+        plan='free'
+    )
+    db.add(tenant)
+    db.flush()  # Para garantir que o tenant existe
+    
+    # Definir contexto de tenant
+    set_tenant_context(tenant_id)
+    
+    # Criar usuário (definir tenant_id explicitamente)
+    user = models.User(
+        email=payload.email,
+        hashed_password=hash_password(payload.password),
+        nome=payload.nome,
+        nome_loja=payload.nome_loja,
+        is_active=True,
+        consent_date=datetime.now(timezone.utc),
+        tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
+    )
+    db.add(user)
+    db.flush()  # Para obter user.id
+    
+    # Criar role de Admin para este tenant
+    admin_role = models.Role(
+        name='Administrador',
+        tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
+    )
+    db.add(admin_role)
+    db.flush()
+    
+    # ✅ VINCULAR TODAS AS PERMISSÕES À ROLE DE ADMINISTRADOR
+    # Buscar todas as permissões do sistema
+    all_permissions = db.query(models.Permission).all()
+    for permission in all_permissions:
+        role_permission = models.RolePermission(
+            role_id=admin_role.id,
+            permission_id=permission.id,
+            tenant_id=tenant_id
+        )
+        db.add(role_permission)
+    db.flush()
+    
+    # Vincular usuário ao tenant com role de admin
+    user_tenant = models.UserTenant(
+        user_id=user.id,
+        tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente
+        role_id=admin_role.id,
+        is_active=True
+    )
+    db.add(user_tenant)
+    db.commit()
+    
+    # Criar sessão
+    db_session = create_session(
+        db=db,
+        user_id=user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS
+    )
+    
+    # Criar token inicial (sem tenant_id - usuário precisa selecionar)
+    token_jti = db_session.token_jti
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "jti": token_jti,
+            "tenant_id": None
+        }
+    )
+    
+    # Retornar dados do usuário e tenant
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user={
+            "id": user.id,
+            "name": user.nome,
+            "email": user.email,
+            "is_active": user.is_active
+        },
+        tenants=[{
+            "id": str(tenant_id),
+            "name": tenant.name,
+            "role_id": admin_role.id
+        }]
+    )
 
 
 @router.post("/login-multitenant", response_model=LoginResponse)

@@ -46,11 +46,16 @@ async def obter_resumo_dashboard(
         vendas_pagas = db.query(
             func.sum(Venda.total)
         ).filter(
-            Venda.status == 'finalizada'
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.status == 'finalizada'
+            )
         ).scalar() or 0
         
         contas_pagas_total = db.query(
             func.sum(ContaPagar.valor_pago)
+        ).filter(
+            ContaPagar.tenant_id == tenant_id
         ).scalar() or 0
         
         saldo_atual = vendas_pagas - contas_pagas_total
@@ -61,7 +66,10 @@ async def obter_resumo_dashboard(
         contas_receber_total = db.query(
             func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido)
         ).filter(
-            ContaReceber.status.in_(['pendente', 'parcial', 'vencida'])
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status.in_(['pendente', 'parcial', 'vencida'])
+            )
         ).scalar() or 0
         
         # Contas vencidas a receber
@@ -69,6 +77,7 @@ async def obter_resumo_dashboard(
             func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido)
         ).filter(
             and_(
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status.in_(['pendente', 'parcial', 'vencida']),
                 ContaReceber.data_vencimento < hoje
             )
@@ -80,7 +89,10 @@ async def obter_resumo_dashboard(
         contas_pagar_total = db.query(
             func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)
         ).filter(
-            ContaPagar.status.in_(['pendente', 'parcial', 'vencida'])
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status.in_(['pendente', 'parcial', 'vencida'])
+            )
         ).scalar() or 0
         
         # Contas vencidas a pagar
@@ -88,6 +100,7 @@ async def obter_resumo_dashboard(
             func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)
         ).filter(
             and_(
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.status.in_(['pendente', 'parcial', 'vencida']),
                 ContaPagar.data_vencimento < hoje
             )
@@ -100,7 +113,10 @@ async def obter_resumo_dashboard(
             func.count(Venda.id).label('quantidade'),
             func.sum(Venda.total).label('valor_total')
         ).filter(
-            Venda.data_venda >= inicio_periodo
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
+            )
         ).first()
         
         total_vendas_periodo = vendas_periodo.valor_total or 0
@@ -111,6 +127,7 @@ async def obter_resumo_dashboard(
             func.sum(Venda.total)
         ).filter(
             and_(
+                Venda.tenant_id == tenant_id,
                 Venda.data_venda >= inicio_periodo,
                 Venda.status == 'finalizada'
             )
@@ -123,6 +140,7 @@ async def obter_resumo_dashboard(
             func.sum(Venda.total)
         ).filter(
             and_(
+                Venda.tenant_id == tenant_id,
                 Venda.data_venda >= inicio_periodo,
                 Venda.status == 'finalizada'
             )
@@ -131,7 +149,10 @@ async def obter_resumo_dashboard(
         saidas_periodo = db.query(
             func.sum(ContaPagar.valor_pago)
         ).filter(
-            ContaPagar.data_pagamento >= inicio_periodo
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.data_pagamento >= inicio_periodo
+            )
         ).scalar() or 0
         
         # ========================================
@@ -196,6 +217,7 @@ async def obter_entradas_saidas_por_dia(
             func.sum(Venda.total).label('total')
         ).filter(
             and_(
+                Venda.tenant_id == tenant_id,
                 Venda.data_venda >= inicio_periodo,
                 Venda.status == 'finalizada'
             )
@@ -208,7 +230,10 @@ async def obter_entradas_saidas_por_dia(
             func.date(ContaPagar.data_pagamento).label('data'),
             func.sum(ContaPagar.valor_pago).label('total')
         ).filter(
-            ContaPagar.data_pagamento >= inicio_periodo
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.data_pagamento >= inicio_periodo
+            )
         ).group_by(
             func.date(ContaPagar.data_pagamento)
         ).all()
@@ -269,7 +294,10 @@ async def obter_vendas_por_dia(
             func.count(Venda.id).label('quantidade'),
             func.sum(Venda.total).label('valor_total')
         ).filter(
-            Venda.data_venda >= inicio_periodo
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
+            )
         ).group_by(
             func.date(Venda.data_venda)
         ).all()
@@ -401,7 +429,11 @@ async def obter_top_produtos(
         ).join(
             Venda, VendaItem.venda_id == Venda.id
         ).filter(
-            Venda.data_venda >= inicio_periodo
+            and_(
+                Venda.tenant_id == tenant_id,
+                Produto.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
+            )
         ).group_by(
             Produto.id, Produto.nome
         ).order_by(

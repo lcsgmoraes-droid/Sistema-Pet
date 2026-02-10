@@ -110,7 +110,7 @@ from decimal import Decimal
 from datetime import datetime, date, timedelta
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_, func
+from sqlalchemy import desc, or_, func, String
 import json
 from uuid import UUID
 
@@ -1763,6 +1763,46 @@ class VendaService:
                 logger.error(f"⚠️ Erro ao criar contas a pagar de entrega: {str(e)}", exc_info=True)
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
             
+            # 💳 Criar contas a pagar de taxas de pagamento
+            contas_pagar_taxas_ids = []
+            logger.info(f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}")
+            try:
+                # Combinar pagamentos existentes com novos
+                todos_pagamentos = list(pagamentos_existentes) + [
+                    type('obj', (object,), {
+                        'forma_pagamento': p['forma_pagamento'],
+                        'valor': p['valor'],
+                        'numero_parcelas': p.get('numero_parcelas', 1)
+                    })() for p in pagamentos
+                ]
+                
+                logger.info(f"💳 Total de pagamentos a processar: {len(todos_pagamentos)}")
+                for pag in todos_pagamentos:
+                    logger.info(f"  - {pag.forma_pagamento}: R$ {pag.valor}")
+                
+                resultado_taxas = processar_contas_pagar_taxas(
+                    venda=venda,
+                    pagamentos=todos_pagamentos,
+                    user_id=user_id,
+                    tenant_id=tenant_id,
+                    db=db
+                )
+                
+                logger.info(f"💳 Resultado do processamento: {resultado_taxas}")
+                
+                if resultado_taxas['success']:
+                    contas_pagar_taxas_ids = resultado_taxas['contas_criadas']
+                    db.commit()  # Commit separado para contas a pagar
+                    logger.info(
+                        f"💳 Contas a pagar de taxas criadas: {resultado_taxas['total_contas']} conta(s), "
+                        f"R$ {resultado_taxas['valor_total']:.2f}"
+                    )
+                else:
+                    logger.warning(f"⚠️ Processamento de taxas falhou: {resultado_taxas.get('error', 'Erro desconhecido')}")
+            except Exception as e:
+                logger.error(f"⚠️ Erro ao criar contas a pagar de taxas: {str(e)}", exc_info=True)
+                db.rollback()  # Rollback apenas das contas (venda já commitada)
+            
             # Preparar retorno
             return {
                 'venda': {
@@ -2002,8 +2042,30 @@ def processar_contas_pagar_entrega(
         proximo_sabado = data_venda + timedelta(days=dias_ate_sabado)
         data_vencimento = proximo_sabado + timedelta(days=2)  # Segunda-feira = sábado + 2
         
-        # 1️⃣ CONTA A PAGAR: Taxa do entregador
+        # Mapear canal para nome legível (sem acentos para compatibilidade)
+        CANAIS_NOMES = {
+            'loja_fisica': 'Loja Fisica',
+            'mercado_livre': 'Mercado Livre',
+            'shopee': 'Shopee',
+            'amazon': 'Amazon'
+        }
+        canal = venda.canal or 'loja_fisica'
+        canal_nome = CANAIS_NOMES.get(canal, 'Loja Física')
+        
+        # 1️⃣ CONTA A PAGAR: Taxa do entregador (Comissão)
         if venda.valor_taxa_entregador and float(venda.valor_taxa_entregador) > 0:
+            # Buscar subcategoria "Comissao Entregador - {Canal}" (sem acentos)
+            from app.dre_plano_contas_models import DRESubcategoria
+            subcategoria_comissao = db.query(DRESubcategoria).filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == f"Comissao Entregador - {canal_nome}"
+            ).first()
+            
+            if not subcategoria_comissao:
+                logger.warning(f"❌ Subcategoria não encontrada: 'Comissão Entregador - {canal_nome}' (tenant: {tenant_id})")
+            else:
+                logger.info(f"✅ Subcategoria encontrada: ID {subcategoria_comissao.id}")
+            
             conta_taxa = ContaPagar(
                 descricao=f"Taxa de entrega - {entregador.nome} - Venda {venda.numero_venda}",
                 fornecedor_id=venda.entregador_id,
@@ -2014,7 +2076,8 @@ def processar_contas_pagar_entrega(
                 status='pendente',
                 user_id=user_id,
                 tenant_id=tenant_id,
-                dre_subcategoria_id=None,  # TODO: Definir subcategoria DRE para despesas com entrega
+                canal=canal,
+                dre_subcategoria_id=subcategoria_comissao.id if subcategoria_comissao else None,
                 observacoes=f"Taxa de entrega ref. venda {venda.numero_venda} - {venda.percentual_taxa_entregador}% da taxa de R$ {venda.taxa_entrega} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})"
             )
             db.add(conta_taxa)
@@ -2033,6 +2096,18 @@ def processar_contas_pagar_entrega(
                 if entregador.custo_operacional_tipo == 'controla_rh' and entregador.custo_operacional_controla_rh_id:
                     observacoes += f" - ID Controla RH: {entregador.custo_operacional_controla_rh_id}"
                 
+                # Buscar subcategoria "Frete Operacional - {Canal}"
+                from app.dre_plano_contas_models import DRESubcategoria
+                subcategoria_frete_op = db.query(DRESubcategoria).filter(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome == f"Frete Operacional - {canal_nome}"
+                ).first()
+                
+                if not subcategoria_frete_op:
+                    logger.warning(f"❌ Subcategoria não encontrada: 'Frete Operacional - {canal_nome}' (tenant: {tenant_id})")
+                else:
+                    logger.info(f"✅ Subcategoria encontrada: ID {subcategoria_frete_op.id}")
+                
                 conta_custo = ContaPagar(
                     descricao=f"{tipo_descricao} entrega - {entregador.nome} - Venda {venda.numero_venda}",
                     fornecedor_id=venda.entregador_id,
@@ -2043,7 +2118,8 @@ def processar_contas_pagar_entrega(
                     status='pendente',
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    dre_subcategoria_id=None,  # TODO: Definir subcategoria DRE para custos operacionais de entrega
+                    canal=canal,
+                    dre_subcategoria_id=subcategoria_frete_op.id if subcategoria_frete_op else None,
                     observacoes=observacoes
                 )
                 
@@ -2068,6 +2144,290 @@ def processar_contas_pagar_entrega(
         
     except Exception as e:
         logger.error(f"❌ Erro ao criar contas a pagar de entrega (venda {venda.id}): {str(e)}", exc_info=True)
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+def gerar_dre_competencia_venda(
+    venda_id: int,
+    user_id: int,
+    tenant_id: str,
+    db: Session
+) -> Dict[str, Any]:
+    """
+    Gera lançamentos de DRE por competência para uma venda (PASSO 1 - Sprint 5).
+    
+    Esta função é chamada no PRIMEIRO MOMENTO em que a venda se torna EFETIVADA
+    (ou seja, quando passa a ter qualquer valor recebido, parcial ou total).
+    
+    Operações executadas:
+    1. Lançar RECEITA (100% do valor bruto) na DRE
+    2. Lançar CMV (custo total dos produtos) na DRE
+    3. Lançar DESCONTO (se houver) na DRE
+    
+    GARANTIAS:
+    - ✅ Idempotente: verifica se DRE já foi gerada (campo venda.dre_gerada)
+    - ✅ Multi-tenant: todos os lançamentos isolados por tenant_id
+    - ✅ Regime de competência: gera no momento da efetivação, não no pagamento
+    - ✅ Atomicidade: chamada dentro da transação principal
+    
+    Args:
+        venda_id: ID da venda
+        user_id: ID do usuário (para auditoria)
+        tenant_id: UUID do tenant (isolamento multi-tenant)
+        db: Sessão do SQLAlchemy (NÃO faz commit, apenas flush)
+        
+    Returns:
+        Dict com resultado:
+        {
+            'success': bool,
+            'lancamentos_criados': int,
+            'receita_gerada': float,
+            'cmv_gerado': float,
+            'desconto_gerado': float,
+            'message': str
+        }
+        
+    Raises:
+        HTTPException: Se venda não encontrada ou subcategorias DRE inválidas
+        
+    Exemplo:
+        >>> resultado = gerar_dre_competencia_venda(
+        ...     venda_id=120,
+        ...     user_id=1,
+        ...     tenant_id="uuid-tenant",
+        ...     db=db
+        ... )
+        >>> logger.info(f"DRE gerada: {resultado['lancamentos_criados']} lançamentos")
+    """
+
+
+def processar_contas_pagar_taxas(
+    venda: 'Venda',
+    pagamentos: List[Any],
+    user_id: int,
+    tenant_id: str,
+    db: Session
+) -> Dict[str, Any]:
+    """
+    Cria contas a pagar para taxas de pagamento (operação pós-commit).
+    
+    Para cada pagamento da venda:
+    1. Busca a forma de pagamento e suas taxas (taxa_percentual, taxa_fixa, taxas_por_parcela)
+    2. Calcula o valor da taxa
+    3. Identifica a subcategoria DRE apropriada (baseado no tipo e canal)
+    4. Cria conta a pagar na DRE
+    
+    Tipos de taxa suportados:
+    - Cartão de crédito (com ou sem parcelamento)
+    - Cartão de débito
+    - PIX
+    - Transferência
+    - Boleto
+    
+    Args:
+        venda: Objeto Venda (já commitada)
+        pagamentos: Lista de objetos de pagamento (VendaPagamento)
+        user_id: ID do usuário
+        tenant_id: UUID do tenant
+        db: Sessão do SQLAlchemy
+        
+    Returns:
+        Dict com resultado:
+        {
+            'success': bool,
+            'total_contas': int,
+            'valor_total': float,
+            'contas_criadas': List[int],
+            'detalhes': List[str]
+        }
+    """
+    from app.financeiro_models import ContaPagar, FormaPagamento
+    from app.dre_plano_contas_models import DRESubcategoria
+    from decimal import Decimal
+    from datetime import date
+    import json
+    
+    if not pagamentos:
+        return {
+            'success': True,
+            'total_contas': 0,
+            'valor_total': 0.0,
+            'contas_criadas': [],
+            'detalhes': ['Nenhum pagamento para processar']
+        }
+    
+    contas_criadas_ids = []
+    valor_total = Decimal('0')
+    detalhes = []
+    
+    try:
+        # Mapear canal para determinar subcategoria DRE apropriada
+        canal = venda.canal or 'loja_fisica'
+        
+        # Mapear tipo de pagamento para nome da subcategoria DRE
+        MAPA_SUBCATEGORIAS = {
+            'cartao_credito': 'Taxas de Cartão de Crédito',
+            'credito': 'Taxas de Cartão de Crédito',
+            'Cartão Crédito': 'Taxas de Cartão de Crédito',
+            'cartao_debito': 'Taxas de Cartão de Débito',
+            'debito': 'Taxas de Cartão de Débito',
+            'Cartão Débito': 'Taxas de Cartão de Débito',
+            'pix': 'Taxa de PIX',
+            'PIX': 'Taxa de PIX',
+            'Pix': 'Taxa de PIX',
+        }
+        
+        # Mapear canal para sufixo da subcategoria
+        MAPA_CANAIS = {
+            'loja_fisica': 'Loja Física',
+            'pdv': 'Loja Física',  # PDV = Loja Física
+            'mercado_livre': 'Mercado Livre',
+            'shopee': 'Shopee',
+            'amazon': 'Amazon'
+        }
+        
+        canal_sufixo = MAPA_CANAIS.get(canal, 'Loja Física')  # Default: Loja Física
+        
+        # Processar cada pagamento
+        for pagamento in pagamentos:
+            # Pular formas de pagamento sem taxa (dinheiro, crédito cliente)
+            forma_pag_nome = pagamento.forma_pagamento.lower()
+            if 'dinheiro' in forma_pag_nome or 'credito_cliente' in forma_pag_nome:
+                continue
+            
+            # Buscar configuração da forma de pagamento
+            forma_pag = db.query(FormaPagamento).filter(
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.ativo == True
+            ).filter(
+                (FormaPagamento.nome == pagamento.forma_pagamento) |
+                (FormaPagamento.tipo == pagamento.forma_pagamento) |
+                (func.lower(FormaPagamento.nome).like(f'%{forma_pag_nome}%'))
+            ).first()
+            
+            if not forma_pag:
+                logger.warning(f"⚠️ Forma de pagamento não encontrada: {pagamento.forma_pagamento}")
+                continue
+            
+            # Verificar se tem taxa configurada
+            taxa_percentual = Decimal(str(forma_pag.taxa_percentual or 0))
+            taxa_fixa = Decimal(str(forma_pag.taxa_fixa or 0))
+            
+            if taxa_percentual == 0 and taxa_fixa == 0:
+                logger.debug(f"✓ Forma de pagamento sem taxa: {forma_pag.nome}")
+                continue
+            
+            # Verificar se tem taxa específica para número de parcelas
+            num_parcelas = getattr(pagamento, 'numero_parcelas', 1) or 1
+            
+            if num_parcelas > 1 and forma_pag.taxas_por_parcela:
+                try:
+                    taxas_por_parcela_dict = json.loads(forma_pag.taxas_por_parcela)
+                    if str(num_parcelas) in taxas_por_parcela_dict:
+                        taxa_parcela_config = taxas_por_parcela_dict[str(num_parcelas)]
+                        taxa_percentual = Decimal(str(taxa_parcela_config.get('taxa_percentual', taxa_percentual)))
+                        taxa_fixa = Decimal(str(taxa_parcela_config.get('taxa_fixa', taxa_fixa)))
+                        logger.info(f"💳 Taxa específica para {num_parcelas}x: {taxa_percentual}% + R$ {taxa_fixa}")
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.warning(f"⚠️ Erro ao processar taxas_por_parcela: {str(e)}")
+            
+            # Calcular valor da taxa
+            valor_pagamento = Decimal(str(pagamento.valor))
+            valor_taxa = (valor_pagamento * taxa_percentual / Decimal('100')) + taxa_fixa
+            
+            if valor_taxa <= 0:
+                continue
+            
+            # Determinar nome da subcategoria DRE
+            tipo_pagamento_base = forma_pag.tipo or pagamento.forma_pagamento
+            nome_subcategoria_base = MAPA_SUBCATEGORIAS.get(
+                tipo_pagamento_base,
+                MAPA_SUBCATEGORIAS.get(pagamento.forma_pagamento, None)
+            )
+            
+            if not nome_subcategoria_base:
+                logger.warning(f"⚠️ Tipo de pagamento não mapeado: {tipo_pagamento_base}")
+                continue
+            
+            # Montar nome completo da subcategoria (com canal)
+            nome_subcategoria = f"{nome_subcategoria_base} - {canal_sufixo}"
+            
+            # Buscar subcategoria DRE
+            subcategoria_taxa = db.query(DRESubcategoria).filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == nome_subcategoria,
+                DRESubcategoria.ativo == True
+            ).first()
+            
+            # Se não encontrar com canal, tentar genérico
+            if not subcategoria_taxa:
+                subcategoria_taxa = db.query(DRESubcategoria).filter(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome == nome_subcategoria_base,
+                    DRESubcategoria.ativo == True
+                ).first()
+            
+            if not subcategoria_taxa:
+                logger.warning(f"❌ Subcategoria DRE não encontrada: {nome_subcategoria} (tentou também {nome_subcategoria_base})")
+                continue
+            
+            logger.info(f"✅ Subcategoria DRE encontrada: {subcategoria_taxa.nome} (ID: {subcategoria_taxa.id})")
+            
+            # Criar conta a pagar
+            descricao = f"Taxa {forma_pag.nome}"
+            if num_parcelas > 1:
+                descricao += f" {num_parcelas}x"
+            descricao += f" - Venda {venda.numero_venda}"
+            
+            observacoes = f"Taxa de pagamento ref. venda {venda.numero_venda}"
+            if taxa_percentual > 0 and taxa_fixa > 0:
+                observacoes += f" - {taxa_percentual}% + R$ {taxa_fixa} sobre R$ {valor_pagamento}"
+            elif taxa_percentual > 0:
+                observacoes += f" - {taxa_percentual}% sobre R$ {valor_pagamento}"
+            else:
+                observacoes += f" - Taxa fixa de R$ {taxa_fixa}"
+            
+            # Data de vencimento: assumindo 30 dias (pode ser ajustado pelo campo prazo_dias)
+            prazo_dias = forma_pag.prazo_dias or forma_pag.prazo_recebimento or 30
+            data_vencimento = date.today() + timedelta(days=prazo_dias)
+            
+            conta_taxa = ContaPagar(
+                descricao=descricao,
+                fornecedor_id=None,  # Taxa não tem fornecedor específico
+                valor_original=valor_taxa,
+                valor_final=valor_taxa,
+                data_emissao=date.today(),
+                data_vencimento=data_vencimento,
+                status='pendente',
+                user_id=user_id,
+                tenant_id=tenant_id,
+                canal=canal,
+                dre_subcategoria_id=subcategoria_taxa.id,
+                observacoes=observacoes
+            )
+            
+            db.add(conta_taxa)
+            db.flush()
+            
+            contas_criadas_ids.append(conta_taxa.id)
+            valor_total += valor_taxa
+            detalhes.append(f"{forma_pag.nome}: R$ {valor_taxa:.2f}")
+            
+            logger.info(f"✅ Conta a pagar criada: Taxa {forma_pag.nome} R$ {valor_taxa:.2f}")
+        
+        return {
+            'success': True,
+            'total_contas': len(contas_criadas_ids),
+            'valor_total': float(valor_total),
+            'contas_criadas': contas_criadas_ids,
+            'detalhes': detalhes
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar contas a pagar de taxas (venda {venda.id}): {str(e)}", exc_info=True)
         return {
             'success': False,
             'error': str(e)
