@@ -3,7 +3,7 @@ Endpoint DRE por Canal - Retorna dados estruturados com nome e cor por canal
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, or_, extract
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List, Dict
@@ -15,6 +15,8 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
+from app.financeiro_models import ContaPagar
+from app.dre_plano_contas_models import DRESubcategoria
 
 router = APIRouter(prefix="/financeiro/dre/canais", tags=["DRE por Canal"])
 
@@ -91,15 +93,20 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, user_id: int) -> Dic
         
         if canal not in dados_por_canal:
             dados_por_canal[canal] = {
-                'receita_bruta': Decimal('0'),
+                'receita_produtos': Decimal('0'),  # subtotal (só produtos)
+                'taxa_entrega': Decimal('0'),  # frete cobrado do cliente
                 'descontos': Decimal('0'),
                 'cmv': Decimal('0'),
                 'vendas': []
             }
         
-        # Receita
-        receita = venda.subtotal + (venda.taxa_entrega or 0)
-        dados_por_canal[canal]['receita_bruta'] += receita
+        # Receita de Produtos (apenas subtotal, sem frete)
+        dados_por_canal[canal]['receita_produtos'] += venda.subtotal
+        
+        # Taxa de Frete (o que o cliente pagou)
+        if venda.taxa_entrega:
+            dados_por_canal[canal]['taxa_entrega'] += venda.taxa_entrega
+        
         dados_por_canal[canal]['descontos'] += (venda.desconto_valor or 0)
         dados_por_canal[canal]['vendas'].append(venda)
         
@@ -112,6 +119,45 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, user_id: int) -> Dic
                 dados_por_canal[canal]['cmv'] += custo
     
     return dados_por_canal
+
+
+def obter_despesas_operacionais(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
+    """
+    Calcula o total de despesas operacionais do período
+    Inclui: TODAS as despesas operacionais (salários, fretes, comissões, administrativas, etc.)
+    Exclui: Apenas compras de mercadorias (que vão para CMV)
+    """
+    from app.produtos_models import NotaEntrada
+    
+    # Buscar contas a pagar do período (TODAS, exceto compras de mercadorias)
+    # ✅ USA DATA_EMISSAO (regime de competência)
+    contas_pagar = db.query(ContaPagar).filter(
+        and_(
+            ContaPagar.tenant_id == tenant_id,
+            extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+            extract('year', ContaPagar.data_emissao) == ano,
+            ContaPagar.nota_entrada_id.is_(None)  # Exclui compras de mercadorias (CMV)
+        )
+    ).all()
+    
+    total_despesas = Decimal('0')
+    for conta in contas_pagar:
+        total_despesas += conta.valor_original
+    
+    # Adicionar fretes de notas de entrada (despesa operacional, não CMV)
+    notas = db.query(NotaEntrada).filter(
+        and_(
+            NotaEntrada.tenant_id == tenant_id,
+            extract('month', NotaEntrada.data_emissao) == mes,
+            extract('year', NotaEntrada.data_emissao) == ano
+        )
+    ).all()
+    
+    for nota in notas:
+        if nota.valor_frete:
+            total_despesas += Decimal(str(nota.valor_frete))
+    
+    return total_despesas
 
 
 # ==================== ENDPOINT PRINCIPAL ====================
@@ -159,7 +205,8 @@ def gerar_dre_por_canais(
         else:
             # Canal selecionado mas sem vendas - adicionar com valores zerados
             dados_canais_filtrados[canal_id] = {
-                'receita_bruta': Decimal('0'),
+                'receita_produtos': Decimal('0'),
+                'taxa_entrega': Decimal('0'),
                 'descontos': Decimal('0'),
                 'cmv': Decimal('0'),
                 'vendas': []
@@ -169,7 +216,9 @@ def gerar_dre_por_canais(
     dados_canais = dados_canais_filtrados
     
     # Calcular totais
-    receita_bruta_total = sum(d['receita_bruta'] for d in dados_canais.values())
+    receita_produtos_total = sum(d['receita_produtos'] for d in dados_canais.values())
+    taxa_entrega_total = sum(d['taxa_entrega'] for d in dados_canais.values())
+    receita_bruta_total = receita_produtos_total + taxa_entrega_total
     descontos_total = sum(d['descontos'] for d in dados_canais.values())
     cmv_total = sum(d['cmv'] for d in dados_canais.values())
     receita_liquida_total = receita_bruta_total - descontos_total
@@ -191,15 +240,15 @@ def gerar_dre_por_canais(
         tipo="receita"
     ))
     
-    # Linhas por canal - Vendas de Produtos
+    # Linhas por canal - Vendas de Produtos (apenas subtotal, sem frete)
     for canal, dados in sorted(dados_canais.items()):
         config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        receita = float(dados['receita_bruta'])
-        percentual = (receita / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+        receita_produtos = float(dados['receita_produtos'])
+        percentual = (receita_produtos / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
         
         linhas.append(LinhaCanal(
-            descricao=f"Vendas de Produtos {config['nome']}",  # ← Nome do canal na descrição
-            valor=receita,
+            descricao=f"Vendas de Produtos {config['nome']}",
+            valor=receita_produtos,
             percentual=round(percentual, 2),
             cor=config['cor'],
             cor_bg="#ffffff",
@@ -208,6 +257,31 @@ def gerar_dre_por_canais(
             nivel=1,
             tipo="receita"
         ))
+    
+    # ========== TAXA DE FRETE (RECEITA) POR CANAL ==========
+    # Taxa de frete paga pelo cliente, entra como receita
+    # Vem diretamente do campo taxa_entrega das vendas
+    
+    from app.dre_plano_contas_models import DRESubcategoria
+    
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
+        taxa_frete_canal = float(dados_canais[canal]['taxa_entrega'])
+        
+        if taxa_frete_canal > 0:
+            percentual = (taxa_frete_canal / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+            
+            linhas.append(LinhaCanal(
+                descricao=f"Taxa de Frete {config['nome']}",
+                valor=taxa_frete_canal,
+                percentual=round(percentual, 2),
+                cor=config['cor'],
+                cor_bg="#ffffff",
+                canal=canal,
+                canal_nome=config['nome'],
+                nivel=1,
+                tipo="receita"
+            ))
     
     # Vendas de Serviços por canal (REMOVIDO - será adicionado apenas se houver valores reais)
     
@@ -288,6 +362,45 @@ def gerar_dre_por_canais(
             tipo="custo"
         ))
     
+    # ========== FRETES SOBRE COMPRAS (CMV) ==========
+    # Frete pago na compra de mercadorias
+    
+    subcategoria_frete_compras = db.query(DRESubcategoria).filter(
+        DRESubcategoria.tenant_id == tenant_id,
+        DRESubcategoria.nome == "Fretes sobre Compras"
+    ).first()
+    
+    if subcategoria_frete_compras:
+        contas_frete_compras = db.query(ContaPagar).filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+                extract('year', ContaPagar.data_emissao) == ano,
+                ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id
+            )
+        ).all()
+        
+        total_frete_compras = sum(conta.valor_original for conta in contas_frete_compras)
+        
+        if total_frete_compras > 0:
+            cmv_total += total_frete_compras
+            percentual = (float(total_frete_compras) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+            
+            linhas.append(LinhaCanal(
+                descricao="   Fretes sobre Compras",
+                valor=float(total_frete_compras),
+                percentual=round(percentual, 2),
+                cor="#6b7280",
+                cor_bg="#ffffff",
+                canal="total",
+                canal_nome="Total",
+                nivel=1,
+                tipo="custo"
+            ))
+    
+    # Recalcular lucro bruto com frete de compras
+    lucro_bruto_total = receita_liquida_total - cmv_total
+    
     # ========== LUCRO BRUTO ==========
     linhas.append(LinhaCanal(
         descricao="(=) LUCRO BRUTO",
@@ -302,14 +415,282 @@ def gerar_dre_por_canais(
     ))
     
     # ========== DESPESAS OPERACIONAIS ==========
-    # TODO: Buscar despesas reais de contas_pagar vinculadas às subcategorias DRE
-    # Por enquanto, não exibir seção se não houver despesas
+    # Primeiro, buscar subcategoria antiga "Fretes sobre Vendas" para contas legadas
+    subcategoria_antiga = db.query(DRESubcategoria).filter(
+        DRESubcategoria.tenant_id == tenant_id,
+        DRESubcategoria.nome.like('Fretes sobre Vendas%')
+    ).first()
+    
+    # Calcular Frete Operacional por canal
+    total_frete_op_geral = Decimal('0')
+    detalhes_frete_op = []
+    
+    for canal in sorted(dados_canais.keys()):
+            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
+            total_frete_op_canal = Decimal('0')
+            
+            # Buscar subcategoria específica do canal (nova, sem acentos)
+            nome_canal = config['nome'].replace('í', 'i')
+            subcategoria_frete_op = db.query(DRESubcategoria).filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == f"Frete Operacional - {nome_canal}"
+            ).first()
+            
+            # Buscar contas com a subcategoria nova
+            if subcategoria_frete_op:
+                contas_frete_op = db.query(ContaPagar).filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+                        extract('year', ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_frete_op.id,
+                        ContaPagar.canal == canal
+                    )
+                ).all()
+                total_frete_op_canal += sum(conta.valor_original for conta in contas_frete_op)
+            
+            # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Custo fixo entrega"
+            # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
+            if subcategoria_antiga and canal == 'loja_fisica':
+                contas_antigas_frete = db.query(ContaPagar).filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+                        extract('year', ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
+                        or_(
+                            ContaPagar.descricao.like('Custo fixo entrega%'),
+                            ContaPagar.descricao.like('Controla RH entrega%')
+                        ),
+                        ContaPagar.canal.is_(None)  # Apenas contas sem canal (antigas)
+                    )
+                ).all()
+                total_frete_op_canal += sum(conta.valor_original for conta in contas_antigas_frete)
+            
+            total_frete_op_geral += total_frete_op_canal
+            
+            if total_frete_op_canal > 0:
+                percentual = (float(total_frete_op_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+                
+                detalhes_frete_op.append(LinhaCanal(
+                    descricao=f"   Frete Operacional {config['nome']}",
+                    valor=float(total_frete_op_canal),
+                    percentual=round(percentual, 2),
+                    cor=config['cor'],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config['nome'],
+                    nivel=1,
+                    tipo="despesa"
+                ))
+    
+    # Calcular Comissão Entregador por canal
+    total_comissao_geral = Decimal('0')
+    detalhes_comissao = []
+    
+    for canal in sorted(dados_canais.keys()):
+            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
+            total_comissao_canal = Decimal('0')
+            
+            # Buscar subcategoria específica do canal (nova, sem acentos)
+            nome_canal = config['nome'].replace('í', 'i')
+            subcategoria_comissao = db.query(DRESubcategoria).filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == f"Comissao Entregador - {nome_canal}"
+            ).first()
+            
+            # Buscar contas com a subcategoria nova
+            if subcategoria_comissao:
+                contas_comissao = db.query(ContaPagar).filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+                        extract('year', ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_comissao.id,
+                        ContaPagar.canal == canal
+                    )
+                ).all()
+                total_comissao_canal += sum(conta.valor_original for conta in contas_comissao)
+            
+            # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Taxa de entrega"
+            # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
+            if subcategoria_antiga and canal == 'loja_fisica':
+                contas_antigas_comissao = db.query(ContaPagar).filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+                        extract('year', ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
+                        ContaPagar.descricao.like('Taxa de entrega%'),
+                        ContaPagar.canal.is_(None)  # Apenas contas sem canal (antigas)
+                    )
+                ).all()
+                total_comissao_canal += sum(conta.valor_original for conta in contas_antigas_comissao)
+            
+            total_comissao_geral += total_comissao_canal
+            
+            if total_comissao_canal > 0:
+                percentual = (float(total_comissao_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+                
+                detalhes_comissao.append(LinhaCanal(
+                    descricao=f"   Comissão Entregador {config['nome']}",
+                    valor=float(total_comissao_canal),
+                    percentual=round(percentual, 2),
+                    cor=config['cor'],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config['nome'],
+                    nivel=1,
+                    tipo="despesa"
+                ))
+    
+    # Calcular Comissões de Vendas - Vendedores por canal
+    total_comissao_vendedores_geral = Decimal('0')
+    detalhes_comissao_vendedores = []
+    
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
+        total_comissao_vendedores_canal = Decimal('0')
+        
+        # Buscar subcategoria "Comissões de Vendas - Vendedores"
+        subcategoria_comissao_vendedores = db.query(DRESubcategoria).filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.nome.like('Comiss%es de Vendas - Vendedores')
+        ).first()
+        
+        # Buscar contas
+        if subcategoria_comissao_vendedores:
+            contas_comissao_vendedores = db.query(ContaPagar).filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência (data da venda)
+                    extract('year', ContaPagar.data_emissao) == ano,
+                    ContaPagar.dre_subcategoria_id == subcategoria_comissao_vendedores.id,
+                    or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None))
+                )
+            ).all()
+            total_comissao_vendedores_canal += sum(conta.valor_original for conta in contas_comissao_vendedores)
+        
+        total_comissao_vendedores_geral += total_comissao_vendedores_canal
+        
+        if total_comissao_vendedores_canal > 0:
+            percentual = (float(total_comissao_vendedores_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+            
+            detalhes_comissao_vendedores.append(LinhaCanal(
+                descricao=f"   Comissões de Vendas {config['nome']}",
+                valor=float(total_comissao_vendedores_canal),
+                percentual=round(percentual, 2),
+                cor=config['cor'],
+                cor_bg="#ffffff",
+                canal=canal,
+                canal_nome=config['nome'],
+                nivel=1,
+                tipo="despesa"
+            ))
+    
+    # Calcular Taxas de Cartao/PIX por canal e tipo
+    total_taxas_cartao_geral = Decimal('0')
+    detalhes_taxas_cartao = []
+
+    tipos_taxas = [
+        ("Taxas de Cartão de Crédito", "Taxas de Cartão de Crédito"),
+        ("Taxas de Cartão de Débito", "Taxas de Cartão de Débito"),
+        ("Taxa de PIX", "Taxa de PIX")
+    ]
+
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
+
+        for nome_base, label in tipos_taxas:
+            total_taxa_tipo = Decimal('0')
+
+            nomes_taxas = [
+                f"{nome_base} - {config['nome']}",
+                nome_base
+            ]
+
+            subcategorias_taxas = db.query(DRESubcategoria).filter(
+                and_(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome.in_(nomes_taxas)
+                )
+            ).all()
+
+            if subcategorias_taxas:
+                ids_taxas = [s.id for s in subcategorias_taxas]
+                contas_taxas = db.query(ContaPagar).filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract('month', ContaPagar.data_emissao) == mes,
+                        extract('year', ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id.in_(ids_taxas),
+                        or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None))
+                    )
+                ).all()
+                total_taxa_tipo += sum(conta.valor_original for conta in contas_taxas)
+
+            if total_taxa_tipo > 0:
+                total_taxas_cartao_geral += total_taxa_tipo
+                percentual = (float(total_taxa_tipo) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+                detalhes_taxas_cartao.append(LinhaCanal(
+                    descricao=f"   {label} {config['nome']}",
+                    valor=float(total_taxa_tipo),
+                    percentual=round(percentual, 2),
+                    cor=config['cor'],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config['nome'],
+                    nivel=1,
+                    tipo="despesa"
+                ))
+
+    # Calcular total de despesas operacionais (soma dos detalhes)
+    despesas_operacionais_total = (
+        total_frete_op_geral +
+        total_comissao_geral +
+        total_comissao_vendedores_geral +
+        total_taxas_cartao_geral
+    )
+    
+    # Calcular resultado operacional e lucro líquido
+    resultado_operacional_total = lucro_bruto_total - despesas_operacionais_total
+    lucro_liquido_total = resultado_operacional_total  # Por enquanto, sem resultado financeiro
+    
+    # Inserir linha principal de DESPESAS OPERACIONAIS
+    if despesas_operacionais_total > 0:
+        linhas.append(LinhaCanal(
+            descricao="(-) DESPESAS OPERACIONAIS",
+            valor=float(despesas_operacionais_total),
+            percentual=round((float(despesas_operacionais_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
+            cor="#dc2626",
+            cor_bg="#fef2f2",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="despesa"
+        ))
+        
+        # Adicionar detalhes de Frete Operacional
+        for detalhe in detalhes_frete_op:
+            linhas.append(detalhe)
+        
+        # Adicionar detalhes de Comissão Entregador
+        for detalhe in detalhes_comissao:
+            linhas.append(detalhe)
+        
+        # Adicionar detalhes de Comissões de Vendas - Vendedores
+        for detalhe in detalhes_comissao_vendedores:
+            linhas.append(detalhe)
+
+        # Adicionar detalhes de Taxas de Cartao
+        for detalhe in detalhes_taxas_cartao:
+            linhas.append(detalhe)
     
     # ========== RESULTADO OPERACIONAL ==========
     linhas.append(LinhaCanal(
         descricao="(=) RESULTADO OPERACIONAL",
-        valor=float(lucro_bruto_total),
-        percentual=round((float(lucro_bruto_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
+        valor=float(resultado_operacional_total),
+        percentual=round((float(resultado_operacional_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
         cor="#059669",
         cor_bg="#d1fae5",
         canal="total",
@@ -325,8 +706,8 @@ def gerar_dre_por_canais(
     # ========== LUCRO LÍQUIDO ==========
     linhas.append(LinhaCanal(
         descricao="(=) LUCRO/PREJUÍZO LÍQUIDO",
-        valor=float(lucro_bruto_total),
-        percentual=round((float(lucro_bruto_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
+        valor=float(lucro_liquido_total),
+        percentual=round((float(lucro_liquido_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
         cor="#059669",
         cor_bg="#d1fae5",
         canal="total",
@@ -342,12 +723,12 @@ def gerar_dre_por_canais(
         'receita_liquida': float(receita_liquida_total),
         'cmv': float(cmv_total),
         'lucro_bruto': float(lucro_bruto_total),
-        'despesas_operacionais': 0.0,
-        'resultado_operacional': float(lucro_bruto_total),
+        'despesas_operacionais': float(despesas_operacionais_total),
+        'resultado_operacional': float(resultado_operacional_total),
         'resultado_financeiro': 0.0,
-        'lucro_liquido': float(lucro_bruto_total),
+        'lucro_liquido': float(lucro_liquido_total),
         'margem_bruta': round((float(lucro_bruto_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2),
-        'margem_liquida': round((float(lucro_bruto_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2)
+        'margem_liquida': round((float(lucro_liquido_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2)
     }
     
     return DREPorCanalResponse(

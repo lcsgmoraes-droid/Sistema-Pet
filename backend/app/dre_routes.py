@@ -5,7 +5,7 @@ Sistema automatizado com categorização inteligente
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, extract, or_
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
@@ -18,6 +18,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .vendas_models import Venda, VendaItem, VendaPagamento
 from .financeiro_models import ContaPagar, ContaReceber
+from .dre_plano_contas_models import DRESubcategoria
 
 router = APIRouter(prefix="/financeiro/dre", tags=["DRE"])
 
@@ -116,6 +117,28 @@ def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
     return cmv_total
 
 
+def calcular_frete_notas_entrada(db: Session, mes: int, ano: int) -> Decimal:
+    """
+    Calcula o total de frete das notas de entrada do período
+    O frete é despesa operacional, não CMV
+    """
+    from .produtos_models import NotaEntrada
+    
+    notas = db.query(NotaEntrada).filter(
+        and_(
+            extract('month', NotaEntrada.data_emissao) == mes,
+            extract('year', NotaEntrada.data_emissao) == ano
+        )
+    ).all()
+    
+    frete_total = Decimal('0')
+    for nota in notas:
+        if nota.valor_frete:
+            frete_total += Decimal(str(nota.valor_frete))
+    
+    return frete_total
+
+
 def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     """
     Agrupa despesas por categoria
@@ -123,19 +146,21 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     - Despesas com Pessoal (salários, encargos)
     - Despesas Administrativas (água, luz, internet, telefone)
     - Despesas com Ocupação (aluguel, condomínio, IPTU)
-    - Despesas com Vendas (marketing, taxas)
+    - Despesas com Vendas (marketing, taxas, frete)
     - Outras Despesas
     
-    IMPORTANTE: Exclui pagamentos a fornecedores (esses entram no CMV, não em despesas operacionais)
+    IMPORTANTE: Exclui apenas compras de mercadorias vinculadas a notas de entrada (essas entram no CMV).
+    Inclui despesas operacionais como fretes, custos de entrega, etc.
     """
     
     # Busca contas a pagar do período (pagas ou não)
-    # EXCLUINDO fornecedores (pagamento de mercadorias já entra no CMV)
+    # EXCLUINDO apenas compras de mercadorias (vinculadas a notas de entrada)
+    # ✅ USA DATA_EMISSAO (regime de competência) em vez de data_vencimento
     contas_pagar = db.query(ContaPagar).filter(
         and_(
-            extract('month', ContaPagar.data_vencimento) == mes,
-            extract('year', ContaPagar.data_vencimento) == ano,
-            ContaPagar.fornecedor_id.is_(None)  # EXCLUI pagamentos a fornecedores
+            extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+            extract('year', ContaPagar.data_emissao) == ano,
+            ContaPagar.nota_entrada_id.is_(None)  # EXCLUI apenas compras de mercadorias (CMV)
         )
     ).all()
     
@@ -148,10 +173,10 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     }
     
     # Palavras-chave para categorização automática
-    palavras_pessoal = ['salário', 'salario', 'folha', 'inss', 'fgts', 'vale', 'funcionario', 'funcionário']
+    palavras_pessoal = ['salário', 'salario', 'folha', 'inss', 'fgts', 'vale', 'funcionario', 'funcionário', 'comissão', 'comissao']
     palavras_admin = ['luz', 'água', 'agua', 'internet', 'telefone', 'material', 'limpeza']
     palavras_ocupacao = ['aluguel', 'condomínio', 'condominio', 'iptu']
-    palavras_vendas = ['marketing', 'propaganda', 'anúncio', 'anuncio', 'taxa']
+    palavras_vendas = ['marketing', 'propaganda', 'anúncio', 'anuncio', 'taxa', 'frete', 'entrega', 'entregador']
     
     for conta in contas_pagar:
         descricao_lower = (conta.descricao or '').lower()
@@ -174,28 +199,37 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
 
 def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
     """
-    Calcula o total de taxas de cartão do período
+    Calcula o total de taxas de cartão do período a partir das contas a pagar
     """
-    vendas = db.query(Venda).filter(
+    # Buscar subcategorias de taxas de pagamento (categoria 11 = Despesas Financeiras)
+    subcategorias_taxas = db.query(DRESubcategoria).filter(
         and_(
-            extract('month', Venda.data_venda) == mes,
-            extract('year', Venda.data_venda) == ano,
-            Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial'])
+            DRESubcategoria.categoria_id == 11,
+            DRESubcategoria.ativo == True,
+            or_(
+                DRESubcategoria.nome.like('%Taxa%Cartão%'),
+                DRESubcategoria.nome.like('%Taxa%PIX%'),
+                DRESubcategoria.nome.like('%Taxa%Débito%')
+            )
         )
     ).all()
     
-    taxas_total = Decimal('0')
+    subcategoria_ids = [s.id for s in subcategorias_taxas]
     
-    for venda in vendas:
-        pagamentos = db.query(VendaPagamento).filter(
-            VendaPagamento.venda_id == venda.id
-        ).all()
-        
-        for pagamento in pagamentos:
-            # A tabela venda_pagamentos tem o campo forma_pagamento (texto), não forma_pagamento_id
-            # Vamos calcular taxas apenas se houver relacionamento ou pegar da config
-            # Por ora, pular cálculo de taxas se não houver relacionamento
-            pass
+    if not subcategoria_ids:
+        return Decimal('0')
+    
+    # Buscar contas a pagar de taxas do período (regime de competência)
+    taxas = db.query(ContaPagar).filter(
+        and_(
+            extract('month', ContaPagar.data_emissao) == mes,
+            extract('year', ContaPagar.data_emissao) == ano,
+            ContaPagar.dre_subcategoria_id.in_(subcategoria_ids),
+            ContaPagar.status != 'cancelado'
+        )
+    ).all()
+    
+    taxas_total = sum([Decimal(str(t.valor_original or 0)) for t in taxas])
     
     return taxas_total
 
@@ -263,6 +297,7 @@ def gerar_dre(
     
     categorias_despesas = obter_despesas_por_categoria(db, mes, ano)
     taxas_cartao = calcular_taxas_cartao(db, mes, ano)
+    frete_compras = calcular_frete_notas_entrada(db, mes, ano)  # Frete de notas de entrada
     
     despesas_pessoal = categorias_despesas['Despesas com Pessoal']
     despesas_administrativas = (
@@ -271,7 +306,8 @@ def gerar_dre(
     )
     outras_despesas = (
         categorias_despesas['Despesas com Vendas'] +
-        categorias_despesas['Outras Despesas']
+        categorias_despesas['Outras Despesas'] +
+        frete_compras  # Adiciona frete das notas de entrada
     )
     
     despesas_operacionais = (
@@ -346,10 +382,11 @@ def gerar_dre_detalhado(
     dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
     
     # Busca detalhes das despesas (EXCLUINDO fornecedores)
+    # ✅ USA DATA_EMISSAO (regime de competência)
     contas_pagar = db.query(ContaPagar).filter(
         and_(
-            extract('month', ContaPagar.data_vencimento) == mes,
-            extract('year', ContaPagar.data_vencimento) == ano,
+            extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
+            extract('year', ContaPagar.data_emissao) == ano,
             ContaPagar.fornecedor_id.is_(None)  # EXCLUI pagamentos a fornecedores
         )
     ).all()
