@@ -48,6 +48,7 @@ from app.notas_entrada_routes import router as notas_entrada_router
 from app.contas_pagar_routes import router as contas_pagar_router
 from app.contas_receber_routes import router as contas_receber_router
 from app.conciliacao_cartao_routes import router as conciliacao_cartao_router
+from app.stone_routes import router as stone_router
 from app.financeiro_routes import router as financeiro_router
 from app.contas_bancarias_routes import router as contas_bancarias_router
 from app.lancamentos_routes import router as lancamentos_router
@@ -411,6 +412,7 @@ app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"])
 app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"])
 app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"])
 app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"])
+app.include_router(stone_router, tags=["Stone - Pagamentos & Conciliação"])
 app.include_router(formas_pagamento_router, tags=["Formas de Pagamento & PDV"])
 app.include_router(comissoes_router, tags=["Comissões"])
 app.include_router(comissoes_demonstrativo_router, tags=["Comissões - Demonstrativo"])

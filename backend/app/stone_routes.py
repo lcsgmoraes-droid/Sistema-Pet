@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import logging
 
-from .db import get_db
+from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .stone_api_client import StoneAPIClient
@@ -143,7 +143,7 @@ def registrar_log(
 @router.post("/config")
 def configurar_stone(
     config_data: StoneConfigSchema,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """
@@ -189,7 +189,7 @@ def configurar_stone(
 
 @router.get("/config")
 def obter_config_stone(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """Retorna configuração Stone do tenant (sem expor secrets)"""
@@ -215,7 +215,7 @@ def obter_config_stone(
 @router.post("/payments/pix")
 async def criar_pagamento_pix(
     payment_data: CreatePixPaymentSchema,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """
@@ -322,7 +322,7 @@ async def criar_pagamento_pix(
 @router.post("/payments/card")
 async def criar_pagamento_cartao(
     payment_data: CreateCardPaymentSchema,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """
@@ -436,7 +436,7 @@ async def criar_pagamento_cartao(
 @router.get("/payments/{transaction_id}")
 async def consultar_pagamento(
     transaction_id: int,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """Consulta status atualizado de um pagamento"""
@@ -515,7 +515,7 @@ def listar_pagamentos(
     end_date: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """Lista pagamentos com filtros"""
@@ -565,7 +565,7 @@ def listar_pagamentos(
 async def cancelar_pagamento(
     transaction_id: int,
     cancel_data: CancelPaymentSchema,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """Cancela um pagamento pendente"""
@@ -622,7 +622,7 @@ async def cancelar_pagamento(
 async def estornar_pagamento(
     transaction_id: int,
     refund_data: RefundPaymentSchema,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_session),
     auth = Depends(get_current_user_and_tenant)
 ):
     """Estorna um pagamento aprovado (total ou parcial)"""
@@ -684,7 +684,7 @@ async def estornar_pagamento(
 async def receber_webhook_stone(
     request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """
     Endpoint para receber webhooks da Stone
