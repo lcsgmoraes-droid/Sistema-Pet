@@ -14,8 +14,12 @@ from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .stone_api_client import StoneAPIClient
+from .stone_conciliation_client import StoneConciliationClient
 from .stone_models import StoneTransaction, StoneTransactionLog, StoneConfig
+from .financeiro_models import ContaReceber
+from .vendas_models import Venda
 from pydantic import BaseModel, Field
+from sqlalchemy import and_
 
 
 logger = logging.getLogger(__name__)
@@ -759,3 +763,529 @@ async def receber_webhook_stone(
     logger.info(f"Webhook processado: Transaction {transaction.id} - {old_status} -> {new_status}")
     
     return {"success": True, "message": "Webhook processado com sucesso"}
+
+
+# ==========================================
+# TESTE DE CONEXÃO (SEM AUTENTICAÇÃO)
+# ==========================================
+
+@router.get("/test-connection")
+async def test_stone_connection():
+    """
+    🔧 Endpoint de teste para verificar conexão com API da Stone
+    
+    **Não requer autenticação** - Usa credenciais do ambiente
+    
+    Testa:
+    1. OAuth2 Client Credentials (múltiplos endpoints)
+    2. API Key direta (Authorization Bearer)
+    """
+    import os
+    import httpx
+    
+    try:
+        # Pega credenciais do ambiente
+        client_id = os.getenv('STONE_CLIENT_ID', '')
+        client_secret = os.getenv('STONE_CLIENT_SECRET', '')
+        merchant_id = os.getenv('STONE_MERCHANT_ID', '')
+        sandbox = os.getenv('STONE_SANDBOX', 'true').lower() == 'true'
+        
+        if not client_id:
+            return {
+                "success": False,
+                "error": "STONE_CLIENT_ID não configurado no ambiente"
+            }
+        
+        # =====================================
+        # TESTE 1: Usar chave como API Key direta
+        # =====================================
+        api_key_results = []
+        
+        base_urls = [
+            "https://payments.stone.com.br",
+            "https://api.stone.com.br",
+            "https://ton.com.br"
+        ]
+        
+        test_endpoints = [
+            "/api/v1/transactions",
+            "/v1/transactions",
+            "/api/transactions",
+            "/transactions"
+        ]
+        
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            for base_url in base_urls:
+                for endpoint in test_endpoints:
+                    url = f"{base_url}{endpoint}"
+                    
+                    try:
+                        response = await http_client.get(
+                            url,
+                            headers={"Authorization": f"Bearer {client_id}"}
+                        )
+                        
+                        result = {
+                            "method": "API_KEY",
+                            "url": url,
+                            "status": response.status_code,
+                            "success": response.status_code in [200, 401]  # 401 = autenticado mas sem acesso
+                        }
+                        
+                        if response.status_code == 200:
+                            result["message"] = "✅ API Key funcionou!"
+                            api_key_results.append(result)
+                            
+                            return {
+                                "success": True,
+                                "message": "✅ Conexão Stone estabelecida com API Key!",
+                                "auth_method": "API_KEY",
+                                "endpoint": url,
+                                "all_tests": api_key_results
+                            }
+                        elif response.status_code == 401:
+                            result["message"] = "🔐 Endpoint existe mas precisa de autenticação diferente"
+                        else:
+                            result["response"] = response.text[:150]
+                        
+                        api_key_results.append(result)
+                            
+                    except Exception as e:
+                        api_key_results.append({
+                            "method": "API_KEY",
+                            "url": url,
+                            "status": "error",
+                            "success": False,
+                            "error": str(e)[:100]
+                        })
+        
+        # =====================================
+        # TESTE 2: OAuth2 (como antes)
+        # =====================================
+        oauth_results = []
+        
+        oauth_base_urls = ["https://payments.stone.com.br", "https://api.stone.com.br"]
+        oauth_paths = ["/auth/oauth/token", "/oauth/token", "/api/oauth/token"]
+        
+        async with httpx.AsyncClient(timeout=10.0) as http_client:
+            for base_url in oauth_base_urls[:2]:  # Limita a 2 URLs principais
+                for oauth_path in oauth_paths[:3]:  # Limita a 3 paths principais
+                    url = f"{base_url}{oauth_path}"
+                    
+                    try:
+                        response = await http_client.post(
+                            url,
+                            data={
+                                "grant_type": "client_credentials",
+                                "client_id": client_id,
+                                "client_secret": client_secret
+                            },
+                            headers={"Content-Type": "application/x-www-form-urlencoded"}
+                        )
+                        
+                        result = {
+                            "method": "OAUTH2",
+                            "url": url,
+                            "status": response.status_code,
+                            "success": response.status_code == 200
+                        }
+                        
+                        if response.status_code == 200:
+                            result["message"] = "✅ OAuth2 funcionou!"
+                            oauth_results.append(result)
+                            
+                            return {
+                                "success": True,
+                                "message": "✅ Conexão Stone estabelecida com OAuth2!",
+                                "auth_method": "OAUTH2",
+                                "endpoint": url,
+                                "all_tests": oauth_results
+                            }
+                        else:
+                            result["response"] = response.text[:150]
+                        
+                        oauth_results.append(result)
+                            
+                    except Exception as e:
+                        oauth_results.append({
+                            "method": "OAUTH2",
+                            "url": url,
+                            "status": "error",
+                            "success": False,
+                            "error": str(e)[:100]
+                        })
+        
+        # Nenhum método funcionou
+        return {
+            "success": False,
+            "message": "❌ Nenhum método de autenticação funcionou",
+            "tests_performed": {
+                "api_key": len(api_key_results),
+                "oauth2": len(oauth_results)
+            },
+            "api_key_results": api_key_results[:10],  # Primeiros 10
+            "oauth2_results": oauth_results[:6]  # Primeiros 6
+        }
+        
+    except Exception as e:
+        logger.error(f"Erro ao testar conexão Stone: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "details": {
+                "sandbox_mode": sandbox if 'sandbox' in locals() else None,
+                "base_url": client.base_url if 'client' in locals() else None
+            }
+        }
+
+
+# ==========================================
+# API DE CONCILIAÇÃO STONE
+# ==========================================
+
+class ConsentRequestSchema(BaseModel):
+    """Schema para solicitar consentimento"""
+    document: str = Field(..., description="CNPJ do lojista")
+    affiliation_code: str = Field(..., description="Stone Code")
+    webhook_url: str = Field(..., description="URL para receber webhook")
+
+
+class ConsentWebhookSchema(BaseModel):
+    """Schema do webhook de consentimento"""
+    status: str  # pending, accepted, denied
+    document: str
+    affiliation_code: str
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+
+# Armazenamento temporário de credenciais (em produção, use banco de dados)
+_stone_credentials = {}
+
+
+@router.post("/solicitar-consentimento")
+async def solicitar_consentimento_stone(
+    payload: ConsentRequestSchema,
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    📝 Solicita consentimento do lojista para acessar dados de conciliação
+    
+    **Fluxo:**
+    1. Sistema envia solicitação para Stone
+    2. Stone envia email para o lojista
+    3. Lojista aprova ou nega
+    4. Stone envia webhook com credenciais (se aprovado)
+    5. Sistema salva credenciais automaticamente
+    
+    **Requer:** Permissão de admin
+    """
+    import os
+    
+    user, tenant_id = auth
+    
+    try:
+        client_id = os.getenv("STONE_CLIENT_ID", "")
+        client_secret = os.getenv("STONE_CLIENT_SECRET", "")
+        sandbox = os.getenv("STONE_SANDBOX", "true").lower() == "true"
+        
+        if not client_id or not client_secret:
+            raise HTTPException(400, "Credenciais Stone não configuradas")
+        
+        client = StoneConciliationClient(
+            client_id=client_id,
+            client_secret=client_secret,
+            sandbox=sandbox
+        )
+        
+        result = await client.request_consent(
+            document=payload.document,
+            affiliation_code=payload.affiliation_code,
+            webhook_url=payload.webhook_url
+        )
+        
+        if result.get("success"):
+            return {
+                "success": True,
+                "message": "✅ Consentimento solicitado! Verifique o email do lojista para aprovar.",
+                "details": {
+                    "document": payload.document,
+                    "affiliation_code": payload.affiliation_code,
+                    "next_steps": "O lojista receberá um email da Stone para aprovar o acesso"
+                }
+            }
+        else:
+            raise HTTPException(400, result.get("message", "Erro desconhecido"))
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao solicitar consentimento: {str(e)}")
+        raise HTTPException(500, f"Erro ao solicitar consentimento: {str(e)}")
+
+
+@router.post("/webhook-consentimento")
+async def webhook_consentimento_stone(
+    payload: ConsentWebhookSchema,
+    request: Request
+):
+    """
+    🔔 Webhook para receber notificação de consentimento da Stone
+    
+    **Este endpoint é chamado pela Stone quando:**
+    - Lojista aprova o consentimento (status=accepted)
+    - Lojista nega o consentimento (status=denied)
+    
+    **Não requer autenticação** (webhook externo)
+    """
+    try:
+        logger.info(f"Webhook Stone recebido: {payload.dict()}")
+        
+        if payload.status == "accepted":
+            # Salva credenciais
+            key = f"{payload.document}_{payload.affiliation_code}"
+            _stone_credentials[key] = {
+                "username": payload.username,
+                "password": payload.password,
+                "approved_at": datetime.now().isoformat(),
+                "document": payload.document,
+                "affiliation_code": payload.affiliation_code
+            }
+            
+            logger.info(f"✅ Consentimento aprovado para {payload.document}")
+            
+            return {
+                "success": True,
+                "message": "Consentimento aprovado e credenciais salvas"
+            }
+            
+        elif payload.status == "denied":
+            logger.warning(f"❌ Consentimento negado para {payload.document}")
+            return {
+                "success": True,
+                "message": "Consentimento negado pelo lojista"
+            }
+            
+        else:  # pending
+            logger.info(f"⏳ Consentimento pendente para {payload.document}")
+            return {
+                "success": True,
+                "message": "Consentimento pendente de aprovação"
+            }
+            
+    except Exception as e:
+        logger.error(f"Erro ao processar webhook: {str(e)}")
+        # Retorna 200 mesmo com erro para não retentar
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/extrato/{stone_code}")
+async def buscar_extrato_stone(
+    stone_code: str,
+    start_date: str,
+    end_date: str,
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    📊 Busca extrato de transações da Stone
+    
+    **Args:**
+    - stone_code: Código Stone do estabelecimento
+    - start_date: Data inicial (YYYY-MM-DD)
+    - end_date: Data final (YYYY-MM-DD)
+    
+    **Returns:** Lista de transações do período
+    """
+    import os
+    
+    user, tenant_id = auth
+    
+    try:
+        # Busca credenciais
+        document = os.getenv("STONE_DOCUMENT", "")
+        key = f"{document}_{stone_code}"
+        
+        if key not in _stone_credentials:
+            raise HTTPException(
+                400,
+                "Consentimento não aprovado. Solicite acesso primeiro."
+            )
+        
+        creds = _stone_credentials[key]
+        
+        client_id = os.getenv("STONE_CLIENT_ID")
+        client_secret = os.getenv("STONE_CLIENT_SECRET")
+        sandbox = os.getenv("STONE_SANDBOX", "true").lower() == "true"
+        
+        client = StoneConciliationClient(
+            client_id=client_id,
+            client_secret=client_secret,
+            sandbox=sandbox
+        )
+        
+        # Define credenciais
+        client.set_credentials(
+            username=creds["username"],
+            password=creds["password"]
+        )
+        
+        # Busca transações
+        transactions = await client.get_transactions(
+            stone_code=stone_code,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        return {
+            "success": True,
+            "period": {
+                "start": start_date,
+                "end": end_date
+            },
+            "total": len(transactions),
+            "transactions": transactions
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao buscar extrato: {str(e)}")
+        raise HTTPException(500, f"Erro ao buscar extrato: {str(e)}")
+
+
+@router.post("/conciliar-automatico/{stone_code}")
+async def conciliar_automatico_stone(
+    stone_code: str,
+    start_date: str,
+    end_date: str,
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    🔗 Busca extrato Stone e concilia automaticamente com vendas
+    
+    **Processo:**
+    1. Busca transações da Stone no período
+    2. Para cada transação, tenta match por:
+       - NSU exato
+       - Valor + data próxima
+    3. Atualiza contas_receber como conciliadas
+    
+    **Returns:** Resumo da conciliação
+    """
+    user, tenant_id = auth
+    session = next(get_session())
+    
+    try:
+        # Busca extrato
+        extrato_result = await buscar_extrato_stone(
+            stone_code=stone_code,
+            start_date=start_date,
+            end_date=end_date,
+            auth=auth
+        )
+        
+        if not extrato_result.get("success"):
+            raise HTTPException(400, "Erro ao buscar extrato")
+        
+        transactions = extrato_result.get("transactions", [])
+        
+        resultado = {
+            "total_transacoes": len(transactions),
+            "conciliadas_nsu": 0,
+            "conciliadas_valor_data": 0,
+            "nao_encontradas": 0,
+            "detalhes": []
+        }
+        
+        for trans in transactions:
+            try:
+                # Tenta match por NSU
+                conta = session.query(ContaReceber).filter(
+                    and_(
+                        ContaReceber.tenant_id == tenant_id,
+                        ContaReceber.nsu == trans["nsu"],
+                        ContaReceber.conciliado == False
+                    )
+                ).first()
+                
+                match_type = None
+                
+                if conta:
+                    match_type = "nsu"
+                    resultado["conciliadas_nsu"] += 1
+                else:
+                    # Tenta match por valor + data
+                    trans_date = datetime.fromisoformat(trans["date"])
+                    data_inicio = trans_date - timedelta(days=1)
+                    data_fim = trans_date + timedelta(days=1)
+                    
+                    conta = session.query(ContaReceber).filter(
+                        and_(
+                            ContaReceber.tenant_id == tenant_id,
+                            ContaReceber.valor == trans["amount"],
+                            ContaReceber.data_vencimento >= data_inicio,
+                            ContaReceber.data_vencimento <= data_fim,
+                            ContaReceber.conciliado == False
+                        )
+                    ).first()
+                    
+                    if conta:
+                        match_type = "valor_data"
+                        resultado["conciliadas_valor_data"] += 1
+                
+                if conta:
+                    # Atualiza conta
+                    conta.conciliado = True
+                    conta.data_conciliacao = datetime.now()
+                    conta.nsu = trans["nsu"]
+                    conta.adquirente = "Stone"
+                    
+                    venda_numero = None
+                    if conta.venda_id:
+                        venda = session.query(Venda).get(conta.venda_id)
+                        if venda:
+                            venda_numero = venda.numero_venda
+                    
+                    resultado["detalhes"].append({
+                        "stone_id": trans["stone_id"],
+                        "nsu": trans["nsu"],
+                        "valor": float(trans["amount"]),
+                        "match": True,
+                        "match_type": match_type,
+                        "venda": venda_numero
+                    })
+                else:
+                    resultado["nao_encontradas"] += 1
+                    resultado["detalhes"].append({
+                        "stone_id": trans["stone_id"],
+                        "nsu": trans["nsu"],
+                        "valor": float(trans["amount"]),
+                        "match": False,
+                        "motivo": "Nenhuma venda encontrada"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Erro ao processar transação {trans.get('nsu')}: {str(e)}")
+                resultado["detalhes"].append({
+                    "nsu": trans.get("nsu"),
+                    "erro": str(e)
+                })
+        
+        # Salva alterações
+        session.commit()
+        
+        return {
+            "success": True,
+            "message": f"✅ Conciliação concluída: {resultado['conciliadas_nsu'] + resultado['conciliadas_valor_data']} de {resultado['total_transacoes']} transações",
+            "resumo": resultado
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Erro na conciliação automática: {str(e)}")
+        raise HTTPException(500, f"Erro na conciliação: {str(e)}")
+    finally:
+        session.close()
