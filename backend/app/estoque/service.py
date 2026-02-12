@@ -131,11 +131,34 @@ class EstoqueService:
                     f'Disponível: {estoque_anterior}, Necessário: {quantidade}'
                 )
             
-            # Se permite estoque negativo, apenas logar um aviso
+            # 🟢 MODELO CONTROLADO: Registrar alerta de estoque negativo
+            from app.estoque_models import AlertaEstoqueNegativo
+            
+            estoque_resultante = estoque_anterior - quantidade
+            
+            # Criar alerta persistente
+            alerta = AlertaEstoqueNegativo(
+                tenant_id=tenant_id,
+                produto_id=produto.id,
+                produto_nome=produto.nome,
+                estoque_anterior=estoque_anterior,
+                quantidade_vendida=quantidade,
+                estoque_resultante=estoque_resultante,
+                venda_id=contexto.get('venda_id') if contexto else None,
+                venda_codigo=contexto.get('venda_codigo') if contexto else None,
+                critico=(estoque_resultante < -5),  # Crítico se < -5 unidades
+                status='pendente'
+            )
+            db.add(alerta)
+            db.flush()  # Garante que foi salvo
+            
+            # Logar aviso detalhado
             logger.warning(
-                f'⚠️ ESTOQUE NEGATIVO PERMITIDO: Produto {produto.nome} - '
+                f'⚠️ ESTOQUE NEGATIVO REGISTRADO [ID: {alerta.id}]: '
+                f'Produto {produto.nome} - '
                 f'Disponível: {estoque_anterior}, Necessário: {quantidade}, '
-                f'Ficará com: {estoque_anterior - quantidade}'
+                f'Ficará com: {estoque_resultante} '
+                f'{"🔴 CRÍTICO" if alerta.critico else "⚠️ ATENÇÃO"}'
             )
         
         # FIFO: Consumir lotes se existirem

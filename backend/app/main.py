@@ -42,6 +42,7 @@ from app.vendas_routes import router as vendas_router
 from app.caixa_routes import router as caixa_router
 from app.nfe_routes import router as nfe_router
 from app.estoque_routes import router as estoque_router
+from app.estoque_alertas_routes import router as estoque_alertas_router
 from app.bling_sync_routes import router as bling_sync_router
 from app.pedidos_compra_routes import router as pedidos_compra_router
 from app.notas_entrada_routes import router as notas_entrada_router
@@ -412,6 +413,7 @@ app.include_router(vendas_router, tags=["Vendas & PDV"])
 app.include_router(caixa_router, tags=["Controle de Caixa"])
 app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"])
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
+app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
 app.include_router(bling_sync_router, tags=["Sincronização Bling"])
 app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"])
 app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"])
