@@ -97,10 +97,8 @@ const Layout = () => {
         { path: '/financeiro/dre', label: 'DRE', permission: 'financeiro.dre' },
         { path: '/financeiro/contas-pagar', label: 'Contas a Pagar', permission: 'financeiro.contas_pagar' },
         { path: '/financeiro/contas-receber', label: 'Contas a Receber', permission: 'financeiro.contas_receber' },
-        { path: '/financeiro/contas', label: 'Contas Bancárias', permission: 'financeiro.contas_bancarias' },
-        { path: '/financeiro/formas-pagamento', label: 'Formas de Pagamento', permission: 'financeiro.formas_pagamento' },
-        { path: '/financeiro/relatorio-taxas', label: 'Relatório de Taxas', permission: 'financeiro.relatorio_taxas' },
-        { path: '/financeiro/conciliacao-cartao', label: 'Conciliação de Cartão', permission: 'financeiro.conciliacao_cartao' },
+        { path: '/financeiro/conciliacao-bancaria', label: 'Conciliação Bancária', permission: 'financeiro.conciliacao_bancaria' },
+        { path: '/financeiro/conciliacao-3abas', label: 'Conciliação 3 Abas', highlight: true, permission: 'financeiro.conciliacao_cartao' },
       ]
     },
     { 
@@ -138,6 +136,9 @@ const Layout = () => {
         { path: '/cadastros/categorias', label: 'Categorias de Produtos', permission: 'cadastros.categorias_produtos' },
         { path: '/cadastros/categorias-financeiras', label: 'Categorias Financeiras', permission: 'cadastros.categorias_financeiras' },
         { path: '/cadastros/especies-racas', label: 'Espécies e Raças', permission: 'cadastros.especies_racas' },
+        { path: '/cadastros/financeiro/bancos', label: 'Bancos', permission: 'cadastros.bancos' },
+        { path: '/cadastros/financeiro/formas-pagamento', label: 'Formas de Pagamento', permission: 'cadastros.formas_pagamento' },
+        { path: '/cadastros/financeiro/operadoras', label: 'Operadoras de Cartão', permission: 'cadastros.operadoras' },
       ]
     },
     { 
@@ -179,6 +180,7 @@ const Layout = () => {
         { path: '/configuracoes/fiscal', label: 'Configuração da Empresa', permission: 'configuracoes.empresa' },
         { path: '/configuracoes/entregas', label: 'Entregas', permission: 'configuracoes.entregas' },
         { path: '/configuracoes/custos-moto', label: 'Custos da Moto', permission: 'configuracoes.custos_moto' },
+        { path: '/configuracoes/estoque', label: 'Estoque' },
         { path: '/configuracoes/simples/fechamento', label: 'Fechamento Mensal', permission: 'configuracoes.fechamento_mensal' },
       ]
     },

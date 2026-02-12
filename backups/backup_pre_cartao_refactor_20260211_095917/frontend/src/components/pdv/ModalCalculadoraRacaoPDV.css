@@ -1,0 +1,44 @@
+/**
+ * Estilos para Modal da Calculadora de Ração no PDV
+ */
+
+.modal-calculadora-racao-pdv {
+  /* Animação de entrada */
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-calculadora-racao-pdv .bg-gradient-to-r {
+  background: linear-gradient(to right, #3b82f6, #1e40af);
+}
+
+.modal-calculadora-racao-pdv .spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsivo */
+@media (max-width: 640px) {
+  .modal-calculadora-racao-pdv {
+    max-width: calc(100% - 2rem);
+  }
+}

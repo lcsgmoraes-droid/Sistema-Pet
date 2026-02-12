@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
-import { FiUsers, FiShield, FiSettings, FiTruck } from 'react-icons/fi';
+import { FiUsers, FiShield, FiSettings, FiTruck, FiPackage } from 'react-icons/fi';
 
 export default function Configuracoes() {
+  console.log('🔧 Configuracoes carregou - Total de cards:', 7);
+  
   const cards = [
     {
       title: 'Usuários',
@@ -39,6 +41,13 @@ export default function Configuracoes() {
       color: 'orange'
     },
     {
+      title: 'Estoque',
+      description: 'Configurar comportamento do controle de estoque',
+      icon: FiPackage,
+      link: '/configuracoes/estoque',
+      color: 'indigo'
+    },
+    {
       title: 'Sistema',
       description: 'Configurações gerais do sistema',
       icon: FiSettings,
@@ -63,6 +72,7 @@ export default function Configuracoes() {
             purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100',
             green: 'bg-green-50 text-green-600 hover:bg-green-100',
             orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100',
+            indigo: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100',
             gray: 'bg-gray-50 text-gray-400'
           };
 

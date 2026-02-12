@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "petshop-backend"
+version = "1.0.0"
+description = "Sistema Pet Shop Pro - Backend"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = ["-v", "--tb=short", "--strict-markers", "--assert=plain"]
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests"
+]

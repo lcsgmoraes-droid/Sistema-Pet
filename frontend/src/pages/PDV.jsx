@@ -220,6 +220,13 @@ export default function PDV() {
   // Verificar se há caixa aberto
   useEffect(() => {
     verificarCaixaAberto();
+    
+    // 🔄 Verificar caixa a cada 30 segundos (polling)
+    const intervalId = setInterval(() => {
+      verificarCaixaAberto();
+    }, 30000); // 30 segundos
+    
+    return () => clearInterval(intervalId); // Limpar interval ao desmontar
   }, [caixaKey]);
 
   const verificarCaixaAberto = async () => {
@@ -951,6 +958,12 @@ export default function PDV() {
 
   // Adicionar produto ao carrinho
   const adicionarProduto = (produto) => {
+    // 🔒 VALIDAÇÃO CRÍTICA: Verificar se tem caixa aberto ANTES de adicionar produto
+    if (!temCaixaAberto) {
+      alert('❌ Não é possível adicionar produtos sem caixa aberto. Abra um caixa primeiro.');
+      return;
+    }
+    
     console.log('🛒 Produto sendo adicionado:', {
       nome: produto.nome,
       categoria_id: produto.categoria_id,
@@ -1116,6 +1129,12 @@ export default function PDV() {
   const salvarVenda = async () => {
     if (vendaAtual.itens.length === 0) {
       alert('Adicione pelo menos um produto ou serviço');
+      return;
+    }
+
+    // 🔒 VALIDAÇÃO CRÍTICA: Verificar se tem caixa aberto
+    if (!temCaixaAberto) {
+      alert('❌ Não é possível salvar venda sem caixa aberto. Abra um caixa primeiro.');
       return;
     }
 
@@ -1533,7 +1552,7 @@ export default function PDV() {
         setLoading(true);
         
         // Restaurar status original (perder alterações não salvas)
-        await api.patch(`/vendas/${vendaAtual.id}`, {
+        await api.patch(`/vendas/${vendaAtual.id}/status`, {
           status: statusOriginalVenda
         });
         

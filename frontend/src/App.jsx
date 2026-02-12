@@ -47,9 +47,11 @@ import DashboardFinanceiro from './pages/DashboardFinanceiro';
 import ContasBancarias from './components/ContasBancarias';
 import ContasPagar from './components/ContasPagar';
 import ContasReceber from './components/ContasReceber';
-import ConciliacaoCartao from './pages/Financeiro/ConciliacaoCartao';
+import ConciliacaoCartoesTabs from './pages/ConciliacaoCartoesTabs';  // FASE 8: Arquitetura 3 Abas
+import HistoricoConciliacoes from './pages/HistoricoConciliacoes';  // Histórico de Conciliações
+import ConciliacaoBancaria from './pages/ConciliacaoBancaria';
 import FormasPagamento from './components/FormasPagamento';
-import RelatorioTaxas from './components/RelatorioTaxas';
+import OperadorasCartao from './pages/OperadorasCartao';
 import FluxoCaixa from './components/FluxoCaixa';
 import RelatorioVendas from './components/RelatorioVendas';
 import VendasFinanceiro from './components/VendasFinanceiro';
@@ -81,6 +83,7 @@ import Configuracoes from './pages/Configuracoes';
 import ConfiguracaoFiscalEmpresa from './pages/configuracoes/ConfiguracaoFiscalEmpresa';
 import EntregasConfig from './pages/configuracoes/EntregasConfig';
 import CustosMoto from './pages/configuracoes/CustosMoto';
+import ConfiguracaoEstoque from './pages/configuracoes/ConfiguracaoEstoque';
 // import FechamentoSimples from './pages/FechamentoSimples'; // TODO: Criar arquivo
 import AuditoriaMensal from './pages/AuditoriaMensal';
 import ProjecaoCaixa from './pages/ProjecaoCaixa';
@@ -211,11 +214,6 @@ function App() {
                 <RelatorioVendas />
               </ProtectedRoute>
             } />
-            <Route path="financeiro/contas" element={
-              <ProtectedRoute permission="relatorios.financeiro">
-                <ContasBancarias />
-              </ProtectedRoute>
-            } />
             <Route path="financeiro/contas-pagar" element={
               <ProtectedRoute permission="relatorios.financeiro">
                 <ContasPagar />
@@ -226,19 +224,19 @@ function App() {
                 <ContasReceber />
               </ProtectedRoute>
             } />
-            <Route path="financeiro/conciliacao-cartao" element={
+            <Route path="financeiro/conciliacao-3abas" element={
               <ProtectedRoute permission="relatorios.financeiro">
-                <ConciliacaoCartao />
+                <ConciliacaoCartoesTabs />
               </ProtectedRoute>
             } />
-            <Route path="financeiro/formas-pagamento" element={
+            <Route path="financeiro/historico-conciliacoes" element={
               <ProtectedRoute permission="relatorios.financeiro">
-                <FormasPagamento />
+                <HistoricoConciliacoes />
               </ProtectedRoute>
             } />
-            <Route path="financeiro/relatorio-taxas" element={
+            <Route path="financeiro/conciliacao-bancaria" element={
               <ProtectedRoute permission="relatorios.financeiro">
-                <RelatorioTaxas />
+                <ConciliacaoBancaria />
               </ProtectedRoute>
             } />
             <Route path="financeiro/fluxo-caixa" element={
@@ -266,6 +264,22 @@ function App() {
             <Route path="cadastros/categorias" element={<Categorias />} />
             <Route path="cadastros/categorias-financeiras" element={<CategoriasFinanceiras />} />
             <Route path="cadastros/especies-racas" element={<EspeciesRacas />} />
+            <Route path="cadastros/cargos" element={<Cargos />} />
+            <Route path="cadastros/financeiro/bancos" element={
+              <ProtectedRoute permission="configuracoes.editar">
+                <ContasBancarias />
+              </ProtectedRoute>
+            } />
+            <Route path="cadastros/financeiro/formas-pagamento" element={
+              <ProtectedRoute permission="configuracoes.editar">
+                <FormasPagamento />
+              </ProtectedRoute>
+            } />
+            <Route path="cadastros/financeiro/operadoras" element={
+              <ProtectedRoute permission="configuracoes.editar">
+                <OperadorasCartao />
+              </ProtectedRoute>
+            } />
             <Route path="subcategorias" element={<Subcategorias />} />
             
             {/* Rotas de Administração */}
@@ -282,11 +296,11 @@ function App() {
             <Route path="configuracoes/fiscal" element={<ConfiguracaoFiscalEmpresa />} />
             <Route path="configuracoes/entregas" element={<EntregasConfig />} />
             <Route path="configuracoes/custos-moto" element={<CustosMoto />} />
+            <Route path="configuracoes/estoque" element={<ConfiguracaoEstoque />} />
             {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
             <Route path="auditoria/provisoes" element={<AuditoriaMensal />} />
             <Route path="projecao-caixa" element={<ProjecaoCaixa />} />
             <Route path="simulacao-contratacao" element={<SimulacaoContratacao />} />
-            <Route path="cadastros/cargos" element={<Cargos />} />
             <Route path="rh/funcionarios" element={<Funcionarios />} />
             <Route path="admin/roles" element={<RolesPage />} />
 

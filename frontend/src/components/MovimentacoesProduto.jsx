@@ -305,32 +305,32 @@ export default function MovimentacoesProduto() {
     if (mov.referencia_tipo === 'venda') {
       // Verificar se tem NF (documento com padrão de chave NFe ou número NF)
       if (mov.documento && (mov.documento.length === 44 || mov.documento.startsWith('NF'))) {
-        return { texto: `NF ${mov.documento}`, icone: 'nf-venda', cor: 'text-red-600' };
+        return { texto: `NF ${mov.documento}`, icone: 'nf-venda', cor: 'text-red-600', link: null };
       }
       // Senão, é apenas pedido
-      return { texto: `Pedido #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600' };
+      return { texto: `Pedido #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600', link: `/pdv?vendaId=${mov.referencia_id}` };
     }
     // Se for balanço
     if (mov.motivo === 'balanco') {
-      return { texto: 'Balanço', icone: 'balanco', cor: 'text-blue-600' };
+      return { texto: 'Balanço', icone: 'balanco', cor: 'text-blue-600', link: null };
     }
     // Se for SAÍDA Manual - vermelho
     if (mov.tipo === 'saida') {
-      return { texto: 'Saída Manual', icone: 'manual', cor: 'text-red-600' };
+      return { texto: 'Saída Manual', icone: 'manual', cor: 'text-red-600', link: null };
     }
     // Se for entrada por XML (chave NFe com 44 dígitos)
     if (mov.tipo === 'entrada' && mov.documento && mov.documento.length === 44) {
-      return { texto: `NF ${mov.documento.substring(25, 34)}`, icone: 'nf-entrada', cor: 'text-green-600' };
+      return { texto: `NF ${mov.documento.substring(25, 34)}`, icone: 'nf-entrada', cor: 'text-green-600', link: null };
     }
     // Se for entrada manual com documento
     if (mov.tipo === 'entrada' && mov.documento) {
-      return { texto: `Doc ${mov.documento}`, icone: 'documento', cor: 'text-blue-600' };
+      return { texto: mov.documento, icone: 'documento', cor: 'text-blue-600', link: `/pdv?vendaId=${mov.documento}` };
     }
     // Entrada manual sem documento - verde
     if (mov.tipo === 'entrada') {
-      return { texto: 'Entrada Manual', icone: 'manual', cor: 'text-green-600' };
+      return { texto: 'Entrada Manual', icone: 'manual', cor: 'text-green-600', link: null };
     }
-    return { texto: 'Manual', icone: 'manual', cor: 'text-gray-500' };
+    return { texto: 'Manual', icone: 'manual', cor: 'text-gray-500', link: null };
   };
 
   // Calcular totalizadores
@@ -660,14 +660,28 @@ export default function MovimentacoesProduto() {
                           mov.lote_nome
                         ) : '-'}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           {mesmaVenda && (
                             <span className="text-blue-600" title="Mesmo pedido/venda">↪</span>
                           )}
-                          <span className={`${origem.cor} font-medium`}>
-                            {origem.texto}
-                          </span>
+                          {origem.link ? (
+                            <a
+                              href={origem.link}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                navigate(origem.link);
+                              }}
+                              className={`${origem.cor} font-medium hover:underline cursor-pointer`}
+                            >
+                              {origem.texto}
+                            </a>
+                          ) : (
+                            <span className={`${origem.cor} font-medium`}>
+                              {origem.texto}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">

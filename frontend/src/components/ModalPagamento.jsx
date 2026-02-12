@@ -28,6 +28,8 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   const [pagamentos, setPagamentos] = useState([]);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
+  const [operadoras, setOperadoras] = useState([]); // 🆕 Operadoras de cartão
+  const [operadoraSelecionada, setOperadoraSelecionada] = useState(null); // 🆕 Operadora selecionada
   const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState(null);
   const [bandeira, setBandeira] = useState('');
   const [nsuCartao, setNsuCartao] = useState(''); // NSU para conciliação bancária
@@ -67,6 +69,25 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       }
     };
     carregarFormas();
+  }, []);
+
+  // 🆕 Carregar operadoras de cartão
+  useEffect(() => {
+    const carregarOperadoras = async () => {
+      try {
+        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        setOperadoras(response.data);
+        
+        // Pré-selecionar operadora padrão
+        const padrao = response.data.find(op => op.padrao);
+        if (padrao) {
+          setOperadoraSelecionada(padrao);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar operadoras:', error);
+      }
+    };
+    carregarOperadoras();
   }, []);
 
   // Buscar pagamentos existentes da venda
@@ -396,6 +417,18 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       return;
     }
 
+    // 🆕 ALERTA 1: Validar operadora para cartões
+    if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !operadoraSelecionada) {
+      setErro('Selecione a operadora do cartão');
+      return;
+    }
+
+    // 🆕 ALERTA 1: Validar parcelas contra operadora
+    if (operadoraSelecionada && numeroParcelas > operadoraSelecionada.max_parcelas) {
+      setErro(`A operadora ${operadoraSelecionada.nome} permite no máximo ${operadoraSelecionada.max_parcelas}x`);
+      return;
+    }
+
     // Permitir valor maior que o restante (para dinheiro com troco)
     // ou menor (para baixa parcial)
 
@@ -414,6 +447,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       nsu_cartao: ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && nsuCartao
         ? nsuCartao
         : null,
+      operadora_id: operadoraSelecionada?.id || null, // 🆕 ID da operadora
       numero_parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1,
       parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1, // Compatibilidade
       valor_recebido: valor, // Valor recebido do cliente
@@ -458,6 +492,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     setFormaPagamentoSelecionada(null);
     setValorRecebido('');
     setBandeira('');
+    setOperadoraSelecionada(operadoras.find(op => op.padrao) || null); // 🆕 Resetar para padrão
     setNsuCartao(''); // Limpar NSU
     setNumeroParcelas(1);
     setErro('');
@@ -919,6 +954,37 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                   {/* Bandeira do cartão */}
                   {formaPagamentoSelecionada?.tipo && ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && (
                     <>
+                      {/* 🆕 OPERADORA DE CARTÃO */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Operadora *
+                        </label>
+                        <select
+                          value={operadoraSelecionada?.id || ''}
+                          onChange={(e) => {
+                            const op = operadoras.find(o => o.id === parseInt(e.target.value));
+                            setOperadoraSelecionada(op);
+                            // Ajustar parcelas se exceder o máximo da nova operadora
+                            if (op && numeroParcelas > op.max_parcelas) {
+                              setNumeroParcelas(op.max_parcelas);
+                            }
+                          }}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Selecione a operadora...</option>
+                          {operadoras.map((op) => (
+                            <option key={op.id} value={op.id}>
+                              {op.nome} ({op.max_parcelas}x máx)
+                            </option>
+                          ))}
+                        </select>
+                        {operadoraSelecionada && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Máximo de {operadoraSelecionada.max_parcelas} parcelas
+                          </p>
+                        )}
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Bandeira
@@ -977,7 +1043,10 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                           })()
                         }`}
                       >
-                        {Array.from({ length: formaPagamentoSelecionada.parcelas_maximas || 12 }, (_, i) => i + 1).map(
+                        {/* 🆕 Usar max_parcelas da operadora se cartão, senão da forma de pagamento */}
+                        {Array.from({ 
+                          length: operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada.parcelas_maximas || 12 
+                        }, (_, i) => i + 1).map(
                           (n) => {
                             const valorParaParcelar = parseFloat(valorRecebido) || valorRestante;
                             const valorParcela = valorParaParcelar / n;
@@ -1133,6 +1202,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                             {pag.bandeira && (
                               <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
                             )}
+                            {pag.nsu_cartao && (
+                              <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
+                            )}
                             {pag.numero_parcelas && pag.numero_parcelas > 1 && (
                               <div className="text-sm text-blue-600 mt-1 font-medium">
                                 🔢 Parcelado em {pag.numero_parcelas}x de R$ {(parseFloat(pag.valor) / pag.numero_parcelas).toFixed(2)}
@@ -1195,6 +1267,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                             </div>
                             {pag.bandeira && (
                               <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
+                            )}
+                            {pag.nsu_cartao && (
+                              <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
                             )}
                             {pag.numero_parcelas > 1 && (
                               <div className="text-sm text-blue-600 mt-1 font-medium">

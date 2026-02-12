@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 const FormasPagamento = () => {
   const [formas, setFormas] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
+  const [operadoras, setOperadoras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -16,6 +17,7 @@ const FormasPagamento = () => {
     taxa_fixa: 0,
     prazo_dias: 0,
     operadora: '',
+    operadora_id: null,
     gera_contas_receber: false,
     split_parcelas: false,
     conta_bancaria_destino_id: null,
@@ -39,13 +41,15 @@ const FormasPagamento = () => {
 
   const carregarDados = async () => {
     try {
-      const [formasRes, bancariasRes] = await Promise.all([
+      const [formasRes, bancariasRes, operadorasRes] = await Promise.all([
         api.get(`/financeiro/formas-pagamento?apenas_ativas=false`),
-        api.get(`/api/contas-bancarias?apenas_ativas=true`)
+        api.get(`/api/contas-bancarias?apenas_ativas=true`),
+        api.get(`/api/operadoras-cartao?apenas_ativas=true`)
       ]);
       
       setFormas(formasRes.data);
       setContasBancarias(bancariasRes.data);
+      setOperadoras(operadorasRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar formas de pagamento');
@@ -77,6 +81,7 @@ const FormasPagamento = () => {
         taxa_fixa: forma.taxa_fixa,
         prazo_dias: forma.prazo_dias,
         operadora: forma.operadora || '',
+        operadora_id: forma.operadora_id || null,
         gera_contas_receber: forma.gera_contas_receber,
         split_parcelas: forma.split_parcelas,
         conta_bancaria_destino_id: forma.conta_bancaria_destino_id,
@@ -102,6 +107,7 @@ const FormasPagamento = () => {
         taxa_fixa: 0,
         prazo_dias: 0,
         operadora: '',
+        operadora_id: null,
         gera_contas_receber: false,
         split_parcelas: false,
         conta_bancaria_destino_id: null,
@@ -215,8 +221,10 @@ const FormasPagamento = () => {
                       <span className="text-2xl">{forma.icone}</span>
                       <div>
                         <div className="font-medium">{forma.nome}</div>
-                        {forma.operadora && (
-                          <div className="text-xs text-gray-500">{forma.operadora}</div>
+                        {forma.operadora_id && (
+                          <div className="text-xs text-gray-500">
+                            {operadoras.find(op => op.id === forma.operadora_id)?.nome || forma.operadora || 'Operadora não encontrada'}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -382,14 +390,37 @@ const FormasPagamento = () => {
                 {(formData.tipo === 'cartao_credito' || formData.tipo === 'cartao_debito') && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Operadora</label>
-                      <input
-                        type="text"
+                      <label className="block text-sm font-medium mb-1">Operadora *</label>
+                      <select
                         className="w-full border border-gray-300 rounded px-3 py-2"
-                        value={formData.operadora}
-                        onChange={(e) => setFormData({...formData, operadora: e.target.value})}
-                        placeholder="Stone, Cielo, Rede..."
-                      />
+                        value={formData.operadora_id || ''}
+                        onChange={(e) => {
+                          const operadoraId = parseInt(e.target.value) || null;
+                          const operadora = operadoras.find(o => o.id === operadoraId);
+                          
+                          // Sempre ajusta parcelas_maximas para o limite da nova operadora
+                          let novasParcelas = operadora?.max_parcelas || formData.parcelas_maximas;
+                          
+                          setFormData({
+                            ...formData, 
+                            operadora_id: operadoraId,
+                            operadora: operadora?.nome || '',
+                            parcelas_maximas: novasParcelas
+                          });
+                        }}
+                      >
+                        <option value="">Selecione a operadora...</option>
+                        {operadoras.map(op => (
+                          <option key={op.id} value={op.id}>
+                            {op.icone} {op.nome} (até {op.max_parcelas}x)
+                          </option>
+                        ))}
+                      </select>
+                      {formData.operadora_id && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Limite de parcelas desta operadora: {operadoras.find(o => o.id === formData.operadora_id)?.max_parcelas}x
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -456,10 +487,26 @@ const FormasPagamento = () => {
                           type="number"
                           className="w-full border border-gray-300 rounded px-3 py-2"
                           min="1"
-                          max="24"
+                          max={formData.operadora_id ? operadoras.find(o => o.id === formData.operadora_id)?.max_parcelas || 24 : 24}
                           value={formData.parcelas_maximas}
-                          onChange={(e) => setFormData({...formData, parcelas_maximas: parseInt(e.target.value) || 1})}
+                          onChange={(e) => {
+                            const valor = parseInt(e.target.value) || 1;
+                            const operadora = operadoras.find(o => o.id === formData.operadora_id);
+                            const maxPermitido = operadora?.max_parcelas || 24;
+                            
+                            if (valor > maxPermitido) {
+                              toast.error(`❌ Esta operadora permite no máximo ${maxPermitido}x`);
+                              return;
+                            }
+                            
+                            setFormData({...formData, parcelas_maximas: valor});
+                          }}
                         />
+                        {formData.operadora_id && (
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Limitado a {operadoras.find(o => o.id === formData.operadora_id)?.max_parcelas}x pela operadora selecionada
+                          </p>
+                        )}
                       </div>
 
                       {/* Configuração de taxas por parcela */}

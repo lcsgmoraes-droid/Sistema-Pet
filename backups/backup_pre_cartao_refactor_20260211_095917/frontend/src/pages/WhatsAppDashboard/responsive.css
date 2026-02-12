@@ -1,0 +1,139 @@
+/* Responsividade Mobile - WhatsApp Dashboard */
+
+/* Tablets e dispositivos menores */
+@media (max-width: 1024px) {
+  .whatsapp-dashboard-sidebar {
+    width: 320px;
+  }
+  
+  .stats-cards-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Tablets Portrait */
+@media (max-width: 768px) {
+  .whatsapp-dashboard-sidebar {
+    position: absolute;
+    width: 100%;
+    max-width: 320px;
+    z-index: 40;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .whatsapp-dashboard-sidebar.closed {
+    transform: translateX(-100%);
+  }
+  
+  .stats-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .bot-assist-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 320px;
+    z-index: 50;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .stats-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    font-size: 0.75rem;
+  }
+  
+  .stats-card-value {
+    font-size: 1.25rem;
+  }
+  
+  .conversation-card {
+    padding: 12px;
+  }
+  
+  .chat-input-area textarea {
+    font-size: 16px; /* Evita zoom no iOS */
+  }
+  
+  .notification-toast {
+    max-width: calc(100vw - 32px);
+  }
+}
+
+/* Mobile Small */
+@media (max-width: 480px) {
+  .stats-cards-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  
+  .whatsapp-dashboard-header {
+    padding: 12px;
+  }
+  
+  .chat-message-bubble {
+    max-width: 85%;
+  }
+}
+
+/* Orientação Landscape em Mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .whatsapp-dashboard-sidebar {
+    width: 280px;
+  }
+  
+  .conversation-queue {
+    max-height: calc(100vh - 200px);
+  }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  .whatsapp-dashboard {
+    background-color: #1a1a1a;
+  }
+  
+  .card-bg {
+    background-color: #2d2d2d;
+    border-color: #404040;
+  }
+}
+
+/* High Contrast */
+@media (prefers-contrast: high) {
+  .card-border {
+    border-width: 2px;
+  }
+  
+  .button-primary {
+    font-weight: 600;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .whatsapp-dashboard-sidebar,
+  .bot-assist-panel,
+  .notification-toast {
+    display: none;
+  }
+  
+  .chat-interface {
+    width: 100%;
+  }
+}

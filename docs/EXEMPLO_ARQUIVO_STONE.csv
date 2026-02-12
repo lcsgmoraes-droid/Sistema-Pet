@@ -1,0 +1,7 @@
+NSU;Data Transação;Data Pagamento;Valor Bruto;Taxa MDR %;Valor Taxa;Valor Líquido;Parcela;Tipo;Bandeira
+123456;15/03/2025;16/03/2025;R$ 1.500,00;2,5%;R$ 37,50;R$ 1.462,50;1/1;Débito;Visa
+123457;15/03/2025;16/03/2025;R$ 800,00;3,0%;R$ 24,00;R$ 776,00;1/1;Débito;Mastercard
+123458;16/03/2025;16/04/2025;R$ 2.000,00;2,5%;R$ 50,00;R$ 1.950,00;1/1;Crédito à Vista;Visa
+123459;16/03/2025;16/05/2025;R$ 1.200,00;5,2%;R$ 62,40;R$ 1.137,60;1/3;Crédito Parcelado;Elo
+123460;16/03/2025;16/06/2025;R$ 1.200,00;5,2%;R$ 62,40;R$ 1.137,60;2/3;Crédito Parcelado;Elo
+123461;16/03/2025;16/07/2025;R$ 1.200,00;5,2%;R$ 62,40;R$ 1.137,60;3/3;Crédito Parcelado;Elo

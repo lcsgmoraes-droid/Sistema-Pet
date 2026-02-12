@@ -1,0 +1,138 @@
+# ============================================================================
+# DOCKER COMPOSE - PRODUÇÃO
+# Sistema Pet Shop Pro - Ambiente de Produção com Dados Reais
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # POSTGRESQL - Banco de dados de PRODUÇÃO
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: petshop-prod-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    volumes:
+      - postgres-prod-data:/var/lib/postgresql/data
+    networks:
+      - prod-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+
+  # ==========================================================================
+  # BACKEND - FastAPI + SQLAlchemy
+  # ==========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petshop-prod-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT}
+      - DEBUG=${DEBUG}
+      - RUNNING_IN_DOCKER=true
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,${ALLOWED_ORIGINS}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - BLING_CLIENT_ID=${BLING_CLIENT_ID}
+      - BLING_CLIENT_SECRET=${BLING_CLIENT_SECRET}
+      - STONE_CLIENT_ID=${STONE_CLIENT_ID}
+      - STONE_CLIENT_SECRET=${STONE_CLIENT_SECRET}
+      - STONE_MERCHANT_ID=${STONE_MERCHANT_ID}
+      - STONE_SANDBOX=${STONE_SANDBOX}
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE}
+      - LOG_LEVEL=${LOG_LEVEL}
+    volumes:
+      - uploads-prod:/app/uploads
+    networks:
+      - prod-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ==========================================================================
+  # BACKUP - Backup automático 4x ao dia
+  # ==========================================================================
+  backup:
+    image: postgres:16-alpine
+    container_name: petshop-prod-backup
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./backups:/backups
+    networks:
+      - prod-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+    command: >
+      sh -c "
+      echo '🔐 Backup automático iniciado - A cada 6 horas';
+      while true; do
+        TIMESTAMP=$$(date +%Y%m%d_%H%M%S);
+        echo \"[$(date)] Iniciando backup...\";
+        pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -F c -f /backups/backup_$$TIMESTAMP.dump;
+        if [ $$? -eq 0 ]; then
+          echo \"[$(date)] ✅ Backup criado: backup_$$TIMESTAMP.dump\";
+          find /backups -name '*.dump' -mtime +${BACKUP_RETENTION_DAYS:-30} -delete;
+          echo \"[$(date)] 🗑️ Backups antigos removidos (>30 dias)\";
+        else
+          echo \"[$(date)] ❌ Erro no backup!\";
+        fi;
+        echo \"[$(date)] Próximo backup em 6 horas...\";
+        sleep 21600;
+      done
+      "
+
+# ==========================================================================
+# VOLUMES - Persistência de dados
+# ==========================================================================
+volumes:
+  postgres-prod-data:
+    name: petshop-prod-postgres-data
+  uploads-prod:
+    name: petshop-prod-uploads
+
+# ==========================================================================
+# NETWORKS
+# ==========================================================================
+networks:
+  prod-network:
+    name: petshop-prod-network
+    driver: bridge

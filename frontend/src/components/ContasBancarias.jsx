@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
-  Plus, Edit2, Trash2, DollarSign, TrendingUp, AlertCircle,
-  Building2, Wallet, CreditCard, X, Save, ArrowUpCircle, ArrowDownCircle
+  Plus, Edit2, Trash2, AlertCircle,
+  Building2, Wallet, CreditCard, X, Save
 } from 'lucide-react';
 import api from '../api';
 
@@ -22,7 +22,6 @@ function ContasBancarias() {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
-  const [modalAjuste, setModalAjuste] = useState(false);
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [erro, setErro] = useState('');
   
@@ -34,12 +33,8 @@ function ContasBancarias() {
     saldo_inicial: 0,
     cor: '#dc2626',
     icone: '🏦',
+    instituicao_bancaria: false,
     ativa: true
-  });
-  
-  const [ajusteData, setAjusteData] = useState({
-    novo_saldo: 0,
-    descricao: ''
   });
 
   useEffect(() => {
@@ -68,6 +63,7 @@ function ContasBancarias() {
         saldo_inicial: conta.saldo_inicial,
         cor: conta.cor || '#dc2626',
         icone: conta.icone || '🏦',
+        instituicao_bancaria: conta.instituicao_bancaria || false,
         ativa: conta.ativa
       });
       setContaSelecionada(conta);
@@ -80,21 +76,12 @@ function ContasBancarias() {
         saldo_inicial: 0,
         cor: tipoPadrao.cor_padrao,
         icone: '🏦',
+        instituicao_bancaria: false,
         ativa: true
       });
       setContaSelecionada(null);
     }
     setModalAberto(true);
-    setErro('');
-  };
-
-  const abrirModalAjuste = (conta) => {
-    setContaSelecionada(conta);
-    setAjusteData({
-      novo_saldo: conta.saldo_atual,
-      descricao: ''
-    });
-    setModalAjuste(true);
     setErro('');
   };
 
@@ -110,6 +97,7 @@ function ContasBancarias() {
         saldo_inicial: Number(formData.saldo_inicial) || 0,
         cor: formData.cor,
         icone: formData.icone || '🏦',
+        instituicao_bancaria: Boolean(formData.instituicao_bancaria),
         ativa: Boolean(formData.ativa)
       };
 
@@ -131,28 +119,6 @@ function ContasBancarias() {
     }
   };
 
-  const ajustarSaldo = async (e) => {
-    e.preventDefault();
-    
-    if (!ajusteData.descricao.trim()) {
-      setErro('Informe o motivo do ajuste');
-      return;
-    }
-    
-    try {
-      await api.post(
-        `/api/contas-bancarias/${contaSelecionada.id}/ajustar-saldo`,
-        ajusteData
-      );
-      
-      await carregarContas();
-      setModalAjuste(false);
-    } catch (error) {
-      console.error('Erro:', error);
-      setErro(error.response?.data?.detail || 'Erro ao ajustar saldo');
-    }
-  };
-
   const excluirConta = async (id) => {
     if (!confirm('Deseja realmente excluir esta conta?')) return;
     
@@ -164,18 +130,6 @@ function ContasBancarias() {
       setErro(error.response?.data?.detail || 'Erro ao excluir conta');
     }
   };
-
-  const calcularTotais = () => {
-    return contas.reduce((acc, conta) => {
-      if (!conta.ativa) return acc;
-      
-      acc.total += conta.saldo_atual;
-      acc.por_tipo[conta.tipo] = (acc.por_tipo[conta.tipo] || 0) + conta.saldo_atual;
-      return acc;
-    }, { total: 0, por_tipo: {} });
-  };
-
-  const totais = calcularTotais();
 
   if (loading) {
     return (
@@ -191,8 +145,8 @@ function ContasBancarias() {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Contas Bancárias</h1>
-            <p className="text-gray-600">Gerencie suas contas, caixas e carteiras digitais</p>
+            <h1 className="text-3xl font-bold text-gray-800">Cadastro de Bancos</h1>
+            <p className="text-gray-600">Configure as contas bancárias, caixas e carteiras digitais do sistema</p>
           </div>
           <button
             onClick={() => abrirModal()}
@@ -201,39 +155,6 @@ function ContasBancarias() {
             <Plus className="w-5 h-5" />
             Nova Conta
           </button>
-        </div>
-        
-        {/* Resumo Geral */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm">Saldo Total</p>
-                <p className="text-2xl font-bold">
-                  R$ {totais.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <DollarSign className="w-10 h-10 text-blue-200" />
-            </div>
-          </div>
-          
-          {TIPOS_CONTA.map(tipo => {
-            const Icon = tipo.icon;
-            const valor = totais.por_tipo[tipo.value] || 0;
-            return (
-              <div key={tipo.value} className="bg-white rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-600 text-sm">{tipo.label}</p>
-                    <p className="text-xl font-bold text-gray-800">
-                      R$ {valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <Icon className="w-8 h-8 text-gray-400" />
-                </div>
-              </div>
-            );
-          })}
         </div>
       </div>
 
@@ -281,24 +202,19 @@ function ContasBancarias() {
                 )}
               </div>
 
-              {/* Saldo */}
+              {/* Informações */}
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-1">Saldo Atual</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  R$ {conta.saldo_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm text-gray-600 mb-1">Tipo de Conta</p>
+                <p className="text-lg font-semibold text-gray-800">
+                  {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
                 </p>
+                {conta.banco && (
+                  <p className="text-sm text-gray-500 mt-1">{conta.banco}</p>
+                )}
               </div>
 
               {/* Ações */}
               <div className="flex gap-2">
-                <button
-                  onClick={() => abrirModalAjuste(conta)}
-                  className="flex-1 flex items-center justify-center gap-1 bg-yellow-50 text-yellow-700 px-3 py-2 rounded-lg hover:bg-yellow-100 transition text-sm"
-                  disabled={!conta.ativa}
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Ajustar
-                </button>
                 <button
                   onClick={() => abrirModal(conta)}
                   className="flex items-center justify-center bg-gray-100 text-gray-700 p-2 rounded-lg hover:bg-gray-200 transition"
@@ -452,6 +368,19 @@ function ContasBancarias() {
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
+                  id="instituicao_bancaria"
+                  checked={formData.instituicao_bancaria}
+                  onChange={(e) => setFormData({ ...formData, instituicao_bancaria: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="instituicao_bancaria" className="text-sm text-gray-700">
+                  🏦 Instituição Bancária (para conciliação OFX)
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
                   id="ativa"
                   checked={formData.ativa}
                   onChange={(e) => setFormData({ ...formData, ativa: e.target.checked })}
@@ -481,93 +410,6 @@ function ContasBancarias() {
         </div>
       )}
 
-      {/* Modal Ajustar Saldo */}
-      {modalAjuste && contaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800">Ajustar Saldo</h2>
-              <button onClick={() => setModalAjuste(false)} className="text-gray-500 hover:text-gray-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={ajustarSaldo} className="space-y-4">
-              {erro && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">
-                  {erro}
-                </div>
-              )}
-
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-1">Saldo Atual</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  R$ {contaSelecionada.saldo_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Novo Saldo</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={ajusteData.novo_saldo}
-                  onChange={(e) => setAjusteData({ ...ajusteData, novo_saldo: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              {ajusteData.novo_saldo !== contaSelecionada.saldo_atual && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                  ajusteData.novo_saldo > contaSelecionada.saldo_atual 
-                    ? 'bg-green-50 text-green-700' 
-                    : 'bg-red-50 text-red-700'
-                }`}>
-                  {ajusteData.novo_saldo > contaSelecionada.saldo_atual ? (
-                    <ArrowUpCircle className="w-5 h-5" />
-                  ) : (
-                    <ArrowDownCircle className="w-5 h-5" />
-                  )}
-                  <span className="font-medium">
-                    {ajusteData.novo_saldo > contaSelecionada.saldo_atual ? '+' : ''}
-                    R$ {Math.abs(ajusteData.novo_saldo - contaSelecionada.saldo_atual).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo do Ajuste</label>
-                <textarea
-                  value={ajusteData.descricao}
-                  onChange={(e) => setAjusteData({ ...ajusteData, descricao: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Ex: Acerto de caixa, valor encontrado a mais..."
-                  required
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setModalAjuste(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                >
-                  <Save className="w-4 h-4" />
-                  Confirmar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
