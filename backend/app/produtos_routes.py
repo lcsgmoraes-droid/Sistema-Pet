@@ -2668,7 +2668,7 @@ def saida_estoque_fifo(
 def relatorio_movimentacoes(
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
-    produto_id: Optional[int] = None,
+    produto_id: Optional[str] = None,  # String para aceitar "" vazio
     tipo_movimentacao: Optional[str] = None,
     agrupar_por_mes: bool = False,
     db: Session = Depends(get_session),
@@ -2713,9 +2713,13 @@ def relatorio_movimentacoes(
         data_inicio_dt = dt.now() - timedelta(days=180)
         query = query.filter(EstoqueMovimentacao.created_at >= data_inicio_dt)
     
-    # Filtro de produto
-    if produto_id:
-        query = query.filter(EstoqueMovimentacao.produto_id == produto_id)
+    # Filtro de produto (converter string para int se não vazio)
+    if produto_id and produto_id.strip():
+        try:
+            produto_id_int = int(produto_id)
+            query = query.filter(EstoqueMovimentacao.produto_id == produto_id_int)
+        except ValueError:
+            pass  # Ignora se não for número válido
     
     # Filtro de tipo
     if tipo_movimentacao and tipo_movimentacao != "todos":

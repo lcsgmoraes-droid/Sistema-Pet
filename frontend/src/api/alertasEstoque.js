@@ -33,7 +33,7 @@ export const getDashboardAlertas = () => {
  */
 export const resolverAlerta = (alertaId, acao, observacao = null) => {
   return api.put(`/estoque/alertas/${alertaId}/resolver`, {
-    acao,
+    status: acao,  // Backend espera 'status' e não 'acao'
     observacao
   });
 };
