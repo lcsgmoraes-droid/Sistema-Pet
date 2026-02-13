@@ -2721,9 +2721,9 @@ def relatorio_movimentacoes(
         except ValueError:
             pass  # Ignora se não for número válido
     
-    # Filtro de tipo
+    # Filtro de tipo (campo 'tipo' e não 'tipo_movimentacao')
     if tipo_movimentacao and tipo_movimentacao != "todos":
-        query = query.filter(EstoqueMovimentacao.tipo_movimentacao == tipo_movimentacao)
+        query = query.filter(EstoqueMovimentacao.tipo == tipo_movimentacao)
     
     # Ordenar por data (mais recente primeiro)
     query = query.order_by(EstoqueMovimentacao.created_at.desc())
@@ -2737,9 +2737,9 @@ def relatorio_movimentacoes(
         # Buscar produto
         produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
         
-        # Determinar entrada/saída
-        entrada = mov.quantidade if mov.tipo_movimentacao == "entrada" else None
-        saida = mov.quantidade if mov.tipo_movimentacao != "entrada" else None
+        # Determinar entrada/saída (campo 'tipo' e não 'tipo_movimentacao')
+        entrada = mov.quantidade if mov.tipo == "entrada" else None
+        saida = mov.quantidade if mov.tipo != "entrada" else None
         
         # Calcular valor total
         valor_total = None

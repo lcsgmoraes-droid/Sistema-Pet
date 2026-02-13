@@ -74,8 +74,11 @@ export default function ProdutosRelatorio() {
   const carregarProdutos = async () => {
     try {
       const response = await getProdutos();
-      // Garantir que sempre seja um array
-      if (Array.isArray(response.data)) {
+      // Backend retorna objeto paginado {items: [...], total: 124}
+      if (response.data && Array.isArray(response.data.items)) {
+        setProdutos(response.data.items);
+      } else if (Array.isArray(response.data)) {
+        // Fallback para array direto (retrocompatibilidade)
         setProdutos(response.data);
       } else {
         console.warn('Resposta de produtos não é um array:', response.data);
