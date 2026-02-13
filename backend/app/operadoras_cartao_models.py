@@ -10,7 +10,7 @@ Analogia:
 - Operadoras Cartão = "suas contas" ("BB Conta Corrente 12345")
 """
 
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Index, Text
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, Index, Text, DECIMAL
 from sqlalchemy.orm import relationship
 from app.db import Base
 from datetime import datetime
@@ -36,10 +36,17 @@ class OperadoraCartao(Base):
     
     # Identificação
     nome = Column(String(200), nullable=False)  # "Stone - Loja Centro"
+    codigo = Column(String(50), nullable=True)
     descricao = Column(Text, nullable=True)     # "Operadora da loja física"
     
-    # Vínculo ao template
-    template_id = Column(Integer, ForeignKey('adquirentes_templates.id'), nullable=False)
+    # Taxas de cartão
+    taxa_debito = Column(DECIMAL(5, 2), nullable=True)
+    taxa_credito_vista = Column(DECIMAL(5, 2), nullable=True)
+    taxa_credito_parcelado = Column(DECIMAL(5, 2), nullable=True)
+    max_parcelas = Column(Integer, nullable=True)
+    
+    # Vínculo ao template (se usar conciliação)
+    template_id = Column(Integer, ForeignKey('adquirentes_templates.id'), nullable=True)
     template = relationship("AdquirenteTemplate", foreign_keys=[template_id])
     
     # Configurações específicas

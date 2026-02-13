@@ -347,7 +347,7 @@ class ConciliacaoLote(BaseTenantModel):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
-    parcelas = relationship("ContaReceber", back_populates="lote")
+    # parcelas = relationship("ContaReceber", back_populates="lote")  # TEMPORARIAMENTE COMENTADO - ContaReceber não tem back_populates
     
     def to_dict(self):
         return {

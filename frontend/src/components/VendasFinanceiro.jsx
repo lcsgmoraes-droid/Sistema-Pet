@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter, ChevronDown, ChevronRight, Download, FileText, BarChart3, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -73,11 +73,25 @@ export default function VendasFinanceiro() {
   };
 
   const formatarData = (dataStr) => {
-    if (!dataStr) return '';
-    // Parse manual para evitar problemas de timezone
-    const [ano, mes, dia] = dataStr.split('-').map(Number);
-    const data = new Date(ano, mes - 1, dia);
-    return data.toLocaleDateString('pt-BR');
+    if (!dataStr) return 'N/A';
+    try {
+      // Se já é um objeto Date
+      if (dataStr instanceof Date) {
+        return dataStr.toLocaleDateString('pt-BR');
+      }
+      
+      // Tentar parse de ISO string ou formato YYYY-MM-DD
+      const data = new Date(dataStr);
+      
+      // Verificar se é uma data válida
+      if (isNaN(data.getTime())) {
+        return 'N/A';
+      }
+      
+      return data.toLocaleDateString('pt-BR');
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   const CORES_GRAFICOS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
@@ -1134,8 +1148,10 @@ export default function VendasFinanceiro() {
                   <th className="px-2 py-2 text-right">Venda Bruta</th>
                   <th className="px-2 py-2 text-right">Desconto</th>
                   <th className="px-2 py-2 text-right">Taxa Entrega</th>
+                  <th className="px-2 py-2 text-right">Taxa Operac.</th>
                   <th className="px-2 py-2 text-right">Taxa Cartão</th>
                   <th className="px-2 py-2 text-right">Comissão</th>
+                  <th className="px-2 py-2 text-right">Imposto</th>
                   <th className="px-2 py-2 text-right">Custo</th>
                   <th className="px-2 py-2 text-right">Líquida</th>
                   <th className="px-2 py-2 text-right">Lucro</th>
@@ -1146,8 +1162,8 @@ export default function VendasFinanceiro() {
               </thead>
               <tbody>
                 {listaVendas.map((venda) => (
-                  <>
-                    <tr key={venda.id} className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => toggleVendaExpandida(venda.id)}>
+                  <React.Fragment key={venda.id}>
+                    <tr className="border-b hover:bg-gray-50 cursor-pointer" onClick={() => toggleVendaExpandida(venda.id)}>
                       <td className="px-2 py-2">
                         {vendasExpandidas.has(venda.id) ? 
                           <ChevronDown className="w-4 h-4 text-gray-600" /> : 
@@ -1159,9 +1175,11 @@ export default function VendasFinanceiro() {
                       <td className="px-2 py-2">{venda.cliente_nome}</td>
                       <td className="px-2 py-2 text-right font-medium">{formatarMoeda(venda.venda_bruta)}</td>
                       <td className="px-2 py-2 text-right text-red-600">-{formatarMoeda(venda.desconto)}</td>
-                      <td className="px-2 py-2 text-right text-gray-600">-{formatarMoeda(venda.taxa_entrega)}</td>
+                      <td className="px-2 py-2 text-right text-blue-600" title="Comissão repassada ao entregador">-{formatarMoeda(venda.taxa_entrega)}</td>
+                      <td className="px-2 py-2 text-right text-orange-500" title="Custo operacional da entrega (empresa)">-{formatarMoeda(venda.taxa_operacional || 0)}</td>
                       <td className="px-2 py-2 text-right text-purple-600">-{formatarMoeda(venda.taxa_cartao)}</td>
                       <td className="px-2 py-2 text-right text-blue-600">-{formatarMoeda(venda.comissao)}</td>
+                      <td className="px-2 py-2 text-right text-pink-600" title="Impostos sobre faturamento">-{formatarMoeda(venda.imposto || 0)}</td>
                       <td className="px-2 py-2 text-right text-orange-600">-{formatarMoeda(venda.custo_produtos)}</td>
                       <td className="px-2 py-2 text-right font-medium">{formatarMoeda(venda.venda_liquida)}</td>
                       <td className={`px-2 py-2 text-right font-bold ${venda.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -1185,7 +1203,7 @@ export default function VendasFinanceiro() {
                     {/* Linha expandida com detalhes dos produtos */}
                     {vendasExpandidas.has(venda.id) && venda.itens && venda.itens.length > 0 && (
                       <tr key={`${venda.id}-detalhes`} className="bg-blue-50">
-                        <td colSpan="15" className="px-4 py-3">
+                        <td colSpan="17" className="px-4 py-3">
                           <div className="pl-8">
                             <div className="font-semibold text-gray-700 mb-2">Produtos desta venda:</div>
                             <table className="w-full text-xs">
@@ -1197,8 +1215,10 @@ export default function VendasFinanceiro() {
                                   <th className="px-2 py-1 text-right">Venda Bruta</th>
                                   <th className="px-2 py-1 text-right">Desconto</th>
                                   <th className="px-2 py-1 text-right">Taxa Entr.</th>
+                                  <th className="px-2 py-1 text-right">Taxa Oper.</th>
                                   <th className="px-2 py-1 text-right">Taxa Cartão</th>
                                   <th className="px-2 py-1 text-right">Comissão</th>
+                                  <th className="px-2 py-1 text-right">Imposto</th>
                                   <th className="px-2 py-1 text-right">Custo Unit.</th>
                                   <th className="px-2 py-1 text-right">Custo Total</th>
                                   <th className="px-2 py-1 text-right">Líquido</th>
@@ -1215,9 +1235,11 @@ export default function VendasFinanceiro() {
                                     <td className="px-2 py-1 text-right">{formatarMoeda(item.preco_unitario)}</td>
                                     <td className="px-2 py-1 text-right font-medium">{formatarMoeda(item.venda_bruta)}</td>
                                     <td className="px-2 py-1 text-right text-red-600">-{formatarMoeda(item.desconto)}</td>
-                                    <td className="px-2 py-1 text-right text-gray-600">-{formatarMoeda(item.taxa_entrega)}</td>
+                                    <td className="px-2 py-1 text-right text-blue-600">-{formatarMoeda(item.taxa_entrega)}</td>
+                                    <td className="px-2 py-1 text-right text-orange-500">-{formatarMoeda(item.taxa_operacional || 0)}</td>
                                     <td className="px-2 py-1 text-right text-purple-600">-{formatarMoeda(item.taxa_cartao)}</td>
                                     <td className="px-2 py-1 text-right text-blue-600">-{formatarMoeda(item.comissao)}</td>
+                                    <td className="px-2 py-1 text-right text-pink-600">-{formatarMoeda(item.imposto || 0)}</td>
                                     <td className="px-2 py-1 text-right text-orange-600">{formatarMoeda(item.custo_unitario)}</td>
                                     <td className="px-2 py-1 text-right text-orange-600 font-medium">-{formatarMoeda(item.custo_total)}</td>
                                     <td className="px-2 py-1 text-right font-medium">{formatarMoeda(item.valor_liquido)}</td>
@@ -1247,7 +1269,7 @@ export default function VendasFinanceiro() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

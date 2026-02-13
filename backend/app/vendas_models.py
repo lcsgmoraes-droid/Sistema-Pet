@@ -350,7 +350,7 @@ class VendaPagamento(BaseTenantModel):
     
     # Relacionamentos
     venda = relationship("Venda", back_populates="pagamentos")
-    operadora_cartao = relationship("OperadoraCartao", back_populates="venda_pagamentos")
+    # operadora_cartao = relationship("OperadoraCartao", back_populates="venda_pagamentos")  # TODO: Criar modelo OperadoraCartao
     
     def to_dict(self):
         return {

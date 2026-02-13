@@ -57,8 +57,9 @@ class OperadoraCartao(BaseTenantModel):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    formas_pagamento = relationship("FormaPagamento", back_populates="operadora_cartao")
-    venda_pagamentos = relationship("VendaPagamento", back_populates="operadora_cartao")
+    # TEMPORARIAMENTE DESABILITADO - modelos não têm back_populates correspondente
+    # formas_pagamento = relationship("FormaPagamento", back_populates="operadora_cartao")
+    # venda_pagamentos = relationship("VendaPagamento", back_populates="operadora_cartao")
     
     def to_dict(self):
         """Serializa modelo para dict"""

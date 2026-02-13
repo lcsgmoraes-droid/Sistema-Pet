@@ -569,9 +569,11 @@ class ComissaoItem(Base):
     
     # Custos e descontos por item
     taxa_cartao_item = Column(Numeric, nullable=True, default=0)
-    imposto_item = Column(Numeric, nullable=True, default=0)
-    custo_entrega_item = Column(Numeric, nullable=True, default=0)
-    desconto_item = Column(Numeric, nullable=True, default=0)
+    impostos_item = Column("impostos_item", Numeric, nullable=True, default=0)
+    taxa_entregador_item = Column(Numeric, nullable=True, default=0)
+    custo_operacional_item = Column(Numeric, nullable=True, default=0)
+    receita_taxa_entrega_item = Column(Numeric, nullable=True, default=0)
+    percentual_impostos = Column(Numeric, nullable=True, default=0)
     
     # Pagamento
     percentual_pago = Column(Numeric, nullable=True)

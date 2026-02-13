@@ -95,7 +95,7 @@ class FormaPagamento(BaseTenantModel):
     
     # Relationships
     conta_bancaria_destino = relationship("ContaBancaria", foreign_keys=[conta_bancaria_destino_id])
-    operadora_cartao = relationship("OperadoraCartao", back_populates="formas_pagamento")
+    operadora_cartao = relationship("OperadoraCartao", foreign_keys=[operadora_id])  # Relação unidirecional
     contas_receber = relationship("ContaReceber", back_populates="forma_pagamento")
     pagamentos = relationship("Pagamento", back_populates="forma_pagamento")
     recebimentos = relationship("Recebimento", back_populates="forma_pagamento")
@@ -332,7 +332,7 @@ class ContaReceber(BaseTenantModel):
     forma_pagamento = relationship("FormaPagamento", back_populates="contas_receber")
     recebimentos = relationship("Recebimento", back_populates="conta", cascade="all, delete-orphan")
     parcelas = relationship("ContaReceber", backref="conta_principal", remote_side=[id], foreign_keys=[conta_principal_id])
-    lote = relationship("ConciliacaoLote", foreign_keys=[conciliacao_lote_id], back_populates="parcelas")
+    # lote = relationship("ConciliacaoLote", foreign_keys=[conciliacao_lote_id], back_populates="parcelas")  # TODO: Criar modelo ConciliacaoLote
 
 
 class Pagamento(BaseTenantModel):
