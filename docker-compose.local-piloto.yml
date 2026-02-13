@@ -55,8 +55,9 @@ services:
     restart: unless-stopped
     environment:
       # 🔴 IMPORTANTE: Modo PRODUCTION
-      ENV: production
+      ENVIRONMENT: production
       DEBUG: "False"
+      RUNNING_IN_DOCKER: "true"
       
       # Database
       DATABASE_URL: postgresql://petshop_user:petshop_pass_2026@postgres-prod:5432/petshop_prod
