@@ -1,0 +1,100 @@
+# ============================================================================
+# 🟢 DOCKER COMPOSE - LOCAL PILOTO (LOJA REAL)
+# ============================================================================
+# 
+# Para que serve: Rodar piloto na loja com dados REAIS
+# Porta Postgres: 5434
+# Porta Backend: 8001
+# Dados: REAIS da loja
+# 
+# IMPORTANTE: NÃO usar para testes! Use o local-dev.yml
+# 
+# COMO USAR:
+# docker-compose -f docker-compose.local-piloto.yml up -d
+# Ver logs: docker-compose -f docker-compose.local-piloto.yml logs -f
+# Parar: docker-compose -f docker-compose.local-piloto.yml down
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # POSTGRES - PRODUÇÃO LOCAL
+  # ============================================================================
+  postgres-prod:
+    image: postgres:15-alpine
+    container_name: petshop-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-petshop_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-petshop_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-petshop_prod}
+      TZ: America/Sao_Paulo
+      PGTZ: America/Sao_Paulo
+    ports:
+      - "5434:5432"  # PORTA DIFERENTE (5434)
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    networks:
+      - petshop-prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petshop_user -d petshop_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # BACKEND - PRODUÇÃO LOCAL
+  # ============================================================================
+  backend-prod:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petshop-prod-backend
+    restart: unless-stopped
+    environment:
+      # 🔴 IMPORTANTE: Modo PRODUCTION
+      ENV: production
+      DEBUG: "False"
+      
+      # Database
+      DATABASE_URL: postgresql://petshop_user:petshop_pass_2026@postgres-prod:5432/petshop_prod
+      
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-seu_secret_key_super_seguro_aqui_2026}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 43200
+      
+      # CORS
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174
+      
+      # Google Maps API
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      
+      # Timezone
+      TZ: America/Sao_Paulo
+    ports:
+      - "8001:8000"  # PORTA DIFERENTE (8001)
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres-prod:
+        condition: service_healthy
+    networks:
+      - petshop-prod-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  petshop-prod-network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+    driver: local

@@ -1,65 +1,42 @@
-@echo off
-REM ===========================================================================
-REM INICIAR DESENVOLVIMENTO - Docker Compose (Backend + Banco)
-REM ===========================================================================
+﻿@echo off
+chcp 65001 >nul
+title 🔵 LOCAL DEV - Testes e Desenvolvimento
 
 echo.
-echo ========================================
-echo   Pet Shop Pro - DESENVOLVIMENTO
-echo ========================================
+echo ============================================================================
+echo   🔵 AMBIENTE LOCAL DEV (TESTES)
+echo ============================================================================
 echo.
-
-REM Verificar se Docker está rodando
-docker info >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERRO] Docker nao esta rodando!
-    echo.
-    echo Por favor, inicie o Docker Desktop e tente novamente.
-    pause
-    exit /b 1
-)
-
-echo [1/4] Parando outros ambientes...
-docker-compose -f docker-compose.production.yml down 2>nul
-
+echo Subindo:
+echo   - Banco DEV (porta 5433)
+echo   - Backend DEV (porta 8000)
 echo.
-echo [2/4] Iniciando containers de DESENVOLVIMENTO...
-docker-compose -f docker-compose.development.yml up -d
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo [ERRO] Falha ao iniciar containers!
-    pause
-    exit /b 1
-)
-
-echo.
-echo [3/4] Aguardando containers ficarem prontos (10 segundos)...
-timeout /t 10 /nobreak >nul
-
-echo.
-echo [4/4] Iniciando Frontend (React + Vite)...
-start "Frontend DEV - Pet Shop Pro" cmd /k "cd frontend && npm run dev"
-
-timeout /t 2 >nul
-
-echo.
-echo ========================================
-echo   DESENVOLVIMENTO - URLs
-echo ========================================
-echo.
-echo Backend:  http://localhost:8000
-echo Docs API: http://localhost:8000/docs
 echo Frontend: http://localhost:5173
+echo Backend:  http://localhost:8000
+echo Docs:     http://localhost:8000/docs
 echo.
-echo Banco:    PostgreSQL (Docker) localhost:5432
-echo Ambiente: DESENVOLVIMENTO
+echo ⚠️  Use este ambiente apenas para TESTES!
+echo ⚠️  Para vendas reais, use INICIAR_PILOTO.bat
 echo.
-echo ========================================
-echo.
-echo Abrindo logs do Backend...
-echo (Pressione Ctrl+C para parar de ver os logs)
-echo.
+pause
 
-REM Mostrar logs do backend em tempo real
-docker-compose -f docker-compose.development.yml logs -f backend
+echo.
+echo Subindo containers...
+docker-compose -f docker-compose.local-dev.yml up -d
+
+echo.
+echo ✅ Ambiente DEV iniciado!
+echo.
+echo Aguardando backend ficar pronto (15 segundos)...
+timeout /t 15 /nobreak >nul
+
+echo.
+echo ============================================================================
+echo   Acesse: http://localhost:5173
+echo   Backend: http://localhost:8000/docs
+echo ============================================================================
+echo.
+echo Para ver logs: docker-compose -f docker-compose.local-dev.yml logs -f
+echo Para parar: docker-compose -f docker-compose.local-dev.yml down
+echo.
+pause

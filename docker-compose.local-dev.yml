@@ -1,6 +1,14 @@
 # ============================================================================
-# DOCKER COMPOSE - DESENVOLVIMENTO
-# Sistema Pet Shop Pro - Ambiente Local com Hot Reload
+# 🔵 DOCKER COMPOSE - LOCAL DEV (TESTES)
+# ============================================================================
+# 
+# Para que serve: Desenvolvimento e testes locais
+# Porta Postgres: 5433
+# Porta Backend: 8000
+# Dados: Fictícios/Teste
+# 
+# COMO USAR:
+# docker-compose -f docker-compose.local-dev.yml up -d
 # ============================================================================
 
 version: '3.8'
