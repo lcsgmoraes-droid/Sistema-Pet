@@ -3,6 +3,7 @@
  * Sistema de monitoramento e gerenciamento de estoque crítico
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, XCircle, TrendingDown, Package, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../api/alertasEstoque';
 
 export default function AlertasEstoque() {
+  const navigate = useNavigate();
   const [alertasPendentes, setAlertasPendentes] = useState([]);
   const [todosAlertas, setTodosAlertas] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -44,13 +46,21 @@ export default function AlertasEstoque() {
     }
   };
 
-  const handleResolverAlerta = async (alertaId, acao) => {
+  const handleResolverAlerta = async (alertaId, acao, produtoId = null) => {
+    if (acao === 'resolvido' && produtoId) {
+      // Redirecionar para página de produtos para fazer ajuste de estoque
+      navigate(`/produtos?produto_id=${produtoId}`);
+      toast.info('Redirecionando para ajustar o estoque do produto...');
+      return;
+    }
+    
+    // Apenas ignorar o alerta
     try {
       await resolverAlerta(alertaId, acao);
-      toast.success(acao === 'resolvido' ? 'Alerta resolvido com sucesso!' : 'Alerta ignorado');
+      toast.success('Alerta ignorado com sucesso');
       carregarDados();
     } catch (error) {
-      console.error('Erro ao resolver alerta:', error);
+      console.error('Erro ao ignorar alerta:', error);
       toast.error('Erro ao processar alerta');
     }
   };
@@ -236,15 +246,17 @@ export default function AlertasEstoque() {
 
                       <div className="flex flex-col gap-2 ml-4">
                         <button
-                          onClick={() => handleResolverAlerta(alerta.id, 'resolvido')}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                          onClick={() => handleResolverAlerta(alerta.id, 'resolvido', alerta.produto_id)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                          title="Ir para o produto e fazer ajuste de estoque"
                         >
-                          <CheckCircle size={16} />
-                          Resolver
+                          <Package size={16} />
+                          Ajustar Estoque
                         </button>
                         <button
                           onClick={() => handleResolverAlerta(alerta.id, 'ignorado')}
                           className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                          title="Ignorar este alerta (aceitar estoque negativo)"
                         >
                           <XCircle size={16} />
                           Ignorar
