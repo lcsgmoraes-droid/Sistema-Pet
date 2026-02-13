@@ -96,23 +96,29 @@ export default function ProdutosRelatorio() {
       const response = await getRelatorioMovimentacoes(filtros);
       const dados = response.data;
       
-      // Garantir que dados seja sempre um array
-      if (Array.isArray(dados)) {
-        setMovimentacoes(dados);
-        
-        // Calcular totais
-        const totais = dados.reduce((acc, mov) => {
-          acc.totalEntradas += mov.quantidade_entrada || 0;
-          acc.totalSaidas += mov.quantidade_saida || 0;
-          acc.valorTotal += mov.valor_total || 0;
-          return acc;
-        }, { totalEntradas: 0, totalSaidas: 0, valorTotal: 0 });
-        
-        setTotais(totais);
+      // Backend retorna objeto {total_registros, agrupado_por_mes, movimentacoes: [...]}
+      let movimentacoesArray = [];
+      
+      if (dados && Array.isArray(dados.movimentacoes)) {
+        movimentacoesArray = dados.movimentacoes;
+      } else if (Array.isArray(dados)) {
+        // Fallback para array direto (retrocompatibilidade)
+        movimentacoesArray = dados;
       } else {
         console.warn('Resposta de movimentações não é um array:', dados);
-        setMovimentacoes([]);
       }
+      
+      setMovimentacoes(movimentacoesArray);
+      
+      // Calcular totais
+      const totais = movimentacoesArray.reduce((acc, mov) => {
+        acc.totalEntradas += mov.entrada || 0;
+        acc.totalSaidas += mov.saida || 0;
+        acc.valorTotal += mov.valor_total || 0;
+        return acc;
+      }, { totalEntradas: 0, totalSaidas: 0, valorTotal: 0 });
+      
+      setTotais(totais);
     } catch (error) {
       console.error('Erro ao carregar relatório:', error);
       console.error('Detalhes do erro:', error.response?.data);
@@ -144,17 +150,17 @@ export default function ProdutosRelatorio() {
     // Criar CSV
     const headers = ['Data', 'Produto', 'Código', 'Entrada', 'Saída', 'Estoque', 'Tipo', 'Valor', 'Usuário', 'Nº Pedido', 'Lançamento'];
     const rows = movimentacoes.map(mov => [
-      formatarData(mov.data_movimentacao),
+      mov.data || '',
       mov.produto_nome || '',
-      mov.produto_codigo || '',
-      mov.quantidade_entrada || 0,
-      mov.quantidade_saida || 0,
-      mov.estoque_atual || 0,
-      mov.tipo_movimentacao || '',
+      mov.codigo || '',
+      mov.entrada || 0,
+      mov.saida || 0,
+      mov.estoque || 0,
+      mov.tipo || '',
       formatarMoeda(mov.valor_total || 0),
-      mov.usuario_nome || '',
+      mov.usuario || '',
       mov.numero_pedido || '',
-      formatarDataHora(mov.data_criacao),
+      mov.lancamento || '',
     ]);
 
     let csv = headers.join(';') + '\n';
@@ -393,33 +399,33 @@ export default function ProdutosRelatorio() {
                     {movs.map((mov, idx) => (
                       <tr key={idx} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                          {formatarData(mov.data_movimentacao)}
+                          {mov.data}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {mov.produto_nome || '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-center text-gray-700 font-mono">
-                          {mov.produto_codigo || '-'}
+                          {mov.codigo || '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
-                          {mov.quantidade_entrada > 0 ? mov.quantidade_entrada : '-'}
+                          {mov.entrada > 0 ? mov.entrada : '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold text-red-600">
-                          {mov.quantidade_saida > 0 ? mov.quantidade_saida : '-'}
+                          {mov.saida > 0 ? mov.saida : '-'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right text-gray-900">
-                          {mov.estoque_atual || 0}
+                          {mov.estoque || 0}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTipoBadge(mov.tipo_movimentacao)}`}>
-                            {mov.tipo_movimentacao}
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTipoBadge(mov.tipo)}`}>
+                            {mov.tipo}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-right text-gray-900">
                           {formatarMoeda(mov.valor_total || 0)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          {mov.usuario_nome || '-'}
+                          {mov.usuario || '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {mov.numero_pedido ? (
