@@ -48,11 +48,19 @@ class ResolverAlertaRequest(BaseModel):
     observacao: Optional[str] = None
 
 
+class ProdutoEstoqueNegativo(BaseModel):
+    produto_id: int
+    nome: str
+    estoque_atual: float
+    alertas_pendentes: int
+
+
 class DashboardAlertasResponse(BaseModel):
-    total_alertas_pendentes: int
-    total_produtos_afetados: int
-    total_criticos: int
-    alertas_recentes: List[AlertaEstoqueResponse]
+    total_alertas: int  # Total de todos os alertas (pendentes + resolvidos)
+    alertas_pendentes: int
+    alertas_criticos: int
+    alertas_resolvidos: int
+    produtos_estoque_negativo: List[ProdutoEstoqueNegativo]
 
 
 # ============================================================================
@@ -127,29 +135,24 @@ def dashboard_alertas(
     
     🟢 MODELO CONTROLADO - Métricas visíveis para tomada de decisão
     """
+    from app.produtos_models import Produto
     tenant_id = current_user.tenant_id
     
+    # Total de TODOS os alertas (independente do status)
+    total_alertas = db.query(AlertaEstoqueNegativo).filter(
+        AlertaEstoqueNegativo.tenant_id == tenant_id
+    ).count()
+    
     # Total de alertas pendentes
-    total_pendentes = db.query(AlertaEstoqueNegativo).filter(
+    alertas_pendentes = db.query(AlertaEstoqueNegativo).filter(
         and_(
             AlertaEstoqueNegativo.tenant_id == tenant_id,
             AlertaEstoqueNegativo.status == 'pendente'
         )
     ).count()
     
-    # Total de produtos afetados (distintos)
-    from sqlalchemy import func
-    produtos_afetados = db.query(
-        func.count(func.distinct(AlertaEstoqueNegativo.produto_id))
-    ).filter(
-        and_(
-            AlertaEstoqueNegativo.tenant_id == tenant_id,
-            AlertaEstoqueNegativo.status == 'pendente'
-        )
-    ).scalar() or 0
-    
-    # Total de alertas críticos
-    total_criticos = db.query(AlertaEstoqueNegativo).filter(
+    # Total de alertas críticos PENDENTES
+    alertas_criticos = db.query(AlertaEstoqueNegativo).filter(
         and_(
             AlertaEstoqueNegativo.tenant_id == tenant_id,
             AlertaEstoqueNegativo.status == 'pendente',
@@ -157,22 +160,52 @@ def dashboard_alertas(
         )
     ).count()
     
-    # Alertas recentes (últimos 10)
-    alertas_recentes = db.query(AlertaEstoqueNegativo).filter(
+    # Total de alertas resolvidos
+    alertas_resolvidos = db.query(AlertaEstoqueNegativo).filter(
         and_(
             AlertaEstoqueNegativo.tenant_id == tenant_id,
-            AlertaEstoqueNegativo.status == 'pendente'
+            AlertaEstoqueNegativo.status.in_(['resolvido', 'ignorado'])
         )
-    ).order_by(
-        desc(AlertaEstoqueNegativo.critico),
-        desc(AlertaEstoqueNegativo.data_alerta)
-    ).limit(10).all()
+    ).count()
+    
+    # Produtos com estoque negativo ATUAL
+    produtos_negativos = db.query(
+        Produto.id,
+        Produto.nome,
+        Produto.estoque_atual
+    ).filter(
+        and_(
+            Produto.tenant_id == tenant_id,
+            Produto.estoque_atual < 0
+        )
+    ).all()
+    
+    produtos_estoque_negativo = []
+    for produto_id, nome, estoque_atual in produtos_negativos:
+        # Contar alertas pendentes para este produto
+        count_alertas = db.query(AlertaEstoqueNegativo).filter(
+            and_(
+                AlertaEstoqueNegativo.tenant_id == tenant_id,
+                AlertaEstoqueNegativo.produto_id == produto_id,
+                AlertaEstoqueNegativo.status == 'pendente'
+            )
+        ).count()
+        
+        produtos_estoque_negativo.append(
+            ProdutoEstoqueNegativo(
+                produto_id=produto_id,
+                nome=nome,
+                estoque_atual=estoque_atual,
+                alertas_pendentes=count_alertas
+            )
+        )
     
     return DashboardAlertasResponse(
-        total_alertas_pendentes=total_pendentes,
-        total_produtos_afetados=produtos_afetados,
-        total_criticos=total_criticos,
-        alertas_recentes=alertas_recentes
+        total_alertas=total_alertas,
+        alertas_pendentes=alertas_pendentes,
+        alertas_criticos=alertas_criticos,
+        alertas_resolvidos=alertas_resolvidos,
+        produtos_estoque_negativo=produtos_estoque_negativo
     )
 
 
