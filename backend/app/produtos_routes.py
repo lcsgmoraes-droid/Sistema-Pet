@@ -2741,11 +2741,6 @@ def relatorio_movimentacoes(
         entrada = mov.quantidade if mov.tipo == "entrada" else None
         saida = mov.quantidade if mov.tipo != "entrada" else None
         
-        # Calcular valor total
-        valor_total = None
-        if mov.preco_unitario:
-            valor_total = mov.preco_unitario * mov.quantidade
-        
         item = {
             "id": mov.id,
             "data": mov.created_at.strftime("%d/%m/%Y"),
@@ -2758,14 +2753,14 @@ def relatorio_movimentacoes(
             "produto_id": mov.produto_id,
             "entrada": entrada,
             "saida": saida,
-            "estoque": mov.estoque_resultante,
-            "tipo": mov.tipo_movimentacao.title(),
-            "valor_unitario": mov.preco_unitario,
-            "valor_total": valor_total,
-            "usuario": mov.usuario or "Sistema",
-            "numero_pedido": mov.numero_pedido,
+            "estoque": mov.quantidade_nova,
+            "tipo": mov.tipo.title(),
+            "valor_unitario": mov.custo_unitario,
+            "valor_total": mov.valor_total,
+            "usuario": mov.user.nome if mov.user else "Sistema",
+            "numero_pedido": mov.documento,
             "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S"),
-            "observacoes": mov.observacoes,
+            "observacoes": mov.observacao,
             "lotes_consumidos": mov.lotes_consumidos
         }
         
