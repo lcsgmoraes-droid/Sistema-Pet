@@ -12,6 +12,7 @@ import {
   BarChart2
 } from 'lucide-react';
 import { finalizarVenda, criarVenda } from '../api/vendas';
+import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 
@@ -557,6 +558,35 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     setErro('');
 
     try {
+      // ⚠️ VERIFICAR ESTOQUE NEGATIVO ANTES DE FINALIZAR
+      const itensParaVerificar = venda.itens
+        .filter(item => item.tipo === 'produto' && item.produto_id)
+        .map(item => ({
+          produto_id: item.produto_id,
+          quantidade: item.quantidade
+        }));
+      
+      if (itensParaVerificar.length > 0) {
+        const response = await verificarEstoqueNegativo(itensParaVerificar);
+        const produtosNegativos = response.data || [];
+        
+        if (produtosNegativos.length > 0) {
+          // Montar mensagem de alerta
+          const mensagens = produtosNegativos.map(p => 
+            `• ${p.produto_nome}: estoque atual ${p.estoque_atual}, após venda ficará ${p.estoque_resultante}`
+          ).join('\n');
+          
+          const confirmar = window.confirm(
+            `⚠️ ATENÇÃO: Os seguintes produtos ficarão com ESTOQUE NEGATIVO:\n\n${mensagens}\n\nDeseja continuar mesmo assim?`
+          );
+          
+          if (!confirmar) {
+            setLoading(false);
+            return; // Cancelar finalização
+          }
+        }
+      }
+      
       // Criar a venda primeiro se ainda não foi criada
       let vendaId = venda.id;
       

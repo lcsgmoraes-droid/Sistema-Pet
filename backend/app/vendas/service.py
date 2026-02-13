@@ -445,7 +445,8 @@ class VendaService:
                             user_id=user_id,
                             tenant_id=tenant_id,
                             db=db,
-                            product_variation_id=None
+                            product_variation_id=None,
+                            venda_codigo=numero_venda
                         )
                         
                         estoque_baixado.extend(resultados)
@@ -595,7 +596,8 @@ class VendaService:
         user_id: int,
         tenant_id: str,
         db: Session,
-        product_variation_id: int = None
+        product_variation_id: int = None,
+        venda_codigo: str = None
     ) -> List[Dict[str, Any]]:
         """
         Processa a baixa de estoque de um item de venda.
@@ -645,7 +647,7 @@ class VendaService:
                 user_id=user_id,
                 tenant_id=tenant_id,
                 db=db,
-                documento=None,
+                documento=venda_codigo,
                 observacao=None
             )
             
@@ -687,7 +689,7 @@ class VendaService:
                     user_id=user_id,
                     tenant_id=tenant_id,
                     db=db,
-                    documento=None,
+                    documento=venda_codigo,
                     observacao=f"KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)"
                 )
                 
@@ -771,7 +773,7 @@ class VendaService:
                         user_id=user_id,
                         tenant_id=tenant_id,
                         db=db,
-                        documento=None,
+                        documento=venda_codigo,
                         observacao=f"Componente do KIT VIRTUAL '{produto.nome}' (vendido: {quantidade_vendida}x)"
                     )
                     
@@ -1585,7 +1587,8 @@ class VendaService:
                             user_id=user_id,
                             tenant_id=tenant_id,
                             db=db,
-                            product_variation_id=product_variation_id
+                            product_variation_id=product_variation_id,
+                            venda_codigo=venda.numero_venda
                         )
                         
                         # Acumular resultados

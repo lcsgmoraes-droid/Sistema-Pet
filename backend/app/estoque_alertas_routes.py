@@ -250,3 +250,69 @@ def excluir_alerta(
     logger.info(f"🗑️ Alerta de estoque negativo excluído - ID: {alerta_id}")
     
     return {"message": "Alerta excluído com sucesso"}
+
+
+# ============================================================================
+# VERIFICAÇÃO DE ESTOQUE PRÉ-VENDA
+# ============================================================================
+
+class ItemVerificarEstoque(BaseModel):
+    produto_id: int
+    quantidade: float
+
+
+class VerificarEstoqueRequest(BaseModel):
+    itens: List[ItemVerificarEstoque]
+
+
+class ProdutoEstoqueNegativoResponse(BaseModel):
+    produto_id: int
+    produto_nome: str
+    estoque_atual: float
+    quantidade_solicitada: float
+    estoque_resultante: float
+
+
+@router.post("/verificar-estoque-negativo", response_model=List[ProdutoEstoqueNegativoResponse])
+def verificar_estoque_negativo_pre_venda(
+    request: VerificarEstoqueRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Verifica se algum produto ficará com estoque negativo ao finalizar a venda.
+    Retorna lista de produtos que ficarão com estoque negativo.
+    """
+    from app.produtos_models import Produto
+    
+    tenant_id = current_user.tenant_id
+    produtos_negativos = []
+    
+    for item in request.itens:
+        # Buscar produto
+        produto = db.query(Produto).filter(
+            and_(
+                Produto.id == item.produto_id,
+                Produto.tenant_id == tenant_id
+            )
+        ).first()
+        
+        if not produto:
+            continue
+        
+        estoque_atual = produto.estoque_atual or 0
+        estoque_resultante = estoque_atual - item.quantidade
+        
+        # Se ficará negativo, adicionar à lista
+        if estoque_resultante < 0:
+            produtos_negativos.append(
+                ProdutoEstoqueNegativoResponse(
+                    produto_id=produto.id,
+                    produto_nome=produto.nome,
+                    estoque_atual=estoque_atual,
+                    quantidade_solicitada=item.quantidade,
+                    estoque_resultante=estoque_resultante
+                )
+            )
+    
+    return produtos_negativos

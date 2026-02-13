@@ -45,3 +45,12 @@ export const resolverAlerta = (alertaId, acao, observacao = null) => {
 export const deletarAlerta = (alertaId) => {
   return api.delete(`/estoque/alertas/${alertaId}`);
 };
+
+/**
+ * Verificar se produtos ficarão com estoque negativo
+ * @param {Array} itens - Array de objetos {produto_id, quantidade}
+ * @returns {Promise} - Lista de produtos que ficarão com estoque negativo
+ */
+export const verificarEstoqueNegativo = (itens) => {
+  return api.post('/estoque/alertas/verificar-estoque-negativo', { itens });
+};
