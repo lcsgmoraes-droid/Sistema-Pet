@@ -58,6 +58,8 @@ services:
       ENVIRONMENT: production
       DEBUG: "False"
       RUNNING_IN_DOCKER: "true"
+      LOG_LEVEL: INFO
+      SQL_AUDIT_ENFORCE_LEVEL: error
       
       # Database
       DATABASE_URL: postgresql://petshop_user:petshop_pass_2026@postgres-prod:5432/petshop_prod
@@ -66,12 +68,27 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-seu_secret_key_super_seguro_aqui_2026}
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 43200
+      ADMIN_TOKEN: piloto_admin_token_2026
       
       # CORS
       ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174
+      FRONTEND_URL: http://localhost:5173
       
-      # Google Maps API
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      # APIs
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-AIzaSyClc2jpIcrb2PrCaOBkzQc4XCmEVFlWiO0}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      
+      # Integrações
+      BLING_CLIENT_ID: ${BLING_CLIENT_ID:-}
+      BLING_CLIENT_SECRET: ${BLING_CLIENT_SECRET:-}
+      STONE_CLIENT_ID: ${STONE_CLIENT_ID:-sk_cb70739f3d554f57a84db078586f5637}
+      STONE_CLIENT_SECRET: ${STONE_CLIENT_SECRET:-sk_cb70739f3d554f57a84db078586f5637}
+      STONE_MERCHANT_ID: ${STONE_MERCHANT_ID:-691890226}
+      STONE_SANDBOX: ${STONE_SANDBOX:-false}
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-100}
       
       # Timezone
       TZ: America/Sao_Paulo
