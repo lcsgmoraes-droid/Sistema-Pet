@@ -215,9 +215,9 @@ export default function AlertasEstoque() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Venda ID</p>
+                            <p className="text-sm text-gray-500">Venda</p>
                             <p className="text-lg font-semibold text-blue-600">
-                              #{alerta.venda_id}
+                              {alerta.venda_codigo ? `#${alerta.venda_codigo}` : (alerta.venda_id ? `ID: ${alerta.venda_id}` : 'N/A')}
                             </p>
                           </div>
                         </div>
@@ -428,7 +428,7 @@ export default function AlertasEstoque() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-blue-600 font-medium">
-                            #{alerta.venda_id}
+                            {alerta.venda_codigo ? `#${alerta.venda_codigo}` : (alerta.venda_id ? `ID: ${alerta.venda_id}` : 'N/A')}
                           </td>
                         </tr>
                       ))

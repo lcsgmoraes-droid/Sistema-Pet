@@ -74,9 +74,16 @@ export default function ProdutosRelatorio() {
   const carregarProdutos = async () => {
     try {
       const response = await getProdutos();
-      setProdutos(response.data);
+      // Garantir que sempre seja um array
+      if (Array.isArray(response.data)) {
+        setProdutos(response.data);
+      } else {
+        console.warn('Resposta de produtos não é um array:', response.data);
+        setProdutos([]);
+      }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
+      setProdutos([]); // Garantir array vazio em caso de erro
     }
   };
 
@@ -85,20 +92,29 @@ export default function ProdutosRelatorio() {
       setLoading(true);
       const response = await getRelatorioMovimentacoes(filtros);
       const dados = response.data;
-      setMovimentacoes(dados);
       
-      // Calcular totais
-      const totais = dados.reduce((acc, mov) => {
-        acc.totalEntradas += mov.quantidade_entrada || 0;
-        acc.totalSaidas += mov.quantidade_saida || 0;
-        acc.valorTotal += mov.valor_total || 0;
-        return acc;
-      }, { totalEntradas: 0, totalSaidas: 0, valorTotal: 0 });
-      
-      setTotais(totais);
+      // Garantir que dados seja sempre um array
+      if (Array.isArray(dados)) {
+        setMovimentacoes(dados);
+        
+        // Calcular totais
+        const totais = dados.reduce((acc, mov) => {
+          acc.totalEntradas += mov.quantidade_entrada || 0;
+          acc.totalSaidas += mov.quantidade_saida || 0;
+          acc.valorTotal += mov.valor_total || 0;
+          return acc;
+        }, { totalEntradas: 0, totalSaidas: 0, valorTotal: 0 });
+        
+        setTotais(totais);
+      } else {
+        console.warn('Resposta de movimentações não é um array:', dados);
+        setMovimentacoes([]);
+      }
     } catch (error) {
       console.error('Erro ao carregar relatório:', error);
-      alert('Erro ao carregar relatório');
+      console.error('Detalhes do erro:', error.response?.data);
+      alert(`Erro ao carregar relatório: ${error.response?.data?.detail || error.message}`);
+      setMovimentacoes([]);
     } finally {
       setLoading(false);
     }
