@@ -69,8 +69,17 @@ const Layout = () => {
     { path: '/dashboard-gerencial', icon: FiBarChart2, label: '📊 Dashboard Gerencial', highlight: true, permission: 'relatorios.gerencial' },
     { path: '/clientes', icon: FiUsers, label: 'Pessoas', permission: 'clientes.visualizar' },
     { path: '/pets', icon: PawPrint, label: '🐾 Pets', highlight: true, permission: 'clientes.visualizar' }, // Vinculado a clientes
-    { path: '/produtos', icon: FiPackage, label: 'Produtos', permission: 'produtos.visualizar' },
-    { path: '/estoque/alertas', icon: FiAlertTriangle, label: '⚠️ Alertas Estoque', highlight: true, permission: 'produtos.visualizar' },
+    { 
+      path: '/produtos', 
+      icon: FiPackage, 
+      label: 'Produtos', 
+      permission: 'produtos.visualizar',
+      submenu: [
+        { path: '/produtos', label: 'Listar Produtos', permission: 'produtos.visualizar' },
+        { path: '/produtos/relatorio', label: 'Relatório de Movimentações', permission: 'produtos.visualizar' },
+        { path: '/estoque/alertas', label: 'Alertas de Estoque', permission: 'produtos.visualizar' },
+      ]
+    },
     { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: true, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },

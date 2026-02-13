@@ -144,8 +144,8 @@ class EstoqueService:
                 estoque_anterior=estoque_anterior,
                 quantidade_vendida=quantidade,
                 estoque_resultante=estoque_resultante,
-                venda_id=contexto.get('venda_id') if contexto else None,
-                venda_codigo=contexto.get('venda_codigo') if contexto else None,
+                venda_id=referencia_id if referencia_tipo == 'venda' else None,
+                venda_codigo=documento if referencia_tipo == 'venda' else None,
                 critico=(estoque_resultante < -5),  # Crítico se < -5 unidades
                 status='pendente'
             )
