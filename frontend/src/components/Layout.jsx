@@ -5,7 +5,7 @@ import {
   FiHome, FiUsers, FiPackage, FiShoppingCart, FiDollarSign,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX,
   FiBox, FiTrendingUp, FiFileText, FiChevronDown, FiChevronRight,
-  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield
+  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import FloatingCalculatorButton from './FloatingCalculatorButton';
@@ -70,6 +70,7 @@ const Layout = () => {
     { path: '/clientes', icon: FiUsers, label: 'Pessoas', permission: 'clientes.visualizar' },
     { path: '/pets', icon: PawPrint, label: '🐾 Pets', highlight: true, permission: 'clientes.visualizar' }, // Vinculado a clientes
     { path: '/produtos', icon: FiPackage, label: 'Produtos', permission: 'produtos.visualizar' },
+    { path: '/estoque/alertas', icon: FiAlertTriangle, label: '⚠️ Alertas Estoque', highlight: true, permission: 'produtos.visualizar' },
     { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: true, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },

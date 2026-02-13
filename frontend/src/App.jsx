@@ -21,6 +21,7 @@ import Pessoas from './pages/ClientesNovo';
 import Produtos from './pages/Produtos';
 import ProdutosNovo from './pages/ProdutosNovo';
 import ProdutosRelatorio from './pages/ProdutosRelatorio';
+import AlertasEstoque from './pages/AlertasEstoque';
 import Lembretes from './pages/Lembretes';
 import CalculadoraRacao from './pages/CalculadoraRacao';
 
@@ -169,6 +170,11 @@ function App() {
             {/* Rotas auxiliares de produtos (mantidas) */}
             <Route path="produtos/:id/movimentacoes" element={<MovimentacoesProduto />} />
             <Route path="produtos/relatorio" element={<ProdutosRelatorio />} />
+            <Route path="estoque/alertas" element={
+              <ProtectedRoute permission="produtos.visualizar">
+                <AlertasEstoque />
+              </ProtectedRoute>
+            } />
             <Route path="lembretes" element={<Lembretes />} />
             <Route path="calculadora-racao" element={<CalculadoraRacao />} />
 

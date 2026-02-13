@@ -36,7 +36,7 @@ class AlertaEstoqueNegativo(BaseTenantModel):
     data_alerta = Column(DateTime, nullable=False, default=datetime.utcnow)
     status = Column(String(20), nullable=False, default='pendente')  # pendente, resolvido, ignorado
     data_resolucao = Column(DateTime, nullable=True)
-    usuario_resolucao_id = Column(Integer, ForeignKey('usuarios.id'), nullable=True)
+    usuario_resolucao_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     observacao = Column(String(500), nullable=True)
     
     # Flags
