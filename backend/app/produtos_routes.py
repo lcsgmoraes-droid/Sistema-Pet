@@ -2683,6 +2683,9 @@ def relatorio_movimentacoes(
     from datetime import datetime as dt, timedelta
     from sqlalchemy import func, extract
     
+    # Extrair tenant_id
+    user, tenant_id = user_and_tenant
+    
     # Query base
     query = db.query(EstoqueMovimentacao).join(Produto).filter(
         Produto.tenant_id == tenant_id
