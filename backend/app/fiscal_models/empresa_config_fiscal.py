@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey
 )
 from sqlalchemy.sql import func
-from app.database.base import Base
+from app.db.base_class import Base
 
 
 class EmpresaConfigFiscal(Base):

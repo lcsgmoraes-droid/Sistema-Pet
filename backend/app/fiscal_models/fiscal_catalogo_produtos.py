@@ -2,7 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, Text, DateTime
 )
 from sqlalchemy.sql import func
-from app.database.base import Base
+from app.db.base_class import Base
 
 
 class FiscalCatalogoProdutos(Base):
