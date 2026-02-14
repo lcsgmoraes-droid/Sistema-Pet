@@ -8,6 +8,7 @@ FASE 2: Criar tabela operadoras_cartao + FKs + Seed automático
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 from datetime import datetime
 
@@ -99,12 +100,25 @@ def upgrade():
         ondelete='SET NULL'
     )
     op.create_index('idx_venda_pagamentos_operadora', 'venda_pagamentos', ['operadora_id'])
+    
     # Índice composto para buscar por NSU + Operadora (evita duplicatas entre operadoras)
-    op.create_index(
-        'idx_venda_pagamentos_nsu_operadora',
-        'venda_pagamentos',
-        ['nsu_cartao', 'operadora_id']
-    )
+    # ⚠️ DEFENSIVO: Criar apenas se coluna nsu_cartao existir
+    connection = op.get_bind()
+    coluna_nsu_existe = connection.execute(text("""
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'venda_pagamentos'
+          AND column_name = 'nsu_cartao'
+    """)).fetchone()
+    
+    if coluna_nsu_existe:
+        op.create_index(
+            'idx_venda_pagamentos_nsu_operadora',
+            'venda_pagamentos',
+            ['nsu_cartao', 'operadora_id']
+        )
+    else:
+        print("⚠️ Coluna nsu_cartao não existe. Pulando índice idx_venda_pagamentos_nsu_operadora.")
     
     # ========================================
     # 4. SEED AUTOMÁTICO DE OPERADORAS
@@ -112,7 +126,7 @@ def upgrade():
     # Importante: Executar apenas se não existir nenhuma operadora
     # Isso evita duplicação em ambientes que já foram migrados
     
-    connection = op.get_bind()
+    # connection já foi obtido acima para verificação da coluna
     
     # Buscar todos os tenants
     tenants_result = connection.execute(sa.text("SELECT id FROM tenants"))
@@ -283,8 +297,8 @@ def upgrade():
 
 
 def downgrade():
-    # Remover índices
-    op.drop_index('idx_venda_pagamentos_nsu_operadora', 'venda_pagamentos')
+    # Remover índices (defensivo: if_exists para evitar erro caso não exista)
+    op.drop_index('idx_venda_pagamentos_nsu_operadora', 'venda_pagamentos', if_exists=True)
     op.drop_index('idx_venda_pagamentos_operadora', 'venda_pagamentos')
     op.drop_index('idx_formas_pagamento_operadora', 'formas_pagamento')
     op.drop_index('idx_operadoras_padrao', 'operadoras_cartao')
