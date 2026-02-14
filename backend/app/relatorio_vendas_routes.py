@@ -53,9 +53,11 @@ async def obter_relatorio_vendas(
     if not data_fim:
         data_fim = date.today().isoformat()
     
-    # Converter strings para datetime
+    # Converter strings para datetime naive (datas no banco são naive em horário de Brasília)
     data_inicio_dt = datetime.fromisoformat(data_inicio)
-    data_fim_dt = datetime.fromisoformat(data_fim).replace(hour=23, minute=59, second=59)
+    data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
+    data_fim_dt = datetime.fromisoformat(data_fim)
+    data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
     
     # Buscar vendas do período com filtro de tenant
     vendas = db.query(Venda).filter(
@@ -685,6 +687,46 @@ async def obter_relatorio_vendas(
     resumo["margem_media"] = round((lucro_total_geral / venda_liquida * 100) if venda_liquida > 0 else 0, 1)
     
     # ==============================================
+    # PRODUTOS PARA ANÁLISE INTELIGENTE (flat list)
+    # ==============================================
+    produtos_analise = {}
+    for venda in vendas:
+        itens = db.query(VendaItem).filter(
+            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
+        ).all()
+        
+        for item in itens:
+            produto = item.produto
+            if not produto:
+                continue
+                
+            prod_nome = produto.nome
+            if prod_nome not in produtos_analise:
+                produtos_analise[prod_nome] = {
+                    'nome': prod_nome,
+                    'produto': prod_nome,
+                    'marca': produto.marca.nome if produto.marca else None,
+                    'categoria': produto.categoria.nome if produto.categoria else None,
+                    'quantidade': 0,
+                    'valor_total': 0,
+                    'custo_total': 0
+                }
+            
+            produtos_analise[prod_nome]['quantidade'] += float(item.quantidade or 0)
+            produtos_analise[prod_nome]['valor_total'] += float(item.subtotal or 0)
+            
+            # Calcular custo
+            if produto.preco_custo:
+                produtos_analise[prod_nome]['custo_total'] += float(produto.preco_custo) * float(item.quantidade or 0)
+    
+    # Converter para lista e ordenar por valor
+    produtos_analise_lista = sorted(
+        list(produtos_analise.values()), 
+        key=lambda x: x['valor_total'], 
+        reverse=True
+    )
+    
+    # ==============================================
     # RETORNO COMPLETO
     # ==============================================
     return {
@@ -695,6 +737,7 @@ async def obter_relatorio_vendas(
         "vendas_por_tipo": vendas_por_tipo_lista,
         "vendas_por_grupo": vendas_por_grupo_lista,
         "produtos_detalhados": produtos_detalhados_lista,
+        "produtos_analise": produtos_analise_lista,
         "lista_vendas": lista_vendas
     }
 
@@ -834,9 +877,20 @@ async def exportar_vendas_pdf(
             for item in itens:
                 prod_nome = item.produto.nome if item.produto else 'Produto sem nome'
                 if prod_nome not in prod_dict:
-                    prod_dict[prod_nome] = {'produto': prod_nome, 'quantidade': 0, 'valor_total': 0}
+                    prod_dict[prod_nome] = {
+                        'produto': prod_nome,
+                        'nome': prod_nome,
+                        'quantidade': 0,
+                        'valor_total': 0,
+                        'custo_total': 0,
+                        'marca': item.produto.marca.nome if (item.produto and item.produto.marca) else None,
+                        'categoria': item.produto.categoria.nome if (item.produto and item.produto.categoria) else None
+                    }
                 prod_dict[prod_nome]['quantidade'] += float(item.quantidade or 0)
                 prod_dict[prod_nome]['valor_total'] += float(item.subtotal or 0)
+                # Adicionar custo do produto
+                if item.produto and item.produto.preco_custo:
+                    prod_dict[prod_nome]['custo_total'] += float(item.produto.preco_custo) * float(item.quantidade or 0)
         
         produtos_detalhados = sorted(list(prod_dict.values()), key=lambda x: x['valor_total'], reverse=True)
         

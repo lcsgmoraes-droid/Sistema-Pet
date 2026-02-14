@@ -241,10 +241,13 @@ def listar_vendas(
         query = query.filter(~Venda.id.in_(subquery))
     
     if data_inicio:
+        # Datas no banco são naive (sem timezone) em horário de Brasília
         data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
         query = query.filter(Venda.data_venda >= data_inicio_dt)
     
     if data_fim:
+        # Datas no banco são naive (sem timezone) em horário de Brasília
         data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
         data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
         query = query.filter(Venda.data_venda <= data_fim_dt)
@@ -2409,10 +2412,13 @@ def relatorio_resumo(
     query = db.query(Venda).filter_by(tenant_id=tenant_id)
     
     if data_inicio:
+        # Datas no banco são naive (sem timezone) em horário de Brasília
         data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
         query = query.filter(Venda.data_venda >= data_inicio_dt)
     
     if data_fim:
+        # Datas no banco são naive (sem timezone) em horário de Brasília
         data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
         data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
         query = query.filter(Venda.data_venda <= data_fim_dt)

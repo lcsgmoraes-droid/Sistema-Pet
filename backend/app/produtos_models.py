@@ -5,6 +5,7 @@ Sistema completo com categorias, marcas, lotes e FIFO
 """
 
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Index, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .db import Base
@@ -228,6 +229,21 @@ class Produto(BaseTenantModel):
     especies_indicadas = Column(String(100), nullable=True)  # dog, cat, both (espec�fico para ra��es)
     tabela_consumo = Column(Text, nullable=True)  # JSON com tabela de consumo da embalagem (peso x idade x quantidade di�ria)
     
+    # ========== CLASSIFICA��O INTELIGENTE DE RA��ES (FASE 3 - IA) ==========
+    # Arrays para suportar m�ltiplas classifica��es (ex: "todas as ra�as", "todos os portes")
+    porte_animal = Column(JSONB, nullable=True)  # ["Pequeno", "M�dio", "Grande", "Gigante", "Todos"]
+    fase_publico = Column(JSONB, nullable=True)  # ["Filhote", "Adulto", "Senior", "Gestante", "Todos"]
+    tipo_tratamento = Column(JSONB, nullable=True)  # ["Obesidade", "Alergia", "Sens�vel", "Digestivo", "Urin�rio", "Renal", "Hipoalerg�nico", "Light"]
+    sabor_proteina = Column(String(100), nullable=True)  # Frango, Carne, Peixe, Cordeiro, Soja, Mix, etc.
+    auto_classificar_nome = Column(Boolean, default=True, nullable=False)  # Ativa auto-classifica��o via IA    
+    # ========== OPÇÕES DE RAÇÃO - SISTEMA DINÂMICO (FOREIGN KEYS) ==========
+    # Relacionamentos com tabelas de opções dinâmicas configuradas pelo usuário
+    linha_racao_id = Column(Integer, ForeignKey('linhas_racao.id', ondelete='SET NULL'), nullable=True)
+    porte_animal_id = Column(Integer, ForeignKey('portes_animal.id', ondelete='SET NULL'), nullable=True)
+    fase_publico_id = Column(Integer, ForeignKey('fases_publico.id', ondelete='SET NULL'), nullable=True)
+    tipo_tratamento_id = Column(Integer, ForeignKey('tipos_tratamento.id', ondelete='SET NULL'), nullable=True)
+    sabor_proteina_id = Column(Integer, ForeignKey('sabores_proteina.id', ondelete='SET NULL'), nullable=True)
+    apresentacao_peso_id = Column(Integer, ForeignKey('apresentacoes_peso.id', ondelete='SET NULL'), nullable=True)    
     # Imagem Principal
     imagem_principal = Column(String(255), nullable=True)
     

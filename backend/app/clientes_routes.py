@@ -564,7 +564,13 @@ def create_cliente(
     return novo_cliente
 
 
-@router.get("/", response_model=List[ClienteResponse])
+class ClientesListResponse(BaseModel):
+    items: List[ClienteResponse]
+    total: int
+    skip: int
+    limit: int
+
+@router.get("/", response_model=ClientesListResponse)
 @require_permission("clientes.visualizar")
 def list_clientes(
     skip: int = 0,
@@ -596,6 +602,7 @@ def list_clientes(
         # Filtro de busca
         if search:
             query = query.filter(
+                (Cliente.codigo.ilike(f"%{search}%")) |
                 (Cliente.nome.ilike(f"%{search}%")) |
                 (Cliente.cpf.ilike(f"%{search}%")) |
                 (Cliente.cnpj.ilike(f"%{search}%")) |
@@ -610,8 +617,18 @@ def list_clientes(
             ativo = True
         query = query.filter(Cliente.ativo == ativo)
         
+        # Contar total (ANTES do offset/limit)
+        total = query.count()
+        
+        # Buscar registros paginados
         clientes = query.order_by(Cliente.nome).offset(skip).limit(limit).all()
-        return clientes
+        
+        return ClientesListResponse(
+            items=clientes,
+            total=total,
+            skip=skip,
+            limit=limit
+        )
         
     except Exception as e:
         import logging

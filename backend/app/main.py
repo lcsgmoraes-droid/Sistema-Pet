@@ -77,6 +77,11 @@ from app.importacao_pessoas import router as importacao_pessoas_router
 from app.lembretes import router as lembretes_router
 from app.calculadora_racao import router as calculadora_racao_router
 from app.cliente_info_pdv import router as cliente_info_pdv_router
+from app.opcoes_racao_routes import router as opcoes_racao_router
+from app.analise_racoes_routes import router as analise_racoes_router  # Fase 4: Análises de Rações
+from app.pdv_racoes_routes import router as pdv_racoes_router  # Fase 5: PDV Inteligente de Rações
+from app.sugestoes_racoes_routes import router as sugestoes_racoes_router  # Fase 6: Sugestões Inteligentes
+from app.ml_racoes_routes import router as ml_racoes_router  # Fase 7: Machine Learning
 from app.formas_pagamento_routes import router as formas_pagamento_router
 from app.operadoras_routes import router as operadoras_router
 from app.comissoes_routes import router as comissoes_router
@@ -405,6 +410,11 @@ app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
 app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!
 app.include_router(importacao_pessoas_router, tags=["Importação de Pessoas"])
 app.include_router(produtos_router, tags=["Produtos"])
+app.include_router(opcoes_racao_router, tags=["Opções de Ração"])
+app.include_router(analise_racoes_router, tags=["Análises de Rações"])  # Fase 4: Dashboard de Análise
+app.include_router(pdv_racoes_router, tags=["PDV - Rações Inteligentes"])  # Fase 5: Alertas e Sugestões
+app.include_router(sugestoes_racoes_router, tags=["Sugestões Inteligentes - Rações"])  # Fase 6: Detecção e Otimização
+app.include_router(ml_racoes_router, tags=["Machine Learning - Rações"])  # Fase 7: Aprendizado e Previsão
 app.include_router(variacoes_router, tags=["Produtos - Variações"])  # Sprint 2
 app.include_router(calculadora_racao_router, prefix="/api", tags=["Calculadora de Ração"])
 app.include_router(lembretes_router, prefix="/api", tags=["Lembretes de Recorrência"])

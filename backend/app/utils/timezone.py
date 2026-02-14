@@ -11,18 +11,21 @@ BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
 
 def now_brasilia() -> datetime:
     """
-    Retorna datetime atual no timezone de Brasília.
-    Use esta função em vez de datetime.now() ou datetime.utcnow()
+    Retorna datetime atual no timezone de Brasília SEM timezone info.
+    Isso evita conversões automáticas do banco de dados para UTC.
     
     Returns:
-        datetime: Data/hora atual em Brasília com timezone
+        datetime: Data/hora atual em Brasília (naive/sem timezone)
         
     Exemplo:
         >>> agora = now_brasilia()
         >>> print(agora)
-        2026-02-06 10:26:00-03:00
+        2026-02-13 23:26:00  # Horário de Brasília, mas sem -03:00
     """
-    return datetime.now(BRASILIA_TZ)
+    # Obter horário atual de Brasília
+    brasilia_now = datetime.now(BRASILIA_TZ)
+    # Remover timezone info para evitar conversão do banco
+    return brasilia_now.replace(tzinfo=None)
 
 
 def to_brasilia(dt: datetime) -> datetime:

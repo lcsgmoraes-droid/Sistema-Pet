@@ -61,22 +61,30 @@ def safe_decimal_to_float_zero(value: Optional[Decimal]) -> float:
 def safe_datetime_to_iso(value: Optional[datetime]) -> Optional[str]:
     """
     Converte datetime para string ISO 8601 de forma segura.
+    Datas naive (sem timezone) são assumidas como horário de Brasília.
     
     Args:
         value: Valor datetime ou None
         
     Returns:
-        String ISO ou None
+        String ISO com timezone de Brasília ou None
         
     Examples:
-        >>> safe_datetime_to_iso(datetime(2026, 1, 22, 15, 30))
-        '2026-01-22T15:30:00'
+        >>> safe_datetime_to_iso(datetime(2026, 2, 13, 23, 30))
+        '2026-02-13T23:30:00-03:00'  # Assume Brasília e adiciona timezone
         >>> safe_datetime_to_iso(None)
         None
     """
     if value is None:
         return None
     if isinstance(value, datetime):
+        from app.utils.timezone import BRASILIA_TZ
+        
+        # Se não tem timezone, assume que JÁ está em horário de Brasília
+        # (por causa do now_brasilia() que salva naive no banco)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=BRASILIA_TZ)
+        
         return value.isoformat()
     if isinstance(value, date):
         return value.isoformat()

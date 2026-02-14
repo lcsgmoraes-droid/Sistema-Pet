@@ -4,8 +4,8 @@ from app.db.base_class import Base
 # Importando models principais (do arquivo app/models.py)
 from app.models import User, UserSession, Cliente, UserTenant  # noqa
 
-# Importando models fiscais (do diretório app/models/)
-from app.models import (  # noqa
+# Importando models fiscais (do diretório app/fiscal_models/)
+from app.fiscal_models import (  # noqa
     EmpresaConfigFiscal,
     FiscalCatalogoProdutos,
     FiscalEstadoPadrao,
