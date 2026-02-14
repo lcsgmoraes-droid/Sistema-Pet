@@ -26,37 +26,37 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # ============================================================================
-# METADATA CONFIGURATION (STAGING MODE)
+# METADATA CONFIGURATION (AUTOGENERATE MODE)
 # ============================================================================
-# 🔒 FASE 8 / STAGING: Desconectar metadata dos models
-# 
-# Durante alembic upgrade em staging/produção:
-# - NÃO precisamos de autogenerate
-# - NÃO queremos que ENUMs dos models interfiram nas migrations
-# - Queremos apenas executar as migrations manuais
-#
-# ⚠️ IMPORTANTE: Quando for usar autogenerate novamente (dev):
-# - Descomentar as importações abaixo
-# - Restaurar: target_metadata = Base.metadata
+# ✅ MODO DESENVOLVIMENTO: Habilitar autogenerate
+# Importar Base e todos os models para que Alembic detecte as tabelas
 # ============================================================================
 
-# 🚫 DESABILITADO PARA STAGING (evita conflito de ENUMs)
-# from app.db import Base
-# import app.models
-# import app.produtos_models  
-# import app.vendas_models
-# import app.caixa_models
-# import app.financeiro_models
-# import app.comissoes_models
-# import app.comissoes_avancadas_models
-# import app.formas_pagamento_models
-# import app.idempotency_models
-# import app.cargo_models
-# import app.segmentacao_models
-# target_metadata = Base.metadata
+from app.db.base_class import Base
 
-# ✅ MODO STAGING: Sem metadata, apenas execução de migrations
-target_metadata = None
+# Importar todos os models (o db.base já faz isso, mas explícito é melhor)
+import app.models  # User, Cliente, etc (arquivo models.py)
+import app.fiscal_models  # Models fiscais (diretório fiscal_models/)
+import app.produtos_models
+import app.vendas_models
+import app.caixa_models
+import app.financeiro_models
+import app.comissoes_models
+import app.comissoes_avancadas_models
+import app.formas_pagamento_models
+import app.idempotency_models
+import app.cargo_models
+import app.segmentacao_models
+import app.rotas_entrega_models
+import app.opportunities_models
+import app.opportunity_events_models
+import app.dre_plano_contas_models
+
+# IA models
+from app.ia import aba7_models, aba7_extrato_models
+
+# Configurar metadata para autogenerate
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
