@@ -1,7 +1,7 @@
 """add_produto_opcoes_racao_fields
 
 Revision ID: 86967908c0e9
-Revises: 20260214_ia_metadata
+Revises: 20260212_fix_historico_timestamps
 Create Date: 2026-02-14 04:59:20.393686
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '86967908c0e9'
-down_revision: Union[str, Sequence[str], None] = '20260214_ia_metadata'
+down_revision: Union[str, Sequence[str], None] = '20260212_fix_historico_timestamps'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
