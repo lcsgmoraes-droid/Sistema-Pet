@@ -304,6 +304,13 @@ class ProdutoBase(BaseModel):
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None  # JSON com tabela de consumo da embalagem
+    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
+    linha_racao_id: Optional[int] = None
+    porte_animal_id: Optional[int] = None
+    fase_publico_id: Optional[int] = None
+    tipo_tratamento_id: Optional[int] = None
+    sabor_proteina_id: Optional[int] = None
+    apresentacao_peso_id: Optional[int] = None
     # Sprint 2: Produtos com variação
     tipo_produto: Optional[str] = 'SIMPLES'  # SIMPLES, PAI, VARIACAO, KIT
     produto_pai_id: Optional[int] = None  # FK para produto PAI (se for VARIACAO)
@@ -370,6 +377,13 @@ class ProdutoUpdate(BaseModel):
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None
+    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
+    linha_racao_id: Optional[int] = None
+    porte_animal_id: Optional[int] = None
+    fase_publico_id: Optional[int] = None
+    tipo_tratamento_id: Optional[int] = None
+    sabor_proteina_id: Optional[int] = None
+    apresentacao_peso_id: Optional[int] = None
     # Sprint 2: Produtos com variação
     tipo_produto: Optional[str] = None
     produto_pai_id: Optional[int] = None
@@ -1233,6 +1247,17 @@ def criar_produto(
     logger.info(f"📦 Dados recebidos: {produto.model_dump()}")
     
     # ========================================
+    # 🔄 AUTO-CONVERSÃO: classificacao_racao='sim' → tipo='ração'
+    # ========================================
+    if produto.classificacao_racao == 'sim':
+        produto.tipo = 'ração'
+        logger.info("✅ Produto marcado como ração (classificacao_racao='sim')")
+    elif produto.classificacao_racao in ['nao', 'não', None]:
+        # Se não é ração, garantir que tipo seja 'produto'
+        if not produto.tipo or produto.tipo == 'ração':
+            produto.tipo = 'produto'
+    
+    # ========================================
     # VALIDAÇÕES DE INFRAESTRUTURA (mantidas na rota)
     # ========================================
     
@@ -1972,7 +1997,19 @@ def atualizar_produto(
     composicao_kit = dados_recebidos.pop('composicao_kit', None)
     
     # ========================================
-    # 🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO (ATUALIZAÇÃO)
+    # � AUTO-CONVERSÃO: classificacao_racao='sim' → tipo='ração'
+    # ========================================
+    if 'classificacao_racao' in dados_recebidos:
+        if dados_recebidos['classificacao_racao'] == 'sim':
+            dados_recebidos['tipo'] = 'ração'
+            logger.info(f"✅ Produto {produto_id} marcado como ração (classificacao_racao='sim')")
+        elif dados_recebidos['classificacao_racao'] in ['nao', 'não', None]:
+            # Se não é ração, garantir que tipo seja 'produto'
+            dados_recebidos['tipo'] = 'produto'
+            logger.info(f"✅ Produto {produto_id} desmarcado como ração")
+    
+    # ========================================
+    # �🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO (ATUALIZAÇÃO)
     # ========================================
     is_parent_atual = produto.is_parent
     is_parent_novo = dados_recebidos.get('is_parent', is_parent_atual)
@@ -2158,6 +2195,7 @@ def atualizar_preco_produto(
 ):
     """Atualiza apenas o preço de um produto (edição rápida)"""
     
+    current_user, tenant_id = user_and_tenant
     logger.info(f"🏷️ Atualizando preço do produto {produto_id}")
     
     produto = db.query(Produto).filter(
@@ -3511,3 +3549,333 @@ def listar_historico_precos(
         })
     
     return resultado
+
+
+# ==================== CLASSIFICA��O INTELIGENTE DE RA��ES ====================
+
+@router.post("/{produto_id}/classificar-ia")
+async def classificar_produto_ia(
+    produto_id: int,
+    forcar: bool = False,  # For�a reclassifica��o mesmo se auto_classificar_nome = False
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Aplica classifica��o inteligente via IA em um produto
+    Extrai automaticamente: porte, fase, tratamento, sabor e peso do nome
+    """
+    from .classificador_racao import classificar_produto
+    
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    
+    # Buscar produto
+    produto = db.query(Produto).filter(
+        Produto.id == produto_id,
+        Produto.tenant_id == tenant_id
+    ).first()
+    
+    if not produto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Produto n�o encontrado"
+        )
+    
+    # Verificar se deve classificar
+    if not forcar and not produto.auto_classificar_nome:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Auto-classifica��o desativada para este produto. Use forcar=true para for�ar."
+        )
+    
+    # Executar classifica��o
+    resultado, confianca, metadata = classificar_produto(produto.nome, produto.peso_embalagem)
+    
+    # Importar models de lookup
+    from .opcoes_racao_models import PorteAnimal, FasePublico, TipoTratamento, SaborProteina, LinhaRacao
+    
+    # Atualizar produto apenas com campos que foram identificados
+    campos_atualizados = []
+    
+    # Salvar metadados da classifica��o
+    produto.classificacao_ia_versao = metadata["versao"]
+    
+    if resultado["especie_indicada"]:
+        # Mapear para formato do banco (dog, cat, both, bird, etc)
+        mapa_especies = {
+            "Cães": "dog",
+            "Gatos": "cat",
+            "Pássaros": "bird",
+            "Roedores": "rodent",
+            "Peixes": "fish"
+        }
+        especie_db = mapa_especies.get(resultado["especie_indicada"], resultado["especie_indicada"].lower())
+        produto.especies_indicadas = especie_db
+        campos_atualizados.append("especies_indicadas")
+    
+    # Buscar ID do porte baseado no nome retornado pela IA
+    # Classificador retorna array, pegar primeiro elemento
+    if resultado["porte_animal"] and len(resultado["porte_animal"]) > 0:
+        nome_porte = resultado["porte_animal"][0]  # Pega primeiro porte do array
+        porte = db.query(PorteAnimal).filter(
+            PorteAnimal.tenant_id == tenant_id,
+            PorteAnimal.nome == nome_porte,
+            PorteAnimal.ativo == True
+        ).first()
+        if porte:
+            produto.porte_animal_id = porte.id
+            campos_atualizados.append("porte_animal_id")
+    
+    # Buscar ID da fase baseado no nome retornado pela IA
+    # Classificador retorna array, pegar primeiro elemento
+    if resultado["fase_publico"] and len(resultado["fase_publico"]) > 0:
+        nome_fase = resultado["fase_publico"][0]  # Pega primeira fase do array
+        fase = db.query(FasePublico).filter(
+            FasePublico.tenant_id == tenant_id,
+            FasePublico.nome == nome_fase,
+            FasePublico.ativo == True
+        ).first()
+        if fase:
+            produto.fase_publico_id = fase.id
+            campos_atualizados.append("fase_publico_id")
+    
+    # Buscar ID do tipo de tratamento baseado no nome retornado pela IA
+    # Classificador retorna array, pegar primeiro elemento
+    if resultado["tipo_tratamento"] and len(resultado["tipo_tratamento"]) > 0:
+        nome_tratamento = resultado["tipo_tratamento"][0]  # Pega primeiro tratamento do array
+        tratamento = db.query(TipoTratamento).filter(
+            TipoTratamento.tenant_id == tenant_id,
+            TipoTratamento.nome == nome_tratamento,
+            TipoTratamento.ativo == True
+        ).first()
+        if tratamento:
+            produto.tipo_tratamento_id = tratamento.id
+            campos_atualizados.append("tipo_tratamento_id")
+    
+    # Buscar ID do sabor/proteína baseado no nome retornado pela IA
+    if resultado["sabor_proteina"]:
+        sabor = db.query(SaborProteina).filter(
+            SaborProteina.tenant_id == tenant_id,
+            SaborProteina.nome == resultado["sabor_proteina"],
+            SaborProteina.ativo == True
+        ).first()
+        if sabor:
+            produto.sabor_proteina_id = sabor.id
+            campos_atualizados.append("sabor_proteina_id")
+    
+    # Buscar ID da linha de ração baseado no nome retornado pela IA
+    if resultado.get("linha_racao"):
+        linha = db.query(LinhaRacao).filter(
+            LinhaRacao.tenant_id == tenant_id,
+            LinhaRacao.nome == resultado["linha_racao"],
+            LinhaRacao.ativo == True
+        ).first()
+        if linha:
+            produto.linha_racao_id = linha.id
+            campos_atualizados.append("linha_racao_id")
+    
+    # Atualizar peso se retornado pela IA e ainda não definido
+    if resultado["peso_embalagem"] and not produto.peso_embalagem:
+        produto.peso_embalagem = resultado["peso_embalagem"]
+        campos_atualizados.append("peso_embalagem")
+    
+    # Salvar
+    if campos_atualizados:
+        db.commit()
+        db.refresh(produto)
+    
+    return {
+        "success": True,
+        "produto_id": produto.id,
+        "nome": produto.nome,
+        "classificacao": resultado,
+        "confianca": confianca,
+        "campos_atualizados": campos_atualizados,
+        "mensagem": f"Classifica��o aplicada com sucesso. Score: {confianca['score']}%"
+    }
+
+
+@router.post("/classificar-lote")
+async def classificar_lote_produtos(
+    produto_ids: List[int] = None,  # Se None, classifica todos ativos com auto_classificar_nome=True
+    apenas_sem_classificacao: bool = True,  # S� classifica produtos sem classifica��o existente
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Classifica m�ltiplos produtos em lote
+    �til para classificar produtos hist�ricos
+    """
+    from .classificador_racao import classificar_produto
+    
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    
+    # Montar query
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.ativo == True,
+        Produto.auto_classificar_nome == True
+    )
+    
+    # Filtrar por IDs específicos se fornecido
+    if produto_ids:
+        query = query.filter(Produto.id.in_(produto_ids))
+    
+    # Filtrar apenas produtos sem classificação completa
+    if apenas_sem_classificacao:
+        query = query.filter(
+            (Produto.porte_animal == None) |
+            (Produto.fase_publico == None) |
+            (Produto.sabor_proteina == None)
+        )
+    
+    produtos = query.limit(100).all()  # Limite de segurança
+    
+    sucesso = []
+    erros = []
+    
+    for produto in produtos:
+        try:
+            resultado, confianca = classificar_produto(produto.nome, produto.peso_embalagem)
+            
+            campos_atualizados = []
+            
+            if resultado["especie_indicada"] and not produto.especies_indicadas:
+                # Mapear para formato do banco
+                mapa_especies = {
+                    "Cães": "dog",
+                    "Gatos": "cat",
+                    "Pássaros": "bird",
+                    "Roedores": "rodent",
+                    "Peixes": "fish"
+                }
+                especie_db = mapa_especies.get(resultado["especie_indicada"], resultado["especie_indicada"].lower())
+                produto.especies_indicadas = especie_db
+                campos_atualizados.append("especies_indicadas")
+            
+            if resultado["porte_animal"] and not produto.porte_animal:
+                produto.porte_animal = resultado["porte_animal"]
+                campos_atualizados.append("porte_animal")
+            
+            if resultado["fase_publico"] and not produto.fase_publico:
+                produto.fase_publico = resultado["fase_publico"]
+                campos_atualizados.append("fase_publico")
+            
+            if resultado["tipo_tratamento"] and not produto.tipo_tratamento:
+                produto.tipo_tratamento = resultado["tipo_tratamento"]
+                campos_atualizados.append("tipo_tratamento")
+            
+            if resultado["sabor_proteina"] and not produto.sabor_proteina:
+                produto.sabor_proteina = resultado["sabor_proteina"]
+                campos_atualizados.append("sabor_proteina")
+            
+            if resultado["peso_embalagem"] and not produto.peso_embalagem:
+                produto.peso_embalagem = resultado["peso_embalagem"]
+                campos_atualizados.append("peso_embalagem")
+            
+            if campos_atualizados:
+                db.commit()
+                db.refresh(produto)
+            
+            sucesso.append({
+                "produto_id": produto.id,
+                "nome": produto.nome,
+                "campos_atualizados": campos_atualizados,
+                "score": confianca["score"]
+            })
+            
+        except Exception as e:
+            erros.append({
+                "produto_id": produto.id,
+                "nome": produto.nome,
+                "erro": str(e)
+            })
+    
+    return {
+        "success": True,
+        "total_processados": len(produtos),
+        "sucessos": len(sucesso),
+        "erros": len(erros),
+        "detalhes_sucesso": sucesso,
+        "detalhes_erros": erros
+    }
+
+
+@router.get("/racao/alertas")
+async def listar_racoes_sem_classificacao(
+    limite: int = 50,
+    offset: int = 0,
+    especie: Optional[str] = None,  # Filtro por espécie: dog, cat, bird, rodent, fish
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Lista ra��es sem classifica��o completa para alertas
+    Filtra produtos classificados como ra��o mas sem informa��es importantes
+    
+    Parâmetros:
+    - especie: Filtro opcional por espécie (dog, cat, bird, rodent, fish)
+    """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    
+    # Buscar rações sem classificação completa
+    # Considera "ração" se:
+    # 1. classificacao_racao != null AND != 'Não é ração'
+    # 2. OU categoria.nome LIKE '%ração%'
+    
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.ativo == True
+    ).outerjoin(Categoria, Produto.categoria_id == Categoria.id)
+    
+    # Filtro: é ração E está incompleta
+    query = query.filter(
+        Produto.classificacao_racao == 'sim'
+    ).filter(
+        (Produto.especies_indicadas == None) |
+        (Produto.porte_animal_id == None) |
+        (Produto.fase_publico_id == None) |
+        (Produto.sabor_proteina == None) |
+        (Produto.peso_embalagem == None)
+    )
+    
+    # Filtrar por espécie se especificado
+    if especie:
+        query = query.filter(Produto.especies_indicadas == especie)
+    
+    total = query.count()
+    produtos = query.limit(limite).offset(offset).all()
+    
+    resultado = []
+    for produto in produtos:
+        campos_faltantes = []
+        if not produto.especies_indicadas:
+            campos_faltantes.append("especies_indicadas")
+        if not produto.porte_animal_id:
+            campos_faltantes.append("porte_animal")
+        if not produto.fase_publico_id:
+            campos_faltantes.append("fase_publico")
+        if not produto.sabor_proteina:
+            campos_faltantes.append("sabor_proteina")
+        if not produto.peso_embalagem:
+            campos_faltantes.append("peso_embalagem")
+        
+        resultado.append({
+            "id": produto.id,
+            "codigo": produto.codigo,
+            "nome": produto.nome,
+            "classificacao_racao": produto.classificacao_racao,
+            "especies_indicadas": produto.especies_indicadas,
+            "categoria": produto.categoria.nome if produto.categoria else None,
+            "marca": produto.marca.nome if produto.marca else None,
+            "campos_faltantes": campos_faltantes,
+            "completude": round((5 - len(campos_faltantes)) / 5 * 100, 1),
+            "auto_classificar_ativo": produto.auto_classificar_nome
+        })
+    
+    return {
+        "total": total,
+        "limite": limite,
+        "offset": offset,
+        "especie_filtro": especie,
+        "items": resultado
+    }
