@@ -1,0 +1,58 @@
+# ==============================================
+# DOCKERFILE PRODUÇÃO - BACKEND FASTAPI
+# ==============================================
+
+FROM python:3.11-slim
+
+# Metadata
+LABEL maintainer="Pet Shop Pro"
+LABEL version="1.1.0"
+LABEL description="Backend FastAPI para Pet Shop Pro - Produção"
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY requirements.txt .
+
+# Instalar dependências Python
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copiar código da aplicação
+COPY . .
+
+# Criar diretórios necessários
+RUN mkdir -p /app/uploads /app/logs /app/data && \
+    chmod -R 755 /app/uploads /app/logs /app/data
+
+# Criar usuário não-root para segurança
+RUN useradd -m -u 1000 petshop && \
+    chown -R petshop:petshop /app
+
+# Mudar para usuário não-root
+USER petshop
+
+# Expor porta
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
+  CMD curl -f http://localhost:8000/health || exit 1
+
+# Comando de inicialização
+# 4 workers para produção (ajustar conforme CPU disponível)
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "4", \
+     "--log-level", "info", \
+     "--access-log"]
