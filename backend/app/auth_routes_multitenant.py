@@ -11,7 +11,7 @@ from jose import jwt
 import uuid
 
 from app.db import get_session
-from app import models
+from app.models import User, Tenant, Role, Permission, RolePermission, UserTenant
 from app.auth import (
     verify_password, 
     create_access_token, 
@@ -70,7 +70,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     - **nome_loja**: Nome da loja/empresa (opcional)
     """
     # Verificar se email já existe
-    existing = db.query(models.User).filter(models.User.email == payload.email).first()
+    existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -87,7 +87,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     # Criar tenant primeiro
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or payload.email}"
     tenant_id = uuid.uuid4()  # Gerar UUID
-    tenant = models.Tenant(
+    tenant = Tenant(
         id=str(tenant_id),
         name=tenant_name,
         status='active',
@@ -100,7 +100,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     set_tenant_context(tenant_id)
     
     # Criar usuário (definir tenant_id explicitamente)
-    user = models.User(
+    user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         nome=payload.nome,
@@ -113,7 +113,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.flush()  # Para obter user.id
     
     # Criar role de Admin para este tenant
-    admin_role = models.Role(
+    admin_role = Role(
         name='Administrador',
         tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
     )
@@ -122,9 +122,9 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     
     # ✅ VINCULAR TODAS AS PERMISSÕES À ROLE DE ADMINISTRADOR
     # Buscar todas as permissões do sistema
-    all_permissions = db.query(models.Permission).all()
+    all_permissions = db.query(Permission).all()
     for permission in all_permissions:
-        role_permission = models.RolePermission(
+        role_permission = RolePermission(
             role_id=admin_role.id,
             permission_id=permission.id,
             tenant_id=tenant_id
@@ -133,7 +133,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.flush()
     
     # Vincular usuário ao tenant com role de admin
-    user_tenant = models.UserTenant(
+    user_tenant = UserTenant(
         user_id=user.id,
         tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente
         role_id=admin_role.id,
@@ -185,7 +185,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     Fase 1: Autentica usuário e retorna lista de tenants disponíveis.
     Token gerado SEM tenant_id.
     """
-    user = db.query(models.User).filter(models.User.email == credentials.email).first()
+    user = db.query(User).filter(User.email == credentials.email).first()
     
     if not user or not verify_password(credentials.password, user.hashed_password):
         # log_audit(
@@ -209,8 +209,8 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             detail="Usuário inativo",
         )
     
-    user_tenants = db.query(models.UserTenant).filter(
-        models.UserTenant.user_id == user.id
+    user_tenants = db.query(UserTenant).filter(
+        UserTenant.user_id == user.id
     ).all()
     
     if not user_tenants:
@@ -250,7 +250,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     
     tenants_list = []
     for ut in user_tenants:
-        tenant = db.query(models.Tenant).filter(models.Tenant.id == ut.tenant_id).first()
+        tenant = db.query(Tenant).filter(Tenant.id == ut.tenant_id).first()
         if tenant:
             tenants_list.append({
                 "id": str(tenant.id),
@@ -277,7 +277,7 @@ def select_tenant(
     body: SelectTenantRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_session),
-    current_user: models.User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Fase 2: Seleciona tenant e gera token COM tenant_id.
@@ -293,9 +293,9 @@ def select_tenant(
             detail="tenant_id inválido"
         )
     
-    user_tenant = db.query(models.UserTenant).filter(
-        models.UserTenant.user_id == current_user.id,
-        models.UserTenant.tenant_id == tenant_uuid
+    user_tenant = db.query(UserTenant).filter(
+        UserTenant.user_id == current_user.id,
+        UserTenant.tenant_id == tenant_uuid
     ).first()
     
     if not user_tenant:
@@ -304,7 +304,7 @@ def select_tenant(
             detail="Você não tem acesso a este tenant"
         )
     
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_uuid).first()
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -381,9 +381,9 @@ def get_me_multitenant(
     """
     current_user, tenant_id = user_and_tenant
     
-    user_tenant = db.query(models.UserTenant).filter(
-        models.UserTenant.user_id == current_user.id,
-        models.UserTenant.tenant_id == tenant_id
+    user_tenant = db.query(UserTenant).filter(
+        UserTenant.user_id == current_user.id,
+        UserTenant.tenant_id == tenant_id
     ).first()
     
     if not user_tenant:
@@ -392,21 +392,21 @@ def get_me_multitenant(
             detail="Usuário não tem acesso ao tenant selecionado"
         )
     
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     
     role = None
     if user_tenant.role_id:
-        role = db.query(models.Role).filter(models.Role.id == user_tenant.role_id).first()
+        role = db.query(Role).filter(Role.id == user_tenant.role_id).first()
     
     permissions = []
     if role:
-        role_permissions = db.query(models.RolePermission).filter(
-            models.RolePermission.role_id == role.id
+        role_permissions = db.query(RolePermission).filter(
+            RolePermission.role_id == role.id
         ).all()
         
         for rp in role_permissions:
-            perm = db.query(models.Permission).filter(
-                models.Permission.id == rp.permission_id
+            perm = db.query(Permission).filter(
+                Permission.id == rp.permission_id
             ).first()
             if perm:
                 permissions.append(perm.code)
@@ -434,7 +434,7 @@ def get_me_multitenant(
 @router.post("/logout-multitenant")
 def logout_multitenant(
     db: Session = Depends(get_session),
-    current_user: models.User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Revoga todas as sessões do usuário.

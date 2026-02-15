@@ -12,7 +12,7 @@ from datetime import datetime
 from app.db import get_session as get_db
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app import models
+from app.models import User, UserTenant, Role, RolePermission, Permission
 from app.ia.aba6_chat_ia import (
     criar_conversa_service,
     listar_conversas_service,
@@ -64,7 +64,7 @@ class ChatResponse(BaseModel):
 
 @router.post("/nova-conversa", response_model=ConversaResponse, status_code=status.HTTP_201_CREATED)
 async def criar_nova_conversa(
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Cria uma nova conversa"""
@@ -85,7 +85,7 @@ async def criar_nova_conversa(
 @router.get("/conversas", response_model=List[ConversaResponse])
 async def listar_conversas(
     limit: int = 20,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Lista conversas do usuário"""
@@ -109,7 +109,7 @@ async def listar_conversas(
 @router.get("/conversa/{conversa_id}/mensagens", response_model=List[MensagemResponse])
 async def obter_mensagens(
     conversa_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém mensagens de uma conversa"""
@@ -158,24 +158,24 @@ async def enviar_mensagem(
         )
     
     # Buscar permissões do usuário
-    user_tenant = db.query(models.UserTenant).filter(
-        models.UserTenant.user_id == usuario_id,
-        models.UserTenant.tenant_id == tenant_id
+    user_tenant = db.query(UserTenant).filter(
+        UserTenant.user_id == usuario_id,
+        UserTenant.tenant_id == tenant_id
     ).first()
     
     user_permissions = []
     role_name = None
     if user_tenant and user_tenant.role_id:
-        role = db.query(models.Role).filter(models.Role.id == user_tenant.role_id).first()
+        role = db.query(Role).filter(Role.id == user_tenant.role_id).first()
         if role:
             role_name = role.name
-            role_permissions = db.query(models.RolePermission).filter(
-                models.RolePermission.role_id == role.id
+            role_permissions = db.query(RolePermission).filter(
+                RolePermission.role_id == role.id
             ).all()
             
             for rp in role_permissions:
-                perm = db.query(models.Permission).filter(
-                    models.Permission.id == rp.permission_id
+                perm = db.query(Permission).filter(
+                    Permission.id == rp.permission_id
                 ).first()
                 if perm:
                     user_permissions.append(perm.code)
@@ -242,7 +242,7 @@ async def enviar_mensagem(
 @router.delete("/conversa/{conversa_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deletar_conversa(
     conversa_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Deleta uma conversa"""
@@ -260,7 +260,7 @@ async def deletar_conversa(
 
 @router.get("/contexto-financeiro")
 async def obter_contexto_financeiro(
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém contexto financeiro do usuário (para debug)"""

@@ -13,7 +13,7 @@ from io import BytesIO
 from app.db import get_session as get_db
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app import models
+from app.models import User
 from app.ia.aba7_dre import DREService
 from app.ia.aba7_models import DREPeriodo, DREProduto, DREInsight
 
@@ -127,7 +127,7 @@ class CalcularDRERequest(BaseModel):
 @router.post("/calcular", response_model=DRECompleto)
 async def calcular_dre(
     request: CalcularDRERequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE para um período"""
@@ -144,7 +144,7 @@ async def calcular_dre(
 
 
 @router.get("/canais")
-async def listar_canais(current_user: models.User = Depends(get_current_user)):
+async def listar_canais(current_user: User = Depends(get_current_user)):
     """Lista todos os canais disponíveis"""
     return {
         'canais': [
@@ -161,7 +161,7 @@ async def listar_canais(current_user: models.User = Depends(get_current_user)):
 @router.get("/listar", response_model=List[DREResumo])
 async def listar_dres(
     limit: int = Query(12, ge=1, le=100),
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Lista DREs calculados"""
@@ -176,7 +176,7 @@ async def listar_dres(
 @router.get("/{dre_id}", response_model=DRECompleto)
 async def obter_dre(
     dre_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém DRE completo"""
@@ -194,7 +194,7 @@ async def obter_dre(
 @router.get("/{dre_id}/produtos", response_model=List[ProdutoRentabilidade])
 async def obter_produtos_rentabilidade(
     dre_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém ranking de produtos por rentabilidade"""
@@ -209,7 +209,7 @@ async def obter_produtos_rentabilidade(
 @router.get("/{dre_id}/categorias", response_model=List[CategoriaRentabilidade])
 async def obter_categorias_rentabilidade(
     dre_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém análise por categoria"""
@@ -224,7 +224,7 @@ async def obter_categorias_rentabilidade(
 @router.get("/{dre_id}/insights", response_model=List[InsightDRE])
 async def obter_insights(
     dre_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém insights automáticos"""
@@ -240,7 +240,7 @@ async def obter_insights(
 async def comparar_periodos(
     dre1_id: int,
     dre2_id: int,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Compara dois períodos"""
@@ -258,7 +258,7 @@ async def comparar_periodos(
 @router.get("/indices-mercado")
 async def obter_indices_mercado(
     setor: str = Query('pet_shop', description="Setor a consultar"),
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém índices de mercado (benchmarks) para comparação"""
@@ -319,7 +319,7 @@ async def obter_indices_mercado(
 
 @router.get("/setores-disponiveis")
 async def listar_setores(
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Lista setores disponíveis com índices de mercado"""
@@ -343,7 +343,7 @@ async def listar_setores(
 
 @router.post("/calcular-mes-atual", response_model=DRECompleto)
 async def calcular_mes_atual(
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE do mês atual (atalho)"""
@@ -363,7 +363,7 @@ async def calcular_mes_atual(
 
 @router.post("/calcular-mes-passado", response_model=DRECompleto)
 async def calcular_mes_passado(
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE do mês passado completo (atalho)"""
@@ -737,7 +737,7 @@ class DREDetalheResponse(BaseModel):
 @router.post("/calcular-detalhado", response_model=DREDetalheResponse)
 async def calcular_dre_detalhado(
     request: CalcularDREDetalhadadRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -764,7 +764,7 @@ async def calcular_dre_detalhado(
 @router.post("/consolidado")
 async def calcular_dre_consolidado(
     request: dict,  # {data_inicio, data_fim, canais: [lista de canais]}
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -819,7 +819,7 @@ class AlocarDespesaRequest(BaseModel):
 @router.post("/alocar-despesa")
 async def alocar_despesa(
     request: AlocarDespesaRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
