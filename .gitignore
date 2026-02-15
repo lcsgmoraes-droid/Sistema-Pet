@@ -97,3 +97,10 @@ htmlcov/
 *.bak
 *.backup
 backup_*.sql
+
+# Dados SimplesVet (apenas local, não versionar)
+simplesvet/
+**/simplesvet/
+
+# CSVs grandes de comparação (apenas local)
+Comparação*.csv
