@@ -21,7 +21,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .financeiro_models import CategoriaFinanceira, FormaPagamento
 
-router = APIRouter(prefix="/api/financeiro", tags=["Financeiro - Configurações"])
+router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configurações"])
 
 # ============================================================================
 # SCHEMAS
