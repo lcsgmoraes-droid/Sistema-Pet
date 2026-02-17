@@ -8,6 +8,7 @@ export default function ConfiguracaoFiscalEmpresa() {
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
 
   const normalizeCnaesSecundarios = (value) => {
+    console.log('🔧 normalizeCnaesSecundarios chamado com:', value, 'tipo:', typeof value);
     if (!value) return [];
     if (Array.isArray(value)) return value;
     if (typeof value === "string") {
@@ -18,6 +19,7 @@ export default function ConfiguracaoFiscalEmpresa() {
         return [];
       }
     }
+    console.warn('⚠️ Valor inesperado para CNAEs, retornando array vazio');
     return [];
   };
   
@@ -61,10 +63,16 @@ export default function ConfiguracaoFiscalEmpresa() {
         // Carregar dados fiscais
         const resFiscal = await api.get("/empresa/fiscal");
         console.log('📊 Dados fiscais carregados:', resFiscal.data);
+        console.log('🔍 cnaes_secundarios recebido:', resFiscal.data.cnaes_secundarios);
+        console.log('🔍 Tipo:', typeof resFiscal.data.cnaes_secundarios);
+        console.log('🔍 É array?', Array.isArray(resFiscal.data.cnaes_secundarios));
         
         const cnaesSecundarios = normalizeCnaesSecundarios(
           resFiscal.data.cnaes_secundarios
         );
+        
+        console.log('✅ Após normalizar:', cnaesSecundarios);
+        console.log('✅ É array agora?', Array.isArray(cnaesSecundarios));
 
         setForm({
           regime_tributario: resFiscal.data.regime_tributario || "",
@@ -110,8 +118,16 @@ export default function ConfiguracaoFiscalEmpresa() {
           console.log("Endpoint de dados cadastrais não existe ainda");
         }
       } catch (e) {
-        console.error("Erro ao carregar configurações", e);
+        console.error("❌ Erro ao carregar configurações:", e);
+        console.error("❌ Resposta completa:", e.response);
         toast.error("Erro ao carregar configurações da empresa");
+        
+        // Garantir estados seguros mesmo em caso de erro
+        setCnaesSecundarios([]);
+        setForm(prev => ({
+          ...prev,
+          cnaes_secundarios: []
+        }));
       } finally {
         setLoading(false);
       }
@@ -277,6 +293,9 @@ export default function ConfiguracaoFiscalEmpresa() {
     );
   }
 
+  // 🛡️ PROTEÇÃO: Garantir que cnaesSecundarios seja SEMPRE um array
+  const cnaesSecundariosSeguro = Array.isArray(cnaesSecundarios) ? cnaesSecundarios : [];
+  
   const simplesAtivo = form.regime_tributario === "Simples Nacional";
 
   return (
@@ -571,16 +590,16 @@ export default function ConfiguracaoFiscalEmpresa() {
             </div>
             
             {/* CNAEs Secundários */}
-            {Array.isArray(cnaesSecundarios) && cnaesSecundarios.length > 0 && (
+            {cnaesSecundariosSeguro.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CNAEs Secundários ({cnaesSecundarios.length})
+                  CNAEs Secundários ({cnaesSecundariosSeguro.length})
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {cnaesSecundarios.map((cnae, index) => (
+                  {cnaesSecundariosSeguro.map((cnae, index) => (
                     <div key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                      <span className="font-semibold text-gray-700">{cnae.codigo}</span>
-                      <span className="text-gray-600"> - {cnae.descricao}</span>
+                      <span className="font-semibold text-gray-700">{cnae?.codigo || 'N/A'}</span>
+                      <span className="text-gray-600"> - {cnae?.descricao || 'Sem descrição'}</span>
                     </div>
                   ))}
                 </div>
