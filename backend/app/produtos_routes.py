@@ -12,7 +12,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, Código de Bar
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, text
+from sqlalchemy import func, text, or_
 from typing import List, Optional
 from datetime import datetime, timedelta
 import random
