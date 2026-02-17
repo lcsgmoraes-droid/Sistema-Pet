@@ -44,10 +44,18 @@ export default function EntregasConfig() {
           estado: cfg.data.estado ?? "",
         });
         
-        setEntregadores(pessoas.data ?? []);
+        // 🛡️ PROTEÇÃO: Garantir que entregadores seja SEMPRE um array
+        const entregadoresList = Array.isArray(pessoas.data) 
+          ? pessoas.data 
+          : (pessoas.data?.clientes || pessoas.data?.items || []);
+        
+        console.log('🚚 Entregadores carregados:', entregadoresList);
+        setEntregadores(entregadoresList);
       } catch (e) {
-        console.error(e);
+        console.error('❌ Erro ao carregar configurações:', e);
         alert("Erro ao carregar configurações de entrega");
+        // 🛡️ Garantir array vazio em caso de erro
+        setEntregadores([]);
       } finally {
         setLoading(false);
       }
@@ -128,7 +136,7 @@ export default function EntregasConfig() {
             }
           >
             <option value="">Nenhum (escolher manualmente)</option>
-            {entregadores.map((p) => (
+            {Array.isArray(entregadores) && entregadores.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nome}
               </option>
