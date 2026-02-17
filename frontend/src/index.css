@@ -79,3 +79,159 @@ body {
     background-position: -200% 0;
   }
 }
+
+/* ========================================
+   RESPONSIVIDADE MOBILE
+======================================== */
+
+/* Tabelas responsivas em mobile */
+@media (max-width: 768px) {
+  /* Tabelas - scroll horizontal */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  table {
+    min-width: 600px;
+    font-size: 14px;
+  }
+  
+  table th,
+  table td {
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  
+  /* Botões - ajustar tamanho */
+  button {
+    min-height: 44px; /* Tamanho mínimo tocável */
+    font-size: 14px;
+  }
+  
+  /* Inputs - melhor para toque */
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    font-size: 16px; /* Previne zoom no iOS */
+    padding: 10px 12px;
+  }
+  
+  /* Cards - ajustar espaçamento */
+  .card,
+  .bg-white {
+    margin-bottom: 16px;
+  }
+  
+  /* Grids - uma coluna em mobile */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+  
+  /* Formulários - uma coluna */
+  .form-grid,
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Textos menores */
+  h1 {
+    font-size: 24px;
+  }
+  
+  h2 {
+    font-size: 20px;
+  }
+  
+  h3 {
+    font-size: 18px;
+  }
+  
+  /* Modais - fullscreen em mobile */
+  .modal-content {
+    max-width: 100%;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  /* Espaçamentos reduzidos */
+  .space-y-4 > * + * {
+    margin-top: 12px;
+  }
+  
+  .space-y-6 > * + * {
+    margin-top: 16px;
+  }
+  
+  /* Flex - wrap em mobile */
+  .flex {
+    flex-wrap: wrap;
+  }
+  
+  /* Gap reduzido */
+  .gap-4 {
+    gap: 12px;
+  }
+  
+  .gap-6 {
+    gap: 16px;
+  }
+}
+
+/* Tablets e telas médias */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .grid-cols-3,
+  .grid-cols-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Modo paisagem em smartphones */
+@media (max-width: 768px) and (orientation: landscape) {
+  .sidebar {
+    width: 60px;
+  }
+  
+  header {
+    padding: 8px 16px;
+  }
+}
+
+/* Otimizações para touch */
+@media (hover: none) and (pointer: coarse) {
+  /* Aumentar área clicável */
+  a,
+  button {
+    padding: 12px;
+  }
+  
+  /* Remover hover effects em dispositivos touch */
+  .hover\:bg-gray-100:hover {
+    background-color: initial;
+  }
+  
+  /* Feedback visual ao tocar */
+  button:active,
+  a:active {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+}
+
+/* Print - esconder elementos desnecessários */
+@media print {
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+  
+  main {
+    padding: 0;
+  }
+}

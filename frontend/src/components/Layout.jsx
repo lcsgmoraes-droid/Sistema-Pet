@@ -15,6 +15,19 @@ const Layout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   
+  // Estado para detectar mobile
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Detectar mudanças no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   // Função para verificar se o usuário tem permissão
   const hasPermission = (permission) => {
     if (!user) return false;
@@ -36,6 +49,9 @@ const Layout = () => {
   
   // Estado da sidebar com persistência e fechada por padrão no PDV
   const [sidebarOpen, setSidebarOpen] = useState(() => {
+    // Em mobile, sempre começa fechada
+    if (window.innerWidth < 768) return false;
+    
     const saved = localStorage.getItem('sidebar_open');
     if (saved !== null) {
       return JSON.parse(saved);
@@ -55,14 +71,32 @@ const Layout = () => {
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
 
-  // Persistir estado da sidebar no localStorage
+  // Fechar sidebar em mobile ao clicar em um link
+  const handleMenuClick = () => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  };
+  
+  // Persistir estado da sidebar no localStorage (apenas desktop)
   useEffect(() => {
-    localStorage.setItem('sidebar_open', JSON.stringify(sidebarOpen));
-  }, [sidebarOpen]);
+    if (!isMobile) {
+      localStorage.setItem('sidebar_open', JSON.stringify(sidebarOpen));
+    }
+  }, [sidebarOpen, isMobile]);
 
   useEffect(() => {
-    localStorage.setItem('sidebar_visible', JSON.stringify(sidebarVisible));
-  }, [sidebarVisible]);
+    if (!isMobile) {
+      localStorage.setItem('sidebar_visible', JSON.stringify(sidebarVisible));
+    }
+  }, [sidebarVisible, isMobile]);
+  
+  // Fechar menu mobile ao mudar de rota
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname, isMobile]);
 
   const allMenuItems = [
     { path: '/dashboard', icon: FiHome, label: 'Dashboard', permission: 'relatorios.gerencial' }, // Precisa de permissão
@@ -227,42 +261,54 @@ const Layout = () => {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Backdrop para mobile */}
+      {isMobile && sidebarOpen && sidebarVisible && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
       {sidebarVisible && (
         <aside 
           className={`${
-            sidebarOpen ? 'w-64' : 'w-20'
-          } bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 transition-all duration-300 flex flex-col shadow-lg`}
+            isMobile 
+              ? `fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ${
+                  sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                }`
+              : `${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300`
+          } bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 flex flex-col shadow-lg`}
         >
         {/* Logo/Header com Toggle */}
         <div className="p-4 flex items-center justify-between border-b border-indigo-100 bg-white/50">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 hover:from-indigo-500 hover:to-purple-600 flex items-center justify-center shadow-md transition-all cursor-pointer"
-              title={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
-            >
-              {sidebarOpen ? (
+            {!isMobile && (
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 hover:from-indigo-500 hover:to-purple-600 flex items-center justify-center shadow-md transition-all cursor-pointer"
+                title={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
+              >
                 <FiMenu className="text-white w-6 h-6" />
-              ) : (
-                <FiMenu className="text-white w-6 h-6" />
-              )}
-            </button>
-            {sidebarOpen && (
-              <div>
-                <h1 className="font-bold text-lg text-gray-800">Pet Shop Pro</h1>
-                <p className="text-xs text-gray-500">Central de Gestão</p>
-              </div>
+              </button>
             )}
+            <div>
+              <h1 className="font-bold text-lg text-gray-800">Pet Shop Pro</h1>
+              <p className="text-xs text-gray-500">Central de Gestão</p>
+            </div>
           </div>
           
-          {/* Botão Patinha - Esconde sidebar completamente */}
+          {/* Botão Fechar (mobile) ou Patinha (desktop) */}
           <button
-            onClick={() => setSidebarVisible(false)}
+            onClick={() => isMobile ? setSidebarOpen(false) : setSidebarVisible(false)}
             className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
-            title="Esconder menu completamente"
+            title={isMobile ? 'Fechar menu' : 'Esconder menu completamente'}
           >
-            <PawPrint className="w-5 h-5 text-indigo-600" />
+            {isMobile ? (
+              <FiX className="w-6 h-6 text-indigo-600" />
+            ) : (
+              <PawPrint className="w-5 h-5 text-indigo-600" />
+            )}
           </button>
         </div>
 
@@ -273,10 +319,12 @@ const Layout = () => {
               {item.submenu ? (
                 <>
                   <button
-                    onClick={() => setSubmenusOpen(prev => ({
-                      ...prev,
-                      [item.path]: !prev[item.path]
-                    }))}
+                    onClick={() => {
+                      setSubmenusOpen(prev => ({
+                        ...prev,
+                        [item.path]: !prev[item.path]
+                      }));
+                    }}
                     className={`w-full flex items-center justify-between gap-3 px-4 py-3 mx-2 rounded-lg transition-all ${
                       location.pathname.startsWith(item.path)
                         ? 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm'
@@ -299,6 +347,7 @@ const Layout = () => {
                         <Link
                           key={subitem.path}
                           to={subitem.path}
+                          onClick={handleMenuClick}
                           className={`flex items-center gap-3 px-4 py-2 mx-2 ml-12 rounded-lg transition-all text-sm ${
                             isActive(subitem.path)
                               ? 'bg-white text-indigo-600 shadow-sm font-medium'
@@ -314,6 +363,7 @@ const Layout = () => {
               ) : (
                 <Link
                   to={item.path}
+                  onClick={handleMenuClick}
                   className={`flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-lg transition-all ${
                     isActive(item.path)
                       ? 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm'
@@ -350,8 +400,8 @@ const Layout = () => {
         </aside>
       )}
       
-      {/* Botão flutuante para mostrar sidebar quando escondida */}
-      {!sidebarVisible && (
+      {/* Botão flutuante para mostrar sidebar quando escondida (apenas desktop) */}
+      {!sidebarVisible && !isMobile && (
         <button
           onClick={() => setSidebarVisible(true)}
           className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-r-xl shadow-lg transition-all"
@@ -364,21 +414,43 @@ const Layout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-end">
+        <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+          {/* Menu Hamburguer (Mobile) */}
+          {isMobile && sidebarVisible && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors md:hidden"
+              aria-label="Toggle menu"
+            >
+              <FiMenu className="w-6 h-6 text-gray-700" />
+            </button>
+          )}
+          
+          {/* Botão Patinha Mobile - Mostrar menu quando escondido */}
+          {isMobile && !sidebarVisible && (
+            <button
+              onClick={() => setSidebarVisible(true)}
+              className="p-2 rounded-lg hover:bg-indigo-100 transition-colors md:hidden"
+              aria-label="Mostrar menu"
+            >
+              <PawPrint className="w-6 h-6 text-indigo-600" />
+            </button>
+          )}
+          
           {/* User Info */}
-          <div className="flex items-center gap-3">
-            <div className="text-right">
+          <div className="flex items-center gap-2 md:gap-3 ml-auto">
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-gray-900">{user?.nome || user?.email}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base">
               {user?.nome?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-3 md:p-6">
           <Outlet />
         </main>
       </div>
