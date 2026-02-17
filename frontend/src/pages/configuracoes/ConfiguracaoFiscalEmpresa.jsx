@@ -81,9 +81,8 @@ export default function ConfiguracaoFiscalEmpresa() {
         if (resFiscal.data.cnae_descricao) {
           setCnaePrincipalDescricao(resFiscal.data.cnae_descricao);
         }
-        if (cnaesSecundarios.length > 0) {
-          setCnaesSecundarios(cnaesSecundarios);
-        }
+        // Sempre atualizar cnaesSecundarios, mesmo que vazio
+        setCnaesSecundarios(cnaesSecundarios);
         
         // Tentar carregar dados cadastrais (se endpoint existir)
         try {
@@ -218,8 +217,9 @@ export default function ConfiguracaoFiscalEmpresa() {
           setCnaePrincipalDescricao(dados.cnae_fiscal_descricao);
         }
         
+        // Sempre atualizar cnaesSecundarios, mesmo que vazio
+        setCnaesSecundarios(cnaesSecundarios);
         if (cnaesSecundarios.length > 0) {
-          setCnaesSecundarios(cnaesSecundarios);
           console.log(`📋 Encontrados ${cnaesSecundarios.length} CNAEs secundários`);
         }
       }
@@ -571,7 +571,7 @@ export default function ConfiguracaoFiscalEmpresa() {
             </div>
             
             {/* CNAEs Secundários */}
-            {cnaesSecundarios.length > 0 && (
+            {Array.isArray(cnaesSecundarios) && cnaesSecundarios.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   CNAEs Secundários ({cnaesSecundarios.length})
