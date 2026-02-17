@@ -9,6 +9,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 import uuid
+import logging
 
 from app.db import get_session
 from app.models import User, Tenant, Role, Permission, RolePermission, UserTenant
@@ -26,9 +27,64 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.tenancy.context import set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
+logger = logging.getLogger(__name__)
 security = HTTPBearer()
 router = APIRouter(prefix="/auth", tags=["auth-multitenant"])
 
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def grant_all_permissions_to_role(role_id: int, tenant_id: str, db: Session) -> int:
+    """
+    Vincula TODAS as permissões existentes no sistema a uma role.
+    
+    Esta função garante que:
+    - Todas as permissões da tabela Permission sejam vinculadas à role
+    - Não haja duplicatas (verifica antes de inserir)
+    - Funcione tanto para roles novas quanto para atualizar roles existentes
+    
+    Args:
+        role_id: ID da role que receberá as permissões
+        tenant_id: ID do tenant (para RolePermission)
+        db: Sessão do banco de dados
+    
+    Returns:
+        Número de permissões vinculadas (novas)
+    """
+    # Buscar todas as permissões do sistema
+    all_permissions = db.query(Permission).all()
+    
+    # Buscar permissões JÁ vinculadas a esta role
+    existing_permission_ids = set(
+        db.query(RolePermission.permission_id)
+        .filter(
+            RolePermission.role_id == role_id,
+            RolePermission.tenant_id == tenant_id
+        )
+        .all()
+    )
+    existing_permission_ids = {pid[0] for pid in existing_permission_ids}
+    
+    # Adicionar apenas as que ainda NÃO estão vinculadas
+    new_permissions_count = 0
+    for permission in all_permissions:
+        if permission.id not in existing_permission_ids:
+            role_permission = RolePermission(
+                role_id=role_id,
+                permission_id=permission.id,
+                tenant_id=tenant_id
+            )
+            db.add(role_permission)
+            new_permissions_count += 1
+    
+    return new_permissions_count
+
+
+# =============================================================================
+# REQUEST/RESPONSE MODELS
+# =============================================================================
 
 class LoginRequest(BaseModel):
     email: str
@@ -106,6 +162,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         nome=payload.nome,
         nome_loja=payload.nome_loja,
         is_active=True,
+        is_admin=True,  # ✅ SUPER ADMIN - primeiro usuário do tenant
         consent_date=datetime.now(timezone.utc),
         tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
     )
@@ -121,16 +178,19 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.flush()
     
     # ✅ VINCULAR TODAS AS PERMISSÕES À ROLE DE ADMINISTRADOR
-    # Buscar todas as permissões do sistema
-    all_permissions = db.query(Permission).all()
-    for permission in all_permissions:
-        role_permission = RolePermission(
-            role_id=admin_role.id,
-            permission_id=permission.id,
-            tenant_id=tenant_id
-        )
-        db.add(role_permission)
+    # Garante que TODAS as permissões (existentes e futuras) sejam vinculadas
+    permissions_granted = grant_all_permissions_to_role(
+        role_id=admin_role.id,
+        tenant_id=tenant_id,
+        db=db
+    )
     db.flush()
+    
+    # Log: quantas permissões foram vinculadas
+    logger.info(
+        f"Role 'Administrador' criada para tenant {tenant_id}: "
+        f"{permissions_granted} permissões vinculadas"
+    )
     
     # Vincular usuário ao tenant com role de admin
     user_tenant = UserTenant(

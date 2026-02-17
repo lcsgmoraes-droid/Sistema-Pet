@@ -34,7 +34,7 @@ const ProjecoesIA = () => {
 
     try {
       // Buscar movimentações históricas
-      const response = await api.get('/api/financeiro/movimentacoes', {
+      const response = await api.get('/financeiro/movimentacoes', {
         params: {
           data_inicio: dataInicio.toISOString().split('T')[0],
           data_fim: hoje.toISOString().split('T')[0]
@@ -98,7 +98,7 @@ const ProjecoesIA = () => {
 
   const buscarSaldoAtual = async () => {
     try {
-      const response = await api.get('/api/financeiro/saldo-atual');
+      const response = await api.get('/financeiro/saldo-atual');
       return response.data.saldo || 10000; // valor padrão se não conseguir buscar
     } catch (erro) {
       console.error('Erro ao buscar saldo:', erro);

@@ -1,0 +1,68 @@
+# ==============================================
+# DOCKERFILE PRODUÇÃO - FRONTEND REACT
+# ==============================================
+
+# ============================================
+# STAGE 1: BUILD
+# ============================================
+FROM node:18-alpine AS builder
+
+# Metadata
+LABEL maintainer="Pet Shop Pro"
+LABEL version="1.1.0"
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Copiar package files
+COPY package*.json ./
+
+# Instalar dependências (incluindo devDependencies para build)
+RUN npm ci
+
+# Copiar código fonte
+COPY . .
+
+# Build argument para API URL (caminho relativo para usar o mesmo domínio via Nginx)
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
+# Build da aplicação otimizada
+RUN npm run build
+
+# ============================================
+# STAGE 2: PRODUCTION
+# ============================================
+FROM nginx:alpine
+
+# Instalar curl para health check
+RUN apk add --no-cache curl
+
+# Copiar build do stage anterior
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copiar configuração nginx customizada
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Criar usuário não-root
+RUN addgroup -g 1000 petshop && \
+    adduser -D -u 1000 -G petshop petshop && \
+    chown -R petshop:petshop /usr/share/nginx/html && \
+    chown -R petshop:petshop /var/cache/nginx && \
+    chown -R petshop:petshop /var/log/nginx && \
+    chown -R petshop:petshop /etc/nginx/conf.d && \
+    touch /var/run/nginx.pid && \
+    chown -R petshop:petshop /var/run/nginx.pid
+
+# Mudar para usuário não-root
+USER petshop
+
+# Expor porta
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost/ || exit 1
+
+# Comando de inicialização
+CMD ["nginx", "-g", "daemon off;"]

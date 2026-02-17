@@ -30,7 +30,7 @@ const ExtratoBancario = () => {
 
     setUploading(true);
     try {
-      const response = await api.post('/api/ia/extrato/upload', formData, {
+      const response = await api.post('/ia/extrato/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -48,7 +48,7 @@ const ExtratoBancario = () => {
   const carregarPendentes = async () => {
     setLoadingPendentes(true);
     try {
-      const response = await api.get('/api/ia/extrato/pendentes');
+      const response = await api.get('/ia/extrato/pendentes');
       setPendentes(response.data);
     } catch (error) {
       console.error('Erro ao carregar pendentes:', error);
@@ -60,7 +60,7 @@ const ExtratoBancario = () => {
 
   const aprovarLancamento = async (id) => {
     try {
-      await api.post('/api/ia/extrato/validar', {
+      await api.post('/ia/extrato/validar', {
         lancamento_id: id,
         aprovado: true
       });
@@ -74,7 +74,7 @@ const ExtratoBancario = () => {
 
   const corrigirLancamento = async (id, categoria_correta) => {
     try {
-      await api.post('/api/ia/extrato/validar', {
+      await api.post('/ia/extrato/validar', {
         lancamento_id: id,
         aprovado: false,
         categoria_correta_id: categoria_correta
@@ -89,7 +89,7 @@ const ExtratoBancario = () => {
 
   const carregarPadroes = async () => {
     try {
-      const response = await api.get('/api/ia/extrato/padroes');
+      const response = await api.get('/ia/extrato/padroes');
       setPadroes(response.data);
     } catch (error) {
       console.error('Erro ao carregar padrões:', error);
@@ -99,7 +99,7 @@ const ExtratoBancario = () => {
 
   const carregarEstatisticas = async () => {
     try {
-      const response = await api.get('/api/ia/extrato/estatisticas');
+      const response = await api.get('/ia/extrato/estatisticas');
       setEstatisticas(response.data);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);

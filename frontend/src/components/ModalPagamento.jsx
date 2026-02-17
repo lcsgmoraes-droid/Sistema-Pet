@@ -76,7 +76,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   useEffect(() => {
     const carregarOperadoras = async () => {
       try {
-        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        const response = await api.get('/operadoras-cartao?apenas_ativas=true');
         setOperadoras(response.data);
         
         // Pré-selecionar operadora padrão

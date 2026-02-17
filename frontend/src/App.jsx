@@ -56,6 +56,8 @@ import OperadorasCartao from './pages/OperadorasCartao';
 import FluxoCaixa from './components/FluxoCaixa';
 import RelatorioVendas from './components/RelatorioVendas';
 import VendasFinanceiro from './components/VendasFinanceiro';
+import AlertasRacao from './components/AlertasRacao';
+import OpcoesRacao from './components/OpcoesRacao';
 import DRE from './components/DRE';
 
 // Componentes de IA
@@ -325,6 +327,16 @@ function App() {
             <Route path="ia/whatsapp" element={
               <ProtectedRoute permission="ia.whatsapp">
                 <WhatsAppDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="ia/alertas-racao" element={
+              <ProtectedRoute permission="produtos.editar">
+                <AlertasRacao />
+              </ProtectedRoute>
+            } />
+            <Route path="cadastros/opcoes-racao" element={
+              <ProtectedRoute permission="produtos.editar">
+                <OpcoesRacao />
               </ProtectedRoute>
             } />
           </Route>

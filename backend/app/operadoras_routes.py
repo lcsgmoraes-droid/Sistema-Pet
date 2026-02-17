@@ -16,7 +16,7 @@ from app.models import User
 from app.operadoras_models import OperadoraCartao
 from app.vendas_models import VendaPagamento
 
-router = APIRouter(prefix="/api/operadoras-cartao", tags=["Operadoras de Cartão"])
+router = APIRouter(prefix="/operadoras-cartao", tags=["Operadoras de Cartão"])
 
 
 # ============================================================================

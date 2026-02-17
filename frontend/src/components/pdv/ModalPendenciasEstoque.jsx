@@ -84,7 +84,7 @@ export default function ModalPendenciasEstoque({
 
   const carregarProdutosSemEstoque = async () => {
     try {
-      const response = await api.get('/produtos', {
+      const response = await api.get('/produtos/', {
         params: { 
           page: 1,
           page_size: 1000,

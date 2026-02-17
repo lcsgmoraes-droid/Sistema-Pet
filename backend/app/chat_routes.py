@@ -23,7 +23,7 @@ from app.ia.aba6_chat_ia import (
 from app.ia.aba6_models import Conversa, MensagemChat
 
 
-router = APIRouter(prefix="/api/chat", tags=["Chat IA"])
+router = APIRouter(prefix="/chat", tags=["Chat IA"])
 
 
 # ==================== SCHEMAS ====================

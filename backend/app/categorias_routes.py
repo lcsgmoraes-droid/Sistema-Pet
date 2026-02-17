@@ -15,7 +15,7 @@ from app.financeiro_models import CategoriaFinanceira
 from app.domain.validators.dre_validator import validar_categoria_financeira_dre
 from app.utils.logger import logger
 
-router = APIRouter(prefix="/api/categorias-financeiras", tags=["Categorias Financeiras"])
+router = APIRouter(prefix="/categorias-financeiras", tags=["Categorias Financeiras"])
 
 
 # ==================== Schemas ====================

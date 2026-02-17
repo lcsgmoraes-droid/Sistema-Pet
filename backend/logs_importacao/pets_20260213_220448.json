@@ -1,0 +1,9 @@
+{
+  "total_processados": 10,
+  "validos": 0,
+  "invalidos": 10,
+  "duplicados": 0,
+  "importados": 0,
+  "clientes_nao_encontrados": 10,
+  "erros": []
+}

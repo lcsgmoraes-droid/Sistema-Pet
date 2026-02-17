@@ -48,9 +48,9 @@ export default function DashboardFluxoCaixa({ userId }) {
 
       // Carregar índices, projeções e alertas em paralelo
       const [indicesRes, projecoesRes, alertasRes] = await Promise.all([
-        api.get(`/api/ia/fluxo/indices-saude/${userId}`, { headers }),
-        api.get(`/api/ia/fluxo/projecoes/${userId}?dias=15`, { headers }),
-        api.get(`/api/ia/fluxo/alertas/${userId}`, { headers })
+        api.get(`/ia/fluxo/indices-saude/${userId}`, { headers }),
+        api.get(`/ia/fluxo/projecoes/${userId}?dias=15`, { headers }),
+        api.get(`/ia/fluxo/alertas/${userId}`, { headers })
       ]);
 
       setIndices(indicesRes.data);
@@ -70,7 +70,7 @@ export default function DashboardFluxoCaixa({ userId }) {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
-      await api.post(`/api/ia/fluxo/projetar-15-dias/${userId}`, {}, { headers });
+      await api.post(`/ia/fluxo/projetar-15-dias/${userId}`, {}, { headers });
       
       toast.success('Projeção gerada com sucesso!', { id: toastId });
       carregarDados();

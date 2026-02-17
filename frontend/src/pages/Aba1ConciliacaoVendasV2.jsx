@@ -50,7 +50,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
           return;
         }
         
-        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        const response = await api.get('/operadoras-cartao?apenas_ativas=true');
         setOperadoras(response.data);
         
         // Pré-selecionar operadora padrão
@@ -148,7 +148,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
         return;
       }
       
-      const response = await api.get('/api/conciliacao/aba1/vendas-pdv', {
+      const response = await api.get('/conciliacao/aba1/vendas-pdv', {
         params: {
           status: statusFiltro,  // Usar filtro selecionado pelo usuário
           operadora_id: operadoraSelecionada?.id === 'legacy' ? 'legacy' : operadoraSelecionada?.id,  // Filtrar por operadora ou legacy
@@ -209,7 +209,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
     formData.append('operadora_id', operadoraSelecionada.id);
     
     try {
-      const response = await api.post('/api/conciliacao/aba1/upload-stone', formData, {
+      const response = await api.post('/conciliacao/aba1/upload-stone', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
@@ -248,7 +248,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
     }
     
     try {
-      const response = await api.get('/api/conciliacao/aba1/stone-nao-conciliadas', {
+      const response = await api.get('/conciliacao/aba1/stone-nao-conciliadas', {
         params: {
           operadora_id: operadoraSelecionada.id,  // FILTRAR por operadora
           status: statusFiltro  // FILTRAR por status (pendentes/todas/conciliadas)
@@ -274,7 +274,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
     setErro(null);
     
     try {
-      const response = await api.post('/api/conciliacao/aba1/processar-matches');
+      const response = await api.post('/conciliacao/aba1/processar-matches');
       
       if (response.data.success) {
         // Armazenar matches para visualização
@@ -316,14 +316,14 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
     
     try {
       // Buscar importacao_id da última importação (filtrada por operadora)
-      const responseStone = await api.get('/api/conciliacao/aba1/stone-nao-conciliadas', {
+      const responseStone = await api.get('/conciliacao/aba1/stone-nao-conciliadas', {
         params: {
           operadora_id: operadoraSelecionada?.id
         }
       });
       const importacaoId = responseStone.data.importacao_id;
       
-      const response = await api.post('/api/conciliacao/aba1/confirmar-matches', {
+      const response = await api.post('/conciliacao/aba1/confirmar-matches', {
         importacao_id: importacaoId,
         matches_confirmados: matchesOK  // Enviar APENAS os OK
       });
@@ -348,7 +348,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
   // Função: Confirmar um match
   const handleConfirmarMatch = async (vendaId, nsuStone) => {
     try {
-      const response = await api.post('/api/conciliacao/aba1/confirmar-match', {
+      const response = await api.post('/conciliacao/aba1/confirmar-match', {
         venda_id: vendaId,
         nsu_stone: nsuStone,
         aplicar_correcoes: false
@@ -368,7 +368,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
   // Função: Atualizar operadora de um pagamento
   const handleAtualizarOperadora = async (pagamentoId, operadoraId) => {
     try {
-      const response = await api.put('/api/conciliacao/aba1/atualizar-operadora', {
+      const response = await api.put('/conciliacao/aba1/atualizar-operadora', {
         pagamento_id: pagamentoId,
         operadora_id: operadoraId
       });
@@ -401,7 +401,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
       }
       
       try {
-        const response = await api.patch(`/api/vendas/${venda.id}/pagamento/${venda.pagamento.id}/nsu`, {
+        const response = await api.patch(`/vendas/${venda.id}/pagamento/${venda.pagamento.id}/nsu`, {
           nsu_cartao: novoNSU.trim()
         });
         

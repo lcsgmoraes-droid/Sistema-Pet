@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-02-13T22:06:09.791148",
+  "modo": "dry-run",
+  "database": "postgresql://postgres:postgres@localhost:5433/petshop_dev",
+  "estatisticas": {
+    "clientes": {
+      "total": 9997,
+      "validos": 17966,
+      "invalidos": 1,
+      "duplicados": 1013,
+      "importados": 0,
+      "erros": [
+        {
+          "linha": 9997,
+          "codigo": null,
+          "nome": null,
+          "erro": "'NoneType' object has no attribute 'strip'"
+        }
+      ]
+    }
+  }
+}

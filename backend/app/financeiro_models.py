@@ -3,7 +3,7 @@ Models para o Módulo Financeiro
 Contas a Pagar, Contas a Receber, Categorias, Formas de Pagamento
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Numeric, func
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .db import Base
@@ -641,35 +641,27 @@ class RegraConciliacao(BaseTenantModel):
     # Padrão de reconhecimento
     padrao_memo = Column(String(255))  # Ex: "%MANFRIM%"
     tipo_operacao = Column(String(50))  # 'Pagamento', 'Pix', 'Taxa'
-    valor_min = Column(Numeric(15, 2))
-    valor_max = Column(Numeric(15, 2))
+    descricao = Column(String(255))
     
     # Ação automática
-    tipo_vinculo = Column(String(50))
     fornecedor_id = Column(Integer, ForeignKey('clientes.id'))
     categoria_dre_id = Column(Integer, ForeignKey('dre_subcategorias.id'))
-    criar_conta_pagar = Column(Boolean, default=False)
-    baixar_automatico = Column(Boolean, default=False)
-    
-    # Recorrência
-    recorrente = Column(Boolean, default=False)
-    periodicidade = Column(String(20))
-    criar_provisoes = Column(Boolean, default=False)
-    meses_provisao = Column(Integer, default=12)
+    centro_custo_id = Column(Integer)
     
     # Confiabilidade
     vezes_aplicada = Column(Integer, default=0)
     vezes_confirmada = Column(Integer, default=0)
     confianca = Column(Integer)  # (confirmada/aplicada) * 100
+    prioridade = Column(Integer)
     
     # Status
-    ativa = Column(Boolean, default=True)
-    criado_em = Column(DateTime, default=datetime.utcnow)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    ativo = Column(Boolean, default=True)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     
     # Relationships
-    fornecedor = relationship("Cliente")
-    categoria_dre = relationship("DRESubcategoria")
+    fornecedor = relationship("Cliente", foreign_keys=[fornecedor_id])
+    categoria_dre = relationship("DRESubcategoria", foreign_keys=[categoria_dre_id])
 
 
 class ProvisaoAutomatica(BaseTenantModel):

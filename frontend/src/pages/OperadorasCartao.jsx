@@ -41,7 +41,7 @@ function OperadorasCartao() {
   const carregarOperadoras = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/operadoras-cartao');
+      const response = await api.get('/operadoras-cartao');
       setOperadoras(response.data);
     } catch (error) {
       console.error('Erro ao carregar operadoras:', error);
@@ -109,10 +109,10 @@ function OperadorasCartao() {
       };
 
       if (operadoraSelecionada) {
-        await api.put(`/api/operadoras-cartao/${operadoraSelecionada.id}`, dadosEnvio);
+        await api.put(`/operadoras-cartao/${operadoraSelecionada.id}`, dadosEnvio);
         toast.success('Operadora atualizada com sucesso!');
       } else {
-        await api.post('/api/operadoras-cartao', dadosEnvio);
+        await api.post('/operadoras-cartao', dadosEnvio);
         toast.success('Operadora criada com sucesso!');
       }
       
@@ -132,7 +132,7 @@ function OperadorasCartao() {
     }
 
     try {
-      await api.delete(`/api/operadoras-cartao/${id}`);
+      await api.delete(`/operadoras-cartao/${id}`);
       toast.success('Operadora removida com sucesso!');
       carregarOperadoras();
     } catch (error) {

@@ -21,7 +21,7 @@ from app.whatsapp.security import (
 )
 
 
-router = APIRouter(prefix="/api/whatsapp/security", tags=["WhatsApp Security & LGPD"])
+router = APIRouter(prefix="/whatsapp/security", tags=["WhatsApp Security & LGPD"])
 
 
 # ============================================================================

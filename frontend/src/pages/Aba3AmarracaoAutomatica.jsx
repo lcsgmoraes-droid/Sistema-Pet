@@ -41,7 +41,7 @@ export default function Aba3AmarracaoAutomatica({ onConcluida, status }) {
   useEffect(() => {
     const carregarOperadoras = async () => {
       try {
-        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        const response = await api.get('/operadoras-cartao?apenas_ativas=true');
         setOperadoras(response.data);
 
         const padrao = response.data.find((op) => op.padrao);
@@ -86,7 +86,7 @@ export default function Aba3AmarracaoAutomatica({ onConcluida, status }) {
   // Buscar preview (transparência)
   const buscarPreview = async () => {
     try {
-      const response = await api.get('/api/conciliacao/aba3/preview-amarracao', {
+      const response = await api.get('/conciliacao/aba3/preview-amarracao', {
         params: {
           data_recebimento: dataRecebimento,
           operadora: operadoraSelecionada?.nome
@@ -110,7 +110,7 @@ export default function Aba3AmarracaoAutomatica({ onConcluida, status }) {
     setErro(null);
 
     try {
-      const response = await api.post('/api/conciliacao/aba3/amarrar-automatico', {
+      const response = await api.post('/conciliacao/aba3/amarrar-automatico', {
         data_recebimento: dataRecebimento,
         operadora: operadoraSelecionada?.nome
       });

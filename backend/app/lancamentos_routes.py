@@ -23,7 +23,7 @@ from .financeiro_models import (
     ContaReceber
 )
 
-router = APIRouter(prefix="/api/lancamentos", tags=["Lançamentos"])
+router = APIRouter(prefix="/lancamentos", tags=["Lançamentos"])
 
 
 # ============= SCHEMAS =============

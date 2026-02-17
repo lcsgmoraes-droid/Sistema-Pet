@@ -100,8 +100,17 @@ const DashboardAnaliseRacoes = () => {
     try {
       setLoading(true);
       
+      // 🔍 DEBUG: Verificar token antes da requisição
+      const token = localStorage.getItem('access_token');
+      console.log('🔐 [DashboardAnaliseRacoes] Iniciando carregamento de dados', {
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN'
+      });
+      
       // Carregar opções de filtros
+      console.log('📡 [DashboardAnaliseRacoes] Chamando: /racoes/analises/opcoes-filtros');
       const resOpcoes = await api.get('/racoes/analises/opcoes-filtros');
+      console.log('✅ [DashboardAnaliseRacoes] Opções carregadas:', resOpcoes.data);
       setOpcoesFiltros(resOpcoes.data);
       
       // Carregar resumo (sem filtros de data para overview geral)
@@ -109,8 +118,19 @@ const DashboardAnaliseRacoes = () => {
       
       setLoading(false);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados do dashboard');
+      console.error('❌ [DashboardAnaliseRacoes] Erro ao carregar dados:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      
+      if (error.response?.status === 403) {
+        toast.error('Acesso negado. Verifique suas permissões ou faça login novamente.');
+      } else {
+        toast.error('Erro ao carregar dados do dashboard');
+      }
+      
       setLoading(false);
     }
   };

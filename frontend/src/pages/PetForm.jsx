@@ -72,7 +72,7 @@ const PetForm = () => {
 
   const loadClientes = async () => {
     try {
-      const response = await api.get('/clientes');
+      const response = await api.get('/clientes/');
       setClientes(response.data);
     } catch (err) {
       console.error('Erro ao carregar clientes:', err);

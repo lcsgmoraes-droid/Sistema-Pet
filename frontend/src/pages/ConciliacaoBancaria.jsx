@@ -40,7 +40,7 @@ export default function ConciliacaoBancaria() {
   
   const carregarContasBancarias = async () => {
     try {
-      const res = await api.get('/api/contas-bancarias', {
+      const res = await api.get('/contas-bancarias', {
         params: { apenas_ativas: true }
       });
       console.log('📊 Contas bancárias carregadas:', res.data);
@@ -66,7 +66,7 @@ export default function ConciliacaoBancaria() {
       if (dataFim) params.data_fim = dataFim;
       params.limit = 200;
       
-      const res = await api.get('/api/conciliacao/movimentacoes', { params });
+      const res = await api.get('/conciliacao/movimentacoes', { params });
       
       setMovimentacoes(res.data);
     } catch (error) {
@@ -80,7 +80,7 @@ export default function ConciliacaoBancaria() {
     try {
       const params = {};
       if (contaSelecionada) params.conta_bancaria_id = contaSelecionada;
-      const res = await api.get('/api/conciliacao/estatisticas', { params });
+      const res = await api.get('/conciliacao/estatisticas', { params });
       setEstatisticas(res.data);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
@@ -89,7 +89,7 @@ export default function ConciliacaoBancaria() {
   
   const carregarRegras = async () => {
     try {
-      const res = await api.get('/api/conciliacao/regras');
+      const res = await api.get('/conciliacao/regras');
       setRegras(res.data);
     } catch (error) {
       console.error('Erro ao carregar regras:', error);
@@ -692,7 +692,7 @@ function ModalRegras({ regras, onClose, onAtualizar }) {
     if (!confirm('Deseja realmente desativar esta regra?')) return;
     
     try {
-      await api.delete(`/api/conciliacao/regras/${regraId}`);
+      await api.delete(`/conciliacao/regras/${regraId}`);
       
       onAtualizar();
       const novasRegras = regrasLocais.filter(r => r.id !== regraId);

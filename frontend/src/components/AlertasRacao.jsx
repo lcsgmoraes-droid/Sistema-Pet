@@ -49,12 +49,26 @@ function AlertasRacao() {
   const carregarAlertasRacao = async () => {
     setLoading(true);
     try {
+      // 🔍 DEBUG: Verificar token antes da requisição
+      const token = localStorage.getItem('access_token');
+      console.log('🔐 [AlertasRacao] Iniciando carregamento de alertas', {
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
+        especieFiltro
+      });
+      
       const params = { limite: 50, offset: 0 };
       if (especieFiltro) {
         params.especie = especieFiltro;
       }
       
+      console.log('📡 [AlertasRacao] Chamando: /produtos/racao/alertas', params);
       const response = await api.get('/produtos/racao/alertas', { params });
+      console.log('✅ [AlertasRacao] Alertas carregados:', {
+        total: response.data.total,
+        items: response.data.items?.length
+      });
+      
       setRacoesSemClassificacao(response.data.items || []);
       setStats({
         total: response.data.total,
@@ -62,8 +76,18 @@ function AlertasRacao() {
         offset: response.data.offset
       });
     } catch (error) {
-      console.error('Erro ao carregar alertas:', error);
-      toast.error('Erro ao carregar alertas de rações');
+      console.error('❌ [AlertasRacao] Erro ao carregar alertas:', {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      
+      if (error.response?.status === 403) {
+        toast.error('Acesso negado. Verifique suas permissões ou faça login novamente.');
+      } else {
+        toast.error('Erro ao carregar alertas de rações');
+      }
     } finally {
       setLoading(false);
     }

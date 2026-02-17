@@ -1,0 +1,57 @@
+# Backend não deve ignorar nada crítico pois já tem .gitignore
+# Este .dockerignore previne arquivos desnecessários no build
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentação
+*.md
+docs/
+
+# Backups
+backup*/
+*.backup
+
+# Logs locais
+*.log
+
+# Environment
+.env
+.env.*
+
+# SQLite (será montado via volume)
+*.db
+*.db-shm
+*.db-wal

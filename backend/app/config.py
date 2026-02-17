@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Auditoria SQL (Pré-Prod Block 1)
     SQL_AUDIT_ENFORCE: bool = True
-    SQL_AUDIT_ENFORCE_LEVEL: str = "warn"  # warn, error, strict
+    SQL_AUDIT_ENFORCE_LEVEL: str = "error"  # warn, error, strict
 
     # Guard Rails (Pré-Prod Block 1)
     ENABLE_GUARDRAILS: bool = False

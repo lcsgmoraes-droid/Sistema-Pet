@@ -36,7 +36,7 @@ from app.whatsapp.websocket import (
     emit_handoff_resolved, emit_agent_status_change
 )
 
-router = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp Handoff - Sprint 4"])
+router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Handoff - Sprint 4"])
 
 
 # ========================================

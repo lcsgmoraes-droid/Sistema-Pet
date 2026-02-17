@@ -153,7 +153,7 @@ const AlertasIA = () => {
 
   const buscarSaldoAtual = async () => {
     try {
-      const response = await api.get('/api/financeiro/saldo-atual');
+      const response = await api.get('/financeiro/saldo-atual');
       return response.data.saldo || 10000;
     } catch (erro) {
       return 10000; // valor padrão
@@ -166,7 +166,7 @@ const AlertasIA = () => {
       const dataLimite = new Date();
       dataLimite.setDate(dataLimite.getDate() + dias);
 
-      const response = await api.get('/api/financeiro/contas-pagar', {
+      const response = await api.get('/financeiro/contas-pagar', {
         params: {
           data_inicio: hoje.toISOString().split('T')[0],
           data_fim: dataLimite.toISOString().split('T')[0],
@@ -182,7 +182,7 @@ const AlertasIA = () => {
 
   const buscarVencimentosAtrasados = async () => {
     try {
-      const response = await api.get('/api/financeiro/contas-pagar', {
+      const response = await api.get('/financeiro/contas-pagar', {
         params: {
           atrasadas: true
         }
@@ -200,7 +200,7 @@ const AlertasIA = () => {
       const inicio = new Date();
       inicio.setDate(inicio.getDate() - 30);
 
-      const response = await api.get('/api/financeiro/analise-gastos', {
+      const response = await api.get('/financeiro/analise-gastos', {
         params: {
           data_inicio: inicio.toISOString().split('T')[0],
           data_fim: hoje.toISOString().split('T')[0]
@@ -215,7 +215,7 @@ const AlertasIA = () => {
 
   const verificarRecorrencias = async () => {
     try {
-      const response = await api.get('/api/financeiro/recorrencias-proximas');
+      const response = await api.get('/financeiro/recorrencias-proximas');
       return response.data || [];
     } catch (erro) {
       return [];
@@ -224,7 +224,7 @@ const AlertasIA = () => {
 
   const verificarProjecaoNegativa = async (dias) => {
     try {
-      const response = await api.get('/api/ia/fluxo/projecao-saldo', {
+      const response = await api.get('/ia/fluxo/projecao-saldo', {
         params: { dias }
       });
       return response.data || { diasAteNegativo: 0 };

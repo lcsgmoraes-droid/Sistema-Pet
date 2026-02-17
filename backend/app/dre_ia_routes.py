@@ -17,7 +17,7 @@ from app.models import User
 from app.ia.aba7_dre import DREService
 from app.ia.aba7_models import DREPeriodo, DREProduto, DREInsight
 
-router = APIRouter(prefix="/api/ia/dre", tags=["IA - DRE Inteligente"])
+router = APIRouter(prefix="/ia/dre", tags=["IA - DRE Inteligente"])
 
 
 # ==================== SCHEMAS ====================

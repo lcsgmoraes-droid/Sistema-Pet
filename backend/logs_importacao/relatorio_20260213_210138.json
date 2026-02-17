@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-02-13T21:01:38.459687",
+  "modo": "producao",
+  "database": "postgresql://postgres:postgres@localhost:5433/petshop_dev",
+  "estatisticas": {
+    "clientes": {
+      "total": 200,
+      "validos": 180,
+      "invalidos": 0,
+      "duplicados": 20,
+      "importados": 180,
+      "erros": []
+    }
+  }
+}

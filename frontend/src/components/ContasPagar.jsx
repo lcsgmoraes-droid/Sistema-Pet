@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
+import { safeArray } from '../utils/safeArray';
 
 const ContasPagar = () => {
   const navigate = useNavigate();
@@ -49,13 +50,13 @@ const ContasPagar = () => {
         api.get(`/contas-pagar/?_t=${Date.now()}`),
         api.get(`/clientes/?tipo_cadastro=fornecedor`),
         api.get(`/financeiro/formas-pagamento/`),
-        api.get(`/api/contas-bancarias?apenas_ativas=true`)
+        api.get(`/contas-bancarias?apenas_ativas=true`)
       ]);
       
-      setContas(contasRes.data);
-      setFornecedores(fornecedoresRes.data);
-      setFormasPagamento(formasRes.data);
-      setContasBancarias(bancariasRes.data);
+      setContas(safeArray(contasRes.data));
+      setFornecedores(safeArray(fornecedoresRes.data));
+      setFormasPagamento(safeArray(formasRes.data));
+      setContasBancarias(safeArray(bancariasRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar contas a pagar');
@@ -255,7 +256,7 @@ const ContasPagar = () => {
               onChange={(e) => setFiltros({...filtros, fornecedor_id: e.target.value || null})}
             >
               <option value="">Todos</option>
-              {fornecedores.map(f => (
+              {safeArray(fornecedores).map(f => (
                 <option key={f.id} value={f.id}>{f.nome}</option>
               ))}
             </select>
@@ -346,7 +347,7 @@ const ContasPagar = () => {
                   </td>
                 </tr>
               ) : (
-                contas.map(conta => (
+                safeArray(contas).map(conta => (
                   <tr key={conta.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm">{conta.id}</td>
                     <td className="px-4 py-3 text-sm">
@@ -451,7 +452,7 @@ const ContasPagar = () => {
                       onChange={(e) => handleFormaChange(e.target.value)}
                     >
                       <option value="">Selecione...</option>
-                      {formasPagamento.map(f => (
+                      {safeArray(formasPagamento).map(f => (
                         <option key={f.id} value={f.id}>{f.icone || '💳'} {f.nome}</option>
                       ))}
                     </select>
@@ -479,7 +480,7 @@ const ContasPagar = () => {
                     onChange={(e) => setDadosPagamento({...dadosPagamento, conta_bancaria_id: parseInt(e.target.value) || null})}
                   >
                     <option value="">Selecione a conta...</option>
-                    {contasBancarias.map(c => (
+                    {safeArray(contasBancarias).map(c => (
                       <option key={c.id} value={c.id}>
                         {c.nome} - {formatarMoeda(c.saldo_atual || 0)}
                       </option>
@@ -729,7 +730,7 @@ const ContasPagar = () => {
                   onChange={(e) => setNovaFormaData({...novaFormaData, conta_bancaria_destino_id: parseInt(e.target.value) || null})}
                 >
                   <option value="">Nenhuma (selecionar manualmente)</option>
-                  {contasBancarias.map(c => (
+                  {safeArray(contasBancarias).map(c => (
                     <option key={c.id} value={c.id}>{c.nome}</option>
                   ))}
                 </select>

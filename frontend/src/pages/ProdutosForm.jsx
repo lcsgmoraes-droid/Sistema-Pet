@@ -177,7 +177,7 @@ export default function ProdutosForm() {
   
   const carregarClientes = async () => {
     try {
-      const response = await api.get('/clientes', {
+      const response = await api.get('/clientes/', {
         params: { tipo: 'fornecedor', apenas_ativos: true }
       });
       setClientes(response.data);

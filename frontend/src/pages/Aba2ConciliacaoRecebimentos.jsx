@@ -78,7 +78,7 @@ export default function Aba2ConciliacaoRecebimentos({ onConcluida, status }) {
   useEffect(() => {
     const carregarOperadoras = async () => {
       try {
-        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        const response = await api.get('/operadoras-cartao?apenas_ativas=true');
         setOperadoras(response.data);
         
         // Pré-selecionar operadora padrão (Stone geralmente)
@@ -529,7 +529,7 @@ export default function Aba2ConciliacaoRecebimentos({ onConcluida, status }) {
       ];
 
       // 3. Chamar API
-      const response = await api.post('/api/conciliacao/aba2/validar-recebimentos', {
+      const response = await api.post('/conciliacao/aba2/validar-recebimentos', {
         recebimentos_detalhados,
         recibo_lote,
         ofx_creditos,

@@ -24,7 +24,7 @@ from .parsers.ofx_parser import OFXParser, validar_extrato
 from pydantic import BaseModel
 
 
-router = APIRouter(prefix="/api/conciliacao", tags=["Conciliação Bancária"])
+router = APIRouter(prefix="/conciliacao", tags=["Conciliação Bancária"])
 
 
 # ============================================================================
@@ -71,7 +71,7 @@ class RegraResponse(BaseModel):
     id: int
     padrao_memo: str
     tipo_operacao: Optional[str]
-    tipo_vinculo: Optional[str]
+    descricao: Optional[str]
     fornecedor_nome: Optional[str]
     vezes_aplicada: int
     vezes_confirmada: int
@@ -151,7 +151,7 @@ async def upload_ofx(
     regras = db.query(RegraConciliacao).filter(
         and_(
             RegraConciliacao.tenant_id == current_user.tenant_id,
-            RegraConciliacao.ativa == True
+            RegraConciliacao.ativo == True
         )
     ).all()
     
@@ -416,7 +416,7 @@ async def listar_regras(
     )
     
     if ativas_apenas:
-        query = query.filter(RegraConciliacao.ativa == True)
+        query = query.filter(RegraConciliacao.ativo == True)
     
     query = query.order_by(desc(RegraConciliacao.confianca))
     regras = query.all()
@@ -434,12 +434,12 @@ async def listar_regras(
             id=regra.id,
             padrao_memo=regra.padrao_memo or '',
             tipo_operacao=regra.tipo_operacao,
-            tipo_vinculo=regra.tipo_vinculo,
+            descricao=regra.descricao,
             fornecedor_nome=fornecedor_nome,
             vezes_aplicada=regra.vezes_aplicada or 0,
             vezes_confirmada=regra.vezes_confirmada or 0,
             confianca=regra.confianca,
-            ativa=regra.ativa or False
+            ativa=regra.ativo or False
         ))
     
     return resultado
@@ -463,7 +463,7 @@ async def deletar_regra(
     if not regra:
         raise HTTPException(status_code=404, detail="Regra não encontrada")
     
-    regra.ativa = False
+    regra.ativo = False
     db.commit()
     
     return {"success": True}
@@ -516,7 +516,7 @@ async def obter_estatisticas(
     regras_ativas = db.query(RegraConciliacao).filter(
         and_(
             RegraConciliacao.tenant_id == current_user.tenant_id,
-            RegraConciliacao.ativa == True
+            RegraConciliacao.ativo == True
         )
     ).count()
     

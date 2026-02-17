@@ -45,8 +45,12 @@ services:
       ENVIRONMENT: production
       DEBUG: "false"
       
+      # SQL Audit
+      SQL_AUDIT_ENFORCE: "true"
+      SQL_AUDIT_ENFORCE_LEVEL: error
+      
       # CORS
-      CORS_ORIGINS: https://mlprohub.com.br,https://www.mlprohub.com.br
+      ALLOWED_ORIGINS: https://mlprohub.com.br,https://www.mlprohub.com.br
       
       # App
       APP_NAME: "Pet Shop Pro"
@@ -78,7 +82,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_API_URL: https://mlprohub.com.br/api
+        VITE_API_URL: /api
     container_name: petshop-prod-frontend
     restart: always
     networks:
@@ -104,7 +108,7 @@ services:
     networks:
       - petshop-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -43,8 +43,8 @@ const FormasPagamento = () => {
     try {
       const [formasRes, bancariasRes, operadorasRes] = await Promise.all([
         api.get(`/financeiro/formas-pagamento?apenas_ativas=false`),
-        api.get(`/api/contas-bancarias?apenas_ativas=true`),
-        api.get(`/api/operadoras-cartao?apenas_ativas=true`)
+        api.get(`/contas-bancarias?apenas_ativas=true`),
+        api.get(`/operadoras-cartao?apenas_ativas=true`)
       ]);
       
       setFormas(formasRes.data);

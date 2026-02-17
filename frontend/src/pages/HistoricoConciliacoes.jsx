@@ -33,7 +33,7 @@ export default function HistoricoConciliacoes() {
       if (filtros.data_inicio) params.append('data_inicio', filtros.data_inicio);
       if (filtros.data_fim) params.append('data_fim', filtros.data_fim);
 
-      const response = await api.get(`/api/conciliacao/historico?${params.toString()}`);
+      const response = await api.get(`/conciliacao/historico?${params.toString()}`);
       
       if (response.data && response.data.items) {
         setHistorico(response.data.items);

@@ -4,7 +4,7 @@ SQLAlchemy ORM Models
 """
 from sqlalchemy import Column, Integer, String, BigInteger, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, UniqueConstraint, Index
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, deferred
 from app.db import Base
 from app.base_models import BaseTenantModel
 import sqlalchemy as sa
@@ -175,9 +175,7 @@ class Cliente(BaseTenantModel):
     parceiro_emails_copia = Column(Text, nullable=True)  # Emails adicionais separados por vírgula
     
     # 👔 RH - FUNCIONÁRIOS (novo)
-    # TODO: Criar tabela Cargo antes de descomentar
-    # cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
-    cargo_id = Column(Integer, nullable=True, index=True)  # FK temporária sem constraint
+    cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
     
     # 💰 CONFIGURAÇÃO DE COMISSÕES
     data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento de comissão

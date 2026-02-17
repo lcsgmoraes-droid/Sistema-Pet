@@ -10,7 +10,7 @@ from app.db import get_session
 from app.auth_routes_multitenant import get_current_user
 from app.seed_adquirentes import criar_templates_adquirentes
 
-router = APIRouter(prefix="/api/admin", tags=["Administração"])
+router = APIRouter(prefix="/admin", tags=["Administração"])
 
 
 @router.post("/seed/adquirentes")

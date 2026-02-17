@@ -26,6 +26,8 @@ class TestMessageRequest(BaseModel):
 
 
 class TestMessageResponse(BaseModel):
+    model_config = {"protected_namespaces": ()}
+    
     success: bool
     intent: str
     confidence: float

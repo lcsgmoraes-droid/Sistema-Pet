@@ -107,6 +107,7 @@ export default function PDV() {
   const [filtroVendas, setFiltroVendas] = useState('24h');
   const [filtroStatus, setFiltroStatus] = useState('todas');
   const [filtroTemEntrega, setFiltroTemEntrega] = useState(false);
+  const [buscaNumeroVenda, setBuscaNumeroVenda] = useState('');
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [searchVendaQuery, setSearchVendaQuery] = useState('');
@@ -248,7 +249,7 @@ export default function PDV() {
     // console.log('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
     try {
       // console.log('📦 Fazendo request para /clientes...');
-      const response = await api.get('/clientes', {
+      const response = await api.get('/clientes/', {
         params: {
           is_entregador: true,
           incluir_inativos: false,
@@ -257,7 +258,15 @@ export default function PDV() {
       });
       
       // console.log('✅ Response recebido:', response.data);
-      const entregadoresList = response.data.clientes || response.data || [];
+      // A API retorna um objeto paginado: {items: Array, total: number, skip: number, limit: number}
+      let entregadoresList = response.data.items || response.data.clientes || response.data || [];
+      
+      // Garantir que é um array
+      if (!Array.isArray(entregadoresList)) {
+        console.error('❌ Resposta da API não é um array:', entregadoresList);
+        entregadoresList = [];
+      }
+      
       // console.log('📋 Total de entregadores carregados:', entregadoresList.length);
       // console.log('📋 Lista completa:', entregadoresList);
       setEntregadores(entregadoresList);
@@ -458,7 +467,7 @@ export default function PDV() {
   // Carregar vendas recentes
   useEffect(() => {
     carregarVendasRecentes();
-  }, [filtroVendas, filtroStatus, filtroTemEntrega]);
+  }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
 
   // Carregar venda específica se vier na URL
   useEffect(() => {
@@ -670,24 +679,31 @@ export default function PDV() {
       const params = {
         data_inicio: dataInicio.toISOString().split('T')[0],
         data_fim: hoje.toISOString().split('T')[0],
-        per_page: 10
+        per_page: 50  // Aumentado para 50
       };
 
-      if (filtroStatus === 'pago') {
-        params.status = 'finalizada';
-      } else if (filtroStatus === 'aberta') {
-        params.status = 'aberta';
-      }
-      // 'todas' não adiciona filtro de status
-      
-      // Filtro de tem entrega - só adicionar se estiver marcado
-      if (filtroTemEntrega === true) {
-        params.tem_entrega = true;
+      // Busca por número da venda tem prioridade
+      if (buscaNumeroVenda.trim()) {
+        params.busca = buscaNumeroVenda.trim();
+        // Remover filtros de data quando buscar por número
+        delete params.data_inicio;
+        delete params.data_fim;
+      } else {
+        if (filtroStatus === 'pago') {
+          params.status = 'finalizada';
+        } else if (filtroStatus === 'aberta') {
+          params.status = 'aberta';
+        }
+        // 'todas' não adiciona filtro de status
+        
+        // Filtro de tem entrega - só adicionar se estiver marcado
+        if (filtroTemEntrega === true) {
+          params.tem_entrega = true;
+        }
       }
 
-      // console.log('Parâmetros de busca:', params);
+      console.log('📊 Parâmetros de busca de vendas:', params);
       const resultado = await listarVendas(params);
-      // console.log('Vendas encontradas:', resultado.vendas?.length);
 
       setVendasRecentes(resultado.vendas || []);
     } catch (error) {
@@ -1896,7 +1912,15 @@ export default function PDV() {
               </div>
               {vendaAtual.data_venda && (
                 <span className="text-xs text-blue-600">
-                  {new Date(vendaAtual.data_venda).toLocaleDateString('pt-BR')}
+                  {(() => {
+                    const dataStr = vendaAtual.data_venda;
+                    if (typeof dataStr === 'string' && dataStr.includes('T')) {
+                      const [date] = dataStr.split('T');
+                      const [y, m, d] = date.split('-');
+                      return `${d}/${m}/${y}`;
+                    }
+                    return new Date(dataStr).toLocaleDateString('pt-BR');
+                  })()}
                 </span>
               )}
             </div>
@@ -3140,6 +3164,17 @@ export default function PDV() {
             />
             <span className="text-xs font-medium text-gray-700">Apenas com entrega</span>
           </label>
+          
+          {/* Busca por número */}
+          <div className="px-2 pb-2">
+            <input
+              type="text"
+              value={buscaNumeroVenda}
+              onChange={(e) => setBuscaNumeroVenda(e.target.value)}
+              placeholder="Buscar por número..."
+              className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
 
         {/* Lista de vendas */}
@@ -3201,12 +3236,18 @@ export default function PDV() {
                   </div>
                 </div>
                 <div className="text-[10px] text-gray-500">
-                  {new Date(venda.data_venda).toLocaleString('pt-BR', { 
-                    day: '2-digit', 
-                    month: '2-digit', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
+                  {(() => {
+                    const dataStr = venda.data_venda;
+                    if (typeof dataStr === 'string' && dataStr.includes('T')) {
+                      // Extrair data e hora da string ISO: 2026-02-13T23:14:22-03:00
+                      const [date, timeWithTz] = dataStr.split('T');
+                      const time = timeWithTz.split('-')[0].split('+')[0]; // Remove timezone
+                      const [y, m, d] = date.split('-');
+                      const [h, min] = time.split(':');
+                      return `${d}/${m} ${h}:${min}`;
+                    }
+                    return new Date(dataStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                  })()}
                 </div>
               </div>
             ))
@@ -4014,23 +4055,13 @@ function ModalCadastroCliente({ onClose, onClienteCriado }) {
     setErro('');
 
     try {
-      const response = await fetch('/clientes/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          tipo_cadastro: 'cliente',
-          tipo_pessoa: 'PF'
-        })
+      const response = await api.post('/clientes', {
+        ...formData,
+        tipo_cadastro: 'cliente',
+        tipo_pessoa: 'PF'
       });
 
-      if (!response.ok) throw new Error('Erro ao criar cliente');
-
-      const cliente = await response.json();
-      onClienteCriado(cliente);
+      onClienteCriado(response.data);
     } catch (error) {
       console.error('Erro:', error);
       setErro('Erro ao cadastrar cliente');

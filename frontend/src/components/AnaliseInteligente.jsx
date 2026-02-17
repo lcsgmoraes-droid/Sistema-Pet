@@ -22,7 +22,7 @@ const AnaliseInteligente = ({ dados, periodo }) => {
 
   const carregarIndicesMercado = async () => {
     try {
-      const response = await api.get('/api/ia/dre/indices-mercado', {
+      const response = await api.get('/ia/dre/indices-mercado', {
         params: { setor: 'pet_shop' }
       });
       setIndicesMercado(response.data);
@@ -59,7 +59,7 @@ const AnaliseInteligente = ({ dados, periodo }) => {
       const mesAnterior = periodo.mes === 1 ? 12 : periodo.mes - 1;
       const anoAnterior = periodo.mes === 1 ? periodo.ano - 1 : periodo.ano;
       
-      const response = await api.get('/api/financeiro/dre', {
+      const response = await api.get('/financeiro/dre', {
         params: { ano: anoAnterior, mes: mesAnterior }
       });
       return response.data;

@@ -30,11 +30,11 @@ const ModalLancamentoCredito = ({ isOpen, onClose, onSave }) => {
       const headers = { Authorization: `Bearer ${token}` };
 
       // Carregar categorias de receita hierarquicamente
-      const catRes = await api.get('/api/categorias-financeiras/arvore?tipo=receita&apenas_ativas=true', { headers });
+      const catRes = await api.get('/categorias-financeiras/arvore?tipo=receita&apenas_ativas=true', { headers });
       setCategorias(catRes.data);
 
       // Carregar contas bancárias
-      const contasRes = await api.get('/api/contas-bancarias?apenas_ativas=true', { headers });
+      const contasRes = await api.get('/contas-bancarias?apenas_ativas=true', { headers });
       setContas(contasRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -67,7 +67,7 @@ const ModalLancamentoCredito = ({ isOpen, onClose, onSave }) => {
         data_efetivacao: formData.status === 'realizado' ? formData.data_lancamento : null
       };
 
-      await api.post('/api/lancamentos/manuais', payload, { headers });
+      await api.post('/lancamentos/manuais', payload, { headers });
       
       alert('💰 Lançamento de crédito criado com sucesso!');
       onSave();

@@ -34,7 +34,7 @@ from .conciliacao_models import (
 )
 
 
-router = APIRouter(prefix="/api/conciliacao", tags=["Conciliação de Cartões"])
+router = APIRouter(prefix="/conciliacao-vendas", tags=["Conciliação de Cartões"])
 
 
 # ==============================================================================

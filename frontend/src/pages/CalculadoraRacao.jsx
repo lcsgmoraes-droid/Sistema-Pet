@@ -38,7 +38,7 @@ export default function CalculadoraRacao() {
         try {
             console.log('🔍 Iniciando carregamento de produtos...');
             
-            const response = await api.get('/produtos');
+            const response = await api.get('/produtos/');
             
             console.log('📡 Resposta da API:', {
                 status: response.status,

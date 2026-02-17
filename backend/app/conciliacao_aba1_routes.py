@@ -26,7 +26,7 @@ from .conciliacao_models import AdquirenteTemplate
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/conciliacao/aba1", tags=["Conciliação Vendas - Aba 1"])
+router = APIRouter(prefix="/conciliacao/aba1", tags=["Conciliação Vendas - Aba 1"])
 
 
 # ==============================================================================

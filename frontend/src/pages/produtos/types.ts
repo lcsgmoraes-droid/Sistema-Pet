@@ -19,11 +19,15 @@ export interface Product {
   nome: string;
   sku: string;
   tipo: ProductType;
+  preco_custo?: number;
+  markup?: number;
   preco: number;
+  preco_promocional?: number;
   estoque: number;
   status: ProductStatus;
   marca?: string;
   categoria?: string;
+  descricao_completa?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -61,7 +65,7 @@ export interface ProductFormData {
   status: ProductStatus;
   marca?: string;
   categoria?: string;
-  descricao?: string;
+  descricao_completa?: string;
   e_produto_fisico: boolean;
 }
 
@@ -76,6 +80,6 @@ export interface CreateProductPayload {
   status: ProductStatus;
   marca?: string;
   categoria?: string;
-  descricao?: string;
+  descricao_completa?: string;
   e_produto_fisico: boolean;
 }

@@ -15,7 +15,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.financeiro_models import ContaBancaria, MovimentacaoFinanceira
 
-router = APIRouter(prefix="/api/contas-bancarias", tags=["Contas Bancárias"])
+router = APIRouter(prefix="/contas-bancarias", tags=["Contas Bancárias"])
 
 
 # ==================== Schemas ====================

@@ -1139,6 +1139,7 @@ def gerar_codigo_barras(
     - SKUU: 4 últimos dígitos do SKU
     - C: Dígito verificador
     """
+    current_user, tenant_id = user_and_tenant
     
     max_tentativas = 10
     tentativa = 0
@@ -2282,6 +2283,7 @@ def gerar_sku(
     Formato: {PREFIXO}-{NÚMERO_SEQUENCIAL}
     Exemplo: PROD-00001
     """
+    current_user, tenant_id = user_and_tenant
     
     # Buscar último SKU com o mesmo prefixo
     ultimo_produto = db.query(Produto).filter(
@@ -3815,67 +3817,137 @@ async def listar_racoes_sem_classificacao(
     Parâmetros:
     - especie: Filtro opcional por espécie (dog, cat, bird, rodent, fish)
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    
-    # Buscar rações sem classificação completa
-    # Considera "ração" se:
-    # 1. classificacao_racao != null AND != 'Não é ração'
-    # 2. OU categoria.nome LIKE '%ração%'
-    
-    query = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
-        Produto.ativo == True
-    ).outerjoin(Categoria, Produto.categoria_id == Categoria.id)
-    
-    # Filtro: é ração E está incompleta
-    query = query.filter(
-        Produto.classificacao_racao == 'sim'
-    ).filter(
-        (Produto.especies_indicadas == None) |
-        (Produto.porte_animal_id == None) |
-        (Produto.fase_publico_id == None) |
-        (Produto.sabor_proteina == None) |
-        (Produto.peso_embalagem == None)
-    )
-    
-    # Filtrar por espécie se especificado
-    if especie:
-        query = query.filter(Produto.especies_indicadas == especie)
-    
-    total = query.count()
-    produtos = query.limit(limite).offset(offset).all()
-    
-    resultado = []
-    for produto in produtos:
-        campos_faltantes = []
-        if not produto.especies_indicadas:
-            campos_faltantes.append("especies_indicadas")
-        if not produto.porte_animal_id:
-            campos_faltantes.append("porte_animal")
-        if not produto.fase_publico_id:
-            campos_faltantes.append("fase_publico")
-        if not produto.sabor_proteina:
-            campos_faltantes.append("sabor_proteina")
-        if not produto.peso_embalagem:
-            campos_faltantes.append("peso_embalagem")
+    try:
+        current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
         
-        resultado.append({
-            "id": produto.id,
-            "codigo": produto.codigo,
-            "nome": produto.nome,
-            "classificacao_racao": produto.classificacao_racao,
-            "especies_indicadas": produto.especies_indicadas,
-            "categoria": produto.categoria.nome if produto.categoria else None,
-            "marca": produto.marca.nome if produto.marca else None,
-            "campos_faltantes": campos_faltantes,
-            "completude": round((5 - len(campos_faltantes)) / 5 * 100, 1),
-            "auto_classificar_ativo": produto.auto_classificar_nome
-        })
+        logger.info(f"[racao/alertas] Iniciando busca para tenant {tenant_id}, especie={especie}")
+        
+        # Buscar rações sem classificação completa
+        # Considera "ração" se:
+        # 1. classificacao_racao != null AND != 'Não é ração'
+        # 2. OU categoria.nome LIKE '%ração%'
+        
+        # Usar joinedload para evitar N+1 queries
+        query = db.query(Produto).options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca)
+        ).filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo == True
+        )
+        
+        # Filtro: é ração E está incompleta
+        query = query.filter(
+            Produto.classificacao_racao == 'sim'
+        )
+        
+        # Montar filtros dinamicamente baseado em campos que existem
+        filtros_incompletos = []
+        filtros_incompletos.append(Produto.especies_indicadas == None)
+        
+        # Adicionar filtros apenas para campos que existem no modelo
+        if hasattr(Produto, 'porte_animal_id'):
+            filtros_incompletos.append(Produto.porte_animal_id == None)
+            logger.info(f"[racao/alertas] Campo 'porte_animal_id' encontrado no modelo")
+        else:
+            logger.warning(f"[racao/alertas] Campo 'porte_animal_id' NÃO existe no modelo")
+        
+        if hasattr(Produto, 'fase_publico_id'):
+            filtros_incompletos.append(Produto.fase_publico_id == None)
+            logger.info(f"[racao/alertas] Campo 'fase_publico_id' encontrado no modelo")
+        else:
+            logger.warning(f"[racao/alertas] Campo 'fase_publico_id' NÃO existe no modelo")
+        
+        filtros_incompletos.append(Produto.sabor_proteina == None)
+        filtros_incompletos.append(Produto.peso_embalagem == None)
+        
+        # Aplicar filtro OR (pelo menos um campo faltando)
+        query = query.filter(or_(*filtros_incompletos))
+        
+        # Filtrar por espécie se especificado
+        if especie:
+            query = query.filter(Produto.especies_indicadas == especie)
+        
+        total = query.count()
+        logger.info(f"[racao/alertas] Total de produtos encontrados: {total}")
+        
+        produtos = query.limit(limite).offset(offset).all()
+        logger.info(f"[racao/alertas] Produtos retornados nesta página: {len(produtos)}")
+        
+        resultado = []
+        for produto in produtos:
+            try:
+                campos_faltantes = []
+                
+                if not produto.especies_indicadas:
+                    campos_faltantes.append("especies_indicadas")
+                
+                # Verificar campos FK apenas se existirem no modelo
+                if hasattr(produto, 'porte_animal_id'):
+                    if not produto.porte_animal_id:
+                        campos_faltantes.append("porte_animal")
+                
+                if hasattr(produto, 'fase_publico_id'):
+                    if not produto.fase_publico_id:
+                        campos_faltantes.append("fase_publico")
+                
+                if not produto.sabor_proteina:
+                    campos_faltantes.append("sabor_proteina")
+                
+                if not produto.peso_embalagem:
+                    campos_faltantes.append("peso_embalagem")
+                
+                # Acesso seguro a relationships
+                categoria_nome = None
+                if produto.categoria:
+                    categoria_nome = produto.categoria.nome
+                
+                marca_nome = None
+                if produto.marca:
+                    marca_nome = produto.marca.nome
+                
+                # Acesso seguro ao campo auto_classificar_nome
+                auto_classificar = False
+                if hasattr(produto, 'auto_classificar_nome'):
+                    auto_classificar = produto.auto_classificar_nome or False
+                
+                resultado.append({
+                    "id": produto.id,
+                    "codigo": produto.codigo,
+                    "nome": produto.nome,
+                    "classificacao_racao": produto.classificacao_racao,
+                    "especies_indicadas": produto.especies_indicadas,
+                    "categoria": categoria_nome,
+                    "marca": marca_nome,
+                    "campos_faltantes": campos_faltantes,
+                    "completude": round((5 - len(campos_faltantes)) / 5 * 100, 1),
+                    "auto_classificar_ativo": auto_classificar
+                })
+            except Exception as e:
+                logger.error(f"[racao/alertas] Erro ao processar produto {produto.id}: {str(e)}")
+                logger.error(f"[racao/alertas] Stack trace: {traceback.format_exc()}")
+                continue
+        
+        logger.info(f"[racao/alertas] Busca concluída com sucesso. Total de itens no resultado: {len(resultado)}")
+        
+        return {
+            "total": total,
+            "limite": limite,
+            "offset": offset,
+            "especie_filtro": especie,
+            "items": resultado
+        }
     
-    return {
-        "total": total,
-        "limite": limite,
-        "offset": offset,
-        "especie_filtro": especie,
-        "items": resultado
-    }
+    except Exception as error:
+        logger.error(f"[racao/alertas] ERRO CRÍTICO: {str(error)}")
+        logger.error(f"[racao/alertas] Stack trace:\n{traceback.format_exc()}")
+        
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "message": "Erro ao listar rações sem classificação",
+                "error": str(error),
+                "stack": traceback.format_exc(),
+                "endpoint": "/api/produtos/racao/alertas"
+            }
+        )

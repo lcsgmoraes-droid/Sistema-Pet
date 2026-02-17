@@ -21,7 +21,7 @@ from app.whatsapp.schemas import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/whatsapp/config", tags=["WhatsApp Config"])
+router = APIRouter(prefix="/whatsapp/config", tags=["WhatsApp Config"])
 
 
 # ============================================================================

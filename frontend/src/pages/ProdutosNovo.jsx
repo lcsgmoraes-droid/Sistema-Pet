@@ -117,6 +117,14 @@ export default function ProdutosNovo() {
     tabela_consumo: '',
     categoria_racao: '',
     especies_indicadas: 'both',
+    
+    // Opções de Ração - Sistema Dinâmico
+    linha_racao_id: '',
+    porte_animal_id: '',
+    fase_publico_id: '',
+    tipo_tratamento_id: '',
+    sabor_proteina_id: '',
+    apresentacao_peso_id: '',
   });
 
   // Dados auxiliares
@@ -128,6 +136,14 @@ export default function ProdutosNovo() {
   const [imagens, setImagens] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [clientes, setClientes] = useState([]);
+  
+  // Opções de Ração - Dados dinâmicos das APIs
+  const [opcoesLinhas, setOpcoesLinhas] = useState([]);
+  const [opcoesPortes, setOpcoesPortes] = useState([]);
+  const [opcoesFases, setOpcoesFases] = useState([]);
+  const [opcoesTratamentos, setOpcoesTratamentos] = useState([]);
+  const [opcoesSabores, setOpcoesSabores] = useState([]);
+  const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
   
   // Sprint 2: Estados para variações
   const [variacoes, setVariacoes] = useState([]);
@@ -197,6 +213,21 @@ export default function ProdutosNovo() {
     }
   }, [id]);
   
+  // Auto-detectar "ração" no nome do produto
+  useEffect(() => {
+    if (!isEdicao && formData.nome) {
+      const nomeMinusculo = formData.nome.toLowerCase();
+      const isRacao = nomeMinusculo.includes('racao') || nomeMinusculo.includes('ração');
+      
+      if (isRacao && formData.classificacao_racao !== 'sim') {
+        setFormData(prev => ({
+          ...prev,
+          classificacao_racao: 'sim'
+        }));
+      }
+    }
+  }, [formData.nome, isEdicao, formData.classificacao_racao]);
+  
   // Detectar parâmetro de aba na URL (após carregar o produto)
   useEffect(() => {
     if (!loading && isEdicao) {
@@ -236,7 +267,7 @@ export default function ProdutosNovo() {
         getCategorias(),
         getMarcas(),
         getDepartamentos(),
-        api.get('/clientes', { params: { tipo_cadastro: 'fornecedor', apenas_ativos: true } }),
+        api.get('/clientes/', { params: { tipo_cadastro: 'fornecedor', apenas_ativos: true } }),
       ]);
       setCategorias(catRes.data);
       
@@ -247,8 +278,34 @@ export default function ProdutosNovo() {
       setMarcas(marcRes.data);
       setDepartamentos(depRes.data);
       setClientes(cliRes.data);
+      
+      // Carregar opções de ração
+      carregarOpcoesRacao();
     } catch (error) {
       console.error('Erro ao carregar dados auxiliares:', error);
+    }
+  };
+  
+  // Carregar opções dinâmicas de ração das APIs
+  const carregarOpcoesRacao = async () => {
+    try {
+      const [linhas, portes, fases, tratamentos, sabores, apresentacoes] = await Promise.all([
+        api.get('/opcoes-racao/linhas', { params: { apenas_ativos: true } }),
+        api.get('/opcoes-racao/portes', { params: { apenas_ativos: true } }),
+        api.get('/opcoes-racao/fases', { params: { apenas_ativos: true } }),
+        api.get('/opcoes-racao/tratamentos', { params: { apenas_ativos: true } }),
+        api.get('/opcoes-racao/sabores', { params: { apenas_ativos: true } }),
+        api.get('/opcoes-racao/apresentacoes', { params: { apenas_ativos: true } }),
+      ]);
+      
+      setOpcoesLinhas(linhas.data);
+      setOpcoesPortes(portes.data);
+      setOpcoesFases(fases.data);
+      setOpcoesTratamentos(tratamentos.data);
+      setOpcoesSabores(sabores.data);
+      setOpcoesApresentacoes(apresentacoes.data);
+    } catch (error) {
+      console.error('Erro ao carregar opções de ração:', error);
     }
   };
   
@@ -344,6 +401,14 @@ export default function ProdutosNovo() {
         tabela_consumo: produto.tabela_consumo || '',
         categoria_racao: produto.categoria_racao || '',
         especies_indicadas: produto.especies_indicadas || 'both',
+        
+        // Opções de Ração - Sistema Dinâmico
+        linha_racao_id: produto.linha_racao_id || '',
+        porte_animal_id: produto.porte_animal_id || '',
+        fase_publico_id: produto.fase_publico_id || '',
+        tipo_tratamento_id: produto.tipo_tratamento_id || '',
+        sabor_proteina_id: produto.sabor_proteina_id || '',
+        apresentacao_peso_id: produto.apresentacao_peso_id || '',
       });
 
       // 🔗 Carregar informações do predecessor
@@ -809,7 +874,7 @@ export default function ProdutosNovo() {
   // Carregar produtos disponíveis para compor o kit
   const carregarProdutosDisponiveis = async () => {
     try {
-      const response = await api.get('/produtos', {
+      const response = await api.get('/produtos/', {
         params: {
           apenas_ativos: true,
           tipo_produto: 'SIMPLES', // Só produtos simples podem ser componentes
@@ -985,6 +1050,14 @@ export default function ProdutosNovo() {
         tabela_consumo: formData.tabela_consumo || null,
         categoria_racao: formData.categoria_racao || null,
         especies_indicadas: formData.especies_indicadas || null,
+        
+        // Opções de Ração - Sistema Dinâmico
+        linha_racao_id: formData.linha_racao_id ? parseInt(formData.linha_racao_id) : null,
+        porte_animal_id: formData.porte_animal_id ? parseInt(formData.porte_animal_id) : null,
+        fase_publico_id: formData.fase_publico_id ? parseInt(formData.fase_publico_id) : null,
+        tipo_tratamento_id: formData.tipo_tratamento_id ? parseInt(formData.tipo_tratamento_id) : null,
+        sabor_proteina_id: formData.sabor_proteina_id ? parseInt(formData.sabor_proteina_id) : null,
+        apresentacao_peso_id: formData.apresentacao_peso_id ? parseInt(formData.apresentacao_peso_id) : null,
       };
       
       console.log('ðŸ“¤ Enviando dados para API:', dados);
@@ -1059,6 +1132,25 @@ export default function ProdutosNovo() {
             <h1 className="text-3xl font-bold text-gray-900">
               {isEdicao ? 'Editar Produto' : 'Novo Produto'}
             </h1>
+            {/* Informações do Produto - Sempre Visível */}
+            {isEdicao && formData.codigo && (
+              <div className="mt-3 flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-700">SKU:</span>
+                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-lg font-mono">
+                    {formData.codigo}
+                  </span>
+                </div>
+                {formData.nome && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-700">Descrição:</span>
+                    <span className="text-gray-600">
+                      {formData.nome}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <a
             href="/cadastros/categorias"
@@ -2562,63 +2654,171 @@ export default function ProdutosNovo() {
                 </div>
               </div>
 
-              {/* Classificação e Peso */}
+              {/* E ração */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Classificação da Ração
+                    É ração?
                   </label>
                   <select
-                    value={formData.classificacao_racao}
-                    onChange={(e) => handleChange('classificacao_racao', e.target.value)}
+                    value={formData.classificacao_racao || 'nao'}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setFormData(prev => ({
+                        ...prev,
+                        classificacao_racao: valor,
+                        linha_racao_id: valor === 'sim' ? prev.linha_racao_id : '',
+                        porte_animal_id: valor === 'sim' ? prev.porte_animal_id : '',
+                        fase_publico_id: valor === 'sim' ? prev.fase_publico_id : '',
+                        tipo_tratamento_id: valor === 'sim' ? prev.tipo_tratamento_id : '',
+                        sabor_proteina_id: valor === 'sim' ? prev.sabor_proteina_id : '',
+                        apresentacao_peso_id: valor === 'sim' ? prev.apresentacao_peso_id : '',
+                        peso_embalagem: valor === 'sim' ? prev.peso_embalagem : '',
+                        categoria_racao: valor === 'sim' ? prev.categoria_racao : ''
+                      }));
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
-                    <option value="">Não é ração</option>
-                    <option value="super_premium">Super Premium</option>
-                    <option value="premium">Premium</option>
-                    <option value="especial">Especial</option>
-                    <option value="standard">Standard</option>
+                    <option value="nao">Não</option>
+                    <option value="sim">Sim</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Peso da Embalagem (kg) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.peso_embalagem}
-                    onChange={(e) => handleChange('peso_embalagem', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    placeholder="Ex: 15 (15kg)"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Necessário para calcular duração e custo/dia
-                  </p>
                 </div>
               </div>
 
-              {/* Categoria e Espécies */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoria
-                  </label>
-                  <select
-                    value={formData.categoria_racao}
-                    onChange={(e) => handleChange('categoria_racao', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="">Selecione...</option>
-                    <option value="filhote">Filhote</option>
-                    <option value="adulto">Adulto</option>
-                    <option value="senior">Senior (Idoso)</option>
-                    <option value="gestante">Gestante</option>
-                    <option value="light">Light (Obesidade)</option>
-                  </select>
-                </div>
+              {/* Opções de Ração - Sistema Dinâmico */}
+              {formData.classificacao_racao === 'sim' && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-4">📋 Informações Detalhadas da Ração</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Linha */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Linha
+                      </label>
+                      <select
+                        value={formData.linha_racao_id}
+                        onChange={(e) => handleChange('linha_racao_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {opcoesLinhas.map(linha => (
+                          <option key={linha.id} value={linha.id}>{linha.nome}</option>
+                        ))}
+                      </select>
+                    </div>
 
+                    {/* Porte */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Porte do Animal
+                      </label>
+                      <select
+                        value={formData.porte_animal_id}
+                        onChange={(e) => handleChange('porte_animal_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {opcoesPortes.map(porte => (
+                          <option key={porte.id} value={porte.id}>{porte.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Fase */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fase/Público
+                      </label>
+                      <select
+                        value={formData.fase_publico_id}
+                        onChange={(e) => {
+                          const faseId = e.target.value;
+                          const faseSelecionada = opcoesFases.find(fase => String(fase.id) === String(faseId));
+                          setFormData(prev => ({
+                            ...prev,
+                            fase_publico_id: faseId,
+                            categoria_racao: faseSelecionada ? faseSelecionada.nome : ''
+                          }));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {opcoesFases.map(fase => (
+                          <option key={fase.id} value={fase.id}>{fase.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Tratamento */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tratamento <span className="text-gray-400">(Opcional)</span>
+                      </label>
+                      <select
+                        value={formData.tipo_tratamento_id}
+                        onChange={(e) => handleChange('tipo_tratamento_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Nenhum</option>
+                        {opcoesTratamentos.map(tratamento => (
+                          <option key={tratamento.id} value={tratamento.id}>{tratamento.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Sabor */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Sabor/Proteína
+                      </label>
+                      <select
+                        value={formData.sabor_proteina_id}
+                        onChange={(e) => handleChange('sabor_proteina_id', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {opcoesSabores.map(sabor => (
+                          <option key={sabor.id} value={sabor.id}>{sabor.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Apresentação */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Apresentação (Peso)
+                      </label>
+                      <select
+                        value={formData.apresentacao_peso_id}
+                        onChange={(e) => {
+                          const apresentacaoId = e.target.value;
+                          const apresentacao = opcoesApresentacoes.find(apr => String(apr.id) === String(apresentacaoId));
+                          setFormData(prev => ({
+                            ...prev,
+                            apresentacao_peso_id: apresentacaoId,
+                            peso_embalagem: apresentacao ? String(apresentacao.peso_kg) : prev.peso_embalagem
+                          }));
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {opcoesApresentacoes.map(apr => (
+                          <option key={apr.id} value={apr.id}>{apr.peso_kg}kg</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-blue-600 mt-3">
+                    💡 <strong>Dica:</strong> Essas informações ajudam a IA a recomendar a ração ideal para cada pet no PDV.
+                    Você pode gerenciar as opções disponíveis em <strong>Cadastros &gt; Opções de Ração</strong>.
+                  </p>
+                </div>
+              )}
+
+              {/* Espécies Indicadas */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Espécies Indicadas

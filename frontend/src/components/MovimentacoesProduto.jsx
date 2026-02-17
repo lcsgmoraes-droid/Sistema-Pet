@@ -39,12 +39,12 @@ export default function MovimentacoesProduto() {
             console.log('Carregando produto ID:', id);
       
       // Carregar produto
-      const produtoRes = await api.get(`http://127.0.0.1:8000/produtos/${id}`);
+      const produtoRes = await api.get(`/produtos/${id}`);
       console.log('Produto carregado:', produtoRes.data);
       setProduto(produtoRes.data);
       
       // Carregar movimentações
-      const movRes = await api.get(`http://127.0.0.1:8000/estoque/movimentacoes/produto/${id}`);
+      const movRes = await api.get(`/estoque/movimentacoes/produto/${id}`);
       console.log('Movimentações carregadas:', movRes.data);
       setMovimentacoes(movRes.data);
     } catch (error) {
@@ -125,7 +125,7 @@ export default function MovimentacoesProduto() {
     try {
             const responses = await Promise.all(
         selectedIds.map(id => 
-          api.delete(`http://127.0.0.1:8000/estoque/movimentacoes/${id}`)
+          api.delete(`/estoque/movimentacoes/${id}`)
         )
       );
 
@@ -162,7 +162,7 @@ export default function MovimentacoesProduto() {
         };
 
         await api.patch(
-          `http://127.0.0.1:8000/estoque/movimentacoes/${editingMovimentacao.id}`,
+          `/estoque/movimentacoes/${editingMovimentacao.id}`,
           payload
         );
 

@@ -21,7 +21,7 @@ export default function Subcategorias() {
 
   const carregarCategorias = async () => {
     try {
-      const response = await api.get('/api/categorias-financeiras');
+      const response = await api.get('/categorias-financeiras');
       setCategorias(response.data.filter(c => c.ativo));
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);

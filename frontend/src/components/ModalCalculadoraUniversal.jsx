@@ -74,7 +74,7 @@ export default function ModalCalculadoraUniversal({
       const timer = setTimeout(async () => {
         setBuscandoRacoes(true);
         try {
-          const response = await api.get('/produtos', {
+            const response = await api.get('/produtos/', {
             params: { busca: buscaRacao }
           });
           
@@ -168,7 +168,7 @@ export default function ModalCalculadoraUniversal({
       };
 
       console.log('📤 Enviando payload:', payload);
-      const response = await api.post('/api/produtos/calculadora-racao', payload);
+      const response = await api.post('/produtos/calculadora-racao', payload);
       
       console.log('📥 Resposta recebida:', response.data);
       if (response.data) {

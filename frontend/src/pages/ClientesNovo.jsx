@@ -22,6 +22,11 @@ const Pessoas = () => {
   const [editingCliente, setEditingCliente] = useState(null);
   const [error, setError] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('todos'); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
+  
+  // Estados de paginação
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [registrosPorPagina, setRegistrosPorPagina] = useState(20);
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [pets, setPets] = useState([]);
@@ -134,7 +139,21 @@ const Pessoas = () => {
 
   useEffect(() => {
     loadClientes();
-  }, [tipoFiltro]);
+  }, [tipoFiltro, paginaAtual, registrosPorPagina]);
+
+  // Debounce para busca (aguarda 500ms após usuário parar de digitar)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Resetar para página 1 ao buscar
+      if (paginaAtual !== 1) {
+        setPaginaAtual(1);
+      } else {
+        loadClientes();
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Carregar raças quando espécie mudar
   useEffect(() => {
@@ -169,9 +188,33 @@ const Pessoas = () => {
   const loadClientes = async () => {
     try {
       setLoading(true);
-      const url = tipoFiltro === 'todos' ? '/clientes/' : `/clientes/?tipo_cadastro=${tipoFiltro}`;
+      const skip = (paginaAtual - 1) * registrosPorPagina;
+      const params = new URLSearchParams({
+        skip: skip.toString(),
+        limit: registrosPorPagina.toString()
+      });
+      
+      if (tipoFiltro !== 'todos') {
+        params.append('tipo_cadastro', tipoFiltro);
+      }
+      
+      // Adicionar busca se houver termo
+      if (searchTerm && searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
+      }
+      
+      const url = `/clientes/?${params.toString()}`;
       const response = await api.get(url);
-      setClientes(response.data);
+      
+      // API agora retorna { items: [], total: X }
+      if (response.data.items) {
+        setClientes(response.data.items);
+        setTotalRegistros(response.data.total);
+      } else {
+        // Fallback para compatibilidade (caso API antiga)
+        setClientes(response.data);
+        setTotalRegistros(response.data.length);
+      }
     } catch (err) {
       setError('Erro ao carregar pessoas');
       console.error(err);
@@ -1039,7 +1082,7 @@ const Pessoas = () => {
     const loadMensagens = async () => {
       try {
         setLoadingMensagens(true);
-        const response = await api.get(`/api/whatsapp/clientes/${clienteId}/whatsapp/ultimas?limit=5`);
+        const response = await api.get(`/whatsapp/clientes/${clienteId}/whatsapp/ultimas?limit=5`);
         setMensagens(response.data);
       } catch (err) {
         console.error('Erro ao carregar mensagens:', err);
@@ -1130,7 +1173,7 @@ const Pessoas = () => {
       <div className="mb-6 border-b border-gray-200">
         <div className="flex gap-2">
           <button
-            onClick={() => setTipoFiltro('todos')}
+            onClick={() => { setTipoFiltro('todos'); setPaginaAtual(1); }}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               tipoFiltro === 'todos'
                 ? 'border-purple-600 text-purple-600'
@@ -1140,7 +1183,7 @@ const Pessoas = () => {
             Todos
           </button>
           <button
-            onClick={() => setTipoFiltro('cliente')}
+            onClick={() => { setTipoFiltro('cliente'); setPaginaAtual(1); }}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               tipoFiltro === 'cliente'
                 ? 'border-purple-600 text-purple-600'
@@ -1150,7 +1193,7 @@ const Pessoas = () => {
             Clientes
           </button>
           <button
-            onClick={() => setTipoFiltro('fornecedor')}
+            onClick={() => { setTipoFiltro('fornecedor'); setPaginaAtual(1); }}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               tipoFiltro === 'fornecedor'
                 ? 'border-purple-600 text-purple-600'
@@ -1160,7 +1203,7 @@ const Pessoas = () => {
             Fornecedores
           </button>
           <button
-            onClick={() => setTipoFiltro('veterinario')}
+            onClick={() => { setTipoFiltro('veterinario'); setPaginaAtual(1); }}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               tipoFiltro === 'veterinario'
                 ? 'border-purple-600 text-purple-600'
@@ -1170,7 +1213,7 @@ const Pessoas = () => {
             Veterinários
           </button>
           <button
-            onClick={() => setTipoFiltro('funcionario')}
+            onClick={() => { setTipoFiltro('funcionario'); setPaginaAtual(1); }}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               tipoFiltro === 'funcionario'
                 ? 'border-purple-600 text-purple-600'
@@ -1216,6 +1259,94 @@ const Pessoas = () => {
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
           <FiAlertCircle />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Paginação Superior */}
+      {!loading && totalRegistros > 0 && (
+        <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg flex items-center justify-between mb-0">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              Mostrando {(paginaAtual - 1) * registrosPorPagina + 1} a {Math.min(paginaAtual * registrosPorPagina, totalRegistros)} de {totalRegistros} pessoas
+            </span>
+            <select
+              value={registrosPorPagina}
+              onChange={(e) => {
+                setRegistrosPorPagina(Number(e.target.value));
+                setPaginaAtual(1);
+              }}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value={10}>10 por página</option>
+              <option value={20}>20 por página</option>
+              <option value={30}>30 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPaginaAtual(1)}
+              disabled={paginaAtual === 1}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Primeira
+            </button>
+            <button
+              onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+              disabled={paginaAtual === 1}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+
+            {/* Páginas numeradas */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(Math.ceil(totalRegistros / registrosPorPagina), 5) }, (_, i) => {
+                const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina);
+                let pageNum;
+                if (totalPaginas <= 5) {
+                  pageNum = i + 1;
+                } else if (paginaAtual <= 3) {
+                  pageNum = i + 1;
+                } else if (paginaAtual >= totalPaginas - 2) {
+                  pageNum = totalPaginas - 4 + i;
+                } else {
+                  pageNum = paginaAtual - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPaginaAtual(pageNum)}
+                    className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                      paginaAtual === pageNum
+                        ? 'bg-purple-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setPaginaAtual(prev => Math.min(prev + 1, Math.ceil(totalRegistros / registrosPorPagina)))}
+              disabled={paginaAtual === Math.ceil(totalRegistros / registrosPorPagina)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+            <button
+              onClick={() => setPaginaAtual(Math.ceil(totalRegistros / registrosPorPagina))}
+              disabled={paginaAtual === Math.ceil(totalRegistros / registrosPorPagina)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Última
+            </button>
+          </div>
         </div>
       )}
 
@@ -1401,6 +1532,94 @@ const Pessoas = () => {
           <div className="text-center py-12">
             <FiUser className="mx-auto text-gray-400 mb-4" size={48} />
             <p className="text-gray-600">Nenhum cliente encontrado</p>
+          </div>
+        )}
+        
+        {/* Paginação Inferior */}
+        {!loading && totalRegistros > 0 && (
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                Mostrando {(paginaAtual - 1) * registrosPorPagina + 1} a {Math.min(paginaAtual * registrosPorPagina, totalRegistros)} de {totalRegistros} pessoas
+              </span>
+              <select
+                value={registrosPorPagina}
+                onChange={(e) => {
+                  setRegistrosPorPagina(Number(e.target.value));
+                  setPaginaAtual(1);
+                }}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value={10}>10 por página</option>
+                <option value={20}>20 por página</option>
+                <option value={30}>30 por página</option>
+                <option value={50}>50 por página</option>
+                <option value={100}>100 por página</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPaginaAtual(1)}
+                disabled={paginaAtual === 1}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Primeira
+              </button>
+              <button
+                onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                disabled={paginaAtual === 1}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+
+              {/* Páginas numeradas */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(Math.ceil(totalRegistros / registrosPorPagina), 5) }, (_, i) => {
+                  const totalPaginas = Math.ceil(totalRegistros / registrosPorPagina);
+                  let pageNum;
+                  if (totalPaginas <= 5) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual <= 3) {
+                    pageNum = i + 1;
+                  } else if (paginaAtual >= totalPaginas - 2) {
+                    pageNum = totalPaginas - 4 + i;
+                  } else {
+                    pageNum = paginaAtual - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPaginaAtual(pageNum)}
+                      className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                        paginaAtual === pageNum
+                          ? 'bg-purple-600 text-white'
+                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setPaginaAtual(prev => Math.min(prev + 1, Math.ceil(totalRegistros / registrosPorPagina)))}
+                disabled={paginaAtual === Math.ceil(totalRegistros / registrosPorPagina)}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+              <button
+                onClick={() => setPaginaAtual(Math.ceil(totalRegistros / registrosPorPagina))}
+                disabled={paginaAtual === Math.ceil(totalRegistros / registrosPorPagina)}
+                className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Última
+              </button>
+            </div>
           </div>
         )}
       </div>

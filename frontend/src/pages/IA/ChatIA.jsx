@@ -37,7 +37,7 @@ export default function ChatIA() {
 
   const carregarConversas = async () => {
     try {
-      const response = await api.get('/api/chat/conversas');
+      const response = await api.get('/chat/conversas');
       setConversas(response.data);
     } catch (error) {
       console.error('Erro ao carregar conversas:', error);
@@ -47,7 +47,7 @@ export default function ChatIA() {
   const carregarMensagens = async (conversaId) => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/chat/conversa/${conversaId}/mensagens`);
+      const response = await api.get(`/chat/conversa/${conversaId}/mensagens`);
       setMensagens(response.data);
     } catch (error) {
       console.error('Erro ao carregar mensagens:', error);
@@ -59,7 +59,7 @@ export default function ChatIA() {
 
   const novaConversa = async () => {
     try {
-      const response = await api.post('/api/chat/nova-conversa', {});
+      const response = await api.post('/chat/nova-conversa', {});
       
       setConversas([response.data, ...conversas]);
       setConversaAtiva(response.data.id);
@@ -81,7 +81,7 @@ export default function ChatIA() {
     setMensagemInput('');
 
     try {
-      const response = await api.post('/api/chat/enviar', {
+      const response = await api.post('/chat/enviar', {
         conversa_id: conversaAtiva,
         mensagem: mensagemTexto
       });
@@ -118,7 +118,7 @@ export default function ChatIA() {
     if (!confirm('Deseja deletar esta conversa?')) return;
 
     try {
-      await api.delete(`/api/chat/conversa/${conversaId}`);
+      await api.delete(`/chat/conversa/${conversaId}`);
 
       setConversas(conversas.filter(c => c.id !== conversaId));
       if (conversaAtiva === conversaId) {

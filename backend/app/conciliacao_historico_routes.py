@@ -27,7 +27,7 @@ from .conciliacao_models import HistoricoConciliacao
 # ============================================================================
 # ROUTER
 # ============================================================================
-router = APIRouter(prefix="/api/conciliacao/historico", tags=["Histórico Conciliação"])
+router = APIRouter(prefix="/conciliacao/historico", tags=["Histórico Conciliação"])
 
 
 # ============================================================================

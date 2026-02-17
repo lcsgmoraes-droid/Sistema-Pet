@@ -55,7 +55,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
     try {
       const [clientesRes, categoriasRes, subcategoriasDRERes] = await Promise.all([
         api.get('/clientes/?tipo_cadastro=cliente'),
-        api.get('/api/categorias-financeiras/'),
+        api.get('/categorias-financeiras/'),
         api.get('/dre/subcategorias')
       ]);
       
@@ -157,7 +157,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
     }
 
     try {
-      const response = await api.post('/api/categorias-financeiras/', {
+      const response = await api.post('/categorias-financeiras/', {
         nome: formCategoria.nome,
         tipo: formCategoria.tipo,
         cor: formCategoria.cor,

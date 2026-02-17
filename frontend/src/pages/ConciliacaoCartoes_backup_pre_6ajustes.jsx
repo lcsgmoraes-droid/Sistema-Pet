@@ -36,7 +36,7 @@ export default function ConciliacaoCartoes() {
 
   const carregarAdquirentes = async () => {
     try {
-      const res = await api.get('/api/conciliacao/templates');
+      const res = await api.get('/conciliacao/templates');
       setAdquirentes(res.data.templates || []);
       if (res.data.templates?.length > 0) {
         setAdquirenteSelecionado(res.data.templates[0].id);
@@ -49,7 +49,7 @@ export default function ConciliacaoCartoes() {
   const carregarValidacoes = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/api/conciliacao/validacoes', {
+      const res = await api.get('/conciliacao/validacoes', {
         params: {
           page: 1,
           per_page: 20
@@ -103,11 +103,11 @@ export default function ConciliacaoCartoes() {
     formData.append('adquirente_id', adquirenteSelecionado);
 
     try {
-      const uploadRes = await api.post('/api/conciliacao/upload-operadora', formData);
+      const uploadRes = await api.post('/conciliacao/upload-operadora', formData);
       
       if (uploadRes.data.success) {
         // 2. Validar automaticamente
-        const validarRes = await api.post('/api/conciliacao/validar', {
+        const validarRes = await api.post('/conciliacao/validar', {
           importacao_id: uploadRes.data.importacao_id,
           data_inicio: new Date().toISOString().split('T')[0],
           data_fim: new Date().toISOString().split('T')[0],

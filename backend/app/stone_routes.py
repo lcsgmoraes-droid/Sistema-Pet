@@ -23,7 +23,7 @@ from sqlalchemy import and_
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/stone", tags=["Stone Payments"])
+router = APIRouter(prefix="/stone", tags=["Stone Payments"])
 
 
 # ==========================================

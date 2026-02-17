@@ -2,7 +2,7 @@
 import { api } from './api';
 import type { DashboardStats, AgentStatus, HandoffItem, Message } from '../stores/whatsappStore';
 
-const BASE_URL = '/api/whatsapp';
+const BASE_URL = '/whatsapp';
 
 export const whatsappService = {
   // Configuration

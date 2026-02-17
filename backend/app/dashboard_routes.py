@@ -346,54 +346,99 @@ async def obter_contas_vencidas(
     
     try:
         hoje = datetime.now().date()
+        logger.info(f"[contas-vencidas] Buscando contas vencidas para tenant {tenant_id}")
         
         # Contas a receber vencidas
-        contas_receber = db.query(ContaReceber).filter(
-            and_(
-                ContaReceber.tenant_id == tenant_id,
-                ContaReceber.status.in_(['pendente', 'parcial', 'vencido']),
-                ContaReceber.data_vencimento < hoje
-            )
-        ).order_by(ContaReceber.data_vencimento.asc()).limit(limite).all()
+        try:
+            contas_receber = db.query(ContaReceber).filter(
+                and_(
+                    ContaReceber.tenant_id == tenant_id,
+                    ContaReceber.status.in_(['pendente', 'parcial', 'vencido']),
+                    ContaReceber.data_vencimento < hoje
+                )
+            ).order_by(ContaReceber.data_vencimento.asc()).limit(limite).all()
+            logger.info(f"[contas-vencidas] Encontradas {len(contas_receber)} contas a receber vencidas")
+        except Exception as e:
+            logger.error(f"[contas-vencidas] Erro ao buscar contas a receber: {e}")
+            contas_receber = []
         
         # Contas a pagar vencidas
-        contas_pagar = db.query(ContaPagar).filter(
-            and_(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.status.in_(['pendente', 'parcial', 'vencido']),
-                ContaPagar.data_vencimento < hoje
-            )
-        ).order_by(ContaPagar.data_vencimento.asc()).limit(limite).all()
+        try:
+            contas_pagar = db.query(ContaPagar).filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    ContaPagar.status.in_(['pendente', 'parcial', 'vencido']),
+                    ContaPagar.data_vencimento < hoje
+                )
+            ).order_by(ContaPagar.data_vencimento.asc()).limit(limite).all()
+            logger.info(f"[contas-vencidas] Encontradas {len(contas_pagar)} contas a pagar vencidas")
+        except Exception as e:
+            logger.error(f"[contas-vencidas] Erro ao buscar contas a pagar: {e}")
+            contas_pagar = []
+        
+        #Serializar contas a receber
+        contas_receber_list = []
+        for c in contas_receber:
+            try:
+                # Acessar relacionamentos com segurança
+                cliente_nome = None
+                try:
+                    if hasattr(c, 'cliente') and c.cliente:
+                        cliente_nome = c.cliente.nome
+                except Exception:
+                    pass
+                
+                valor_final = float(c.valor_final) if c.valor_final else 0
+                valor_recebido = float(c.valor_recebido) if c.valor_recebido else 0
+                
+                contas_receber_list.append({
+                    "id": c.id,
+                    "descricao": c.descricao or "Sem descrição",
+                    "cliente": cliente_nome,
+                    "valor_total": valor_final,
+                    "valor_pago": valor_recebido,
+                    "saldo": valor_final - valor_recebido,
+                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
+                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
+                    "status": c.status
+                })
+            except Exception as e:
+                logger.error(f"[contas-vencidas] Erro ao serializar conta a receber {c.id}: {e}")
+                continue
+        
+        # Serializar contas a pagar
+        contas_pagar_list = []
+        for c in contas_pagar:
+            try:
+                # Acessar relacionamentos com segurança
+                fornecedor_nome = None
+                try:
+                    if hasattr(c, 'fornecedor') and c.fornecedor:
+                        fornecedor_nome = c.fornecedor.nome
+                except Exception:
+                    pass
+                
+                valor_final = float(c.valor_final) if c.valor_final else 0
+                valor_pago = float(c.valor_pago) if c.valor_pago else 0
+                
+                contas_pagar_list.append({
+                    "id": c.id,
+                    "descricao": c.descricao or "Sem descrição",
+                    "fornecedor": fornecedor_nome,
+                    "valor_total": valor_final,
+                    "valor_pago": valor_pago,
+                    "saldo": valor_final - valor_pago,
+                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
+                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
+                    "status": c.status
+                })
+            except Exception as e:
+                logger.error(f"[contas-vencidas] Erro ao serializar conta a pagar {c.id}: {e}")
+                continue
         
         return {
-            "contas_receber": [
-                {
-                    "id": c.id,
-                    "descricao": c.descricao,
-                    "cliente": c.cliente.nome if c.cliente else None,
-                    "valor_total": float(c.valor_final),
-                    "valor_pago": float(c.valor_recebido),
-                    "saldo": float(c.valor_final - c.valor_recebido),
-                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
-                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
-                    "status": c.status
-                }
-                for c in contas_receber
-            ],
-            "contas_pagar": [
-                {
-                    "id": c.id,
-                    "descricao": c.descricao,
-                    "fornecedor": c.fornecedor.nome if c.fornecedor else None,
-                    "valor_total": float(c.valor_final),
-                    "valor_pago": float(c.valor_pago),
-                    "saldo": float(c.valor_final - c.valor_pago),
-                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
-                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
-                    "status": c.status
-                }
-                for c in contas_pagar
-            ]
+            "contas_receber": contas_receber_list,
+            "contas_pagar": contas_pagar_list
         }
         
     except Exception as e:

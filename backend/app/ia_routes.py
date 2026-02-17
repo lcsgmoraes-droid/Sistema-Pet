@@ -34,7 +34,7 @@ from app.ia.aba5_fluxo_caixa import (
 # ============================================================================
 
 router = APIRouter(
-    prefix="/api/ia/fluxo",
+    prefix="/ia/fluxo",
     tags=["IA - Fluxo de Caixa"],
     dependencies=[Depends(get_current_user)]
 )

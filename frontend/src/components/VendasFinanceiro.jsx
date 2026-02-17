@@ -55,6 +55,11 @@ export default function VendasFinanceiro() {
   const [vendasPorGrupoComparacao, setVendasPorGrupoComparacao] = useState([]);
   const [vendasPorFuncionarioComparacao, setVendasPorFuncionarioComparacao] = useState([]);
 
+  // Estados para Análise Inteligente
+  const [produtosMaisLucrativos, setProdutosMaisLucrativos] = useState([]);
+  const [produtosPorCategoria, setProdutosPorCategoria] = useState({});
+  const [produtosAnalise, setProdutosAnalise] = useState([]);
+
   const toggleVendaExpandida = (vendaId) => {
     const novoSet = new Set(vendasExpandidas);
     if (novoSet.has(vendaId)) {
@@ -72,12 +77,28 @@ export default function VendasFinanceiro() {
     }).format(valor || 0);
   };
 
+  // Helper para garantir números válidos
+  const sanitizarNumero = (valor) => {
+    if (valor === null || valor === undefined || isNaN(valor) || !isFinite(valor)) {
+      return 0;
+    }
+    return valor;
+  };
+
   const formatarData = (dataStr) => {
     if (!dataStr) return 'N/A';
     try {
       // Se já é um objeto Date
       if (dataStr instanceof Date) {
         return dataStr.toLocaleDateString('pt-BR');
+      }
+      
+      // Se é string ISO (ex: 2026-02-13T23:14:22-03:00)
+      // Extrair apenas a parte da data sem fazer conversões de timezone
+      if (typeof dataStr === 'string' && dataStr.includes('T')) {
+        const dateOnly = dataStr.split('T')[0]; // "2026-02-13"
+        const [year, month, day] = dateOnly.split('-');
+        return `${day}/${month}/${year}`;
       }
       
       // Tentar parse de ISO string ou formato YYYY-MM-DD
@@ -404,6 +425,7 @@ export default function VendasFinanceiro() {
       setVendasPorTipo(data.vendas_por_tipo || []);
       setVendasPorGrupo(data.vendas_por_grupo || []);
       setProdutosDetalhados(data.produtos_detalhados || []);
+      setProdutosAnalise(data.produtos_analise || []);
       setListaVendas(data.lista_vendas || []);
 
       if (modoComparacao || abaAtiva === 'comparacao') {
@@ -433,9 +455,83 @@ export default function VendasFinanceiro() {
     }
   };
 
+  // Função para calcular análise inteligente
+  const calcularAnaliseInteligente = () => {
+    if (!produtosAnalise || produtosAnalise.length === 0) {
+      setProdutosMaisLucrativos([]);
+      setProdutosPorCategoria({});
+      return;
+    }
+
+    // Calcular produtos mais lucrativos com margem
+    const produtosComMargem = produtosAnalise.map(produto => {
+      const custo = sanitizarNumero(produto.custo_total);
+      const preco = sanitizarNumero(produto.valor_total);
+      const quantidade = sanitizarNumero(produto.quantidade) || 1;
+      const lucro = preco - custo;
+      const margem = custo > 0 ? ((lucro / custo) * 100) : 0;
+      
+      return {
+        nome: produto.nome || produto.produto || 'Produto sem nome',
+        marca: produto.marca || '-',
+        quantidade: quantidade,
+        custo: sanitizarNumero(custo / quantidade),
+        preco: sanitizarNumero(preco / quantidade),
+        lucro_total: sanitizarNumero(lucro),
+        margem: sanitizarNumero(margem),
+        categoria: produto.categoria || 'Sem Categoria'
+      };
+    });
+
+    // Ordenar por lucro total decrescente
+    const topProdutos = produtosComMargem
+      .sort((a, b) => b.lucro_total - a.lucro_total)
+      .slice(0, 20);
+    
+    setProdutosMaisLucrativos(topProdutos);
+
+    // Agrupar por categoria
+    const porCategoria = {};
+    produtosComMargem.forEach(produto => {
+      const cat = produto.categoria || 'Sem Categoria';
+      if (!porCategoria[cat]) {
+        porCategoria[cat] = {
+          quantidade: 0,
+          total: 0,
+          margens: []
+        };
+      }
+      porCategoria[cat].quantidade += produto.quantidade;
+      porCategoria[cat].total += produto.preco * produto.quantidade;
+      porCategoria[cat].margens.push(produto.margem);
+    });
+
+    // Calcular margem média por categoria
+    Object.keys(porCategoria).forEach(cat => {
+      const margens = porCategoria[cat].margens;
+      const somaMargens = margens.reduce((a, b) => sanitizarNumero(a) + sanitizarNumero(b), 0);
+      porCategoria[cat].margem_media = sanitizarNumero(margens.length > 0 ? somaMargens / margens.length : 0);
+      delete porCategoria[cat].margens;
+    });
+
+    setProdutosPorCategoria(porCategoria);
+  };
+
+  // Recalcular análise quando produtos mudarem
+  useEffect(() => {
+    if (abaAtiva === 'analise') {
+      calcularAnaliseInteligente();
+    }
+  }, [produtosAnalise, abaAtiva]);
+
   useEffect(() => {
     carregarDados();
   }, [dataInicio, dataFim, modoComparacao, periodoComparacao, abaAtiva]);
+
+  // Aplicar filtro "Este mês" ao carregar componente pela primeira vez
+  useEffect(() => {
+    aplicarFiltroRapido('este_mes');
+  }, []); // Roda apenas uma vez ao montar o componente
 
   if (loading) {
     return (
@@ -659,6 +755,16 @@ export default function VendasFinanceiro() {
             }`}
           >
             Comparação de Períodos
+          </button>
+          <button
+            onClick={() => setAbaAtiva('analise')}
+            className={`px-4 py-2 font-medium ${
+              abaAtiva === 'analise'
+                ? 'border-b-2 border-blue-500 text-blue-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Análise Inteligente
           </button>
         </div>
       </div>
@@ -1662,6 +1768,235 @@ export default function VendasFinanceiro() {
           )}
         </div>
       )}
-    </div>
+
+      {/* Aba de Análise Inteligente */}
+      {abaAtiva === 'analise' && (
+        <div className="space-y-6">
+          {/* Indicador de Carregamento */}
+          {loading && (
+            <div className="flex justify-center items-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            </div>
+          )}
+
+          {/* Conteúdo da Análise */}
+          {!loading && (
+            <>
+              {/* Header Informativo */}
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
+                <div className="flex items-center gap-3 mb-2">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <h2 className="text-2xl font-bold">Análise Inteligente de Produtos</h2>
+                </div>
+                <p className="text-blue-100">Identifique os produtos mais lucrativos e oportunidades de melhoria no seu mix de produtos</p>
+              </div>
+
+              {/* Produtos Mais Lucrativos */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold">🏆 Top Produtos por Lucro</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2">
+                        <th className="text-left py-2 px-2">#</th>
+                        <th className="text-left py-2 px-2">Produto</th>
+                        <th className="text-left py-2 px-2">Marca</th>
+                        <th className="text-right py-2 px-2">Qtd</th>
+                        <th className="text-right py-2 px-2">Custo Unit.</th>
+                        <th className="text-right py-2 px-2">Preço Venda</th>
+                        <th className="text-right py-2 px-2">Margem %</th>
+                        <th className="text-right py-2 px-2">Lucro Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {produtosMaisLucrativos.map((produto, index) => (
+                        <tr key={index} className="border-b hover:bg-gray-50">
+                          <td className="py-3 px-2">
+                            <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                              index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                              index === 1 ? 'bg-gray-100 text-gray-800' :
+                              index === 2 ? 'bg-orange-100 text-orange-800' :
+                              'bg-blue-50 text-blue-800'
+                            }`}>
+                              {index + 1}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 font-medium">{produto.nome}</td>
+                          <td className="py-3 px-2 text-gray-600">{produto.marca || '-'}</td>
+                          <td className="py-3 px-2 text-right">{sanitizarNumero(produto.quantidade)}</td>
+                          <td className="py-3 px-2 text-right text-red-600">{formatarMoeda(sanitizarNumero(produto.custo))}</td>
+                          <td className="py-3 px-2 text-right text-green-600">{formatarMoeda(sanitizarNumero(produto.preco))}</td>
+                          <td className="py-3 px-2 text-right">
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                              sanitizarNumero(produto.margem) >= 50 ? 'bg-green-100 text-green-800' :
+                              sanitizarNumero(produto.margem) >= 30 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {sanitizarNumero(produto.margem).toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right font-bold text-green-600">{formatarMoeda(sanitizarNumero(produto.lucro_total))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Análise por Categoria */}
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold mb-4">📊 Desempenho por Categoria</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(produtosPorCategoria).map(([categoria, dados]) => (
+                    <div key={categoria} className="border rounded-lg p-4 hover:shadow-lg transition-shadow">
+                      <div className="font-semibold text-gray-800 mb-2">{categoria}</div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Vendas:</span>
+                          <span className="font-semibold">{sanitizarNumero(dados.quantidade)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Faturamento:</span>
+                          <span className="font-semibold text-green-600">{formatarMoeda(sanitizarNumero(dados.total))}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Margem Média:</span>
+                          <span className={`font-semibold ${
+                            sanitizarNumero(dados.margem_media) >= 40 ? 'text-green-600' : 
+                            sanitizarNumero(dados.margem_media) >= 25 ? 'text-yellow-600' : 
+                            'text-red-600'
+                          }`}>
+                            {sanitizarNumero(dados.margem_media).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Alertas e Recomendações */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Produtos com Baixa Margem */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold">⚠️ Atenção: Margens Baixas</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {produtosMaisLucrativos
+                      .filter(p => sanitizarNumero(p.margem) < 25)
+                      .slice(0, 5)
+                      .map((produto, index) => (
+                        <div key={index} className="p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
+                          <div className="font-medium text-sm">{produto.nome}</div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            Margem: <span className="font-semibold text-red-600">{sanitizarNumero(produto.margem).toFixed(1)}%</span>
+                            {" - "}Revisar preço de custo ou venda
+                          </div>
+                        </div>
+                      ))
+                    }
+                    {produtosMaisLucrativos.filter(p => sanitizarNumero(p.margem) < 25).length === 0 && (
+                      <div className="text-center text-gray-500 py-4">
+                        ✅ Nenhum produto com margem crítica
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Oportunidades */}
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold">💡 Oportunidades</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {produtosMaisLucrativos
+                      .filter(p => sanitizarNumero(p.margem) >= 40 && sanitizarNumero(p.quantidade) < 10)
+                      .slice(0, 3)
+                      .map((produto, index) => (
+                        <div key={index} className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                          <div className="font-medium text-sm">{produto.nome}</div>
+                          <div className="text-xs text-blue-800 mt-1">
+                            <strong>Alta margem ({sanitizarNumero(produto.margem).toFixed(1)}%)</strong> mas poucas vendas ({sanitizarNumero(produto.quantidade)} un.)
+                            <br />
+                            💬 Considere promover este produto
+                          </div>
+                        </div>
+                      ))
+                    }
+                    {produtosMaisLucrativos
+                      .filter(p => sanitizarNumero(p.margem) >= 40)
+                      .slice(0, 2)
+                      .map((produto, index) => (
+                        <div key={`camp-${index}`} className="p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
+                          <div className="font-medium text-sm">{produto.nome}</div>
+                          <div className="text-xs text-green-800 mt-1">
+                            <strong>⭐ Campeão de vendas</strong> com excelente margem
+                            <br />
+                            💬 Mantenha em destaque
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico de Margem vs Volume */}
+              {mostrarGraficos && produtosMaisLucrativos.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-semibold mb-4">📈 Margem vs Volume de Vendas</h3>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={produtosMaisLucrativos.slice(0, 15).map(p => ({
+                      ...p,
+                      margem: sanitizarNumero(p.margem),
+                      quantidade: sanitizarNumero(p.quantidade)
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="nome" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={120}
+                        interval={0}
+                        tick={{ fontSize: 11 }}
+                      />
+                      <YAxis 
+                        yAxisId="left"
+                        orientation="left"
+                        stroke="#10B981"
+                        label={{ value: 'Margem %', angle: -90, position: 'insideLeft' }}
+                      />
+                      <YAxis 
+                        yAxisId="right"
+                        orientation="right"
+                        stroke="#3B82F6"
+                        label={{ value: 'Quantidade', angle: 90, position: 'insideRight' }}
+                      />
+                      <Tooltip />
+                      <Legend />
+                      <Bar yAxisId="left" dataKey="margem" fill="#10B981" name="Margem %" />
+                      <Bar yAxisId="right" dataKey="quantidade" fill="#3B82F6" name="Qtd Vendida" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}    </div>
   );
 }

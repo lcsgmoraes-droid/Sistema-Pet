@@ -23,7 +23,7 @@ export default function EntregasConfig() {
       try {
         const [cfg, pessoas] = await Promise.all([
           api.get("/configuracoes/entregas"),
-          api.get("/clientes", { 
+          api.get("/clientes/", { 
             params: { 
               is_entregador: true, 
               entregador_ativo: true 

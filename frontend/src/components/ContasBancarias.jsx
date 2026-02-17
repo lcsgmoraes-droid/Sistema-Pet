@@ -44,7 +44,7 @@ function ContasBancarias() {
   const carregarContas = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/contas-bancarias');
+      const response = await api.get('/contas-bancarias');
       setContas(response.data);
     } catch (error) {
       console.error('Erro:', error);
@@ -104,9 +104,9 @@ function ContasBancarias() {
       console.log('Enviando dados:', dadosEnvio);
       
       if (contaSelecionada) {
-        await api.put(`/api/contas-bancarias/${contaSelecionada.id}`, dadosEnvio);
+        await api.put(`/contas-bancarias/${contaSelecionada.id}`, dadosEnvio);
       } else {
-        await api.post('/api/contas-bancarias', dadosEnvio);
+        await api.post('/contas-bancarias', dadosEnvio);
       }
       
       await carregarContas();
@@ -123,7 +123,7 @@ function ContasBancarias() {
     if (!confirm('Deseja realmente excluir esta conta?')) return;
     
     try {
-      await api.delete(`/api/contas-bancarias/${id}`);
+      await api.delete(`/contas-bancarias/${id}`);
       await carregarContas();
     } catch (error) {
       console.error('Erro:', error);

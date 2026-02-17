@@ -3,19 +3,26 @@ Endpoint de Relatório de Vendas
 Similar ao SimplesVet com abas: Resumo, Totais por produto, Lista de Vendas
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from datetime import datetime, date
 from typing import Optional
 from io import BytesIO
+import json
+import logging
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .vendas_models import Venda, VendaItem, VendaPagamento
 from .produtos_models import Produto
-from .models import User
+from .models import User, Cliente
+from .comissoes_models import ComissaoItem
+from .empresa_config_fiscal_models import EmpresaConfigFiscal
+from .financeiro_models import FormaPagamento
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/relatorios")
 
@@ -71,7 +78,10 @@ async def obter_relatorio_vendas(
     em_aberto = 0
     for v in vendas:
         if v.status != 'finalizada':
-            total_pago = sum(float(p.valor) for p in v.pagamentos) if v.pagamentos else 0
+            pagamentos = db.query(VendaPagamento).filter(
+                and_(VendaPagamento.venda_id == v.id, VendaPagamento.tenant_id == tenant_id)
+            ).all()
+            total_pago = sum(float(p.valor) for p in pagamentos) if pagamentos else 0
             em_aberto += (float(v.total) - total_pago)
     
     percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
@@ -110,7 +120,10 @@ async def obter_relatorio_vendas(
         vendas_por_data[data_str]["desconto"] += venda.desconto_valor or 0
         vendas_por_data[data_str]["valor_liquido"] += venda.total
         
-        total_pago = sum(p.valor for p in venda.pagamentos) if venda.pagamentos else 0
+        pagamentos = db.query(VendaPagamento).filter(
+            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
+        ).all()
+        total_pago = sum(p.valor for p in pagamentos) if pagamentos else 0
         vendas_por_data[data_str]["valor_recebido"] += total_pago
         vendas_por_data[data_str]["saldo_aberto"] += (venda.total - total_pago) if venda.status != 'finalizada' else 0
     
@@ -146,7 +159,9 @@ async def obter_relatorio_vendas(
     
     formas_recebimento = {}
     for venda in vendas:
-        pagamentos = db.query(VendaPagamento).filter(VendaPagamento.venda_id == venda.id).all()
+        pagamentos = db.query(VendaPagamento).filter(
+            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
+        ).all()
         for pag in pagamentos:
             forma_codigo = str(pag.forma_pagamento) if pag.forma_pagamento else "Não informado"
             forma_base = FORMAS_PAGAMENTO_MAP.get(forma_codigo, forma_codigo)
@@ -186,7 +201,9 @@ async def obter_relatorio_vendas(
     for venda in vendas:
         funcionario_id = venda.user_id
         if funcionario_id:
-            user = db.query(User).filter(User.id == funcionario_id).first()
+            user = db.query(User).filter(
+                and_(User.id == funcionario_id, User.tenant_id == tenant_id)
+            ).first()
             nome_func = user.nome if user else f"ID {funcionario_id}"
         else:
             nome_func = "Sem funcionário"
@@ -229,9 +246,13 @@ async def obter_relatorio_vendas(
     total_geral = sum(v.total for v in vendas)
     
     for venda in vendas:
-        itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+        itens = db.query(VendaItem).filter(
+            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
+        ).all()
         for item in itens:
-            produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
+            produto = db.query(Produto).filter(
+                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
+            ).first()
             if produto and produto.categoria:
                 grupo = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
@@ -267,10 +288,14 @@ async def obter_relatorio_vendas(
     produtos_por_categoria = {}
     
     for venda in vendas:
-        itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+        itens = db.query(VendaItem).filter(
+            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
+        ).all()
         for item in itens:
             produto_id = item.produto_id
-            produto = db.query(Produto).filter(Produto.id == produto_id).first()
+            produto = db.query(Produto).filter(
+                and_(Produto.id == produto_id, Produto.tenant_id == tenant_id)
+            ).first()
             
             # Determinar categoria e subcategoria
             if produto and produto.categoria:
@@ -438,7 +463,90 @@ async def obter_relatorio_vendas(
     
     for venda in vendas:
         # Buscar itens da venda
-        itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+        itens = db.query(VendaItem).filter(
+            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
+        ).all()
+
+        # ==============================
+        # CALCULO DE RENTABILIDADE (safe)
+        # ==============================
+        taxa_total = 0.0
+        comissao = 0.0
+        impostos_percentual = 0.0
+        taxa_operacional_entrega = 0.0
+
+        # Taxa de cartao por FormaPagamento (JSON taxas_por_parcela)
+        pagamentos = db.query(VendaPagamento).filter(
+            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
+        ).all()
+        for pag in pagamentos:
+            taxa_percentual = 0.0
+            if pag.forma_pagamento:
+                forma_pag = db.query(FormaPagamento).filter(
+                    and_(
+                        func.lower(func.trim(FormaPagamento.nome)) == func.lower(func.trim(pag.forma_pagamento)),
+                        FormaPagamento.ativo == True,
+                        FormaPagamento.tenant_id == tenant_id
+                    )
+                ).first()
+                if not forma_pag:
+                    logger.warning(
+                        "FormaPagamento nao encontrada: %s (venda_id=%s)",
+                        pag.forma_pagamento,
+                        venda.id
+                    )
+                else:
+                    taxas_por_parcela = forma_pag.taxas_por_parcela
+                    if isinstance(taxas_por_parcela, str):
+                        try:
+                            taxas_por_parcela = json.loads(taxas_por_parcela)
+                        except Exception:
+                            logger.warning(
+                                "taxas_por_parcela invalido para FormaPagamento %s",
+                                forma_pag.nome
+                            )
+                            taxas_por_parcela = None
+
+                    if isinstance(taxas_por_parcela, dict) and pag.numero_parcelas:
+                        taxa_percentual = float(
+                            taxas_por_parcela.get(str(pag.numero_parcelas), 0) or 0
+                        )
+                    elif forma_pag.taxa_percentual:
+                        taxa_percentual = float(forma_pag.taxa_percentual)
+            else:
+                logger.warning("Pagamento sem forma_pagamento (venda_id=%s)", venda.id)
+
+            taxa_total += (float(pag.valor or 0) * taxa_percentual / 100.0)
+
+        # Comissao real da tabela comissoes_itens
+        comissoes_itens = db.query(ComissaoItem).filter(
+            and_(ComissaoItem.venda_id == venda.id, ComissaoItem.tenant_id == tenant_id)
+        ).all()
+        if not comissoes_itens:
+            logger.warning("Sem comissao para venda_id=%s", venda.id)
+        for com_item in comissoes_itens:
+            comissao += float(com_item.valor_comissao or 0)
+
+        # Imposto (config fiscal)
+        config_fiscal = db.query(EmpresaConfigFiscal).filter(
+            EmpresaConfigFiscal.tenant_id == tenant_id
+        ).first()
+        if not config_fiscal or not config_fiscal.aliquota_simples_vigente:
+            logger.warning("Config fiscal ausente ou sem aliquota (tenant_id=%s)", tenant_id)
+        else:
+            impostos_percentual = float(config_fiscal.aliquota_simples_vigente)
+
+        # Taxa operacional de entrega
+        if venda.tem_entrega and venda.entregador_id:
+            entregador = db.query(Cliente).filter(
+                and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
+            ).first()
+            if not entregador:
+                logger.warning("Entregador nao encontrado (id=%s)", venda.entregador_id)
+            elif entregador.taxa_fixa_entrega:
+                taxa_operacional_entrega = float(entregador.taxa_fixa_entrega)
+        else:
+            logger.warning("Venda sem entregador para taxa operacional (venda_id=%s)", venda.id)
         
         # Calcular CUSTO TOTAL e SUBTOTAL dos produtos para rateio
         custo_total = 0
@@ -447,7 +555,9 @@ async def obter_relatorio_vendas(
         
         # Primeiro loop: calcular totais
         for item in itens:
-            produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
+            produto = db.query(Produto).filter(
+                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
+            ).first()
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             custo_item = custo_unitario * float(item.quantidade)
             subtotal_item = float(item.quantidade) * float(item.preco_unitario)
@@ -455,21 +565,11 @@ async def obter_relatorio_vendas(
             custo_total += custo_item
             subtotal_itens += subtotal_item
         
-        # Calcular TAXAS de cartão/pagamento
-        pagamentos = db.query(VendaPagamento).filter(VendaPagamento.venda_id == venda.id).all()
-        taxa_total = 0
-        for pag in pagamentos:
-            forma = pag.forma_pagamento if pag.forma_pagamento else 'Dinheiro'
-            taxa_percentual = TAXAS_CARTAO.get(forma, 0)
-            taxa_valor = (float(pag.valor) * taxa_percentual / 100)
-            taxa_total += taxa_valor
-        
-        # Calcular COMISSÃO apenas se houver campo marcado (atualmente 0 até implementar checkbox no PDV)
-        comissao = 0
-        
         # Segundo loop: calcular rateio para cada item
         for item in itens:
-            produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
+            produto = db.query(Produto).filter(
+                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
+            ).first()
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             quantidade = float(item.quantidade)
             preco_unit = float(item.preco_unitario)
@@ -486,12 +586,22 @@ async def obter_relatorio_vendas(
             taxa_entrega_rateada = float(venda.taxa_entrega or 0) * percentual_item
             taxa_cartao_rateada = taxa_total * percentual_item
             comissao_rateada = comissao * percentual_item
+            imposto_rateado = (subtotal_item * impostos_percentual / 100.0) * percentual_item
+            taxa_operacional_rateada = taxa_operacional_entrega * percentual_item
             
             # Valor líquido do item
             valor_liquido_item = subtotal_item - desconto_rateado
             
             # Lucro do item
-            lucro_item = valor_liquido_item - custo_item - taxa_entrega_rateada - taxa_cartao_rateada - comissao_rateada
+            lucro_item = (
+                valor_liquido_item
+                - custo_item
+                - taxa_entrega_rateada
+                - taxa_cartao_rateada
+                - comissao_rateada
+                - imposto_rateado
+                - taxa_operacional_rateada
+            )
             
             # Margens do item
             margem_sobre_venda_item = (lucro_item / valor_liquido_item * 100) if valor_liquido_item > 0 else 0
@@ -511,6 +621,8 @@ async def obter_relatorio_vendas(
                 "taxa_entrega": round(taxa_entrega_rateada, 2),
                 "taxa_cartao": round(taxa_cartao_rateada, 2),
                 "comissao": round(comissao_rateada, 2),
+                "imposto": round(imposto_rateado, 2),
+                "taxa_operacional": round(taxa_operacional_rateada, 2),
                 "custo_unitario": round(custo_unitario, 2),
                 "custo_total": round(custo_item, 2),
                 "valor_liquido": round(valor_liquido_item, 2),
@@ -521,7 +633,16 @@ async def obter_relatorio_vendas(
             })
         
         # Calcular LUCRO
-        lucro = float(venda.total) - custo_total - taxa_total - comissao - float(venda.taxa_entrega or 0)
+        imposto_total = float(venda.total) * (impostos_percentual / 100.0)
+        lucro = (
+            float(venda.total)
+            - custo_total
+            - taxa_total
+            - comissao
+            - imposto_total
+            - float(venda.taxa_entrega or 0)
+            - taxa_operacional_entrega
+        )
         
         # Calcular MARGENS
         margem_sobre_venda = (lucro / float(venda.total) * 100) if venda.total > 0 else 0
@@ -543,6 +664,8 @@ async def obter_relatorio_vendas(
             "taxa_entrega": round(float(venda.taxa_entrega or 0), 2),
             "taxa_cartao": round(taxa_total, 2),
             "comissao": round(comissao, 2),
+            "imposto": round(imposto_total, 2),
+            "taxa_operacional": round(taxa_operacional_entrega, 2),
             "custo_produtos": round(custo_total, 2),
             "venda_liquida": round(float(venda.total), 2),
             "lucro": round(lucro, 2),
@@ -678,7 +801,9 @@ async def exportar_vendas_pdf(
         # Formas de recebimento
         formas_dict = {}
         for v in vendas:
-            pagamentos = db.query(VendaPagamento).filter(VendaPagamento.venda_id == v.id).all()
+            pagamentos = db.query(VendaPagamento).filter(
+                and_(VendaPagamento.venda_id == v.id, VendaPagamento.tenant_id == tenant_id)
+            ).all()
             for p in pagamentos:
                 forma = p.forma_pagamento or 'Não informado'
                 if forma not in formas_dict:
@@ -703,7 +828,9 @@ async def exportar_vendas_pdf(
         # Produtos detalhados
         prod_dict = {}
         for v in vendas:
-            itens = db.query(VendaItem).filter(VendaItem.venda_id == v.id).all()
+            itens = db.query(VendaItem).filter(
+                and_(VendaItem.venda_id == v.id, VendaItem.tenant_id == tenant_id)
+            ).all()
             for item in itens:
                 prod_nome = item.produto.nome if item.produto else 'Produto sem nome'
                 if prod_nome not in prod_dict:

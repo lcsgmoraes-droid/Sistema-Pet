@@ -136,7 +136,7 @@ export const deleteDepartamento = (id) => {
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, departamento_id, estoque_baixo, em_promocao
  */
 export const getProdutos = (params = {}) => {
-  return api.get('/produtos', { params });
+  return api.get('/produtos/', { params });
 };
 
 /**

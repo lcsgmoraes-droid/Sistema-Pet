@@ -45,7 +45,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
         }
 
         console.log('🔄 Carregando operadoras...');
-        const response = await api.get('/api/operadoras-cartao?apenas_ativas=true');
+        const response = await api.get('/operadoras-cartao?apenas_ativas=true');
         console.log('✅ Operadoras carregadas:', response.data);
         setOperadoras(response.data);
         
@@ -119,7 +119,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
       console.log('📝 Operadora ID:', operadoraSelecionada.id);
 
       // Chamar novo endpoint com persistência
-      const response = await api.post('/api/conciliacao/aba1/upload-e-conciliar', formData, {
+      const response = await api.post('/conciliacao/aba1/upload-e-conciliar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

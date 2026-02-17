@@ -48,7 +48,7 @@ const CategoriasFinanceiras = () => {
   const carregarCategorias = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/categorias-financeiras/');
+      const response = await api.get('/categorias-financeiras/');
       console.log('📂 Categorias carregadas:', response.data.length);
       console.log('🔍 Primeira categoria:', response.data[0]);
       setCategorias(response.data);
@@ -124,7 +124,7 @@ const CategoriasFinanceiras = () => {
       let categoriaId;
       
       if (editando) {
-        await api.put(`/api/categorias-financeiras/${editando}`, {
+        await api.put(`/categorias-financeiras/${editando}`, {
           nome: formData.nome,
           tipo: formData.tipo,
           cor: formData.cor,
@@ -135,7 +135,7 @@ const CategoriasFinanceiras = () => {
         categoriaId = editando;
         toast.success('Categoria atualizada com sucesso!');
       } else {
-        const response = await api.post('/api/categorias-financeiras/', {
+        const response = await api.post('/categorias-financeiras/', {
           nome: formData.nome,
           tipo: formData.tipo,
           cor: formData.cor,
@@ -211,7 +211,7 @@ const CategoriasFinanceiras = () => {
     if (!window.confirm('Deseja realmente excluir esta categoria?')) return;
     
     try {
-      await api.delete(`/api/categorias-financeiras/${id}`);
+      await api.delete(`/categorias-financeiras/${id}`);
       toast.success('Categoria excluída com sucesso!');
       carregarDados();
     } catch (error) {

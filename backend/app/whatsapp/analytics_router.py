@@ -14,7 +14,7 @@ from app.whatsapp.analytics import WhatsAppAnalyticsService
 from pydantic import BaseModel, Field
 
 
-router = APIRouter(prefix="/api/whatsapp/analytics", tags=["WhatsApp Analytics"])
+router = APIRouter(prefix="/whatsapp/analytics", tags=["WhatsApp Analytics"])
 
 
 class DateRangeQuery(BaseModel):

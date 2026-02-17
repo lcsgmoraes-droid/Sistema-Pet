@@ -41,7 +41,7 @@ const ChatIAModal = ({ isOpen, onClose, contexto }) => {
     setEnviando(true);
 
     try {
-      const response = await api.post('/api/ia/chat', {
+      const response = await api.post('/ia/chat', {
         mensagem: inputMensagem,
         contexto: contexto
       });

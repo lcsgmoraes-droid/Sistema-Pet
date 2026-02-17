@@ -198,12 +198,28 @@ except Exception as e:
 # Configurar Rate Limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=["1000/hour"])
 
-# Criar app
+# Criar app  
 app = FastAPI(
     title=SYSTEM_NAME,
     description="Sistema completo de gestão para Pet Shop",
     version=SYSTEM_VERSION
 )
+
+# ====================
+# PROXY HEADERS - Para HTTPS atrás de reverse proxy (nginx)
+# ====================
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+
+# Confia nos headers X-Forwarded-* do nginx
+@app.middleware("http")
+async def proxy_headers_middleware(request: Request, call_next):
+    """Respeita X-Forwarded-Proto para redirects HTTPS"""
+    # Se nginx enviou X-Forwarded-Proto: https, o FastAPI deve usar HTTPS nos redirects
+    if request.headers.get("X-Forwarded-Proto") == "https":
+        request.scope["scheme"] = "https"
+    response = await call_next(request)
+    return response
 
 # ====================
 # MIDDLEWARE DE REQUEST CONTEXT (PRÉ-PROD BLOCO 4)
@@ -494,12 +510,12 @@ app.include_router(pendencia_estoque_router, tags=["Pendências de Estoque - Lis
 # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7
 # ============================================================================
 app.include_router(whatsapp_webhook_router)  # Webhooks 360dialog (sem auth)
-app.include_router(whatsapp_config_router)   # Configuração (com auth)
-app.include_router(whatsapp_handoff_router)  # Sprint 4: Human Handoff (com auth)
+app.include_router(whatsapp_config_router, prefix="/api")   # Configuração (com auth)
+app.include_router(whatsapp_handoff_router, prefix="/api")  # Sprint 4: Human Handoff (com auth)
 app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
-app.include_router(whatsapp_api_router)  # Sprint 6: Tools & Tests (com auth)
-app.include_router(whatsapp_analytics_router)  # Sprint 7: Analytics & Reports (com auth)
-app.include_router(whatsapp_security_router)  # Sprint 8: Security & LGPD (com auth)
+app.include_router(whatsapp_api_router, prefix="/api")  # Sprint 6: Tools & Tests (com auth)
+app.include_router(whatsapp_analytics_router, prefix="/api")  # Sprint 7: Analytics & Reports (com auth)
+app.include_router(whatsapp_security_router, prefix="/api")  # Sprint 8: Security & LGPD (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
 

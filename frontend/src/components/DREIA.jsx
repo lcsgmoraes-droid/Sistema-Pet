@@ -45,7 +45,7 @@ export default function DREIA() {
     setLoading(true);
     try {
       // Buscar DRE período
-      const respPeriodo = await api.get('/api/ia/dre/periodo', {
+      const respPeriodo = await api.get('/ia/dre/periodo', {
         params: {
           usuario_id: usuarioId,
           data_inicio: dataInicio,
@@ -54,7 +54,7 @@ export default function DREIA() {
       });
       
       // Buscar DRE por canais
-      const respCanais = await api.get('/api/ia/dre/canais', {
+      const respCanais = await api.get('/ia/dre/canais', {
         params: {
           usuario_id: usuarioId,
           data_inicio: dataInicio,
@@ -63,7 +63,7 @@ export default function DREIA() {
       });
       
       // Buscar DRE consolidado
-      const respConsolidado = await api.get('/api/ia/dre/consolidado', {
+      const respConsolidado = await api.get('/ia/dre/consolidado', {
         params: {
           usuario_id: usuarioId,
           data_inicio: dataInicio,
@@ -122,7 +122,7 @@ export default function DREIA() {
         alocacoes: alocacoes
       };
       
-      await api.post('/api/ia/dre/alocacao', payload);
+      await api.post('/ia/dre/alocacao', payload);
       toast.success('Alocação salva com sucesso!');
       carregarDados();
     } catch (error) {

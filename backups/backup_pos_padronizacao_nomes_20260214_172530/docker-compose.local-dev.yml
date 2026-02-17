@@ -1,0 +1,101 @@
+# ============================================================================
+# 🔵 DOCKER COMPOSE - LOCAL DEV (TESTES)
+# ============================================================================
+# 
+# Para que serve: Desenvolvimento e testes locais
+# Porta Postgres: 5433
+# Porta Backend: 8000
+# Dados: Fictícios/Teste
+# 
+# COMO USAR:
+# docker-compose -f docker-compose.local-dev.yml up -d
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # POSTGRESQL - Banco de dados de DESENVOLVIMENTO
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: petshop-dev-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=petshop_dev
+      - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    networks:
+      - dev-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d petshop_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5433:5432"  # Mapeado para 5433 no host para compatibilidade
+
+  # ==========================================================================
+  # BACKEND - FastAPI + SQLAlchemy
+  # ==========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petshop-dev-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - RUNNING_IN_DOCKER=true
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/petshop_dev
+      - JWT_SECRET_KEY=dev-secret-key-not-for-production
+      - ADMIN_TOKEN=dev_admin_token
+      - FRONTEND_URL=http://localhost:5173
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:8000
+      - GOOGLE_MAPS_API_KEY=AIzaSyClc2jpIcrb2PrCaOBkzQc4XCmEVFlWiO0
+      - OPENAI_API_KEY=
+      - BLING_CLIENT_ID=
+      - BLING_CLIENT_SECRET=
+      - STONE_CLIENT_ID=sk_cb70739f3d554f57a84db078586f5637
+      - STONE_CLIENT_SECRET=sk_cb70739f3d554f57a84db078586f5637
+      - STONE_MERCHANT_ID=691890226
+      - STONE_SANDBOX=false
+      - RATE_LIMIT_ENABLED=false
+      - RATE_LIMIT_PER_MINUTE=1000
+      - LOG_LEVEL=DEBUG
+    volumes:
+      # Volume para código (hot reload)
+      - ./backend:/app
+      - /app/__pycache__
+    networks:
+      - dev-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+# ==========================================================================
+# VOLUMES - Persistência de dados
+# ==========================================================================
+volumes:
+  postgres-dev-data:
+    name: petshop-dev-postgres-data
+
+# ==========================================================================
+# NETWORKS
+# ==========================================================================
+networks:
+  dev-network:
+    name: petshop-dev-network
+    driver: bridge

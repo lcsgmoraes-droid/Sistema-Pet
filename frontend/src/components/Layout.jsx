@@ -146,6 +146,7 @@ const Layout = () => {
         { path: '/cadastros/categorias', label: 'Categorias de Produtos', permission: 'cadastros.categorias_produtos' },
         { path: '/cadastros/categorias-financeiras', label: 'Categorias Financeiras', permission: 'cadastros.categorias_financeiras' },
         { path: '/cadastros/especies-racas', label: 'Espécies e Raças', permission: 'cadastros.especies_racas' },
+        { path: '/cadastros/opcoes-racao', label: 'Opções de Ração', permission: 'produtos.editar' },
         { path: '/cadastros/financeiro/bancos', label: 'Bancos', permission: 'cadastros.bancos' },
         { path: '/cadastros/financeiro/formas-pagamento', label: 'Formas de Pagamento', permission: 'cadastros.formas_pagamento' },
         { path: '/cadastros/financeiro/operadoras', label: 'Operadoras de Cartão', permission: 'cadastros.operadoras' },
@@ -169,6 +170,7 @@ const Layout = () => {
         { path: '/ia/chat', label: 'Chat IA', permission: null }, // Sempre disponível
         { path: '/ia/fluxo-caixa', label: 'Fluxo de Caixa Preditivo', permission: 'ia.fluxo_caixa' },
         { path: '/ia/whatsapp', label: 'Bot WhatsApp', permission: 'ia.whatsapp' },
+        { path: '/ia/alertas-racao', label: '⚠ Alertas Rações', permission: 'produtos.editar' },
       ]
     },
     { 

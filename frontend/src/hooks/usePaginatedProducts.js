@@ -30,7 +30,7 @@ export const usePaginatedProducts = (filters = {}, pageSize = 50) => {
     setError(null);
 
     try {
-      const response = await api.get('/produtos', {
+      const response = await api.get('/produtos/', {
         params: {
           ...filters,
           page,

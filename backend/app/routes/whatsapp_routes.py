@@ -22,7 +22,7 @@ from app.whatsapp.ai_service import get_ai_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/whatsapp", tags=["WhatsApp"])
+router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
 
 # ============================================================================

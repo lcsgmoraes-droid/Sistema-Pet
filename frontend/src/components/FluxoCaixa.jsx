@@ -9,6 +9,7 @@ import {
 import ChatIAModal from './ChatIAModal';
 import ProjecoesIA from './ProjecoesIA';
 import AlertasIA from './AlertasIA';
+import { safeArray } from '../utils/safeArray';
 
 const FluxoCaixa = () => {
   const navigate = useNavigate();
@@ -60,7 +61,7 @@ const FluxoCaixa = () => {
 
   const carregarContasBancarias = async () => {
     try {
-      const response = await api.get(`/api/contas-bancarias`);
+      const response = await api.get(`/contas-bancarias`);
       setContasBancarias(response.data);
     } catch (error) {
       console.error('Erro ao carregar contas bancárias:', error);
@@ -296,7 +297,7 @@ const FluxoCaixa = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
             >
               <option value="">Todas as Contas</option>
-              {contasBancarias.map(conta => (
+              {safeArray(contasBancarias).map(conta => (
                 <option key={conta.id} value={conta.id}>{conta.nome}</option>
               ))}
             </select>
@@ -516,8 +517,8 @@ const FluxoCaixa = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {dados.periodos && dados.periodos.length > 0 ? (
-                    dados.periodos
+                  {safeArray(dados?.periodos).length > 0 ? (
+                    safeArray(dados?.periodos)
                       .filter(periodo => {
                         // Se o filtro estiver ativo, mostra apenas períodos com movimentações
                         if (!apenasComLancamentos) return true;
@@ -576,7 +577,7 @@ const FluxoCaixa = () => {
                               <td colSpan="7" className="px-6 py-4">
                                 <div className="space-y-2">
                                   <h4 className="font-bold text-gray-700 mb-3">📋 Movimentações Detalhadas</h4>
-                                  {movimentacoes.map((mov, movIdx) => (
+                                  {safeArray(movimentacoes).map((mov, movIdx) => (
                                     <div
                                       key={movIdx}
                                       className={`flex justify-between items-center p-2 rounded ${

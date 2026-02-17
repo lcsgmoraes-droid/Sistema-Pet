@@ -30,8 +30,8 @@ export default function DashboardFinanceiro() {
       const [resPagar, resReceber, resContas, resResumo] = await Promise.all([
         api.get(`/contas-pagar/dashboard/resumo`, config),
         api.get(`/contas-receber/dashboard/resumo`, config),
-        api.get(`/api/contas-bancarias?apenas_ativas=true`, config),
-        api.get(`/api/contas-bancarias/resumo/saldos`, config)
+        api.get(`/contas-bancarias?apenas_ativas=true`, config),
+        api.get(`/contas-bancarias/resumo/saldos`, config)
       ]);
 
       setResumoPagar(resPagar.data);

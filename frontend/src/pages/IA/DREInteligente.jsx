@@ -38,7 +38,7 @@ export default function DREInteligente() {
   const carregarDREs = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/api/ia/dre/listar');
+      const response = await api.get('/ia/dre/listar');
       setDres(response.data);
       
       if (response.data.length > 0) {
@@ -55,19 +55,19 @@ export default function DREInteligente() {
   const carregarDetalhes = async (dreId) => {
     try {
       // Carregar DRE completo
-      const dreResponse = await api.get(`/api/ia/dre/${dreId}`);
+      const dreResponse = await api.get(`/ia/dre/${dreId}`);
       setDreAtual(dreResponse.data);
       
       // Carregar produtos
-      const produtosResponse = await api.get(`/api/ia/dre/${dreId}/produtos`);
+      const produtosResponse = await api.get(`/ia/dre/${dreId}/produtos`);
       setProdutos(produtosResponse.data);
       
       // Carregar categorias
-      const categoriasResponse = await api.get(`/api/ia/dre/${dreId}/categorias`);
+      const categoriasResponse = await api.get(`/ia/dre/${dreId}/categorias`);
       setCategorias(categoriasResponse.data);
       
       // Carregar insights
-      const insightsResponse = await api.get(`/api/ia/dre/${dreId}/insights`);
+      const insightsResponse = await api.get(`/ia/dre/${dreId}/insights`);
       setInsights(insightsResponse.data);
       
     } catch (error) {
@@ -79,7 +79,7 @@ export default function DREInteligente() {
   const calcularMesAtual = async () => {
     setCalculando(true);
     try {
-      const response = await api.post('/api/ia/dre/calcular-mes-atual', {});
+      const response = await api.post('/ia/dre/calcular-mes-atual', {});
       
       toast.success('DRE do mês atual calculado!');
       carregarDREs();
@@ -95,7 +95,7 @@ export default function DREInteligente() {
   const calcularMesPassado = async () => {
     setCalculando(true);
     try {
-      const response = await api.post('/api/ia/dre/calcular-mes-passado', {});
+      const response = await api.post('/ia/dre/calcular-mes-passado', {});
       
       toast.success('DRE do mês passado calculado!');
       carregarDREs();
@@ -116,7 +116,7 @@ export default function DREInteligente() {
     
     setCalculando(true);
     try {
-      const response = await api.post('/api/ia/dre/calcular', periodoCustom);
+      const response = await api.post('/ia/dre/calcular', periodoCustom);
       
       toast.success('DRE calculado!');
       carregarDREs();

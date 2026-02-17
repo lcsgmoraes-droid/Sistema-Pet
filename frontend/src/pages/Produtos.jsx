@@ -67,7 +67,7 @@ const PRODUTOS_COLUNAS = [
           <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border border-gray-200 flex-shrink-0">
             {produto.imagem_principal ? (
               <img 
-                src={`http://127.0.0.1:8000${produto.imagem_principal}`} 
+                src={produto.imagem_principal.startsWith('http') ? produto.imagem_principal : `${window.location.origin}${produto.imagem_principal}`} 
                 alt={produto.nome}
                 className="w-full h-full object-cover object-center"
                 onError={(e) => {
@@ -1047,6 +1047,93 @@ export default function Produtos() {
         </div>
       </div>
 
+      {/* Paginação Superior */}
+      {!loading && totalItens > 0 && (
+        <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg flex items-center justify-between mt-6 mb-0">
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a {Math.min(paginaAtual * itensPorPagina, totalItens)} de {totalItens} produtos
+            </span>
+            <select
+              value={itensPorPagina}
+              onChange={(e) => {
+                setItensPorPagina(Number(e.target.value));
+                setPaginaAtual(1);
+              }}
+              className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value={10}>10 por página</option>
+              <option value={20}>20 por página</option>
+              <option value={30}>30 por página</option>
+              <option value={50}>50 por página</option>
+              <option value={100}>100 por página</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPaginaAtual(1)}
+              disabled={paginaAtual === 1}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Primeira
+            </button>
+            <button
+              onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+              disabled={paginaAtual === 1}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+
+            {/* Páginas numeradas */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(totalPaginas, 5) }, (_, i) => {
+                let pageNum;
+                if (totalPaginas <= 5) {
+                  pageNum = i + 1;
+                } else if (paginaAtual <= 3) {
+                  pageNum = i + 1;
+                } else if (paginaAtual >= totalPaginas - 2) {
+                  pageNum = totalPaginas - 4 + i;
+                } else {
+                  pageNum = paginaAtual - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPaginaAtual(pageNum)}
+                    className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
+                      paginaAtual === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaAtual === totalPaginas}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Próxima
+            </button>
+            <button
+              onClick={() => setPaginaAtual(totalPaginas)}
+              disabled={paginaAtual === totalPaginas}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Última
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabela */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -1169,7 +1256,7 @@ export default function Produtos() {
           </table>
         </div>
 
-        {/* Paginação */}
+        {/* Paginação Inferior */}
         {!loading && totalItens > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-4">

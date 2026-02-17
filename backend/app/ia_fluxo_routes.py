@@ -15,7 +15,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .financeiro_models import ContaPagar, ContaReceber, ContaBancaria, LancamentoManual
 
-router = APIRouter(prefix="/api", tags=["IA Fluxo Caixa"])
+router = APIRouter(tags=["IA Fluxo Caixa"])
 
 
 @router.get("/financeiro/movimentacoes")

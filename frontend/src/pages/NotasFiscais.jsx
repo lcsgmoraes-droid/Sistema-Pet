@@ -50,7 +50,7 @@ export default function NotasFiscais() {
       if (dataInicial) params.append('data_inicial', dataInicial);
       if (dataFinal) params.append('data_final', dataFinal);
       
-      const response = await api.get(`/nfe?${params.toString()}`);
+      const response = await api.get(`/nfe/?${params.toString()}`);
       setNotas(response.data.notas || []);
     } catch (error) {
       console.error('Erro ao carregar notas:', error);

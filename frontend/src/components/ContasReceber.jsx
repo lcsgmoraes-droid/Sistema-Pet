@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
+import { safeArray } from '../utils/safeArray';
 
 const ContasReceber = () => {
   const navigate = useNavigate();
@@ -64,22 +65,22 @@ const ContasReceber = () => {
         api.get(`/contas-receber/`, { headers }),
         api.get(`/clientes/`, { headers }),
         api.get(`/financeiro/formas-pagamento/`, { headers }),
-        api.get(`/api/contas-bancarias?apenas_ativas=true`, { headers })
+        api.get(`/contas-bancarias?apenas_ativas=true`, { headers })
       ]);
       
       console.log('📊 Contas carregadas:', contasRes.data.length, 'contas');
-      console.log('📋 Status das contas:', contasRes.data.map(c => ({ id: c.id, status: c.status, descricao: c.descricao })));
-      console.log('� Todas as vendas nos contas:', contasRes.data.map(c => c.numero_venda).filter(n => n));
+      console.log('📋 Status das contas:', safeArray(contasRes.data).map(c => ({ id: c.id, status: c.status, descricao: c.descricao })));
+      console.log('🔢 Todas as vendas nos contas:', safeArray(contasRes.data).map(c => c.numero_venda).filter(n => n));
       console.log('🎯 Procurando venda 202601100007:', contasRes.data.find(c => c.numero_venda === '202601100007' || c.descricao?.includes('202601100007')));
-      console.log('�📦 Antes de setContas:', contasRes.data);
+      console.log('📦 Antes de setContas:', contasRes.data);
       // Ordenar por ID (mais recentes primeiro por padrão)
-      const contasOrdenadas = [...contasRes.data].sort((a, b) => b.id - a.id);
+      const contasOrdenadas = [...safeArray(contasRes.data)].sort((a, b) => b.id - a.id);
       setContas(contasOrdenadas);
       console.log('✅ Contas setadas no estado');
-      setClientes(clientesRes.data);
-      setClientes(clientesRes.data);
-      setFormasPagamento(formasRes.data);
-      setContasBancarias(bancariasRes.data);
+      setClientes(safeArray(clientesRes.data));
+      setClientes(safeArray(clientesRes.data));
+      setFormasPagamento(safeArray(formasRes.data));
+      setContasBancarias(safeArray(bancariasRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar contas a receber');
@@ -302,7 +303,7 @@ const ContasReceber = () => {
               onChange={(e) => setFiltros({...filtros, cliente_id: e.target.value || null})}
             >
               <option value="">Todos</option>
-              {clientes.map(c => (
+              {safeArray(clientes).map(c => (
                 <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
             </select>
@@ -375,14 +376,14 @@ const ContasReceber = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {contas.length === 0 ? (
+              {safeArray(contas).length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                     Nenhuma conta encontrada
                   </td>
                 </tr>
               ) : (
-                contas
+                safeArray(contas)
                   .filter(conta => {
                     // Filtro local por número de venda
                     if (!buscaNumeroVenda) return true;
@@ -554,7 +555,7 @@ const ContasReceber = () => {
                     onChange={(e) => setDadosRecebimento({...dadosRecebimento, forma_pagamento_id: parseInt(e.target.value) || null})}
                   >
                     <option value="">Selecione...</option>
-                    {formasPagamento.map(f => (
+                    {safeArray(formasPagamento).map(f => (
                       <option key={f.id} value={f.id}>{f.nome}</option>
                     ))}
                   </select>
@@ -568,7 +569,7 @@ const ContasReceber = () => {
                     onChange={(e) => setDadosRecebimento({...dadosRecebimento, conta_bancaria_id: parseInt(e.target.value) || null})}
                   >
                     <option value="">Selecione a conta...</option>
-                    {contasBancarias.map(c => (
+                    {safeArray(contasBancarias).map(c => (
                       <option key={c.id} value={c.id}>
                         {c.nome} - {formatarMoeda(c.saldo_atual || 0)}
                       </option>
@@ -768,7 +769,7 @@ const ContasReceber = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {detalhesCompletos.recebimentos.map((recebimento, index) => (
+                        {safeArray(detalhesCompletos?.recebimentos).map((recebimento, index) => (
                           <tr key={index}>
                             <td className="px-3 py-2 text-sm">{formatarData(recebimento.data)}</td>
                             <td className="px-3 py-2 text-sm font-semibold text-green-600">{formatarMoeda(recebimento.valor)}</td>

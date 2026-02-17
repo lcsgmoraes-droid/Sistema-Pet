@@ -32,7 +32,7 @@ export default function Pessoas() {
         params.busca = buscaTexto;
       }
 
-      const response = await api.get('/clientes', { params });
+      const response = await api.get('/clientes/', { params });
       
       setPessoas(response.data || []);
     } catch (error) {

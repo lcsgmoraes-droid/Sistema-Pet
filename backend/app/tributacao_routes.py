@@ -14,7 +14,7 @@ from app.ia.aba7_tributacao import CalculadoraTributaria
 from app.ia.aba7_extrato_models import ConfiguracaoTributaria
 
 
-router = APIRouter(prefix="/api/tributacao", tags=["Tributação e Impostos"])
+router = APIRouter(prefix="/tributacao", tags=["Tributação e Impostos"])
 
 
 # ===== SCHEMAS =====

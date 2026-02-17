@@ -1,0 +1,11 @@
+{
+  "total_processados": 1680,
+  "validos": 0,
+  "invalidos": 1680,
+  "duplicados": 0,
+  "importados": 0,
+  "clientes_nao_encontrados": 1679,
+  "erros": [
+    "Linha 1680: Código do pet ausente"
+  ]
+}

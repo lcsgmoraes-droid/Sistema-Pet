@@ -208,7 +208,7 @@ const ComissoesListagem = () => {
 
   const carregarProdutos = async () => {
     try {
-      const response = await api.get('/produtos');
+      const response = await api.get('/produtos/');
       if (response.data) {
         setProdutosDisponiveis(Array.isArray(response.data) ? response.data : []);
       }
@@ -220,7 +220,7 @@ const ComissoesListagem = () => {
 
   const carregarGrupos = async () => {
     try {
-      const response = await api.get('/api/categorias-financeiras');
+      const response = await api.get('/categorias-financeiras');
       if (response.data) {
         setGruposDisponiveis(Array.isArray(response.data) ? response.data : []);
       }
@@ -246,7 +246,7 @@ const ComissoesListagem = () => {
 
   const carregarContasBancarias = async () => {
     try {
-      const response = await api.get('/api/contas-bancarias');
+      const response = await api.get('/contas-bancarias');
       if (response.data) {
         setContasBancarias(Array.isArray(response.data) ? response.data.filter(c => c.ativa) : []);
       }

@@ -36,7 +36,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
     setLoading(true);
     try {
       // Carregar lançamentos recorrentes
-      const lancRes = await api.get('/api/lancamentos/recorrentes');
+      const lancRes = await api.get('/lancamentos/recorrentes');
       setLancamentos(lancRes.data);
 
       // Carregar categorias
@@ -44,7 +44,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
       setCategorias(catRes.data);
 
       // Carregar contas bancárias
-      const contasRes = await api.get('/api/contas-bancarias');
+      const contasRes = await api.get('/contas-bancarias');
       setContas(contasRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -68,10 +68,10 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
       };
 
       if (editando) {
-        await api.put(`/api/lancamentos/recorrentes/${editando.id}`, payload);
+        await api.put(`/lancamentos/recorrentes/${editando.id}`, payload);
         alert('✅ Lançamento recorrente atualizado!');
       } else {
-        await api.post('/api/lancamentos/recorrentes', payload);
+        await api.post('/lancamentos/recorrentes', payload);
         alert('✅ Lançamento recorrente criado!');
       }
       
@@ -111,7 +111,7 @@ const ModalLancamentosRecorrentes = ({ isOpen, onClose, onSave }) => {
     if (!confirm('Deseja realmente excluir este lançamento recorrente?')) return;
 
     try {
-      await api.delete(`/api/lancamentos/recorrentes/${id}`);
+      await api.delete(`/lancamentos/recorrentes/${id}`);
       alert('🗑️ Lançamento recorrente excluído!');
       carregarDados();
       onSave();
