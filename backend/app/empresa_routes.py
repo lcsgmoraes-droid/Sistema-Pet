@@ -4,7 +4,7 @@ Rotas da Empresa - Configurações Gerais e Fiscais
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
@@ -70,6 +70,16 @@ class ConfigFiscalResponse(BaseModel):
     cnae_descricao: Optional[str] = None
     cnaes_secundarios: Optional[list] = None
     contribuinte_icms: bool
+    
+    @field_validator('cnaes_secundarios', mode='before')
+    @classmethod
+    def ensure_list(cls, v):
+        """Garante que cnaes_secundarios sempre seja uma lista"""
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        return []
     
     class Config:
         from_attributes = True
