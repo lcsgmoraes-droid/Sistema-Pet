@@ -38,11 +38,13 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
   // Função SEGURA para converter qualquer valor em número
   const parseNumber = (valor: any): number => {
     if (!valor) return 0;
+    // Permite tanto vírgula quanto ponto como separador decimal
     const limpo = valor
       .toString()
-      .replace(/[^\d,]/g, '')
-      .replace(',', '.');
-    const numero = parseFloat(limpo);
+      .replace(/[^\d.,]/g, '');
+    // Normaliza vírgula para ponto
+    const normalizado = limpo.replace(',', '.');
+    const numero = parseFloat(normalizado);
     return isNaN(numero) ? 0 : numero;
   };
 

@@ -744,7 +744,7 @@ export default function ProdutosForm() {
                 name="preco_custo"
                 value={formatarValorMonetario(produto.preco_custo)}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                  const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                   setProduto({ ...produto, preco_custo: value || '' });
                 }}
                 onFocus={(e) => {
@@ -772,7 +772,7 @@ export default function ProdutosForm() {
                 name="preco_venda"
                 value={formatarValorMonetario(produto.preco_venda)}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                  const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                   setProduto({ ...produto, preco_venda: value || '' });
                 }}
                 onFocus={(e) => {

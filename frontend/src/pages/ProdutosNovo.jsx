@@ -35,8 +35,11 @@ import api from '../api';
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
   if (valor === '' || valor === null || valor === undefined) return 0;
-  const limpo = valor.toString().replace(/[^\d,]/g, '').replace(',', '.');
-  const numero = parseFloat(limpo);
+  // Permite tanto vírgula quanto ponto como separador decimal
+  const limpo = valor.toString().replace(/[^\d.,]/g, '');
+  // Normaliza vírgula para ponto
+  const normalizado = limpo.replace(',', '.');
+  const numero = parseFloat(normalizado);
   return isNaN(numero) ? 0 : numero;
 };
 
@@ -198,6 +201,14 @@ export default function ProdutosNovo() {
 
   // Modal de edição de lote
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
+  
+  // Estados para controlar edição de campos monetários
+  const [camposEmEdicao, setCamposEmEdicao] = useState({
+    preco_custo: false,
+    markup: false,
+    preco_venda: false,
+    preco_promocional: false,
+  });
   const [loteEmEdicao, setLoteEmEdicao] = useState(null);
 
   // Modal de fornecedor
@@ -1465,19 +1476,22 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_custo ? `R$ ${parseNumber(formData.preco_custo).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={
+                        camposEmEdicao.preco_custo
+                          ? (formData.preco_custo || '')
+                          : (formData.preco_custo ? `R$ ${parseNumber(formData.preco_custo).toFixed(2).replace('.', ',')}` : 'R$ 0,00')
+                      }
                       onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                         handleChange('preco_custo', value);
                       }}
                       onFocus={(e) => {
-                        if (formData.preco_custo) {
-                          e.target.value = parseNumber(formData.preco_custo).toFixed(2).replace('.', ',');
-                          e.target.select();
-                        }
+                        setCamposEmEdicao(prev => ({ ...prev, preco_custo: true }));
+                        e.target.select();
                       }}
                       onBlur={(e) => {
-                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        setCamposEmEdicao(prev => ({ ...prev, preco_custo: false }));
+                        const value = parseNumber(e.target.value);
                         handleChange('preco_custo', value > 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1491,19 +1505,22 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.markup ? `${parseNumber(formData.markup).toFixed(2).replace('.', ',')}%` : '0,00%'}
+                      value={
+                        camposEmEdicao.markup
+                          ? (formData.markup || '')
+                          : (formData.markup ? `${parseNumber(formData.markup).toFixed(2).replace('.', ',')}%` : '0,00%')
+                      }
                       onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                         handleChange('markup', value);
                       }}
                       onFocus={(e) => {
-                        if (formData.markup) {
-                          e.target.value = parseNumber(formData.markup).toFixed(2).replace('.', ',');
-                          e.target.select();
-                        }
+                        setCamposEmEdicao(prev => ({ ...prev, markup: true }));
+                        e.target.select();
                       }}
                       onBlur={(e) => {
-                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        setCamposEmEdicao(prev => ({ ...prev, markup: false }));
+                        const value = parseNumber(e.target.value);
                         handleChange('markup', value >= 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1517,19 +1534,22 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_venda ? `R$ ${parseNumber(formData.preco_venda).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={
+                        camposEmEdicao.preco_venda
+                          ? (formData.preco_venda || '')
+                          : (formData.preco_venda ? `R$ ${parseNumber(formData.preco_venda).toFixed(2).replace('.', ',')}` : 'R$ 0,00')
+                      }
                       onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                         handleChange('preco_venda', value);
                       }}
                       onFocus={(e) => {
-                        if (formData.preco_venda) {
-                          e.target.value = parseNumber(formData.preco_venda).toFixed(2).replace('.', ',');
-                          e.target.select();
-                        }
+                        setCamposEmEdicao(prev => ({ ...prev, preco_venda: true }));
+                        e.target.select();
                       }}
                       onBlur={(e) => {
-                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        setCamposEmEdicao(prev => ({ ...prev, preco_venda: false }));
+                        const value = parseNumber(e.target.value);
                         handleChange('preco_venda', value > 0 ? value.toFixed(2) : '');
                       }}
                       required
@@ -1544,19 +1564,22 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_promocional ? `R$ ${parseNumber(formData.preco_promocional).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={
+                        camposEmEdicao.preco_promocional
+                          ? (formData.preco_promocional || '')
+                          : (formData.preco_promocional ? `R$ ${parseNumber(formData.preco_promocional).toFixed(2).replace('.', ',')}` : 'R$ 0,00')
+                      }
                       onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
+                        const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
                         handleChange('preco_promocional', value);
                       }}
                       onFocus={(e) => {
-                        if (formData.preco_promocional) {
-                          e.target.value = parseNumber(formData.preco_promocional).toFixed(2).replace('.', ',');
-                          e.target.select();
-                        }
+                        setCamposEmEdicao(prev => ({ ...prev, preco_promocional: true }));
+                        e.target.select();
                       }}
                       onBlur={(e) => {
-                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        setCamposEmEdicao(prev => ({ ...prev, preco_promocional: false }));
+                        const value = parseNumber(e.target.value);
                         handleChange('preco_promocional', value > 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1566,12 +1589,12 @@ export default function ProdutosNovo() {
                 </div>
               )}
 
-              {/* Linha 6: Datas da PromoÃ§Ã£o */}
+              {/* Linha 6: Datas da Promoção */}
               {formData.preco_promocional && formData.tipo_produto !== 'PAI' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      InÃ­cio da PromoÃ§Ã£o
+                      Início da Promoção
                     </label>
                     <input
                       type="date"
@@ -1583,7 +1606,7 @@ export default function ProdutosNovo() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fim da PromoÃ§Ã£o
+                      Fim da Promoção
                     </label>
                     <input
                       type="date"

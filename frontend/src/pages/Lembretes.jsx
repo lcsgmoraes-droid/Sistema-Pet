@@ -19,7 +19,7 @@ export default function Lembretes() {
     const carregarLembretes = async () => {
         setLoading(true);
         try {
-            const response = await api.get('/lembretes/pendentes');
+            const response = await api.get('/api/lembretes/pendentes');
             setLembretes(response.data.lembretes || []);
         } catch (error) {
             console.error('Erro ao carregar lembretes:', error);
@@ -31,7 +31,7 @@ export default function Lembretes() {
 
     const completarLembrete = async (lembrete_id) => {
         try {
-            await api.post(`/lembretes/${lembrete_id}/completar`, {});
+            await api.post(`/api/lembretes/${lembrete_id}/completar`, {});
             toast.success('Lembrete marcado como completado');
             carregarLembretes();
         } catch (error) {
@@ -41,7 +41,7 @@ export default function Lembretes() {
 
     const renovarLembrete = async (lembrete_id) => {
         try {
-            await api.post(`/lembretes/${lembrete_id}/renovar`, {});
+            await api.post(`/api/lembretes/${lembrete_id}/renovar`, {});
             toast.success('Lembrete renovado com sucesso');
             carregarLembretes();
         } catch (error) {
@@ -52,7 +52,7 @@ export default function Lembretes() {
     const cancelarLembrete = async (lembrete_id) => {
         if (window.confirm('Tem certeza que deseja cancelar este lembrete?')) {
             try {
-                await api.delete(`/lembretes/${lembrete_id}`);
+                await api.delete(`/api/lembretes/${lembrete_id}`);
                 toast.success('Lembrete cancelado');
                 carregarLembretes();
             } catch (error) {
