@@ -200,23 +200,25 @@ const Layout = () => {
 
   // Filtrar menus baseado nas permissões do usuário
   const menuItems = allMenuItems.filter(item => {
+    // Se tem submenu, filtrar os itens do submenu por permissão PRIMEIRO
+    if (item.submenu && Array.isArray(item.submenu)) {
+      const submenuFiltrado = item.submenu.filter(subitem => {
+        // Se subitem não tem permissão, é sempre visível
+        if (!subitem.permission) return true;
+        // Verifica se usuário tem a permissão
+        return hasPermission(subitem.permission);
+      });
+      // Se o submenu ficou vazio após filtrar, não mostra o menu principal
+      if (submenuFiltrado.length === 0) return false;
+      // Atualiza o submenu com apenas itens permitidos
+      item.submenu = submenuFiltrado;
+    }
+    
     // Se não tem permissão definida no menu principal, item é sempre visível
     if (!item.permission) {
-      // Se tem submenu, filtrar os itens do submenu por permissão
-      if (item.submenu) {
-        const submenuFiltrado = item.submenu.filter(subitem => {
-          // Se subitem não tem permissão, é sempre visível
-          if (!subitem.permission) return true;
-          // Verifica se usuário tem a permissão
-          return hasPermission(subitem.permission);
-        });
-        // Se o submenu ficou vazio após filtrar, não mostra o menu principal
-        if (submenuFiltrado.length === 0) return false;
-        // Atualiza o submenu com apenas itens permitidos
-        item.submenu = submenuFiltrado;
-      }
       return true;
     }
+    
     // Verifica se usuário tem a permissão do menu principal
     return hasPermission(item.permission);
   });
@@ -266,7 +268,7 @@ const Layout = () => {
 
         {/* Menu Items */}
         <nav className="flex-1 py-4 overflow-y-auto">
-          {menuItems.map((item) => (
+          {Array.isArray(menuItems) && menuItems.map((item) => (
             <div key={item.path}>
               {item.submenu ? (
                 <>
@@ -293,7 +295,7 @@ const Layout = () => {
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
                     <div className="mt-1 mb-2 space-y-1">
-                      {item.submenu.map((subitem) => (
+                      {Array.isArray(item.submenu) && item.submenu.map((subitem) => (
                         <Link
                           key={subitem.path}
                           to={subitem.path}
