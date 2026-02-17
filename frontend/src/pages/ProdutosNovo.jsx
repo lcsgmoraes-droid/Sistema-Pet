@@ -32,6 +32,14 @@ import {
 } from '../api/produtos';
 import api from '../api';
 
+// Função auxiliar para converter valores sem retornar NaN
+const parseNumber = (valor) => {
+  if (valor === '' || valor === null || valor === undefined) return 0;
+  const limpo = valor.toString().replace(/[^\d,]/g, '').replace(',', '.');
+  const numero = parseFloat(limpo);
+  return isNaN(numero) ? 0 : numero;
+};
+
 export default function ProdutosNovo() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -540,10 +548,10 @@ export default function ProdutosNovo() {
     setFormData(prev => {
       const novosDados = { ...prev, [campo]: valor };
       
-      // Calcular markup automaticamente quando mudar preÃ§o
+      // Calcular markup automaticamente quando mudar preço
       if (campo === 'preco_custo' || campo === 'preco_venda') {
-        const custo = parseFloat(campo === 'preco_custo' ? valor : prev.preco_custo);
-        const venda = parseFloat(campo === 'preco_venda' ? valor : prev.preco_venda);
+        const custo = parseNumber(campo === 'preco_custo' ? valor : prev.preco_custo);
+        const venda = parseNumber(campo === 'preco_venda' ? valor : prev.preco_venda);
         
         if (custo && venda && custo > 0) {
           const markup = calcularMarkup(custo, venda);
@@ -551,10 +559,10 @@ export default function ProdutosNovo() {
         }
       }
       
-      // Calcular preÃ§o de venda pelo markup
+      // Calcular preço de venda pelo markup
       if (campo === 'markup') {
-        const custo = parseFloat(prev.preco_custo);
-        const markupVal = parseFloat(valor);
+        const custo = parseNumber(prev.preco_custo);
+        const markupVal = parseNumber(valor);
         
         if (custo && custo > 0 && markupVal >= 0) {
           const venda = calcularPrecoVenda(custo, markupVal);
@@ -1339,7 +1347,7 @@ export default function ProdutosNovo() {
                   value={formData.nome}
                   onChange={(e) => handleChange('nome', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: RaÃ§Ã£o Golden para CÃ£es Adultos 15kg"
+                  placeholder="Ex: Ração Golden para Cães Adultos 15kg"
                   required
                 />
               </div>
@@ -1457,20 +1465,20 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_custo ? `R$ ${Number(formData.preco_custo).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={formData.preco_custo ? `R$ ${parseNumber(formData.preco_custo).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                         handleChange('preco_custo', value);
                       }}
                       onFocus={(e) => {
                         if (formData.preco_custo) {
-                          e.target.value = Number(formData.preco_custo).toFixed(2).replace('.', ',');
+                          e.target.value = parseNumber(formData.preco_custo).toFixed(2).replace('.', ',');
                           e.target.select();
                         }
                       }}
                       onBlur={(e) => {
-                        const value = e.target.value.replace(',', '.');
-                        handleChange('preco_custo', value);
+                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        handleChange('preco_custo', value > 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="R$ 0,00"
@@ -1483,20 +1491,20 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.markup ? `${Number(formData.markup).toFixed(2).replace('.', ',')}%` : '0,00%'}
+                      value={formData.markup ? `${parseNumber(formData.markup).toFixed(2).replace('.', ',')}%` : '0,00%'}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                         handleChange('markup', value);
                       }}
                       onFocus={(e) => {
                         if (formData.markup) {
-                          e.target.value = Number(formData.markup).toFixed(2).replace('.', ',');
+                          e.target.value = parseNumber(formData.markup).toFixed(2).replace('.', ',');
                           e.target.select();
                         }
                       }}
                       onBlur={(e) => {
-                        const value = e.target.value.replace(',', '.');
-                        handleChange('markup', value);
+                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        handleChange('markup', value >= 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="0,00%"
@@ -1509,20 +1517,20 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_venda ? `R$ ${Number(formData.preco_venda).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={formData.preco_venda ? `R$ ${parseNumber(formData.preco_venda).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                         handleChange('preco_venda', value);
                       }}
                       onFocus={(e) => {
                         if (formData.preco_venda) {
-                          e.target.value = Number(formData.preco_venda).toFixed(2).replace('.', ',');
+                          e.target.value = parseNumber(formData.preco_venda).toFixed(2).replace('.', ',');
                           e.target.select();
                         }
                       }}
                       onBlur={(e) => {
-                        const value = e.target.value.replace(',', '.');
-                        handleChange('preco_venda', value);
+                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        handleChange('preco_venda', value > 0 ? value.toFixed(2) : '');
                       }}
                       required
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -1536,20 +1544,20 @@ export default function ProdutosNovo() {
                     </label>
                     <input
                       type="text"
-                      value={formData.preco_promocional ? `R$ ${Number(formData.preco_promocional).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
+                      value={formData.preco_promocional ? `R$ ${parseNumber(formData.preco_promocional).toFixed(2).replace('.', ',')}` : 'R$ 0,00'}
                       onChange={(e) => {
                         const value = e.target.value.replace(/[^\d,]/g, '').replace(',', '.');
                         handleChange('preco_promocional', value);
                       }}
                       onFocus={(e) => {
                         if (formData.preco_promocional) {
-                          e.target.value = Number(formData.preco_promocional).toFixed(2).replace('.', ',');
+                          e.target.value = parseNumber(formData.preco_promocional).toFixed(2).replace('.', ',');
                           e.target.select();
                         }
                       }}
                       onBlur={(e) => {
-                        const value = e.target.value.replace(',', '.');
-                        handleChange('preco_promocional', value);
+                        const value = parseNumber(e.target.value.replace(',', '.'));
+                        handleChange('preco_promocional', value > 0 ? value.toFixed(2) : '');
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder="R$ 0,00"
