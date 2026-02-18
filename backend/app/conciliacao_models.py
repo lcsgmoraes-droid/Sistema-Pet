@@ -431,7 +431,7 @@ class ConciliacaoValidacao(BaseTenantModel):
     importacao_ofx = relationship("ConciliacaoImportacao", foreign_keys=[importacao_ofx_id], back_populates="validacoes_ofx")
     importacao_pagamentos = relationship("ConciliacaoImportacao", foreign_keys=[importacao_pagamentos_id], back_populates="validacoes_pagamentos")
     importacao_recebimentos = relationship("ConciliacaoImportacao", foreign_keys=[importacao_recebimentos_id], back_populates="validacoes_recebimentos")
-    logs = relationship("ConciliacaoLog", back_populates="validacao")
+    # logs = relationship("ConciliacaoLog", back_populates="validacao")  # Disabled - FK conciliacao_validacao_id não existe
     
     def to_dict(self):
         return {
@@ -518,7 +518,7 @@ class ConciliacaoLog(BaseTenantModel):
     user_agent = Column(String(255), nullable=True)
     
     # Relationships
-    validacao = relationship("ConciliacaoValidacao", back_populates="logs")
+    # validacao = relationship("ConciliacaoValidacao", back_populates="logs")  # Disabled - FK conciliacao_validacao_id não existe
     
     def to_dict(self):
         return {
@@ -596,7 +596,7 @@ class ConciliacaoRecebimento(BaseTenantModel):
     updated_at = None
     
     # Relationships
-    validacao = relationship("ConciliacaoValidacao", foreign_keys=[validacao_id])
+    # validacao = relationship("ConciliacaoValidacao", foreign_keys=[validacao_id])  # Disabled - FK validacao_id não existe
     
     def to_dict(self):
         return {
