@@ -22,6 +22,18 @@ export default function ModalCalculadoraUniversal({
 }) {
   const location = useLocation();
   const estaNoPDV = location.pathname === '/pdv';
+  
+  // Detectar mobile
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Estados
   const [racaoSelecionadaId, setRacaoSelecionadaId] = useState(null);
@@ -200,8 +212,9 @@ export default function ModalCalculadoraUniversal({
     setMostraDropdown(false);
   };
 
-  // Handlers para arrastar o modal
+  // Handlers para arrastar o modal (apenas desktop)
   const handleMouseDown = (e) => {
+    if (isMobile) return; // Desabilitar drag em mobile
     if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
       return; // Não arrastar se clicar em botões, inputs ou selects
     }
@@ -240,10 +253,17 @@ export default function ModalCalculadoraUniversal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 p-0 md:p-4 overflow-y-auto">
       <div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
-        style={{
+        className={`
+          bg-white 
+          ${isMobile 
+            ? 'w-full min-h-screen rounded-none' 
+            : 'rounded-xl w-full max-w-2xl max-h-[90vh]'
+          } 
+          shadow-2xl overflow-hidden flex flex-col
+        `}
+        style={isMobile ? {} : {
           transform: `translate(${position.x}px, ${position.y}px)`,
           cursor: isDragging ? 'grabbing' : 'default'
         }}
@@ -251,29 +271,29 @@ export default function ModalCalculadoraUniversal({
         
         {/* Header */}
         <div 
-          className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-4 flex items-center justify-between"
-          onMouseDown={handleMouseDown}
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 md:px-6 py-3 md:py-4 flex items-center justify-between"
+          onMouseDown={isMobile ? undefined : handleMouseDown}
+          style={{ cursor: isMobile ? 'default' : (isDragging ? 'grabbing' : 'grab') }}
         >
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🥫</span>
+          <div className="flex items-center gap-2 md:gap-3">
+            <span className="text-2xl md:text-3xl">🥫</span>
             <div>
-              <h2 className="text-xl font-bold">Calculadora de Ração</h2>
-              <p className="text-sm text-orange-100">
+              <h2 className="text-lg md:text-xl font-bold">Calculadora de Ração</h2>
+              <p className="text-xs md:text-sm text-orange-100">
                 {estaNoPDV ? 'Rações do carrinho' : 'Buscar ração manualmente'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-orange-400 rounded-lg transition-colors"
+            className="p-1.5 md:p-2 hover:bg-orange-400 rounded-lg transition-colors"
           >
-            <X size={24} />
+            <X size={isMobile ? 20 : 24} />
           </button>
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
           
           {/* Seleção de Ração */}
           <div className="space-y-2">
@@ -384,7 +404,7 @@ export default function ModalCalculadoraUniversal({
           </div>
 
           {/* Dados do Pet */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Peso do Pet (kg) *
@@ -433,7 +453,7 @@ export default function ModalCalculadoraUniversal({
                 <span>✅</span> Resultados do Cálculo
               </h3>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-lg p-4">
                   <div className="text-sm text-gray-600">⏱️ Duração</div>
                   <div className="text-2xl font-bold text-gray-900">
@@ -465,7 +485,7 @@ export default function ModalCalculadoraUniversal({
                   </div>
                 </div>
 
-                <div className="bg-white rounded-lg p-4 col-span-2">
+                <div className="bg-white rounded-lg p-4 col-span-1 sm:col-span-2">
                   <div className="text-sm text-gray-600">📆 Custo mensal</div>
                   <div className="text-2xl font-bold text-gray-900">
                     R$ {resultados.custo_mensal?.toFixed(2)}
@@ -477,7 +497,7 @@ export default function ModalCalculadoraUniversal({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 border-t px-6 py-4 flex justify-end gap-3">
+        <div className="bg-gray-50 border-t px-4 md:px-6 py-3 md:py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 md:gap-3">
           <button
             onClick={onClose}
             className="px-6 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"

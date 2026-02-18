@@ -25,6 +25,7 @@ import {
   formatarData
 } from '../api/produtos';
 import api from '../api';
+import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
 
 export default function ProdutosForm() {
   const { id } = useParams();
@@ -528,76 +529,27 @@ export default function ProdutosForm() {
       </div>
       
       {/* Abas */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex space-x-8">
-          <button
-            onClick={() => setAbaAtiva('dados')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
-              abaAtiva === 'dados'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            📋 Dados Básicos
-          </button>
-          
-          {isEdit && (
-            <>
-              <button
-                onClick={() => setAbaAtiva('imagens')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
-                  abaAtiva === 'imagens'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🖼️ Imagens ({imagens.length})
-              </button>
-              
-              <button
-                onClick={() => setAbaAtiva('fornecedores')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
-                  abaAtiva === 'fornecedores'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🏭 Fornecedores ({fornecedores.length})
-              </button>
-              
-              {produto.controle_lote && (
-                <button
-                  onClick={() => setAbaAtiva('lotes')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
-                    abaAtiva === 'lotes'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  📦 Lotes ({lotes.length})
-                </button>
-              )}
-              
-              {/* 🔒 SPRINT 2: Aba de Variações para produtos PAI */}
-              {produto.tipo_produto === 'PAI' && (
-                <button
-                  onClick={() => setAbaAtiva('variacoes')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm transition ${
-                    abaAtiva === 'variacoes'
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  🔹 Variações ({variacoes.length})
-                </button>
-              )}
-            </>
-          )}
-        </nav>
-      </div>
+      <ResponsiveTabs
+        tabs={[
+          { id: 'dados', label: '📋 Dados Básicos', count: null },
+          ...(isEdit ? [
+            { id: 'imagens', label: '🖼️ Imagens', count: imagens.length },
+            { id: 'fornecedores', label: '🏭 Fornecedores', count: fornecedores.length },
+            ...(produto.controle_lote ? [
+              { id: 'lotes', label: '📦 Lotes', count: lotes.length }
+            ] : []),
+            ...(produto.tipo_produto === 'PAI' ? [
+              { id: 'variacoes', label: '🔹 Variações', count: variacoes.length }
+            ] : [])
+          ] : [])
+        ]}
+        activeTab={abaAtiva}
+        onChange={setAbaAtiva}
+      />
       
       {/* Conteúdo das Abas */}
       {abaAtiva === 'dados' && (
+        <TabContent>
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
           {/* Código e Nome */}
           <div className="grid grid-cols-3 gap-4">
@@ -926,9 +878,11 @@ export default function ProdutosForm() {
             </button>
           </div>
         </form>
+        </TabContent>
       )}
       
       {abaAtiva === 'imagens' && isEdit && (
+        <TabContent>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Imagens do Produto</h2>
@@ -997,9 +951,11 @@ export default function ProdutosForm() {
             </p>
           </div>
         </div>
+        </TabContent>
       )}
       
       {abaAtiva === 'fornecedores' && isEdit && (
+        <TabContent>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Fornecedores do Produto</h2>
@@ -1072,9 +1028,11 @@ export default function ProdutosForm() {
             </div>
           )}
         </div>
+        </TabContent>
       )}
       
       {abaAtiva === 'lotes' && isEdit && produto.controle_lote && (
+        <TabContent>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-900">Controle de Lotes (FIFO)</h2>
@@ -1143,10 +1101,12 @@ export default function ProdutosForm() {
             </p>
           </div>
         </div>
+        </TabContent>
       )}
       
       {/* 🔒 SPRINT 2: Aba de Variações para produtos PAI */}
       {abaAtiva === 'variacoes' && isEdit && produto.tipo_produto === 'PAI' && (
+        <TabContent>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -1261,6 +1221,7 @@ export default function ProdutosForm() {
             </div>
           )}
         </div>
+        </TabContent>
       )}
       
       {/* Modais */}

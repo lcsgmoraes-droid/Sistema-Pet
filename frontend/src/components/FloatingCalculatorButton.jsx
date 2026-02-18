@@ -7,13 +7,25 @@ import { Calculator, Minimize2, Maximize2 } from 'lucide-react';
  * 
  * - Aparece em TODAS as telas do sistema
  * - Minimizável (fica só o ícone pequeno)
- * - Arrastável para reposicionar
+ * - Arrastável para reposicionar (apenas desktop)
+ * - Mobile: fixo no topo direito, sem drag
  */
 export default function FloatingCalculatorButton({ onClick }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isDragging, setIsDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+  
+  // Detectar mudanças no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Função para garantir posição segura
   const getSafePosition = (pos, isMinimized) => {
@@ -27,6 +39,11 @@ export default function FloatingCalculatorButton({ onClick }) {
   };
   
   const [position, setPosition] = useState(() => {
+    // Em mobile, sempre fixo no topo direito
+    if (window.innerWidth < 768) {
+      return { x: window.innerWidth - 70, y: 80 };
+    }
+    
     const saved = localStorage.getItem('calc_button_pos');
     const defaultPos = { 
       x: window.innerWidth - 150, 
@@ -51,6 +68,9 @@ export default function FloatingCalculatorButton({ onClick }) {
   });
 
   const handleMouseDown = (e) => {
+    // Desabilitar drag em mobile
+    if (isMobile) return;
+    
     // Permitir arrastar de qualquer lugar EXCETO o botão de expandir/minimizar
     const isToggleButton = e.target.closest('button[title="Expandir"], button[title="Minimizar"]');
     
@@ -147,10 +167,17 @@ export default function FloatingCalculatorButton({ onClick }) {
   // Ajustar posição ao redimensionar janela
   useEffect(() => {
     const handleResize = () => {
-      const safePos = getSafePosition(position, minimizado);
-      if (safePos.x !== position.x || safePos.y !== position.y) {
-        setPosition(safePos);
-        localStorage.setItem('calc_button_pos', JSON.stringify(safePos));
+      const newIsMobile = window.innerWidth < 768;
+      
+      // Se mudou para mobile, fixar no topo direito
+      if (newIsMobile) {
+        setPosition({ x: window.innerWidth - 70, y: 80 });
+      } else {
+        const safePos = getSafePosition(position, minimizado);
+        if (safePos.x !== position.x || safePos.y !== position.y) {
+          setPosition(safePos);
+          localStorage.setItem('calc_button_pos', JSON.stringify(safePos));
+        }
       }
     };
     
@@ -169,15 +196,15 @@ export default function FloatingCalculatorButton({ onClick }) {
       {/* Versão Minimizada */}
       {minimizado ? (
         <div 
-          className="relative group cursor-move"
-          onMouseDown={handleMouseDown}
+          className={`relative group ${isMobile ? '' : 'cursor-move'}`}
+          onMouseDown={isMobile ? undefined : handleMouseDown}
         >
           <button
             onClick={handleClick}
             onMouseDown={(e) => e.stopPropagation()} 
             className="calc-button-main
               flex items-center justify-center
-              w-12 h-12
+              w-12 h-12 md:w-12 md:h-12
               bg-gradient-to-br from-orange-500 to-orange-600
               hover:from-orange-600 hover:to-orange-700
               text-white
@@ -193,25 +220,27 @@ export default function FloatingCalculatorButton({ onClick }) {
             <Calculator size={20} />
           </button>
 
-          {/* Botão expandir (aparece ao hover) */}
-          <button
-            onClick={handleToggleMinimize}
-            onMouseDown={(e) => e.stopPropagation()}
-            className="
-              absolute -bottom-1 -right-1
-              bg-blue-600 hover:bg-blue-700
-              text-white
-              w-6 h-6
-              rounded-full
-              flex items-center justify-center
-              opacity-0 group-hover:opacity-100
-              transition-opacity
-              shadow-md
-            "
-            title="Expandir"
-          >
-            <Maximize2 size={12} />
-          </button>
+          {/* Botão expandir (aparece ao hover) - Apenas desktop */}
+          {!isMobile && (
+            <button
+              onClick={handleToggleMinimize}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="
+                absolute -bottom-1 -right-1
+                bg-blue-600 hover:bg-blue-700
+                text-white
+                w-6 h-6
+                rounded-full
+                flex items-center justify-center
+                opacity-0 group-hover:opacity-100
+                transition-opacity
+                shadow-md
+              "
+              title="Expandir"
+            >
+              <Maximize2 size={12} />
+            </button>
+          )}
         </div>
       ) : (
         /* Versão Expandida */
@@ -229,8 +258,8 @@ export default function FloatingCalculatorButton({ onClick }) {
         >
           {/* Header - Área de arraste */}
           <div 
-            className="flex items-center justify-between gap-2 drag-handle cursor-move"
-            onMouseDown={handleMouseDown}
+            className={`flex items-center justify-between gap-2 drag-handle ${isMobile ? '' : 'cursor-move'}`}
+            onMouseDown={isMobile ? undefined : handleMouseDown}
           >
             <div className="flex items-center gap-2 pointer-events-none">
               <div className="
@@ -279,10 +308,12 @@ export default function FloatingCalculatorButton({ onClick }) {
             🥫 Calcular Ração
           </button>
 
-          {/* Info adicional */}
-          <div className="text-[10px] text-gray-500 text-center">
-            Arraste para mover
-          </div>
+          {/* Info adicional - Apenas desktop */}
+          {!isMobile && (
+            <div className="text-[10px] text-gray-500 text-center">
+              Arraste para mover
+            </div>
+          )}
         </div>
       )}
     </div>
