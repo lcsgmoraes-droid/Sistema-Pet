@@ -120,7 +120,7 @@ class Produto(BaseTenantModel):
     tags = Column(Text, nullable=True)  # JSON array
     
     # Código de Barras
-    codigo_barras = Column(String(13), nullable=True)
+    codigo_barras = Column(String(20), nullable=True)  # Aumentado para suportar EAN-14 e outros formatos
     codigos_barras_alternativos = Column(Text, nullable=True)  # JSON array
     
     # Relacionamentos (FKs)
@@ -238,12 +238,20 @@ class Produto(BaseTenantModel):
     auto_classificar_nome = Column(Boolean, default=True, nullable=False)  # Ativa auto-classifica��o via IA    
     # ========== OPÇÕES DE RAÇÃO - SISTEMA DINÂMICO (FOREIGN KEYS) ==========
     # Relacionamentos com tabelas de opções dinâmicas configuradas pelo usuário
-    linha_racao_id = Column(Integer, ForeignKey('linhas_racao.id', ondelete='SET NULL'), nullable=True)
-    porte_animal_id = Column(Integer, ForeignKey('portes_animal.id', ondelete='SET NULL'), nullable=True)
-    fase_publico_id = Column(Integer, ForeignKey('fases_publico.id', ondelete='SET NULL'), nullable=True)
-    tipo_tratamento_id = Column(Integer, ForeignKey('tipos_tratamento.id', ondelete='SET NULL'), nullable=True)
-    sabor_proteina_id = Column(Integer, ForeignKey('sabores_proteina.id', ondelete='SET NULL'), nullable=True)
-    apresentacao_peso_id = Column(Integer, ForeignKey('apresentacoes_peso.id', ondelete='SET NULL'), nullable=True)    
+    # DESABILITADO TEMPORARIAMENTE: Tabelas não existem ainda
+    # linha_racao_id = Column(Integer, ForeignKey('linhas_racao.id', ondelete='SET NULL'), nullable=True)
+    # porte_animal_id = Column(Integer, ForeignKey('portes_animal.id', ondelete='SET NULL'), nullable=True)
+    # fase_publico_id = Column(Integer, ForeignKey('fases_publico.id', ondelete='SET NULL'), nullable=True)
+    # tipo_tratamento_id = Column(Integer, ForeignKey('tipos_tratamento.id', ondelete='SET NULL'), nullable=True)
+    # sabor_proteina_id = Column(Integer, ForeignKey('sabores_proteina.id', ondelete='SET NULL'), nullable=True)
+    # apresentacao_peso_id = Column(Integer, ForeignKey('apresentacoes_peso.id', ondelete='SET NULL'), nullable=True)
+    linha_racao_id = Column(Integer, nullable=True)
+    porte_animal_id = Column(Integer, nullable=True)
+    fase_publico_id = Column(Integer, nullable=True)
+    tipo_tratamento_id = Column(Integer, nullable=True)
+    sabor_proteina_id = Column(Integer, nullable=True)
+    apresentacao_peso_id = Column(Integer, nullable=True)
+    
     # Imagem Principal
     imagem_principal = Column(String(255), nullable=True)
     

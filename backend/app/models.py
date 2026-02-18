@@ -69,12 +69,13 @@ class User(BaseTenantModel):
     audit_logs = relationship("AuditLog", back_populates="user")
     
     # IA - Relacionamentos ABA 7 (Extrato Bancário com IA)
+    # DESABILITADO TEMPORARIAMENTE: aba7_extrato_models tem dependências circulares
     # Usando strings para evitar problemas de importação circular
-    padroes_categorizacao = relationship("PadraoCategoriacaoIA", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
-    lancamentos_importados = relationship("LancamentoImportado", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
-    arquivos_extrato = relationship("ArquivoExtratoImportado", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
-    historico_dre = relationship("HistoricoAtualizacaoDRE", back_populates="usuario", foreign_keys="HistoricoAtualizacaoDRE.usuario_id", cascade="all, delete-orphan", lazy="dynamic")
-    configuracao_tributaria = relationship("ConfiguracaoTributaria", back_populates="usuario", uselist=False, cascade="all, delete-orphan")
+    # padroes_categorizacao = relationship("PadraoCategoriacaoIA", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
+    # lancamentos_importados = relationship("LancamentoImportado", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
+    # arquivos_extrato = relationship("ArquivoExtratoImportado", back_populates="usuario", cascade="all, delete-orphan", lazy="dynamic")
+    # historico_dre = relationship("HistoricoAtualizacaoDRE", back_populates="usuario", foreign_keys="HistoricoAtualizacaoDRE.usuario_id", cascade="all, delete-orphan", lazy="dynamic")
+    # configuracao_tributaria = relationship("ConfiguracaoTributaria", back_populates="usuario", uselist=False, cascade="all, delete-orphan")
 
 
 class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenant-specific
@@ -175,7 +176,8 @@ class Cliente(BaseTenantModel):
     parceiro_emails_copia = Column(Text, nullable=True)  # Emails adicionais separados por vírgula
     
     # 👔 RH - FUNCIONÁRIOS (novo)
-    cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
+    # cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
+    cargo_id = Column(Integer, nullable=True, index=True)  # FK temporária sem constraint (tabela cargos não existe ainda)
     
     # 💰 CONFIGURAÇÃO DE COMISSÕES
     data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento de comissão

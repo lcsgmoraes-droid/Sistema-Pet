@@ -63,10 +63,18 @@ STATS = {
     'racas': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
     'clientes': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
     'marcas': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
-    'produtos': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
+    'produtos': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0, 'sem_sku': 0},
     'pets': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
     'vendas': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
     'itens_venda': {'total': 0, 'sucesso': 0, 'erro': 0, 'duplicado': 0},
+}
+
+# Lista de itens não importados (para gerar relatório)
+NAO_IMPORTADOS = {
+    'produtos': [],  # {'linha': idx, 'sku': '', 'nome': '', 'motivo': '', 'erro': ''}
+    'clientes': [],
+    'pets': [],
+    'vendas': [],
 }
 
 # Usuário para importação (será o primeiro admin do sistema)
@@ -368,11 +376,18 @@ def importar_clientes(db: Session, limite: Optional[int] = None):
                         log(f"Cliente já existe (CPF): {row['pes_var_nome']}", 'AVISO')
                     continue
             
+            # ✅ VALIDAÇÃO: Pular clientes sem nome
+            nome = row.get('pes_var_nome', '').strip() if row.get('pes_var_nome') else ''
+            if not nome:
+                STATS['clientes']['erro'] += 1
+                log(f"Cliente sem nome pulado (código: {codigo})", 'AVISO')
+                continue
+            
             cliente = Cliente(
                 user_id=USER_ID,
                 tenant_id=TENANT_ID,
                 codigo=codigo,
-                nome=row['pes_var_nome'],
+                nome=nome,
                 cpf=cpf,
                 telefone=contato.get('telefone'),
                 celular=contato.get('celular'),
@@ -413,9 +428,29 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
     registros = ler_csv('eco_produto.csv', limite)
     STATS['produtos']['total'] = len(registros)
     
+    linha = 0  # Contador de linha para relatório
     for row in registros:
+        linha += 1
         try:
-            codigo = row['pro_var_chave']
+            # VALIDAÇÃO RIGOROSA DO SKU
+            codigo_bruto = row.get('pro_var_chave', '').strip()
+            nome = row.get('pro_var_nome', 'DESCONHECIDO')
+            
+            if not codigo_bruto:
+                STATS['produtos']['sem_sku'] += 1
+                STATS['produtos']['erro'] += 1
+                erro_msg = "SKU_VAZIO: Produto sem código/SKU"
+                log(f"[{linha}/{len(registros)}] {erro_msg}: {nome}", 'AVISO')
+                NAO_IMPORTADOS['produtos'].append({
+                    'linha': linha,
+                    'sku': 'VAZIO',
+                    'nome': nome,
+                    'motivo': 'SEM_SKU',
+                    'erro': erro_msg
+                })
+                continue
+            
+            codigo = codigo_bruto
 
             marca_id = None
             if row.get('mar_int_codigo'):
@@ -430,6 +465,13 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             if existe:
                 ID_MAP['produtos'][row['pro_int_codigo']] = existe.id
                 STATS['produtos']['duplicado'] += 1
+                NAO_IMPORTADOS['produtos'].append({
+                    'linha': linha,
+                    'sku': codigo,
+                    'nome': nome,
+                    'motivo': 'DUPLICADO',
+                    'erro': f'SKU {codigo} já existe (ID: {existe.id})'
+                })
                 if marca_id and not existe.marca_id:
                     existe.marca_id = marca_id
                     db.add(existe)
@@ -466,13 +508,47 @@ def importar_produtos(db: Session, limite: Optional[int] = None):
             STATS['produtos']['sucesso'] += 1
             log(f"Produto: {produto.nome} (SKU: {produto.codigo})", 'SUCESSO')
             
+        except KeyError as e:
+            STATS['produtos']['erro'] += 1
+            erro_msg = f"Campo obrigatório faltando: {str(e)}"
+            log(f"Erro produto {row.get('pro_var_nome', 'DESCONHECIDO')}: {erro_msg}", 'ERRO')
+            NAO_IMPORTADOS['produtos'].append({
+                'linha': linha,
+                'sku': row.get('pro_var_chave', 'N/A'),
+                'nome': row.get('pro_var_nome', 'DESCONHECIDO'),
+                'motivo': 'ERRO',
+                'erro': erro_msg
+            })
+            continue
         except Exception as e:
             STATS['produtos']['erro'] += 1
-            log(f"Erro produto {row.get('pro_var_nome', 'DESCONHECIDO')}: {str(e)}", 'ERRO')
+            erro_msg = str(e)
+            log(f"Erro produto {row.get('pro_var_nome', 'DESCONHECIDO')}: {erro_msg}", 'ERRO')
+            NAO_IMPORTADOS['produtos'].append({
+                'linha': linha,
+                'sku': row.get('pro_var_chave', 'N/A'),
+                'nome': row.get('pro_var_nome', 'DESCONHECIDO'),
+                'motivo': 'ERRO',
+                'erro': erro_msg
+            })
             continue
     
     db.commit()
     log(f"✓ Produtos: {STATS['produtos']['sucesso']}/{STATS['produtos']['total']}")
+    
+    # Gerar relatório de produtos NÃO importados
+    if NAO_IMPORTADOS['produtos']:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        csv_file = Path(__file__).parent / f"logs_importacao/produtos_nao_importados_{timestamp}.csv"
+        csv_file.parent.mkdir(exist_ok=True)
+        
+        with open(csv_file, 'w', encoding='utf-8', newline='') as f:
+            import csv as csv_module
+            writer = csv_module.DictWriter(f, fieldnames=['linha', 'sku', 'nome', 'motivo', 'erro'])
+            writer.writeheader()
+            writer.writerows(NAO_IMPORTADOS['produtos'])
+        
+        log(f"📄 Relatório de não importados: {csv_file}", 'AVISO')
 
 
 def importar_marcas(db: Session):
@@ -727,29 +803,41 @@ def importar_itens_venda(db: Session, vendas_ids: List[str]):
 
 def exibir_resumo():
     """Exibe resumo da importação"""
-    print("\n" + "="*80)
-    print("RESUMO DA IMPORTACAO".center(80))
-    print("="*80)
-    print(f"{'ENTIDADE':<15} | {'TOTAL':>6} | {'NOVOS':>6} | {'DUPLIC':>6} | {'ERROS':>6} | {'TAXA':>6}")
-    print("-"*80)
+    print("\n" + "="*90)
+    print("RESUMO DA IMPORTACAO".center(90))
+    print("="*90)
+    print(f"{'ENTIDADE':<15} | {'TOTAL':>6} | {'NOVOS':>6} | {'DUPLIC':>6} | {'ERROS':>6} | {'SEM_SKU':>7} | {'TAXA':>6}")
+    print("-"*90)
     
     for entidade, stats in STATS.items():
         if stats['total'] > 0:
             taxa = (stats['sucesso'] / stats['total']) * 100 if stats['total'] > 0 else 0
+            sem_sku = stats.get('sem_sku', 0)
             print(f"{entidade.upper():<15} | {stats['total']:>6} | {stats['sucesso']:>6} | "
-                  f"{stats['duplicado']:>6} | {stats['erro']:>6} | {taxa:>5.1f}%")
+                  f"{stats['duplicado']:>6} | {stats['erro']:>6} | {sem_sku:>7} | {taxa:>5.1f}%")
     
-    print("="*80)
+    print("-"*90)
     
     # Resumo consolidado
     total_geral = sum(s['total'] for s in STATS.values())
     novos_geral = sum(s['sucesso'] for s in STATS.values())
     duplic_geral = sum(s['duplicado'] for s in STATS.values())
     erros_geral = sum(s['erro'] for s in STATS.values())
+    sem_sku_geral = sum(s.get('sem_sku', 0) for s in STATS.values())
     
-    print(f"\n{'TOTAL GERAL':<15} | {total_geral:>6} | {novos_geral:>6} | "
-          f"{duplic_geral:>6} | {erros_geral:>6}")
-    print("="*80 + "\n")
+    print(f"{'TOTAL GERAL':<15} | {total_geral:>6} | {novos_geral:>6} | "
+          f"{duplic_geral:>6} | {erros_geral:>6} | {sem_sku_geral:>7}")
+    print("="*90)
+    
+    # Aviso sobre não importados
+    nao_imp_total = sum(len(items) for items in NAO_IMPORTADOS.values())
+    if nao_imp_total > 0:
+        print(f"\n⚠️  ATENÇÃO: {nao_imp_total} itens NÃO foram importados")
+        for entidade, items in NAO_IMPORTADOS.items():
+            if items:
+                print(f"  - {entidade.capitalize()}: {len(items)}")
+        print(f"\n📄 Verifique os arquivos CSV em logs_importacao/ para detalhes dos produtos não importados")
+    print("="*90 + "\n")
 
 
 def main():
