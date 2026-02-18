@@ -60,7 +60,7 @@ class PadraoCategoriacaoIA(BaseTenantModel):
     criado_manualmente = Column(Boolean, default=False)  # User criou vs IA criou
     
     # Relacionamentos
-    usuario = relationship("User", back_populates="padroes_categorizacao")
+    # usuario = relationship("User", back_populates="padroes_categorizacao")  # Disabled - User.padroes_categorizacao comentado
     lancamentos_aplicados = relationship("LancamentoImportado", back_populates="padrao_sugerido")
 
 
@@ -118,7 +118,7 @@ class LancamentoImportado(BaseTenantModel):
     atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relacionamentos
-    usuario = relationship("User", back_populates="lancamentos_importados")
+    # usuario = relationship("User", back_populates="lancamentos_importados")  # Disabled - User.lancamentos_importados comentado
     padrao_sugerido = relationship("PadraoCategoriacaoIA", back_populates="lancamentos_aplicados")
     categoria_sugerida = relationship("CategoriaFinanceira", foreign_keys=[categoria_financeira_id])
     categoria_validada = relationship("CategoriaFinanceira", foreign_keys=[categoria_usuario_id])
@@ -160,7 +160,7 @@ class ArquivoExtratoImportado(BaseTenantModel):
     mensagem_erro = Column(Text, nullable=True)
     
     # Relacionamentos
-    usuario = relationship("User", back_populates="arquivos_extrato")
+    # usuario = relationship("User", back_populates="arquivos_extrato")  # Disabled - User.arquivos_extrato comentado
 
 
 class HistoricoAtualizacaoDRE(BaseTenantModel):
@@ -190,7 +190,7 @@ class HistoricoAtualizacaoDRE(BaseTenantModel):
     aprovado_por = Column(Integer, ForeignKey('users.id'), nullable=True)
     
     # Relacionamentos
-    usuario = relationship("User", foreign_keys=[usuario_id], back_populates="historico_dre")
+    # usuario = relationship("User", foreign_keys=[usuario_id], back_populates="historico_dre")  # Disabled - User.historico_dre comentado
     dre_periodo = relationship("DREPeriodo", back_populates="historico_atualizacoes")
 
 
@@ -234,9 +234,9 @@ class ConfiguracaoTributaria(BaseTenantModel):
     atualizado_em = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relacionamentos
-    usuario = relationship("User", back_populates="configuracao_tributaria")
+    # usuario = relationship("User", back_populates="configuracao_tributaria")  # Disabled - User.configuracao_tributaria comentado
 
 
-    # Relacionamentos
-    usuario = relationship("User", back_populates="configuracao_tributaria")
+    # Relacionamentos - DUPLICADO (manter comentado)
+    # usuario = relationship("User", back_populates="configuracao_tributaria")
 
