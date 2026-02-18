@@ -1,0 +1,11 @@
+linha,sku,nome,motivo,erro
+1,3465,Abajour Para Hamster,DUPLICADO,SKU 3465 já existe (ID: 168)
+2,1635,Acessorios 800,DUPLICADO,SKU 1635 já existe (ID: 169)
+3,1630,Acessorios 900,DUPLICADO,SKU 1630 já existe (ID: 170)
+4,991,Adesivo  Variados,DUPLICADO,SKU 991 já existe (ID: 171)
+5,6041,Adesivo Borboleta,DUPLICADO,SKU 6041 já existe (ID: 172)
+6,1636,Adesivo Mini Presilha,DUPLICADO,SKU 1636 já existe (ID: 173)
+7,997,Adesivo Presilha,DUPLICADO,SKU 997 já existe (ID: 174)
+8,6040,Adesivo Presilha Estrela,DUPLICADO,SKU 6040 já existe (ID: 175)
+9,1868,Adesivos  Ano Novo,DUPLICADO,SKU 1868 já existe (ID: 176)
+10,2649,Adesivos Laco G,DUPLICADO,SKU 2649 já existe (ID: 177)

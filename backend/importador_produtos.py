@@ -53,12 +53,16 @@ class EstatisticasImportacao:
     validos: int = 0
     invalidos: int = 0
     duplicados: int = 0
+    sem_sku: int = 0
     importados: int = 0
     erros: list = None
+    nao_importados: list = None  # Lista de produtos não importados com motivo
     
     def __post_init__(self):
         if self.erros is None:
             self.erros = []
+        if self.nao_importados is None:
+            self.nao_importados = []
 
 
 class ImportadorProdutos:
@@ -222,11 +226,16 @@ class ImportadorProdutos:
         limites = LIMITES_CAMPOS
         
         # Campos obrigatórios
-        codigo = self.truncar_campo(row.get('pro_var_chave'), limites['codigo'], 'codigo')
+        codigo_bruto = row.get('pro_var_chave', '').strip()
         nome = self.truncar_campo(row.get('pro_var_nome'), limites['nome'], 'nome')
         
-        if not codigo:
-            erros.append("Código do produto é obrigatório")
+        # VALIDAÇÃO RIGOROSA DO SKU
+        if not codigo_bruto:
+            erros.append("SKU_VAZIO: Produto sem código/SKU (pro_var_chave vazio)")
+        elif len(codigo_bruto) == 0:
+            erros.append("SKU_VAZIO: Produto sem código/SKU (apenas espaços)")
+        
+        codigo = self.truncar_campo(codigo_bruto, limites['codigo'], 'codigo') if codigo_bruto else None
         
         if not nome:
             erros.append("Nome do produto é obrigatório")
@@ -334,6 +343,13 @@ class ImportadorProdutos:
                         if 'DUPLICADO' in aviso:
                             self.log(f"[{idx}/{len(rows)}] {aviso}", 'WARN')
                             self.stats.duplicados += 1
+                            # Adicionar à lista de não importados
+                            self.stats.nao_importados.append({
+                                'linha': idx,
+                                'sku': row.get('pro_var_chave', 'N/A'),
+                                'nome': row.get('pro_var_nome', 'N/A'),
+                                'motivo': 'DUPLICADO'
+                            })
                         else:
                             self.log(f"[{idx}] AVISO: {aviso}", 'WARN')
                 
@@ -342,6 +358,22 @@ class ImportadorProdutos:
                         for erro in resultado.erros:
                             self.log(f"[{idx}/{len(rows)}] ERRO: {erro}", 'ERROR')
                             self.stats.erros.append(f"Linha {idx}: {erro}")
+                            
+                            # Classificar tipo de erro
+                            if 'SKU_VAZIO' in erro:
+                                self.stats.sem_sku += 1
+                                motivo = 'SEM_SKU'
+                            else:
+                                motivo = 'INVALIDO'
+                            
+                            # Adicionar à lista de não importados
+                            self.stats.nao_importados.append({
+                                'linha': idx,
+                                'sku': row.get('pro_var_chave', 'VAZIO'),
+                                'nome': row.get('pro_var_nome', 'N/A'),
+                                'motivo': motivo,
+                                'erro': erro
+                            })
                         self.stats.invalidos += 1
                     continue
                 
@@ -393,6 +425,26 @@ class ImportadorProdutos:
         finally:
             session.close()
         
+        # Gerar CSV com produtos NÃO importados
+        if self.stats.nao_importados:
+            log_dir = Path(self.log_file).parent
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_nao_importados = log_dir / f"nao_importados_{timestamp}.csv"
+            
+            with open(csv_nao_importados, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=['linha', 'sku', 'nome', 'motivo', 'erro'])
+                writer.writeheader()
+                for item in self.stats.nao_importados:
+                    writer.writerow({
+                        'linha': item['linha'],
+                        'sku': item['sku'],
+                        'nome': item['nome'],
+                        'motivo': item['motivo'],
+                        'erro': item.get('erro', '')
+                    })
+            
+            self.log(f"\nArquivo de produtos NÃO importados: {csv_nao_importados}", 'WARN')
+        
         # Relatório final
         self.log("")
         self.log("="*80)
@@ -400,15 +452,21 @@ class ImportadorProdutos:
         self.log("="*80)
         self.log(f"\nPRODUTOS:")
         self.log(f"  Total processados: {self.stats.total}")
-        self.log(f"  Válidos:          {self.stats.validos} ({self.stats.validos/self.stats.total*100:.1f}%)")
+        percentual = (self.stats.validos/self.stats.total*100) if self.stats.total > 0 else 0
+        self.log(f"  Válidos:          {self.stats.validos} ({percentual:.1f}%)")
         self.log(f"  Inválidos:        {self.stats.invalidos}")
+        self.log(f"    - Sem SKU:       {self.stats.sem_sku}")
         self.log(f"  Duplicados:       {self.stats.duplicados}")
         self.log(f"  Importados:       {self.stats.importados}")
+        self.log(f"  NÃO Importados:   {len(self.stats.nao_importados)}")
         
         if self.stats.erros:
             self.log(f"\nErros encontrados: {len(self.stats.erros)}")
+            self.log("Primeiros 10 erros:")
             for erro in self.stats.erros[:10]:
                 self.log(f"  - {erro}", 'ERROR')
+            if len(self.stats.erros) > 10:
+                self.log(f"  ... e mais {len(self.stats.erros) - 10} erros")
         
         self.log("="*80)
 

@@ -76,8 +76,8 @@ class FormaPagamento(BaseTenantModel):
     parcelas_maximas = Column(Integer, default=1)  # manter compatibilidade
     taxas_por_parcela = Column(Text)  # JSON com taxas específicas por número de parcelas
     
-    # Operadora de Cartão (nova arquitetura)
-    operadora_id = Column(Integer, ForeignKey('operadoras_cartao.id'), nullable=True, index=True)
+    # Operadora de Cartão (FK desabilitado - tabela operadoras_cartao não existe)
+    operadora_id = Column(Integer, nullable=True, index=True)  # was: ForeignKey('operadoras_cartao.id')
     
     # Antecipação de recebíveis
     permite_antecipacao = Column(Boolean, default=False)
@@ -95,7 +95,7 @@ class FormaPagamento(BaseTenantModel):
     
     # Relationships
     conta_bancaria_destino = relationship("ContaBancaria", foreign_keys=[conta_bancaria_destino_id])
-    operadora_cartao = relationship("OperadoraCartao", foreign_keys=[operadora_id])  # Relação unidirecional
+    # operadora_cartao = relationship("OperadoraCartao", foreign_keys=[operadora_id])  # Disabled - tabela não existe
     contas_receber = relationship("ContaReceber", back_populates="forma_pagamento")
     pagamentos = relationship("Pagamento", back_populates="forma_pagamento")
     recebimentos = relationship("Recebimento", back_populates="forma_pagamento")
@@ -291,9 +291,10 @@ class ContaReceber(BaseTenantModel):
         nullable=True, 
         comment="antecipacao (todas parcelas) | parcela_individual (1/3, 2/3, etc)"
     )
+    # FK desabilitado - tabela conciliacao_recebimentos pode não estar registrada
     conciliacao_recebimento_id = Column(
         Integer, 
-        ForeignKey('conciliacao_recebimentos.id'),
+        # was: ForeignKey('conciliacao_recebimentos.id'),
         nullable=True,
         index=True,
         comment="FK para recebimento Stone (idempotência)"
@@ -303,13 +304,13 @@ class ContaReceber(BaseTenantModel):
     diferenca_taxa = Column(Numeric(5, 2), nullable=True, comment="MDR real - MDR estimado")
     diferenca_valor = Column(Numeric(15, 2), nullable=True, comment="Valor líquido real - estimado")
     
-    # Vínculo com lotes (Ajuste #3)
-    conciliacao_lote_id = Column(Integer, ForeignKey('conciliacao_lotes.id', ondelete='SET NULL'), nullable=True)
+    # Vínculo com lotes (Ajuste #3) - FK desabilitado
+    conciliacao_lote_id = Column(Integer, nullable=True)  # was: ForeignKey('conciliacao_lotes.id', ondelete='SET NULL')
     
-    # Vínculo com validação (CRÍTICO - evita dupla movimentação)
+    # Vínculo com validação (FK desabilitado - tabela conciliacao_validacoes não existe)
     validacao_id = Column(
         Integer, 
-        ForeignKey('conciliacao_validacoes.id', ondelete='SET NULL'), 
+        # was: ForeignKey('conciliacao_validacoes.id', ondelete='SET NULL'), 
         nullable=True,
         index=True,
         comment="Validação que processou esta parcela (evita reprocessamento)"

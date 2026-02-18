@@ -1,9 +1,9 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
 from app.config import get_database_url
+from app.db.base_class import Base
 
-# Base para os modelos ORM
-Base = declarative_base()
+# Base para os modelos ORM (importada de base_class.py para compatibilidade com Alembic)
 
 DATABASE_URL = get_database_url()
 

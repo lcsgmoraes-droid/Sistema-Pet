@@ -13,11 +13,12 @@ class KitComposicao(Base):
     tenant_id = Column(Integer, nullable=False, index=True)
 
     # O kit pode ser um produto ou uma variação
-    produto_kit_id = Column(Integer, ForeignKey("produto.id"), nullable=False)
+    # TEMPORÁRIO: FKs desabilitadas - tabelas não existem ainda
+    produto_kit_id = Column(Integer, nullable=False)  # ForeignKey("produto.id")
 
     # Item que compõe o kit (produto ou variação)
-    produto_item_id = Column(Integer, ForeignKey("produto.id"), nullable=False)
-    variacao_item_id = Column(Integer, ForeignKey("produto_variacao.id"), nullable=True)
+    produto_item_id = Column(Integer, nullable=False)  # ForeignKey("produto.id")
+    variacao_item_id = Column(Integer, nullable=True)  # ForeignKey("produto_variacao.id")
 
     quantidade = Column(Numeric(10, 3), nullable=False, default=1)
 

@@ -478,8 +478,8 @@ class ConciliacaoLog(BaseTenantModel):
     
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     
-    # Vínculo
-    conciliacao_validacao_id = Column(Integer, ForeignKey('conciliacao_validacoes.id', ondelete='CASCADE'), nullable=True)
+    # Vínculo (FK desabilitado - tabela conciliacao_validacoes não existe)
+    conciliacao_validacao_id = Column(Integer, nullable=True)  # was: ForeignKey('conciliacao_validacoes.id', ondelete='CASCADE')
     
     # Versionamento (Ajuste #7)
     versao_conciliacao = Column(
@@ -580,7 +580,7 @@ class ConciliacaoRecebimento(BaseTenantModel):
     # Validação (Aba 2)
     validado = Column(Boolean, default=False, nullable=False, index=True, comment="Se passou validação cascata (Aba 2)")
     validado_em = Column(DateTime, nullable=True, comment="Quando foi validado")
-    validacao_id = Column(Integer, ForeignKey('conciliacao_validacoes.id'), nullable=True, comment="FK para validação")
+    validacao_id = Column(Integer, nullable=True, comment="FK desabilitado - tabela conciliacao_validacoes não existe")  # was: ForeignKey('conciliacao_validacoes.id')
     
     # Amarração (Aba 3)
     amarrado = Column(Boolean, default=False, nullable=False, index=True, comment="Se foi amarrado a uma venda (Aba 3)")

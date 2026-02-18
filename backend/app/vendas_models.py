@@ -335,7 +335,7 @@ class VendaPagamento(BaseTenantModel):
     numero_transacao = Column(String(100), nullable=True)
     numero_autorizacao = Column(String(100), nullable=True)
     nsu_cartao = Column(String(50), nullable=True, index=True)  # NSU da operadora (para conciliação)
-    operadora_id = Column(Integer, ForeignKey('operadoras_cartao.id'), nullable=True, index=True)  # Operadora (Stone, Cielo, etc)
+    operadora_id = Column(Integer, nullable=True, index=True)  # was: ForeignKey('operadoras_cartao.id') - tabela não existe
     status_conciliacao = Column(Enum('nao_conciliado', 'conciliado', name='status_conciliacao_enum'), nullable=False, server_default='nao_conciliado')  # Status da conciliação
     
     # Troco (se dinheiro)
