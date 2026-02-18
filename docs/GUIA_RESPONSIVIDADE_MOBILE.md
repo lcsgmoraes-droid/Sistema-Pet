@@ -91,6 +91,37 @@ import { ResponsiveForm, FormActions } from '../components/ResponsiveGrid';
 </ResponsiveForm>
 ```
 
+#### 🔖 ResponsiveTabs
+Abas responsivas com scroll horizontal em mobile.
+
+```jsx
+import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
+
+function MeuComponente() {
+  const [activeTab, setActiveTab] = useState('dados');
+  
+  return (
+    <>
+      <ResponsiveTabs
+        tabs={[
+          { id: 'dados', label: '📋 Dados', count: null },
+          { id: 'imagens', label: '🖼️ Imagens', count: 5 },
+          { id: 'config', label: '⚙️ Config', count: null }
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
+      
+      {activeTab === 'dados' && (
+        <TabContent>
+          {/* conteúdo da aba */}
+        </TabContent>
+      )}
+    </>
+  );
+}
+```
+
 ### 3. Hooks Customizados
 
 #### useIsMobile
@@ -296,11 +327,25 @@ function MinhaLista() {
 
 ## 🐛 Problemas Conhecidos e Soluções
 
+### Calculadora em mobile
+**Problema**: Calculadora flutuante difícil de usar em mobile, drag não funciona bem em touch  
+**Solução**: 
+- Calculadora fixada no topo direito em mobile (não arrasta)
+- Modal fullscreen em mobile com botões maiores
+- Desabilitado drag em telas < 768px
+
 ### Zoom no iOS ao focar input
 **Solução**: Garantir `font-size: 16px` mínimo em inputs (já implementado no CSS global)
 
 ### Tabelas muito largas
 **Solução**: Usar `ResponsiveTable` ou considerar `MobileCard` para mobile
+
+### Abas (tabs) com muitos itens
+**Problema**: Abas não cabem na tela em mobile  
+**Solução**: 
+- Scroll horizontal automático
+- Usar componente `ResponsiveTabs`
+- CSS customizado para nav.flex com abas
 
 ### Menu não fecha em mobile
 **Solução**: Verificar se está usando `handleMenuClick` nos links do menu
@@ -314,8 +359,11 @@ function MinhaLista() {
 - [ ] Implementar PWA (Progressive Web App)
 - [ ] Adicionar touch gestures (swipe para abrir menu)
 - [ ] Otimizar performance em mobile (code splitting)
+- [x] ~~Adaptar calculadora para mobile~~ ✅ (18/02/2026)
+- [x] ~~Tornar abas responsivas~~ ✅ (18/02/2026)
 
 ---
 
-**Data de Atualização**: 17/02/2026
-**Versão**: 1.0.0
+**Data de Atualização**: 18/02/2026  
+**Versão**: 1.1.0  
+**Última build**: index-1771387828651.js
