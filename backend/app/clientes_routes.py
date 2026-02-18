@@ -10,6 +10,7 @@ Routes para gerenciamento de Clientes e Pets
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import case
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
@@ -620,8 +621,22 @@ def list_clientes(
         # Contar total (ANTES do offset/limit)
         total = query.count()
         
+        # Ordenação inteligente: prioriza match exato no código
+        if search:
+            query = query.order_by(
+                case(
+                    (Cliente.codigo == search, 1),  # Match exato no código
+                    (Cliente.codigo.ilike(f"{search}%"), 2),  # Código começa com busca
+                    (Cliente.nome.ilike(f"{search}%"), 3),  # Nome começa com busca
+                    else_=4
+                ),
+                Cliente.nome
+            )
+        else:
+            query = query.order_by(Cliente.nome)
+        
         # Buscar registros paginados
-        clientes = query.order_by(Cliente.nome).offset(skip).limit(limit).all()
+        clientes = query.offset(skip).limit(limit).all()
         
         return ClientesListResponse(
             items=clientes,

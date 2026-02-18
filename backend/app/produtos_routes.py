@@ -12,7 +12,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, Código de Bar
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, text, or_
+from sqlalchemy import func, text, or_, case
 from typing import List, Optional
 from datetime import datetime, timedelta
 import random
@@ -1478,6 +1478,21 @@ def listar_produtos_vendaveis(
     # PAGINAÇÃO
     offset = (page - 1) * page_size
     
+    # Ordenação inteligente: prioriza match exato no código
+    if busca:
+        order_clause = [
+            case(
+                (Produto.codigo == busca, 1),  # Match exato no código
+                (Produto.codigo_barras == busca, 1),  # Match exato no código de barras
+                (Produto.codigo.ilike(f"{busca}%"), 2),  # Código começa com busca
+                (Produto.nome.ilike(f"{busca}%"), 3),  # Nome começa com busca
+                else_=4
+            ),
+            Produto.nome
+        ]
+    else:
+        order_clause = [Produto.created_at.desc()]
+    
     # QUERY FINAL
     produtos = (
         query
@@ -1487,7 +1502,7 @@ def listar_produtos_vendaveis(
             joinedload(Produto.imagens),
             joinedload(Produto.lotes)
         )
-        .order_by(Produto.created_at.desc())
+        .order_by(*order_clause)
         .offset(offset)
         .limit(page_size)
         .all()
