@@ -63,7 +63,7 @@ async def obter_relatorio_vendas(
     # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
     vendas = db.query(Venda).options(
         selectinload(Venda.cliente),
-        selectinload(Venda.user),
+        selectinload(Venda.usuario),
         selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.categoria),
         selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.marca),
         selectinload(Venda.pagamentos)
@@ -229,9 +229,9 @@ async def obter_relatorio_vendas(
     vendas_por_funcionario = {}
     for venda in vendas:
         funcionario_id = venda.user_id
-        # OTIMIZAÇÃO: usar relacionamento user já carregado
+        # OTIMIZAÇÃO: usar relacionamento usuario já carregado
         if funcionario_id:
-            nome_func = venda.user.nome if venda.user else f"ID {funcionario_id}"
+            nome_func = venda.usuario.nome if venda.usuario else f"ID {funcionario_id}"
         else:
             nome_func = "Sem funcionário"
         
