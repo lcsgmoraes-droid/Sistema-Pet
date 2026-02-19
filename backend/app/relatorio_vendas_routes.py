@@ -5,7 +5,7 @@ Similar ao SimplesVet com abas: Resumo, Totais por produto, Lista de Vendas
 
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func, and_
 from datetime import datetime, date
 from typing import Optional
@@ -59,14 +59,47 @@ async def obter_relatorio_vendas(
     data_fim_dt = datetime.fromisoformat(data_fim)
     data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
     
-    # Buscar vendas do período com filtro de tenant
-    vendas = db.query(Venda).filter(
+    # OTIMIZAÇÃO: Buscar vendas com EAGER LOADING para evitar N+1 queries
+    # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
+    vendas = db.query(Venda).options(
+        selectinload(Venda.cliente),
+        selectinload(Venda.user),
+        selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.categoria),
+        selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.marca),
+        selectinload(Venda.pagamentos)
+    ).filter(
         and_(
             Venda.tenant_id == tenant_id,
             Venda.data_venda >= data_inicio_dt,
             Venda.data_venda <= data_fim_dt
         )
     ).all()
+    
+    # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
+    config_fiscal = db.query(EmpresaConfigFiscal).filter(
+        EmpresaConfigFiscal.tenant_id == tenant_id
+    ).first()
+    impostos_percentual_global = float(config_fiscal.aliquota_simples_vigente) if config_fiscal and config_fiscal.aliquota_simples_vigente else 0.0
+    
+    # OTIMIZAÇÃO: Carregar todas as comissões de uma vez
+    venda_ids = [v.id for v in vendas]
+    comissoes_map = {}
+    if venda_ids:
+        comissoes_itens = db.query(ComissaoItem).filter(
+            and_(ComissaoItem.venda_id.in_(venda_ids), ComissaoItem.tenant_id == tenant_id)
+        ).all()
+        for com_item in comissoes_itens:
+            if com_item.venda_id not in comissoes_map:
+                comissoes_map[com_item.venda_id] = []
+            comissoes_map[com_item.venda_id].append(com_item)
+    
+    # OTIMIZAÇÃO: Carregar todas as formas de pagamento ativas de uma vez
+    formas_pagamento_map = {}
+    formas_pag_list = db.query(FormaPagamento).filter(
+        and_(FormaPagamento.ativo == True, FormaPagamento.tenant_id == tenant_id)
+    ).all()
+    for fp in formas_pag_list:
+        formas_pagamento_map[fp.nome.lower().strip()] = fp
     
     # ==============================================
     # RESUMO (Cards no topo)
@@ -80,10 +113,8 @@ async def obter_relatorio_vendas(
     em_aberto = 0
     for v in vendas:
         if v.status != 'finalizada':
-            pagamentos = db.query(VendaPagamento).filter(
-                and_(VendaPagamento.venda_id == v.id, VendaPagamento.tenant_id == tenant_id)
-            ).all()
-            total_pago = sum(float(p.valor) for p in pagamentos) if pagamentos else 0
+            # OTIMIZAÇÃO: usar pagamentos já carregados em vez de query ao BD
+            total_pago = sum(float(p.valor) for p in v.pagamentos) if v.pagamentos else 0
             em_aberto += (float(v.total) - total_pago)
     
     percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
@@ -122,10 +153,8 @@ async def obter_relatorio_vendas(
         vendas_por_data[data_str]["desconto"] += venda.desconto_valor or 0
         vendas_por_data[data_str]["valor_liquido"] += venda.total
         
-        pagamentos = db.query(VendaPagamento).filter(
-            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
-        ).all()
-        total_pago = sum(p.valor for p in pagamentos) if pagamentos else 0
+        # OTIMIZAÇÃO: usar pagamentos já carregados
+        total_pago = sum(p.valor for p in venda.pagamentos) if venda.pagamentos else 0
         vendas_por_data[data_str]["valor_recebido"] += total_pago
         vendas_por_data[data_str]["saldo_aberto"] += (venda.total - total_pago) if venda.status != 'finalizada' else 0
     
@@ -161,10 +190,8 @@ async def obter_relatorio_vendas(
     
     formas_recebimento = {}
     for venda in vendas:
-        pagamentos = db.query(VendaPagamento).filter(
-            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
-        ).all()
-        for pag in pagamentos:
+        # OTIMIZAÇÃO: usar pagamentos já carregados
+        for pag in venda.pagamentos:
             forma_codigo = str(pag.forma_pagamento) if pag.forma_pagamento else "Não informado"
             forma_base = FORMAS_PAGAMENTO_MAP.get(forma_codigo, forma_codigo)
             
@@ -202,11 +229,9 @@ async def obter_relatorio_vendas(
     vendas_por_funcionario = {}
     for venda in vendas:
         funcionario_id = venda.user_id
+        # OTIMIZAÇÃO: usar relacionamento user já carregado
         if funcionario_id:
-            user = db.query(User).filter(
-                and_(User.id == funcionario_id, User.tenant_id == tenant_id)
-            ).first()
-            nome_func = user.nome if user else f"ID {funcionario_id}"
+            nome_func = venda.user.nome if venda.user else f"ID {funcionario_id}"
         else:
             nome_func = "Sem funcionário"
         
@@ -248,13 +273,10 @@ async def obter_relatorio_vendas(
     total_geral = sum(v.total for v in vendas)
     
     for venda in vendas:
-        itens = db.query(VendaItem).filter(
-            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
-        ).all()
-        for item in itens:
-            produto = db.query(Produto).filter(
-                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
-            ).first()
+        # OTIMIZAÇÃO: usar itens já carregados
+        for item in venda.itens:
+            # OTIMIZAÇÃO: usar relacionamento produto já carregado
+            produto = item.produto
             if produto and produto.categoria:
                 grupo = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
@@ -290,14 +312,11 @@ async def obter_relatorio_vendas(
     produtos_por_categoria = {}
     
     for venda in vendas:
-        itens = db.query(VendaItem).filter(
-            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
-        ).all()
-        for item in itens:
+        # OTIMIZAÇÃO: usar itens já carregados
+        for item in venda.itens:
             produto_id = item.produto_id
-            produto = db.query(Produto).filter(
-                and_(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-            ).first()
+            # OTIMIZAÇÃO: usar relacionamento produto já carregado
+            produto = item.produto
             
             # Determinar categoria e subcategoria
             if produto and produto.categoria:
@@ -464,33 +483,24 @@ async def obter_relatorio_vendas(
     COMISSAO_PADRAO = 5.0  # 5%
     
     for venda in vendas:
-        # Buscar itens da venda
-        itens = db.query(VendaItem).filter(
-            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
-        ).all()
+        # OTIMIZAÇÃO: usar itens já carregados em vez de query ao BD
+        itens = venda.itens
 
         # ==============================
         # CALCULO DE RENTABILIDADE (safe)
         # ==============================
         taxa_total = 0.0
         comissao = 0.0
-        impostos_percentual = 0.0
+        impostos_percentual = impostos_percentual_global  # OTIMIZAÇÃO: usar valor já carregado
         taxa_operacional_entrega = 0.0
 
         # Taxa de cartao por FormaPagamento (JSON taxas_por_parcela)
-        pagamentos = db.query(VendaPagamento).filter(
-            and_(VendaPagamento.venda_id == venda.id, VendaPagamento.tenant_id == tenant_id)
-        ).all()
-        for pag in pagamentos:
+        # OTIMIZAÇÃO: usar pagamentos já carregados
+        for pag in venda.pagamentos:
             taxa_percentual = 0.0
             if pag.forma_pagamento:
-                forma_pag = db.query(FormaPagamento).filter(
-                    and_(
-                        func.lower(func.trim(FormaPagamento.nome)) == func.lower(func.trim(pag.forma_pagamento)),
-                        FormaPagamento.ativo == True,
-                        FormaPagamento.tenant_id == tenant_id
-                    )
-                ).first()
+                # OTIMIZAÇÃO: usar map pré-carregado em vez de query ao BD
+                forma_pag = formas_pagamento_map.get(pag.forma_pagamento.lower().strip())
                 if not forma_pag:
                     logger.warning(
                         "FormaPagamento nao encontrada: %s (venda_id=%s)",
@@ -520,26 +530,19 @@ async def obter_relatorio_vendas(
 
             taxa_total += (float(pag.valor or 0) * taxa_percentual / 100.0)
 
-        # Comissao real da tabela comissoes_itens
-        comissoes_itens = db.query(ComissaoItem).filter(
-            and_(ComissaoItem.venda_id == venda.id, ComissaoItem.tenant_id == tenant_id)
-        ).all()
+        # OTIMIZAÇÃO: Comissao real da tabela comissoes_itens (usar map pré-carregado)
+        comissoes_itens = comissoes_map.get(venda.id, [])
         if not comissoes_itens:
             logger.warning("Sem comissao para venda_id=%s", venda.id)
         for com_item in comissoes_itens:
             comissao += float(com_item.valor_comissao or 0)
 
-        # Imposto (config fiscal)
-        config_fiscal = db.query(EmpresaConfigFiscal).filter(
-            EmpresaConfigFiscal.tenant_id == tenant_id
-        ).first()
-        if not config_fiscal or not config_fiscal.aliquota_simples_vigente:
-            logger.warning("Config fiscal ausente ou sem aliquota (tenant_id=%s)", tenant_id)
-        else:
-            impostos_percentual = float(config_fiscal.aliquota_simples_vigente)
+        # OTIMIZAÇÃO: Imposto já foi carregado globalmente (impostos_percentual_global)
 
         # Taxa operacional de entrega
         if venda.tem_entrega and venda.entregador_id:
+            # OTIMIZAÇÃO: Carregar entregador apenas se necessário
+            # Idealmente, isso deveria ser eager-loaded também, mas é menos comum
             entregador = db.query(Cliente).filter(
                 and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
             ).first()
@@ -548,7 +551,7 @@ async def obter_relatorio_vendas(
             elif entregador.taxa_fixa_entrega:
                 taxa_operacional_entrega = float(entregador.taxa_fixa_entrega)
         else:
-            logger.warning("Venda sem entregador para taxa operacional (venda_id=%s)", venda.id)
+            pass  # Sem warning se não tem entrega
         
         # Calcular CUSTO TOTAL e SUBTOTAL dos produtos para rateio
         custo_total = 0
@@ -557,9 +560,8 @@ async def obter_relatorio_vendas(
         
         # Primeiro loop: calcular totais
         for item in itens:
-            produto = db.query(Produto).filter(
-                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
-            ).first()
+            # OTIMIZAÇÃO: usar relacionamento produto já carregado
+            produto = item.produto
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             custo_item = custo_unitario * float(item.quantidade)
             subtotal_item = float(item.quantidade) * float(item.preco_unitario)
@@ -569,9 +571,8 @@ async def obter_relatorio_vendas(
         
         # Segundo loop: calcular rateio para cada item
         for item in itens:
-            produto = db.query(Produto).filter(
-                and_(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
-            ).first()
+            # OTIMIZAÇÃO: usar relacionamento produto já carregado
+            produto = item.produto
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             quantidade = float(item.quantidade)
             preco_unit = float(item.preco_unitario)
@@ -691,11 +692,9 @@ async def obter_relatorio_vendas(
     # ==============================================
     produtos_analise = {}
     for venda in vendas:
-        itens = db.query(VendaItem).filter(
-            and_(VendaItem.venda_id == venda.id, VendaItem.tenant_id == tenant_id)
-        ).all()
-        
-        for item in itens:
+        # OTIMIZAÇÃO: usar itens já carregados
+        for item in venda.itens:
+            # OTIMIZAÇÃO: usar relacionamento produto já carregado
             produto = item.produto
             if not produto:
                 continue
