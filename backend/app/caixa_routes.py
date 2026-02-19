@@ -82,11 +82,14 @@ async def abrir_caixa(
     ).scalar()
     numero_caixa = (ultimo_caixa or 0) + 1
     
+    # Nome do usuário (fallback para email se nome não estiver preenchido)
+    usuario_nome = current_user.nome or current_user.email
+    
     # Criar novo caixa
     novo_caixa = Caixa(
         numero_caixa=numero_caixa,
         usuario_id=current_user.id,
-        usuario_nome=current_user.nome,
+        usuario_nome=usuario_nome,
         valor_abertura=dados.valor_abertura,
         conta_origem_id=dados.conta_origem_id,
         conta_origem_nome=dados.conta_origem_nome,
@@ -204,6 +207,9 @@ async def criar_movimentacao(
             detail="Caixa não está aberto"
         )
     
+    # Nome do usuário (fallback para email se nome não estiver preenchido)
+    usuario_nome = current_user.nome or current_user.email
+    
     # Criar movimentação
     movimentacao = MovimentacaoCaixa(
         caixa_id=caixa_id,
@@ -220,7 +226,7 @@ async def criar_movimentacao(
         fornecedor_nome=dados.fornecedor_nome,
         documento=dados.documento,
         usuario_id=current_user.id,
-        usuario_nome=current_user.nome,
+        usuario_nome=usuario_nome,
         tenant_id=tenant_id
     )
     
