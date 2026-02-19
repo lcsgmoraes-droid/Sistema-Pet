@@ -76,30 +76,41 @@ async def obter_relatorio_vendas(
     ).all()
     
     # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
-    config_fiscal = db.query(EmpresaConfigFiscal).filter(
-        EmpresaConfigFiscal.tenant_id == tenant_id
-    ).first()
-    impostos_percentual_global = float(config_fiscal.aliquota_simples_vigente) if config_fiscal and config_fiscal.aliquota_simples_vigente else 0.0
+    # Tratamento de erro caso a tabela não exista
+    try:
+        config_fiscal = db.query(EmpresaConfigFiscal).filter(
+            EmpresaConfigFiscal.tenant_id == tenant_id
+        ).first()
+        impostos_percentual_global = float(config_fiscal.aliquota_simples_vigente) if config_fiscal and config_fiscal.aliquota_simples_vigente else 0.0
+    except Exception as e:
+        logger.warning(f"Erro ao buscar config fiscal (tabela pode não existir): {e}")
+        impostos_percentual_global = 0.0
     
     # OTIMIZAÇÃO: Carregar todas as comissões de uma vez
     venda_ids = [v.id for v in vendas]
     comissoes_map = {}
     if venda_ids:
-        comissoes_itens = db.query(ComissaoItem).filter(
-            and_(ComissaoItem.venda_id.in_(venda_ids), ComissaoItem.tenant_id == tenant_id)
-        ).all()
-        for com_item in comissoes_itens:
-            if com_item.venda_id not in comissoes_map:
-                comissoes_map[com_item.venda_id] = []
-            comissoes_map[com_item.venda_id].append(com_item)
+        try:
+            comissoes_itens = db.query(ComissaoItem).filter(
+                and_(ComissaoItem.venda_id.in_(venda_ids), ComissaoItem.tenant_id == tenant_id)
+            ).all()
+            for com_item in comissoes_itens:
+                if com_item.venda_id not in comissoes_map:
+                    comissoes_map[com_item.venda_id] = []
+                comissoes_map[com_item.venda_id].append(com_item)
+        except Exception as e:
+            logger.warning(f"Erro ao buscar comissões (tabela pode não existir): {e}")
     
     # OTIMIZAÇÃO: Carregar todas as formas de pagamento ativas de uma vez
     formas_pagamento_map = {}
-    formas_pag_list = db.query(FormaPagamento).filter(
-        and_(FormaPagamento.ativo == True, FormaPagamento.tenant_id == tenant_id)
-    ).all()
-    for fp in formas_pag_list:
-        formas_pagamento_map[fp.nome.lower().strip()] = fp
+    try:
+        formas_pag_list = db.query(FormaPagamento).filter(
+            and_(FormaPagamento.ativo == True, FormaPagamento.tenant_id == tenant_id)
+        ).all()
+        for fp in formas_pag_list:
+            formas_pagamento_map[fp.nome.lower().strip()] = fp
+    except Exception as e:
+        logger.warning(f"Erro ao buscar formas de pagamento (tabela pode não existir): {e}")
     
     # ==============================================
     # RESUMO (Cards no topo)
@@ -543,13 +554,16 @@ async def obter_relatorio_vendas(
         if venda.tem_entrega and venda.entregador_id:
             # OTIMIZAÇÃO: Carregar entregador apenas se necessário
             # Idealmente, isso deveria ser eager-loaded também, mas é menos comum
-            entregador = db.query(Cliente).filter(
-                and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
-            ).first()
-            if not entregador:
-                logger.warning("Entregador nao encontrado (id=%s)", venda.entregador_id)
-            elif entregador.taxa_fixa_entrega:
-                taxa_operacional_entrega = float(entregador.taxa_fixa_entrega)
+            try:
+                entregador = db.query(Cliente).filter(
+                    and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
+                ).first()
+                if not entregador:
+                    logger.warning("Entregador nao encontrado (id=%s)", venda.entregador_id)
+                elif entregador.taxa_fixa_entrega:
+                    taxa_operacional_entrega = float(entregador.taxa_fixa_entrega)
+            except Exception as e:
+                logger.warning(f"Erro ao buscar entregador: {e}")
         else:
             pass  # Sem warning se não tem entrega
         
