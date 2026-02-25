@@ -310,7 +310,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     
     tenants_list = []
     for ut in user_tenants:
-        tenant = db.query(Tenant).filter(Tenant.id == ut.tenant_id).first()
+        tenant = db.query(Tenant).filter(Tenant.id == str(ut.tenant_id)).first()
         if tenant:
             tenants_list.append({
                 "id": str(tenant.id),
@@ -355,7 +355,7 @@ def select_tenant(
     
     user_tenant = db.query(UserTenant).filter(
         UserTenant.user_id == current_user.id,
-        UserTenant.tenant_id == tenant_uuid
+        UserTenant.tenant_id == str(tenant_uuid)
     ).first()
     
     if not user_tenant:
@@ -364,7 +364,7 @@ def select_tenant(
             detail="Você não tem acesso a este tenant"
         )
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_uuid)).first()
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -452,7 +452,7 @@ def get_me_multitenant(
             detail="Usuário não tem acesso ao tenant selecionado"
         )
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     
     role = None
     if user_tenant.role_id:
