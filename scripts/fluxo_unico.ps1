@@ -8,8 +8,8 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
 $validatorScript = Join-Path $PSScriptRoot 'validar_fluxo.ps1'
-$prodScript = Join-Path $PSScriptRoot 'gerenciar_producao.ps1'
-$devScript = Join-Path $root 'INICIAR_DEV.bat'
+$devComposeFile = Join-Path $root 'docker-compose.local-dev.yml'
+$prodComposeFile = Join-Path $root 'docker-compose.prod.yml'
 
 function Run-Validator([bool]$allowLocalChanges) {
     if ($allowLocalChanges) {
@@ -20,6 +20,28 @@ function Run-Validator([bool]$allowLocalChanges) {
 
     if ($LASTEXITCODE -ne 0) {
         throw 'Validacao do fluxo falhou.'
+    }
+}
+
+function Run-ComposeUp([string]$composeFile) {
+    if (-not (Test-Path $composeFile)) {
+        throw "Arquivo docker compose nao encontrado: $composeFile"
+    }
+
+    docker compose -f $composeFile up -d
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao subir containers com compose: $composeFile"
+    }
+}
+
+function Run-ComposeStatus([string]$composeFile) {
+    if (-not (Test-Path $composeFile)) {
+        throw "Arquivo docker compose nao encontrado: $composeFile"
+    }
+
+    docker compose -f $composeFile ps
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao consultar status do compose: $composeFile"
     }
 }
 
@@ -37,15 +59,15 @@ switch ($Acao) {
 
     'dev-up' {
         Run-Validator -allowLocalChanges $true
-        & $devScript
+        Run-ComposeUp -composeFile $devComposeFile
     }
 
     'prod-up' {
         Run-Validator -allowLocalChanges $false
-        & $prodScript up
+        Run-ComposeUp -composeFile $prodComposeFile
     }
 
     'status' {
-        & $prodScript status
+        Run-ComposeStatus -composeFile $prodComposeFile
     }
 }
