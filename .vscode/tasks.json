@@ -1,0 +1,101 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Fluxo: 1) Check",
+      "detail": "Checagem geral de seguranca e organizacao (nao sobe nada).",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\fluxo_unico.ps1",
+        "check"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: 2) Dev Up",
+      "detail": "Sobe ambiente DEV para desenvolvimento/testes.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\fluxo_unico.ps1",
+        "dev-up"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: 3) Release Check",
+      "detail": "Valida se esta pronto para subir producao (passo obrigatorio).",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\fluxo_unico.ps1",
+        "release-check"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: 4) Prod Up",
+      "detail": "Sobe producao pelo caminho oficial e seguro.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\fluxo_unico.ps1",
+        "prod-up"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: 5) Status",
+      "detail": "Mostra status dos servicos e saude do ambiente.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\fluxo_unico.ps1",
+        "status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: Completo (1->5)",
+      "detail": "Executa toda a sequencia oficial, em ordem.",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Fluxo: 1) Check",
+        "Fluxo: 2) Dev Up",
+        "Fluxo: 3) Release Check",
+        "Fluxo: 4) Prod Up",
+        "Fluxo: 5) Status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: Assistente Release Seguro",
+      "detail": "Prepara blocos de commit, pede confirmacao e so faz push final com sua autorizacao.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\assistente_release_seguro.ps1"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

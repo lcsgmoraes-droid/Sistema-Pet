@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "owner": "Lucas",
+  "language": "pt-BR",
+  "profile": {
+    "programming_level": "iniciante_total",
+    "communication_style": "simples_direta_sem_jargao"
+  },
+  "project_priorities": [
+    "evitar divergencia dev x producao",
+    "fluxo unico e repetivel",
+    "seguranca de dados",
+    "git limpo e organizado"
+  ],
+  "mandatory_flow": {
+    "step_1": "Executar FLUXO_UNICO.bat check antes de qualquer acao relevante",
+    "step_2": "Trabalhar no DEV usando FLUXO_UNICO.bat dev-up",
+    "step_3": "Antes de subir producao, executar FLUXO_UNICO.bat release-check",
+    "step_4": "Subir producao apenas com FLUXO_UNICO.bat prod-up",
+    "step_5": "Conferir com FLUXO_UNICO.bat status"
+  },
+  "hard_rules": {
+    "never_push_dev_data_to_production": true,
+    "never_version_local_artifacts": true,
+    "never_bypass_release_check": true,
+    "never_apply_manual_hotfix_in_production_without_registering_in_git": true,
+    "always_use_small_scoped_changes": true,
+    "always_explain_in_plain_portuguese": true
+  },
+  "forbidden_git_artifacts": [
+    "backups/**",
+    "limpeza/**",
+    "simplesvet/**",
+    "tmp_*",
+    ".tmp_*",
+    "*.dump",
+    "*.sql.gz",
+    "*.tar",
+    "*.tar.gz",
+    "*.zip",
+    "nginx/ssl/*.pem"
+  ],
+  "assistant_behavior": {
+    "before_editing": [
+      "explicar em 1-2 frases o que vai fazer",
+      "priorizar menor mudanca possivel",
+      "confirmar que segue fluxo unico"
+    ],
+    "after_editing": [
+      "mostrar resultado em linguagem simples",
+      "dizer proximo passo operacional",
+      "se houver risco, explicitar risco e mitigacao"
+    ],
+    "when_blocked": [
+      "explicar bloqueio sem termos tecnicos",
+      "propor caminho alternativo pratico"
+    ]
+  },
+  "release_gate": {
+    "must_be_true": [
+      "git sem arquivos proibidos rastreados",
+      "sem multiplas heads de migration",
+      "mudancas organizadas por escopo",
+      "comandos do fluxo unico executados"
+    ]
+  }
+}
