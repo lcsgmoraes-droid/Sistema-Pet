@@ -96,6 +96,21 @@
         ".\\scripts\\assistente_release_seguro.ps1"
       ],
       "problemMatcher": []
+    },
+    {
+      "label": "Fluxo: Assistente Release (Executar Commit+Push)",
+      "detail": "Executa o assistente no modo de execucao (commit e push), com confirmacoes de seguranca.",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        ".\\scripts\\assistente_release_seguro.ps1",
+        "-ExecutarCommit",
+        "-ExecutarPush"
+      ],
+      "problemMatcher": []
     }
   ]
 }
