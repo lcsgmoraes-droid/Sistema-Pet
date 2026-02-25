@@ -19,6 +19,10 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     proxy: {
+      '/api/auth': {
+        target: 'http://127.0.0.1:8000',
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
       '/auth': 'http://127.0.0.1:8000',
       '/api': 'http://127.0.0.1:8000',
     }

@@ -10,7 +10,9 @@ const configuredApiUrl = import.meta.env.VITE_API_URL;
 const mode = import.meta.env.MODE;
 
 // ⚠️ ALERTA: Em produção DEVE ser '/api', em desenvolvimento DEVE ser 'http://127.0.0.1:8000'
-const API_URL = configuredApiUrl || 'http://127.0.0.1:8000';
+const API_URL = isDevelopment
+  ? (!configuredApiUrl || configuredApiUrl === '/api' ? 'http://127.0.0.1:8000' : configuredApiUrl)
+  : (configuredApiUrl || '/api');
 
 // 🔍 DEBUG: Log de configuração ao carregar o módulo
 console.log('═══════════════════════════════════════════════════════');
