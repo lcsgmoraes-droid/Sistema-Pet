@@ -202,7 +202,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["1000/hour"])
 app = FastAPI(
     title=SYSTEM_NAME,
     description="Sistema completo de gestão para Pet Shop",
-    version=SYSTEM_VERSION
+    version=SYSTEM_VERSION,
 )
 
 # ====================
@@ -479,7 +479,7 @@ app.include_router(ia_fluxo_router, tags=["IA - Fluxo Inteligente"])
 app.include_router(analytics_router, tags=["Analytics - CQRS Read Models"])
 app.include_router(audit_router, tags=["Auditoria (Read-Only)"])
 app.include_router(tributacao_router, tags=["Tributação e Impostos"])
-app.include_router(whatsapp_router, prefix="/api", tags=["WhatsApp IA - Sprint 3"])  # ✅ REATIVADO Sprint 3
+app.include_router(whatsapp_router, tags=["WhatsApp IA - Sprint 3"])  # ✅ REATIVADO Sprint 3
 # app.include_router(whatsapp_router, tags=["WhatsApp CRM"])  # DESATIVADO - Usar novos endpoints WhatsApp IA
 app.include_router(segmentacao_router, tags=["Segmentação de Clientes"])
 app.include_router(pdv_ai_router, tags=["PDV - IA Contextual"])
@@ -510,12 +510,12 @@ app.include_router(pendencia_estoque_router, tags=["Pendências de Estoque - Lis
 # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7
 # ============================================================================
 app.include_router(whatsapp_webhook_router)  # Webhooks 360dialog (sem auth)
-app.include_router(whatsapp_config_router, prefix="/api")   # Configuração (com auth)
-app.include_router(whatsapp_handoff_router, prefix="/api")  # Sprint 4: Human Handoff (com auth)
+app.include_router(whatsapp_config_router)   # Configuração (com auth)
+app.include_router(whatsapp_handoff_router)  # Sprint 4: Human Handoff (com auth)
 app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
-app.include_router(whatsapp_api_router, prefix="/api")  # Sprint 6: Tools & Tests (com auth)
-app.include_router(whatsapp_analytics_router, prefix="/api")  # Sprint 7: Analytics & Reports (com auth)
-app.include_router(whatsapp_security_router, prefix="/api")  # Sprint 8: Security & LGPD (com auth)
+app.include_router(whatsapp_api_router)  # Sprint 6: Tools & Tests (com auth)
+app.include_router(whatsapp_analytics_router)  # Sprint 7: Analytics & Reports (com auth)
+app.include_router(whatsapp_security_router)  # Sprint 8: Security & LGPD (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
 
