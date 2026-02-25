@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -32,8 +32,9 @@ const Layout = () => {
   const hasPermission = (permission) => {
     if (!user) return false;
     
-    // Admins têm acesso a tudo
-    if (user.role?.name === 'admin' || user.role?.name === 'Admin') {
+    // Admins têm acesso a tudo (qualquer variação do nome do role admin)
+    const adminRoles = ['admin', 'Admin', 'Administrador', 'administrador', 'ADMIN'];
+    if (adminRoles.includes(user.role?.name)) {
       return true;
     }
     
@@ -70,6 +71,94 @@ const Layout = () => {
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
+  const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
+  const overlaySuspeitoDesdeRef = useRef(new Map());
+
+  const neutralizarOverlay = (elementoOverlay) => {
+    if (!elementoOverlay) return;
+
+    elementoOverlay.style.pointerEvents = 'none';
+    elementoOverlay.style.backgroundColor = 'transparent';
+    elementoOverlay.style.opacity = '0';
+    elementoOverlay.style.transition = 'opacity 120ms ease';
+
+    window.setTimeout(() => {
+      if (elementoOverlay.parentNode) {
+        elementoOverlay.remove();
+      }
+    }, 140);
+  };
+
+  const ehOverlayTelaCheia = (elementoOverlay) => {
+    const estilo = window.getComputedStyle(elementoOverlay);
+    const larguraTelaCheia = elementoOverlay.offsetWidth >= (window.innerWidth - 8);
+    const alturaTelaCheia = elementoOverlay.offsetHeight >= (window.innerHeight - 8);
+    const zIndex = Number.parseInt(estilo.zIndex || '0', 10);
+
+    return (
+      estilo.position === 'fixed' &&
+      larguraTelaCheia &&
+      alturaTelaCheia &&
+      zIndex >= 40
+    );
+  };
+
+  const encontrarOverlaysOrfaos = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return [];
+    }
+
+    const overlays = Array.from(document.querySelectorAll('div.fixed.inset-0'));
+
+    return overlays.filter((elementoOverlay) => {
+      if (!ehOverlayTelaCheia(elementoOverlay)) {
+        return false;
+      }
+
+      const classes = elementoOverlay.className || '';
+      if (typeof classes === 'string' && classes.includes('bg-transparent')) {
+        return false;
+      }
+
+      const estilo = window.getComputedStyle(elementoOverlay);
+      const visivel = estilo.display !== 'none' && estilo.visibility !== 'hidden';
+      const bloqueiaClique = estilo.pointerEvents !== 'none';
+      const fundoAtivo = estilo.backgroundColor && estilo.backgroundColor !== 'rgba(0, 0, 0, 0)' && estilo.backgroundColor !== 'transparent';
+      const possuiSpinner = Boolean(elementoOverlay.querySelector('.animate-spin'));
+      const overlayCalculadora = elementoOverlay.getAttribute('data-overlay-type') === 'calculadora-universal';
+      const overlaySemConteudo = (elementoOverlay.textContent || '').trim().length === 0;
+
+      if (!visivel || !bloqueiaClique) {
+        return false;
+      }
+
+      const possuiConteudoModal = Boolean(
+        elementoOverlay.querySelector('[role="dialog"], .bg-white, .rounded-lg, .rounded-xl, .shadow-2xl, .shadow-xl')
+      );
+
+      if (overlayCalculadora && !calculadoraAberta) {
+        return true;
+      }
+
+      return !possuiConteudoModal && (fundoAtivo || possuiSpinner || overlaySemConteudo);
+    });
+  };
+
+  const destravarTela = (silencioso = false) => {
+    setSidebarOpen(false);
+    setCalculadoraAberta(false);
+
+    const eventoEscape = new KeyboardEvent('keydown', { key: 'Escape' });
+    window.dispatchEvent(eventoEscape);
+
+    const overlaysOrfaos = encontrarOverlaysOrfaos();
+    overlaysOrfaos.forEach((elementoOverlay) => neutralizarOverlay(elementoOverlay));
+
+    overlaySuspeitoDesdeRef.current.clear();
+    if (!silencioso) {
+      setTelaBloqueadaSuspeita(false);
+    }
+  };
 
   // Fechar sidebar em mobile ao clicar em um link
   const handleMenuClick = () => {
@@ -98,6 +187,62 @@ const Layout = () => {
     }
   }, [location.pathname, isMobile]);
 
+  useEffect(() => {
+    if (isMobile && sidebarOpen) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile, sidebarOpen]);
+
+  useEffect(() => {
+    setCalculadoraAberta(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const verificarTelaBloqueada = () => {
+      const overlaysOrfaos = encontrarOverlaysOrfaos();
+      const agora = Date.now();
+
+      const mapeamentoAtual = overlaySuspeitoDesdeRef.current;
+      let precisaDestravarAutomaticamente = false;
+
+      const overlaysSet = new Set(overlaysOrfaos);
+      for (const elemento of Array.from(mapeamentoAtual.keys())) {
+        if (!overlaysSet.has(elemento)) {
+          mapeamentoAtual.delete(elemento);
+        }
+      }
+
+      overlaysOrfaos.forEach((elementoOverlay) => {
+        const vistoDesde = mapeamentoAtual.get(elementoOverlay) || agora;
+        mapeamentoAtual.set(elementoOverlay, vistoDesde);
+
+        const overlayCalculadora = elementoOverlay.getAttribute('data-overlay-type') === 'calculadora-universal';
+        const limiteMs = overlayCalculadora ? 900 : 1800;
+
+        if (agora - vistoDesde >= limiteMs) {
+          precisaDestravarAutomaticamente = true;
+          neutralizarOverlay(elementoOverlay);
+        }
+      });
+
+      setTelaBloqueadaSuspeita(overlaysOrfaos.length > 0);
+
+      if (precisaDestravarAutomaticamente) {
+        destravarTela(true);
+      }
+    };
+
+    verificarTelaBloqueada();
+    const intervalId = window.setInterval(verificarTelaBloqueada, 1000);
+    const observer = new MutationObserver(() => verificarTelaBloqueada());
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      window.clearInterval(intervalId);
+      observer.disconnect();
+    };
+  }, [calculadoraAberta]);
+
   const allMenuItems = [
     { path: '/dashboard', icon: FiHome, label: 'Dashboard', permission: 'relatorios.gerencial' }, // Precisa de permissão
     { path: '/dashboard-gerencial', icon: FiBarChart2, label: '📊 Dashboard Gerencial', highlight: true, permission: 'relatorios.gerencial' },
@@ -117,6 +262,7 @@ const Layout = () => {
     { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: true, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },
+    { path: '/ecommerce', icon: FiShoppingCart, label: 'E-commerce MVP', permission: 'vendas.visualizar' },
     { path: '/notas-fiscais', icon: FiFileText, label: 'Notas Fiscais', permission: 'vendas.visualizar' }, // Vinculado a vendas
     { 
       path: '/compras', 
@@ -264,7 +410,7 @@ const Layout = () => {
       {/* Backdrop para mobile */}
       {isMobile && sidebarOpen && sidebarVisible && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed inset-0 bg-transparent z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -313,7 +459,7 @@ const Layout = () => {
         </div>
 
         {/* Menu Items */}
-        <nav className="flex-1 py-4 overflow-y-auto">
+        <nav className="flex-1 py-2 md:py-4 overflow-y-auto overflow-x-hidden">
           {Array.isArray(menuItems) && menuItems.map((item) => (
             <div key={item.path}>
               {item.submenu ? (
@@ -325,30 +471,30 @@ const Layout = () => {
                         [item.path]: !prev[item.path]
                       }));
                     }}
-                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 mx-2 rounded-lg transition-all ${
+                    className={`w-full flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 rounded-lg transition-all text-sm md:text-base ${
                       location.pathname.startsWith(item.path)
                         ? 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm'
                         : 'text-gray-700 hover:bg-white/60'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="text-lg flex-shrink-0" />
-                      {sidebarOpen && <span className="font-medium text-sm">{item.label}</span>}
+                    <div className="flex items-center gap-2 md:gap-3">
+                      <item.icon className="text-base md:text-lg flex-shrink-0" />
+                      {sidebarOpen && <span className="font-medium text-xs md:text-sm">{item.label}</span>}
                     </div>
                     {sidebarOpen && (
                       submenusOpen[item.path] 
-                        ? <FiChevronDown className="text-sm text-gray-400" /> 
-                        : <FiChevronRight className="text-sm text-gray-400" />
+                        ? <FiChevronDown className="text-xs md:text-sm text-gray-400" /> 
+                        : <FiChevronRight className="text-xs md:text-sm text-gray-400" />
                     )}
                   </button>
                   {submenusOpen[item.path] && sidebarOpen && (
-                    <div className="mt-1 mb-2 space-y-1">
+                    <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
                       {Array.isArray(item.submenu) && item.submenu.map((subitem) => (
                         <Link
                           key={subitem.path}
                           to={subitem.path}
                           onClick={handleMenuClick}
-                          className={`flex items-center gap-3 px-4 py-2 mx-2 ml-12 rounded-lg transition-all text-sm ${
+                          className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 mx-1 md:mx-2 ml-8 md:ml-12 rounded-lg transition-all text-xs md:text-sm ${
                             isActive(subitem.path)
                               ? 'bg-white text-indigo-600 shadow-sm font-medium'
                               : 'text-gray-600 hover:bg-white/50'
@@ -364,17 +510,17 @@ const Layout = () => {
                 <Link
                   to={item.path}
                   onClick={handleMenuClick}
-                  className={`flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-lg transition-all ${
+                  className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 my-0.5 md:my-1 rounded-lg transition-all text-sm md:text-base ${
                     isActive(item.path)
                       ? 'bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm'
                       : 'text-gray-700 hover:bg-white/60'
                   }`}
                   title={!sidebarOpen ? item.label : ''}
                 >
-                  <item.icon className="text-lg flex-shrink-0" />
+                  <item.icon className="text-base md:text-lg flex-shrink-0" />
                   {sidebarOpen && (
                     <div className="flex items-center justify-between flex-1">
-                      <span className="font-medium text-sm">{item.label}</span>
+                      <span className="font-medium text-xs md:text-sm">{item.label}</span>
                       {item.badge && (
                         <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
                       )}
@@ -472,6 +618,16 @@ const Layout = () => {
             setCalculadoraAberta(false);
           }}
         />
+      )}
+
+      {telaBloqueadaSuspeita && (
+        <button
+          onClick={destravarTela}
+          className="fixed bottom-4 right-4 z-[80] px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg"
+          title="Remover bloqueio visual da tela"
+        >
+          Destravar tela
+        </button>
       )}
     </div>
   );
