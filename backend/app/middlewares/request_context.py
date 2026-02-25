@@ -129,7 +129,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         """
         Processa request e injeta contexto observável.
         """
-        
+
+        # ============================================================
+        # 0️⃣ BYPASS PARA WEBSOCKET
+        # BaseHTTPMiddleware não suporta WebSocket - deixa passar direto
+        # ============================================================
+        if request.scope.get("type") == "websocket":
+            return await call_next(request)
+
         # ============================================================
         # 1️⃣ GERAR OU OBTER REQUEST_ID
         # ============================================================
