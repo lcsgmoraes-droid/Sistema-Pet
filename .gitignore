@@ -97,6 +97,27 @@ htmlcov/
 *.bak
 *.backup
 backup_*.sql
+backups/
+limpeza/
+
+# Dumps e exports locais
+*.dump
+*.sql.gz
+*.tar
+*.tar.gz
+*.zip
+
+# Artefatos temporários de diagnóstico
+tmp_*
+.tmp_*
+
+# Dados locais de importação
+simplesvet/
+**/simplesvet/
+**/simplesvet_data/
+
+# Uploads e dados locais fora do backend padrão
+uploads/
 
 # Dados SimplesVet (apenas local, não versionar)
 simplesvet/
@@ -104,3 +125,6 @@ simplesvet/
 
 # CSVs grandes de comparação (apenas local)
 Comparação*.csv
+
+# Certificados locais gerados automaticamente (NUNCA versionar)
+nginx/ssl/*.pem
