@@ -1436,13 +1436,17 @@ def listar_produtos_vendaveis(
 
     # FILTROS OPCIONAIS
     if busca:
-        busca_pattern = f"%{busca}%"
-        query = query.filter(
-            (Produto.nome.ilike(busca_pattern)) |
-            (Produto.codigo.ilike(busca_pattern)) |
-            (Produto.codigo_barras.ilike(busca_pattern))
-        )
-    
+        # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
+        # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
+        palavras = [p.strip() for p in busca.split() if p.strip()]
+        for palavra in palavras:
+            p = f"%{palavra}%"
+            query = query.filter(
+                (Produto.nome.ilike(p)) |
+                (Produto.codigo.ilike(p)) |
+                (Produto.codigo_barras.ilike(p))
+            )
+
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
     
