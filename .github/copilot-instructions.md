@@ -37,6 +37,7 @@ Use sempre esta sequencia:
 - Nao pular validacao de release.
 - Nao corrigir em producao manualmente sem refletir no Git.
 - **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` — sem build, o codigo novo nao aparece em producao.**
+- **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
 
 ## Em caso de conflito
 

@@ -41,6 +41,36 @@
     "*.zip",
     "nginx/ssl/*.pem"
   ],
+  "protected_files_never_delete": [
+    "docker-compose.local-dev.yml",
+    "docker-compose.prod.yml",
+    "docker-compose.cloud.yml",
+    "docker-compose.local-piloto.yml",
+    ".env.example",
+    ".env.development",
+    ".env.local-prod",
+    ".env.production-local",
+    ".env.production.example",
+    ".env.production.template",
+    ".env.staging",
+    ".env.staging.example",
+    "frontend/.env.dev",
+    "frontend/.env.example",
+    "frontend/.env.piloto",
+    "scripts/fluxo_unico.ps1",
+    "scripts/validar_fluxo.ps1",
+    ".github/copilot-instructions.md",
+    ".github/assistant-rules.json",
+    "docs/FLUXO_UNICO_DEV_PROD.md"
+  ],
+  "commit_safety_rules": {
+    "never_use_git_add_A_blindly": true,
+    "before_commit_always_check": [
+      "git status --short para ver delecoes (linhas com D)",
+      "se houver delecao de arquivo em protected_files_never_delete: RESTAURAR antes de commitar",
+      "nunca deletar arquivos de infraestrutura (docker-compose, .env templates, scripts)"
+    ]
+  },
   "assistant_behavior": {
     "before_editing": [
       "explicar em 1-2 frases o que vai fazer",
