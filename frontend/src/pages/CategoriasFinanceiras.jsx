@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiTag, FiChevronDown, FiChevronRight } from 'react-icons/fi';
-import api from '../api';
+import api from '../api.js';
 import { toast } from 'react-hot-toast';
 
 const CategoriasFinanceiras = () => {

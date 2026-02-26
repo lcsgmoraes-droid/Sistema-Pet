@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
@@ -22,6 +23,21 @@ from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
+_rotas_schema_checked = False
+
+
+def ensure_rotas_entrega_schema(db: Session) -> None:
+    """Compatibilidade de schema para rotas/paradas em ambientes legados."""
+    global _rotas_schema_checked
+    if _rotas_schema_checked:
+        return
+
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
+    db.commit()
+    _rotas_schema_checked = True
 
 
 @router.get("/", response_model=List[RotaEntregaResponse])
@@ -41,6 +57,7 @@ def listar_rotas(
     from app.models import Cliente
     
     user, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
     
     query = db.query(RotaEntrega).options(
         joinedload(RotaEntrega.entregador),
@@ -231,6 +248,7 @@ def obter_rota(
     Obtém detalhes de uma rota específica.
     """
     user, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
     
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.id == rota_id,
@@ -256,6 +274,7 @@ def atualizar_rota(
     Atualiza dados de uma rota (status, observações, etc).
     """
     user, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
     
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.id == rota_id,

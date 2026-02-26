@@ -1,11 +1,7 @@
 import axios from "axios";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const isDevelopment = import.meta.env.DEV;
-
-const baseURL = isDevelopment
-  ? (!configuredApiUrl || configuredApiUrl === "/api" ? "http://127.0.0.1:8000" : configuredApiUrl)
-  : (configuredApiUrl || "/api");
+const baseURL = configuredApiUrl || "/api";
 
 export const api = axios.create({
   baseURL,
@@ -13,7 +9,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token");
+    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -30,9 +26,10 @@ api.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401) {
-      console.warn("Sessão inválida ou tenant não selecionado");
+      console.warn("Sessao invalida ou tenant nao selecionado");
 
       localStorage.removeItem("access_token");
+      localStorage.removeItem("token");
       localStorage.removeItem("tenants");
 
       window.location.href = "/login";

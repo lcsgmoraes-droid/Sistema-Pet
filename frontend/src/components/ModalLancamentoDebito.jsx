@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import api from '../api';
 
@@ -28,14 +28,14 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
       // Carregar categorias de despesa hierarquicamente
       const catRes = await api.get('/categorias-financeiras/arvore?tipo=despesa&apenas_ativas=true', { headers });
       setCategorias(catRes.data);
 
-      // Carregar contas bancárias
+      // Carregar contas bancÃ¡rias
       const contasRes = await api.get('/contas-bancarias?apenas_ativas=true', { headers });
       setContas(contasRes.data);
     } catch (error) {
@@ -56,7 +56,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
       const payload = {
@@ -71,12 +71,12 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
 
       await api.post('/lancamentos/manuais', payload, { headers });
       
-      alert('💸 Lançamento de débito criado com sucesso!');
+      alert('ðŸ’¸ LanÃ§amento de dÃ©bito criado com sucesso!');
       onSave();
       handleClose();
     } catch (error) {
-      console.error('Erro ao criar lançamento:', error);
-      alert('❌ Erro ao criar lançamento: ' + (error.response?.data?.detail || error.message));
+      console.error('Erro ao criar lanÃ§amento:', error);
+      alert('âŒ Erro ao criar lanÃ§amento: ' + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-red-600">💸 Lançamento de Débito (Saída)</h2>
+          <h2 className="text-xl font-bold text-red-600">ðŸ’¸ LanÃ§amento de DÃ©bito (SaÃ­da)</h2>
           <button onClick={handleClose} className="text-gray-500 hover:text-gray-700">
             <X size={24} />
           </button>
@@ -111,7 +111,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Descrição *
+              DescriÃ§Ã£o *
             </label>
             <input
               type="text"
@@ -198,7 +198,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Conta Bancária
+              Conta BancÃ¡ria
             </label>
             <div className="flex gap-2">
               <select
@@ -209,7 +209,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
                 <option value="">Selecione...</option>
                 {contas.map(conta => (
                   <option key={conta.id} value={conta.id}>
-                    {conta.icone || '💳'} {conta.nome} - {formatarMoeda(conta.saldo_atual)}
+                    {conta.icone || 'ðŸ’³'} {conta.nome} - {formatarMoeda(conta.saldo_atual)}
                   </option>
                 ))}
               </select>
@@ -217,7 +217,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
                 type="button"
                 onClick={() => window.open('/financeiro', '_blank')}
                 className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-md border border-gray-300"
-                title="Adicionar nova conta bancária"
+                title="Adicionar nova conta bancÃ¡ria"
               >
                 <Plus size={18} />
               </button>
@@ -234,21 +234,21 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500"
               required
             >
-              <option value="previsto">📅 Previsto (a pagar)</option>
-              <option value="realizado">✅ Realizado (pago)</option>
+              <option value="previsto">ðŸ“… Previsto (a pagar)</option>
+              <option value="realizado">âœ… Realizado (pago)</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Observações
+              ObservaÃ§Ãµes
             </label>
             <textarea
               value={formData.observacoes}
               onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500"
               rows="2"
-              placeholder="Informações adicionais..."
+              placeholder="InformaÃ§Ãµes adicionais..."
             />
           </div>
 
@@ -265,7 +265,7 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
               disabled={loading}
               className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
             >
-              {loading ? 'Salvando...' : '💸 Salvar Débito'}
+              {loading ? 'Salvando...' : 'ðŸ’¸ Salvar DÃ©bito'}
             </button>
           </div>
         </form>
@@ -275,3 +275,4 @@ const ModalLancamentoDebito = ({ isOpen, onClose, onSave }) => {
 };
 
 export default ModalLancamentoDebito;
+

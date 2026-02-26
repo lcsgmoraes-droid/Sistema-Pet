@@ -909,7 +909,7 @@ export default function ProdutosForm() {
               {imagens.map(img => (
                 <div key={img.id} className="relative group border rounded-lg overflow-hidden">
                   <img
-                    src={`http://localhost:8000${img.url}`}
+                    src={`${import.meta.env.VITE_API_URL || '/api'}${img.url}`}
                     alt={img.descricao || 'Imagem do produto'}
                     className="w-full h-48 object-cover"
                   />

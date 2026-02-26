@@ -1,6 +1,6 @@
-/**
- * Simulador de Cenários
- * Permite simular cenários otimista, pessimista e realista
+﻿/**
+ * Simulador de CenÃ¡rios
+ * Permite simular cenÃ¡rios otimista, pessimista e realista
  */
 
 import React, { useState } from 'react';
@@ -13,21 +13,21 @@ const CENARIOS = [
   {
     id: 'otimista',
     nome: 'Otimista',
-    descricao: 'Aumento de 20% nas receitas e redução de 10% nas despesas',
+    descricao: 'Aumento de 20% nas receitas e reduÃ§Ã£o de 10% nas despesas',
     icon: TrendingUp,
     color: 'green'
   },
   {
     id: 'realista',
     nome: 'Realista',
-    descricao: 'Mantém o padrão atual de receitas e despesas',
+    descricao: 'MantÃ©m o padrÃ£o atual de receitas e despesas',
     icon: Minus,
     color: 'blue'
   },
   {
     id: 'pessimista',
     nome: 'Pessimista',
-    descricao: 'Redução de 20% nas receitas e aumento de 10% nas despesas',
+    descricao: 'ReduÃ§Ã£o de 20% nas receitas e aumento de 10% nas despesas',
     icon: TrendingDown,
     color: 'red'
   }
@@ -41,7 +41,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
   const simularCenario = async () => {
     setSimulando(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
 
       const response = await api.post(
@@ -51,10 +51,10 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
       );
 
       setResultadoSimulacao(response.data);
-      toast.success(`Cenário ${cenarioSelecionado} simulado com sucesso!`);
+      toast.success(`CenÃ¡rio ${cenarioSelecionado} simulado com sucesso!`);
     } catch (error) {
-      console.error('Erro ao simular cenário:', error);
-      toast.error('Erro ao simular cenário');
+      console.error('Erro ao simular cenÃ¡rio:', error);
+      toast.error('Erro ao simular cenÃ¡rio');
     } finally {
       setSimulando(false);
     }
@@ -65,13 +65,13 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
 
   return (
     <div className="space-y-6">
-      {/* Seletor de Cenários */}
+      {/* Seletor de CenÃ¡rios */}
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Simulador de Cenários
+          Simulador de CenÃ¡rios
         </h3>
         <p className="text-gray-600 mb-6">
-          Simule diferentes cenários para entender o impacto no seu fluxo de caixa
+          Simule diferentes cenÃ¡rios para entender o impacto no seu fluxo de caixa
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -130,25 +130,25 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
           ) : (
             <>
               <Play className="w-5 h-5" />
-              Simular Cenário
+              Simular CenÃ¡rio
             </>
           )}
         </button>
       </div>
 
-      {/* Resultado da Simulação */}
+      {/* Resultado da SimulaÃ§Ã£o */}
       {resultadoSimulacao && (
         <>
-          {/* Comparação de Métricas */}
+          {/* ComparaÃ§Ã£o de MÃ©tricas */}
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Comparação: Base vs {cenarioConfig?.nome}
+              ComparaÃ§Ã£o: Base vs {cenarioConfig?.nome}
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Projeção Base */}
+              {/* ProjeÃ§Ã£o Base */}
               <div>
-                <h4 className="font-medium text-gray-700 mb-3">Cenário Atual</h4>
+                <h4 className="font-medium text-gray-700 mb-3">CenÃ¡rio Atual</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Saldo Final</span>
@@ -160,7 +160,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Variação</span>
+                    <span className="text-sm text-gray-600">VariaÃ§Ã£o</span>
                     <span className="font-semibold text-gray-900">
                       {new Intl.NumberFormat('pt-BR', {
                         style: 'currency',
@@ -174,9 +174,9 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                 </div>
               </div>
 
-              {/* Projeção Simulada */}
+              {/* ProjeÃ§Ã£o Simulada */}
               <div>
-                <h4 className="font-medium text-gray-700 mb-3">Cenário {cenarioConfig?.nome}</h4>
+                <h4 className="font-medium text-gray-700 mb-3">CenÃ¡rio {cenarioConfig?.nome}</h4>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Saldo Final</span>
@@ -194,7 +194,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Variação</span>
+                    <span className="text-sm text-gray-600">VariaÃ§Ã£o</span>
                     <span className={`font-semibold ${
                       cenarioSelecionado === 'otimista' ? 'text-green-600' :
                       cenarioSelecionado === 'pessimista' ? 'text-red-600' :
@@ -213,10 +213,10 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
               </div>
             </div>
 
-            {/* Diferença */}
+            {/* DiferenÃ§a */}
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="flex justify-between items-center">
-                <span className="font-medium text-gray-700">Diferença no Saldo Final</span>
+                <span className="font-medium text-gray-700">DiferenÃ§a no Saldo Final</span>
                 <span className={`text-xl font-bold ${
                   (resultadoSimulacao?.projecoes_ajustadas?.[resultadoSimulacao?.projecoes_ajustadas?.length - 1]?.saldo_ajustado || 0) >
                   (projecoesBase?.[projecoesBase?.length - 1]?.saldo_estimado || 0)
@@ -235,23 +235,24 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
             </div>
           </div>
 
-          {/* Gráfico da Simulação */}
+          {/* GrÃ¡fico da SimulaÃ§Ã£o */}
           <GraficoProjecoes
             projecoes={resultadoSimulacao?.projecoes_ajustadas || []}
-            titulo={`Projeção - Cenário ${cenarioConfig?.nome}`}
+            titulo={`ProjeÃ§Ã£o - CenÃ¡rio ${cenarioConfig?.nome}`}
             detalhado
           />
         </>
       )}
 
-      {/* Cenário Base */}
+      {/* CenÃ¡rio Base */}
       {!resultadoSimulacao && projecoesBase && projecoesBase.length > 0 && (
         <GraficoProjecoes
           projecoes={projecoesBase}
-          titulo="Projeção Atual (Cenário Base)"
+          titulo="ProjeÃ§Ã£o Atual (CenÃ¡rio Base)"
           detalhado
         />
       )}
     </div>
   );
 }
+

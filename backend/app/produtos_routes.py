@@ -1,13 +1,13 @@
-# ⚠️ ARQUIVO CRÍTICO DE PRODUÇÃO
-# Este arquivo impacta diretamente operações reais (PDV / Financeiro / Estoque).
-# NÃO alterar sem:
+﻿# âš ï¸ ARQUIVO CRÃTICO DE PRODUÃ‡ÃƒO
+# Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
+# NÃƒO alterar sem:
 # 1. Entender o fluxo completo
-# 2. Testar cenário real
+# 2. Testar cenÃ¡rio real
 # 3. Validar impacto financeiro
 
 """
-Rotas para o módulo de Produtos
-Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, Código de Barras
+Rotas para o mÃ³dulo de Produtos
+Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de Barras
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -28,13 +28,13 @@ from .produtos_models import (
     Categoria, Marca, Departamento, Produto, ProdutoLote,
     ProdutoImagem, ProdutoFornecedor, ListaPreco, ProdutoListaPreco,
     EstoqueMovimentacao, ProdutoHistoricoPreco, NotaEntrada,
-    ProdutoKitComponente  # Sprint 4: Composição de KIT
+    ProdutoKitComponente  # Sprint 4: ComposiÃ§Ã£o de KIT
 )
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 # Service Layer
 from .services.produto_service import ProdutoService
-from .services.kit_estoque_service import KitEstoqueService  # Sprint 4: Composição de KIT
+from .services.kit_estoque_service import KitEstoqueService  # Sprint 4: ComposiÃ§Ã£o de KIT
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -43,56 +43,56 @@ router = APIRouter(prefix="/produtos", tags=["produtos"])
 
 
 # ==========================================
-# FUNÇÕES AUXILIARES - CONSOLIDAÇÃO DE LÓGICA REPETIDA
+# FUNÃ‡Ã•ES AUXILIARES - CONSOLIDAÃ‡ÃƒO DE LÃ“GICA REPETIDA
 # ==========================================
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
-    """Desempacota e valida user_and_tenant (padrão repetido 30+ vezes)"""
+    """Desempacota e valida user_and_tenant (padrÃ£o repetido 30+ vezes)"""
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
 
 
 def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):
-    """Busca produto com validação de tenant e retorna 404 se não encontrado"""
+    """Busca produto com validaÃ§Ã£o de tenant e retorna 404 se nÃ£o encontrado"""
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     return produto
 
 
 def _obter_categoria_ou_404(db: Session, categoria_id: int, tenant_id: int):
-    """Busca categoria com validação de tenant e retorna 404 se não encontrada"""
+    """Busca categoria com validaÃ§Ã£o de tenant e retorna 404 se nÃ£o encontrada"""
     categoria = db.query(Categoria).filter(
         Categoria.id == categoria_id,
         Categoria.tenant_id == tenant_id
     ).first()
     
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
     
     return categoria
 
 
 def _obter_marca_ou_404(db: Session, marca_id: int, tenant_id: int):
-    """Busca marca com validação de tenant e retorna 404 se não encontrada"""
+    """Busca marca com validaÃ§Ã£o de tenant e retorna 404 se nÃ£o encontrada"""
     marca = db.query(Marca).filter(
         Marca.id == marca_id,
         Marca.tenant_id == tenant_id
     ).first()
     
     if not marca:
-        raise HTTPException(status_code=404, detail="Marca não encontrada")
+        raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
     
     return marca
 
 
 def _validar_sku_unico(db: Session, sku: str, tenant_id: int, produto_id: Optional[int] = None):
-    """Valida se SKU é único no tenant (exceto para o próprio produto em edição)"""
+    """Valida se SKU Ã© Ãºnico no tenant (exceto para o prÃ³prio produto em ediÃ§Ã£o)"""
     query = db.query(Produto).filter(
         Produto.sku == sku,
         Produto.tenant_id == tenant_id
@@ -104,12 +104,12 @@ def _validar_sku_unico(db: Session, sku: str, tenant_id: int, produto_id: Option
     if query.first():
         raise HTTPException(
             status_code=400,
-            detail=f"SKU '{sku}' já está em uso"
+            detail=f"SKU '{sku}' jÃ¡ estÃ¡ em uso"
         )
 
 
 def _validar_codigo_barras_unico(db: Session, codigo_barras: str, tenant_id: int, produto_id: Optional[int] = None):
-    """Valida se código de barras é único no tenant (exceto para o próprio produto em edição)"""
+    """Valida se cÃ³digo de barras Ã© Ãºnico no tenant (exceto para o prÃ³prio produto em ediÃ§Ã£o)"""
     query = db.query(Produto).filter(
         Produto.codigo_barras == codigo_barras,
         Produto.tenant_id == tenant_id
@@ -121,7 +121,7 @@ def _validar_codigo_barras_unico(db: Session, codigo_barras: str, tenant_id: int
     if query.first():
         raise HTTPException(
             status_code=400,
-            detail=f"Código de barras '{codigo_barras}' já está em uso"
+            detail=f"CÃ³digo de barras '{codigo_barras}' jÃ¡ estÃ¡ em uso"
         )
 
 
@@ -212,11 +212,11 @@ class DepartamentoResponse(DepartamentoBase):
 
 
 # ==========================================
-# SCHEMAS - GERADOR DE CÓDIGO DE BARRAS
+# SCHEMAS - GERADOR DE CÃ“DIGO DE BARRAS
 # ==========================================
 
 class GerarCodigoBarrasRequest(BaseModel):
-    sku: str  # Código do produto (ex: PROD-00123)
+    sku: str  # CÃ³digo do produto (ex: PROD-00123)
 
 
 class GerarCodigoBarrasResponse(BaseModel):
@@ -233,7 +233,7 @@ class GerarCodigoBarrasResponse(BaseModel):
 class KitComponenteBase(BaseModel):
     """Schema base para componente de KIT"""
     produto_componente_id: int  # ID do produto que faz parte do KIT
-    quantidade: float  # Quantidade necessária do componente no KIT
+    quantidade: float  # Quantidade necessÃ¡ria do componente no KIT
     ordem: int = 0
     opcional: bool = False
 
@@ -276,7 +276,7 @@ class ProdutoBase(BaseModel):
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = 0
-    preco_venda: Optional[float] = None  # Opcional porque produto PAI não tem preço
+    preco_venda: Optional[float] = None  # Opcional porque produto PAI nÃ£o tem preÃ§o
     preco_promocional: Optional[float] = None
     promocao_inicio: Optional[datetime] = None
     promocao_fim: Optional[datetime] = None
@@ -290,48 +290,48 @@ class ProdutoBase(BaseModel):
     aliquota_icms: Optional[float] = None
     aliquota_pis: Optional[float] = None
     aliquota_cofins: Optional[float] = None
-    # Recorrência (Fase 1)
+    # RecorrÃªncia (Fase 1)
     tem_recorrencia: Optional[bool] = False
     tipo_recorrencia: Optional[str] = None
     intervalo_dias: Optional[int] = None
     numero_doses: Optional[int] = None
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
-    # Ração - Calculadora (Fase 2)
+    # RaÃ§Ã£o - Calculadora (Fase 2)
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
     tabela_nutricional: Optional[str] = None  # JSON string
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None  # JSON com tabela de consumo da embalagem
-    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
+    # OpÃ§Ãµes de RaÃ§Ã£o - Sistema DinÃ¢mico (Foreign Keys)
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
     tipo_tratamento_id: Optional[int] = None
     sabor_proteina_id: Optional[int] = None
     apresentacao_peso_id: Optional[int] = None
-    # Sprint 2: Produtos com variação
+    # Sprint 2: Produtos com variaÃ§Ã£o
     tipo_produto: Optional[str] = 'SIMPLES'  # SIMPLES, PAI, VARIACAO, KIT
     produto_pai_id: Optional[int] = None  # FK para produto PAI (se for VARIACAO)
     # Sprint 4: Produtos KIT
-    tipo_kit: Optional[str] = 'VIRTUAL'  # VIRTUAL (estoque calculado) ou FISICO (estoque próprio)
+    tipo_kit: Optional[str] = 'VIRTUAL'  # VIRTUAL (estoque calculado) ou FISICO (estoque prÃ³prio)
     e_kit_fisico: Optional[bool] = False  # Alias para tipo_kit (usado pelo frontend)
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None  # ID do produto que este substitui
-    motivo_descontinuacao: Optional[str] = None  # Motivo da substituição
+    motivo_descontinuacao: Optional[str] = None  # Motivo da substituiÃ§Ã£o
 
 
 class ProdutoCreate(ProdutoBase):
     """
-    Schema para criação de produto.
-    Nota: preco_venda é opcional - produto PAI não precisa ter preço.
-    A validação de preço obrigatório para produtos SIMPLES/VARIACAO é feita no service.
+    Schema para criaÃ§Ã£o de produto.
+    Nota: preco_venda Ã© opcional - produto PAI nÃ£o precisa ter preÃ§o.
+    A validaÃ§Ã£o de preÃ§o obrigatÃ³rio para produtos SIMPLES/VARIACAO Ã© feita no service.
     
     Para produtos KIT:
     - Se tipo_produto='KIT', pode enviar composicao_kit (lista de componentes)
-    - Se e_kit_fisico=False (padrão), estoque será calculado automaticamente
-    - Se e_kit_fisico=True, terá estoque próprio controlado manualmente
+    - Se e_kit_fisico=False (padrÃ£o), estoque serÃ¡ calculado automaticamente
+    - Se e_kit_fisico=True, terÃ¡ estoque prÃ³prio controlado manualmente
     """
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
 
@@ -363,28 +363,28 @@ class ProdutoUpdate(BaseModel):
     aliquota_icms: Optional[float] = None
     aliquota_pis: Optional[float] = None
     aliquota_cofins: Optional[float] = None
-    # Recorrência (Fase 1)
+    # RecorrÃªncia (Fase 1)
     tem_recorrencia: Optional[bool] = None
     tipo_recorrencia: Optional[str] = None
     intervalo_dias: Optional[int] = None
     numero_doses: Optional[int] = None
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
-    # Ração - Calculadora (Fase 2)
+    # RaÃ§Ã£o - Calculadora (Fase 2)
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
     tabela_nutricional: Optional[str] = None
     categoria_racao: Optional[str] = None
     especies_indicadas: Optional[str] = None
     tabela_consumo: Optional[str] = None
-    # Opções de Ração - Sistema Dinâmico (Foreign Keys)
+    # OpÃ§Ãµes de RaÃ§Ã£o - Sistema DinÃ¢mico (Foreign Keys)
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
     tipo_tratamento_id: Optional[int] = None
     sabor_proteina_id: Optional[int] = None
     apresentacao_peso_id: Optional[int] = None
-    # Sprint 2: Produtos com variação
+    # Sprint 2: Produtos com variaÃ§Ã£o
     tipo_produto: Optional[str] = None
     produto_pai_id: Optional[int] = None
     # Sprint 4: Produtos KIT
@@ -438,19 +438,19 @@ class ProdutoResponse(ProdutoBase):
     
     id: int
     estoque_atual: Optional[float] = 0
-    controlar_estoque: Optional[bool] = True  # Sempre controla estoque por padrão
+    controlar_estoque: Optional[bool] = True  # Sempre controla estoque por padrÃ£o
     markup_percentual: Optional[float] = None  # Campo calculado
     ativo: bool
     created_at: datetime
     updated_at: datetime
     categoria: Optional[CategoriaResponse] = None
-    categoria_nome: Optional[str] = None  # 🆕 Nome da categoria (para facilitar uso no frontend)
+    categoria_nome: Optional[str] = None  # ðŸ†• Nome da categoria (para facilitar uso no frontend)
     marca: Optional[MarcaResponse] = None
     imagens: List[ImagemUploadResponse] = Field(default_factory=list)
     lotes: List[LoteResponse] = Field(default_factory=list)
     imagem_principal: Optional[str] = None  # URL da imagem principal
-    total_variacoes: Optional[int] = 0  # Número de variações (para produtos PAI)
-    # Sprint 4: KIT - Composição e estoque virtual
+    total_variacoes: Optional[int] = 0  # NÃºmero de variaÃ§Ãµes (para produtos PAI)
+    # Sprint 4: KIT - ComposiÃ§Ã£o e estoque virtual
     composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
     # Sistema Predecessor/Sucessor
@@ -461,7 +461,7 @@ class ProdutoResponse(ProdutoBase):
     @field_validator('categoria_nome', mode='before')
     @classmethod
     def set_categoria_nome(cls, v, info) -> Optional[str]:
-        # Se já tem valor, retornar
+        # Se jÃ¡ tem valor, retornar
         if v:
             return v
         
@@ -475,11 +475,11 @@ class ProdutoResponse(ProdutoBase):
     @field_validator('imagem_principal', mode='before')
     @classmethod
     def set_imagem_principal(cls, v, info) -> Optional[str]:
-        # Se já tem valor, retornar
+        # Se jÃ¡ tem valor, retornar
         if v:
             return v
         
-        # Tentar pegar das imagens (se disponível no contexto)
+        # Tentar pegar das imagens (se disponÃ­vel no contexto)
         return None
 
 
@@ -560,15 +560,15 @@ def criar_categoria(
         if not pai:
             raise HTTPException(
                 status_code=404,
-                detail="Categoria pai não encontrada"
+                detail="Categoria pai nÃ£o encontrada"
             )
         
-        # Verificar nível máximo (4 níveis)
+        # Verificar nÃ­vel mÃ¡ximo (4 nÃ­veis)
         nivel_pai = calcular_nivel(db, categoria.categoria_pai_id)
         if nivel_pai >= 4:
             raise HTTPException(
                 status_code=400,
-                detail="Limite de 4 níveis de categorias atingido"
+                detail="Limite de 4 nÃ­veis de categorias atingido"
             )
     
     # Criar categoria
@@ -593,12 +593,12 @@ def listar_categorias(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista todas as categorias (o frontend constrói a hierarquia)
+    Lista todas as categorias (o frontend constrÃ³i a hierarquia)
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Retornar TODAS as categorias ativas do usuário
-    # O frontend vai construir a árvore hierárquica
+    # Retornar TODAS as categorias ativas do usuÃ¡rio
+    # O frontend vai construir a Ã¡rvore hierÃ¡rquica
     query = db.query(Categoria).filter(
         Categoria.tenant_id == tenant_id,
         Categoria.ativo == True
@@ -606,7 +606,7 @@ def listar_categorias(
     
     categorias = query.order_by(Categoria.ordem, Categoria.nome).all()
     
-    # Calcular nível e contadores para cada categoria
+    # Calcular nÃ­vel e contadores para cada categoria
     resultado = []
     for cat in categorias:
         cat_dict = {
@@ -635,7 +635,7 @@ def listar_categorias(
 
 
 def calcular_nivel(db: Session, categoria_id: int, nivel: int = 1) -> int:
-    """Calcula o nível de uma categoria na hierarquia"""
+    """Calcula o nÃ­vel de uma categoria na hierarquia"""
     categoria = db.query(Categoria).filter(Categoria.id == categoria_id).first()
     if not categoria or not categoria.categoria_pai_id:
         return nivel
@@ -647,7 +647,7 @@ def listar_categorias_hierarquia(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Lista todas as categorias em formato de árvore hierárquica"""
+    """Lista todas as categorias em formato de Ã¡rvore hierÃ¡rquica"""
     
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
@@ -657,7 +657,7 @@ def listar_categorias_hierarquia(
         Categoria.ativo == True
     ).order_by(Categoria.ordem, Categoria.nome).all()
     
-    # Construir árvore
+    # Construir Ã¡rvore
     def construir_arvore(pai_id=None):
         resultado = []
         for cat in categorias:
@@ -683,7 +683,7 @@ def obter_categoria(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Obtém detalhes de uma categoria"""
+    """ObtÃ©m detalhes de uma categoria"""
     
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
@@ -694,7 +694,7 @@ def obter_categoria(
     ).first()
     
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
     
     return categoria
 
@@ -717,15 +717,15 @@ def atualizar_categoria(
     ).first()
     
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
     
     # Verificar se categoria pai existe (se fornecida e diferente)
     if categoria_update.categoria_pai_id and categoria_update.categoria_pai_id != categoria.categoria_pai_id:
-        # Não permitir que categoria seja filha de si mesma
+        # NÃ£o permitir que categoria seja filha de si mesma
         if categoria_update.categoria_pai_id == categoria_id:
             raise HTTPException(
                 status_code=400,
-                detail="Categoria não pode ser pai de si mesma"
+                detail="Categoria nÃ£o pode ser pai de si mesma"
             )
         
         pai = db.query(Categoria).filter(
@@ -736,7 +736,7 @@ def atualizar_categoria(
         if not pai:
             raise HTTPException(
                 status_code=404,
-                detail="Categoria pai não encontrada"
+                detail="Categoria pai nÃ£o encontrada"
             )
     
     # Atualizar campos
@@ -768,7 +768,7 @@ def deletar_categoria(
     ).first()
     
     if not categoria:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
     
     # Verificar se categoria tem subcategorias
     subcategorias = db.query(Categoria).filter(
@@ -857,7 +857,7 @@ def obter_marca(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Obtém detalhes de uma marca"""
+    """ObtÃ©m detalhes de uma marca"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     marca = _obter_marca_ou_404(db, marca_id, tenant_id)
     return marca
@@ -875,7 +875,7 @@ def atualizar_marca(
     marca = _obter_marca_ou_404(db, marca_id, tenant_id)
     
     if not marca:
-        raise HTTPException(status_code=404, detail="Marca não encontrada")
+        raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
     
     for key, value in marca_update.model_dump(exclude_unset=True).items():
         setattr(marca, key, value)
@@ -904,7 +904,7 @@ def deletar_marca(
     ).first()
     
     if not marca:
-        raise HTTPException(status_code=404, detail="Marca não encontrada")
+        raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
     
     # Verificar se marca tem produtos
     produtos_count = db.query(Produto).filter(
@@ -958,7 +958,7 @@ def listar_departamentos(
     busca: Optional[str] = None,
     db: Session = Depends(get_session)
 ):
-    """Lista departamentos (rota pública)"""
+    """Lista departamentos (rota pÃºblica)"""
     
     query = db.query(Departamento).filter(
         Departamento.ativo == True
@@ -978,7 +978,7 @@ def obter_departamento(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Obtém um departamento por ID"""
+    """ObtÃ©m um departamento por ID"""
     
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
@@ -989,7 +989,7 @@ def obter_departamento(
     ).first()
     
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento não encontrado")
+        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
     
     return departamento
 
@@ -1012,7 +1012,7 @@ def atualizar_departamento(
     ).first()
     
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento não encontrado")
+        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
     
     for key, value in departamento_update.model_dump(exclude_unset=True).items():
         setattr(departamento, key, value)
@@ -1040,7 +1040,7 @@ def deletar_departamento(
     ).first()
     
     if not departamento:
-        raise HTTPException(status_code=404, detail="Departamento não encontrado")
+        raise HTTPException(status_code=404, detail="Departamento nÃ£o encontrado")
     
     # Verificar se departamento tem produtos
     produtos_count = db.query(Produto).filter(
@@ -1064,27 +1064,27 @@ def deletar_departamento(
 
 
 # ==========================================
-# ENDPOINTS - CÓDIGO DE BARRAS
+# ENDPOINTS - CÃ“DIGO DE BARRAS
 # ==========================================
 
 def calcular_digito_verificador_ean13(codigo_12_digitos: str) -> str:
     """
-    Calcula o dígito verificador para código EAN-13
-    Algoritmo: Módulo 10
+    Calcula o dÃ­gito verificador para cÃ³digo EAN-13
+    Algoritmo: MÃ³dulo 10
     """
     if len(codigo_12_digitos) != 12:
-        raise ValueError("Código deve ter exatamente 12 dígitos")
+        raise ValueError("CÃ³digo deve ter exatamente 12 dÃ­gitos")
     
-    # Somar dígitos nas posições ímpares (1, 3, 5...) multiplicados por 1
+    # Somar dÃ­gitos nas posiÃ§Ãµes Ã­mpares (1, 3, 5...) multiplicados por 1
     soma_impar = sum(int(codigo_12_digitos[i]) for i in range(0, 12, 2))
     
-    # Somar dígitos nas posições pares (2, 4, 6...) multiplicados por 3
+    # Somar dÃ­gitos nas posiÃ§Ãµes pares (2, 4, 6...) multiplicados por 3
     soma_par = sum(int(codigo_12_digitos[i]) * 3 for i in range(1, 12, 2))
     
     # Soma total
     soma_total = soma_impar + soma_par
     
-    # Dígito verificador = (10 - (soma_total % 10)) % 10
+    # DÃ­gito verificador = (10 - (soma_total % 10)) % 10
     digito = (10 - (soma_total % 10)) % 10
     
     return str(digito)
@@ -1092,34 +1092,34 @@ def calcular_digito_verificador_ean13(codigo_12_digitos: str) -> str:
 
 def gerar_codigo_barras_ean13(sku: str) -> str:
     """
-    Gera código de barras EAN-13 com padrão:
-    789 (Brasil) + 5 dígitos aleatórios + 4 últimos dígitos do SKU + checksum
+    Gera cÃ³digo de barras EAN-13 com padrÃ£o:
+    789 (Brasil) + 5 dÃ­gitos aleatÃ³rios + 4 Ãºltimos dÃ­gitos do SKU + checksum
     
-    Exemplo: SKU = PROD-00123 → EAN-13 = 7891234501234
+    Exemplo: SKU = PROD-00123 â†’ EAN-13 = 7891234501234
     """
-    # Extrair apenas números do SKU
+    # Extrair apenas nÃºmeros do SKU
     numeros_sku = ''.join(filter(str.isdigit, sku))
     
     if not numeros_sku:
-        # Se não houver números, usar aleatório
+        # Se nÃ£o houver nÃºmeros, usar aleatÃ³rio
         numeros_sku = str(random.randint(1000, 9999))
     
-    # Pegar últimos 4 dígitos
+    # Pegar Ãºltimos 4 dÃ­gitos
     ultimos_4_sku = numeros_sku[-4:].zfill(4)
     
     # Prefixo Brasil
     prefixo = "789"
     
-    # 5 dígitos aleatórios
+    # 5 dÃ­gitos aleatÃ³rios
     meio = str(random.randint(10000, 99999))
     
-    # Montar código de 12 dígitos
+    # Montar cÃ³digo de 12 dÃ­gitos
     codigo_12 = prefixo + meio + ultimos_4_sku
     
-    # Calcular dígito verificador
+    # Calcular dÃ­gito verificador
     digito_verificador = calcular_digito_verificador_ean13(codigo_12)
     
-    # Código completo EAN-13
+    # CÃ³digo completo EAN-13
     codigo_ean13 = codigo_12 + digito_verificador
     
     return codigo_ean13
@@ -1132,12 +1132,12 @@ def gerar_codigo_barras(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Gera código de barras EAN-13 único
+    Gera cÃ³digo de barras EAN-13 Ãºnico
     Formato: 789-XXXXX-SKUU-C
     - 789: Prefixo Brasil
-    - XXXXX: 5 dígitos aleatórios
-    - SKUU: 4 últimos dígitos do SKU
-    - C: Dígito verificador
+    - XXXXX: 5 dÃ­gitos aleatÃ³rios
+    - SKUU: 4 Ãºltimos dÃ­gitos do SKU
+    - C: DÃ­gito verificador
     """
     current_user, tenant_id = user_and_tenant
     
@@ -1145,10 +1145,10 @@ def gerar_codigo_barras(
     tentativa = 0
     
     while tentativa < max_tentativas:
-        # Gerar código
+        # Gerar cÃ³digo
         codigo = gerar_codigo_barras_ean13(request.sku)
         
-        # Verificar se já existe
+        # Verificar se jÃ¡ existe
         existe = db.query(Produto).filter(
             Produto.codigo_barras == codigo,
             Produto.tenant_id == tenant_id
@@ -1166,7 +1166,7 @@ def gerar_codigo_barras(
     
     raise HTTPException(
         status_code=500,
-        detail="Não foi possível gerar código de barras único após múltiplas tentativas"
+        detail="NÃ£o foi possÃ­vel gerar cÃ³digo de barras Ãºnico apÃ³s mÃºltiplas tentativas"
     )
 
 
@@ -1176,26 +1176,26 @@ def validar_codigo_barras(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Valida um código de barras EAN-13"""
+    """Valida um cÃ³digo de barras EAN-13"""
     
-    # Remover espaços e traços
+    # Remover espaÃ§os e traÃ§os
     codigo_limpo = codigo.replace(" ", "").replace("-", "")
     
     # Verificar comprimento
     if len(codigo_limpo) != 13:
         return {
             "valido": False,
-            "erro": f"Código deve ter 13 dígitos. Fornecido: {len(codigo_limpo)} dígitos"
+            "erro": f"CÃ³digo deve ter 13 dÃ­gitos. Fornecido: {len(codigo_limpo)} dÃ­gitos"
         }
     
-    # Verificar se são apenas números
+    # Verificar se sÃ£o apenas nÃºmeros
     if not codigo_limpo.isdigit():
         return {
             "valido": False,
-            "erro": "Código deve conter apenas números"
+            "erro": "CÃ³digo deve conter apenas nÃºmeros"
         }
     
-    # Validar dígito verificador
+    # Validar dÃ­gito verificador
     codigo_12 = codigo_limpo[:12]
     digito_fornecido = codigo_limpo[12]
     digito_calculado = calcular_digito_verificador_ean13(codigo_12)
@@ -1203,10 +1203,10 @@ def validar_codigo_barras(
     if digito_fornecido != digito_calculado:
         return {
             "valido": False,
-            "erro": f"Dígito verificador inválido. Esperado: {digito_calculado}, Fornecido: {digito_fornecido}"
+            "erro": f"DÃ­gito verificador invÃ¡lido. Esperado: {digito_calculado}, Fornecido: {digito_fornecido}"
         }
     
-    # Verificar se já existe no banco
+    # Verificar se jÃ¡ existe no banco
     existe = db.query(Produto).filter(
         Produto.codigo_barras == codigo_limpo,
         Produto.tenant_id == tenant_id
@@ -1218,13 +1218,13 @@ def validar_codigo_barras(
             "existe_no_banco": True,
             "produto_id": existe.id,
             "produto_nome": existe.nome,
-            "aviso": "Código de barras já cadastrado para outro produto"
+            "aviso": "CÃ³digo de barras jÃ¡ cadastrado para outro produto"
         }
     
     return {
         "valido": True,
         "existe_no_banco": False,
-        "mensagem": "Código de barras válido e disponível"
+        "mensagem": "CÃ³digo de barras vÃ¡lido e disponÃ­vel"
     }
 
 
@@ -1244,25 +1244,25 @@ def criar_produto(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
     # LOG: Dados recebidos
-    logger.info(f"🔍 Criando produto - User: {current_user.email}")
-    logger.info(f"📦 Dados recebidos: {produto.model_dump()}")
+    logger.info(f"ðŸ” Criando produto - User: {current_user.email}")
+    logger.info(f"ðŸ“¦ Dados recebidos: {produto.model_dump()}")
     
     # ========================================
-    # 🔄 AUTO-CONVERSÃO: classificacao_racao='sim' → tipo='ração'
+    # ðŸ”„ AUTO-CONVERSÃƒO: classificacao_racao='sim' â†’ tipo='raÃ§Ã£o'
     # ========================================
     if produto.classificacao_racao == 'sim':
-        produto.tipo = 'ração'
-        logger.info("✅ Produto marcado como ração (classificacao_racao='sim')")
-    elif produto.classificacao_racao in ['nao', 'não', None]:
-        # Se não é ração, garantir que tipo seja 'produto'
-        if not produto.tipo or produto.tipo == 'ração':
+        produto.tipo = 'raÃ§Ã£o'
+        logger.info("âœ… Produto marcado como raÃ§Ã£o (classificacao_racao='sim')")
+    elif produto.classificacao_racao in ['nao', 'nÃ£o', None]:
+        # Se nÃ£o Ã© raÃ§Ã£o, garantir que tipo seja 'produto'
+        if not produto.tipo or produto.tipo == 'raÃ§Ã£o':
             produto.tipo = 'produto'
     
     # ========================================
-    # VALIDAÇÕES DE INFRAESTRUTURA (mantidas na rota)
+    # VALIDAÃ‡Ã•ES DE INFRAESTRUTURA (mantidas na rota)
     # ========================================
     
-    # Verificar se SKU já existe
+    # Verificar se SKU jÃ¡ existe
     existe_sku = db.query(Produto).filter(
         Produto.codigo == produto.codigo,
         Produto.tenant_id == tenant_id
@@ -1271,10 +1271,10 @@ def criar_produto(
     if existe_sku:
         raise HTTPException(
             status_code=400,
-            detail=f"SKU '{produto.codigo}' já cadastrado"
+            detail=f"SKU '{produto.codigo}' jÃ¡ cadastrado"
         )
     
-    # Verificar se código de barras já existe
+    # Verificar se cÃ³digo de barras jÃ¡ existe
     if produto.codigo_barras:
         existe_barcode = db.query(Produto).filter(
             Produto.codigo_barras == produto.codigo_barras,
@@ -1284,7 +1284,7 @@ def criar_produto(
         if existe_barcode:
             raise HTTPException(
                 status_code=400,
-                detail=f"Código de barras '{produto.codigo_barras}' já cadastrado"
+                detail=f"CÃ³digo de barras '{produto.codigo_barras}' jÃ¡ cadastrado"
             )
     
     # Verificar se categoria existe
@@ -1295,7 +1295,7 @@ def criar_produto(
             Categoria.ativo == True
         ).first()
         if not categoria:
-            raise HTTPException(status_code=404, detail="Categoria não encontrada")
+            raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
     
     # Verificar se marca existe
     if produto.marca_id:
@@ -1305,29 +1305,29 @@ def criar_produto(
             Marca.ativo == True
         ).first()
         if not marca:
-            raise HTTPException(status_code=404, detail="Marca não encontrada")
+            raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
     
     # ========================================
-    # 🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO
+    # ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O
     # ========================================
     if produto.tipo_produto == 'PAI':
         if produto.preco_venda and produto.preco_venda > 0:
             raise HTTPException(
                 status_code=400,
-                detail="❌ Produto pai não pode ter preço de venda. O preço deve ser definido nas variações individuais."
+                detail="âŒ Produto pai nÃ£o pode ter preÃ§o de venda. O preÃ§o deve ser definido nas variaÃ§Ãµes individuais."
             )
-        # Verificar estoque_atual se existir no modelo (pode não existir em ProdutoCreate)
+        # Verificar estoque_atual se existir no modelo (pode nÃ£o existir em ProdutoCreate)
         estoque = getattr(produto, 'estoque_atual', None)
         if estoque and estoque > 0:
             raise HTTPException(
                 status_code=400,
-                detail="❌ Produto pai não pode ter estoque inicial. O estoque deve ser gerenciado nas variações."
+                detail="âŒ Produto pai nÃ£o pode ter estoque inicial. O estoque deve ser gerenciado nas variaÃ§Ãµes."
             )
     
     # ========================================
-    # 🔒 VALIDAÇÃO: VARIAÇÃO DUPLICADA
+    # ðŸ”’ VALIDAÃ‡ÃƒO: VARIAÃ‡ÃƒO DUPLICADA
     # ========================================
-    # Se está criando uma VARIAÇÃO, verificar duplicidade por signature
+    # Se estÃ¡ criando uma VARIAÃ‡ÃƒO, verificar duplicidade por signature
     variation_sig = getattr(produto, 'variation_signature', None)
     if produto.produto_pai_id and variation_sig:
         variacao_existente = db.query(Produto).filter(
@@ -1340,11 +1340,11 @@ def criar_produto(
         if variacao_existente:
             raise HTTPException(
                 status_code=409,
-                detail=f"❌ Já existe uma variação com os mesmos atributos para este produto. Variação existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})"
+                detail=f"âŒ JÃ¡ existe uma variaÃ§Ã£o com os mesmos atributos para este produto. VariaÃ§Ã£o existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})"
             )
     
     # ========================================
-    # 🔒 PREDECESSOR/SUCESSOR: Marcar predecessor como descontinuado
+    # ðŸ”’ PREDECESSOR/SUCESSOR: Marcar predecessor como descontinuado
     # ========================================
     if produto.produto_predecessor_id:
         predecessor = db.query(Produto).filter(
@@ -1355,7 +1355,7 @@ def criar_produto(
         if not predecessor:
             raise HTTPException(
                 status_code=404,
-                detail="Produto predecessor não encontrado"
+                detail="Produto predecessor nÃ£o encontrado"
             )
         
         # Marcar predecessor como descontinuado
@@ -1363,9 +1363,9 @@ def criar_produto(
         if produto.motivo_descontinuacao:
             predecessor.motivo_descontinuacao = produto.motivo_descontinuacao
         else:
-            predecessor.motivo_descontinuacao = f"Substituído por: {produto.nome}"
+            predecessor.motivo_descontinuacao = f"SubstituÃ­do por: {produto.nome}"
         
-        logger.info(f"📦 Produto predecessor {predecessor.id} marcado como descontinuado")
+        logger.info(f"ðŸ“¦ Produto predecessor {predecessor.id} marcado como descontinuado")
     
     # ========================================
     # DELEGAR PARA SERVICE LAYER
@@ -1375,28 +1375,28 @@ def criar_produto(
         # Preparar dados do produto
         produto_data = produto.model_dump()
         
-        # Adicionar user_id aos dados (necessário para o modelo)
+        # Adicionar user_id aos dados (necessÃ¡rio para o modelo)
         produto_data['user_id'] = current_user.id
         
-        # Chamar service com regras de negócio
+        # Chamar service com regras de negÃ³cio
         novo_produto = ProdutoService.create_produto(
             dados=produto_data,
             db=db,
             tenant_id=tenant_id
         )
         
-        logger.info(f"✅ Produto criado com sucesso! ID: {novo_produto.id}")
+        logger.info(f"âœ… Produto criado com sucesso! ID: {novo_produto.id}")
         return novo_produto
         
     except ValueError as e:
-        # Erros de validação de negócio
-        logger.warning(f"⚠️ Validação de negócio falhou: {str(e)}")
+        # Erros de validaÃ§Ã£o de negÃ³cio
+        logger.warning(f"âš ï¸ ValidaÃ§Ã£o de negÃ³cio falhou: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Erro ao criar produto: {str(e)}")
-        logger.error(f"❌ Tipo do erro: {type(e).__name__}")
+        logger.error(f"âŒ Erro ao criar produto: {str(e)}")
+        logger.error(f"âŒ Tipo do erro: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar produto: {str(e)}")
 
 
@@ -1420,18 +1420,18 @@ def listar_produtos_vendaveis(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista apenas produtos VENDÁVEIS (SIMPLES, VARIACAO e KIT)
+    Lista apenas produtos VENDÃVEIS (SIMPLES, VARIACAO e KIT)
     
     Usado pelo PDV e carrinho de vendas.
-    Produtos PAI não aparecem pois não são vendáveis diretamente.
+    Produtos PAI nÃ£o aparecem pois nÃ£o sÃ£o vendÃ¡veis diretamente.
     """
     user, tenant_id = user_and_tenant
 
-    # QUERY BASE - Produtos vendáveis (incluindo KIT)
+    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.tipo_produto.in_(['SIMPLES', 'VARIACAO', 'KIT'])  # KIT é vendável!
+        Produto.tipo_produto.in_(['SIMPLES', 'VARIACAO', 'KIT'])  # KIT Ã© vendÃ¡vel!
     )
 
     # FILTROS OPCIONAIS
@@ -1475,17 +1475,17 @@ def listar_produtos_vendaveis(
     # TOTAL
     total = query.count()
 
-    # PAGINAÇÃO
+    # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
     
-    # Ordenação inteligente: prioriza match exato no código
+    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
     if busca:
         order_clause = [
             case(
-                (Produto.codigo == busca, 1),  # Match exato no código
-                (Produto.codigo_barras == busca, 1),  # Match exato no código de barras
-                (Produto.codigo.ilike(f"{busca}%"), 2),  # Código começa com busca
-                (Produto.nome.ilike(f"{busca}%"), 3),  # Nome começa com busca
+                (Produto.codigo == busca, 1),  # Match exato no cÃ³digo
+                (Produto.codigo_barras == busca, 1),  # Match exato no cÃ³digo de barras
+                (Produto.codigo.ilike(f"{busca}%"), 2),  # CÃ³digo comeÃ§a com busca
+                (Produto.nome.ilike(f"{busca}%"), 3),  # Nome comeÃ§a com busca
                 else_=4
             ),
             Produto.nome
@@ -1516,13 +1516,13 @@ def listar_produtos_vendaveis(
     logger = logging.getLogger(__name__)
     
     for produto in produtos:
-        # 🆕 Adicionar categoria_nome para facilitar frontend
+        # ðŸ†• Adicionar categoria_nome para facilitar frontend
         if produto.categoria:
             produto.categoria_nome = produto.categoria.nome
         
         if produto.tipo_produto == 'KIT':
             try:
-                # Carregar composição do KIT
+                # Carregar composiÃ§Ã£o do KIT
                 composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
                 produto.composicao_kit = composicao
                 
@@ -1531,7 +1531,7 @@ def listar_produtos_vendaveis(
                     estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id)
                     produto.estoque_virtual = estoque_virtual
                 else:
-                    # KIT FÍSICO usa estoque próprio
+                    # KIT FÃSICO usa estoque prÃ³prio
                     produto.estoque_virtual = int(produto.estoque_atual or 0)
             except Exception as e:
                 logger.warning(f"Erro ao processar kit {produto.id}: {e}")
@@ -1553,7 +1553,7 @@ def listar_produtos_vendaveis(
 @require_permission("produtos.visualizar")
 def listar_produtos(
     page: int = 1,
-    page_size: int = 1000,  # força trazer tudo
+    page_size: int = 1000,  # forÃ§a trazer tudo
     busca: Optional[str] = None,
     categoria_id: Optional[int] = None,
     marca_id: Optional[int] = None,
@@ -1571,8 +1571,8 @@ def listar_produtos(
     """
     Lista produtos com hierarquia PAI > FILHOS
     
-    REGRA DE NEGÓCIO (Sprint 2 + KIT - Atualizada):
-    - Produtos PAI aparecem na listagem com suas variações agrupadas
+    REGRA DE NEGÃ“CIO (Sprint 2 + KIT - Atualizada):
+    - Produtos PAI aparecem na listagem com suas variaÃ§Ãµes agrupadas
     - Produtos SIMPLES aparecem normalmente
     - Produtos KIT aparecem normalmente
     - Produtos VARIACAO aparecem apenas dentro do grupo do PAI
@@ -1580,11 +1580,11 @@ def listar_produtos(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # QUERY BASE - Buscar apenas produtos principais (SIMPLES, PAI e KIT)
-    # VARIACAO não aparecem sozinhas, apenas agrupadas com o PAI
-    # EXCEÇÃO: Se filtrar explicitamente por tipo_produto, respeita o filtro
-    # EXCEÇÃO 2: Se filtrar por produto_predecessor_id, buscar apenas sucessores (qualquer tipo)
+    # VARIACAO nÃ£o aparecem sozinhas, apenas agrupadas com o PAI
+    # EXCEÃ‡ÃƒO: Se filtrar explicitamente por tipo_produto, respeita o filtro
+    # EXCEÃ‡ÃƒO 2: Se filtrar por produto_predecessor_id, buscar apenas sucessores (qualquer tipo)
     if produto_predecessor_id:
-        # Buscar produtos que são sucessores do produto especificado
+        # Buscar produtos que sÃ£o sucessores do produto especificado
         query = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
             Produto.produto_predecessor_id == produto_predecessor_id
@@ -1592,7 +1592,7 @@ def listar_produtos(
     elif tipo_produto:
         query = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
-            Produto.tipo_produto == tipo_produto  # Filtro específico
+            Produto.tipo_produto == tipo_produto  # Filtro especÃ­fico
         )
     else:
         query = db.query(Produto).filter(
@@ -1605,7 +1605,10 @@ def listar_produtos(
     # Se ativo=True, mostra apenas ativos
     # Se ativo=False, mostra apenas inativos
     if ativo is not None:
-        query = query.filter(Produto.ativo == ativo)
+        if ativo:
+            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
+        else:
+            query = query.filter(Produto.ativo.is_(False))
 
     # FILTROS OPCIONAIS
     if busca:
@@ -1648,9 +1651,9 @@ def listar_produtos(
     # TOTAL
     total = query.count()
     
-    logger.info(f"📦 GET /produtos/ - Total encontrado: {total} | Tenant: {tenant_id}")
+    logger.info(f"ðŸ“¦ GET /produtos/ - Total encontrado: {total} | Tenant: {tenant_id}")
 
-    # PAGINAÇÃO
+    # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
     
     # QUERY FINAL COM RELACIONAMENTOS
@@ -1668,14 +1671,14 @@ def listar_produtos(
         .all()
     )
     
-    # Filtro de segurança: remover None
+    # Filtro de seguranÃ§a: remover None
     produtos = [p for p in produtos if p is not None]
     
-    # HIERARQUIA: Para produtos PAI, buscar suas variações
-    # Para produtos KIT, calcular estoque virtual e carregar composição
+    # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
+    # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
     produtos_expandidos = []
     for produto in produtos:
-        # Se for PAI, contar variações antes de adicionar
+        # Se for PAI, contar variaÃ§Ãµes antes de adicionar
         if produto.tipo_produto == 'PAI':
             total_variacoes = db.query(func.count(Produto.id)).filter(
                 Produto.produto_pai_id == produto.id,
@@ -1684,11 +1687,11 @@ def listar_produtos(
             ).scalar()
             produto.total_variacoes = total_variacoes or 0
         
-        # Se for KIT, processar composição e estoque
+        # Se for KIT, processar composiÃ§Ã£o e estoque
         if produto.tipo_produto == 'KIT':
             try:
-                # ⚠️ TEMPORÁRIO: Desabilitado para evitar timeout
-                # Carregar composição do KIT
+                # âš ï¸ TEMPORÃRIO: Desabilitado para evitar timeout
+                # Carregar composiÃ§Ã£o do KIT
                 # composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
                 produto.composicao_kit = []
                 
@@ -1696,9 +1699,9 @@ def listar_produtos(
                 if produto.tipo_kit == 'VIRTUAL':
                     # estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id)
                     # produto.estoque_virtual = estoque_virtual
-                    produto.estoque_virtual = 0  # Temporário
+                    produto.estoque_virtual = 0  # TemporÃ¡rio
                 else:
-                    # KIT FÍSICO usa estoque próprio
+                    # KIT FÃSICO usa estoque prÃ³prio
                     produto.estoque_virtual = int(produto.estoque_atual or 0)
             except Exception as e:
                 logger.warning(f"Erro ao processar kit {produto.id}: {e}")
@@ -1707,7 +1710,7 @@ def listar_produtos(
         
         produtos_expandidos.append(produto)
         
-        # Se for PAI, buscar e incluir suas variações logo após
+        # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
         if produto.tipo_produto == 'PAI':
             variacoes = db.query(Produto).filter(
                 Produto.produto_pai_id == produto.id,
@@ -1718,7 +1721,7 @@ def listar_produtos(
                 joinedload(Produto.lotes)
             ).order_by(Produto.nome).all()
             
-            # Adicionar variações logo após o PAI
+            # Adicionar variaÃ§Ãµes logo apÃ³s o PAI
             produtos_expandidos.extend(variacoes)
     
     pages = (total + page_size - 1) // page_size
@@ -1739,9 +1742,9 @@ def listar_variacoes_produto(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista todas as variações de um produto PAI
+    Lista todas as variaÃ§Ãµes de um produto PAI
     
-    Sprint 2: Lazy load de variações
+    Sprint 2: Lazy load de variaÃ§Ãµes
     - Usado para expandir produto PAI na listagem
     - Retorna apenas produtos filhos (tipo_produto = 'VARIACAO')
     - Ordenado por nome
@@ -1749,33 +1752,33 @@ def listar_variacoes_produto(
     
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Verificar se produto existe e é PAI
+    # Verificar se produto existe e Ã© PAI
     produto_pai = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
     ).first()
     
     if not produto_pai:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     if produto_pai.tipo_produto != 'PAI':
         raise HTTPException(
             status_code=400,
-            detail="Produto não é do tipo PAI (não possui variações)"
+            detail="Produto nÃ£o Ã© do tipo PAI (nÃ£o possui variaÃ§Ãµes)"
         )
     
-    # Buscar variações
+    # Buscar variaÃ§Ãµes
     variacoes = db.query(Produto).filter(
         Produto.produto_pai_id == produto_id,
         Produto.tipo_produto == 'VARIACAO',
-        Produto.ativo == True,  # Filtrar apenas variações ativas
+        Produto.ativo == True,  # Filtrar apenas variaÃ§Ãµes ativas
         Produto.tenant_id == tenant_id
     ).options(
         joinedload(Produto.imagens),
         joinedload(Produto.lotes)
     ).order_by(Produto.nome).all()
     
-    logger.info(f"📦 Produto PAI #{produto_id} possui {len(variacoes)} variações ativas")
+    logger.info(f"ðŸ“¦ Produto PAI #{produto_id} possui {len(variacoes)} variaÃ§Ãµes ativas")
     
     return variacoes
 
@@ -1787,37 +1790,37 @@ def listar_variacoes_excluidas(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista variações excluídas (soft-deleted) de um produto PAI
+    Lista variaÃ§Ãµes excluÃ­das (soft-deleted) de um produto PAI
     Permite visualizar, restaurar ou excluir definitivamente
     """
     
-    # Verificar se produto existe e é PAI
+    # Verificar se produto existe e Ã© PAI
     produto_pai = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
     ).first()
     
     if not produto_pai:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     if produto_pai.tipo_produto != 'PAI':
         raise HTTPException(
             status_code=400,
-            detail="Produto não é do tipo PAI (não possui variações)"
+            detail="Produto nÃ£o Ã© do tipo PAI (nÃ£o possui variaÃ§Ãµes)"
         )
     
-    # Buscar variações excluídas
+    # Buscar variaÃ§Ãµes excluÃ­das
     variacoes_excluidas = db.query(Produto).filter(
         Produto.produto_pai_id == produto_id,
         Produto.tipo_produto == 'VARIACAO',
-        Produto.ativo == False,  # Apenas inativas (excluídas)
+        Produto.ativo == False,  # Apenas inativas (excluÃ­das)
         Produto.tenant_id == tenant_id
     ).options(
         joinedload(Produto.imagens),
         joinedload(Produto.lotes)
     ).order_by(Produto.updated_at.desc()).all()
     
-    logger.info(f"🗑️ Produto PAI #{produto_id} possui {len(variacoes_excluidas)} variações excluídas")
+    logger.info(f"ðŸ—‘ï¸ Produto PAI #{produto_id} possui {len(variacoes_excluidas)} variaÃ§Ãµes excluÃ­das")
     
     return variacoes_excluidas
 
@@ -1829,7 +1832,7 @@ def restaurar_variacao(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Restaura uma variação excluída (reativa)
+    Restaura uma variaÃ§Ã£o excluÃ­da (reativa)
     """
     
     produto = db.query(Produto).filter(
@@ -1839,10 +1842,10 @@ def restaurar_variacao(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Variação não encontrada")
+        raise HTTPException(status_code=404, detail="VariaÃ§Ã£o nÃ£o encontrada")
     
     if produto.ativo:
-        raise HTTPException(status_code=400, detail="Variação já está ativa")
+        raise HTTPException(status_code=400, detail="VariaÃ§Ã£o jÃ¡ estÃ¡ ativa")
     
     # Restaurar
     produto.ativo = True
@@ -1851,7 +1854,7 @@ def restaurar_variacao(
     db.commit()
     db.refresh(produto)
     
-    logger.info(f"♻️ Variação #{produto_id} restaurada com sucesso")
+    logger.info(f"â™»ï¸ VariaÃ§Ã£o #{produto_id} restaurada com sucesso")
     
     return produto
 
@@ -1863,8 +1866,8 @@ def excluir_variacao_permanentemente(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Exclui DEFINITIVAMENTE uma variação do banco de dados
-    ATENÇÃO: Esta ação é irreversível!
+    Exclui DEFINITIVAMENTE uma variaÃ§Ã£o do banco de dados
+    ATENÃ‡ÃƒO: Esta aÃ§Ã£o Ã© irreversÃ­vel!
     """
     
     produto = db.query(Produto).filter(
@@ -1874,19 +1877,19 @@ def excluir_variacao_permanentemente(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Variação não encontrada")
+        raise HTTPException(status_code=404, detail="VariaÃ§Ã£o nÃ£o encontrada")
     
     if produto.ativo:
         raise HTTPException(
             status_code=400, 
-            detail="Não é possível excluir permanentemente uma variação ativa. Exclua-a primeiro (soft delete)."
+            detail="NÃ£o Ã© possÃ­vel excluir permanentemente uma variaÃ§Ã£o ativa. Exclua-a primeiro (soft delete)."
         )
     
     # Excluir DEFINITIVAMENTE
     db.delete(produto)
     db.commit()
     
-    logger.warning(f"⚠️ Variação #{produto_id} EXCLUÍDA PERMANENTEMENTE do banco de dados")
+    logger.warning(f"âš ï¸ VariaÃ§Ã£o #{produto_id} EXCLUÃDA PERMANENTEMENTE do banco de dados")
     
     return None
 
@@ -1898,7 +1901,7 @@ def obter_produto(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Obtém detalhes completos de um produto
+    ObtÃ©m detalhes completos de um produto
     
     Para produtos do tipo KIT:
     - Retorna composicao_kit (lista de componentes)
@@ -1917,7 +1920,7 @@ def obter_produto(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     # Preparar resposta base
     response_data = {
@@ -1936,7 +1939,7 @@ def obter_produto(
     if produto.tipo_produto == 'KIT':
         from .services.kit_estoque_service import KitEstoqueService
         
-        # Buscar composição do KIT
+        # Buscar composiÃ§Ã£o do KIT
         composicao = KitEstoqueService.obter_detalhes_composicao(db, produto_id)
         response_data['composicao_kit'] = composicao
         
@@ -1944,9 +1947,9 @@ def obter_produto(
         if produto.tipo_kit == 'VIRTUAL':
             estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto_id)
             response_data['estoque_virtual'] = estoque_virtual
-            logger.info(f"🧩 Kit #{produto_id}: estoque_virtual={estoque_virtual}")
+            logger.info(f"ðŸ§© Kit #{produto_id}: estoque_virtual={estoque_virtual}")
         else:
-            # KIT FÍSICO usa estoque próprio
+            # KIT FÃSICO usa estoque prÃ³prio
             response_data['estoque_virtual'] = int(produto.estoque_atual or 0)
     
     # Mapear tipo_kit para e_kit_fisico (compatibilidade com frontend)
@@ -1978,9 +1981,9 @@ def atualizar_produto(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # Verificar se novo SKU já existe
+    # Verificar se novo SKU jÃ¡ existe
     if produto_update.codigo and produto_update.codigo != produto.codigo:
         existe_sku = db.query(Produto).filter(
             Produto.codigo == produto_update.codigo,
@@ -1991,10 +1994,10 @@ def atualizar_produto(
         if existe_sku:
             raise HTTPException(
                 status_code=400,
-                detail=f"SKU '{produto_update.codigo}' já cadastrado"
+                detail=f"SKU '{produto_update.codigo}' jÃ¡ cadastrado"
             )
     
-    # Verificar se novo código de barras já existe
+    # Verificar se novo cÃ³digo de barras jÃ¡ existe
     if produto_update.codigo_barras and produto_update.codigo_barras != produto.codigo_barras:
         existe_barcode = db.query(Produto).filter(
             Produto.codigo_barras == produto_update.codigo_barras,
@@ -2005,7 +2008,7 @@ def atualizar_produto(
         if existe_barcode:
             raise HTTPException(
                 status_code=400,
-                detail=f"Código de barras '{produto_update.codigo_barras}' já cadastrado"
+                detail=f"CÃ³digo de barras '{produto_update.codigo_barras}' jÃ¡ cadastrado"
             )
     
     # Extrair dados
@@ -2013,68 +2016,68 @@ def atualizar_produto(
     composicao_kit = dados_recebidos.pop('composicao_kit', None)
     
     # ========================================
-    # � AUTO-CONVERSÃO: classificacao_racao='sim' → tipo='ração'
+    # ï¿½ AUTO-CONVERSÃƒO: classificacao_racao='sim' â†’ tipo='raÃ§Ã£o'
     # ========================================
     if 'classificacao_racao' in dados_recebidos:
         if dados_recebidos['classificacao_racao'] == 'sim':
-            dados_recebidos['tipo'] = 'ração'
-            logger.info(f"✅ Produto {produto_id} marcado como ração (classificacao_racao='sim')")
-        elif dados_recebidos['classificacao_racao'] in ['nao', 'não', None]:
-            # Se não é ração, garantir que tipo seja 'produto'
+            dados_recebidos['tipo'] = 'raÃ§Ã£o'
+            logger.info(f"âœ… Produto {produto_id} marcado como raÃ§Ã£o (classificacao_racao='sim')")
+        elif dados_recebidos['classificacao_racao'] in ['nao', 'nÃ£o', None]:
+            # Se nÃ£o Ã© raÃ§Ã£o, garantir que tipo seja 'produto'
             dados_recebidos['tipo'] = 'produto'
-            logger.info(f"✅ Produto {produto_id} desmarcado como ração")
+            logger.info(f"âœ… Produto {produto_id} desmarcado como raÃ§Ã£o")
     
     # ========================================
-    # �🔒 TRAVA 3 — VALIDAÇÃO: PRODUTO PAI NÃO TEM PREÇO (ATUALIZAÇÃO)
+    # ï¿½ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O (ATUALIZAÃ‡ÃƒO)
     # ========================================
     is_parent_atual = produto.is_parent
     is_parent_novo = dados_recebidos.get('is_parent', is_parent_atual)
     
     if is_parent_novo:
-        # Bloquear alteração de preço em produto PAI
+        # Bloquear alteraÃ§Ã£o de preÃ§o em produto PAI
         if 'preco_venda' in dados_recebidos and dados_recebidos['preco_venda'] and dados_recebidos['preco_venda'] > 0:
             raise HTTPException(
                 status_code=400,
-                detail="❌ Produto pai não pode ter preço de venda. O preço deve ser definido nas variações individuais."
+                detail="âŒ Produto pai nÃ£o pode ter preÃ§o de venda. O preÃ§o deve ser definido nas variaÃ§Ãµes individuais."
             )
         
-        # Bloquear alteração de estoque em produto PAI
+        # Bloquear alteraÃ§Ã£o de estoque em produto PAI
         if 'estoque_atual' in dados_recebidos and dados_recebidos['estoque_atual'] and dados_recebidos['estoque_atual'] > 0:
             raise HTTPException(
                 status_code=400,
-                detail="❌ Produto pai não pode ter estoque. O estoque deve ser gerenciado nas variações."
+                detail="âŒ Produto pai nÃ£o pode ter estoque. O estoque deve ser gerenciado nas variaÃ§Ãµes."
             )
     
     # ========================================
-    # 🔒 VALIDAÇÃO: VARIAÇÃO DUPLICADA (ATUALIZAÇÃO)
+    # ðŸ”’ VALIDAÃ‡ÃƒO: VARIAÃ‡ÃƒO DUPLICADA (ATUALIZAÃ‡ÃƒO)
     # ========================================
-    # Se está atualizando signature de uma VARIAÇÃO, verificar duplicidade
+    # Se estÃ¡ atualizando signature de uma VARIAÃ‡ÃƒO, verificar duplicidade
     if 'variation_signature' in dados_recebidos and dados_recebidos['variation_signature']:
         variacao_existente = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
             Produto.produto_pai_id == produto.produto_pai_id,
             Produto.variation_signature == dados_recebidos['variation_signature'],
-            Produto.id != produto_id,  # Excluir o próprio produto
+            Produto.id != produto_id,  # Excluir o prÃ³prio produto
             Produto.ativo == True
         ).first()
         
         if variacao_existente:
             raise HTTPException(
                 status_code=409,
-                detail=f"❌ Já existe uma variação com os mesmos atributos para este produto. Variação existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})"
+                detail=f"âŒ JÃ¡ existe uma variaÃ§Ã£o com os mesmos atributos para este produto. VariaÃ§Ã£o existente: '{variacao_existente.nome}' (ID: {variacao_existente.id})"
             )
     
     # ========================================
-    # ATUALIZAR COMPOSIÇÃO DO KIT (se enviado)
+    # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)
     # ========================================
     if composicao_kit is not None and produto.tipo_produto == 'KIT':
         from .services.kit_estoque_service import KitEstoqueService
         
-        # ⚠️ VALIDAÇÃO OBRIGATÓRIA: KIT deve ter pelo menos 1 componente
+        # âš ï¸ VALIDAÃ‡ÃƒO OBRIGATÃ“RIA: KIT deve ter pelo menos 1 componente
         if len(composicao_kit) == 0:
             raise HTTPException(
                 status_code=400, 
-                detail="Produto do tipo KIT deve ter pelo menos 1 componente na composição. Adicione os produtos que fazem parte do kit antes de salvar."
+                detail="Produto do tipo KIT deve ter pelo menos 1 componente na composiÃ§Ã£o. Adicione os produtos que fazem parte do kit antes de salvar."
             )
         
         # Validar novos componentes
@@ -2085,7 +2088,7 @@ def atualizar_produto(
         )
         
         if not valido:
-            raise HTTPException(status_code=400, detail=f"Composição inválida: {erro}")
+            raise HTTPException(status_code=400, detail=f"ComposiÃ§Ã£o invÃ¡lida: {erro}")
         
         # Remover componentes antigos
         db.query(ProdutoKitComponente).filter(
@@ -2103,7 +2106,7 @@ def atualizar_produto(
             )
             db.add(novo_comp)
         
-        logger.info(f"🧩 Composição do Kit #{produto_id} atualizada: {len(composicao_kit)} componentes")
+        logger.info(f"ðŸ§© ComposiÃ§Ã£o do Kit #{produto_id} atualizada: {len(composicao_kit)} componentes")
     
     # ========================================
     # PROCESSAR e_kit_fisico -> tipo_kit
@@ -2123,19 +2126,19 @@ def atualizar_produto(
     try:
         db.commit()
         db.refresh(produto)
-        logger.info(f"✅ Produto #{produto_id} atualizado com sucesso")
+        logger.info(f"âœ… Produto #{produto_id} atualizado com sucesso")
         
-        # Retornar com composição e estoque virtual
+        # Retornar com composiÃ§Ã£o e estoque virtual
         return obter_produto(produto_id, db, user_and_tenant)
         
     except Exception as e:
         db.rollback()
-        logger.error(f"❌ Erro ao atualizar produto: {str(e)}")
+        logger.error(f"âŒ Erro ao atualizar produto: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar produto: {str(e)}")
 
 
 # ============================================================================
-# ATUALIZAÇÃO EM LOTE
+# ATUALIZAÃ‡ÃƒO EM LOTE
 # ============================================================================
 
 class AtualizacaoLoteRequest(BaseModel):
@@ -2151,10 +2154,10 @@ def atualizar_produtos_lote(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Atualiza marca, categoria e/ou departamento de múltiplos produtos"""
+    """Atualiza marca, categoria e/ou departamento de mÃºltiplos produtos"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    logger.info(f"📦 Atualizando {len(dados.produto_ids)} produtos em lote")
+    logger.info(f"ðŸ“¦ Atualizando {len(dados.produto_ids)} produtos em lote")
     
     # Buscar produtos
     produtos = db.query(Produto).filter(
@@ -2165,11 +2168,11 @@ def atualizar_produtos_lote(
     if not produtos:
         raise HTTPException(status_code=404, detail="Nenhum produto encontrado")
     
-    # Validar se todos os produtos pertencem ao usuário
+    # Validar se todos os produtos pertencem ao usuÃ¡rio
     if len(produtos) != len(dados.produto_ids):
         raise HTTPException(
             status_code=400, 
-            detail="Alguns produtos não foram encontrados ou não pertencem ao usuário"
+            detail="Alguns produtos nÃ£o foram encontrados ou nÃ£o pertencem ao usuÃ¡rio"
         )
     
     # Atualizar campos fornecidos
@@ -2189,7 +2192,7 @@ def atualizar_produtos_lote(
     
     db.commit()
     
-    logger.info(f"✅ {len(produtos)} produtos atualizados em lote")
+    logger.info(f"âœ… {len(produtos)} produtos atualizados em lote")
     
     return {
         "produtos_atualizados": len(produtos),
@@ -2209,10 +2212,10 @@ def atualizar_preco_produto(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Atualiza apenas o preço de um produto (edição rápida)"""
+    """Atualiza apenas o preÃ§o de um produto (ediÃ§Ã£o rÃ¡pida)"""
     
     current_user, tenant_id = user_and_tenant
-    logger.info(f"🏷️ Atualizando preço do produto {produto_id}")
+    logger.info(f"ðŸ·ï¸ Atualizando preÃ§o do produto {produto_id}")
     
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
@@ -2220,9 +2223,9 @@ def atualizar_preco_produto(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # Atualizar apenas os preços fornecidos
+    # Atualizar apenas os preÃ§os fornecidos
     if preco_venda is not None:
         produto.preco_venda = preco_venda
     if preco_custo is not None:
@@ -2235,7 +2238,7 @@ def atualizar_preco_produto(
     db.commit()
     db.refresh(produto)
     
-    logger.info(f"✅ Preço atualizado: PV={produto.preco_venda}")
+    logger.info(f"âœ… PreÃ§o atualizado: PV={produto.preco_venda}")
     
     return {
         "id": produto.id,
@@ -2259,13 +2262,13 @@ def deletar_produto(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     # ========================================
-    # 🔒 TRAVA 4 — VALIDAÇÃO: PRODUTO PAI COM VARIAÇÕES NÃO PODE SER EXCLUÍDO
+    # ðŸ”’ TRAVA 4 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI COM VARIAÃ‡Ã•ES NÃƒO PODE SER EXCLUÃDO
     # ========================================
     if produto.is_parent:
-        # Verificar se existem variações ativas
+        # Verificar se existem variaÃ§Ãµes ativas
         variacoes_ativas = db.query(Produto).filter(
             Produto.produto_pai_id == produto_id,
             Produto.tenant_id == tenant_id,
@@ -2275,7 +2278,7 @@ def deletar_produto(
         if variacoes_ativas > 0:
             raise HTTPException(
                 status_code=409,
-                detail=f"❌ Produto '{produto.nome}' possui {variacoes_ativas} variação(ões) ativa(s) e não pode ser excluído. Exclua primeiro todas as variações."
+                detail=f"âŒ Produto '{produto.nome}' possui {variacoes_ativas} variaÃ§Ã£o(Ãµes) ativa(s) e nÃ£o pode ser excluÃ­do. Exclua primeiro todas as variaÃ§Ãµes."
             )
     
     # Soft delete
@@ -2294,25 +2297,25 @@ def gerar_sku(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Gera um SKU único automaticamente
-    Formato: {PREFIXO}-{NÚMERO_SEQUENCIAL}
+    Gera um SKU Ãºnico automaticamente
+    Formato: {PREFIXO}-{NÃšMERO_SEQUENCIAL}
     Exemplo: PROD-00001
     """
     current_user, tenant_id = user_and_tenant
     
-    # Buscar último SKU com o mesmo prefixo
+    # Buscar Ãºltimo SKU com o mesmo prefixo
     ultimo_produto = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.codigo.like(f"{prefixo}-%")
     ).order_by(Produto.id.desc()).first()
     
     if ultimo_produto:
-        # Extrair número do último SKU
+        # Extrair nÃºmero do Ãºltimo SKU
         try:
             ultimo_numero = int(ultimo_produto.codigo.split("-")[-1])
             proximo_numero = ultimo_numero + 1
         except ValueError:
-            # Se não conseguir extrair, começar do 1
+            # Se nÃ£o conseguir extrair, comeÃ§ar do 1
             proximo_numero = 1
     else:
         proximo_numero = 1
@@ -2320,14 +2323,14 @@ def gerar_sku(
     # Gerar novo SKU
     novo_sku = f"{prefixo}-{proximo_numero:05d}"
     
-    # Verificar se já existe (caso de race condition)
+    # Verificar se jÃ¡ existe (caso de race condition)
     existe = db.query(Produto).filter(
         Produto.codigo == novo_sku,
         Produto.tenant_id == tenant_id
     ).first()
     
     if existe:
-        # Se existir, tentar próximo número
+        # Se existir, tentar prÃ³ximo nÃºmero
         novo_sku = f"{prefixo}-{proximo_numero + 1:05d}"
     
     return {
@@ -2359,9 +2362,9 @@ def criar_lote(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # Verificar se número de lote já existe para este produto
+    # Verificar se nÃºmero de lote jÃ¡ existe para este produto
     lote_existente = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
         ProdutoLote.nome_lote == lote.nome_lote
@@ -2370,7 +2373,7 @@ def criar_lote(
     if lote_existente:
         raise HTTPException(
             status_code=400,
-            detail=f"Lote '{lote.nome_lote}' já cadastrado para este produto"
+            detail=f"Lote '{lote.nome_lote}' jÃ¡ cadastrado para este produto"
         )
     
     # Criar lote com timestamp para FIFO
@@ -2397,7 +2400,7 @@ def criar_lote(
 @router.get("/{produto_id}/lotes", response_model=List[LoteResponse])
 def listar_lotes(
     produto_id: int,
-    apenas_disponiveis: bool = False,  # Mostrar todos por padrão
+    apenas_disponiveis: bool = False,  # Mostrar todos por padrÃ£o
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -2405,7 +2408,7 @@ def listar_lotes(
     
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    logger.info(f"📦 Listando lotes do produto {produto_id} - apenas_disponiveis={apenas_disponiveis}")
+    logger.info(f"ðŸ“¦ Listando lotes do produto {produto_id} - apenas_disponiveis={apenas_disponiveis}")
     
     # Verificar se produto existe
     produto = db.query(Produto).filter(
@@ -2414,11 +2417,11 @@ def listar_lotes(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     query = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
-        ProdutoLote.status != 'excluido'  # Apenas lotes não excluídos
+        ProdutoLote.status != 'excluido'  # Apenas lotes nÃ£o excluÃ­dos
     )
     
     if apenas_disponiveis:
@@ -2427,7 +2430,7 @@ def listar_lotes(
     # Ordenar por FIFO (mais antigo primeiro)
     lotes = query.order_by(ProdutoLote.ordem_entrada).all()
     
-    logger.info(f"✅ Encontrados {len(lotes)} lotes")
+    logger.info(f"âœ… Encontrados {len(lotes)} lotes")
     
     return lotes
 
@@ -2440,7 +2443,7 @@ def atualizar_lote(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Atualiza informações de um lote"""
+    """Atualiza informaÃ§Ãµes de um lote"""
     
     # Buscar lote
     lote = db.query(ProdutoLote).filter(
@@ -2449,18 +2452,18 @@ def atualizar_lote(
     ).first()
     
     if not lote:
-        raise HTTPException(status_code=404, detail="Lote não encontrado")
+        raise HTTPException(status_code=404, detail="Lote nÃ£o encontrado")
     
-    # Verificar se o produto pertence ao usuário
+    # Verificar se o produto pertence ao usuÃ¡rio
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # Calcular diferença de quantidade para ajustar estoque
+    # Calcular diferenÃ§a de quantidade para ajustar estoque
     diferenca_quantidade = lote_data.quantidade_inicial - lote.quantidade_inicial
     
     # Atualizar campos
@@ -2496,27 +2499,27 @@ def excluir_lote(
     ).first()
     
     if not lote:
-        raise HTTPException(status_code=404, detail="Lote não encontrado")
+        raise HTTPException(status_code=404, detail="Lote nÃ£o encontrado")
     
-    # Verificar se o produto pertence ao usuário
+    # Verificar se o produto pertence ao usuÃ¡rio
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     # Atualizar estoque do produto (remover a quantidade do lote)
     produto.estoque_atual = produto.estoque_atual - lote.quantidade_disponivel
     
-    # Soft delete - marcar como excluído
+    # Soft delete - marcar como excluÃ­do
     lote.status = 'excluido'
     lote.updated_at = datetime.utcnow()
     
     db.commit()
     
-    return {"message": "Lote excluído com sucesso"}
+    return {"message": "Lote excluÃ­do com sucesso"}
 
 
 @router.post("/{produto_id}/entrada")
@@ -2536,16 +2539,16 @@ def entrada_estoque(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
+    # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
     if produto.is_parent:
         raise HTTPException(
             status_code=400,
-            detail="Produto pai não pode ter entrada de estoque. Realize a entrada nas variações do produto."
+            detail="Produto pai nÃ£o pode ter entrada de estoque. Realize a entrada nas variaÃ§Ãµes do produto."
         )
     
-    # Verificar se lote já existe
+    # Verificar se lote jÃ¡ existe
     lote_existente = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
         ProdutoLote.nome_lote == entrada.nome_lote
@@ -2565,7 +2568,7 @@ def entrada_estoque(
             quantidade_inicial=entrada.quantidade,
             quantidade_disponivel=entrada.quantidade,
             data_fabricacao=entrada.data_fabricacao,
-            data_validade=entrada.data_validade or datetime.utcnow() + timedelta(days=365),  # Validade padrão 1 ano
+            data_validade=entrada.data_validade or datetime.utcnow() + timedelta(days=365),  # Validade padrÃ£o 1 ano
             custo_unitario=entrada.preco_custo,
             ordem_entrada=int(time.time())
         )
@@ -2576,7 +2579,7 @@ def entrada_estoque(
     produto.estoque_atual += entrada.quantidade
     produto.updated_at = datetime.utcnow()
     
-    # Registrar movimentação
+    # Registrar movimentaÃ§Ã£o
     movimentacao = EstoqueMovimentacao(
         produto_id=produto_id,
         tipo="entrada",
@@ -2612,7 +2615,7 @@ def saida_estoque_fifo(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Registra saída de estoque usando FIFO
+    Registra saÃ­da de estoque usando FIFO
     Consome lotes mais antigos primeiro
     """
     
@@ -2624,23 +2627,23 @@ def saida_estoque_fifo(
     ).first()
     
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
-    # VALIDAÇÃO: Produto PAI não pode ter movimentação de estoque
+    # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
     if produto.is_parent:
         raise HTTPException(
             status_code=400,
-            detail="Produto pai não pode ter saída de estoque. Realize a saída nas variações do produto."
+            detail="Produto pai nÃ£o pode ter saÃ­da de estoque. Realize a saÃ­da nas variaÃ§Ãµes do produto."
         )
     
-    # Verificar se há estoque suficiente
+    # Verificar se hÃ¡ estoque suficiente
     if produto.estoque_atual < saida.quantidade:
         raise HTTPException(
             status_code=400,
-            detail=f"Estoque insuficiente. Disponível: {produto.estoque_atual}, Solicitado: {saida.quantidade}"
+            detail=f"Estoque insuficiente. DisponÃ­vel: {produto.estoque_atual}, Solicitado: {saida.quantidade}"
         )
     
-    # Buscar lotes disponíveis ordenados por FIFO (mais antigo primeiro)
+    # Buscar lotes disponÃ­veis ordenados por FIFO (mais antigo primeiro)
     lotes = db.query(ProdutoLote).filter(
         ProdutoLote.produto_id == produto_id,
         ProdutoLote.quantidade_disponivel > 0
@@ -2649,7 +2652,7 @@ def saida_estoque_fifo(
     if not lotes:
         raise HTTPException(
             status_code=400,
-            detail="Nenhum lote disponível"
+            detail="Nenhum lote disponÃ­vel"
         )
     
     # Consumir lotes usando FIFO
@@ -2687,7 +2690,7 @@ def saida_estoque_fifo(
     produto.estoque_atual -= saida.quantidade
     produto.updated_at = datetime.utcnow()
     
-    # Registrar movimentação
+    # Registrar movimentaÃ§Ã£o
     import json
     movimentacao = EstoqueMovimentacao(
         produto_id=produto_id,
@@ -2706,7 +2709,7 @@ def saida_estoque_fifo(
     
     return {
         "sucesso": True,
-        "mensagem": "Saída registrada com sucesso usando FIFO",
+        "mensagem": "SaÃ­da registrada com sucesso usando FIFO",
         "quantidade_saida": saida.quantidade,
         "estoque_anterior": estoque_anterior,
         "estoque_atual": produto.estoque_atual,
@@ -2716,7 +2719,7 @@ def saida_estoque_fifo(
 
 
 # ==========================================
-# ENDPOINTS - RELATÓRIOS
+# ENDPOINTS - RELATÃ“RIOS
 # ==========================================
 
 @router.get("/relatorio/movimentacoes")
@@ -2730,9 +2733,9 @@ def relatorio_movimentacoes(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Relatório de movimentações de estoque
-    Retorna histórico com filtros de período, produto e tipo
-    Inclui número de pedido clicável para navegação ao PDV
+    RelatÃ³rio de movimentaÃ§Ãµes de estoque
+    Retorna histÃ³rico com filtros de perÃ­odo, produto e tipo
+    Inclui nÃºmero de pedido clicÃ¡vel para navegaÃ§Ã£o ao PDV
     """
     
     from datetime import datetime as dt, timedelta
@@ -2763,20 +2766,20 @@ def relatorio_movimentacoes(
         except:
             pass
     
-    # Se não informou datas, usar últimos 6 meses
+    # Se nÃ£o informou datas, usar Ãºltimos 6 meses
     if not data_inicio and not data_fim:
         data_inicio_dt = dt.now() - timedelta(days=180)
         query = query.filter(EstoqueMovimentacao.created_at >= data_inicio_dt)
     
-    # Filtro de produto (converter string para int se não vazio)
+    # Filtro de produto (converter string para int se nÃ£o vazio)
     if produto_id and produto_id.strip():
         try:
             produto_id_int = int(produto_id)
             query = query.filter(EstoqueMovimentacao.produto_id == produto_id_int)
         except ValueError:
-            pass  # Ignora se não for número válido
+            pass  # Ignora se nÃ£o for nÃºmero vÃ¡lido
     
-    # Filtro de tipo (campo 'tipo' e não 'tipo_movimentacao')
+    # Filtro de tipo (campo 'tipo' e nÃ£o 'tipo_movimentacao')
     if tipo_movimentacao and tipo_movimentacao != "todos":
         query = query.filter(EstoqueMovimentacao.tipo == tipo_movimentacao)
     
@@ -2792,7 +2795,7 @@ def relatorio_movimentacoes(
         # Buscar produto
         produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
         
-        # Determinar entrada/saída (campo 'tipo' e não 'tipo_movimentacao')
+        # Determinar entrada/saÃ­da (campo 'tipo' e nÃ£o 'tipo_movimentacao')
         entrada = mov.quantidade if mov.tipo == "entrada" else None
         saida = mov.quantidade if mov.tipo != "entrada" else None
         
@@ -2821,9 +2824,9 @@ def relatorio_movimentacoes(
         
         resultado.append(item)
     
-    # Se solicitado, agrupar por mês
+    # Se solicitado, agrupar por mÃªs
     if agrupar_por_mes:
-        # Agrupar movimentações por mês
+        # Agrupar movimentaÃ§Ãµes por mÃªs
         agrupado = {}
         
         for item in resultado:
@@ -2876,7 +2879,7 @@ from pathlib import Path
 import shutil
 import uuid
 
-# Diretório para salvar imagens
+# DiretÃ³rio para salvar imagens
 UPLOAD_DIR = Path("uploads/produtos")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2892,14 +2895,14 @@ async def upload_imagem_produto(
     Upload de imagem para um produto
     
     - Aceita JPG, PNG, WebP
-    - Tamanho máximo: 5MB
+    - Tamanho mÃ¡ximo: 5MB
     - Salva em /uploads/produtos/{produto_id}/{uuid}.ext
-    - Primeira imagem é automaticamente marcada como principal
+    - Primeira imagem Ã© automaticamente marcada como principal
     """
     try:
         logger.info(f"[UPLOAD] Iniciando upload para produto {produto_id}")
         
-        # Verificar se produto existe e pertence ao usuário
+        # Verificar se produto existe e pertence ao usuÃ¡rio
         produto = db.query(Produto).filter(
             Produto.id == produto_id,
             Produto.tenant_id == tenant_id,
@@ -2907,10 +2910,10 @@ async def upload_imagem_produto(
         ).first()
         
         if not produto:
-            logger.error(f"[UPLOAD] Produto {produto_id} não encontrado para usuário {current_user.email}")
+            logger.error(f"[UPLOAD] Produto {produto_id} nÃ£o encontrado para usuÃ¡rio {current_user.email}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto não encontrado"
+                detail="Produto nÃ£o encontrado"
             )
         
         logger.info(f"[UPLOAD] Produto encontrado: {produto.nome}")
@@ -2918,35 +2921,35 @@ async def upload_imagem_produto(
         # Validar tipo de arquivo
         allowed_types = ["image/jpeg", "image/png", "image/webp"]
         if file.content_type not in allowed_types:
-            logger.error(f"[UPLOAD] Tipo inválido: {file.content_type}")
+            logger.error(f"[UPLOAD] Tipo invÃ¡lido: {file.content_type}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Formato não aceito. Use JPG, PNG ou WebP"
+                detail="Formato nÃ£o aceito. Use JPG, PNG ou WebP"
             )
         
         # Validar tamanho (5MB)
         file.file.seek(0, 2)  # Ir para o final do arquivo
         file_size = file.file.tell()  # Obter tamanho
-        file.file.seek(0)  # Voltar ao início
+        file.file.seek(0)  # Voltar ao inÃ­cio
         
         max_size = 5 * 1024 * 1024  # 5MB
         if file_size > max_size:
             logger.error(f"[UPLOAD] Arquivo muito grande: {file_size} bytes")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Arquivo muito grande. Máximo: 5MB"
+                detail="Arquivo muito grande. MÃ¡ximo: 5MB"
             )
         
         logger.info(f"[UPLOAD] Arquivo validado: {file_size} bytes")
         
-        # Gerar nome único para o arquivo
+        # Gerar nome Ãºnico para o arquivo
         ext = file.filename.split(".")[-1]
         filename = f"{uuid.uuid4()}.{ext}"
         
         # Criar pasta do produto
         produto_dir = UPLOAD_DIR / str(produto_id)
         produto_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[UPLOAD] Diretório criado: {produto_dir}")
+        logger.info(f"[UPLOAD] DiretÃ³rio criado: {produto_dir}")
         
         # Salvar arquivo
         file_path = produto_dir / filename
@@ -2954,21 +2957,21 @@ async def upload_imagem_produto(
             shutil.copyfileobj(file.file, buffer)
         logger.info(f"[UPLOAD] Arquivo salvo: {file_path}")
         
-        # Verificar se já existe imagem principal
+        # Verificar se jÃ¡ existe imagem principal
         tem_principal = db.query(ProdutoImagem).filter(
             ProdutoImagem.produto_id == produto_id,
             ProdutoImagem.e_principal == True
         ).first()
         
-        # Primeira imagem é principal automaticamente
+        # Primeira imagem Ã© principal automaticamente
         e_principal = not tem_principal
-        logger.info(f"[UPLOAD] É principal: {e_principal}")
+        logger.info(f"[UPLOAD] Ã‰ principal: {e_principal}")
         
-        # Obter próxima ordem
+        # Obter prÃ³xima ordem
         max_ordem = db.query(func.max(ProdutoImagem.ordem)).filter(
             ProdutoImagem.produto_id == produto_id
         ).scalar() or 0
-        logger.info(f"[UPLOAD] Próxima ordem: {max_ordem + 1}")
+        logger.info(f"[UPLOAD] PrÃ³xima ordem: {max_ordem + 1}")
         
         # Criar registro no banco
         nova_imagem = ProdutoImagem(
@@ -2982,14 +2985,14 @@ async def upload_imagem_produto(
         db.commit()
         db.refresh(nova_imagem)
         
-        logger.info(f"[UPLOAD] ✅ Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
+        logger.info(f"[UPLOAD] âœ… Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
         
         return nova_imagem
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[UPLOAD] ❌ ERRO: {str(e)}")
+        logger.error(f"[UPLOAD] âŒ ERRO: {str(e)}")
         logger.error(f"[UPLOAD] Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
@@ -3010,7 +3013,7 @@ def listar_imagens_produto(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Verificar se produto existe e pertence ao usuário
+    # Verificar se produto existe e pertence ao usuÃ¡rio
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
@@ -3019,7 +3022,7 @@ def listar_imagens_produto(
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado"
+            detail="Produto nÃ£o encontrado"
         )
     
     imagens = db.query(ProdutoImagem).filter(
@@ -3045,9 +3048,9 @@ def atualizar_imagem(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Atualizar dados da imagem (ordem, se é principal)
+    Atualizar dados da imagem (ordem, se Ã© principal)
     """
-    # Buscar imagem e verificar permissão
+    # Buscar imagem e verificar permissÃ£o
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
         Produto.tenant_id == tenant_id
@@ -3056,7 +3059,7 @@ def atualizar_imagem(
     if not imagem:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Imagem não encontrada"
+            detail="Imagem nÃ£o encontrada"
         )
     
     # Se for marcar como principal, desmarcar outras
@@ -3090,9 +3093,9 @@ def deletar_imagem(
 ):
     """
     Deletar imagem do produto
-    Remove o arquivo físico e o registro do banco
+    Remove o arquivo fÃ­sico e o registro do banco
     """
-    # Buscar imagem e verificar permissão
+    # Buscar imagem e verificar permissÃ£o
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
         Produto.tenant_id == tenant_id
@@ -3101,17 +3104,17 @@ def deletar_imagem(
     if not imagem:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Imagem não encontrada"
+            detail="Imagem nÃ£o encontrada"
         )
     
-    # Deletar arquivo físico
+    # Deletar arquivo fÃ­sico
     try:
         file_path = Path(f".{imagem.url}")  # Remove leading /
         if file_path.exists():
             file_path.unlink()
             logger.info(f"Arquivo {file_path} deletado")
     except Exception as e:
-        logger.warning(f"Erro ao deletar arquivo físico: {e}")
+        logger.warning(f"Erro ao deletar arquivo fÃ­sico: {e}")
     
     # Deletar registro
     db.delete(imagem)
@@ -3173,14 +3176,14 @@ def vincular_fornecedor(
     """
     Vincular fornecedor a um produto
     
-    - Pode ter múltiplos fornecedores por produto
+    - Pode ter mÃºltiplos fornecedores por produto
     - Apenas 1 pode ser principal
     - Fornecedor deve ser do tipo 'fornecedor' no cadastro de clientes
     """
     try:
         logger.info(f"[FORNECEDOR] Vinculando fornecedor {dados.fornecedor_id} ao produto {produto_id}")
         
-        # Verificar se produto existe e pertence ao usuário
+        # Verificar se produto existe e pertence ao usuÃ¡rio
         produto = db.query(Produto).filter(
             Produto.id == produto_id,
             Produto.tenant_id == tenant_id,
@@ -3188,15 +3191,15 @@ def vincular_fornecedor(
         ).first()
         
         if not produto:
-            logger.error(f"[FORNECEDOR] Produto {produto_id} não encontrado")
+            logger.error(f"[FORNECEDOR] Produto {produto_id} nÃ£o encontrado")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Produto não encontrado"
+                detail="Produto nÃ£o encontrado"
             )
         
         logger.info(f"[FORNECEDOR] Produto encontrado: {produto.nome}")
         
-        # Verificar se fornecedor existe e pertence ao usuário
+        # Verificar se fornecedor existe e pertence ao usuÃ¡rio
         fornecedor = db.query(Cliente).filter(
             Cliente.id == dados.fornecedor_id,
             Cliente.tenant_id == tenant_id,
@@ -3204,25 +3207,25 @@ def vincular_fornecedor(
         ).first()
         
         if not fornecedor:
-            logger.error(f"[FORNECEDOR] Fornecedor {dados.fornecedor_id} não encontrado")
+            logger.error(f"[FORNECEDOR] Fornecedor {dados.fornecedor_id} nÃ£o encontrado")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Fornecedor não encontrado ou não é do tipo fornecedor"
+                detail="Fornecedor nÃ£o encontrado ou nÃ£o Ã© do tipo fornecedor"
             )
         
         logger.info(f"[FORNECEDOR] Fornecedor encontrado: {fornecedor.nome}")
         
-        # Verificar se já existe vínculo
+        # Verificar se jÃ¡ existe vÃ­nculo
         vinculo_existente = db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == produto_id,
             ProdutoFornecedor.fornecedor_id == dados.fornecedor_id
         ).first()
         
         if vinculo_existente:
-            logger.error(f"[FORNECEDOR] Vínculo já existe")
+            logger.error(f"[FORNECEDOR] VÃ­nculo jÃ¡ existe")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Fornecedor já vinculado a este produto"
+                detail="Fornecedor jÃ¡ vinculado a este produto"
             )
         
         # Se for marcar como principal, desmarcar outros
@@ -3236,8 +3239,8 @@ def vincular_fornecedor(
             # Atualizar fornecedor_id do produto
             produto.fornecedor_id = dados.fornecedor_id
         
-        # Criar vínculo
-        logger.info(f"[FORNECEDOR] Criando vínculo no banco")
+        # Criar vÃ­nculo
+        logger.info(f"[FORNECEDOR] Criando vÃ­nculo no banco")
         novo_vinculo = ProdutoFornecedor(
             produto_id=produto_id,
             fornecedor_id=dados.fornecedor_id,
@@ -3252,7 +3255,7 @@ def vincular_fornecedor(
         db.commit()
         db.refresh(novo_vinculo)
         
-        logger.info(f"[FORNECEDOR] Vínculo criado com ID {novo_vinculo.id}")
+        logger.info(f"[FORNECEDOR] VÃ­nculo criado com ID {novo_vinculo.id}")
         
         # Montar resposta com dados do fornecedor
         response = FornecedorVinculoResponse(
@@ -3273,13 +3276,13 @@ def vincular_fornecedor(
             fornecedor_telefone=fornecedor.telefone or fornecedor.celular
         )
         
-        logger.info(f"[FORNECEDOR] ✅ Vínculo completado com sucesso")
+        logger.info(f"[FORNECEDOR] âœ… VÃ­nculo completado com sucesso")
         return response
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[FORNECEDOR] ❌ ERRO: {str(e)}")
+        logger.error(f"[FORNECEDOR] âŒ ERRO: {str(e)}")
         logger.error(f"[FORNECEDOR] Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
@@ -3301,7 +3304,7 @@ def listar_fornecedores_produto(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Verificar se produto existe e pertence ao usuário
+    # Verificar se produto existe e pertence ao usuÃ¡rio
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
@@ -3310,7 +3313,7 @@ def listar_fornecedores_produto(
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado"
+            detail="Produto nÃ£o encontrado"
         )
     
     # Buscar fornecedores
@@ -3367,9 +3370,9 @@ def atualizar_vinculo_fornecedor(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Atualizar dados do vínculo fornecedor-produto
+    Atualizar dados do vÃ­nculo fornecedor-produto
     """
-    # Buscar vínculo e verificar permissão
+    # Buscar vÃ­nculo e verificar permissÃ£o
     vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
         ProdutoFornecedor.id == vinculo_id,
         Produto.tenant_id == tenant_id
@@ -3378,7 +3381,7 @@ def atualizar_vinculo_fornecedor(
     if not vinculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vínculo não encontrado"
+            detail="VÃ­nculo nÃ£o encontrado"
         )
     
     # Se for marcar como principal, desmarcar outros
@@ -3412,7 +3415,7 @@ def atualizar_vinculo_fornecedor(
     db.commit()
     db.refresh(vinculo)
     
-    logger.info(f"Vínculo fornecedor {vinculo_id} atualizado por {current_user.email}")
+    logger.info(f"VÃ­nculo fornecedor {vinculo_id} atualizado por {current_user.email}")
     
     # Buscar dados do fornecedor para resposta
     fornecedor = db.query(Cliente).filter(Cliente.id == vinculo.fornecedor_id).first()
@@ -3446,9 +3449,9 @@ def desvincular_fornecedor(
 ):
     """
     Desvincular fornecedor de um produto
-    Remove o vínculo do banco de dados
+    Remove o vÃ­nculo do banco de dados
     """
-    # Buscar vínculo e verificar permissão
+    # Buscar vÃ­nculo e verificar permissÃ£o
     vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
         ProdutoFornecedor.id == vinculo_id,
         Produto.tenant_id == tenant_id
@@ -3457,13 +3460,13 @@ def desvincular_fornecedor(
     if not vinculo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vínculo não encontrado"
+            detail="VÃ­nculo nÃ£o encontrado"
         )
     
     produto_id = vinculo.produto_id
     era_principal = vinculo.e_principal
     
-    # Deletar vínculo
+    # Deletar vÃ­nculo
     db.delete(vinculo)
     
     # Se era principal, tentar promover outro
@@ -3492,7 +3495,7 @@ def desvincular_fornecedor(
 
 
 # ==========================================
-# HISTÓRICO DE PREÇOS
+# HISTÃ“RICO DE PREÃ‡OS
 # ==========================================
 
 class HistoricoPrecoResponse(BaseModel):
@@ -3525,7 +3528,7 @@ def listar_historico_precos(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista histórico de alterações de preços de um produto
+    Lista histÃ³rico de alteraÃ§Ãµes de preÃ§os de um produto
     """
     current_user, tenant_id = user_and_tenant
     
@@ -3534,7 +3537,7 @@ def listar_historico_precos(
         Produto.tenant_id == tenant_id
     ).first()
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
     
     historicos = db.query(ProdutoHistoricoPreco).options(
         joinedload(ProdutoHistoricoPreco.user),
@@ -3568,17 +3571,17 @@ def listar_historico_precos(
     return resultado
 
 
-# ==================== CLASSIFICA��O INTELIGENTE DE RA��ES ====================
+# ==================== CLASSIFICAï¿½ï¿½O INTELIGENTE DE RAï¿½ï¿½ES ====================
 
 @router.post("/{produto_id}/classificar-ia")
 async def classificar_produto_ia(
     produto_id: int,
-    forcar: bool = False,  # For�a reclassifica��o mesmo se auto_classificar_nome = False
+    forcar: bool = False,  # Forï¿½a reclassificaï¿½ï¿½o mesmo se auto_classificar_nome = False
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Aplica classifica��o inteligente via IA em um produto
+    Aplica classificaï¿½ï¿½o inteligente via IA em um produto
     Extrai automaticamente: porte, fase, tratamento, sabor e peso do nome
     """
     from .classificador_racao import classificar_produto
@@ -3594,17 +3597,17 @@ async def classificar_produto_ia(
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto n�o encontrado"
+            detail="Produto nï¿½o encontrado"
         )
     
     # Verificar se deve classificar
     if not forcar and not produto.auto_classificar_nome:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Auto-classifica��o desativada para este produto. Use forcar=true para for�ar."
+            detail="Auto-classificaï¿½ï¿½o desativada para este produto. Use forcar=true para forï¿½ar."
         )
     
-    # Executar classifica��o
+    # Executar classificaï¿½ï¿½o
     resultado, confianca, metadata = classificar_produto(produto.nome, produto.peso_embalagem)
     
     # Importar models de lookup
@@ -3613,15 +3616,15 @@ async def classificar_produto_ia(
     # Atualizar produto apenas com campos que foram identificados
     campos_atualizados = []
     
-    # Salvar metadados da classifica��o
+    # Salvar metadados da classificaï¿½ï¿½o
     produto.classificacao_ia_versao = metadata["versao"]
     
     if resultado["especie_indicada"]:
         # Mapear para formato do banco (dog, cat, both, bird, etc)
         mapa_especies = {
-            "Cães": "dog",
+            "CÃ£es": "dog",
             "Gatos": "cat",
-            "Pássaros": "bird",
+            "PÃ¡ssaros": "bird",
             "Roedores": "rodent",
             "Peixes": "fish"
         }
@@ -3668,7 +3671,7 @@ async def classificar_produto_ia(
             produto.tipo_tratamento_id = tratamento.id
             campos_atualizados.append("tipo_tratamento_id")
     
-    # Buscar ID do sabor/proteína baseado no nome retornado pela IA
+    # Buscar ID do sabor/proteÃ­na baseado no nome retornado pela IA
     if resultado["sabor_proteina"]:
         sabor = db.query(SaborProteina).filter(
             SaborProteina.tenant_id == tenant_id,
@@ -3679,7 +3682,7 @@ async def classificar_produto_ia(
             produto.sabor_proteina_id = sabor.id
             campos_atualizados.append("sabor_proteina_id")
     
-    # Buscar ID da linha de ração baseado no nome retornado pela IA
+    # Buscar ID da linha de raÃ§Ã£o baseado no nome retornado pela IA
     if resultado.get("linha_racao"):
         linha = db.query(LinhaRacao).filter(
             LinhaRacao.tenant_id == tenant_id,
@@ -3690,7 +3693,7 @@ async def classificar_produto_ia(
             produto.linha_racao_id = linha.id
             campos_atualizados.append("linha_racao_id")
     
-    # Atualizar peso se retornado pela IA e ainda não definido
+    # Atualizar peso se retornado pela IA e ainda nÃ£o definido
     if resultado["peso_embalagem"] and not produto.peso_embalagem:
         produto.peso_embalagem = resultado["peso_embalagem"]
         campos_atualizados.append("peso_embalagem")
@@ -3707,20 +3710,20 @@ async def classificar_produto_ia(
         "classificacao": resultado,
         "confianca": confianca,
         "campos_atualizados": campos_atualizados,
-        "mensagem": f"Classifica��o aplicada com sucesso. Score: {confianca['score']}%"
+        "mensagem": f"Classificaï¿½ï¿½o aplicada com sucesso. Score: {confianca['score']}%"
     }
 
 
 @router.post("/classificar-lote")
 async def classificar_lote_produtos(
     produto_ids: List[int] = None,  # Se None, classifica todos ativos com auto_classificar_nome=True
-    apenas_sem_classificacao: bool = True,  # S� classifica produtos sem classifica��o existente
+    apenas_sem_classificacao: bool = True,  # Sï¿½ classifica produtos sem classificaï¿½ï¿½o existente
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Classifica m�ltiplos produtos em lote
-    �til para classificar produtos hist�ricos
+    Classifica mï¿½ltiplos produtos em lote
+    ï¿½til para classificar produtos histï¿½ricos
     """
     from .classificador_racao import classificar_produto
     
@@ -3733,11 +3736,11 @@ async def classificar_lote_produtos(
         Produto.auto_classificar_nome == True
     )
     
-    # Filtrar por IDs específicos se fornecido
+    # Filtrar por IDs especÃ­ficos se fornecido
     if produto_ids:
         query = query.filter(Produto.id.in_(produto_ids))
     
-    # Filtrar apenas produtos sem classificação completa
+    # Filtrar apenas produtos sem classificaÃ§Ã£o completa
     if apenas_sem_classificacao:
         query = query.filter(
             (Produto.porte_animal == None) |
@@ -3745,7 +3748,7 @@ async def classificar_lote_produtos(
             (Produto.sabor_proteina == None)
         )
     
-    produtos = query.limit(100).all()  # Limite de segurança
+    produtos = query.limit(100).all()  # Limite de seguranÃ§a
     
     sucesso = []
     erros = []
@@ -3759,9 +3762,9 @@ async def classificar_lote_produtos(
             if resultado["especie_indicada"] and not produto.especies_indicadas:
                 # Mapear para formato do banco
                 mapa_especies = {
-                    "Cães": "dog",
+                    "CÃ£es": "dog",
                     "Gatos": "cat",
-                    "Pássaros": "bird",
+                    "PÃ¡ssaros": "bird",
                     "Roedores": "rodent",
                     "Peixes": "fish"
                 }
@@ -3821,26 +3824,26 @@ async def classificar_lote_produtos(
 async def listar_racoes_sem_classificacao(
     limite: int = 50,
     offset: int = 0,
-    especie: Optional[str] = None,  # Filtro por espécie: dog, cat, bird, rodent, fish
+    especie: Optional[str] = None,  # Filtro por espÃ©cie: dog, cat, bird, rodent, fish
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista ra��es sem classifica��o completa para alertas
-    Filtra produtos classificados como ra��o mas sem informa��es importantes
+    Lista raï¿½ï¿½es sem classificaï¿½ï¿½o completa para alertas
+    Filtra produtos classificados como raï¿½ï¿½o mas sem informaï¿½ï¿½es importantes
     
-    Parâmetros:
-    - especie: Filtro opcional por espécie (dog, cat, bird, rodent, fish)
+    ParÃ¢metros:
+    - especie: Filtro opcional por espÃ©cie (dog, cat, bird, rodent, fish)
     """
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
         
         logger.info(f"[racao/alertas] Iniciando busca para tenant {tenant_id}, especie={especie}")
         
-        # Buscar rações sem classificação completa
-        # Considera "ração" se:
-        # 1. classificacao_racao != null AND != 'Não é ração'
-        # 2. OU categoria.nome LIKE '%ração%'
+        # Buscar raÃ§Ãµes sem classificaÃ§Ã£o completa
+        # Considera "raÃ§Ã£o" se:
+        # 1. classificacao_racao != null AND != 'NÃ£o Ã© raÃ§Ã£o'
+        # 2. OU categoria.nome LIKE '%raÃ§Ã£o%'
         
         # Usar joinedload para evitar N+1 queries
         query = db.query(Produto).options(
@@ -3851,7 +3854,7 @@ async def listar_racoes_sem_classificacao(
             Produto.ativo == True
         )
         
-        # Filtro: é ração E está incompleta
+        # Filtro: Ã© raÃ§Ã£o E estÃ¡ incompleta
         query = query.filter(
             Produto.classificacao_racao == 'sim'
         )
@@ -3865,13 +3868,13 @@ async def listar_racoes_sem_classificacao(
             filtros_incompletos.append(Produto.porte_animal_id == None)
             logger.info(f"[racao/alertas] Campo 'porte_animal_id' encontrado no modelo")
         else:
-            logger.warning(f"[racao/alertas] Campo 'porte_animal_id' NÃO existe no modelo")
+            logger.warning(f"[racao/alertas] Campo 'porte_animal_id' NÃƒO existe no modelo")
         
         if hasattr(Produto, 'fase_publico_id'):
             filtros_incompletos.append(Produto.fase_publico_id == None)
             logger.info(f"[racao/alertas] Campo 'fase_publico_id' encontrado no modelo")
         else:
-            logger.warning(f"[racao/alertas] Campo 'fase_publico_id' NÃO existe no modelo")
+            logger.warning(f"[racao/alertas] Campo 'fase_publico_id' NÃƒO existe no modelo")
         
         filtros_incompletos.append(Produto.sabor_proteina == None)
         filtros_incompletos.append(Produto.peso_embalagem == None)
@@ -3879,7 +3882,7 @@ async def listar_racoes_sem_classificacao(
         # Aplicar filtro OR (pelo menos um campo faltando)
         query = query.filter(or_(*filtros_incompletos))
         
-        # Filtrar por espécie se especificado
+        # Filtrar por espÃ©cie se especificado
         if especie:
             query = query.filter(Produto.especies_indicadas == especie)
         
@@ -3887,7 +3890,7 @@ async def listar_racoes_sem_classificacao(
         logger.info(f"[racao/alertas] Total de produtos encontrados: {total}")
         
         produtos = query.limit(limite).offset(offset).all()
-        logger.info(f"[racao/alertas] Produtos retornados nesta página: {len(produtos)}")
+        logger.info(f"[racao/alertas] Produtos retornados nesta pÃ¡gina: {len(produtos)}")
         
         resultado = []
         for produto in produtos:
@@ -3943,7 +3946,7 @@ async def listar_racoes_sem_classificacao(
                 logger.error(f"[racao/alertas] Stack trace: {traceback.format_exc()}")
                 continue
         
-        logger.info(f"[racao/alertas] Busca concluída com sucesso. Total de itens no resultado: {len(resultado)}")
+        logger.info(f"[racao/alertas] Busca concluÃ­da com sucesso. Total de itens no resultado: {len(resultado)}")
         
         return {
             "total": total,
@@ -3954,15 +3957,16 @@ async def listar_racoes_sem_classificacao(
         }
     
     except Exception as error:
-        logger.error(f"[racao/alertas] ERRO CRÍTICO: {str(error)}")
+        logger.error(f"[racao/alertas] ERRO CRÃTICO: {str(error)}")
         logger.error(f"[racao/alertas] Stack trace:\n{traceback.format_exc()}")
         
         raise HTTPException(
             status_code=500,
             detail={
-                "message": "Erro ao listar rações sem classificação",
+                "message": "Erro ao listar raÃ§Ãµes sem classificaÃ§Ã£o",
                 "error": str(error),
                 "stack": traceback.format_exc(),
                 "endpoint": "/api/produtos/racao/alertas"
             }
         )
+

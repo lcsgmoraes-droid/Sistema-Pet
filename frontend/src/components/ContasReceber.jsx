@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
@@ -43,6 +43,18 @@ const ContasReceber = () => {
     carregarDados();
   }, []);
 
+  const carregarFormasPagamento = async (headers) => {
+    const response = await api.get('/comissoes/formas-pagamento', { headers });
+    const lista = response.data?.formas || [];
+    return safeArray(lista).map((forma) => ({
+      id: forma.id,
+      nome: forma.nome,
+      tipo: forma.nome?.toLowerCase()?.replace(/\s+/g, '_') || 'outro',
+      icone: '💳',
+      conta_bancaria_destino_id: null,
+    }));
+  };
+
   // Aplicar filtro automaticamente quando buscaNumeroVenda mudar
   useEffect(() => {
     if (buscaNumeroVenda.trim().length > 0) {
@@ -58,29 +70,33 @@ const ContasReceber = () => {
 
   const carregarDados = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       
-      const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.all([
+      const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.allSettled([
         api.get(`/contas-receber/`, { headers }),
         api.get(`/clientes/`, { headers }),
-        api.get(`/financeiro/formas-pagamento/`, { headers }),
+        carregarFormasPagamento(headers),
         api.get(`/contas-bancarias?apenas_ativas=true`, { headers })
       ]);
-      
-      console.log('📊 Contas carregadas:', contasRes.data.length, 'contas');
-      console.log('📋 Status das contas:', safeArray(contasRes.data).map(c => ({ id: c.id, status: c.status, descricao: c.descricao })));
-      console.log('🔢 Todas as vendas nos contas:', safeArray(contasRes.data).map(c => c.numero_venda).filter(n => n));
-      console.log('🎯 Procurando venda 202601100007:', contasRes.data.find(c => c.numero_venda === '202601100007' || c.descricao?.includes('202601100007')));
-      console.log('📦 Antes de setContas:', contasRes.data);
-      // Ordenar por ID (mais recentes primeiro por padrão)
-      const contasOrdenadas = [...safeArray(contasRes.data)].sort((a, b) => b.id - a.id);
+
+      if (contasRes.status !== 'fulfilled') throw contasRes.reason;
+      if (clientesRes.status !== 'fulfilled') throw clientesRes.reason;
+      if (bancariasRes.status !== 'fulfilled') throw bancariasRes.reason;
+
+      // Ordenar por ID (mais recentes primeiro por padrao)
+      const contasOrdenadas = [...safeArray(contasRes.value.data)].sort((a, b) => b.id - a.id);
       setContas(contasOrdenadas);
-      console.log('✅ Contas setadas no estado');
-      setClientes(safeArray(clientesRes.data));
-      setClientes(safeArray(clientesRes.data));
-      setFormasPagamento(safeArray(formasRes.data));
-      setContasBancarias(safeArray(bancariasRes.data));
+      setClientes(safeArray(clientesRes.value.data));
+
+      if (formasRes.status === 'fulfilled') {
+        setFormasPagamento(safeArray(formasRes.value));
+      } else {
+        setFormasPagamento([]);
+        console.warn('Nao foi possivel carregar formas de pagamento. Usando lista vazia.');
+      }
+
+      setContasBancarias(safeArray(bancariasRes.value.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar contas a receber');
@@ -146,7 +162,7 @@ const ContasReceber = () => {
     });
     
     setContas(contasOrdenadas);
-    toast.success(novaOrdenacao === 'desc' ? '📅 Ordenado: Mais recentes primeiro' : '📅 Ordenado: Mais antigas primeiro');
+    toast.success(novaOrdenacao === 'desc' ? 'Ordenado: mais recentes primeiro' : 'Ordenado: mais antigas primeiro');
   };
 
   const abrirModalRecebimento = (conta) => {
@@ -218,18 +234,18 @@ const ContasReceber = () => {
     const vencimento = new Date(conta.data_vencimento);
     
     if (conta.status === 'recebido') {
-      return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-800">✓ Recebido</span>;
+      return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-800">Recebido</span>;
     }
     
     if (vencimento < hoje) {
-      return <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-800">⚠ Vencida</span>;
+      return <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-800">Vencida</span>;
     }
     
     if (conta.status === 'parcial') {
-      return <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">⚡ Parcial</span>;
+      return <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">Parcial</span>;
     }
     
-    return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">⏱ Pendente</span>;
+    return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">Pendente</span>;
   };
 
   if (loading) {
@@ -239,31 +255,31 @@ const ContasReceber = () => {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">💵 Contas a Receber</h2>
+        <h2 className="text-2xl font-bold">Contas a Receber</h2>
         <div className="flex gap-2">
           <button 
             onClick={alternarOrdenacao}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             title={ordenacao === 'desc' ? 'Clique para ver mais antigas primeiro' : 'Clique para ver mais recentes primeiro'}
           >
-            {ordenacao === 'desc' ? '🔽 Mais Recentes' : '🔼 Mais Antigas'}
+            {ordenacao === 'desc' ? 'Mais recentes' : 'Mais antigas'}
           </button>
           <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
-            ➕ Nova Conta
+            Nova Conta
           </button>
         </div>
       </div>
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <h5 className="text-lg font-semibold mb-4">🔍 Filtros</h5>
+        <h5 className="text-lg font-semibold mb-4">Filtros</h5>
         
-        {/* Campo de busca por número de venda */}
+        {/* Campo de busca por numero de venda */}
         <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">🔢 Buscar por Número da Venda</label>
+          <label className="block text-sm font-medium mb-1">Buscar por Numero da Venda</label>
           <input
             type="text"
-            placeholder="Digite o número da venda (ex: 202601100003) e pressione Enter"
+            placeholder="Digite o numero da venda (ex: 202601100003) e pressione Enter"
             className="w-full border border-gray-300 rounded px-3 py-2"
             value={buscaNumeroVenda}
             onChange={(e) => {
@@ -310,7 +326,7 @@ const ContasReceber = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Data Início</label>
+            <label className="block text-sm font-medium mb-1">Data Inicio</label>
             <input
               type="date"
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -337,7 +353,7 @@ const ContasReceber = () => {
                 checked={filtros.apenas_vencidas}
                 onChange={(e) => setFiltros({...filtros, apenas_vencidas: e.target.checked, apenas_vencer: false})}
               />
-              <span className="text-sm">Só Vencidas</span>
+              <span className="text-sm">So Vencidas</span>
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -365,14 +381,14 @@ const ContasReceber = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descrição</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descricao</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Cliente</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Original</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Recebido</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Saldo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Ações</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Acoes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -385,10 +401,10 @@ const ContasReceber = () => {
               ) : (
                 safeArray(contas)
                   .filter(conta => {
-                    // Filtro local por número de venda
+                    // Filtro local por numero de venda
                     if (!buscaNumeroVenda) return true;
                     
-                    // Busca no número da venda se existir - converter para string
+                    // Busca no numero da venda se existir - converter para string
                     const numeroVenda = String(conta.numero_venda || '');
                     const descricao = String(conta.descricao || '');
                     const busca = buscaNumeroVenda.toLowerCase();
@@ -416,24 +432,24 @@ const ContasReceber = () => {
                     <td className="px-4 py-3 text-sm">
                       {conta.status !== 'recebido' && (
                         <>
-                          {/* NSU informado - É transação de cartão */}
+                          {/* NSU informado - E transacao de cartao */}
                           {conta.nsu && !conta.conciliado ? (
                             <>
-                              {/* Link para conciliação */}
+                              {/* Link para conciliacao */}
                               <button
                                 className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs mr-2"
                                 onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
                                 title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
                               >
-                                🔄 Conciliar
+                                Conciliar
                               </button>
-                              {/* Recebimento manual para cartão */}
+                              {/* Recebimento manual para cartao */}
                               <button
                                 className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs mr-2"
                                 onClick={() => abrirModalRecebimento(conta)}
-                                title="Receber manual (caso não consiga conciliar)"
+                                title="Receber manual (caso nao consiga conciliar)"
                               >
-                                💳 Manual
+                                Manual
                               </button>
                             </>
                           ) : conta.venda_id && !conta.nsu ? (
@@ -451,31 +467,31 @@ const ContasReceber = () => {
                                 }}
                                 title="Receber no PDV (movimenta caixa)"
                               >
-                                💵 PDV
+                                PDV
                               </button>
                               <button
                                 className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
                                 onClick={() => abrirModalRecebimento(conta)}
                                 title="Receber manual (sem PDV)"
                               >
-                                💰 Manual
+                                Manual
                               </button>
                             </>
                           ) : (
-                            /* Lançamento manual ou outros - recebimento manual */
+                            /* Lancamento manual ou outros - recebimento manual */
                             <button
                               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
                               onClick={() => abrirModalRecebimento(conta)}
                               title="Registrar recebimento manual"
                             >
-                              💰 Receber Manual
+                              Receber Manual
                             </button>
                           )}
                         </>
                       )}
                       {conta.conciliado && (
                         <span className="text-xs text-green-600 font-semibold mr-2" title={`Conciliado em ${conta.data_conciliacao}`}>
-                          ✓ Conciliado
+                          Conciliado
                         </span>
                       )}
                       <button
@@ -483,7 +499,7 @@ const ContasReceber = () => {
                         title="Ver Detalhes"
                         onClick={() => abrirDetalhes(conta)}
                       >
-                        👁️
+                        Ver
                       </button>
                     </td>
                   </tr>
@@ -508,12 +524,12 @@ const ContasReceber = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center border-b p-4">
-              <h5 className="text-xl font-bold">💰 Registrar Recebimento</h5>
+              <h5 className="text-xl font-bold">Registrar Recebimento</h5>
               <button
                 className="text-gray-500 hover:text-gray-700 text-2xl"
                 onClick={() => setMostrarModalRecebimento(false)}
               >
-                ×
+                X
               </button>
             </div>
             
@@ -521,7 +537,7 @@ const ContasReceber = () => {
               <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4 text-sm">
                 <strong>Conta:</strong> {contaSelecionada.descricao}<br/>
                 <strong>Valor Total:</strong> {formatarMoeda(contaSelecionada.valor_final)}<br/>
-                <strong>Já Recebido:</strong> {formatarMoeda(contaSelecionada.valor_recebido)}<br/>
+                <strong>Ja Recebido:</strong> {formatarMoeda(contaSelecionada.valor_recebido)}<br/>
                 <strong>Saldo Restante:</strong> {formatarMoeda(contaSelecionada.valor_final - contaSelecionada.valor_recebido)}
               </div>
 
@@ -562,7 +578,7 @@ const ContasReceber = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Conta Bancária *</label>
+                  <label className="block text-sm font-medium mb-1">Conta Bancaria *</label>
                   <select
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={dadosRecebimento.conta_bancaria_id || ''}
@@ -611,7 +627,7 @@ const ContasReceber = () => {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Observações</label>
+                  <label className="block text-sm font-medium mb-1">Observacoes</label>
                   <textarea
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     rows="3"
@@ -642,7 +658,7 @@ const ContasReceber = () => {
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                 onClick={registrarRecebimento}
               >
-                ✓ Confirmar Recebimento
+                Confirmar Recebimento
               </button>
             </div>
           </div>
@@ -659,14 +675,14 @@ const ContasReceber = () => {
                 onClick={() => setMostrarDetalhes(false)}
                 className="text-white hover:bg-blue-700 px-3 py-1 rounded"
               >
-                ✕
+                X
               </button>
             </div>
             
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Número da Conta</label>
+                  <label className="block text-sm font-medium text-gray-700">Numero da Conta</label>
                   <p className="mt-1 text-lg">{contaSelecionada.numero_documento || 'N/A'}</p>
                 </div>
                 <div>
@@ -675,7 +691,7 @@ const ContasReceber = () => {
                 </div>
               </div>
 
-              {/* Número do Pedido - Clicável */}
+              {/* Numero do Pedido - Clicavel */}
               {detalhesCompletos.venda && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Pedido/Venda</label>
@@ -684,7 +700,7 @@ const ContasReceber = () => {
                       onClick={() => abrirVenda(detalhesCompletos.venda.id)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
                     >
-                      <span className="text-xl">🛒</span>
+                      <span className="text-xl">Venda</span>
                       <span className="font-semibold">{detalhesCompletos.venda.numero_venda}</span>
                     </button>
                     <button
@@ -692,7 +708,7 @@ const ContasReceber = () => {
                       className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
                       title="Ver no Fluxo de Caixa"
                     >
-                      <span className="text-xl">📈</span>
+                      <span className="text-xl">Fluxo</span>
                       <span className="text-sm">Fluxo</span>
                     </button>
                   </div>
@@ -705,7 +721,7 @@ const ContasReceber = () => {
                     onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
                   >
-                    <span className="text-xl">📈</span>
+                    <span className="text-xl">Fluxo</span>
                     <span className="font-medium">Ver no Fluxo de Caixa</span>
                   </button>
                 </div>
@@ -713,7 +729,7 @@ const ContasReceber = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Data de Emissão</label>
+                  <label className="block text-sm font-medium text-gray-700">Data de Emissao</label>
                   <p className="mt-1">{formatarData(detalhesCompletos.datas.emissao)}</p>
                 </div>
                 <div>
@@ -748,24 +764,24 @@ const ContasReceber = () => {
                       detalhesCompletos.status === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-red-100 text-red-800'
                     }`}>
-                      {detalhesCompletos.status === 'recebido' ? '✓ Recebido' :
-                       detalhesCompletos.status === 'parcial' ? '⚡ Parcial' : '⏱ Pendente'}
+                      {detalhesCompletos.status === 'recebido' ? 'Recebido' :
+                       detalhesCompletos.status === 'parcial' ? 'Parcial' : 'Pendente'}
                     </span>
                   </p>
                 </div>
               </div>
 
-              {/* Recebimentos com Conta Bancária */}
+              {/* Recebimentos com Conta Bancaria */}
               {detalhesCompletos.recebimentos && detalhesCompletos.recebimentos.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">💰 Histórico de Recebimentos</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Historico de Recebimentos</label>
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Data</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Valor</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Conta Bancária</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Conta Bancaria</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -776,10 +792,10 @@ const ContasReceber = () => {
                             <td className="px-3 py-2 text-sm">
                               {recebimento.conta_bancaria_nome ? (
                                 <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-                                  🏦 {recebimento.conta_bancaria_nome}
+                                  {recebimento.conta_bancaria_nome}
                                 </span>
                               ) : (
-                                <span className="text-gray-400 text-xs">Não informada</span>
+                                <span className="text-gray-400 text-xs">Nao informada</span>
                               )}
                             </td>
                           </tr>
@@ -792,7 +808,7 @@ const ContasReceber = () => {
 
               {detalhesCompletos.observacoes && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Observações</label>
+                  <label className="block text-sm font-medium text-gray-700">Observacoes</label>
                   <p className="mt-1 text-gray-600">{detalhesCompletos.observacoes}</p>
                 </div>
               )}
@@ -805,3 +821,4 @@ const ContasReceber = () => {
 };
 
 export default ContasReceber;
+

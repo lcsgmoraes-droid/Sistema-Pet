@@ -2,6 +2,49 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 
+
+const DEFAULT_ICON_BY_TIPO = {
+  dinheiro: '\uD83D\uDCB5',
+  cartao_credito: '\uD83D\uDCB3',
+  cartao_debito: '\uD83D\uDCB3',
+  pix: '\uD83D\uDCF1',
+  boleto: '\uD83D\uDCC4',
+  transferencia: '\uD83C\uDFE6'
+};
+
+const tryRepairMojibake = (value) => {
+  if (typeof value !== 'string' || !value) return '';
+  try {
+    return decodeURIComponent(escape(value));
+  } catch {
+    return value;
+  }
+};
+
+const normalizeText = (value) => {
+  const repaired = tryRepairMojibake(value).trim();
+  if (!repaired) return '';
+  if (repaired.includes('\uFFFD')) return '';
+  const sanitized = repaired.replace(/\?{2,}/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  return sanitized
+    .replace(/Cr dito/gi, 'Credito')
+    .replace(/D bito/gi, 'Debito')
+    .replace(/Transfer ncia/gi, 'Transferencia')
+    .replace(/Banc ria/gi, 'Bancaria');
+};
+
+const normalizeFormaIcon = (rawIcon, tipo) => {
+  const repaired = normalizeText(rawIcon);
+  const fallback = DEFAULT_ICON_BY_TIPO[tipo] || '\uD83D\uDCB3';
+
+  if (!repaired) return fallback;
+  if (repaired.includes('?') || repaired.includes('\u00F0') || repaired.includes('\u00C3')) {
+    return fallback;
+  }
+
+  return repaired;
+};
+
 const FormasPagamento = () => {
   const [formas, setFormas] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
@@ -31,7 +74,7 @@ const FormasPagamento = () => {
     permite_antecipacao: false,
     dias_recebimento_antecipado: null,
     taxa_antecipacao_percentual: null,
-    icone: '💳',
+    icone: DEFAULT_ICON_BY_TIPO.cartao_credito,
     cor: '#3B82F6'
   });
 
@@ -41,15 +84,32 @@ const FormasPagamento = () => {
 
   const carregarDados = async () => {
     try {
-      const [formasRes, bancariasRes, operadorasRes] = await Promise.all([
+      const [formasRes, bancariasRes, operadorasRes] = await Promise.allSettled([
         api.get(`/financeiro/formas-pagamento?apenas_ativas=false`),
         api.get(`/contas-bancarias?apenas_ativas=true`),
         api.get(`/operadoras-cartao?apenas_ativas=true`)
       ]);
-      
-      setFormas(formasRes.data);
-      setContasBancarias(bancariasRes.data);
-      setOperadoras(operadorasRes.data);
+
+      if (formasRes.status === 'fulfilled') {
+        const formasNormalizadas = (formasRes.value.data || []).map((forma) => ({
+          ...forma,
+          nome: normalizeText(forma.nome) || forma.nome,
+          operadora: normalizeText(forma.operadora) || forma.operadora,
+          icone: normalizeFormaIcon(forma.icone, forma.tipo),
+        }));
+        setFormas(formasNormalizadas);
+      }
+
+      if (bancariasRes.status === 'fulfilled') {
+        setContasBancarias(bancariasRes.value.data || []);
+      }
+
+      if (operadorasRes.status === 'fulfilled') {
+        setOperadoras(operadorasRes.value.data || []);
+      } else {
+        setOperadoras([]);
+        console.warn('Operadoras indisponiveis no ambiente atual. Usando lista vazia.');
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar formas de pagamento');
@@ -75,12 +135,12 @@ const FormasPagamento = () => {
       }
       
       setFormData({
-        nome: forma.nome,
+        nome: normalizeText(forma.nome) || forma.nome,
         tipo: forma.tipo,
         taxa_percentual: forma.taxa_percentual,
         taxa_fixa: forma.taxa_fixa,
         prazo_dias: forma.prazo_dias,
-        operadora: forma.operadora || '',
+        operadora: normalizeText(forma.operadora) || forma.operadora || '',
         operadora_id: forma.operadora_id || null,
         gera_contas_receber: forma.gera_contas_receber,
         split_parcelas: forma.split_parcelas,
@@ -95,7 +155,7 @@ const FormasPagamento = () => {
         permite_antecipacao: forma.permite_antecipacao || false,
         dias_recebimento_antecipado: forma.dias_recebimento_antecipado || null,
         taxa_antecipacao_percentual: forma.taxa_antecipacao_percentual || null,
-        icone: forma.icone || '💳',
+        icone: normalizeFormaIcon(forma.icone, forma.tipo),
         cor: forma.cor || '#3B82F6'
       });
     } else {
@@ -121,7 +181,7 @@ const FormasPagamento = () => {
         permite_antecipacao: false,
         dias_recebimento_antecipado: null,
         taxa_antecipacao_percentual: null,
-        icone: '💳',
+        icone: DEFAULT_ICON_BY_TIPO.cartao_credito,
         cor: '#3B82F6'
       });
     }
@@ -159,7 +219,7 @@ const FormasPagamento = () => {
 
     try {
             await api.delete(`/financeiro/formas-pagamento/${id}`);
-      toast.success('Forma de pagamento excluída!');
+      toast.success('Forma de pagamento excluida!');
       carregarDados();
     } catch (error) {
       console.error('Erro ao excluir:', error);
@@ -168,12 +228,12 @@ const FormasPagamento = () => {
   };
 
   const tiposDisponiveis = [
-    { value: 'dinheiro', label: 'Dinheiro', icone: '💵' },
-    { value: 'cartao_credito', label: 'Cartão de Crédito', icone: '💳' },
-    { value: 'cartao_debito', label: 'Cartão de Débito', icone: '💳' },
-    { value: 'pix', label: 'PIX', icone: '📱' },
-    { value: 'boleto', label: 'Boleto', icone: '📄' },
-    { value: 'transferencia', label: 'Transferência', icone: '🏦' }
+    { value: 'dinheiro', label: 'Dinheiro', icone: '\uD83D\uDCB5' },
+    { value: 'cartao_credito', label: 'Cartao de Credito', icone: '\uD83D\uDCB3' },
+    { value: 'cartao_debito', label: 'Cartao de Debito', icone: '\uD83D\uDCB3' },
+    { value: 'pix', label: 'PIX', icone: '\uD83D\uDCF1' },
+    { value: 'boleto', label: 'Boleto', icone: '\uD83D\uDCC4' },
+    { value: 'transferencia', label: 'Transferencia', icone: '\uD83C\uDFE6' }
   ];
 
   if (loading) {
@@ -203,7 +263,7 @@ const FormasPagamento = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta Destino</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acoes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -223,7 +283,7 @@ const FormasPagamento = () => {
                         <div className="font-medium">{forma.nome}</div>
                         {forma.operadora_id && (
                           <div className="text-xs text-gray-500">
-                            {operadoras.find(op => op.id === forma.operadora_id)?.nome || forma.operadora || 'Operadora não encontrada'}
+                            {operadoras.find(op => op.id === forma.operadora_id)?.nome || forma.operadora || 'Operadora nao encontrada'}
                           </div>
                         )}
                       </div>
@@ -257,13 +317,13 @@ const FormasPagamento = () => {
                         className="text-blue-600 hover:text-blue-800"
                         onClick={() => abrirModal(forma)}
                       >
-                        ✏️
+                        Editar
                       </button>
                       <button
                         className="text-red-600 hover:text-red-800"
                         onClick={() => excluir(forma.id)}
                       >
-                        🗑️
+                        Excluir
                       </button>
                     </div>
                   </td>
@@ -286,7 +346,7 @@ const FormasPagamento = () => {
                 onClick={() => setMostrarModal(false)}
                 className="text-white hover:bg-blue-700 px-3 py-1 rounded"
               >
-                ✕
+                Fechar
               </button>
             </div>
             
@@ -300,7 +360,7 @@ const FormasPagamento = () => {
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={formData.nome}
                     onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                    placeholder="Ex: Dinheiro, PIX, Stone Crédito..."
+                    placeholder="Ex: Dinheiro, PIX, Stone Credito..."
                   />
                 </div>
 
@@ -320,15 +380,15 @@ const FormasPagamento = () => {
                   </select>
                 </div>
 
-                {/* Ícone */}
+                {/* Icone */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">Ícone</label>
+                  <label className="block text-sm font-medium mb-1">Icone</label>
                   <input
                     type="text"
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={formData.icone}
                     onChange={(e) => setFormData({...formData, icone: e.target.value})}
-                    placeholder="💵"
+                    placeholder="\uD83D\uDCB5"
                     maxLength={2}
                   />
                 </div>
@@ -368,9 +428,9 @@ const FormasPagamento = () => {
                   />
                 </div>
 
-                {/* Conta Bancária Destino */}
+                {/* Conta Bancaria Destino */}
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Conta Bancária Destino</label>
+                  <label className="block text-sm font-medium mb-1">Conta Bancaria Destino</label>
                   <select
                     className="w-full border border-gray-300 rounded px-3 py-2"
                     value={formData.conta_bancaria_destino_id || ''}
@@ -382,11 +442,11 @@ const FormasPagamento = () => {
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Esta conta será usada automaticamente quando esta forma for selecionada em pagamentos/recebimentos
+                    Esta conta sera usada automaticamente quando esta forma for selecionada em pagamentos/recebimentos
                   </p>
                 </div>
 
-                {/* Operadora (para cartões) */}
+                {/* Operadora (para cartoes) */}
                 {(formData.tipo === 'cartao_credito' || formData.tipo === 'cartao_debito') && (
                   <>
                     <div>
@@ -412,7 +472,7 @@ const FormasPagamento = () => {
                         <option value="">Selecione a operadora...</option>
                         {operadoras.map(op => (
                           <option key={op.id} value={op.id}>
-                            {op.icone} {op.nome} (até {op.max_parcelas}x)
+                            {op.icone} {op.nome} (ate {op.max_parcelas}x)
                           </option>
                         ))}
                       </select>
@@ -458,7 +518,7 @@ const FormasPagamento = () => {
                       checked={formData.gera_contas_receber}
                       onChange={(e) => setFormData({...formData, gera_contas_receber: e.target.checked})}
                     />
-                    <span className="text-sm">Gera Contas a Receber (para cartões com prazo)</span>
+                    <span className="text-sm">Gera Contas a Receber (para cartoes com prazo)</span>
                   </label>
 
                   <label className="flex items-center gap-2">
@@ -467,7 +527,7 @@ const FormasPagamento = () => {
                       checked={formData.requer_nsu}
                       onChange={(e) => setFormData({...formData, requer_nsu: e.target.checked})}
                     />
-                    <span className="text-sm">Requer NSU (número de transação)</span>
+                    <span className="text-sm">Requer NSU (numero de transacao)</span>
                   </label>
 
                   <label className="flex items-center gap-2">
@@ -482,7 +542,7 @@ const FormasPagamento = () => {
                   {formData.permite_parcelamento && (
                     <div className="ml-6 space-y-3">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Máximo de Parcelas</label>
+                        <label className="block text-sm font-medium mb-1">Maximo de Parcelas</label>
                         <input
                           type="number"
                           className="w-full border border-gray-300 rounded px-3 py-2"
@@ -495,7 +555,7 @@ const FormasPagamento = () => {
                             const maxPermitido = operadora?.max_parcelas || 24;
                             
                             if (valor > maxPermitido) {
-                              toast.error(`❌ Esta operadora permite no máximo ${maxPermitido}x`);
+                              toast.error(`Esta operadora permite no maximo ${maxPermitido}x`);
                               return;
                             }
                             
@@ -504,15 +564,15 @@ const FormasPagamento = () => {
                         />
                         {formData.operadora_id && (
                           <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Limitado a {operadoras.find(o => o.id === formData.operadora_id)?.max_parcelas}x pela operadora selecionada
+                            Limitado a {operadoras.find(o => o.id === formData.operadora_id)?.max_parcelas}x pela operadora selecionada
                           </p>
                         )}
                       </div>
 
-                      {/* Configuração de taxas por parcela */}
+                      {/* Configuracao de taxas por parcela */}
                       <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                        <h4 className="text-sm font-semibold text-blue-900 mb-2">📊 Taxas Específicas por Número de Parcelas</h4>
-                        <p className="text-xs text-blue-700 mb-3">Configure taxas diferentes para cada quantidade de parcelas. Se não informado, usa a taxa base ({formData.taxa_percentual}%).</p>
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2">Taxas Especificas por Numero de Parcelas</h4>
+                        <p className="text-xs text-blue-700 mb-3">Configure taxas diferentes para cada quantidade de parcelas. Se nao informado, usa a taxa base ({formData.taxa_percentual}%).</p>
                         
                         <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
                           {Array.from({length: formData.parcelas_maximas}, (_, i) => i + 1).map(numParcelas => (
@@ -548,7 +608,7 @@ const FormasPagamento = () => {
                       checked={formData.permite_antecipacao}
                       onChange={(e) => setFormData({...formData, permite_antecipacao: e.target.checked})}
                     />
-                    <span className="text-sm">Permite Antecipação de Recebíveis</span>
+                    <span className="text-sm">Permite Antecipacao de Recebiveis</span>
                   </label>
 
                   {formData.permite_antecipacao && (
@@ -565,12 +625,12 @@ const FormasPagamento = () => {
                           placeholder="Ex: 1 (cai em D+1)"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Quantos dias após a venda o dinheiro cai na conta com antecipação (geralmente D+1)
+                          Quantos dias apos a venda o dinheiro cai na conta com antecipacao (geralmente D+1)
                         </p>
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium mb-1">Taxa de Antecipação (%) - OPCIONAL</label>
+                        <label className="block text-sm font-medium mb-1">Taxa de Antecipacao (%) - OPCIONAL</label>
                         <input
                           type="number"
                           step="0.01"
@@ -580,12 +640,12 @@ const FormasPagamento = () => {
                           placeholder="Ex: 0.50"
                         />
                         <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded">
-                          <p className="text-xs text-amber-800 font-semibold mb-1">💡 Duas formas de configurar:</p>
+                          <p className="text-xs text-amber-800 font-semibold mb-1">Duas formas de configurar:</p>
                           <p className="text-xs text-amber-700 mb-1">
-                            <strong>1. Com taxa de antecipação:</strong> Preencha este campo e a taxa será somada automaticamente às taxas por parcela configuradas acima
+                            <strong>1. Com taxa de antecipacao:</strong> Preencha este campo e a taxa sera somada automaticamente as taxas por parcela configuradas acima
                           </p>
                           <p className="text-xs text-amber-700">
-                            <strong>2. Sem taxa de antecipação:</strong> Deixe vazio e configure nos campos 1x a 12x acima já com o valor final (taxa normal + antecipação somadas)
+                            <strong>2. Sem taxa de antecipacao:</strong> Deixe vazio e configure nos campos 1x a 12x acima ja com o valor final (taxa normal + antecipacao somadas)
                           </p>
                         </div>
                       </div>
@@ -606,7 +666,7 @@ const FormasPagamento = () => {
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 onClick={salvar}
               >
-                ✓ Salvar
+                Salvar
               </button>
             </div>
           </div>

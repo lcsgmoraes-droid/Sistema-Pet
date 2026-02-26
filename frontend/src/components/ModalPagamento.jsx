@@ -9,8 +9,27 @@ import {
   AlertCircle,
   Trash2,
   FileText,
-  BarChart2
+  BarChart2,
+  Banknote,
+  QrCode,
+  ArrowLeftRight,
+  Receipt,
+  Landmark
 } from 'lucide-react';
+
+// Mapeia o campo icone (palavra-chave ou emoji) para um componente lucide
+const getIconeFormaPagamento = (icone, nome) => {
+  const key = (icone || nome || '').toLowerCase();
+  if (key.includes('pix'))                           return <QrCode className="w-6 h-6" />;
+  if (key.includes('dinheiro') || key.includes('cash')) return <Banknote className="w-6 h-6" />;
+  if (key.includes('debito') || key.includes('d\u00e9bito'))  return <CreditCard className="w-6 h-6" />;
+  if (key.includes('parcelado'))                     return <CreditCard className="w-6 h-6" />;
+  if (key.includes('credito') || key.includes('cr\u00e9dito'))return <CreditCard className="w-6 h-6" />;
+  if (key.includes('transfer') || key.includes('banc')) return <ArrowLeftRight className="w-6 h-6" />;
+  if (key.includes('boleto'))                        return <Receipt className="w-6 h-6" />;
+  if (key.includes('wallet') || key.includes('carteira')) return <Wallet className="w-6 h-6" />;
+  return <CreditCard className="w-6 h-6" />;
+};
 import { finalizarVenda, criarVenda } from '../api/vendas';
 import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
@@ -893,7 +912,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <div className="text-2xl mb-1">{forma.icone || '💳'}</div>
+                        <div className="flex justify-center mb-1 text-gray-500">
+                          {getIconeFormaPagamento(forma.icone, forma.nome)}
+                        </div>
                         <div className={`text-sm font-medium ${selecionada ? 'text-blue-900' : 'text-gray-700'}`}>
                           {forma.nome}
                         </div>

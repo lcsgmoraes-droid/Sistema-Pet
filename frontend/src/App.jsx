@@ -1,12 +1,13 @@
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Pessoas from './pages/ClientesNovo';
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const preloadPessoas = () => import('./pages/ClientesNovo');
+const Pessoas = lazy(preloadPessoas);
 
 // ========================================
 // 🆕 SPRINT 7 - NOVA INTERFACE DE PRODUTOS (TYPESCRIPT) - DESATIVADA
@@ -18,95 +19,172 @@ import Pessoas from './pages/ClientesNovo';
 // ========================================
 // 📦 INTERFACE OFICIAL DE PRODUTOS (JSX) - ATIVA
 // ========================================
-import Produtos from './pages/Produtos';
-import ProdutosNovo from './pages/ProdutosNovo';
-import ProdutosRelatorio from './pages/ProdutosRelatorio';
-import AlertasEstoque from './pages/AlertasEstoque';
-import Lembretes from './pages/Lembretes';
-import CalculadoraRacao from './pages/CalculadoraRacao';
+const preloadProdutos = () => import('./pages/Produtos');
+const Produtos = lazy(preloadProdutos);
+const ProdutosNovo = lazy(() => import('./pages/ProdutosNovo'));
+const ProdutosRelatorio = lazy(() => import('./pages/ProdutosRelatorio'));
+const AlertasEstoque = lazy(() => import('./pages/AlertasEstoque'));
+const preloadLembretes = () => import('./pages/Lembretes');
+const Lembretes = lazy(preloadLembretes);
+const CalculadoraRacao = lazy(() => import('./pages/CalculadoraRacao'));
 
 // Componentes de Pets
-import GerenciamentoPets from './pages/GerenciamentoPets';
-import PetDetalhes from './pages/PetDetalhes';
-import PetForm from './pages/PetForm';
+const GerenciamentoPets = lazy(() => import('./pages/GerenciamentoPets'));
+const PetDetalhes = lazy(() => import('./pages/PetDetalhes'));
+const PetForm = lazy(() => import('./pages/PetForm'));
 
-import PDV from './pages/PDV';
-import MeusCaixas from './pages/MeusCaixas';
-import NotasFiscais from './pages/NotasFiscais';
+const preloadPDV = () => import('./pages/PDV');
+const PDV = lazy(preloadPDV);
+const MeusCaixas = lazy(() => import('./pages/MeusCaixas'));
+const NotasFiscais = lazy(() => import('./pages/NotasFiscais'));
 
 // Timeline de Cliente
-import ClienteTimelinePage from './pages/ClienteTimelinePage';
+const ClienteTimelinePage = lazy(() => import('./pages/ClienteTimelinePage'));
 
 // Componentes de Estoque/Compras
-import MovimentacoesProduto from './components/MovimentacoesProduto';
-import EstoqueBling from './components/EstoqueBling';
-import PedidosCompra from './components/PedidosCompra';
-import EntradaXML from './components/EntradaXML';
+const MovimentacoesProduto = lazy(() => import('./components/MovimentacoesProduto'));
+const EstoqueBling = lazy(() => import('./components/EstoqueBling'));
+const PedidosCompra = lazy(() => import('./components/PedidosCompra'));
+const EntradaXML = lazy(() => import('./components/EntradaXML'));
 
 // Componentes Financeiros
-import DashboardFinanceiro from './pages/DashboardFinanceiro';
-import ContasBancarias from './components/ContasBancarias';
-import ContasPagar from './components/ContasPagar';
-import ContasReceber from './components/ContasReceber';
-import ConciliacaoCartoesTabs from './pages/ConciliacaoCartoesTabs';  // FASE 8: Arquitetura 3 Abas
-import HistoricoConciliacoes from './pages/HistoricoConciliacoes';  // Histórico de Conciliações
-import ConciliacaoBancaria from './pages/ConciliacaoBancaria';
-import FormasPagamento from './components/FormasPagamento';
-import OperadorasCartao from './pages/OperadorasCartao';
-import FluxoCaixa from './components/FluxoCaixa';
-import RelatorioVendas from './components/RelatorioVendas';
-import VendasFinanceiro from './components/VendasFinanceiro';
-import AlertasRacao from './components/AlertasRacao';
-import OpcoesRacao from './components/OpcoesRacao';
-import DRE from './components/DRE';
+const preloadDashboardFinanceiro = () => import('./pages/DashboardFinanceiro');
+const DashboardFinanceiro = lazy(preloadDashboardFinanceiro);
+const ContasBancarias = lazy(() => import('./components/ContasBancarias'));
+const ContasPagar = lazy(() => import('./components/ContasPagar'));
+const ContasReceber = lazy(() => import('./components/ContasReceber'));
+const ConciliacaoCartoesTabs = lazy(() => import('./pages/ConciliacaoCartoesTabs'));
+const HistoricoConciliacoes = lazy(() => import('./pages/HistoricoConciliacoes'));
+const ConciliacaoBancaria = lazy(() => import('./pages/ConciliacaoBancaria'));
+const FormasPagamento = lazy(() => import('./components/FormasPagamento'));
+const OperadorasCartao = lazy(() => import('./pages/OperadorasCartao'));
+const FluxoCaixa = lazy(() => import('./components/FluxoCaixa'));
+const RelatorioVendas = lazy(() => import('./components/RelatorioVendas'));
+const VendasFinanceiro = lazy(() => import('./components/VendasFinanceiro'));
+const AlertasRacao = lazy(() => import('./components/AlertasRacao'));
+const OpcoesRacao = lazy(() => import('./components/OpcoesRacao'));
+const DRE = lazy(() => import('./components/DRE'));
 
 // Componentes de IA
-import IAFluxoCaixa from './pages/IAFluxoCaixa';
-import ChatIA from './pages/IA/ChatIA';
-import DREInteligente from './pages/IA/DREInteligente';
-import RotasInteligentes from './pages/RotasInteligentes';
-import { WhatsAppDashboard } from './pages/WhatsAppDashboard/index.tsx';
-import Comissoes from './pages/Comissoes';
-import ComissoesListagem from './pages/comissoes/ComissoesListagem';
-import ComissoesAbertas from './pages/comissoes/ComissoesAbertas';
-import ComissoesFechamentoFuncionario from './pages/comissoes/ComissoesFechamentoFuncionario';
-import ConferenciaAvancada from './pages/comissoes/ConferenciaAvancada';
-import ComissoesHistoricoFechamentos from './pages/comissoes/ComissoesHistoricoFechamentos';
-import ComissoesFechamentoDetalhe from './pages/comissoes/ComissoesFechamentoDetalhe';
-import RelatoriosComissoes from './pages/comissoes/RelatoriosComissoes';
-import Subcategorias from './pages/Subcategorias';
-import Categorias from './pages/Cadastros/Categorias';
-import CategoriasFinanceiras from './pages/CategoriasFinanceiras';
-import EspeciesRacas from './pages/EspeciesRacas';
-import ClienteFinanceiro from './pages/ClienteFinanceiro';
-import DashboardGerencial from './pages/DashboardGerencial';
-import UsuariosPage from './pages/UsuariosPage.jsx';
-import RolesPage from './pages/RolesPage.jsx';
-import Configuracoes from './pages/Configuracoes';
-import ConfiguracaoFiscalEmpresa from './pages/configuracoes/ConfiguracaoFiscalEmpresa';
-import EntregasConfig from './pages/configuracoes/EntregasConfig';
-import CustosMoto from './pages/configuracoes/CustosMoto';
-import ConfiguracaoEstoque from './pages/configuracoes/ConfiguracaoEstoque';
+const IAFluxoCaixa = lazy(() => import('./pages/IAFluxoCaixa'));
+const ChatIA = lazy(() => import('./pages/IA/ChatIA'));
+const DREInteligente = lazy(() => import('./pages/IA/DREInteligente'));
+const RotasInteligentes = lazy(() => import('./pages/RotasInteligentes'));
+const WhatsAppDashboard = lazy(async () => {
+  const module = await import('./pages/WhatsAppDashboard/index.tsx');
+  return { default: module.WhatsAppDashboard };
+});
+const Comissoes = lazy(() => import('./pages/Comissoes'));
+const ComissoesListagem = lazy(() => import('./pages/comissoes/ComissoesListagem'));
+const ComissoesAbertas = lazy(() => import('./pages/comissoes/ComissoesAbertas'));
+const ComissoesFechamentoFuncionario = lazy(() => import('./pages/comissoes/ComissoesFechamentoFuncionario'));
+const ConferenciaAvancada = lazy(() => import('./pages/comissoes/ConferenciaAvancada'));
+const ComissoesHistoricoFechamentos = lazy(() => import('./pages/comissoes/ComissoesHistoricoFechamentos'));
+const ComissoesFechamentoDetalhe = lazy(() => import('./pages/comissoes/ComissoesFechamentoDetalhe'));
+const RelatoriosComissoes = lazy(() => import('./pages/comissoes/RelatoriosComissoes'));
+const Subcategorias = lazy(() => import('./pages/Subcategorias'));
+const Categorias = lazy(() => import('./pages/Cadastros/Categorias'));
+const CategoriasFinanceiras = lazy(() => import('./pages/CategoriasFinanceiras'));
+const EspeciesRacas = lazy(() => import('./pages/EspeciesRacas'));
+const ClienteFinanceiro = lazy(() => import('./pages/ClienteFinanceiro'));
+const DashboardGerencial = lazy(() => import('./pages/DashboardGerencial'));
+const UsuariosPage = lazy(() => import('./pages/UsuariosPage.jsx'));
+const RolesPage = lazy(() => import('./pages/RolesPage.jsx'));
+const Configuracoes = lazy(() => import('./pages/Configuracoes'));
+const ConfiguracaoFiscalEmpresa = lazy(() => import('./pages/configuracoes/ConfiguracaoFiscalEmpresa'));
+const EntregasConfig = lazy(() => import('./pages/configuracoes/EntregasConfig'));
+const CustosMoto = lazy(() => import('./pages/configuracoes/CustosMoto'));
+const ConfiguracaoEstoque = lazy(() => import('./pages/configuracoes/ConfiguracaoEstoque'));
 // import FechamentoSimples from './pages/FechamentoSimples'; // TODO: Criar arquivo
-import AuditoriaMensal from './pages/AuditoriaMensal';
-import ProjecaoCaixa from './pages/ProjecaoCaixa';
-import SimulacaoContratacao from './pages/SimulacaoContratacao';
-import Cargos from './pages/Cadastros/Cargos';
-import Funcionarios from './pages/RH/Funcionarios';
-import EntregasAbertas from './pages/entregas/EntregasAbertas';
-import RotasEntrega from './pages/entregas/RotasEntrega';
-import HistoricoEntregas from './pages/entregas/HistoricoEntregas';
-import DashEntregasFinanceiro from './pages/entregas/DashEntregasFinanceiro';
+const AuditoriaMensal = lazy(() => import('./pages/AuditoriaMensal'));
+const ProjecaoCaixa = lazy(() => import('./pages/ProjecaoCaixa'));
+const SimulacaoContratacao = lazy(() => import('./pages/SimulacaoContratacao'));
+const Cargos = lazy(() => import('./pages/Cadastros/Cargos'));
+const Funcionarios = lazy(() => import('./pages/RH/Funcionarios'));
+const EntregasAbertas = lazy(() => import('./pages/entregas/EntregasAbertas'));
+const RotasEntrega = lazy(() => import('./pages/entregas/RotasEntrega'));
+const HistoricoEntregas = lazy(() => import('./pages/entregas/HistoricoEntregas'));
+const DashEntregasFinanceiro = lazy(() => import('./pages/entregas/DashEntregasFinanceiro'));
+const EcommerceMVP = lazy(() => import('./pages/ecommerce/EcommerceMVP'));
+
+function AppRoutePreloader() {
+  useEffect(() => {
+    let cancelled = false;
+    let idleId;
+    let timerId;
+    let delayedTimerId;
+
+    const connection =
+      navigator.connection ||
+      navigator.mozConnection ||
+      navigator.webkitConnection;
+
+    const shouldSkipPreload =
+      Boolean(connection?.saveData) ||
+      typeof connection?.effectiveType === 'string' && /(^|-)2g$/.test(connection.effectiveType);
+
+    if (shouldSkipPreload) {
+      return () => {
+      };
+    }
+
+    const runPreload = () => {
+      if (cancelled) {
+        return;
+      }
+
+      preloadLembretes();
+      preloadDashboardFinanceiro();
+      preloadPessoas();
+      preloadProdutos();
+
+      delayedTimerId = window.setTimeout(() => {
+        if (!cancelled) {
+          preloadPDV();
+        }
+      }, 4500);
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(runPreload, { timeout: 2200 });
+    } else {
+      timerId = window.setTimeout(runPreload, 1200);
+    }
+
+    return () => {
+      cancelled = true;
+
+      if (typeof window.cancelIdleCallback === 'function' && typeof idleId === 'number') {
+        window.cancelIdleCallback(idleId);
+      }
+
+      if (typeof timerId === 'number') {
+        window.clearTimeout(timerId);
+      }
+
+      if (typeof delayedTimerId === 'number') {
+        window.clearTimeout(delayedTimerId);
+      }
+    };
+  }, []);
+
+  return null;
+}
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" />
+        <AppRoutePreloader />
+        <Suspense fallback={<div className="p-4 text-sm text-gray-500">Carregando...</div>}>
         <Routes>
           {/* Rotas Públicas */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/:tenantId" element={<EcommerceMVP />} />
+          <Route path="/ecommerce" element={<EcommerceMVP />} />
+          <Route path="/ecommerce/:tenantId" element={<EcommerceMVP />} />
           
           {/* Rotas Protegidas */}
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -318,6 +396,8 @@ function App() {
             <Route path="entregas/historico" element={<HistoricoEntregas />} />
             <Route path="entregas/financeiro" element={<DashEntregasFinanceiro />} />
 
+            {/* Rotas de E-commerce MVP */}
+
             <Route path="ia/fluxo-caixa" element={
               <ProtectedRoute permission="ia.fluxo_caixa">
                 <IAFluxoCaixa />
@@ -344,6 +424,7 @@ function App() {
           {/* Redirect para dashboard */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

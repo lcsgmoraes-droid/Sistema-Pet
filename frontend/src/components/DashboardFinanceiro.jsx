@@ -1,6 +1,6 @@
-/**
+﻿/**
  * DASHBOARD FINANCEIRO - Resumo Geral
- * Visão consolidada de contas a pagar e a receber
+ * VisÃ£o consolidada de contas a pagar e a receber
  * Atualizado: 2025-01-10
  */
 
@@ -24,7 +24,7 @@ export default function DashboardFinanceiro() {
 
   const carregarDashboard = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const [resPagar, resReceber, resContas, resResumo] = await Promise.all([
@@ -73,7 +73,7 @@ export default function DashboardFinanceiro() {
     <div className="p-6 space-y-6">
       {/* HEADER */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">� Financeiro/Contábil</h1>
+        <h1 className="text-3xl font-bold text-gray-800">ï¿½ Financeiro/ContÃ¡bil</h1>
         <div className="flex gap-3">
           <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
             + Nova Conta a Pagar
@@ -83,7 +83,7 @@ export default function DashboardFinanceiro() {
           </button>
         </div>
       </div>
-      {/* MENU DE NAVEGAÇÃO RÁPIDA */}
+      {/* MENU DE NAVEGAÃ‡ÃƒO RÃPIDA */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="grid grid-cols-6 gap-3">
           <button
@@ -91,7 +91,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-blue-50 transition group"
           >
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200">
-              <span className="text-xl">🛒</span>
+              <span className="text-xl">ðŸ›’</span>
             </div>
             <span className="text-xs font-medium text-gray-700">Vendas</span>
           </button>
@@ -101,7 +101,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-green-50 transition group"
           >
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200">
-              <span className="text-xl">📥</span>
+              <span className="text-xl">ðŸ“¥</span>
             </div>
             <span className="text-xs font-medium text-gray-700">Contas a Receber</span>
           </button>
@@ -111,7 +111,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-red-50 transition group"
           >
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center group-hover:bg-red-200">
-              <span className="text-xl">📤</span>
+              <span className="text-xl">ðŸ“¤</span>
             </div>
             <span className="text-xs font-medium text-gray-700">Contas a Pagar</span>
           </button>
@@ -121,9 +121,9 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-indigo-50 transition group"
           >
             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-200">
-              <span className="text-xl">🏦</span>
+              <span className="text-xl">ðŸ¦</span>
             </div>
-            <span className="text-xs font-medium text-gray-700">Contas Bancárias</span>
+            <span className="text-xs font-medium text-gray-700">Contas BancÃ¡rias</span>
           </button>
 
           <button
@@ -131,7 +131,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-purple-50 transition group"
           >
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200">
-              <span className="text-xl">💳</span>
+              <span className="text-xl">ðŸ’³</span>
             </div>
             <span className="text-xs font-medium text-gray-700">Formas Pagamento</span>
           </button>
@@ -141,16 +141,16 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-yellow-50 transition group"
           >
             <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center group-hover:bg-yellow-200">
-              <span className="text-xl">📊</span>
+              <span className="text-xl">ðŸ“Š</span>
             </div>
             <span className="text-xs font-medium text-gray-700">Fluxo de Caixa</span>
           </button>
         </div>
       </div>
-      {/* CONTAS BANCÁRIAS */}
+      {/* CONTAS BANCÃRIAS */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">🏦 Contas Bancárias</h2>
+          <h2 className="text-xl font-bold text-gray-800">ðŸ¦ Contas BancÃ¡rias</h2>
           <button
             onClick={() => navigate('/financeiro/contas')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
@@ -218,10 +218,10 @@ export default function DashboardFinanceiro() {
         )}
       </div>
 
-      {/* SALDO LÍQUIDO */}
+      {/* SALDO LÃQUIDO */}
       <div className={`p-6 rounded-xl ${saldoLiquido >= 0 ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'}`}>
         <div className="text-center">
-          <p className="text-sm font-medium text-gray-600 mb-2">Saldo Líquido Previsto</p>
+          <p className="text-sm font-medium text-gray-600 mb-2">Saldo LÃ­quido Previsto</p>
           <p className={`text-4xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatarMoeda(saldoLiquido)}
           </p>
@@ -237,8 +237,8 @@ export default function DashboardFinanceiro() {
         <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">📤 Contas a Pagar</h2>
-              <p className="text-sm text-gray-500">Despesas e obrigações</p>
+              <h2 className="text-xl font-bold text-gray-800">ðŸ“¤ Contas a Pagar</h2>
+              <p className="text-sm text-gray-500">Despesas e obrigaÃ§Ãµes</p>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-red-600">
@@ -252,7 +252,7 @@ export default function DashboardFinanceiro() {
             {/* Vencidas */}
             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
               <div>
-                <p className="font-semibold text-red-700">⚠️ Vencidas</p>
+                <p className="font-semibold text-red-700">âš ï¸ Vencidas</p>
                 <p className="text-xs text-gray-600">{resumoPagar?.vencidas?.quantidade || 0} contas</p>
               </div>
               <p className="font-bold text-red-700">
@@ -262,31 +262,31 @@ export default function DashboardFinanceiro() {
 
             {/* Vence Hoje */}
             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-              <p className="font-semibold text-orange-700">🔔 Vence Hoje</p>
+              <p className="font-semibold text-orange-700">ðŸ”” Vence Hoje</p>
               <p className="font-bold text-orange-700">
                 {formatarMoeda(resumoPagar?.vence_hoje)}
               </p>
             </div>
 
-            {/* Próximos 7 dias */}
+            {/* PrÃ³ximos 7 dias */}
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-              <p className="font-semibold text-yellow-700">📅 Próximos 7 dias</p>
+              <p className="font-semibold text-yellow-700">ðŸ“… PrÃ³ximos 7 dias</p>
               <p className="font-bold text-yellow-700">
                 {formatarMoeda(resumoPagar?.proximos_7_dias)}
               </p>
             </div>
 
-            {/* Próximos 30 dias */}
+            {/* PrÃ³ximos 30 dias */}
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-              <p className="font-semibold text-blue-700">📊 Próximos 30 dias</p>
+              <p className="font-semibold text-blue-700">ðŸ“Š PrÃ³ximos 30 dias</p>
               <p className="font-bold text-blue-700">
                 {formatarMoeda(resumoPagar?.proximos_30_dias)}
               </p>
             </div>
 
-            {/* Pago no Mês */}
+            {/* Pago no MÃªs */}
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border-t-2">
-              <p className="font-semibold text-gray-700">✅ Pago no Mês</p>
+              <p className="font-semibold text-gray-700">âœ… Pago no MÃªs</p>
               <p className="font-bold text-green-600">
                 {formatarMoeda(resumoPagar?.pago_mes_atual)}
               </p>
@@ -297,7 +297,7 @@ export default function DashboardFinanceiro() {
             onClick={() => navigate('/financeiro/contas-pagar')}
             className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
-            Ver Todas as Contas a Pagar →
+            Ver Todas as Contas a Pagar â†’
           </button>
         </div>
 
@@ -305,7 +305,7 @@ export default function DashboardFinanceiro() {
         <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">📥 Contas a Receber</h2>
+              <h2 className="text-xl font-bold text-gray-800">ðŸ“¥ Contas a Receber</h2>
               <p className="text-sm text-gray-500">Receitas e valores a receber</p>
             </div>
             <div className="text-right">
@@ -317,10 +317,10 @@ export default function DashboardFinanceiro() {
           </div>
 
           <div className="space-y-3">
-            {/* Não Recebidas */}
+            {/* NÃ£o Recebidas */}
             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
               <div>
-                <p className="font-semibold text-red-700">⚠️ Não Recebidas (Vencidas)</p>
+                <p className="font-semibold text-red-700">âš ï¸ NÃ£o Recebidas (Vencidas)</p>
                 <p className="text-xs text-gray-600">{resumoReceber?.vencidas?.quantidade || 0} contas</p>
               </div>
               <p className="font-bold text-red-700">
@@ -330,7 +330,7 @@ export default function DashboardFinanceiro() {
 
             {/* Receber Hoje */}
             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-              <p className="font-semibold text-orange-700">🔔 Receber Hoje</p>
+              <p className="font-semibold text-orange-700">ðŸ”” Receber Hoje</p>
               <p className="font-bold text-orange-700">
                 {formatarMoeda(resumoReceber?.vence_hoje)}
               </p>
@@ -338,7 +338,7 @@ export default function DashboardFinanceiro() {
 
             {/* A Receber - 7 dias */}
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-              <p className="font-semibold text-yellow-700">📅 A Receber (7 dias)</p>
+              <p className="font-semibold text-yellow-700">ðŸ“… A Receber (7 dias)</p>
               <p className="font-bold text-yellow-700">
                 {formatarMoeda(resumoReceber?.proximos_7_dias)}
               </p>
@@ -346,15 +346,15 @@ export default function DashboardFinanceiro() {
 
             {/* A Receber - 30 dias */}
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-              <p className="font-semibold text-blue-700">📊 A Receber (30 dias)</p>
+              <p className="font-semibold text-blue-700">ðŸ“Š A Receber (30 dias)</p>
               <p className="font-bold text-blue-700">
                 {formatarMoeda(resumoReceber?.proximos_30_dias)}
               </p>
             </div>
 
-            {/* Recebido no Mês */}
+            {/* Recebido no MÃªs */}
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border-t-2">
-              <p className="font-semibold text-gray-700">✅ Recebido no Mês</p>
+              <p className="font-semibold text-gray-700">âœ… Recebido no MÃªs</p>
               <p className="font-bold text-green-600">
                 {formatarMoeda(resumoReceber?.recebido_mes_atual)}
               </p>
@@ -365,10 +365,11 @@ export default function DashboardFinanceiro() {
             onClick={() => navigate('/financeiro/contas-receber')}
             className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
-            Ver Todas as Contas a Receber →
+            Ver Todas as Contas a Receber â†’
           </button>
         </div>
       </div>
     </div>
   );
 }
+

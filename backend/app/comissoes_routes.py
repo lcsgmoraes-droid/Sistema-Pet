@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime
 import logging
+from sqlalchemy import text
 
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
@@ -17,6 +18,29 @@ from .utils.tenant_safe_sql import execute_tenant_safe
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/comissoes", tags=["comissoes"])
+_comissoes_schema_checked = False
+
+
+def ensure_comissoes_config_schema(db) -> None:
+    """Garante coluna tenant_id em comissoes_configuracao para compatibilidade."""
+    global _comissoes_schema_checked
+    if _comissoes_schema_checked:
+        return
+
+    db.execute(text("ALTER TABLE comissoes_configuracao ADD COLUMN IF NOT EXISTS tenant_id uuid"))
+    db.execute(text("""
+        UPDATE comissoes_configuracao cc
+        SET tenant_id = c.tenant_id
+        FROM clientes c
+        WHERE cc.funcionario_id = c.id
+          AND cc.tenant_id IS NULL
+    """))
+    db.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_comissoes_configuracao_tenant_id "
+        "ON comissoes_configuracao (tenant_id)"
+    ))
+    db.commit()
+    _comissoes_schema_checked = True
 
 
 # ==========================================
@@ -155,6 +179,7 @@ async def listar_funcionarios_com_comissao(
         
         db = SessionLocal()
         try:
+            ensure_comissoes_config_schema(db)
             # Query que conta as configurações de cada funcionário
             result = execute_tenant_safe(db, """
                 SELECT 
@@ -221,6 +246,7 @@ async def buscar_configuracoes_funcionario(
         
         db = SessionLocal()
         try:
+            ensure_comissoes_config_schema(db)
             result = execute_tenant_safe(db, """
                 SELECT 
                     cc.id,

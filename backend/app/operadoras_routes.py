@@ -6,6 +6,7 @@ Gerenciamento de operadoras (Stone, Cielo, Rede, Getnet, Sumup, etc)
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_
+from sqlalchemy.exc import ProgrammingError
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,11 @@ from app.operadoras_models import OperadoraCartao
 from app.vendas_models import VendaPagamento
 
 router = APIRouter(prefix="/operadoras-cartao", tags=["Operadoras de Cartão"])
+
+
+def ensure_operadoras_table_exists(db: Session) -> None:
+    """Cria a tabela de operadoras automaticamente em ambientes sem migration."""
+    OperadoraCartao.__table__.create(bind=db.get_bind(), checkfirst=True)
 
 
 # ============================================================================
@@ -193,6 +199,7 @@ def listar_operadoras(
         - apenas_ativas: Se True, retorna apenas operadoras ativas
     """
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     query = db.query(OperadoraCartao).filter(
         OperadoraCartao.tenant_id == tenant_id
@@ -201,10 +208,17 @@ def listar_operadoras(
     if apenas_ativas:
         query = query.filter(OperadoraCartao.ativo == True)
     
-    operadoras = query.order_by(
-        OperadoraCartao.padrao.desc(),  # Padrão primeiro
-        OperadoraCartao.nome.asc()
-    ).all()
+    try:
+        operadoras = query.order_by(
+            OperadoraCartao.padrao.desc(),  # Padrão primeiro
+            OperadoraCartao.nome.asc()
+        ).all()
+    except ProgrammingError as exc:
+        # Fallback para ambiente sem migration da tabela operadoras_cartao.
+        if "operadoras_cartao" in str(exc).lower():
+            db.rollback()
+            return []
+        raise
     
     return [op.to_dict() for op in operadoras]
 
@@ -220,6 +234,7 @@ def obter_operadora_padrao(
     Usado pelo PDV para pré-selecionar a operadora ao registrar venda com cartão
     """
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     operadora = db.query(OperadoraCartao).filter(
         and_(
@@ -246,6 +261,7 @@ def obter_operadora(
 ):
     """Retorna uma operadora específica"""
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     operadora = db.query(OperadoraCartao).filter(
         and_(
@@ -276,6 +292,7 @@ def criar_operadora(
     - ⚠️ ALERTA 2: Se marcar como padrão, desmarca as outras
     """
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     # Se marcar como padrão, desmarca as outras
     if operadora_data.padrao:
@@ -310,6 +327,7 @@ def atualizar_operadora(
     - Se marcar como padrão, desmarca as outras
     """
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     # Busca operadora
     operadora = db.query(OperadoraCartao).filter(
@@ -358,6 +376,7 @@ def excluir_operadora(
     - ⚠️ ALERTA 3: Não permite excluir se tiver vendas vinculadas
     """
     current_user, tenant_id = current_user_tenant
+    ensure_operadoras_table_exists(db)
     
     # Busca operadora
     operadora = db.query(OperadoraCartao).filter(

@@ -4,7 +4,7 @@ Sprint 1 BLOCO 3 - Configuração Global de Entregas
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -15,6 +15,27 @@ from app.schemas.configuracao_entrega import (
 )
 
 router = APIRouter(prefix="/configuracoes/entregas", tags=["Configurações - Entregas"])
+
+
+def ensure_configuracoes_entrega_schema(db: Session) -> None:
+    """Compatibilidade de schema em ambiente legado (sem migrations completas)."""
+    db.execute(text("ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS user_id INTEGER"))
+    db.execute(text("""
+        UPDATE configuracoes_entrega ce
+        SET user_id = u.id
+        FROM (
+            SELECT DISTINCT ON (tenant_id) id, tenant_id
+            FROM users
+            ORDER BY tenant_id, id
+        ) u
+        WHERE ce.tenant_id = u.tenant_id
+          AND ce.user_id IS NULL
+    """))
+    db.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_configuracoes_entrega_user_id "
+        "ON configuracoes_entrega (user_id)"
+    ))
+    db.commit()
 
 
 @router.get("", response_model=ConfiguracaoEntregaResponse)
@@ -30,6 +51,7 @@ def get_configuracao_entrega(
     ✅ Idempotente: cria se não existir
     """
     current_user, tenant_id = user_and_tenant
+    ensure_configuracoes_entrega_schema(db)
     
     # Verifica se tenant existe
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
@@ -107,6 +129,7 @@ def update_configuracao_entrega(
     ✅ Parcial: aceita campos opcionais
     """
     current_user, tenant_id = user_and_tenant
+    ensure_configuracoes_entrega_schema(db)
     
     # Verifica se tenant existe
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()

@@ -75,20 +75,6 @@ services:
       start_period: 40s
 
   # ========================================
-  # FRONTEND - REACT + VITE
-  # ========================================
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        VITE_API_URL: /api
-    container_name: petshop-prod-frontend
-    restart: always
-    networks:
-      - petshop-network
-
-  # ========================================
   # NGINX - REVERSE PROXY
   # ========================================
   nginx:
@@ -104,7 +90,6 @@ services:
       - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - backend
-      - frontend
     networks:
       - petshop-network
     healthcheck:

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DollarSign,
@@ -42,7 +42,7 @@ export default function MeusCaixas() {
       setCaixas(response);
     } catch (error) {
       console.error('Erro ao carregar caixas:', error);
-      alert('Erro ao carregar histórico de caixas');
+      alert('Erro ao carregar histÃ³rico de caixas');
     } finally {
       setLoading(false);
     }
@@ -63,8 +63,9 @@ export default function MeusCaixas() {
 
   const handleDownloadPDF = async (caixaId, numeroCaixa) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8000/caixas/${caixaId}/pdf`, {
+      const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const response = await fetch(`${apiBaseUrl}/caixas/${caixaId}/pdf`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -77,7 +78,7 @@ export default function MeusCaixas() {
       // Converter resposta em blob
       const blob = await response.blob();
       
-      // Criar URL temporária e fazer download
+      // Criar URL temporÃ¡ria e fazer download
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -124,7 +125,7 @@ export default function MeusCaixas() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Meus Caixas</h1>
-        <p className="text-gray-600 mt-1">Histórico e gestão dos seus caixas</p>
+        <p className="text-gray-600 mt-1">HistÃ³rico e gestÃ£o dos seus caixas</p>
       </div>
 
       {/* Filtros */}
@@ -132,7 +133,7 @@ export default function MeusCaixas() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data Início
+              Data InÃ­cio
             </label>
             <input
               type="date"
@@ -260,7 +261,7 @@ export default function MeusCaixas() {
                           diferenca.tipo === 'ok' ? 'bg-gray-50' :
                           diferenca.tipo === 'sobra' ? 'bg-green-50' : 'bg-red-50'
                         }`}>
-                          <div className="text-xs text-gray-600 mb-1">Diferença</div>
+                          <div className="text-xs text-gray-600 mb-1">DiferenÃ§a</div>
                           <div className={`text-lg font-semibold ${
                             diferenca.tipo === 'ok' ? 'text-gray-900' :
                             diferenca.tipo === 'sobra' ? 'text-green-900' : 'text-red-900'
@@ -274,7 +275,7 @@ export default function MeusCaixas() {
                     )}
                   </div>
 
-                  {/* Observações */}
+                  {/* ObservaÃ§Ãµes */}
                   {(caixa.observacoes_abertura || caixa.observacoes_fechamento) && (
                     <div className="border-t pt-4 mb-4">
                       {caixa.observacoes_abertura && (
@@ -290,7 +291,7 @@ export default function MeusCaixas() {
                     </div>
                   )}
 
-                  {/* Ações */}
+                  {/* AÃ§Ãµes */}
                   {caixa.status === 'fechado' && (
                     <div className="border-t pt-4 flex gap-3">
                       <button
@@ -318,3 +319,4 @@ export default function MeusCaixas() {
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
-/**
- * Modal de Importação de Pessoas (Clientes, Fornecedores, Veterinários)
+﻿/**
+ * Modal de ImportaÃ§Ã£o de Pessoas (Clientes, Fornecedores, VeterinÃ¡rios)
  */
 import { useState } from 'react';
 import api from '../api';
@@ -26,7 +26,7 @@ export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
 
   const baixarTemplate = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const response = await api.get('/pessoas/template-importacao', {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
@@ -112,7 +112,7 @@ export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
-            <h2 className="text-xl font-bold text-white">Importação de Pessoas em Lote</h2>
+            <h2 className="text-xl font-bold text-white">ImportaÃ§Ã£o de Pessoas em Lote</h2>
           </div>
           <button
             onClick={fechar}
@@ -128,7 +128,7 @@ export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {etapa === 'upload' && (
             <>
-              {/* Instruções */}
+              {/* InstruÃ§Ãµes */}
               <div className="mb-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <h3 className="font-semibold text-purple-900 mb-2 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -137,14 +137,14 @@ export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
                   Como funciona
                 </h3>
                 <ul className="text-sm text-purple-800 space-y-1 ml-7">
-                  <li>1. Baixe o template Excel clicando no botão abaixo</li>
-                  <li>2. Preencha os dados das pessoas (clientes, fornecedores, veterinários)</li>
-                  <li>3. Salve o arquivo e faça o upload aqui</li>
-                  <li>4. Pessoas novas serão criadas, existentes serão atualizadas (baseado no CPF/CNPJ)</li>
+                  <li>1. Baixe o template Excel clicando no botÃ£o abaixo</li>
+                  <li>2. Preencha os dados das pessoas (clientes, fornecedores, veterinÃ¡rios)</li>
+                  <li>3. Salve o arquivo e faÃ§a o upload aqui</li>
+                  <li>4. Pessoas novas serÃ£o criadas, existentes serÃ£o atualizadas (baseado no CPF/CNPJ)</li>
                 </ul>
               </div>
 
-              {/* Botão para baixar template */}
+              {/* BotÃ£o para baixar template */}
               <div className="mb-6">
                 <button
                   onClick={baixarTemplate}
@@ -343,3 +343,4 @@ export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
+

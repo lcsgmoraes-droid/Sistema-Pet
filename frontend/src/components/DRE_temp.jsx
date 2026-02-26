@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { 
@@ -31,7 +31,7 @@ const DRE = () => {
   const carregarDRE = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const [ano, mes] = periodo.split('-');
       
       const response = await api.get(`/financeiro/dre`, {
@@ -89,7 +89,7 @@ const DRE = () => {
 
   const exportarPDF = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const [ano, mes] = periodo.split('-');
       toast.loading('Gerando PDF...', { id: 'pdf' });
       
@@ -110,7 +110,7 @@ const DRE = () => {
       link.click();
       link.remove();
       
-      toast.success('📄 PDF exportado com sucesso!', { id: 'pdf' });
+      toast.success('ðŸ“„ PDF exportado com sucesso!', { id: 'pdf' });
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
       toast.error('Erro ao exportar PDF', { id: 'pdf' });
@@ -119,7 +119,7 @@ const DRE = () => {
 
   const exportarExcel = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const [ano, mes] = periodo.split('-');
       toast.loading('Gerando Excel...', { id: 'excel' });
       
@@ -140,7 +140,7 @@ const DRE = () => {
       link.click();
       link.remove();
       
-      toast.success('📊 Excel exportado com sucesso!', { id: 'excel' });
+      toast.success('ðŸ“Š Excel exportado com sucesso!', { id: 'excel' });
     } catch (error) {
       console.error('Erro ao exportar Excel:', error);
       toast.error('Erro ao exportar Excel', { id: 'excel' });
@@ -163,8 +163,8 @@ const DRE = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">📊 DRE - Demonstração do Resultado</h1>
-          <p className="text-gray-600 mt-1">Análise gerencial de receitas, custos e lucro</p>
+          <h1 className="text-3xl font-bold text-gray-800">ðŸ“Š DRE - DemonstraÃ§Ã£o do Resultado</h1>
+          <p className="text-gray-600 mt-1">AnÃ¡lise gerencial de receitas, custos e lucro</p>
         </div>
         
         <div className="flex gap-2">
@@ -190,19 +190,19 @@ const DRE = () => {
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex items-center gap-4 flex-wrap">
-          {/* Botões de período rápido */}
+          {/* BotÃµes de perÃ­odo rÃ¡pido */}
           <div className="flex gap-2">
             <button
               onClick={() => handlePeriodoPreset('mes_atual')}
               className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
             >
-              Mês Atual
+              MÃªs Atual
             </button>
             <button
               onClick={() => handlePeriodoPreset('mes_anterior')}
               className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
             >
-              Mês Anterior
+              MÃªs Anterior
             </button>
             <button
               onClick={() => handlePeriodoPreset('ano_atual')}
@@ -214,7 +214,7 @@ const DRE = () => {
 
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Período (Mês/Ano)
+              PerÃ­odo (MÃªs/Ano)
             </label>
             <input
               type="month"
@@ -236,7 +236,7 @@ const DRE = () => {
         </div>
       </div>
 
-      {/* Conteúdo do DRE */}
+      {/* ConteÃºdo do DRE */}
       {dados && (
         <div className="space-y-6">
           {/* Cards de Resumo */}
@@ -247,7 +247,7 @@ const DRE = () => {
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div className="text-3xl font-bold">{formatarMoeda(dados.receita_bruta || 0)}</div>
-              <div className="text-xs mt-1 opacity-80">Base de cálculo</div>
+              <div className="text-xs mt-1 opacity-80">Base de cÃ¡lculo</div>
             </div>
 
             <div className="bg-red-500 text-white p-6 rounded-lg shadow">
@@ -261,7 +261,7 @@ const DRE = () => {
 
             <div className="bg-blue-500 text-white p-6 rounded-lg shadow">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm opacity-90">Lucro Líquido</span>
+                <span className="text-sm opacity-90">Lucro LÃ­quido</span>
                 <DollarSign className="w-5 h-5" />
               </div>
               <div className="text-3xl font-bold">{formatarMoeda(dados.lucro_liquido || 0)}</div>
@@ -270,7 +270,7 @@ const DRE = () => {
 
             <div className="bg-purple-500 text-white p-6 rounded-lg shadow">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm opacity-90">Margem Líquida</span>
+                <span className="text-sm opacity-90">Margem LÃ­quida</span>
                 <Percent className="w-5 h-5" />
               </div>
               <div className="text-3xl font-bold">{formatarPercentual(dados.margem_liquida || 0)}</div>
@@ -284,7 +284,7 @@ const DRE = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Descrição
+                    DescriÃ§Ã£o
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Valor
@@ -322,7 +322,7 @@ const DRE = () => {
                 
                 <tr className="bg-gray-50">
                   <td className="px-6 py-3 pl-12 text-gray-700">
-                    Vendas de Serviços
+                    Vendas de ServiÃ§os
                   </td>
                   <td className="px-6 py-3 text-right text-gray-700">
                     {formatarMoeda(dados.vendas_servicos || 0)}
@@ -332,10 +332,10 @@ const DRE = () => {
                   </td>
                 </tr>
 
-                {/* DEDUÇÕES */}
+                {/* DEDUÃ‡Ã•ES */}
                 <tr className="bg-orange-50">
                   <td className="px-6 py-4 font-bold text-orange-800">
-                    (-) DEDUÇÕES DA RECEITA
+                    (-) DEDUÃ‡Ã•ES DA RECEITA
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-orange-800">
                     {formatarMoeda(dados.deducoes_total || 0)}
@@ -359,7 +359,7 @@ const DRE = () => {
 
                 <tr className="bg-gray-50">
                   <td className="px-6 py-3 pl-12 text-gray-700">
-                    Devoluções
+                    DevoluÃ§Ãµes
                   </td>
                   <td className="px-6 py-3 text-right text-gray-700">
                     {formatarMoeda(dados.devolucoes || 0)}
@@ -369,10 +369,10 @@ const DRE = () => {
                   </td>
                 </tr>
 
-                {/* RECEITA LÍQUIDA */}
+                {/* RECEITA LÃQUIDA */}
                 <tr className="bg-blue-50 border-t-2 border-blue-200">
                   <td className="px-6 py-4 font-bold text-blue-800">
-                    (=) RECEITA LÍQUIDA
+                    (=) RECEITA LÃQUIDA
                   </td>
                   <td className="px-6 py-4 text-right font-bold text-blue-800">
                     {formatarMoeda(dados.receita_liquida || 0)}
@@ -447,7 +447,7 @@ const DRE = () => {
 
                 <tr>
                   <td className="px-6 py-3 pl-12 text-gray-700">
-                    Taxas de Cartão
+                    Taxas de CartÃ£o
                   </td>
                   <td className="px-6 py-3 text-right text-gray-700">
                     {formatarMoeda(dados.taxas_cartao || 0)}
@@ -519,10 +519,10 @@ const DRE = () => {
                   </td>
                 </tr>
 
-                {/* LUCRO LÍQUIDO */}
+                {/* LUCRO LÃQUIDO */}
                 <tr className="bg-gradient-to-r from-green-100 to-green-200 border-t-4 border-green-400">
                   <td className="px-6 py-5 font-bold text-green-900 text-lg">
-                    (=) LUCRO/PREJUÍZO LÍQUIDO
+                    (=) LUCRO/PREJUÃZO LÃQUIDO
                   </td>
                   <td className="px-6 py-5 text-right font-bold text-green-900 text-lg">
                     {formatarMoeda(dados.lucro_liquido || 0)}
@@ -540,30 +540,30 @@ const DRE = () => {
       {!dados && !loading && (
         <div className="bg-gray-50 rounded-lg p-12 text-center">
           <FileText className="mx-auto mb-4 text-gray-400" size={64} />
-          <p className="text-gray-600 text-lg">Selecione um período e clique em Atualizar para visualizar o DRE</p>
+          <p className="text-gray-600 text-lg">Selecione um perÃ­odo e clique em Atualizar para visualizar o DRE</p>
         </div>
       )}
         </>
       )}
       
-      {/* Conteúdo da Tab Extrato Bancário */}
+      {/* ConteÃºdo da Tab Extrato BancÃ¡rio */}
       {tabAtiva === 'extrato' && (
         <div className="space-y-6">
           <ExtratoBancarioTab />
         </div>
       )}
       
-      {/* Conteúdo da Tab Análise Inteligente */}
+      {/* ConteÃºdo da Tab AnÃ¡lise Inteligente */}
       {tabAtiva === 'analise' && (
         <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-12 text-center border-2 border-dashed border-purple-300">
           <Brain className="mx-auto mb-4 text-purple-600" size={64} />
-          <h3 className="text-2xl font-bold text-purple-900 mb-2">Análise Inteligente em Desenvolvimento</h3>
+          <h3 className="text-2xl font-bold text-purple-900 mb-2">AnÃ¡lise Inteligente em Desenvolvimento</h3>
           <p className="text-purple-700 text-lg mb-4">
-            Insights automáticos, comparações temporais e recomendações estratégicas
+            Insights automÃ¡ticos, comparaÃ§Ãµes temporais e recomendaÃ§Ãµes estratÃ©gicas
           </p>
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-800 rounded-full">
             <Sparkles size={16} className="animate-pulse" />
-            <span className="font-medium">Em breve disponível</span>
+            <span className="font-medium">Em breve disponÃ­vel</span>
           </div>
         </div>
       )}
@@ -572,7 +572,7 @@ const DRE = () => {
 };
 
 // ===================================================================
-// COMPONENTE: Tab de Extrato Bancário com IA
+// COMPONENTE: Tab de Extrato BancÃ¡rio com IA
 // ===================================================================
 
 const ExtratoBancarioTab = () => {
@@ -596,3 +596,4 @@ const ExtratoBancarioTab = () => {
   }, [viewMode]);
 
   const handleFileSelect = (e) => {
+

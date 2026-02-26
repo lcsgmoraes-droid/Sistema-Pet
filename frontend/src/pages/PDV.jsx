@@ -37,7 +37,8 @@ import {
   RefreshCw,
   Scale,
   Calculator,
-  Bell
+  Bell,
+  Percent
 } from 'lucide-react';
 import { criarVenda, finalizarVenda, listarVendas, buscarVenda } from '../api/vendas';
 import { getProdutos, getProdutosVendaveis } from '../api/produtos';
@@ -634,33 +635,84 @@ export default function PDV() {
 
   // Funções de desconto total
   const abrirModalDescontoTotal = () => {
+    // Pré-popular com o desconto atual (se houver)
+    if (vendaAtual.desconto_valor > 0) {
+      setTipoDescontoTotal('valor');
+      setValorDescontoTotal(vendaAtual.desconto_valor);
+    } else {
+      setTipoDescontoTotal('valor');
+      setValorDescontoTotal(0);
+    }
     setMostrarModalDescontoTotal(true);
   };
 
   const aplicarDescontoTotal = (tipoDesconto, valor) => {
-    const subtotal = vendaAtual.subtotal;
-    let desconto = 0;
-    let descontoPercentual = 0;
+    const itens = vendaAtual.itens;
+    if (itens.length === 0) return;
 
+    // Calcular o total bruto de cada item (preço original × quantidade, sem desconto)
+    const subtotaisBrutos = itens.map(item =>
+      (item.preco_unitario || item.preco_venda) * item.quantidade
+    );
+    const totalBruto = subtotaisBrutos.reduce((sum, v) => sum + v, 0);
+
+    // Calcular valor total do desconto
+    let descontoTotal = 0;
     if (tipoDesconto === 'valor') {
-      desconto = parseFloat(valor) || 0;
-      descontoPercentual = subtotal > 0 ? (desconto / subtotal) * 100 : 0;
+      descontoTotal = Math.min(parseFloat(valor) || 0, totalBruto);
     } else {
-      descontoPercentual = parseFloat(valor) || 0;
-      desconto = (subtotal * descontoPercentual) / 100;
+      const pct = Math.min(parseFloat(valor) || 0, 100);
+      descontoTotal = (totalBruto * pct) / 100;
     }
 
-    const taxaEntrega = vendaAtual.tem_entrega ? (vendaAtual.entrega?.taxa_entrega_total || 0) : 0;
-    const total = subtotal - desconto + taxaEntrega;
+    // Ratear proporcionalmente, ajustando arredondamento no último item
+    let descontoAlocado = 0;
+    const itensAtualizados = itens.map((item, idx) => {
+      const subtotalBrutoItem = subtotaisBrutos[idx];
+      let descontoItem;
 
-    setVendaAtual({
-      ...vendaAtual,
-      desconto_valor: desconto,
-      desconto_percentual: descontoPercentual,
-      total
+      if (idx === itens.length - 1) {
+        // Último item absorve o restante para evitar erro de centavos
+        descontoItem = parseFloat((descontoTotal - descontoAlocado).toFixed(2));
+      } else {
+        const proporcao = totalBruto > 0 ? subtotalBrutoItem / totalBruto : 0;
+        descontoItem = parseFloat((descontoTotal * proporcao).toFixed(2));
+        descontoAlocado += descontoItem;
+      }
+
+      const descontoPercentual = subtotalBrutoItem > 0
+        ? (descontoItem / subtotalBrutoItem) * 100
+        : 0;
+      const subtotal = subtotalBrutoItem - descontoItem;
+      const precoComDesconto = item.quantidade > 0 ? subtotal / item.quantidade : 0;
+
+      return {
+        ...item,
+        desconto_valor: descontoItem,
+        desconto_percentual: descontoPercentual,
+        tipo_desconto_aplicado: tipoDesconto,
+        preco_com_desconto: precoComDesconto,
+        subtotal
+      };
     });
 
+    recalcularTotais(itensAtualizados);
     setMostrarModalDescontoTotal(false);
+  };
+
+  const removerDescontoTotal = () => {
+    const itensAtualizados = vendaAtual.itens.map(item => {
+      const subtotalBruto = (item.preco_unitario || item.preco_venda) * item.quantidade;
+      return {
+        ...item,
+        desconto_valor: 0,
+        desconto_percentual: 0,
+        tipo_desconto_aplicado: null,
+        preco_com_desconto: item.preco_unitario || item.preco_venda,
+        subtotal: subtotalBruto
+      };
+    });
+    recalcularTotais(itensAtualizados);
   };
 
   const carregarVendasRecentes = async () => {
@@ -915,7 +967,10 @@ export default function PDV() {
     if (buscarCliente.length >= 2) {
       const timer = setTimeout(async () => {
         try {
-          const clientes = await buscarClientes({ search: buscarCliente });
+          // Remove parênteses, traços e espaços para permitir busca de telefone
+          // colado do WhatsApp no formato (18)99740-1641 ou (18) 99740-1641
+          const termoBusca = buscarCliente.replace(/[()\-\s]/g, '');
+          const clientes = await buscarClientes({ search: termoBusca });
           setClientesSugeridos(clientes || []);
         } catch (error) {
           console.error('Erro ao buscar clientes:', error);
@@ -2805,29 +2860,40 @@ export default function PDV() {
                     <span className="font-medium">R$ {(vendaAtual.subtotal + vendaAtual.desconto_valor).toFixed(2)}</span>
                   </div>
                   
-                  {/* Desconto com botão de edição */}
-                  {vendaAtual.desconto_valor > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-orange-600">
-                        {((vendaAtual.desconto_valor / (vendaAtual.subtotal + vendaAtual.desconto_valor)) * 100).toFixed(2)}% de desconto:
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-orange-600">
-                          R$ {vendaAtual.desconto_valor.toFixed(2)}
+                  {/* Desconto total — sempre visível com botão */}
+                  <div className="flex justify-between items-center">
+                    <span className={vendaAtual.desconto_valor > 0 ? 'text-orange-600 text-sm' : 'text-gray-500 text-sm'}>
+                      {vendaAtual.desconto_valor > 0
+                        ? `${((vendaAtual.desconto_valor / (vendaAtual.subtotal + vendaAtual.desconto_valor)) * 100).toFixed(2)}% de desconto:`
+                        : 'Desconto:'}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {vendaAtual.desconto_valor > 0 && (
+                        <span className="font-medium text-orange-600 text-sm">
+                          - R$ {vendaAtual.desconto_valor.toFixed(2)}
                         </span>
+                      )}
+                      <button
+                        onClick={abrirModalDescontoTotal}
+                        disabled={modoVisualizacao}
+                        className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded border border-blue-200 disabled:opacity-50 transition-colors"
+                        title="Aplicar desconto no total da venda"
+                      >
+                        <Percent className="w-3 h-3" />
+                        <span>{vendaAtual.desconto_valor > 0 ? 'Editar' : 'Adicionar'}</span>
+                      </button>
+                      {vendaAtual.desconto_valor > 0 && (
                         <button
-                          onClick={abrirModalDescontoTotal}
+                          onClick={removerDescontoTotal}
                           disabled={modoVisualizacao}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
-                          title="Aplicar desconto"
+                          className="p-1 text-red-400 hover:bg-red-50 rounded disabled:opacity-50 transition-colors"
+                          title="Remover desconto"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
+                          <X className="w-3 h-3" />
                         </button>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   <div className="flex justify-between text-gray-600">
                     <span>Total:</span>
@@ -3896,9 +3962,11 @@ export default function PDV() {
 
             <div className="p-6 space-y-4">
               <div className="bg-gray-100 p-4 rounded-lg">
-                <div className="text-sm text-gray-600">Total bruto</div>
+                <div className="text-sm text-gray-600">Total bruto (sem desconto)</div>
                 <div className="text-2xl font-bold text-gray-900">
-                  R$ {vendaAtual.subtotal.toFixed(2)}
+                  R$ {vendaAtual.itens.reduce((sum, item) =>
+                    sum + (item.preco_unitario || item.preco_venda) * item.quantidade, 0
+                  ).toFixed(2)}
                 </div>
               </div>
 
@@ -3949,25 +4017,29 @@ export default function PDV() {
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-700">Desconto</span>
-                  <span className="text-red-600 font-medium">
-                    - R$ {tipoDescontoTotal === 'valor' 
-                      ? valorDescontoTotal.toFixed(2)
-                      : (vendaAtual.subtotal * valorDescontoTotal / 100).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline border-t border-blue-200 pt-2 mt-2">
-                  <span className="text-sm text-gray-700">Total líquido</span>
-                  <span className="text-2xl font-bold text-green-600">
-                    R$ {(tipoDescontoTotal === 'valor' 
-                      ? vendaAtual.subtotal - valorDescontoTotal
-                      : vendaAtual.subtotal - (vendaAtual.subtotal * valorDescontoTotal / 100)
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              </div>
+              {(() => {
+                const totalBrutoModal = vendaAtual.itens.reduce((sum, item) =>
+                  sum + (item.preco_unitario || item.preco_venda) * item.quantidade, 0);
+                const descontoPreview = tipoDescontoTotal === 'valor'
+                  ? Math.min(valorDescontoTotal, totalBrutoModal)
+                  : (totalBrutoModal * Math.min(valorDescontoTotal, 100)) / 100;
+                return (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-gray-700">Desconto</span>
+                      <span className="text-red-600 font-medium">
+                        - R$ {descontoPreview.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-baseline border-t border-blue-200 pt-2 mt-2">
+                      <span className="text-sm text-gray-700">Total líquido</span>
+                      <span className="text-2xl font-bold text-green-600">
+                        R$ {Math.max(0, totalBrutoModal - descontoPreview).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">

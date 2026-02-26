@@ -6,7 +6,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
+from sqlalchemy import and_, desc, text
+from sqlalchemy.exc import NoReferencedTableError
 from datetime import datetime
 
 from app.auth import get_current_user
@@ -17,6 +18,43 @@ from app.utils.logger import logger
 
 
 router = APIRouter(prefix="/estoque/alertas", tags=["Estoque - Alertas"])
+
+def ensure_alertas_table_exists(db: Session) -> None:
+    """Cria tabela de alertas de estoque automaticamente em ambientes sem migration."""
+    try:
+        # Garante que tabelas referenciadas por FK estejam no metadata.
+        from app import produtos_models  # noqa: F401
+        from app import vendas_models  # noqa: F401
+        AlertaEstoqueNegativo.__table__.create(bind=db.get_bind(), checkfirst=True)
+    except NoReferencedTableError:
+        # Fallback para ambiente legado: cria sem FKs para evitar erro 500.
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS alertas_estoque_negativo (
+                id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                tenant_id UUID NOT NULL,
+                produto_id INTEGER NOT NULL,
+                produto_nome VARCHAR(255) NOT NULL,
+                estoque_anterior DOUBLE PRECISION NOT NULL,
+                quantidade_vendida DOUBLE PRECISION NOT NULL,
+                estoque_resultante DOUBLE PRECISION NOT NULL,
+                venda_id INTEGER NULL,
+                venda_codigo VARCHAR(50) NULL,
+                data_alerta TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+                data_resolucao TIMESTAMP WITHOUT TIME ZONE NULL,
+                usuario_resolucao_id INTEGER NULL,
+                observacao VARCHAR(500) NULL,
+                notificado BOOLEAN NOT NULL DEFAULT FALSE,
+                critico BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+            );
+        """))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_alertas_estoque_negativo_tenant_id ON alertas_estoque_negativo (tenant_id);"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_alertas_estoque_negativo_status ON alertas_estoque_negativo (status);"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_alertas_estoque_negativo_critico ON alertas_estoque_negativo (critico);"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_alertas_estoque_negativo_data_alerta ON alertas_estoque_negativo (data_alerta);"))
+        db.commit()
 
 
 # ============================================================================
@@ -80,6 +118,7 @@ def listar_alertas_pendentes(
     🟢 MODELO CONTROLADO - Visibilidade total de produtos com estoque negativo
     """
     tenant_id = current_user.tenant_id
+    ensure_alertas_table_exists(db)
     
     query = db.query(AlertaEstoqueNegativo).filter(
         and_(
@@ -110,6 +149,7 @@ def listar_todos_alertas(
     Lista todos os alertas de estoque negativo (histórico completo).
     """
     tenant_id = current_user.tenant_id
+    ensure_alertas_table_exists(db)
     
     query = db.query(AlertaEstoqueNegativo).filter(
         AlertaEstoqueNegativo.tenant_id == tenant_id
@@ -137,6 +177,7 @@ def dashboard_alertas(
     """
     from app.produtos_models import Produto
     tenant_id = current_user.tenant_id
+    ensure_alertas_table_exists(db)
     
     # Total de TODOS os alertas (independente do status)
     total_alertas = db.query(AlertaEstoqueNegativo).filter(
@@ -224,6 +265,7 @@ def resolver_alerta(
     - Alerta é falso positivo (status='ignorado')
     """
     tenant_id = current_user.tenant_id
+    ensure_alertas_table_exists(db)
     
     alerta = db.query(AlertaEstoqueNegativo).filter(
         and_(
@@ -266,6 +308,7 @@ def excluir_alerta(
     Exclui um alerta de estoque (apenas para correção de erros).
     """
     tenant_id = current_user.tenant_id
+    ensure_alertas_table_exists(db)
     
     alerta = db.query(AlertaEstoqueNegativo).filter(
         and_(

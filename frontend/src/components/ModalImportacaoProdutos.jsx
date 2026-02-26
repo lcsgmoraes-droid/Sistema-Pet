@@ -1,5 +1,5 @@
-/**
- * Modal de Importação de Produtos via Planilha Excel
+﻿/**
+ * Modal de ImportaÃ§Ã£o de Produtos via Planilha Excel
  */
 import { useState } from 'react';
 import api from '../api';
@@ -26,7 +26,7 @@ export default function ModalImportacaoProdutos({ isOpen, onClose, onSuccess }) 
 
   const baixarTemplate = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
       const response = await api.get('/produtos/template-importacao', {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
@@ -111,7 +111,7 @@ export default function ModalImportacaoProdutos({ isOpen, onClose, onSuccess }) 
             <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
-            <h2 className="text-xl font-bold text-white">Importação de Produtos em Lote</h2>
+            <h2 className="text-xl font-bold text-white">ImportaÃ§Ã£o de Produtos em Lote</h2>
           </div>
           <button
             onClick={fechar}
@@ -127,7 +127,7 @@ export default function ModalImportacaoProdutos({ isOpen, onClose, onSuccess }) 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {etapa === 'upload' && (
             <>
-              {/* Instruções */}
+              {/* InstruÃ§Ãµes */}
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -136,14 +136,14 @@ export default function ModalImportacaoProdutos({ isOpen, onClose, onSuccess }) 
                   Como funciona
                 </h3>
                 <ul className="text-sm text-blue-800 space-y-1 ml-7">
-                  <li>1. Baixe o template Excel clicando no botão abaixo</li>
+                  <li>1. Baixe o template Excel clicando no botÃ£o abaixo</li>
                   <li>2. Preencha os dados dos produtos na planilha</li>
-                  <li>3. Salve o arquivo e faça o upload aqui</li>
-                  <li>4. Produtos novos serão criados, existentes serão atualizados (baseado no SKU)</li>
+                  <li>3. Salve o arquivo e faÃ§a o upload aqui</li>
+                  <li>4. Produtos novos serÃ£o criados, existentes serÃ£o atualizados (baseado no SKU)</li>
                 </ul>
               </div>
 
-              {/* Botão para baixar template */}
+              {/* BotÃ£o para baixar template */}
               <div className="mb-6">
                 <button
                   onClick={baixarTemplate}
@@ -342,3 +342,4 @@ export default function ModalImportacaoProdutos({ isOpen, onClose, onSuccess }) 
     </div>
   );
 }
+

@@ -3,40 +3,31 @@
  */
 import axios from 'axios';
 
-// 🔍 VERIFICAÇÃO DE AMBIENTE
 const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const mode = import.meta.env.MODE;
+// Em desenvolvimento, sempre usa proxy do Vite para manter auth/cookies consistentes.
+const API_URL = isDevelopment ? '/api' : (configuredApiUrl || '/api');
+const apiDebugEnabled = isDevelopment && import.meta.env.VITE_DEBUG_API === 'true';
 
-// ⚠️ ALERTA: Em produção DEVE ser '/api', em desenvolvimento DEVE ser 'http://127.0.0.1:8000'
-const API_URL = isDevelopment
-  ? (!configuredApiUrl || configuredApiUrl === '/api' ? 'http://127.0.0.1:8000' : configuredApiUrl)
-  : (configuredApiUrl || '/api');
+const debugLog = (...args) => {
+  if (apiDebugEnabled) {
+    console.log(...args);
+  }
+};
 
-// 🔍 DEBUG: Log de configuração ao carregar o módulo
-console.log('═══════════════════════════════════════════════════════');
-console.log('🌐 [API Config] Configuração do Axios carregada');
-console.log('═══════════════════════════════════════════════════════');
-console.log('  Mode:', mode);
-console.log('  isDevelopment:', isDevelopment);
-console.log('  isProduction:', isProduction);
-console.log('  VITE_API_URL (configurado):', configuredApiUrl);
-console.log('  API_URL (final):', API_URL);
-console.log('  Origem:', window.location.origin);
-console.log('═══════════════════════════════════════════════════════');
+const debugWarn = (...args) => {
+  if (apiDebugEnabled) {
+    console.warn(...args);
+  }
+};
 
-// ⚠️ VALIDAÇÃO: Alertar sobre configuração incorreta
 if (isProduction && API_URL !== '/api') {
-  console.error('❌ [API Config] ERRO: Em produção, VITE_API_URL deve ser "/api"!');
-  console.error('   Valor atual:', API_URL);
-  console.error('   Esperado: /api');
-  console.error('   Verifique o arquivo .env.production e faça rebuild!');
+  console.error('[API Config] Em producao, VITE_API_URL deve ser "/api". Valor atual:', API_URL);
 }
 
-if (isDevelopment && !API_URL.includes('127.0.0.1') && !API_URL.includes('localhost')) {
-  console.warn('⚠️ [API Config] AVISO: Em desenvolvimento, API_URL geralmente aponta para localhost');
-  console.warn('   Valor atual:', API_URL);
+if (isDevelopment && configuredApiUrl && configuredApiUrl !== '/api') {
+  console.warn('[API Config] Ignorando VITE_API_URL em desenvolvimento. Usando "/api" via proxy do Vite.');
 }
 
 const api = axios.create({
@@ -48,70 +39,51 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
-
-    // 🔍 DEBUG: Log token e configuração
-    console.log('🔐 [API Interceptor]', {
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      hasToken: !!token,
-      tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
-      headers: config.headers
-    });
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('✅ Token adicionado ao header Authorization');
     } else {
-      console.warn('⚠️ Nenhum token encontrado no localStorage');
+      debugWarn('[API] Nenhum token encontrado no localStorage');
     }
+
+    debugLog('[API Request]', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+    });
 
     return config;
   },
-  (error) => {
-    console.error('❌ [API Interceptor] Erro na requisição:', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ [API Response]', {
+    debugLog('[API Response]', {
       status: response.status,
-      url: response.config.url,
-      dataPreview: JSON.stringify(response.data).substring(0, 100)
+      url: response.config?.url,
     });
     return response;
   },
   (error) => {
     const status = error.response?.status;
 
-    // 🔍 DEBUG: Log detalhado do erro
-    console.error('❌ [API Response Error]', {
-      status: status,
+    debugWarn('[API Response Error]', {
+      status,
       url: error.config?.url,
-      fullURL: `${error.config?.baseURL}${error.config?.url}`,
-      errorData: error.response?.data,
-      headers: error.response?.headers,
-      requestHeaders: error.config?.headers
+      fullURL: `${error.config?.baseURL || ''}${error.config?.url || ''}`,
     });
 
     if (status === 401) {
-      console.warn('⚠️ Status 401: Sessão inválida ou tenant não selecionado');
-
       localStorage.removeItem('access_token');
+      localStorage.removeItem('token');
       localStorage.removeItem('tenants');
-
       window.location.href = '/login';
     }
 
     if (status === 403) {
-      console.warn('⚠️ Status 403: Acesso negado para este tenant');
-      console.log('🔍 Detalhes do erro 403:', {
-        message: error.response?.data?.detail || error.message,
-        token: localStorage.getItem('access_token')?.substring(0, 20) + '...'
-      });
+      debugWarn('[API] Acesso negado para este tenant');
     }
 
     return Promise.reject(error);

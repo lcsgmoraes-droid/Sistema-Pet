@@ -10,6 +10,16 @@ const EstoqueBling = () => {
   const [filtro, setFiltro] = useState('todos'); // todos, sincronizados, nao_sincronizados
   const [buscaBling, setBuscaBling] = useState('');
 
+  const getCategoriaNome = (produto) => {
+    const categoria = produto?.categoria;
+    if (!categoria) return null;
+    if (typeof categoria === 'string') return categoria;
+    if (typeof categoria === 'object') {
+      return categoria.nome || categoria.descricao || `Categoria #${categoria.id ?? ''}`.trim();
+    }
+    return String(categoria);
+  };
+
   useEffect(() => {
     carregarProdutos();
   }, []);
@@ -109,7 +119,7 @@ const EstoqueBling = () => {
       { duration: 5000 }
     );
     
-    carregarDados();
+    carregarProdutos();
     setSincronizando(false);
   };
 
@@ -324,8 +334,8 @@ const EstoqueBling = () => {
                   </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold">{produto.nome}</div>
-                    {produto.categoria && (
-                      <div className="text-xs text-gray-500">{produto.categoria}</div>
+                    {getCategoriaNome(produto) && (
+                      <div className="text-xs text-gray-500">{getCategoriaNome(produto)}</div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">

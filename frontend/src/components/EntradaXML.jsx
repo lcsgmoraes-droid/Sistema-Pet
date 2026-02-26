@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
@@ -18,19 +18,19 @@ const EntradaXML = () => {
   const [mostrarModalLote, setMostrarModalLote] = useState(false);
   const [resultadoLote, setResultadoLote] = useState(null);
   
-  // Estados para histórico de preços
+  // Estados para histÃ³rico de preÃ§os
   const [mostrarHistoricoPrecos, setMostrarHistoricoPrecos] = useState(false);
   const [historicoPrecos, setHistoricoPrecos] = useState([]);
   const [produtoHistorico, setProdutoHistorico] = useState(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   
-  // Estados para revisão de preços
+  // Estados para revisÃ£o de preÃ§os
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
   const [precosAjustados, setPrecosAjustados] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
   
-  // Estados para rateio (APENAS informativo - estoque é UNIFICADO)
+  // Estados para rateio (APENAS informativo - estoque Ã© UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
   const [quantidadesOnline, setQuantidadesOnline] = useState({}); // {item_id: quantidade_online}
   
@@ -54,18 +54,18 @@ const EntradaXML = () => {
   const [filtroProduto, setFiltroProduto] = useState({});
 
   useEffect(() => {
-    console.log('🔄 [EntradaXML] Componente montado, iniciando carregamento...');
+    console.log('ðŸ”„ [EntradaXML] Componente montado, iniciando carregamento...');
     carregarDados();
   }, []);
 
   const carregarDados = async () => {
-    console.log('📊 [EntradaXML] Carregando dados...');
+    console.log('ðŸ“Š [EntradaXML] Carregando dados...');
     try {
-      const token = localStorage.getItem('token');
-      console.log('🔑 [EntradaXML] Token obtido:', token ? 'SIM' : 'NÃO');
+      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      console.log('ðŸ”‘ [EntradaXML] Token obtido:', token ? 'SIM' : 'NÃƒO');
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log('🌐 [EntradaXML] Fazendo requisições para:', {
+      console.log('ðŸŒ [EntradaXML] Fazendo requisiÃ§Ãµes para:', {
         notasEntrada: `/notas-entrada/`,
         produtos: `/produtos/` // Sem filtro de ativo para trazer todos os produtos
       });
@@ -75,7 +75,7 @@ const EntradaXML = () => {
         api.get(`/produtos/`, { headers, params: { ativo: null } }) // null = todos os produtos
       ]);
 
-      console.log('✅ [EntradaXML] Dados carregados:', {
+      console.log('âœ… [EntradaXML] Dados carregados:', {
         notasEntrada: notasRes.data?.length || 0,
         produtos: produtosRes.data?.items?.length || produtosRes.data?.length || 0
       });
@@ -86,7 +86,7 @@ const EntradaXML = () => {
       const produtosAtivos = listaProdutos.filter(p => p.ativo === true).length;
       const produtosInativos = listaProdutos.filter(p => p.ativo === false).length;
       
-      console.log('📊 [EntradaXML] Produtos por status:', {
+      console.log('ðŸ“Š [EntradaXML] Produtos por status:', {
         ativos: produtosAtivos,
         inativos: produtosInativos,
         total: listaProdutos.length
@@ -95,7 +95,7 @@ const EntradaXML = () => {
       setNotasEntrada(notasRes.data);
       setProdutos(listaProdutos);
     } catch (error) {
-      console.error('❌ [EntradaXML] ERRO ao carregar dados:');
+      console.error('âŒ [EntradaXML] ERRO ao carregar dados:');
       console.error('  - Mensagem:', error.message);
       console.error('  - Response:', error.response?.data);
       console.error('  - Status:', error.response?.status);
@@ -106,19 +106,19 @@ const EntradaXML = () => {
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    console.log('📤 [EntradaXML] Upload iniciado');
+    console.log('ðŸ“¤ [EntradaXML] Upload iniciado');
     console.log('  - Arquivo selecionado:', file?.name);
     console.log('  - Tamanho:', file?.size, 'bytes');
     console.log('  - Tipo:', file?.type);
     
     if (!file) {
-      console.warn('⚠️ [EntradaXML] Nenhum arquivo selecionado');
+      console.warn('âš ï¸ [EntradaXML] Nenhum arquivo selecionado');
       return;
     }
 
     if (!file.name.toLowerCase().endsWith('.xml')) {
-      console.error('❌ [EntradaXML] Arquivo não é XML:', file.name);
-      toast.error('❌ Por favor, selecione um arquivo XML');
+      console.error('âŒ [EntradaXML] Arquivo nÃ£o Ã© XML:', file.name);
+      toast.error('âŒ Por favor, selecione um arquivo XML');
       return;
     }
 
@@ -126,8 +126,8 @@ const EntradaXML = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    console.log('🚀 [EntradaXML] Enviando arquivo para:', `/notas-entrada/upload`);
-    console.log('📦 [EntradaXML] FormData preparado:', file.name, file.size, 'bytes');
+    console.log('ðŸš€ [EntradaXML] Enviando arquivo para:', `/notas-entrada/upload`);
+    console.log('ðŸ“¦ [EntradaXML] FormData preparado:', file.name, file.size, 'bytes');
 
     try {
       const response = await api.post(`/notas-entrada/upload`, formData, {
@@ -136,18 +136,18 @@ const EntradaXML = () => {
         },
       });
 
-      console.log('✅ [EntradaXML] Upload bem-sucedido!');
+      console.log('âœ… [EntradaXML] Upload bem-sucedido!');
       console.log('  - Response data:', response.data);
 
       const itensVinculados = response.data.produtos_vinculados || 0;
       const totalItens = response.data.itens_total || 0;
 
-      console.log(`📊 [EntradaXML] Produtos vinculados: ${itensVinculados}/${totalItens}`);
+      console.log(`ðŸ“Š [EntradaXML] Produtos vinculados: ${itensVinculados}/${totalItens}`);
 
       // Mensagem de fornecedor criado
       if (response.data.fornecedor_criado_automaticamente) {
         toast.success(
-          `🏢 Novo fornecedor cadastrado: ${response.data.fornecedor}`,
+          `ðŸ¢ Novo fornecedor cadastrado: ${response.data.fornecedor}`,
           { duration: 4000 }
         );
       }
@@ -155,20 +155,20 @@ const EntradaXML = () => {
       // Mensagem de produtos reativados
       if (response.data.produtos_reativados > 0) {
         toast.success(
-          `♻️ ${response.data.produtos_reativados} produto(s) inativo(s) reativado(s) automaticamente`,
+          `â™»ï¸ ${response.data.produtos_reativados} produto(s) inativo(s) reativado(s) automaticamente`,
           { duration: 4000 }
         );
       }
 
       toast.success(
-        `✅ NF-e ${response.data.numero_nota} processada! ${itensVinculados}/${totalItens} produtos vinculados automaticamente`,
+        `âœ… NF-e ${response.data.numero_nota} processada! ${itensVinculados}/${totalItens} produtos vinculados automaticamente`,
         { duration: 5000 }
       );
       
       carregarDados();
       event.target.value = ''; // Limpar input
     } catch (error) {
-      console.error('❌ [EntradaXML] ERRO no upload:');
+      console.error('âŒ [EntradaXML] ERRO no upload:');
       console.error('  - Mensagem:', error.message);
       console.error('  - Response data:', error.response?.data);
       console.error('  - Status:', error.response?.status);
@@ -176,28 +176,28 @@ const EntradaXML = () => {
       console.error('  - Stack completo:', error.stack);
       
       const errorMsg = error.response?.data?.detail || error.message || 'Erro ao processar XML da NF-e';
-      console.error('  - Mensagem para usuário:', errorMsg);
+      console.error('  - Mensagem para usuÃ¡rio:', errorMsg);
       
-      toast.error(`❌ ${errorMsg}`);
+      toast.error(`âŒ ${errorMsg}`);
     } finally {
       setUploadingFile(false);
-      console.log('🏁 [EntradaXML] Upload finalizado');
+      console.log('ðŸ [EntradaXML] Upload finalizado');
     }
   };
 
   const handleMultipleFilesUpload = async (event) => {
     const files = Array.from(event.target.files);
-    console.log('📦 [EntradaXML] Upload em lote iniciado -', files.length, 'arquivos');
+    console.log('ðŸ“¦ [EntradaXML] Upload em lote iniciado -', files.length, 'arquivos');
     
     if (files.length === 0) {
-      console.warn('⚠️ [EntradaXML] Nenhum arquivo selecionado');
+      console.warn('âš ï¸ [EntradaXML] Nenhum arquivo selecionado');
       return;
     }
 
-    // Validar se todos são XML
+    // Validar se todos sÃ£o XML
     const invalidFiles = files.filter(f => !f.name.toLowerCase().endsWith('.xml'));
     if (invalidFiles.length > 0) {
-      toast.error(`❌ ${invalidFiles.length} arquivo(s) não são XML: ${invalidFiles.map(f => f.name).join(', ')}`);
+      toast.error(`âŒ ${invalidFiles.length} arquivo(s) nÃ£o sÃ£o XML: ${invalidFiles.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -210,26 +210,26 @@ const EntradaXML = () => {
       formData.append('files', file);
     });
 
-    console.log('🚀 [EntradaXML] Enviando', files.length, 'arquivos para:', `/notas-entrada/upload-lote`);
+    console.log('ðŸš€ [EntradaXML] Enviando', files.length, 'arquivos para:', `/notas-entrada/upload-lote`);
 
     try {
             const response = await api.post(`/notas-entrada/upload-lote`, formData);
 
-      console.log('✅ [EntradaXML] Upload em lote bem-sucedido!');
+      console.log('âœ… [EntradaXML] Upload em lote bem-sucedido!');
       console.log('  - Response:', response.data);
 
       setResultadoLote(response.data);
       
       if (response.data.sucessos > 0) {
         toast.success(
-          `✅ ${response.data.sucessos}/${response.data.total_arquivos} nota(s) processada(s) com sucesso!`,
+          `âœ… ${response.data.sucessos}/${response.data.total_arquivos} nota(s) processada(s) com sucesso!`,
           { duration: 5000 }
         );
       }
       
       if (response.data.erros > 0) {
         toast.error(
-          `⚠️ ${response.data.erros}/${response.data.total_arquivos} nota(s) com erro`,
+          `âš ï¸ ${response.data.erros}/${response.data.total_arquivos} nota(s) com erro`,
           { duration: 5000 }
         );
       }
@@ -237,8 +237,8 @@ const EntradaXML = () => {
       carregarDados();
       event.target.value = ''; // Limpar input
     } catch (error) {
-      console.error('❌ [EntradaXML] ERRO no upload em lote:', error);
-      toast.error(`❌ Erro ao processar lote: ${error.response?.data?.detail || error.message}`);
+      console.error('âŒ [EntradaXML] ERRO no upload em lote:', error);
+      toast.error(`âŒ Erro ao processar lote: ${error.response?.data?.detail || error.message}`);
       setMostrarModalLote(false);
     } finally {
       setUploadingLote(false);
@@ -278,7 +278,7 @@ const EntradaXML = () => {
         `/notas-entrada/${notaId}/itens/${itemId}/vincular?produto_id=${parseInt(produtoId)}`
       );
       
-      toast.success('✅ Produto vinculado com sucesso!');
+      toast.success('âœ… Produto vinculado com sucesso!');
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -288,7 +288,7 @@ const EntradaXML = () => {
       }
       setNotaSelecionada(response.data);
     } catch (error) {
-      console.error('❌ Erro ao vincular produto:', error);
+      console.error('âŒ Erro ao vincular produto:', error);
       toast.error(error.response?.data?.detail || 'Erro ao vincular produto');
     }
   };
@@ -300,13 +300,13 @@ const EntradaXML = () => {
         percentual_loja: parseFloat(percentualLoja)
       });
       
-      toast.success('📊 Rateio configurado com sucesso!');
+      toast.success('ðŸ“Š Rateio configurado com sucesso!');
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
       setNotaSelecionada(response.data);
     } catch (error) {
-      console.error('❌ Erro ao salvar rateio:', error);
+      console.error('âŒ Erro ao salvar rateio:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar rateio');
     }
   };
@@ -317,16 +317,16 @@ const EntradaXML = () => {
         tipo_rateio: tipo
       });
       
-      toast.success(`✅ Nota configurada: ${tipo === 'online' ? '100% Online' : tipo === 'loja' ? '100% Loja Física' : 'Rateio Parcial'}`);
+      toast.success(`âœ… Nota configurada: ${tipo === 'online' ? '100% Online' : tipo === 'loja' ? '100% Loja FÃ­sica' : 'Rateio Parcial'}`);
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
       setNotaSelecionada(response.data);
       
-      // Atualizar estado local para seleção visual
+      // Atualizar estado local para seleÃ§Ã£o visual
       setTipoRateio(tipo);
     } catch (error) {
-      console.error('❌ Erro ao salvar tipo de rateio:', error);
+      console.error('âŒ Erro ao salvar tipo de rateio:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
     }
   };
@@ -337,7 +337,7 @@ const EntradaXML = () => {
         quantidade_online: parseFloat(quantidadeOnline) || 0  // Permitir 0
       });
       
-      toast.success('📊 Quantidade online configurada!');
+      toast.success('ðŸ“Š Quantidade online configurada!');
       
       // Mostrar totais da nota
       const totais = response.data.nota_totais;
@@ -346,7 +346,7 @@ const EntradaXML = () => {
         `${totais.percentual_loja.toFixed(1)}% Loja (R$ ${totais.valor_loja.toFixed(2)})`
       );
       
-      // Atualizar apenas o item específico e os totais da nota, sem recarregar tudo
+      // Atualizar apenas o item especÃ­fico e os totais da nota, sem recarregar tudo
       setNotaSelecionada(prev => ({
         ...prev,
         percentual_online: totais.percentual_online,
@@ -366,7 +366,7 @@ const EntradaXML = () => {
         [itemId]: parseFloat(quantidadeOnline) || 0
       }));
     } catch (error) {
-      console.error('❌ Erro ao salvar quantidade online:', error);
+      console.error('âŒ Erro ao salvar quantidade online:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar');
     }
   };
@@ -381,10 +381,10 @@ const EntradaXML = () => {
       setPreviewProcessamento(response.data);
       setMostrarRevisaoPrecos(true);
       
-      // FECHAR o modal de detalhes quando abrir o de revisão
+      // FECHAR o modal de detalhes quando abrir o de revisÃ£o
       setMostrarDetalhes(false);
       
-      // Inicializar preços ajustados com valores atuais (adaptar para nova estrutura)
+      // Inicializar preÃ§os ajustados com valores atuais (adaptar para nova estrutura)
       const precosIniciais = {};
       response.data.itens.forEach(item => {
         if (item.produto_vinculado) {
@@ -401,13 +401,13 @@ const EntradaXML = () => {
     }
   };
 
-  // Alias para melhor semântica
+  // Alias para melhor semÃ¢ntica
   const carregarPreviewProcessamento = processarNota;
 
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
-      // Atualizar preços se houver alterações (adaptar para nova estrutura)
+      // Atualizar preÃ§os se houver alteraÃ§Ãµes (adaptar para nova estrutura)
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
         const itemOriginal = previewProcessamento.itens.find(i => 
@@ -436,7 +436,7 @@ const EntradaXML = () => {
       );
 
       toast.success(
-        `✅ Nota processada! ${response.data.itens_processados} itens lançados no estoque`,
+        `âœ… Nota processada! ${response.data.itens_processados} itens lanÃ§ados no estoque`,
         { duration: 5000 }
       );
       
@@ -453,14 +453,14 @@ const EntradaXML = () => {
   };
 
   const calcularPrecoVenda = (custoNovo, margemDesejada) => {
-    // Margem = (Preço Venda - Custo) / Preço Venda * 100
-    // Preço Venda = Custo / (1 - Margem/100)
+    // Margem = (PreÃ§o Venda - Custo) / PreÃ§o Venda * 100
+    // PreÃ§o Venda = Custo / (1 - Margem/100)
     if (margemDesejada >= 100) return custoNovo * 2;
     return custoNovo / (1 - margemDesejada / 100);
   };
 
   const calcularMargem = (precoVenda, custoNovo) => {
-    // Margem = (Preço Venda - Custo) / Preço Venda * 100
+    // Margem = (PreÃ§o Venda - Custo) / PreÃ§o Venda * 100
     if (precoVenda <= 0) return 0;
     return ((precoVenda - custoNovo) / precoVenda) * 100;
   };
@@ -496,7 +496,7 @@ const EntradaXML = () => {
     try {
             await api.delete(`/notas-entrada/${notaId}`);
 
-      toast.success('🗑️ Nota excluída com sucesso!');
+      toast.success('ðŸ—‘ï¸ Nota excluÃ­da com sucesso!');
       
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);
@@ -523,7 +523,7 @@ const EntradaXML = () => {
       
       setHistoricoPrecos(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar histórico de preços');
+      toast.error('Erro ao carregar histÃ³rico de preÃ§os');
       setMostrarHistoricoPrecos(false);
     } finally {
       setCarregandoHistorico(false);
@@ -531,7 +531,7 @@ const EntradaXML = () => {
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (!confirm(`⚠️ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso irá:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`)) {
+    if (!confirm(`âš ï¸ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso irÃ¡:\nâ€¢ Remover as quantidades do estoque\nâ€¢ Excluir os lotes criados\nâ€¢ Estornar as contas a pagar lanÃ§adas\nâ€¢ Restaurar o status da nota para pendente`)) {
       return;
     }
 
@@ -543,7 +543,7 @@ const EntradaXML = () => {
       );
 
       toast.success(
-        `✅ Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
+        `âœ… Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
         { duration: 5000 }
       );
       
@@ -564,7 +564,7 @@ const EntradaXML = () => {
     try {
       await api.post(`/notas-entrada/${notaId}/itens/${itemId}/desvincular`);
       
-      toast.success('✅ Produto desvinculado!');
+      toast.success('âœ… Produto desvinculado!');
       
       // Recarregar detalhes da nota
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -583,7 +583,7 @@ const EntradaXML = () => {
     setMostrarModalVincular(true);
   };
 
-  // Detectar divergências entre NF e produto vinculado
+  // Detectar divergÃªncias entre NF e produto vinculado
   const detectarDivergencias = (item) => {
     // Verificar se tem produto vinculado (pode estar em produto_vinculado ou produto_nome)
     const produtoNome = item.produto_vinculado?.produto_nome || item.produto_nome;
@@ -620,8 +620,8 @@ const EntradaXML = () => {
       divergencias.push(`Cor diferente: NF="${corNF}" vs Produto="${corProd}"`);
     }
     
-    // Detectar sabor (para rações)
-    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmão', 'atum', 'vegetais'];
+    // Detectar sabor (para raÃ§Ãµes)
+    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmÃ£o', 'atum', 'vegetais'];
     const saborNF = sabores.find(sabor => descNFLower.includes(sabor));
     const saborProd = sabores.find(sabor => descProdLower.includes(sabor));
     
@@ -632,12 +632,12 @@ const EntradaXML = () => {
     // Detectar animal (cachorro/gato)
     if ((descNFLower.includes('cao') || descNFLower.includes('cachorro') || descNFLower.includes('dog')) && 
         (descProdLower.includes('gato') || descProdLower.includes('cat'))) {
-      divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
+      divergencias.push('âš ï¸ Animal diferente: NF para CACHORRO mas produto Ã© para GATO');
     }
     
     if ((descNFLower.includes('gato') || descNFLower.includes('cat')) && 
         (descProdLower.includes('cao') || descProdLower.includes('cachorro') || descProdLower.includes('dog'))) {
-      divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
+      divergencias.push('âš ï¸ Animal diferente: NF para GATO mas produto Ã© para CACHORRO');
     }
     
     return divergencias;
@@ -648,7 +648,7 @@ const EntradaXML = () => {
     setMostrarModalCriarProduto(true);
     setCarregandoSugestao(true);
     
-    // Resetar formulário
+    // Resetar formulÃ¡rio
     setFormProduto({
       sku: '',
       nome: '',
@@ -670,32 +670,32 @@ const EntradaXML = () => {
       // Determinar qual SKU usar
       let skuParaUsar = response.data.sku_proposto || item.codigo_produto || 'PROD-' + item.id;
       
-      // Se o SKU já existe, usar a primeira sugestão alternativa (a recomendada com ⭐)
+      // Se o SKU jÃ¡ existe, usar a primeira sugestÃ£o alternativa (a recomendada com â­)
       if (response.data.ja_existe && response.data.sugestoes && response.data.sugestoes.length > 0) {
         const sugestaoRecomendada = response.data.sugestoes.find(s => s.padrao) || response.data.sugestoes[0];
         skuParaUsar = sugestaoRecomendada.sku;
       }
       
-      // Preencher formulário com dados do item
+      // Preencher formulÃ¡rio com dados do item
       setFormProduto({
         sku: skuParaUsar,
         nome: item.descricao || item.descricao_produto || 'Produto sem nome',
         descricao: item.descricao || item.descricao_produto || '',
         preco_custo: item.valor_unitario.toString(),
-        preco_venda: (item.valor_unitario * 1.5).toFixed(2), // Sugestão de 50% de margem
+        preco_venda: (item.valor_unitario * 1.5).toFixed(2), // SugestÃ£o de 50% de margem
         margem_lucro: '50',
         estoque_minimo: 10,
         estoque_maximo: 100
       });
       
-      console.log('✅ Formulário preenchido:', {
+      console.log('âœ… FormulÃ¡rio preenchido:', {
         sku: skuParaUsar,
         nome: item.descricao,
         preco_custo: item.valor_unitario
       });
       
     } catch (error) {
-      toast.error('Erro ao buscar sugestões de SKU');
+      toast.error('Erro ao buscar sugestÃµes de SKU');
       console.error('Erro ao buscar SKU:', error);
       
       // Preencher mesmo com erro
@@ -717,7 +717,7 @@ const EntradaXML = () => {
   const criarProdutoNovo = async () => {
     try {
       setLoading(true);
-            // Preparar dados convertendo strings para números
+            // Preparar dados convertendo strings para nÃºmeros
       const dadosProduto = {
         ...formProduto,
         preco_custo: parseFloat(formProduto.preco_custo) || 0,
@@ -732,7 +732,7 @@ const EntradaXML = () => {
         dadosProduto
       );
       
-      toast.success(`✅ Produto ${response.data.produto.codigo} criado e vinculado!`);
+      toast.success(`âœ… Produto ${response.data.produto.codigo} criado e vinculado!`);
       
       // Fechar modal
       setMostrarModalCriarProduto(false);
@@ -760,17 +760,17 @@ const EntradaXML = () => {
     const itensNaoVinculados = notaSelecionada.itens.filter(item => !item.produto_id);
     
     if (itensNaoVinculados.length === 0) {
-      toast.success('Todos os produtos já estão vinculados!');
+      toast.success('Todos os produtos jÃ¡ estÃ£o vinculados!');
       return;
     }
     
     const confirmacao = window.confirm(
       `Criar ${itensNaoVinculados.length} produto(s) automaticamente?\n\n` +
-      `Padrões aplicados:\n` +
-      `• Estoque mínimo: 10\n` +
-      `• Estoque máximo: 100\n` +
-      `• Margem de lucro: 50%\n\n` +
-      `Você poderá editar os produtos depois no cadastro.`
+      `PadrÃµes aplicados:\n` +
+      `â€¢ Estoque mÃ­nimo: 10\n` +
+      `â€¢ Estoque mÃ¡ximo: 100\n` +
+      `â€¢ Margem de lucro: 50%\n\n` +
+      `VocÃª poderÃ¡ editar os produtos depois no cadastro.`
     );
     
     if (!confirmacao) return;
@@ -780,7 +780,7 @@ const EntradaXML = () => {
       let sucessos = 0;
       let erros = 0;
       
-      const loadingToast = toast.loading(`📦 Criando ${itensNaoVinculados.length} produtos...`);
+      const loadingToast = toast.loading(`ðŸ“¦ Criando ${itensNaoVinculados.length} produtos...`);
       
       for (const item of itensNaoVinculados) {
         try {
@@ -791,13 +791,13 @@ const EntradaXML = () => {
           
           let skuParaUsar = skuResponse.data.sku_proposto || item.codigo_produto || `PROD-${item.id}`;
           
-          // Se já existe, usar primeira sugestão alternativa
+          // Se jÃ¡ existe, usar primeira sugestÃ£o alternativa
           if (skuResponse.data.ja_existe && skuResponse.data.sugestoes?.length > 0) {
             const sugestaoRecomendada = skuResponse.data.sugestoes.find(s => s.padrao) || skuResponse.data.sugestoes[0];
             skuParaUsar = sugestaoRecomendada.sku;
           }
           
-          // Criar produto com padrões
+          // Criar produto com padrÃµes
           const dadosProduto = {
             sku: skuParaUsar,
             nome: item.descricao || 'Produto sem nome',
@@ -824,11 +824,11 @@ const EntradaXML = () => {
       toast.dismiss(loadingToast);
       
       if (sucessos > 0) {
-        toast.success(`✅ ${sucessos} produto(s) criado(s) com sucesso!`);
+        toast.success(`âœ… ${sucessos} produto(s) criado(s) com sucesso!`);
       }
       
       if (erros > 0) {
-        toast.error(`❌ ${erros} erro(s) ao criar produtos`);
+        toast.error(`âŒ ${erros} erro(s) ao criar produtos`);
       }
       
       // Recarregar dados
@@ -851,9 +851,9 @@ const EntradaXML = () => {
     return ((venda - custo) / custo * 100).toFixed(2);
   };
 
-  // Funções para determinar cores baseadas em comparações
+  // FunÃ§Ãµes para determinar cores baseadas em comparaÃ§Ãµes
   const getCorComparacao = (valorNovo, valorAntigo, tipo) => {
-    // Validações de segurança
+    // ValidaÃ§Ãµes de seguranÃ§a
     const novo = parseFloat(valorNovo) || 0;
     const antigo = parseFloat(valorAntigo) || 0;
     
@@ -861,17 +861,17 @@ const EntradaXML = () => {
       return { cor: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: '=' };
     }
     
-    // Para custo: menor é melhor (verde), maior é pior (vermelho)
+    // Para custo: menor Ã© melhor (verde), maior Ã© pior (vermelho)
     if (tipo === 'custo') {
       return novo < antigo 
-        ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: '↓' }
-        : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: '↑' };
+        ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'â†“' }
+        : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: 'â†‘' };
     }
     
-    // Para preço e margem: maior é melhor (verde), menor é pior (vermelho)
+    // Para preÃ§o e margem: maior Ã© melhor (verde), menor Ã© pior (vermelho)
     return novo > antigo
-      ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: '↑' }
-      : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: '↓' };
+      ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'â†‘' }
+      : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: 'â†“' };
   };
 
   const getStatusBadge = (status) => {
@@ -889,7 +889,7 @@ const EntradaXML = () => {
   };
 
   const getConfiancaBadge = (confianca) => {
-    if (!confianca) return <span className="text-gray-400 text-sm">Não vinculado</span>;
+    if (!confianca) return <span className="text-gray-400 text-sm">NÃ£o vinculado</span>;
     
     const nivel = confianca >= 90 ? 'alta' : confianca >= 70 ? 'media' : 'baixa';
     const styles = {
@@ -900,7 +900,7 @@ const EntradaXML = () => {
     
     return (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[nivel]}`}>
-        {confianca.toFixed(1)}% {nivel === 'alta' ? '✅' : nivel === 'media' ? '⚠️' : '⚡'}
+        {confianca.toFixed(1)}% {nivel === 'alta' ? 'âœ…' : nivel === 'media' ? 'âš ï¸' : 'âš¡'}
       </span>
     );
   };
@@ -908,11 +908,11 @@ const EntradaXML = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">📄 Entrada por NF-e (XML)</h1>
-        <p className="text-gray-600">Importe notas fiscais eletrônicas e vincule produtos automaticamente</p>
+        <h1 className="text-2xl font-bold text-gray-800">ðŸ“„ Entrada por NF-e (XML)</h1>
+        <p className="text-gray-600">Importe notas fiscais eletrÃ´nicas e vincule produtos automaticamente</p>
       </div>
 
-      {/* Área de Upload */}
+      {/* Ãrea de Upload */}
       <div className="bg-white rounded-lg shadow-md p-8 mb-6">
         <div className="text-center">
           <div className="mb-4">
@@ -921,15 +921,15 @@ const EntradaXML = () => {
             </svg>
           </div>
           <h3 className="text-lg font-semibold mb-2">
-            {uploadingFile ? '⏳ Processando XML...' : 'Selecione o arquivo XML da NF-e'}
+            {uploadingFile ? 'â³ Processando XML...' : 'Selecione o arquivo XML da NF-e'}
           </h3>
           <p className="text-sm text-gray-500 mb-4">
-            O sistema irá processar automaticamente os dados da nota fiscal
+            O sistema irÃ¡ processar automaticamente os dados da nota fiscal
           </p>
           
-          {/* Botões de Upload */}
+          {/* BotÃµes de Upload */}
           <div className="flex gap-3 justify-center">
-            {/* Upload Único */}
+            {/* Upload Ãšnico */}
             <label className="inline-block">
               <input
                 type="file"
@@ -944,11 +944,11 @@ const EntradaXML = () => {
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700 text-white'}
               `}>
-                {uploadingFile ? '⏳ Processando...' : '📁 Upload Único'}
+                {uploadingFile ? 'â³ Processando...' : 'ðŸ“ Upload Ãšnico'}
               </span>
             </label>
             
-            {/* Upload Múltiplo */}
+            {/* Upload MÃºltiplo */}
             <label className="inline-block">
               <input
                 type="file"
@@ -964,18 +964,18 @@ const EntradaXML = () => {
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-green-600 hover:bg-green-700 text-white'}
               `}>
-                {uploadingLote ? '⏳ Processando Lote...' : '📦 Upload Múltiplo'}
+                {uploadingLote ? 'â³ Processando Lote...' : 'ðŸ“¦ Upload MÃºltiplo'}
               </span>
             </label>
           </div>
           
           <p className="text-xs text-gray-500 mt-3">
-            Formatos aceitos: XML de NF-e (padrão SEFAZ)
+            Formatos aceitos: XML de NF-e (padrÃ£o SEFAZ)
           </p>
         </div>
       </div>
 
-      {/* Estatísticas */}
+      {/* EstatÃ­sticas */}
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-blue-600">
@@ -1017,18 +1017,18 @@ const EntradaXML = () => {
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Chave NF-e</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Data Emissão</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Data EmissÃ£o</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Itens</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Ações</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold">AÃ§Ãµes</th>
               </tr>
             </thead>
             <tbody>
               {notasEntrada.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                    Nenhuma nota fiscal importada ainda. Faça o upload de um XML acima.
+                    Nenhuma nota fiscal importada ainda. FaÃ§a o upload de um XML acima.
                   </td>
                 </tr>
               ) : (
@@ -1061,7 +1061,7 @@ const EntradaXML = () => {
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
                             title="Vincular produtos"
                           >
-                            🔗 Vincular
+                            ðŸ”— Vincular
                           </button>
                         )}
                         {nota.entrada_estoque_realizada ? (
@@ -1070,7 +1070,7 @@ const EntradaXML = () => {
                             className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
                             title="Reverter entrada no estoque"
                           >
-                            ↩️ Reverter
+                            â†©ï¸ Reverter
                           </button>
                         ) : (
                           <button
@@ -1078,7 +1078,7 @@ const EntradaXML = () => {
                             className="text-red-600 hover:text-red-800 font-semibold text-sm"
                             title="Excluir nota"
                           >
-                            🗑️ Excluir
+                            ðŸ—‘ï¸ Excluir
                           </button>
                         )}
                       </div>
@@ -1095,10 +1095,10 @@ const EntradaXML = () => {
       {mostrarDetalhes && notaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Cabeçalho */}
+            {/* CabeÃ§alho */}
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">📄 Detalhes da NF-e</h2>
+                <h2 className="text-xl font-bold">ðŸ“„ Detalhes da NF-e</h2>
                 <p className="text-sm text-gray-600">Chave: {notaSelecionada.chave_acesso}</p>
               </div>
               <button
@@ -1108,11 +1108,11 @@ const EntradaXML = () => {
                 }}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
-                ×
+                Ã—
               </button>
             </div>
 
-            {/* Informações da Nota */}
+            {/* InformaÃ§Ãµes da Nota */}
             <div className="px-6 py-4 border-b bg-gray-50">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
@@ -1120,11 +1120,11 @@ const EntradaXML = () => {
                   <div className="font-semibold">{notaSelecionada.fornecedor_nome}</div>
                   <div className="text-xs text-gray-500">{notaSelecionada.fornecedor_cnpj}</div>
                   {notaSelecionada.fornecedor_id && (
-                    <div className="text-xs text-green-600 mt-1">✅ Cadastrado</div>
+                    <div className="text-xs text-green-600 mt-1">âœ… Cadastrado</div>
                   )}
                 </div>
                 <div>
-                  <span className="text-gray-600">Data Emissão:</span>
+                  <span className="text-gray-600">Data EmissÃ£o:</span>
                   <div className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString()}</div>
                 </div>
                 <div>
@@ -1134,7 +1134,7 @@ const EntradaXML = () => {
               </div>
             </div>
 
-            {/* Alerta de Fornecedor Novo - Versão Compacta */}
+            {/* Alerta de Fornecedor Novo - VersÃ£o Compacta */}
             {notaSelecionada.fornecedor_id && notaSelecionada.fornecedor_criado_automaticamente && (
               <div className="px-6 py-2 bg-blue-50 border-b border-blue-200">
                 <div className="flex items-center justify-between">
@@ -1145,7 +1145,7 @@ const EntradaXML = () => {
                     onClick={() => navigate(`/clientes/${notaSelecionada.fornecedor_id}`)}
                     className="px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 text-xs"
                   >
-                    📝 Completar Cadastro
+                    ðŸ“ Completar Cadastro
                   </button>
                 </div>
               </div>
@@ -1155,7 +1155,7 @@ const EntradaXML = () => {
             <div className="px-6 py-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-xl text-gray-800">
-                  📦 Produtos da Nota ({notaSelecionada.itens.length})
+                  ðŸ“¦ Produtos da Nota ({notaSelecionada.itens.length})
                 </h3>
                 
                 {notaSelecionada.status === 'pendente' && 
@@ -1164,9 +1164,9 @@ const EntradaXML = () => {
                     onClick={criarTodosProdutosNaoVinculados}
                     disabled={loading}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-                    title="Cria automaticamente todos os produtos não vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
+                    title="Cria automaticamente todos os produtos nÃ£o vinculados com os padrÃµes: Estoque mÃ­n: 10, mÃ¡x: 100, Margem: 50%"
                   >
-                    <span>✨ Criar Todos Não Vinculados</span>
+                    <span>âœ¨ Criar Todos NÃ£o Vinculados</span>
                     <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
                       {notaSelecionada.itens.filter(i => !i.produto_id).length}
                     </span>
@@ -1181,7 +1181,7 @@ const EntradaXML = () => {
                   
                   return (
                     <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
-                      {/* Grade de 2 Colunas: NF-e (esquerda) | Conexão | Produto Sistema (direita) */}
+                      {/* Grade de 2 Colunas: NF-e (esquerda) | ConexÃ£o | Produto Sistema (direita) */}
                       <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
                         {/* COLUNA ESQUERDA: Dados da NF-e */}
                         <div className="bg-blue-50 border-r-2 border-gray-300 p-4">
@@ -1194,7 +1194,7 @@ const EntradaXML = () => {
                           
                           <div className="space-y-1.5 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-600">Código:</span>
+                              <span className="text-gray-600">CÃ³digo:</span>
                               <span className="font-mono font-semibold">{item.codigo_produto}</span>
                             </div>
                             {item.ean && item.ean !== 'SEM GTIN' && (
@@ -1230,13 +1230,13 @@ const EntradaXML = () => {
                             <div className="mt-3 pt-3 border-t space-y-2">
                               {item.lote && (
                                 <div className="text-xs">
-                                  <span className="text-gray-600">📦 Lote:</span>
+                                  <span className="text-gray-600">ðŸ“¦ Lote:</span>
                                   <div className="font-semibold text-purple-800">{item.lote}</div>
                                 </div>
                               )}
                               {item.data_validade && (
                                 <div className="text-xs">
-                                  <span className="text-gray-600">📅 Validade:</span>
+                                  <span className="text-gray-600">ðŸ“… Validade:</span>
                                   <div className="font-semibold text-orange-800">
                                     {new Date(item.data_validade).toLocaleDateString('pt-BR')}
                                   </div>
@@ -1246,27 +1246,27 @@ const EntradaXML = () => {
                           )}
                         </div>
 
-                        {/* COLUNA CENTRAL: Ícone de Conexão + Alerta de Divergência */}
+                        {/* COLUNA CENTRAL: Ãcone de ConexÃ£o + Alerta de DivergÃªncia */}
                         <div className="flex flex-col items-center justify-center bg-gray-100 px-2 py-4">
                           {item.produto_id ? (
                             <>
                               <button
                                 onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
                                 className="text-3xl text-green-600 hover:text-red-600 transition-colors mb-2"
-                                title="✅ Vinculado - Clique para desvincular"
+                                title="âœ… Vinculado - Clique para desvincular"
                               >
-                                ✓
+                                âœ“
                               </button>
                               {temDivergencia && (
                                 <div className="bg-red-100 border-2 border-red-500 rounded-lg p-2 max-w-[200px]">
                                   <div className="text-center">
-                                    <div className="text-2xl mb-1">⚠️</div>
+                                    <div className="text-2xl mb-1">âš ï¸</div>
                                     <div className="font-bold text-red-700 text-xs mb-1">
-                                      DIVERGÊNCIA!
+                                      DIVERGÃŠNCIA!
                                     </div>
                                     <div className="text-[10px] text-red-600 space-y-0.5">
                                       {divergencias.map((div, idx) => (
-                                        <div key={idx}>• {div}</div>
+                                        <div key={idx}>â€¢ {div}</div>
                                       ))}
                                     </div>
                                   </div>
@@ -1274,8 +1274,8 @@ const EntradaXML = () => {
                               )}
                             </>
                           ) : (
-                            <div className="text-3xl text-gray-400" title="❌ Não vinculado">
-                              ✕
+                            <div className="text-3xl text-gray-400" title="âŒ NÃ£o vinculado">
+                              âœ•
                             </div>
                           )}
                         </div>
@@ -1291,7 +1291,7 @@ const EntradaXML = () => {
                                 <>
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      ✅ PRODUTO SISTEMA
+                                      âœ… PRODUTO SISTEMA
                                     </div>
                                   </div>
                                   
@@ -1300,7 +1300,7 @@ const EntradaXML = () => {
                                   </div>
 
                                   <div className="text-xs text-green-700 mb-3 italic">
-                                    💡 Para alterar o vínculo, selecione outro produto ou clique no ✓ para desvincular
+                                    ðŸ’¡ Para alterar o vÃ­nculo, selecione outro produto ou clique no âœ“ para desvincular
                                   </div>
 
                                   {/* Select para trocar produto */}
@@ -1327,7 +1327,7 @@ const EntradaXML = () => {
                                 <>
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      ⚠️ NÃO VINCULADO
+                                      âš ï¸ NÃƒO VINCULADO
                                     </div>
                                   </div>
                                   
@@ -1335,7 +1335,7 @@ const EntradaXML = () => {
                                     {/* Campo de pesquisa */}
                                     <div>
                                       <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                        🔍 Pesquisar produto existente:
+                                        ðŸ” Pesquisar produto existente:
                                       </label>
                                       <input
                                         type="text"
@@ -1373,7 +1373,7 @@ const EntradaXML = () => {
                                               }}
                                               className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
                                             >
-                                              {!p.ativo && '🔴 '}{p.codigo} - {p.nome}
+                                              {!p.ativo && 'ðŸ”´ '}{p.codigo} - {p.nome}
                                               {!p.ativo && ' [INATIVO]'} 
                                               <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
                                             </button>
@@ -1387,7 +1387,7 @@ const EntradaXML = () => {
                                           );
                                         }).length === 0 && (
                                           <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                            ❌ Nenhum produto encontrado
+                                            âŒ Nenhum produto encontrado
                                           </div>
                                         )}
                                       </div>
@@ -1403,19 +1403,19 @@ const EntradaXML = () => {
                                       onClick={() => abrirModalCriarProduto(item)}
                                       className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-sm"
                                     >
-                                      ➕ Criar Novo Produto
+                                      âž• Criar Novo Produto
                                     </button>
                                   </div>
                                 </>
                               )}
                             </>
                           ) : (
-                            // Nota já processada - apenas visualização
+                            // Nota jÃ¡ processada - apenas visualizaÃ§Ã£o
                             <div>
                               {item.produto_id ? (
                                 <>
                                   <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
-                                    ✅ VINCULADO
+                                    âœ… VINCULADO
                                   </div>
                                   <div className="font-semibold text-base text-green-900">
                                     {item.produto_nome}
@@ -1423,7 +1423,7 @@ const EntradaXML = () => {
                                 </>
                               ) : (
                                 <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
-                                  ⚠️ NÃO VINCULADO
+                                  âš ï¸ NÃƒO VINCULADO
                                 </div>
                               )}
                             </div>
@@ -1437,13 +1437,13 @@ const EntradaXML = () => {
                        item.produto_id && (
                         <div className="col-span-3 p-4 border-t-2 border-gray-300 bg-gradient-to-r from-blue-50 via-gray-50 to-green-50">
                           <h4 className="font-medium text-gray-700 mb-3 flex items-center text-sm">
-                            📦 Quantidade destinada ao estoque online
+                            ðŸ“¦ Quantidade destinada ao estoque online
                           </h4>
                           
                           <div className="grid grid-cols-3 gap-4">
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">
-                                📋 Total NF
+                                ðŸ“‹ Total NF
                               </label>
                               <input
                                 type="number"
@@ -1455,7 +1455,7 @@ const EntradaXML = () => {
                             
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                🌐 Online
+                                ðŸŒ Online
                               </label>
                               <input
                                 type="number"
@@ -1477,7 +1477,7 @@ const EntradaXML = () => {
                             
                             <div>
                               <label className="block text-xs font-medium text-gray-600 mb-1">
-                                🏪 Loja
+                                ðŸª Loja
                               </label>
                               <input
                                 type="number"
@@ -1489,7 +1489,7 @@ const EntradaXML = () => {
                           </div>
                           
                           <div className="mt-3 text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-300 font-medium">
-                            💵 Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
+                            ðŸ’µ Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
                           </div>
                           
                           {(quantidadesOnline[item.id] !== undefined && 
@@ -1502,12 +1502,12 @@ const EntradaXML = () => {
                               )}
                               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 mt-3 text-sm"
                             >
-                              💾 Salvar Distribuição
+                              ðŸ’¾ Salvar DistribuiÃ§Ã£o
                             </button>
                           ) : (
                             item.quantidade_online !== null && item.quantidade_online !== undefined && (
                               <div className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3 border border-green-200 flex items-center justify-center font-medium">
-                                ✅ Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
+                                âœ… Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
                               </div>
                             )
                           )}
@@ -1517,7 +1517,7 @@ const EntradaXML = () => {
 
                     {notaSelecionada.status === 'processada' && item.produto_id && (
                       <div className="mt-3 pt-3 border-t bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <span className="text-blue-800 font-semibold">✅ Lançado no estoque:</span>
+                        <span className="text-blue-800 font-semibold">âœ… LanÃ§ado no estoque:</span>
                         <span className="ml-2">{item.produto_nome}</span>
                       </div>
                     )}
@@ -1527,17 +1527,17 @@ const EntradaXML = () => {
               </div>
             </div>
 
-            {/* Rodapé com Ações */}
+            {/* RodapÃ© com AÃ§Ãµes */}
             {notaSelecionada.status === 'pendente' && (
               <div className="sticky bottom-0 bg-white border-t px-6 py-4 space-y-3">
-                {/* Seção de Rateio - ANTES de processar */}
+                {/* SeÃ§Ã£o de Rateio - ANTES de processar */}
                 <div className="bg-gray-50 border border-gray-200 rounded p-3">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-700">
-                      📊 Distribuição (informativo para relatórios)
+                      ðŸ“Š DistribuiÃ§Ã£o (informativo para relatÃ³rios)
                     </h4>
                     <div className="text-xs text-gray-500">
-                      Estoque unificado • Classificação apenas para análises
+                      Estoque unificado â€¢ ClassificaÃ§Ã£o apenas para anÃ¡lises
                     </div>
                   </div>
                   
@@ -1551,7 +1551,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      🏪 Loja
+                      ðŸª Loja
                     </button>
                     <button
                       onClick={() => salvarTipoRateio(notaSelecionada.id, 'online')}
@@ -1562,7 +1562,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      🌐 Online
+                      ðŸŒ Online
                     </button>
                     <button
                       onClick={() => salvarTipoRateio(notaSelecionada.id, 'parcial')}
@@ -1573,7 +1573,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      📊 Parcial
+                      ðŸ“Š Parcial
                     </button>
                     
                     {(notaSelecionada.percentual_online > 0 || notaSelecionada.tipo_rateio) && (
@@ -1586,12 +1586,12 @@ const EntradaXML = () => {
 
                   {tipoRateio === 'parcial' && (
                     <div className="mt-2 text-xs text-gray-600 bg-gray-100 rounded p-2">
-                      💡 Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
+                      ðŸ’¡ Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
                     </div>
                   )}
                 </div>
 
-                {/* Barra de Status e Botões de Ação */}
+                {/* Barra de Status e BotÃµes de AÃ§Ã£o */}
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
                     {notaSelecionada.itens.filter(i => i.produto_id).length} de {notaSelecionada.itens.length} produtos vinculados
@@ -1603,7 +1603,7 @@ const EntradaXML = () => {
                         disabled={loading}
                         className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:bg-gray-400"
                       >
-                        {loading ? '⏳ Revertendo...' : '↩️ Reverter Entrada'}
+                        {loading ? 'â³ Revertendo...' : 'â†©ï¸ Reverter Entrada'}
                       </button>
                     ) : (
                       <>
@@ -1613,7 +1613,7 @@ const EntradaXML = () => {
                             disabled={loading}
                             className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-400"
                           >
-                            🗑️ Excluir Nota
+                            ðŸ—‘ï¸ Excluir Nota
                           </button>
                         )}
                         {notaSelecionada.itens.some(i => i.produto_id) && (
@@ -1623,14 +1623,14 @@ const EntradaXML = () => {
                               disabled={loading}
                               className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                             >
-                              💰 Revisar Preços
+                              ðŸ’° Revisar PreÃ§os
                             </button>
                             <button
                               onClick={() => processarNota(notaSelecionada.id)}
                               disabled={loading}
                               className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
                             >
-                              {loading ? '⏳ Processando...' : '✅ Processar Nota'}
+                              {loading ? 'â³ Processando...' : 'âœ… Processar Nota'}
                             </button>
                           </>
                         )}
@@ -1659,7 +1659,7 @@ const EntradaXML = () => {
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">➕ Criar Novo Produto</h2>
+                <h2 className="text-xl font-bold">âž• Criar Novo Produto</h2>
                 <p className="text-sm text-gray-600">A partir do item da NF-e</p>
               </div>
               <button
@@ -1670,7 +1670,7 @@ const EntradaXML = () => {
                 }}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
-                ×
+                Ã—
               </button>
             </div>
 
@@ -1678,21 +1678,21 @@ const EntradaXML = () => {
               {carregandoSugestao ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Gerando sugestões de SKU...</p>
+                  <p className="text-gray-600">Gerando sugestÃµes de SKU...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Informações do Item da NF-e */}
+                  {/* InformaÃ§Ãµes do Item da NF-e */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="font-semibold text-blue-900 mb-2">📄 Dados da NF-e:</div>
+                    <div className="font-semibold text-blue-900 mb-2">ðŸ“„ Dados da NF-e:</div>
                     <div className="text-sm space-y-1 text-blue-800">
-                      <div><strong>Descrição:</strong> {itemSelecionadoParaCriar.descricao}</div>
-                      <div><strong>Código Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
+                      <div><strong>DescriÃ§Ã£o:</strong> {itemSelecionadoParaCriar.descricao}</div>
+                      <div><strong>CÃ³digo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
                       <div><strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}</div>
                       {itemSelecionadoParaCriar.ean && (
                         <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
                       )}
-                      <div><strong>Valor Unitário:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
+                      <div><strong>Valor UnitÃ¡rio:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
                     </div>
                   </div>
 
@@ -1700,17 +1700,17 @@ const EntradaXML = () => {
                   {sugestaoSku?.ja_existe && (
                     <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-2xl">⚠️</span>
+                        <span className="text-2xl">âš ï¸</span>
                         <div className="flex-1">
                           <div className="font-semibold text-yellow-900 mb-2">
-                            Código do fornecedor "{sugestaoSku.sku_proposto}" já está em uso!
+                            CÃ³digo do fornecedor "{sugestaoSku.sku_proposto}" jÃ¡ estÃ¡ em uso!
                           </div>
                           <div className="text-sm text-yellow-800 mb-3">
                             Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br/>
-                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. Você pode alterar se preferir.</span>
+                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. VocÃª pode alterar se preferir.</span>
                           </div>
                           <div className="text-sm text-yellow-800 mb-2 font-semibold">
-                            Outras opções de SKU disponíveis:
+                            Outras opÃ§Ãµes de SKU disponÃ­veis:
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {sugestaoSku.sugestoes.map(sug => (
@@ -1723,7 +1723,7 @@ const EntradaXML = () => {
                                     : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50'
                                 } ${sug.padrao ? 'ring-2 ring-yellow-400' : ''}`}
                               >
-                                {sug.sku} {sug.padrao && '⭐'}
+                                {sug.sku} {sug.padrao && 'â­'}
                               </button>
                             ))}
                           </div>
@@ -1732,25 +1732,25 @@ const EntradaXML = () => {
                     </div>
                   )}
 
-                  {/* Sucesso - SKU disponível */}
+                  {/* Sucesso - SKU disponÃ­vel */}
                   {sugestaoSku && !sugestaoSku.ja_existe && (
                     <div className="bg-green-50 border border-green-300 rounded-lg p-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">✅</span>
+                        <span className="text-xl">âœ…</span>
                         <div className="text-sm text-green-800">
-                          <strong>SKU disponível!</strong> O código do fornecedor pode ser usado diretamente.
+                          <strong>SKU disponÃ­vel!</strong> O cÃ³digo do fornecedor pode ser usado diretamente.
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Formulário */}
+                  {/* FormulÃ¡rio */}
                   <div className="space-y-4">
                     {/* SKU */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        SKU / Código do Produto *
-                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no código do fornecedor)</span>
+                        SKU / CÃ³digo do Produto *
+                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no cÃ³digo do fornecedor)</span>
                       </label>
                       <input
                         type="text"
@@ -1759,7 +1759,7 @@ const EntradaXML = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
                         placeholder="Ex: MGZ-12345"
                       />
-                      <p className="text-xs text-gray-500 mt-1">💡 Você pode editar o SKU se preferir</p>
+                      <p className="text-xs text-gray-500 mt-1">ðŸ’¡ VocÃª pode editar o SKU se preferir</p>
                     </div>
 
                     {/* Nome */}
@@ -1776,25 +1776,25 @@ const EntradaXML = () => {
                       />
                     </div>
 
-                    {/* Descrição */}
+                    {/* DescriÃ§Ã£o */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        Descrição
+                        DescriÃ§Ã£o
                       </label>
                       <textarea
                         value={formProduto.descricao}
                         onChange={(e) => setFormProduto({ ...formProduto, descricao: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         rows="2"
-                        placeholder="Descrição detalhada (opcional)"
+                        placeholder="DescriÃ§Ã£o detalhada (opcional)"
                       />
                     </div>
 
-                    {/* Preços */}
+                    {/* PreÃ§os */}
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preço de Custo *
+                          PreÃ§o de Custo *
                         </label>
                         <input
                           type="number"
@@ -1834,7 +1834,7 @@ const EntradaXML = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preço de Venda *
+                          PreÃ§o de Venda *
                         </label>
                         <input
                           type="number"
@@ -1858,7 +1858,7 @@ const EntradaXML = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Mínimo
+                          Estoque MÃ­nimo
                         </label>
                         <input
                           type="number"
@@ -1869,7 +1869,7 @@ const EntradaXML = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Máximo
+                          Estoque MÃ¡ximo
                         </label>
                         <input
                           type="number"
@@ -1884,7 +1884,7 @@ const EntradaXML = () => {
               )}
             </div>
 
-            {/* Rodapé */}
+            {/* RodapÃ© */}
             <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -1909,14 +1909,14 @@ const EntradaXML = () => {
                 }
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? '⏳ Criando...' : '✅ Criar e Vincular Produto'}
+                {loading ? 'â³ Criando...' : 'âœ… Criar e Vincular Produto'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal de Visualização da Nota */}
+      {/* Modal de VisualizaÃ§Ã£o da Nota */}
       {mostrarVisualizacao && notaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1924,8 +1924,8 @@ const EntradaXML = () => {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-2xl font-bold">📄 NF-e {notaSelecionada.numero_nota}</h2>
-                  <p className="text-blue-100 mt-1">Série: {notaSelecionada.serie}</p>
+                  <h2 className="text-2xl font-bold">ðŸ“„ NF-e {notaSelecionada.numero_nota}</h2>
+                  <p className="text-blue-100 mt-1">SÃ©rie: {notaSelecionada.serie}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -1934,20 +1934,20 @@ const EntradaXML = () => {
                   }}
                   className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
                 >
-                  ✕
+                  âœ•
                 </button>
               </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              {/* Informações da Nota */}
+              {/* InformaÃ§Ãµes da Nota */}
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">📋 Dados da Nota</h3>
+                  <h3 className="font-semibold text-gray-700 mb-3">ðŸ“‹ Dados da Nota</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Data Emissão:</span>
+                      <span className="text-gray-600">Data EmissÃ£o:</span>
                       <span className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString('pt-BR')}</span>
                     </div>
                     <div className="flex justify-between">
@@ -1962,7 +1962,7 @@ const EntradaXML = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">🏢 Fornecedor</h3>
+                  <h3 className="font-semibold text-gray-700 mb-3">ðŸ¢ Fornecedor</h3>
                   <div className="space-y-2 text-sm">
                     <div>
                       <span className="text-gray-600">Nome:</span>
@@ -1978,11 +1978,11 @@ const EntradaXML = () => {
 
               {/* Chave de Acesso */}
               <div className="mb-6 p-3 bg-gray-50 rounded">
-                <div className="text-xs text-gray-600 mb-1">🔑 Chave de Acesso</div>
+                <div className="text-xs text-gray-600 mb-1">ðŸ”‘ Chave de Acesso</div>
                 <div className="font-mono text-xs break-all">{notaSelecionada.chave_acesso}</div>
               </div>
 
-              {/* Status de Vinculação */}
+              {/* Status de VinculaÃ§Ã£o */}
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-blue-600">{notaSelecionada.itens?.length || 0}</div>
@@ -1994,13 +1994,13 @@ const EntradaXML = () => {
                 </div>
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-orange-600">{notaSelecionada.produtos_nao_vinculados}</div>
-                  <div className="text-sm text-gray-600">Não Vinculados</div>
+                  <div className="text-sm text-gray-600">NÃ£o Vinculados</div>
                 </div>
               </div>
 
               {/* Itens da Nota */}
               <div>
-                <h3 className="font-semibold text-gray-700 mb-3">📦 Itens da Nota</h3>
+                <h3 className="font-semibold text-gray-700 mb-3">ðŸ“¦ Itens da Nota</h3>
                 <div className="space-y-3">
                   {notaSelecionada.itens?.map((item, index) => (
                     <div key={item.id} className="border border-gray-200 rounded-lg p-4">
@@ -2008,16 +2008,16 @@ const EntradaXML = () => {
                         <div className="flex-1">
                           <div className="font-semibold text-gray-800">{item.descricao}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            Código: {item.codigo_produto} | NCM: {item.ncm}
+                            CÃ³digo: {item.codigo_produto} | NCM: {item.ncm}
                           </div>
                         </div>
                         {item.vinculado ? (
                           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">
-                            ✓ Vinculado
+                            âœ“ Vinculado
                           </span>
                         ) : (
                           <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">
-                            ⚠ Não Vinculado
+                            âš  NÃ£o Vinculado
                           </span>
                         )}
                       </div>
@@ -2046,13 +2046,13 @@ const EntradaXML = () => {
                         <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
                           {item.lote && (
                             <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                              <span className="text-gray-600">📦 Lote:</span>
+                              <span className="text-gray-600">ðŸ“¦ Lote:</span>
                               <div className="font-semibold text-purple-800">{item.lote}</div>
                             </div>
                           )}
                           {item.data_validade && (
                             <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                              <span className="text-gray-600">📅 Validade:</span>
+                              <span className="text-gray-600">ðŸ“… Validade:</span>
                               <div className="font-semibold text-orange-800">
                                 {new Date(item.data_validade).toLocaleDateString('pt-BR')}
                               </div>
@@ -2063,7 +2063,7 @@ const EntradaXML = () => {
 
                       {item.vinculado && item.produto_nome && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
-                          <span className="text-xs text-gray-600">→ Produto vinculado: </span>
+                          <span className="text-xs text-gray-600">â†’ Produto vinculado: </span>
                           <span className="text-sm font-semibold text-blue-600">{item.produto_nome}</span>
                         </div>
                       )}
@@ -2077,9 +2077,9 @@ const EntradaXML = () => {
             <div className="border-t p-6 bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-600">
                 {notaSelecionada.entrada_estoque_realizada ? (
-                  <span className="text-green-600 font-semibold">✅ Entrada realizada no estoque</span>
+                  <span className="text-green-600 font-semibold">âœ… Entrada realizada no estoque</span>
                 ) : (
-                  <span className="text-orange-600 font-semibold">⚠️ Entrada ainda não processada</span>
+                  <span className="text-orange-600 font-semibold">âš ï¸ Entrada ainda nÃ£o processada</span>
                 )}
               </div>
               <div className="flex gap-3">
@@ -2092,7 +2092,7 @@ const EntradaXML = () => {
                       }}
                       className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                     >
-                      💰 Revisar Preços e Processar
+                      ðŸ’° Revisar PreÃ§os e Processar
                     </button>
                   </>
                 )}
@@ -2104,7 +2104,7 @@ const EntradaXML = () => {
                     }}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
                   >
-                    🔗 Vincular Produtos
+                    ðŸ”— Vincular Produtos
                   </button>
                 )}
                 <button
@@ -2122,19 +2122,19 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de Revisão de Preços */}
+      {/* Modal de RevisÃ£o de PreÃ§os */}
       {mostrarRevisaoPrecos && previewProcessamento && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
-              <h2 className="text-2xl font-bold">💰 Revisão de Preços e Custos</h2>
+              <h2 className="text-2xl font-bold">ðŸ’° RevisÃ£o de PreÃ§os e Custos</h2>
               <p className="text-purple-100 mt-1">
                 NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
               </p>
             </div>
 
-            {/* Resumo de Alterações */}
+            {/* Resumo de AlteraÃ§Ãµes */}
             <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-semibold text-gray-700">Filtrar:</span>
@@ -2167,7 +2167,7 @@ const EntradaXML = () => {
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
                       >
-                        <span className="text-base">📋</span>
+                        <span className="text-base">ðŸ“‹</span>
                         Todos ({total})
                       </button>
                       
@@ -2180,7 +2180,7 @@ const EntradaXML = () => {
                               : 'bg-red-100 text-red-700 hover:bg-red-200'
                           }`}
                         >
-                          <span className="text-base">📈</span>
+                          <span className="text-base">ðŸ“ˆ</span>
                           {aumentos} custo{aumentos > 1 ? 's' : ''} maior{aumentos > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2194,7 +2194,7 @@ const EntradaXML = () => {
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
                           }`}
                         >
-                          <span className="text-base">📉</span>
+                          <span className="text-base">ðŸ“‰</span>
                           {reducoes} custo{reducoes > 1 ? 's' : ''} menor{reducoes > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2208,8 +2208,8 @@ const EntradaXML = () => {
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
-                          <span className="text-base">➡️</span>
-                          {iguais} sem alteração
+                          <span className="text-base">âž¡ï¸</span>
+                          {iguais} sem alteraÃ§Ã£o
                         </button>
                       )}
                     </>
@@ -2228,7 +2228,7 @@ const EntradaXML = () => {
                     
                     if (!vinculado) return false;
                     
-                    // Pegar variação de custo (pode estar em produto_vinculado ou diretamente no item)
+                    // Pegar variaÃ§Ã£o de custo (pode estar em produto_vinculado ou diretamente no item)
                     const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || item.variacao_custo_percentual || 0;
                     
                     if (filtroCusto === 'todos') return true;
@@ -2278,7 +2278,7 @@ const EntradaXML = () => {
                               onClick={() => buscarHistoricoPrecos(produtoVinc.produto_id, produtoVinc.produto_nome)}
                               className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
                             >
-                              📊 Histórico
+                              ðŸ“Š HistÃ³rico
                             </button>
                             <div className="mt-1 text-sm">
                               Quantidade <strong>{item.quantidade || item.quantidade_nf || 0}</strong>
@@ -2288,33 +2288,33 @@ const EntradaXML = () => {
                       </div>
 
                       <div className="p-5 bg-white space-y-4">
-                        {/* Comparação de Custos */}
+                        {/* ComparaÃ§Ã£o de Custos */}
                         <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">💵 Custo Anterior</div>
+                            <div className="text-xs text-gray-500 mb-1">ðŸ’µ Custo Anterior</div>
                             <div className="text-2xl font-bold text-gray-700">
                               R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">🆕 Custo Novo</div>
+                            <div className="text-xs text-gray-500 mb-1">ðŸ†• Custo Novo</div>
                             <div className="text-2xl font-bold text-blue-600">
                               R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">📊 Variação</div>
+                            <div className="text-xs text-gray-500 mb-1">ðŸ“Š VariaÃ§Ã£o</div>
                             <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                              {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
+                              {custoVariacao > 0 ? 'â†—' : custoVariacao < 0 ? 'â†˜' : 'âž¡'} {Math.abs(custoVariacao).toFixed(1)}%
                             </div>
                           </div>
                         </div>
 
-                        {/* Campos de Preço e Margem */}
+                        {/* Campos de PreÃ§o e Margem */}
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              💰 Preço de Venda
+                              ðŸ’° PreÃ§o de Venda
                             </label>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
@@ -2337,7 +2337,7 @@ const EntradaXML = () => {
 
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              📈 Margem de Lucro
+                              ðŸ“ˆ Margem de Lucro
                             </label>
                             <div className="relative">
                               <input
@@ -2359,20 +2359,20 @@ const EntradaXML = () => {
                           </div>
                         </div>
 
-                        {/* Análise Comparativa */}
+                        {/* AnÃ¡lise Comparativa */}
                         <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                          <h4 className="text-sm font-semibold text-purple-800 mb-3">📊 Análise Comparativa (Valores Anteriores)</h4>
+                          <h4 className="text-sm font-semibold text-purple-800 mb-3">ðŸ“Š AnÃ¡lise Comparativa (Valores Anteriores)</h4>
                           <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">ðŸ’µ Custo Anterior</div>
                               <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">💰 Preço Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">ðŸ’° PreÃ§o Anterior</div>
                               <div className="text-lg font-bold text-blue-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">📈 Margem Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">ðŸ“ˆ Margem Anterior</div>
                               <div className="text-lg font-bold text-purple-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
                             </div>
                           </div>
@@ -2393,7 +2393,7 @@ const EntradaXML = () => {
                 }}
                 className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors"
               >
-                ❌ Cancelar
+                âŒ Cancelar
               </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -2407,7 +2407,7 @@ const EntradaXML = () => {
                   disabled={loading}
                   className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-lg shadow-lg disabled:opacity-50 transition-all"
                 >
-                  {loading ? '⏳ Processando...' : '✅ Confirmar e Processar Nota'}
+                  {loading ? 'â³ Processando...' : 'âœ… Confirmar e Processar Nota'}
                 </button>
               </div>
             </div>
@@ -2415,13 +2415,13 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de Histórico de Preços */}
+      {/* Modal de HistÃ³rico de PreÃ§os */}
       {mostrarHistoricoPrecos && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
-              <h2 className="text-2xl font-bold">📊 Histórico de Alterações de Preços</h2>
+              <h2 className="text-2xl font-bold">ðŸ“Š HistÃ³rico de AlteraÃ§Ãµes de PreÃ§os</h2>
               {produtoHistorico && (
                 <p className="mt-2 text-purple-100">
                   {produtoHistorico.nome}
@@ -2437,7 +2437,7 @@ const EntradaXML = () => {
                 </div>
               ) : historicoPrecos.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">Nenhuma alteração de preço registrada</p>
+                  <p className="text-gray-500 text-lg">Nenhuma alteraÃ§Ã£o de preÃ§o registrada</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2448,13 +2448,13 @@ const EntradaXML = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">
-                              {hist.motivo === 'nfe_entrada' ? '📦' : 
-                               hist.motivo === 'nfe_revisao_precos' ? '💰' : 
-                               hist.motivo === 'manual' ? '✏️' : '📝'}
+                              {hist.motivo === 'nfe_entrada' ? 'ðŸ“¦' : 
+                               hist.motivo === 'nfe_revisao_precos' ? 'ðŸ’°' : 
+                               hist.motivo === 'manual' ? 'âœï¸' : 'ðŸ“'}
                             </span>
                             <span className="font-semibold text-gray-800">
                               {hist.motivo === 'nfe_entrada' ? 'Entrada NF-e' :
-                               hist.motivo === 'nfe_revisao_precos' ? 'Revisão de Preços' :
+                               hist.motivo === 'nfe_revisao_precos' ? 'RevisÃ£o de PreÃ§os' :
                                hist.motivo === 'manual' ? 'Ajuste Manual' :
                                hist.motivo}
                             </span>
@@ -2474,18 +2474,18 @@ const EntradaXML = () => {
                         </div>
                       </div>
 
-                      {/* Alterações de Preço */}
+                      {/* AlteraÃ§Ãµes de PreÃ§o */}
                       <div className="grid grid-cols-2 gap-4">
                         {/* Custo */}
                         {hist.preco_custo_anterior !== null && hist.preco_custo_novo !== null && (
                           <div className="bg-blue-50 rounded-lg p-3">
-                            <div className="text-xs text-gray-600 font-semibold mb-2">💵 CUSTO</div>
+                            <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ’µ CUSTO</div>
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm text-gray-500">Anterior</div>
                                 <div className="text-lg font-bold">R$ {hist.preco_custo_anterior.toFixed(2)}</div>
                               </div>
-                              <div className="text-2xl">→</div>
+                              <div className="text-2xl">â†’</div>
                               <div>
                                 <div className="text-sm text-gray-500">Novo</div>
                                 <div className="text-lg font-bold text-blue-700">R$ {hist.preco_custo_novo.toFixed(2)}</div>
@@ -2495,22 +2495,22 @@ const EntradaXML = () => {
                               <div className={`mt-2 text-sm font-semibold text-center ${
                                 hist.variacao_custo_percentual > 0 ? 'text-red-600' : 'text-green-600'
                               }`}>
-                                {hist.variacao_custo_percentual > 0 ? '↑' : '↓'} {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
+                                {hist.variacao_custo_percentual > 0 ? 'â†‘' : 'â†“'} {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
                               </div>
                             )}
                           </div>
                         )}
 
-                        {/* Preço de Venda */}
+                        {/* PreÃ§o de Venda */}
                         {hist.preco_venda_anterior !== null && hist.preco_venda_novo !== null && (
                           <div className="bg-green-50 rounded-lg p-3">
-                            <div className="text-xs text-gray-600 font-semibold mb-2">💲 PREÇO DE VENDA</div>
+                            <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ’² PREÃ‡O DE VENDA</div>
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm text-gray-500">Anterior</div>
                                 <div className="text-lg font-bold">R$ {hist.preco_venda_anterior.toFixed(2)}</div>
                               </div>
-                              <div className="text-2xl">→</div>
+                              <div className="text-2xl">â†’</div>
                               <div>
                                 <div className="text-sm text-gray-500">Novo</div>
                                 <div className="text-lg font-bold text-green-700">R$ {hist.preco_venda_novo.toFixed(2)}</div>
@@ -2520,7 +2520,7 @@ const EntradaXML = () => {
                               <div className={`mt-2 text-sm font-semibold text-center ${
                                 hist.variacao_venda_percentual > 0 ? 'text-green-600' : 'text-red-600'
                               }`}>
-                                {hist.variacao_venda_percentual > 0 ? '↑' : '↓'} {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
+                                {hist.variacao_venda_percentual > 0 ? 'â†‘' : 'â†“'} {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
                               </div>
                             )}
                           </div>
@@ -2530,13 +2530,13 @@ const EntradaXML = () => {
                       {/* Margens */}
                       {hist.margem_anterior !== null && hist.margem_nova !== null && (
                         <div className="mt-3 bg-purple-50 rounded-lg p-3">
-                          <div className="text-xs text-gray-600 font-semibold mb-2">📈 MARGEM DE LUCRO</div>
+                          <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ“ˆ MARGEM DE LUCRO</div>
                           <div className="flex items-center justify-around">
                             <div className="text-center">
                               <div className="text-sm text-gray-500">Anterior</div>
                               <div className="text-xl font-bold">{hist.margem_anterior.toFixed(1)}%</div>
                             </div>
-                            <div className="text-2xl">→</div>
+                            <div className="text-2xl">â†’</div>
                             <div className="text-center">
                               <div className="text-sm text-gray-500">Nova</div>
                               <div className="text-xl font-bold text-purple-700">{hist.margem_nova.toFixed(1)}%</div>
@@ -2545,7 +2545,7 @@ const EntradaXML = () => {
                         </div>
                       )}
 
-                      {/* Observações */}
+                      {/* ObservaÃ§Ãµes */}
                       {hist.observacoes && (
                         <div className="mt-3 text-sm text-gray-600 italic bg-gray-50 rounded p-2">
                           {hist.observacoes}
@@ -2581,7 +2581,7 @@ const EntradaXML = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
               <h2 className="text-2xl font-bold">
-                📦 Resultado do Processamento em Lote
+                ðŸ“¦ Resultado do Processamento em Lote
               </h2>
               {resultadoLote && (
                 <p className="mt-2">
@@ -2632,7 +2632,7 @@ const EntradaXML = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-2xl">
-                                {resultado.sucesso ? '✅' : '❌'}
+                                {resultado.sucesso ? 'âœ…' : 'âŒ'}
                               </span>
                               <span className="font-semibold text-gray-800">
                                 {resultado.arquivo}
@@ -2651,7 +2651,7 @@ const EntradaXML = () => {
                                   <strong>Valor:</strong> R$ {resultado.valor_total?.toFixed(2)}
                                 </p>
                                 <p className="text-gray-700">
-                                  <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados, {resultado.produtos_nao_vinculados} não vinculados
+                                  <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados, {resultado.produtos_nao_vinculados} nÃ£o vinculados
                                 </p>
                               </div>
                             ) : (
@@ -2677,7 +2677,7 @@ const EntradaXML = () => {
                 disabled={uploadingLote}
                 className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-colors"
               >
-                {uploadingLote ? '⏳ Processando...' : 'Fechar'}
+                {uploadingLote ? 'â³ Processando...' : 'Fechar'}
               </button>
             </div>
           </div>
@@ -2688,3 +2688,4 @@ const EntradaXML = () => {
 };
 
 export default EntradaXML;
+

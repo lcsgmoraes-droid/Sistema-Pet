@@ -44,19 +44,51 @@ const ContasPagar = () => {
     carregarDados();
   }, []);
 
+  const carregarFormasPagamento = async () => {
+    const response = await api.get('/comissoes/formas-pagamento');
+    const lista = response.data?.formas || [];
+    return safeArray(lista).map((forma) => ({
+      id: forma.id,
+      nome: forma.nome,
+      tipo: forma.nome?.toLowerCase()?.replace(/\s+/g, '_') || 'outro',
+      icone: '💳',
+      conta_bancaria_destino_id: null,
+    }));
+  };
+
   const carregarDados = async () => {
     try {
-      const [contasRes, fornecedoresRes, formasRes, bancariasRes] = await Promise.all([
+      const [contasRes, fornecedoresRes, formasRes, bancariasRes] = await Promise.allSettled([
         api.get(`/contas-pagar/?_t=${Date.now()}`),
         api.get(`/clientes/?tipo_cadastro=fornecedor`),
-        api.get(`/financeiro/formas-pagamento/`),
+        carregarFormasPagamento(),
         api.get(`/contas-bancarias?apenas_ativas=true`)
       ]);
-      
-      setContas(safeArray(contasRes.data));
-      setFornecedores(safeArray(fornecedoresRes.data));
-      setFormasPagamento(safeArray(formasRes.data));
-      setContasBancarias(safeArray(bancariasRes.data));
+
+      if (contasRes.status === 'fulfilled') {
+        setContas(safeArray(contasRes.value.data));
+      } else {
+        throw contasRes.reason;
+      }
+
+      if (fornecedoresRes.status === 'fulfilled') {
+        setFornecedores(safeArray(fornecedoresRes.value.data));
+      } else {
+        throw fornecedoresRes.reason;
+      }
+
+      if (formasRes.status === 'fulfilled') {
+        setFormasPagamento(safeArray(formasRes.value));
+      } else {
+        setFormasPagamento([]);
+        console.warn('Nao foi possivel carregar formas de pagamento. Usando lista vazia.');
+      }
+
+      if (bancariasRes.status === 'fulfilled') {
+        setContasBancarias(safeArray(bancariasRes.value.data));
+      } else {
+        throw bancariasRes.reason;
+      }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar contas a pagar');

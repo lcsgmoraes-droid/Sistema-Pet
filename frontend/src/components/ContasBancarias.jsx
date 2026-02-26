@@ -12,11 +12,43 @@ const TIPOS_CONTA = [
 ];
 
 const ICONES_DISPONIVEIS = [
-  '🏦', '💰', '💳', '💵', '💸', '🏧',
-  '🪙', '💴', '💶', '💷', '🤑', '💲',
-  '🔒', '🏦', '🏪', '🏢', '🏭', '🎯',
-  '📊', '📈', '💼', '👛', '🎁', '⚡'
+  '\uD83C\uDFE6', '\uD83D\uDCB0', '\uD83D\uDCB3', '\uD83D\uDCB5', '\uD83D\uDCB8', '\uD83C\uDFE7',
+  '\uD83E\uDE99', '\uD83D\uDCB4', '\uD83D\uDCB6', '\uD83D\uDCB7', '\uD83E\uDD11', '\uD83D\uDCB2',
+  '\uD83D\uDD12', '\uD83C\uDFE6', '\uD83C\uDFEA', '\uD83C\uDFE2', '\uD83C\uDFED', '\uD83C\uDFAF',
+  '\uD83D\uDCCA', '\uD83D\uDCC8', '\uD83D\uDCBC', '\uD83D\uDC5B', '\uD83C\uDF81', '\u26A1'
 ];
+
+const DEFAULT_ICON_BY_TIPO = {
+  banco: '\uD83C\uDFE6',
+  caixa: '\uD83D\uDCB0',
+  digital: '\uD83D\uDCB3'
+};
+
+const tryRepairMojibake = (value) => {
+  if (typeof value !== 'string' || !value) return '';
+  try {
+    return decodeURIComponent(escape(value));
+  } catch {
+    return value;
+  }
+};
+
+const normalizeContaIcon = (rawIcon, tipo = 'banco') => {
+  const repaired = tryRepairMojibake(rawIcon).trim();
+  const fallback = DEFAULT_ICON_BY_TIPO[tipo] || '\uD83C\uDFE6';
+
+  if (!repaired) return fallback;
+  if (
+    repaired.includes('?') ||
+    repaired.includes('\uFFFD') ||
+    repaired.includes('ð') ||
+    repaired.includes('Ã')
+  ) {
+    return fallback;
+  }
+
+  return repaired;
+};
 
 function ContasBancarias() {
   const [contas, setContas] = useState([]);
@@ -32,7 +64,7 @@ function ContasBancarias() {
     banco: '',
     saldo_inicial: 0,
     cor: '#dc2626',
-    icone: '🏦',
+    icone: DEFAULT_ICON_BY_TIPO.banco,
     instituicao_bancaria: false,
     ativa: true
   });
@@ -45,7 +77,11 @@ function ContasBancarias() {
     try {
       setLoading(true);
       const response = await api.get('/contas-bancarias');
-      setContas(response.data);
+      const contasNormalizadas = (response.data || []).map((conta) => ({
+        ...conta,
+        icone: normalizeContaIcon(conta.icone, conta.tipo),
+      }));
+      setContas(contasNormalizadas);
     } catch (error) {
       console.error('Erro:', error);
       setErro('Erro ao carregar contas bancárias');
@@ -62,7 +98,7 @@ function ContasBancarias() {
         banco: conta.banco || '',
         saldo_inicial: conta.saldo_inicial,
         cor: conta.cor || '#dc2626',
-        icone: conta.icone || '🏦',
+        icone: normalizeContaIcon(conta.icone, conta.tipo),
         instituicao_bancaria: conta.instituicao_bancaria || false,
         ativa: conta.ativa
       });
@@ -75,7 +111,7 @@ function ContasBancarias() {
         banco: '',
         saldo_inicial: 0,
         cor: tipoPadrao.cor_padrao,
-        icone: '🏦',
+        icone: DEFAULT_ICON_BY_TIPO.banco,
         instituicao_bancaria: false,
         ativa: true
       });
@@ -96,7 +132,7 @@ function ContasBancarias() {
         banco: formData.banco?.trim() || null,
         saldo_inicial: Number(formData.saldo_inicial) || 0,
         cor: formData.cor,
-        icone: formData.icone || '🏦',
+        icone: normalizeContaIcon(formData.icone, formData.tipo),
         instituicao_bancaria: Boolean(formData.instituicao_bancaria),
         ativa: Boolean(formData.ativa)
       };

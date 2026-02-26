@@ -28,6 +28,19 @@ class NativeWebSocketService {
   // Callbacks
   public onConnectionChange: ((connected: boolean) => void) | null = null;
   public onMaxReconnectAttemptsReached: (() => void) | null = null;
+
+  private resolveWsBaseUrl(): string {
+    // @ts-ignore - Vite env variables
+    const configuredApiUrl = import.meta.env?.VITE_API_URL || '/api';
+    const isRelative = configuredApiUrl.startsWith('/');
+
+    if (isRelative) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${window.location.host}${configuredApiUrl}`;
+    }
+
+    return configuredApiUrl.replace('http://', 'ws://').replace('https://', 'wss://');
+  }
   
   connect(token: string, agentId: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
@@ -38,11 +51,8 @@ class NativeWebSocketService {
     this.token = token;
     this.agentId = agentId;
     
-    // Use a mesma URL base da API
-    // @ts-ignore - Vite env variables
-    const baseUrl = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:8000';
-    const wsUrl = baseUrl.replace('http://', 'ws://').replace('https://', 'wss://');
-    const url = `${wsUrl}/ws/whatsapp/${agentId}?token=${token}`;
+    const wsBaseUrl = this.resolveWsBaseUrl().replace(/\/+$/, '');
+    const url = `${wsBaseUrl}/ws/whatsapp/${agentId}?token=${token}`;
     
     console.log('🔌 Connecting to WebSocket:', url);
     

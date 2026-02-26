@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import api from '../api';
+import api from '../api.js';
 import { 
   FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiAlertCircle, 
   FiChevronDown, FiChevronRight, FiCheck 

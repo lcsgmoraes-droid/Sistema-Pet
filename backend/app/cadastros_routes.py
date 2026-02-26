@@ -3,6 +3,7 @@ Routes para gerenciamento de Espécies e Raças
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
@@ -17,6 +18,34 @@ from app.audit_log import log_create, log_update, log_delete
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cadastros", tags=["cadastros"])
+
+
+def ensure_especies_racas_tables_exist(db: Session) -> None:
+    """Cria tabelas de espécies/raças automaticamente em ambientes sem migration."""
+    Especie.__table__.create(bind=db.get_bind(), checkfirst=True)
+    Raca.__table__.create(bind=db.get_bind(), checkfirst=True)
+    # Compatibilidade com schema legado de racas (coluna `especie` textual).
+    db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS especie_id INTEGER"))
+    db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS tenant_id UUID"))
+    db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
+    db.execute(text("""
+        UPDATE racas r
+        SET especie_id = e.id
+        FROM especies e
+        WHERE r.especie_id IS NULL
+          AND COALESCE(r.especie, '') <> ''
+          AND lower(trim(r.especie)) = lower(trim(e.nome))
+    """))
+    db.execute(text("""
+        UPDATE racas r
+        SET tenant_id = e.tenant_id
+        FROM especies e
+        WHERE r.tenant_id IS NULL
+          AND r.especie_id = e.id
+    """))
+    db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_especie_id ON racas (especie_id)"))
+    db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_tenant_id ON racas (tenant_id)"))
+    db.commit()
 
 
 # ========== SCHEMAS ==========
@@ -76,6 +105,7 @@ def listar_especies(
 ):
     """Listar todas as espécies cadastradas"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     query = db.query(Especie).filter(Especie.tenant_id == tenant_id)
     
@@ -97,6 +127,7 @@ def obter_especie(
 ):
     """Obter uma espécie por ID"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     especie = db.query(Especie).filter(
         Especie.id == especie_id,
@@ -120,6 +151,7 @@ def criar_especie(
 ):
     """Criar uma nova espécie"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     # Verificar duplicação
     existe = db.query(Especie).filter(
@@ -165,6 +197,7 @@ def atualizar_especie(
 ):
     """Atualizar uma espécie existente"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     especie = db.query(Especie).filter(
         Especie.id == especie_id,
@@ -229,6 +262,7 @@ def deletar_especie(
 ):
     """Deletar uma espécie (soft delete - desativa)"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     especie = db.query(Especie).filter(
         Especie.id == especie_id,
@@ -283,6 +317,7 @@ def listar_racas(
 ):
     """Listar todas as raças cadastradas (com filtro por espécie)"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     query = db.query(Raca).filter(Raca.tenant_id == tenant_id)
     
@@ -322,6 +357,7 @@ def obter_raca(
 ):
     """Obter uma raça por ID"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     raca = db.query(Raca).filter(
         Raca.id == raca_id,
@@ -353,6 +389,7 @@ def criar_raca(
 ):
     """Criar uma nova raça"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     # Verificar se a espécie existe
     especie = db.query(Especie).filter(
@@ -420,6 +457,7 @@ def atualizar_raca(
 ):
     """Atualizar uma raça existente"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     raca = db.query(Raca).filter(
         Raca.id == raca_id,
@@ -509,6 +547,7 @@ def deletar_raca(
 ):
     """Deletar uma raça (soft delete - desativa)"""
     current_user, tenant_id = user_and_tenant
+    ensure_especies_racas_tables_exist(db)
     
     raca = db.query(Raca).filter(
         Raca.id == raca_id,

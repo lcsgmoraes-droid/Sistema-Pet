@@ -1,8 +1,8 @@
-# ⚠️ ARQUIVO CRÍTICO DE PRODUÇÃO
-# Este arquivo impacta diretamente operações reais (PDV / Financeiro / Estoque).
-# NÃO alterar sem:
+﻿# âš ï¸ ARQUIVO CRÃTICO DE PRODUÃ‡ÃƒO
+# Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
+# NÃƒO alterar sem:
 # 1. Entender o fluxo completo
-# 2. Testar cenário real
+# 2. Testar cenÃ¡rio real
 # 3. Validar impacto financeiro
 
 """
@@ -10,7 +10,7 @@ Routes para gerenciamento de Clientes e Pets
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import case
+from sqlalchemy import case, or_
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
@@ -32,13 +32,13 @@ router = APIRouter(prefix="/clientes", tags=["clientes"])
 # ========== HELPERS INTERNOS ==========
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
-    """Desempacota e valida user_and_tenant (padrão repetido 21x)"""
+    """Desempacota e valida user_and_tenant (padrÃ£o repetido 21x)"""
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
 
 
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
-    """Busca cliente com validação de tenant e retorna 404 se não encontrado"""
+    """Busca cliente com validaÃ§Ã£o de tenant e retorna 404 se nÃ£o encontrado"""
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id
@@ -47,22 +47,22 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado"
+            detail="Cliente nÃ£o encontrado"
         )
     
     return cliente
 
 
-# ========== UTILITÁRIOS ==========
+# ========== UTILITÃRIOS ==========
 
 def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tenant_id: int) -> str:
     """
-    Gera código único para cliente seguindo o padrão:
+    Gera cÃ³digo Ãºnico para cliente seguindo o padrÃ£o:
     - Cliente PF: 1XXX (inicia em 1001)
     - Cliente PJ: 2XXX (inicia em 2001)
     - Fornecedor: 3XXX (inicia em 3001)
-    - Veterinário: 4XXX (inicia em 4001)
-    - Funcionário: 5XXX (inicia em 5001)
+    - VeterinÃ¡rio: 4XXX (inicia em 4001)
+    - FuncionÃ¡rio: 5XXX (inicia em 5001)
     """
     # Definir prefixo baseado no tipo
     if tipo_cadastro == 'cliente':
@@ -78,11 +78,11 @@ def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tena
         prefixo = 5
         base = 5001
     else:
-        # Fallback para tipos não mapeados
+        # Fallback para tipos nÃ£o mapeados
         prefixo = 9
         base = 9001
     
-    # Buscar códigos existentes com este prefixo APENAS DESTE TENANT
+    # Buscar cÃ³digos existentes com este prefixo APENAS DESTE TENANT
     codigos_usados = db.query(Cliente.codigo).filter(
         Cliente.tenant_id == tenant_id,
         Cliente.codigo.like(f'{prefixo}%'),
@@ -91,7 +91,7 @@ def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tena
     
     codigos_usados_set = {int(c[0]) for c in codigos_usados if c[0] and c[0].isdigit()}
     
-    # Encontrar próximo código disponível
+    # Encontrar prÃ³ximo cÃ³digo disponÃ­vel
     proximo_codigo = base
     while proximo_codigo in codigos_usados_set:
         proximo_codigo += 1
@@ -158,25 +158,25 @@ class ClienteCreate(BaseModel):
     celular: Optional[str] = None
     email: Optional[str] = None
     
-    # Pessoa Física
+    # Pessoa FÃ­sica
     cpf: Optional[str] = None
     
-    # Pessoa Jurídica
+    # Pessoa JurÃ­dica
     cnpj: Optional[str] = None
     inscricao_estadual: Optional[str] = None
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
     
-    # Veterinário
+    # VeterinÃ¡rio
     crmv: Optional[str] = None
     
-    # Sistema de parceiros (comissões)
+    # Sistema de parceiros (comissÃµes)
     parceiro_ativo: Optional[bool] = False
     parceiro_desde: Optional[str] = None
     parceiro_observacoes: Optional[str] = None
     
-    # Endereço
+    # EndereÃ§o
     cep: Optional[str] = None
     endereco: Optional[str] = None
     numero: Optional[str] = None
@@ -185,12 +185,12 @@ class ClienteCreate(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     
-    # Endereços de entrega
+    # EndereÃ§os de entrega
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
-    enderecos_adicionais: Optional[list] = None  # Array de endereços com tipo, apelido, etc.
+    enderecos_adicionais: Optional[list] = None  # Array de endereÃ§os com tipo, apelido, etc.
     
-    # 🚚 ENTREGADOR (SPRINT 1)
+    # ðŸšš ENTREGADOR (SPRINT 1)
     is_entregador: bool = False
     entregador_padrao: bool = False
     is_terceirizado: bool = False
@@ -201,11 +201,11 @@ class ClienteCreate(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: bool = False
     
-    # 📆 ACERTO FINANCEIRO (ETAPA 4)
+    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
     
     observacoes: Optional[str] = None
 
@@ -250,10 +250,10 @@ class ClienteUpdate(BaseModel):
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
     
-    # Veterinário
+    # VeterinÃ¡rio
     crmv: Optional[str] = None
     
-    # Sistema de parceiros (comissões)
+    # Sistema de parceiros (comissÃµes)
     parceiro_ativo: Optional[bool] = None
     parceiro_desde: Optional[str] = None
     parceiro_observacoes: Optional[str] = None
@@ -267,12 +267,12 @@ class ClienteUpdate(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     
-    # Endereços de entrega
+    # EndereÃ§os de entrega
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
-    enderecos_adicionais: Optional[list] = None  # Array de endereços com tipo, apelido, etc.
+    enderecos_adicionais: Optional[list] = None  # Array de endereÃ§os com tipo, apelido, etc.
     
-    # 🚚 ENTREGADOR (SPRINT 1)
+    # ðŸšš ENTREGADOR (SPRINT 1)
     is_entregador: Optional[bool] = None
     is_terceirizado: Optional[bool] = None
     recebe_repasse: Optional[bool] = None
@@ -282,7 +282,7 @@ class ClienteUpdate(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: Optional[bool] = None
     
-    # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
+    # ðŸšš ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: Optional[bool] = None
     entregador_padrao: Optional[bool] = None
     controla_rh: Optional[bool] = None
@@ -295,14 +295,14 @@ class ClienteUpdate(BaseModel):
     valor_por_km_entrega: Optional[Decimal] = None
     moto_propria: Optional[bool] = None
     
-    # 📆 ACERTO FINANCEIRO (ETAPA 4)
+    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
     
-    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
-    controla_dre: Optional[bool] = None  # True = vai para DRE, False = não classifica (produtos p/ revenda)
+    # ðŸ“Š DRE - CONTROLE DE CLASSIFICAÃ‡ÃƒO
+    controla_dre: Optional[bool] = None  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
     
     observacoes: Optional[str] = None
     ativo: Optional[bool] = None
@@ -337,10 +337,10 @@ class ClienteResponse(BaseModel):
     nome_fantasia: Optional[str] = None
     responsavel: Optional[str] = None
     
-    # Veterinário
+    # VeterinÃ¡rio
     crmv: Optional[str] = None
     
-    # Sistema de parceiros (comissões)
+    # Sistema de parceiros (comissÃµes)
     parceiro_ativo: bool = False
     parceiro_desde: Optional[dt] = None
     parceiro_observacoes: Optional[str] = None
@@ -354,12 +354,12 @@ class ClienteResponse(BaseModel):
     cidade: Optional[str] = None
     estado: Optional[str] = None
     
-    # Endereços adicionais
+    # EndereÃ§os adicionais
     endereco_entrega: Optional[str] = None
     endereco_entrega_2: Optional[str] = None
     enderecos_adicionais: Optional[list] = None
     
-    # 🚚 ENTREGADOR (SPRINT 1)
+    # ðŸšš ENTREGADOR (SPRINT 1)
     is_entregador: bool = False
     is_terceirizado: bool = False
     recebe_repasse: bool = False
@@ -369,7 +369,7 @@ class ClienteResponse(BaseModel):
     valor_por_km: Optional[Decimal] = None
     recebe_comissao_entrega: bool = False
     
-    # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
+    # ðŸšš ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo: bool = True
     entregador_padrao: bool = False
     controla_rh: bool = False
@@ -382,14 +382,14 @@ class ClienteResponse(BaseModel):
     valor_por_km_entrega: Optional[Decimal] = None
     moto_propria: bool = True
     
-    # 📆 ACERTO FINANCEIRO (ETAPA 4)
+    # ðŸ“† ACERTO FINANCEIRO (ETAPA 4)
     tipo_acerto_entrega: Optional[str] = None  # semanal | quinzenal | mensal
     dia_semana_acerto: Optional[int] = None  # 1=segunda ... 7=domingo
     dia_mes_acerto: Optional[int] = None  # 1 a 28
-    data_ultimo_acerto: Optional[str] = None  # Data do último acerto (YYYY-MM-DD)
+    data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
     
-    # 📊 DRE - CONTROLE DE CLASSIFICAÇÃO
-    controla_dre: bool = True  # True = vai para DRE, False = não classifica (produtos p/ revenda)
+    # ðŸ“Š DRE - CONTROLE DE CLASSIFICAÃ‡ÃƒO
+    controla_dre: bool = True  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
     
     observacoes: Optional[str] = None
     ativo: bool = True
@@ -447,9 +447,9 @@ def create_cliente(
     """Criar novo cliente/fornecedor"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Validar documento conforme tipo de pessoa (CPF não é obrigatório)
+    # Validar documento conforme tipo de pessoa (CPF nÃ£o Ã© obrigatÃ³rio)
     if cliente_data.tipo_pessoa == "PF":
-        # Verificar se CPF já existe (se fornecido)
+        # Verificar se CPF jÃ¡ existe (se fornecido)
         if cliente_data.cpf:
             existing = db.query(Cliente).filter(
                 Cliente.tenant_id == tenant_id,
@@ -459,16 +459,16 @@ def create_cliente(
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
+                    detail=f"JÃ¡ existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
                 )
     
     elif cliente_data.tipo_pessoa == "PJ":
         if not cliente_data.cnpj:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CNPJ é obrigatório para Pessoa Jurídica"
+                detail="CNPJ Ã© obrigatÃ³rio para Pessoa JurÃ­dica"
             )
-        # Verificar se CNPJ já existe
+        # Verificar se CNPJ jÃ¡ existe
         existing = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cnpj == cliente_data.cnpj,
@@ -477,10 +477,10 @@ def create_cliente(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
+                detail=f"JÃ¡ existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
             )
     
-    # Verificar se CRMV já existe (se fornecido e for veterinário)
+    # Verificar se CRMV jÃ¡ existe (se fornecido e for veterinÃ¡rio)
     if cliente_data.crmv and cliente_data.tipo_cadastro == "veterinario":
         existing_crmv = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
@@ -490,10 +490,10 @@ def create_cliente(
         if existing_crmv:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um veterinário cadastrado com este CRMV"
+                detail="JÃ¡ existe um veterinÃ¡rio cadastrado com este CRMV"
             )
     
-    # Verificar se celular já existe (se fornecido)
+    # Verificar se celular jÃ¡ existe (se fornecido)
     if cliente_data.celular:
         existing_cel = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
@@ -503,10 +503,10 @@ def create_cliente(
         if existing_cel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cadastro com este celular"
+                detail="JÃ¡ existe um cadastro com este celular"
             )
     
-    # Verificar se telefone já existe (se fornecido)
+    # Verificar se telefone jÃ¡ existe (se fornecido)
     if cliente_data.telefone:
         existing_tel = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
@@ -516,18 +516,18 @@ def create_cliente(
         if existing_tel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cliente cadastrado com este telefone"
+                detail="JÃ¡ existe um cliente cadastrado com este telefone"
             )
     
-    # Gerar código usando a nova função
+    # Gerar cÃ³digo usando a nova funÃ§Ã£o
     codigo = gerar_codigo_cliente(db, cliente_data.tipo_cadastro, cliente_data.tipo_pessoa, tenant_id)
     
     # Preparar dados do cliente
     dados_cliente = cliente_data.model_dump()
     
-    # 🚚 VALIDAÇÃO: Apenas 1 entregador padrão por vez
+    # ðŸšš VALIDAÃ‡ÃƒO: Apenas 1 entregador padrÃ£o por vez
     if dados_cliente.get('entregador_padrao') is True:
-        # Verificar se já existe outro entregador padrão
+        # Verificar se jÃ¡ existe outro entregador padrÃ£o
         entregador_padrao_atual = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.entregador_padrao == True,
@@ -535,12 +535,12 @@ def create_cliente(
         ).first()
         
         if entregador_padrao_atual:
-            # Desmarcar o antigo como padrão
+            # Desmarcar o antigo como padrÃ£o
             entregador_padrao_atual.entregador_padrao = False
             entregador_padrao_atual.updated_at = dt.utcnow()
             import logging
             logger = logging.getLogger(__name__)
-            logger.info(f"🚚 Entregador padrão removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
+            logger.info(f"ðŸšš Entregador padrÃ£o removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
     
     # Serializar enderecos_adicionais para JSON (SQLite armazena como TEXT)
     if dados_cliente.get('enderecos_adicionais'):
@@ -583,7 +583,7 @@ def list_clientes(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Listar clientes/fornecedores do usuário"""
+    """Listar clientes/fornecedores do usuÃ¡rio"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
     try:
@@ -613,21 +613,24 @@ def list_clientes(
                 (Cliente.celular.ilike(f"%{search}%"))
             )
         
-        # Filtro de ativo (padrão True - mostrar apenas ativos)
+        # Filtro de ativo (padrÃ£o True - mostrar apenas ativos)
         if ativo is None:
             ativo = True
-        query = query.filter(Cliente.ativo == ativo)
+        if ativo:
+            query = query.filter(or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)))
+        else:
+            query = query.filter(Cliente.ativo.is_(False))
         
         # Contar total (ANTES do offset/limit)
         total = query.count()
         
-        # Ordenação inteligente: prioriza match exato no código
+        # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
         if search:
             query = query.order_by(
                 case(
-                    (Cliente.codigo == search, 1),  # Match exato no código
-                    (Cliente.codigo.ilike(f"{search}%"), 2),  # Código começa com busca
-                    (Cliente.nome.ilike(f"{search}%"), 3),  # Nome começa com busca
+                    (Cliente.codigo == search, 1),  # Match exato no cÃ³digo
+                    (Cliente.codigo.ilike(f"{search}%"), 2),  # CÃ³digo comeÃ§a com busca
+                    (Cliente.nome.ilike(f"{search}%"), 3),  # Nome comeÃ§a com busca
                     else_=4
                 ),
                 Cliente.nome
@@ -813,14 +816,14 @@ def verificar_duplicata(
     return resultado
 
 
-# ==================== RAÇAS ====================
+# ==================== RAÃ‡AS ====================
 
 @router.get("/racas-teste")
 def list_racas_teste(especie: str = ""):
-    """Teste simples sem dependências"""
+    """Teste simples sem dependÃªncias"""
     return [
-        {"id": 1, "nome": "Labrador", "especie": "Cão"},
-        {"id": 2, "nome": "Siamês", "especie": "Gato"}
+        {"id": 1, "nome": "Labrador", "especie": "CÃ£o"},
+        {"id": 2, "nome": "SiamÃªs", "especie": "Gato"}
     ]
 
 @router.get("/racas")
@@ -830,7 +833,7 @@ def list_racas(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Listar raças cadastradas (filtro por espécie)"""
+    """Listar raÃ§as cadastradas (filtro por espÃ©cie)"""
     
     query = db.query(Raca).filter(Raca.ativo == True)
     
@@ -887,7 +890,7 @@ def update_cliente(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cliente cadastrado com este CPF"
+                detail="JÃ¡ existe um cliente cadastrado com este CPF"
             )
     
     # Verificar CNPJ duplicado (se alterado)
@@ -901,7 +904,7 @@ def update_cliente(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cadastro com este CNPJ"
+                detail="JÃ¡ existe um cadastro com este CNPJ"
             )
     
     # Verificar CRMV duplicado (se alterado)
@@ -915,7 +918,7 @@ def update_cliente(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um veterinário cadastrado com este CRMV"
+                detail="JÃ¡ existe um veterinÃ¡rio cadastrado com este CRMV"
             )
     
     # Verificar celular duplicado (se alterado)
@@ -929,7 +932,7 @@ def update_cliente(
         if existing_cel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cliente cadastrado com este celular"
+                detail="JÃ¡ existe um cliente cadastrado com este celular"
             )
     
     # Verificar telefone duplicado (se alterado)
@@ -943,15 +946,15 @@ def update_cliente(
         if existing_tel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Já existe um cliente cadastrado com este telefone"
+                detail="JÃ¡ existe um cliente cadastrado com este telefone"
             )
     
     # Atualizar campos
     update_data = cliente_data.model_dump(exclude_unset=True)
     
-    # 🚚 VALIDAÇÃO: Apenas 1 entregador padrão por vez
+    # ðŸšš VALIDAÃ‡ÃƒO: Apenas 1 entregador padrÃ£o por vez
     if 'entregador_padrao' in update_data and update_data['entregador_padrao'] is True:
-        # Verificar se já existe outro entregador padrão
+        # Verificar se jÃ¡ existe outro entregador padrÃ£o
         entregador_padrao_atual = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.entregador_padrao == True,
@@ -960,29 +963,29 @@ def update_cliente(
         ).first()
         
         if entregador_padrao_atual:
-            # Desmarcar o antigo como padrão
+            # Desmarcar o antigo como padrÃ£o
             entregador_padrao_atual.entregador_padrao = False
             entregador_padrao_atual.updated_at = dt.utcnow()
-            logger.info(f"🚚 Entregador padrão removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
+            logger.info(f"ðŸšš Entregador padrÃ£o removido de: {entregador_padrao_atual.nome} (ID: {entregador_padrao_atual.id})")
     
     # Serializar enderecos_adicionais para JSON (SQLite armazena como TEXT)
     if 'enderecos_adicionais' in update_data and update_data['enderecos_adicionais'] is not None:
         import json
         update_data['enderecos_adicionais'] = json.dumps(update_data['enderecos_adicionais'])
     
-    # 🔒 DETECTAR TRANSIÇÃO DE PARCEIRO_ATIVO (TRUE → FALSE)
+    # ðŸ”’ DETECTAR TRANSIÃ‡ÃƒO DE PARCEIRO_ATIVO (TRUE â†’ FALSE)
     parceiro_desativado = False
     comissoes_desativadas_count = 0
     
     if 'parceiro_ativo' in update_data:
-        # Cliente era parceiro e está sendo desmarcado
+        # Cliente era parceiro e estÃ¡ sendo desmarcado
         if hasattr(cliente, 'parceiro_ativo') and cliente.parceiro_ativo and not update_data['parceiro_ativo']:
             parceiro_desativado = True
             
-            # Desativar todas as comissões ativas dessa pessoa
+            # Desativar todas as comissÃµes ativas dessa pessoa
             from sqlalchemy import text
             
-            # Contar comissões ativas antes de desativar
+            # Contar comissÃµes ativas antes de desativar
             result = db.execute(
                 text("""
                     SELECT COUNT(*) 
@@ -994,7 +997,7 @@ def update_cliente(
             )
             comissoes_desativadas_count = result.fetchone()[0]
             
-            # Desativar comissões (preservando histórico)
+            # Desativar comissÃµes (preservando histÃ³rico)
             if comissoes_desativadas_count > 0:
                 db.execute(
                     text("""
@@ -1014,7 +1017,7 @@ def update_cliente(
     for field, value in update_data.items():
         setattr(cliente, field, value)
     
-    # Se estiver reativando e não tiver código, gerar um
+    # Se estiver reativando e nÃ£o tiver cÃ³digo, gerar um
     if cliente.ativo and not cliente.codigo:
         cliente.codigo = gerar_codigo_cliente(db, cliente.tipo_cadastro, cliente.tipo_pessoa, tenant_id)
     
@@ -1025,7 +1028,7 @@ def update_cliente(
     # Log de auditoria
     log_update(db, current_user.id, "cliente", cliente.id, old_data, update_data)
     
-    # 📢 PREPARAR RESPOSTA COM AVISO SOBRE COMISSÕES
+    # ðŸ“¢ PREPARAR RESPOSTA COM AVISO SOBRE COMISSÃ•ES
     response = {
         "id": cliente.id,
         "codigo": cliente.codigo,
@@ -1044,17 +1047,17 @@ def update_cliente(
         "updated_at": cliente.updated_at
     }
     
-    # Adicionar aviso se comissões foram desativadas
+    # Adicionar aviso se comissÃµes foram desativadas
     if parceiro_desativado and comissoes_desativadas_count > 0:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning(
-            f"🔒 {comissoes_desativadas_count} comissão(ões) desativada(s) automaticamente "
+            f"ðŸ”’ {comissoes_desativadas_count} comissÃ£o(Ãµes) desativada(s) automaticamente "
             f"para {cliente.nome} (ID: {cliente_id}) porque deixou de ser parceiro."
         )
         
         response["aviso"] = (
-            f"Comissões desativadas automaticamente porque o cliente deixou de ser parceiro. "
+            f"ComissÃµes desativadas automaticamente porque o cliente deixou de ser parceiro. "
             f"Total desativado: {comissoes_desativadas_count}"
         )
     
@@ -1075,7 +1078,7 @@ def delete_cliente(
     cliente.ativo = False
     cliente.updated_at = dt.utcnow()
     
-    # Desativar pets também
+    # Desativar pets tambÃ©m
     for pet in cliente.pets:
         pet.ativo = False
         pet.updated_at = dt.utcnow()
@@ -1108,34 +1111,34 @@ def toggle_parceiro(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Ativar ou desativar um cliente como parceiro para receber comissões.
+    Ativar ou desativar um cliente como parceiro para receber comissÃµes.
     
-    Permite que QUALQUER pessoa (cliente, veterinário, funcionário, fornecedor)
+    Permite que QUALQUER pessoa (cliente, veterinÃ¡rio, funcionÃ¡rio, fornecedor)
     seja ativada como parceiro, independente do tipo_cadastro.
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
-    # Salvar estado anterior para auditoria e lógica
+    # Salvar estado anterior para auditoria e lÃ³gica
     old_status = cliente.parceiro_ativo
     old_parceiro_desde = cliente.parceiro_desde
     
     # ========================================================================
-    # LÓGICA DE ATIVAÇÃO/DESATIVAÇÃO COM PRESERVAÇÃO DE HISTÓRICO
+    # LÃ“GICA DE ATIVAÃ‡ÃƒO/DESATIVAÃ‡ÃƒO COM PRESERVAÃ‡ÃƒO DE HISTÃ“RICO
     # ========================================================================
     
-    # Cenário 1: Ativando parceiro (false → true ou None → true)
+    # CenÃ¡rio 1: Ativando parceiro (false â†’ true ou None â†’ true)
     if request.parceiro_ativo and not old_status:
         cliente.parceiro_ativo = True
         
-        # Se é primeira ativação (nunca foi parceiro antes)
+        # Se Ã© primeira ativaÃ§Ã£o (nunca foi parceiro antes)
         if not old_parceiro_desde:
             cliente.parceiro_desde = dt.utcnow()
             acao = "primeira_ativacao"
-        # Se é reativação (já foi parceiro antes)
+        # Se Ã© reativaÃ§Ã£o (jÃ¡ foi parceiro antes)
         else:
             # Manter data original de parceiro_desde
-            # Adicionar registro de reativação nas observações
+            # Adicionar registro de reativaÃ§Ã£o nas observaÃ§Ãµes
             data_reativacao = dt.utcnow().strftime('%d/%m/%Y')
             observacao_reativacao = f"\n[Reativado como parceiro em {data_reativacao}]"
             
@@ -1146,11 +1149,11 @@ def toggle_parceiro(
             
             acao = "reativacao"
     
-    # Cenário 2: Desativando parceiro (true → false)
+    # CenÃ¡rio 2: Desativando parceiro (true â†’ false)
     elif not request.parceiro_ativo and old_status:
         cliente.parceiro_ativo = False
-        # NÃO limpar parceiro_desde - preservar histórico
-        # Adicionar registro de desativação nas observações
+        # NÃƒO limpar parceiro_desde - preservar histÃ³rico
+        # Adicionar registro de desativaÃ§Ã£o nas observaÃ§Ãµes
         data_desativacao = dt.utcnow().strftime('%d/%m/%Y')
         observacao_desativacao = f"\n[Desativado como parceiro em {data_desativacao}]"
         
@@ -1161,12 +1164,12 @@ def toggle_parceiro(
         
         acao = "desativacao"
     
-    # Cenário 3: Status não mudou (idempotência)
+    # CenÃ¡rio 3: Status nÃ£o mudou (idempotÃªncia)
     else:
         acao = "sem_alteracao"
     
-    # Atualizar observações adicionais se fornecidas pelo usuário
-    # (concatena com as automáticas)
+    # Atualizar observaÃ§Ãµes adicionais se fornecidas pelo usuÃ¡rio
+    # (concatena com as automÃ¡ticas)
     if request.parceiro_observacoes is not None and request.parceiro_observacoes.strip():
         if cliente.parceiro_observacoes:
             cliente.parceiro_observacoes = f"{request.parceiro_observacoes}\n{cliente.parceiro_observacoes}"
@@ -1190,12 +1193,12 @@ def toggle_parceiro(
         }
     )
     
-    # Mensagens específicas por ação
+    # Mensagens especÃ­ficas por aÃ§Ã£o
     mensagens = {
         "primeira_ativacao": f"Parceiro ativado pela primeira vez em {cliente.parceiro_desde.strftime('%d/%m/%Y')}",
         "reativacao": f"Parceiro reativado com sucesso (parceiro desde {cliente.parceiro_desde.strftime('%d/%m/%Y')})",
-        "desativacao": f"Parceiro desativado (histórico preservado desde {cliente.parceiro_desde.strftime('%d/%m/%Y') if cliente.parceiro_desde else 'N/A'})",
-        "sem_alteracao": f"Status de parceiro já estava como {'ativo' if cliente.parceiro_ativo else 'inativo'}"
+        "desativacao": f"Parceiro desativado (histÃ³rico preservado desde {cliente.parceiro_desde.strftime('%d/%m/%Y') if cliente.parceiro_desde else 'N/A'})",
+        "sem_alteracao": f"Status de parceiro jÃ¡ estava como {'ativo' if cliente.parceiro_ativo else 'inativo'}"
     }
     
     return {
@@ -1225,13 +1228,13 @@ def atualizar_controla_dre(
     """
     Atualizar o controle DRE de um cliente/fornecedor.
     
-    - controla_dre=True: Lançamentos deste fornecedor/cliente VÃO para DRE (padrão)
-    - controla_dre=False: Lançamentos NÃO vão para DRE (ex: fornecedor de produtos para revenda como Buendia)
+    - controla_dre=True: LanÃ§amentos deste fornecedor/cliente VÃƒO para DRE (padrÃ£o)
+    - controla_dre=False: LanÃ§amentos NÃƒO vÃ£o para DRE (ex: fornecedor de produtos para revenda como Buendia)
     
-    Quando controla_dre=False, os lançamentos deste fornecedor/cliente:
-    - NÃO aparecem na lista de pendentes de classificação
-    - NÃO geram sugestões de classificação DRE
-    - São automaticamente ignorados no processo de classificação
+    Quando controla_dre=False, os lanÃ§amentos deste fornecedor/cliente:
+    - NÃƒO aparecem na lista de pendentes de classificaÃ§Ã£o
+    - NÃƒO geram sugestÃµes de classificaÃ§Ã£o DRE
+    - SÃ£o automaticamente ignorados no processo de classificaÃ§Ã£o
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
@@ -1275,7 +1278,7 @@ def create_pet(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
-    # Gerar código único para o pet baseado no código do cliente
+    # Gerar cÃ³digo Ãºnico para o pet baseado no cÃ³digo do cliente
     codigo_pet = f"{cliente.codigo}-PET-{db.query(Pet).filter(Pet.cliente_id == cliente_id).count() + 1:04d}"
     
     # Criar pet
@@ -1305,7 +1308,7 @@ def listar_todos_pets(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Listar todos os pets do usuário (de todos os clientes)"""
+    """Listar todos os pets do usuÃ¡rio (de todos os clientes)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
     pets = db.query(Pet).join(Cliente).filter(
@@ -1352,7 +1355,7 @@ def get_pet(
     if not pet:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pet não encontrado"
+            detail="Pet nÃ£o encontrado"
         )
     
     # Calcular idade em meses se tiver data de nascimento
@@ -1402,7 +1405,7 @@ def update_pet(
     if not pet:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pet não encontrado"
+            detail="Pet nÃ£o encontrado"
         )
     
     # Capturar dados antigos para auditoria
@@ -1430,14 +1433,14 @@ def update_pet(
         ano_nascimento = hoje.year - anos
         mes_nascimento = hoje.month - meses
         
-        # Ajustar se o mês ficar negativo
+        # Ajustar se o mÃªs ficar negativo
         if mes_nascimento <= 0:
             mes_nascimento += 12
             ano_nascimento -= 1
         
-        # Usar dia 1 como padrão
+        # Usar dia 1 como padrÃ£o
         pet.data_nascimento = dt(ano_nascimento, mes_nascimento, 1)
-        # Remover idade_aproximada do update_data pois já foi processada
+        # Remover idade_aproximada do update_data pois jÃ¡ foi processada
         del update_data['idade_aproximada']
     
     for field, value in update_data.items():
@@ -1496,7 +1499,7 @@ def delete_pet(
     if not pet:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pet não encontrado"
+            detail="Pet nÃ£o encontrado"
         )
     
     # Soft delete
@@ -1526,7 +1529,7 @@ def remover_campo_duplicado(
 ):
     """
     Remove campo duplicado (telefone/celular/CPF) de um cliente antigo
-    e adiciona observação sobre a remoção.
+    e adiciona observaÃ§Ã£o sobre a remoÃ§Ã£o.
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
@@ -1534,17 +1537,17 @@ def remover_campo_duplicado(
     if campo not in ["telefone", "celular", "cpf", "cnpj"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Campo inválido. Use: telefone, celular, cpf ou cnpj"
+            detail="Campo invÃ¡lido. Use: telefone, celular, cpf ou cnpj"
         )
     
     # Buscar cliente antigo
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
-    # Validar que está ativo
+    # Validar que estÃ¡ ativo
     if not cliente.ativo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado"
+            detail="Cliente nÃ£o encontrado"
         )
     
     # Guardar valor antigo para log
@@ -1553,9 +1556,9 @@ def remover_campo_duplicado(
     # Remover o campo
     setattr(cliente, campo, None)
     
-    # Adicionar observação
+    # Adicionar observaÃ§Ã£o
     observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[SISTEMA] {campo.capitalize()} removido (valor anterior: {valor_antigo}) - Transferido para cadastro do cliente código {novo_cliente_codigo}"
+    nova_observacao = f"[SISTEMA] {campo.capitalize()} removido (valor anterior: {valor_antigo}) - Transferido para cadastro do cliente cÃ³digo {novo_cliente_codigo}"
     
     if observacao_atual:
         cliente.observacoes = f"{observacao_atual}\n\n{nova_observacao}"
@@ -1580,7 +1583,7 @@ def remover_campo_duplicado(
 
 
 # ============================================================================
-# GERENCIAMENTO DE CRÉDITO
+# GERENCIAMENTO DE CRÃ‰DITO
 # ============================================================================
 
 class AjustarCreditoRequest(BaseModel):
@@ -1594,7 +1597,7 @@ def adicionar_credito(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Adiciona crédito ao saldo do cliente"""
+    """Adiciona crÃ©dito ao saldo do cliente"""
     from decimal import Decimal
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
@@ -1602,7 +1605,7 @@ def adicionar_credito(
     if not cliente.ativo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado"
+            detail="Cliente nÃ£o encontrado"
         )
     
     if dados.valor <= 0:
@@ -1611,14 +1614,14 @@ def adicionar_credito(
             detail="Valor deve ser maior que zero"
         )
     
-    # Adicionar crédito
+    # Adicionar crÃ©dito
     credito_anterior = float(cliente.credito or 0)
     cliente.credito = Decimal(str(credito_anterior + dados.valor))
     cliente.updated_at = dt.utcnow()
     
-    # Adicionar observação no histórico
+    # Adicionar observaÃ§Ã£o no histÃ³rico
     observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] Crédito adicionado: R$ {dados.valor:.2f} - {dados.motivo}"
+    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] CrÃ©dito adicionado: R$ {dados.valor:.2f} - {dados.motivo}"
     
     if observacao_atual:
         cliente.observacoes = f"{observacao_atual}\n{nova_observacao}"
@@ -1634,7 +1637,7 @@ def adicionar_credito(
     )
     
     return {
-        "message": "Crédito adicionado com sucesso",
+        "message": "CrÃ©dito adicionado com sucesso",
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
         "credito_anterior": credito_anterior,
@@ -1651,7 +1654,7 @@ def remover_credito(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Remove crédito do saldo do cliente"""
+    """Remove crÃ©dito do saldo do cliente"""
     from decimal import Decimal
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
@@ -1659,7 +1662,7 @@ def remover_credito(
     if not cliente.ativo:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado"
+            detail="Cliente nÃ£o encontrado"
         )
     
     if dados.valor <= 0:
@@ -1673,16 +1676,16 @@ def remover_credito(
     if dados.valor > credito_atual:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Valor a remover (R$ {dados.valor:.2f}) excede o crédito disponível (R$ {credito_atual:.2f})"
+            detail=f"Valor a remover (R$ {dados.valor:.2f}) excede o crÃ©dito disponÃ­vel (R$ {credito_atual:.2f})"
         )
     
-    # Remover crédito
+    # Remover crÃ©dito
     cliente.credito = Decimal(str(credito_atual - dados.valor))
     cliente.updated_at = dt.utcnow()
     
-    # Adicionar observação no histórico
+    # Adicionar observaÃ§Ã£o no histÃ³rico
     observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] Crédito removido: R$ {dados.valor:.2f} - {dados.motivo}"
+    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] CrÃ©dito removido: R$ {dados.valor:.2f} - {dados.motivo}"
     
     if observacao_atual:
         cliente.observacoes = f"{observacao_atual}\n{nova_observacao}"
@@ -1698,7 +1701,7 @@ def remover_credito(
     )
     
     return {
-        "message": "Crédito removido com sucesso",
+        "message": "CrÃ©dito removido com sucesso",
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
         "credito_anterior": credito_atual,
@@ -1709,7 +1712,7 @@ def remover_credito(
 
 
 # ============================================================================
-# HISTÓRICO DE COMPRAS
+# HISTÃ“RICO DE COMPRAS
 # ============================================================================
 
 @router.get("/{cliente_id}/historico-compras")
@@ -1718,7 +1721,7 @@ async def get_historico_compras(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Retorna o histórico de compras do cliente"""
+    """Retorna o histÃ³rico de compras do cliente"""
     from .vendas_models import Venda
     from sqlalchemy import func, desc
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -1730,23 +1733,23 @@ async def get_historico_compras(
         Venda.tenant_id == tenant_id
     ).order_by(desc(Venda.data_venda)).all()
     
-    # Estatísticas
+    # EstatÃ­sticas
     total_compras = len(vendas)
     total_gasto = sum(float(v.total or 0) for v in vendas if v.status == 'finalizada')
     ticket_medio = total_gasto / total_compras if total_compras > 0 else 0
     
-    # Última compra
+    # Ãšltima compra
     ultima_compra = vendas[0].data_venda if vendas else None
     
     return {
         "cliente_id": cliente.id,
         "cliente_nome": cliente.nome,
-        # Campos no nível raiz para compatibilidade com frontend
+        # Campos no nÃ­vel raiz para compatibilidade com frontend
         "total_compras": total_compras,
         "valor_total_gasto": round(total_gasto, 2),
         "ticket_medio": round(ticket_medio, 2),
         "ultima_compra": ultima_compra.isoformat() if ultima_compra else None,
-        # Mantendo estatisticas também para compatibilidade
+        # Mantendo estatisticas tambÃ©m para compatibilidade
         "estatisticas": {
             "total_compras": total_compras,
             "total_gasto": round(total_gasto, 2),
@@ -1756,7 +1759,7 @@ async def get_historico_compras(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.id,  # O número da venda é o próprio ID
+                "numero_venda": v.id,  # O nÃºmero da venda Ã© o prÃ³prio ID
                 "data_venda": v.data_venda.isoformat() if hasattr(v.data_venda, 'isoformat') else str(v.data_venda),
                 "total": float(v.total or 0),
                 "subtotal": float(v.subtotal or 0) if hasattr(v, 'subtotal') else float(v.total or 0),
@@ -1793,8 +1796,8 @@ async def get_vendas_em_aberto(
     ).order_by(Venda.data_venda.asc()).all()
     
     # DEBUG: Log para verificar quantas vendas foram encontradas
-    logger.info(f"🔍 DEBUG vendas-em-aberto: cliente_id={cliente_id}, user_id={current_user.id}")
-    logger.info(f"📊 Total vendas encontradas: {len(vendas_aberto)}")
+    logger.info(f"ðŸ” DEBUG vendas-em-aberto: cliente_id={cliente_id}, user_id={current_user.id}")
+    logger.info(f"ðŸ“Š Total vendas encontradas: {len(vendas_aberto)}")
     
     # Filtrar apenas vendas com saldo devedor maior que zero
     vendas_com_saldo = []
@@ -1804,9 +1807,9 @@ async def get_vendas_em_aberto(
         
         if saldo > 0.01:  # Apenas vendas com saldo maior que 1 centavo
             vendas_com_saldo.append(v)
-            logger.info(f"  ✅ ID: {v.id} | Status: {v.status} | Total: R$ {v.total} | Pago: R$ {valor_pago} | Saldo: R$ {saldo}")
+            logger.info(f"  âœ… ID: {v.id} | Status: {v.status} | Total: R$ {v.total} | Pago: R$ {valor_pago} | Saldo: R$ {saldo}")
         else:
-            logger.info(f"  ❌ ID: {v.id} | Status: {v.status} | Saldo zerado - EXCLUÍDA")
+            logger.info(f"  âŒ ID: {v.id} | Status: {v.status} | Saldo zerado - EXCLUÃDA")
     
     # Usar apenas vendas com saldo
     vendas_aberto = vendas_com_saldo
@@ -1837,7 +1840,7 @@ async def get_vendas_em_aberto(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.numero_venda,  # Número formatado da venda (ex: 202601190004)
+                "numero_venda": v.numero_venda,  # NÃºmero formatado da venda (ex: 202601190004)
                 "data_venda": v.data_venda.isoformat() if hasattr(v.data_venda, 'isoformat') else str(v.data_venda),
                 "total": float(v.total or 0),
                 "total_pago": sum(float(pag.valor or 0) for pag in v.pagamentos) if hasattr(v, 'pagamentos') and v.pagamentos else 0,
@@ -1856,7 +1859,7 @@ async def baixar_vendas_lote(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Dá baixa em múltiplas vendas de uma vez, gerando movimentações no caixa e contas a receber"""
+    """DÃ¡ baixa em mÃºltiplas vendas de uma vez, gerando movimentaÃ§Ãµes no caixa e contas a receber"""
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
         
@@ -1880,7 +1883,7 @@ async def baixar_vendas_lote(
         logger.info(f"Valor total: {valor_total}")
         logger.info(f"Forma pagamento: {forma_pagamento}")
         
-        # Validar se há caixa aberto
+        # Validar se hÃ¡ caixa aberto
         caixa_aberto = db.query(Caixa).filter(
             Caixa.usuario_id == current_user.id,
             Caixa.tenant_id == tenant_id,
@@ -1892,7 +1895,7 @@ async def baixar_vendas_lote(
         if not caixa_aberto:
             raise HTTPException(
                 status_code=400,
-                detail='Não há caixa aberto. Abra o caixa antes de dar baixa nas vendas.'
+                detail='NÃ£o hÃ¡ caixa aberto. Abra o caixa antes de dar baixa nas vendas.'
             )
         
         # Buscar vendas ordenadas da mais antiga para a mais nova
@@ -1909,7 +1912,7 @@ async def baixar_vendas_lote(
             raise HTTPException(status_code=404, detail='Nenhuma venda encontrada')
         
         if len(vendas) != len(vendas_ids):
-            raise HTTPException(status_code=400, detail='Algumas vendas não foram encontradas ou não estão em aberto')
+            raise HTTPException(status_code=400, detail='Algumas vendas nÃ£o foram encontradas ou nÃ£o estÃ£o em aberto')
         
         # Calcular saldo devedor de cada venda
         vendas_com_saldo = []
@@ -1921,7 +1924,7 @@ async def baixar_vendas_lote(
             
             logger.info(f"Venda {venda.id}: Total={venda.total}, Pago={valor_ja_pago}, Saldo={saldo_devedor}")
             
-            if saldo_devedor > 0.01:  # Tolerância de 1 centavo
+            if saldo_devedor > 0.01:  # TolerÃ¢ncia de 1 centavo
                 vendas_com_saldo.append({
                     'venda': venda,
                     'saldo_devedor': saldo_devedor,
@@ -1932,7 +1935,7 @@ async def baixar_vendas_lote(
         logger.info(f"Vendas com saldo: {len(vendas_com_saldo)}, Total saldo: {total_saldo_devedor}")
         
         if not vendas_com_saldo:
-            raise HTTPException(status_code=400, detail='Todas as vendas já estão quitadas')
+            raise HTTPException(status_code=400, detail='Todas as vendas jÃ¡ estÃ£o quitadas')
         
         if valor_total > total_saldo_devedor + 0.01:
             raise HTTPException(
@@ -1958,10 +1961,10 @@ async def baixar_vendas_lote(
             logger.info(f"Aplicando {valor_aplicar} na venda {venda.id}")
             
             # Criar pagamento
-            # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
+            # ðŸ”’ ISOLAMENTO MULTI-TENANT: tenant_id obrigatÃ³rio
             pagamento = VendaPagamento(
                 venda_id=venda.id,
-                tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
+                tenant_id=tenant_id,  # âœ… Garantir isolamento entre empresas
                 forma_pagamento=forma_pagamento,
                 valor=valor_aplicar,
                 numero_transacao=numero_transacao,
@@ -1992,10 +1995,10 @@ async def baixar_vendas_lote(
                     'saldo_anterior': saldo_devedor
                 })
             
-            # Registrar movimentação no caixa (apenas para formas que movimentam caixa)
-            formas_que_movimentam_caixa = ['dinheiro', 'Dinheiro', 'pix', 'PIX', 'cartao_debito', 'Cartão de Débito']
+            # Registrar movimentaÃ§Ã£o no caixa (apenas para formas que movimentam caixa)
+            formas_que_movimentam_caixa = ['dinheiro', 'Dinheiro', 'pix', 'PIX', 'cartao_debito', 'CartÃ£o de DÃ©bito']
             if forma_pagamento in formas_que_movimentam_caixa:
-                # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
+                # ðŸ”’ ISOLAMENTO MULTI-TENANT: tenant_id obrigatÃ³rio
                 movimentacao = MovimentacaoCaixa(
                     caixa_id=caixa_aberto.id,
                     tipo='venda',
@@ -2007,7 +2010,7 @@ async def baixar_vendas_lote(
                     usuario_id=current_user.id,
                     usuario_nome=current_user.nome or current_user.email,
                     data_movimento=dt.now(),
-                    tenant_id=tenant_id  # ✅ Garantir isolamento entre empresas
+                    tenant_id=tenant_id  # âœ… Garantir isolamento entre empresas
                 )
                 db.add(movimentacao)
             
@@ -2029,18 +2032,18 @@ async def baixar_vendas_lote(
                 else:
                     conta_receber.status = 'baixa_parcial'
                 
-                # 🆕 Criar registro de recebimento
+                # ðŸ†• Criar registro de recebimento
                 recebimento = Recebimento(
                     conta_receber_id=conta_receber.id,
                     valor_recebido=valor_aplicar,
                     data_recebimento=dt.now().date(),
                     observacoes=f'Baixa em lote - {forma_pagamento}',
                     user_id=current_user.id,
-                    tenant_id=tenant_id  # ✅ Garantir isolamento multi-tenant
+                    tenant_id=tenant_id  # âœ… Garantir isolamento multi-tenant
                 )
                 db.add(recebimento)
                 
-                # 🆕 CRIAR LANÇAMENTO REALIZADO NO FLUXO DE CAIXA
+                # ðŸ†• CRIAR LANÃ‡AMENTO REALIZADO NO FLUXO DE CAIXA
                 fluxo_realizado = FluxoCaixa(
                     usuario_id=current_user.id,
                     tipo='entrada',
@@ -2055,9 +2058,9 @@ async def baixar_vendas_lote(
                 )
                 db.add(fluxo_realizado)
                 
-                logger.info(f"✅ Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}")
+                logger.info(f"âœ… Fluxo de caixa REALIZADO criado: R$ {valor_aplicar:.2f}")
                 
-                # 🆕 CRIAR LANÇAMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
+                # ðŸ†• CRIAR LANÃ‡AMENTO PREVISTO NO FLUXO DE CAIXA (se houver saldo restante)
                 saldo_conta = float(conta_receber.valor_final) - novo_valor_recebido
                 if saldo_conta > 0.01:  # Se ainda tem saldo
                     data_previsao = dt.now() + timedelta(days=30)  # +30 dias
@@ -2076,7 +2079,7 @@ async def baixar_vendas_lote(
                     )
                     db.add(fluxo_previsto)
                     
-                    logger.info(f"✅ Fluxo de caixa PREVISTO criado: R$ {saldo_conta:.2f} para {data_previsao.strftime('%d/%m/%Y')}")
+                    logger.info(f"âœ… Fluxo de caixa PREVISTO criado: R$ {saldo_conta:.2f} para {data_previsao.strftime('%d/%m/%Y')}")
             
             valor_restante -= valor_aplicar
         
@@ -2110,21 +2113,21 @@ async def get_cliente_historico(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    ⚠️ **DEPRECATED** - Esta rota será removida em versão futura
+    âš ï¸ **DEPRECATED** - Esta rota serÃ¡ removida em versÃ£o futura
     
     **Problemas desta rota:**
-    - ❌ Carrega TODAS as transações em memória (sem paginação)
-    - ❌ Performance ruim com histórico grande (>500 transações)
-    - ❌ Alto consumo de memória
-    - ❌ Ordena tudo em Python (deveria ser no banco)
+    - âŒ Carrega TODAS as transaÃ§Ãµes em memÃ³ria (sem paginaÃ§Ã£o)
+    - âŒ Performance ruim com histÃ³rico grande (>500 transaÃ§Ãµes)
+    - âŒ Alto consumo de memÃ³ria
+    - âŒ Ordena tudo em Python (deveria ser no banco)
     
     **Migre para as novas rotas:**
     
-    1. **Para histórico completo paginado:**
+    1. **Para histÃ³rico completo paginado:**
        ```
        GET /financeiro/cliente/{cliente_id}?page=1&per_page=20
        ```
-       - Paginação obrigatória
+       - PaginaÃ§Ã£o obrigatÃ³ria
        - Filtros: data_inicio, data_fim, tipo, status
        - Performance otimizada
     
@@ -2133,30 +2136,30 @@ async def get_cliente_historico(
        GET /financeiro/cliente/{cliente_id}/resumo
        ```
        - Apenas dados agregados (COUNT, SUM)
-       - Muito mais rápido (~10-50ms vs 500-2000ms)
+       - Muito mais rÃ¡pido (~10-50ms vs 500-2000ms)
        - Ideal para Step 6 do wizard
     
-    **Data de remoção planejada:** Junho/2026
+    **Data de remoÃ§Ã£o planejada:** Junho/2026
     
     ---
     
-    Retorna o histórico completo de transações do cliente:
+    Retorna o histÃ³rico completo de transaÃ§Ãµes do cliente:
     - Vendas realizadas
-    - Devoluções
+    - DevoluÃ§Ãµes
     - Contas a receber (em aberto e pagas)
     - Recebimentos
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    user = current_user  # Definir variável user para uso posterior
+    user = current_user  # Definir variÃ¡vel user para uso posterior
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
-    # Importar modelos necessários
+    # Importar modelos necessÃ¡rios
     from app.vendas_models import Venda
     from app.financeiro_models import ContaReceber, Recebimento
     
     historico = []
     
-    # 1. Buscar vendas do cliente (excluir canceladas/devolvidas do histórico principal)
+    # 1. Buscar vendas do cliente (excluir canceladas/devolvidas do histÃ³rico principal)
     vendas = db.query(Venda).filter(
         Venda.cliente_id == cliente_id,
         Venda.status.notin_(['cancelada', 'devolvida'])
@@ -2181,7 +2184,7 @@ async def get_cliente_historico(
             }
         })
     
-    # 2. Buscar devoluções (vendas canceladas/devolvidas)
+    # 2. Buscar devoluÃ§Ãµes (vendas canceladas/devolvidas)
     devolucoes = db.query(Venda).filter(
         Venda.cliente_id == cliente_id,
         Venda.status.in_(['cancelada', 'devolvida'])
@@ -2191,7 +2194,7 @@ async def get_cliente_historico(
         historico.append({
             "tipo": "devolucao",
             "data": devolucao.data_venda.isoformat() if devolucao.data_venda else None,
-            "descricao": f"Devolução - Venda #{devolucao.numero_venda}",
+            "descricao": f"DevoluÃ§Ã£o - Venda #{devolucao.numero_venda}",
             "valor": -float(devolucao.total),
             "status": devolucao.status,
             "detalhes": {
@@ -2246,7 +2249,7 @@ async def get_cliente_historico(
             }
         })
     
-    # Ordenar histórico por data (mais recente primeiro)
+    # Ordenar histÃ³rico por data (mais recente primeiro)
     historico.sort(key=lambda x: x['data'] if x['data'] else '', reverse=True)
     
     # Calcular totais
@@ -2295,7 +2298,7 @@ class TimelineEvento(BaseModel):
 def obter_timeline_cliente(
     cliente_id: int,
     tipo_evento: Optional[str] = Query(None, description="Filtrar por tipo de evento"),
-    pet_id: Optional[int] = Query(None, description="Filtrar eventos de um pet específico"),
+    pet_id: Optional[int] = Query(None, description="Filtrar eventos de um pet especÃ­fico"),
     limit: int = Query(20, ge=1, le=100, description="Limite de eventos"),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
@@ -2304,13 +2307,13 @@ def obter_timeline_cliente(
     Retorna a timeline consolidada do cliente com eventos de:
     - Vendas
     - Contas a receber
-    - Pets (cadastro e atualizações)
+    - Pets (cadastro e atualizaÃ§Ãµes)
     
-    Ordenação: mais recente → mais antigo
+    OrdenaÃ§Ã£o: mais recente â†’ mais antigo
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Validar se cliente existe e pertence ao usuário
+    # Validar se cliente existe e pertence ao usuÃ¡rio
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id
@@ -2319,14 +2322,14 @@ def obter_timeline_cliente(
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cliente não encontrado"
+            detail="Cliente nÃ£o encontrado"
         )
     
     return _obter_timeline(db, "cliente_timeline", cliente_id, tipo_evento, pet_id, limit)
 
 
 def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Optional[str], pet_id: Optional[int], limit: int):
-    """Função auxiliar para buscar timeline de qualquer entidade"""
+    """FunÃ§Ã£o auxiliar para buscar timeline de qualquer entidade"""
     # Query na VIEW otimizada
     id_column = "cliente_id" if "cliente" in view_name else "fornecedor_id"
     
@@ -2357,7 +2360,7 @@ def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Op
         query += " AND (pet_id = :pet_id OR pet_id IS NULL)"
         params["pet_id"] = pet_id
     
-    # Ordenação e limite
+    # OrdenaÃ§Ã£o e limite
     query += " ORDER BY data_evento DESC LIMIT :limit"
     params["limit"] = limit
     
@@ -2401,11 +2404,11 @@ def obter_timeline_fornecedor(
     - Contas a pagar
     - Recebimentos de mercadorias
     
-    Ordenação: mais recente → mais antigo
+    OrdenaÃ§Ã£o: mais recente â†’ mais antigo
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
-    # Validar se fornecedor existe e pertence ao usuário
+    # Validar se fornecedor existe e pertence ao usuÃ¡rio
     fornecedor = db.query(Cliente).filter(
         Cliente.id == fornecedor_id,
         Cliente.tenant_id == tenant_id,
@@ -2415,14 +2418,14 @@ def obter_timeline_fornecedor(
     if not fornecedor:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fornecedor não encontrado"
+            detail="Fornecedor nÃ£o encontrado"
         )
     
     return _obter_timeline(db, "fornecedor_timeline", fornecedor_id, tipo_evento, None, limit)
 
 
 # ============================================================
-# 🚚 ENTREGADORES - Custo Operacional
+# ðŸšš ENTREGADORES - Custo Operacional
 # ============================================================
 
 @router.get("/entregadores/{entregador_id}/custo-operacional")
@@ -2435,14 +2438,14 @@ def obter_custo_operacional_entregador(
     Retorna o custo operacional calculado para o entregador.
     
     Para modelo 'rateio_rh':
-    - Calcula custo_por_entrega = custo_rh_ajustado / media_entregas_real (se disponível)
-    - Senão usa media_entregas_configurada como fallback
+    - Calcula custo_por_entrega = custo_rh_ajustado / media_entregas_real (se disponÃ­vel)
+    - SenÃ£o usa media_entregas_configurada como fallback
     
     Para modelo 'taxa_fixa':
     - Retorna taxa_fixa_entrega
     
     Para modelo 'por_km':
-    - Retorna valor_por_km_entrega (frontend precisa multiplicar pela distância)
+    - Retorna valor_por_km_entrega (frontend precisa multiplicar pela distÃ¢ncia)
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
@@ -2456,7 +2459,7 @@ def obter_custo_operacional_entregador(
     if not entregador:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Entregador não encontrado"
+            detail="Entregador nÃ£o encontrado"
         )
     
     custo_por_entrega = 0
@@ -2464,10 +2467,10 @@ def obter_custo_operacional_entregador(
     detalhes = {}
     
     if modelo == 'rateio_rh' and entregador.controla_rh:
-        # Usar custo_rh_ajustado se disponível
+        # Usar custo_rh_ajustado se disponÃ­vel
         if entregador.custo_rh_ajustado:
             custo_rh = float(entregador.custo_rh_ajustado)
-            # Usar média real se disponível, senão configurada
+            # Usar mÃ©dia real se disponÃ­vel, senÃ£o configurada
             media_entregas = entregador.media_entregas_real or entregador.media_entregas_configurada or 1
             custo_por_entrega = custo_rh / media_entregas if media_entregas > 0 else 0
             
@@ -2479,7 +2482,7 @@ def obter_custo_operacional_entregador(
         else:
             # Sem custo RH configurado
             custo_por_entrega = 0
-            detalhes = {"aviso": "Custo RH não configurado"}
+            detalhes = {"aviso": "Custo RH nÃ£o configurado"}
     
     elif modelo == 'taxa_fixa':
         custo_por_entrega = float(entregador.taxa_fixa_entrega or 0)
@@ -2489,12 +2492,12 @@ def obter_custo_operacional_entregador(
         custo_por_entrega = float(entregador.valor_por_km_entrega or 0)
         detalhes = {
             "valor_por_km": custo_por_entrega,
-            "observacao": "Requer cálculo de distância no frontend"
+            "observacao": "Requer cÃ¡lculo de distÃ¢ncia no frontend"
         }
     
     else:
         # Sem modelo configurado
-        detalhes = {"aviso": "Modelo de custo não configurado"}
+        detalhes = {"aviso": "Modelo de custo nÃ£o configurado"}
     
     return {
         "entregador_id": entregador_id,
@@ -2503,3 +2506,4 @@ def obter_custo_operacional_entregador(
         "custo_por_entrega": round(custo_por_entrega, 2),
         "detalhes": detalhes
     }
+

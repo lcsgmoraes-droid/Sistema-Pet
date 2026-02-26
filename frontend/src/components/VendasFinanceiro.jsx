@@ -1165,7 +1165,7 @@ export default function VendasFinanceiro() {
               </thead>
               <tbody>
                 {produtosDetalhadosFiltrados.map((categoria, catIdx) => (
-                  <>
+                  <React.Fragment key={`cat-group-${catIdx}`}>
                     {/* Linha da Categoria */}
                     <tr key={`cat-${catIdx}`} className="bg-blue-50 font-semibold">
                       <td className="px-4 py-2">{categoria.categoria}</td>
@@ -1177,7 +1177,7 @@ export default function VendasFinanceiro() {
                     
                     {/* Subcategorias */}
                     {categoria.subcategorias && categoria.subcategorias.map((sub, subIdx) => (
-                      <>
+                      <React.Fragment key={`sub-group-${catIdx}-${subIdx}`}>
                         {/* Linha da Subcategoria */}
                         <tr key={`sub-${catIdx}-${subIdx}`} className="bg-gray-50 font-medium">
                           <td className="px-4 py-2 pl-8">{sub.subcategoria}</td>
@@ -1197,7 +1197,7 @@ export default function VendasFinanceiro() {
                             <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_liquido)}</td>
                           </tr>
                         ))}
-                      </>
+                      </React.Fragment>
                     ))}
                     
                     {/* Produtos sem subcategoria */}
@@ -1210,7 +1210,7 @@ export default function VendasFinanceiro() {
                         <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_liquido)}</td>
                       </tr>
                     ))}
-                  </>
+                  </React.Fragment>
                 ))}
                 
                 {/* TOTAL GERAL */}

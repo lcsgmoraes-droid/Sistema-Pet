@@ -5,7 +5,8 @@ Upload OFX, classificação automática, regras de aprendizado
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func
+from sqlalchemy import and_, or_, desc, func, text
+from sqlalchemy.exc import NoReferencedTableError
 from typing import List, Optional, Dict
 from datetime import datetime, date
 from decimal import Decimal
@@ -25,6 +26,40 @@ from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/conciliacao", tags=["Conciliação Bancária"])
+
+
+def ensure_regras_conciliacao_table_exists(db: Session) -> None:
+    """Cria tabela de regras automaticamente em ambientes sem migrations."""
+    try:
+        # Garante metadados de tabelas referenciadas por FKs conhecidas.
+        from app import models  # noqa: F401
+        from app import financeiro_models  # noqa: F401
+        RegraConciliacao.__table__.create(bind=db.get_bind(), checkfirst=True)
+    except (NoReferencedTableError, ImportError):
+        # Fallback legado: cria sem FKs para evitar erro 500.
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS regras_conciliacao (
+                id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                tenant_id UUID NOT NULL,
+                padrao_memo VARCHAR(255),
+                tipo_operacao VARCHAR(50),
+                descricao VARCHAR(255),
+                fornecedor_id INTEGER NULL,
+                categoria_dre_id INTEGER NULL,
+                centro_custo_id INTEGER NULL,
+                vezes_aplicada INTEGER NOT NULL DEFAULT 0,
+                vezes_confirmada INTEGER NOT NULL DEFAULT 0,
+                confianca INTEGER NULL,
+                prioridade INTEGER NULL,
+                ativo BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+            );
+        """))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_regras_conciliacao_tenant_id ON regras_conciliacao (tenant_id);"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_regras_conciliacao_ativo ON regras_conciliacao (ativo);"))
+        db.execute(text("CREATE INDEX IF NOT EXISTS ix_regras_conciliacao_confianca ON regras_conciliacao (confianca);"))
+        db.commit()
 
 
 # ============================================================================
@@ -105,6 +140,8 @@ async def upload_ofx(
     - Sugere classificações
     """
     
+    ensure_regras_conciliacao_table_exists(db)
+
     # Valida conta bancária
     conta = db.query(ContaBancaria).filter(
         and_(
@@ -325,6 +362,8 @@ async def classificar_movimentacao(
     - APENAS vincula, NÃO cria contas automaticamente (evitar duplicação)
     """
     
+    ensure_regras_conciliacao_table_exists(db)
+
     # Busca movimentação
     mov = db.query(MovimentacaoBancaria).filter(
         and_(
@@ -410,6 +449,7 @@ async def listar_regras(
     current_user: User = Depends(get_current_user)
 ):
     """Lista regras de conciliação"""
+    ensure_regras_conciliacao_table_exists(db)
     
     query = db.query(RegraConciliacao).filter(
         RegraConciliacao.tenant_id == current_user.tenant_id
@@ -452,6 +492,7 @@ async def deletar_regra(
     current_user: User = Depends(get_current_user)
 ):
     """Desativa uma regra"""
+    ensure_regras_conciliacao_table_exists(db)
     
     regra = db.query(RegraConciliacao).filter(
         and_(
@@ -499,6 +540,7 @@ async def obter_estatisticas(
     current_user: User = Depends(get_current_user)
 ):
     """Estatísticas da conciliação"""
+    ensure_regras_conciliacao_table_exists(db)
     
     query = db.query(MovimentacaoBancaria).filter(
         MovimentacaoBancaria.tenant_id == current_user.tenant_id
