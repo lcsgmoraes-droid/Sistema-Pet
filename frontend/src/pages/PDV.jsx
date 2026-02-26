@@ -3354,9 +3354,9 @@ export default function PDV() {
                       {venda.tipo_retirada === 'terceiro' && venda.status_entrega !== 'entregue' && (
                         <button
                           onClick={(e) => marcarEntregue(e, venda.id)}
-                          className="text-[10px] bg-green-600 hover:bg-green-700 text-white font-semibold px-2 py-0.5 rounded transition-colors"
+                          className="text-[10px] bg-white hover:bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded border border-green-600 transition-colors"
                         >
-                          ✅ Entregue
+                          Confirmar retirada
                         </button>
                       )}
                       {venda.status_entrega === 'entregue' && (
