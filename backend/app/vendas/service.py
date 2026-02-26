@@ -2378,27 +2378,29 @@ def processar_contas_pagar_taxas(
         
         # Mapear tipo de pagamento para nome da subcategoria DRE
         MAPA_SUBCATEGORIAS = {
-            'cartao_credito': 'Taxas de Cartão de Crédito',
-            'credito': 'Taxas de Cartão de Crédito',
-            'Cartão Crédito': 'Taxas de Cartão de Crédito',
-            'cartao_debito': 'Taxas de Cartão de Débito',
-            'debito': 'Taxas de Cartão de Débito',
-            'Cartão Débito': 'Taxas de Cartão de Débito',
+            'cartao_credito': 'Taxas de Cartao de Credito',
+            'credito': 'Taxas de Cartao de Credito',
+            'Cartão Crédito': 'Taxas de Cartao de Credito',
+            'cartao_debito': 'Taxas de Cartao de Debito',
+            'debito': 'Taxas de Cartao de Debito',
+            'Cartão Débito': 'Taxas de Cartao de Debito',
             'pix': 'Taxa de PIX',
             'PIX': 'Taxa de PIX',
             'Pix': 'Taxa de PIX',
+            'boleto': 'Taxas de Boleto',
         }
         
         # Mapear canal para sufixo da subcategoria
         MAPA_CANAIS = {
-            'loja_fisica': 'Loja Física',
-            'pdv': 'Loja Física',  # PDV = Loja Física
+            'loja_fisica': 'Loja Fisica',
+            'pdv': 'Loja Fisica',  # PDV = Loja Fisica
+            'ecommerce': 'E-commerce',
             'mercado_livre': 'Mercado Livre',
             'shopee': 'Shopee',
             'amazon': 'Amazon'
         }
         
-        canal_sufixo = MAPA_CANAIS.get(canal, 'Loja Física')  # Default: Loja Física
+        canal_sufixo = MAPA_CANAIS.get(canal, 'Loja Fisica')  # Default: Loja Fisica
         
         # Processar cada pagamento
         for pagamento in pagamentos:

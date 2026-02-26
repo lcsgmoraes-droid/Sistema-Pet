@@ -126,6 +126,235 @@ def _find_pedido_id(payload: dict) -> str | None:
     )
 
 
+def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
+    """
+    Extrai payment_method e installments do payload do Pagar.me.
+    Suporta tanto o webhook real (com charges[]) quanto simulações com metadata.
+
+    Returns:
+        tuple: (payment_method: str, installments: int)
+        payment_method values: "pix", "credit_card", "debit_card", "boleto"
+    """
+    data = payload.get("data") or {}
+    metadata = payload.get("metadata") or data.get("metadata") or {}
+    charges = data.get("charges") or payload.get("charges") or []
+
+    payment_method = None
+    installments = 1
+
+    # 1. Estrutura real do Pagar.me: data.charges[0]
+    if charges and isinstance(charges, list):
+        charge = charges[0]
+        if isinstance(charge, dict):
+            payment_method = charge.get("payment_method")
+            last_tx = charge.get("last_transaction") or {}
+            if isinstance(last_tx, dict):
+                try:
+                    installments = int(last_tx.get("installments") or 1)
+                except (TypeError, ValueError):
+                    installments = 1
+
+    # 2. Fallback: metadata / campos raiz (webhook simulado ou campos customizados)
+    if not payment_method:
+        payment_method = (
+            metadata.get("payment_method")
+            or metadata.get("metodo_pagamento")
+            or payload.get("payment_method")
+            or payload.get("metodo_pagamento")
+        )
+
+    if installments == 1:
+        try:
+            raw = (
+                metadata.get("installments")
+                or metadata.get("parcelas")
+                or payload.get("installments")
+                or payload.get("parcelas")
+                or 1
+            )
+            installments = max(1, int(raw))
+        except (TypeError, ValueError):
+            installments = 1
+
+    return str(payment_method or "pix").strip().lower(), installments
+
+
+def _mapear_forma_pagamento_ecommerce(
+    payment_method: str,
+    installments: int,
+    tenant_id: str,
+    db,
+) -> tuple:
+    """
+    Mapeia o payment_method do Pagar.me para o FormaPagamento cadastrado no sistema.
+    Prioriza: tipo exato → nome contendo a variação → qualquer do tipo → PIX.
+
+    Returns:
+        tuple: (forma_pagamento_nome: str, parcelas: int)
+    """
+    from app.financeiro_models import FormaPagamento
+    from sqlalchemy import func as sa_func
+
+    tipo_map = {
+        "pix": "pix",
+        "credit_card": "cartao_credito",
+        "debit_card": "cartao_debito",
+        "boleto": "boleto",
+        "bank_slip": "boleto",
+        "transfer": "transferencia",
+        "voucher": "cartao_credito",
+    }
+    tipo = tipo_map.get(payment_method, "pix")
+
+    base_query = db.query(FormaPagamento).filter(
+        FormaPagamento.tenant_id == tenant_id,
+        FormaPagamento.tipo == tipo,
+        FormaPagamento.ativo == True,
+    )
+
+    forma = None
+    if tipo == "cartao_credito":
+        if installments > 1:
+            # Preferir a forma que contenha "parcela" no nome
+            forma = base_query.filter(
+                sa_func.lower(FormaPagamento.nome).like("%parcela%")
+            ).first()
+        else:
+            # Preferir a forma que contenha "vista" no nome
+            forma = base_query.filter(
+                sa_func.lower(FormaPagamento.nome).like("%vista%")
+            ).first()
+            if not forma:
+                forma = base_query.filter(
+                    ~sa_func.lower(FormaPagamento.nome).like("%parcela%")
+                ).first()
+
+    if not forma:
+        forma = base_query.first()
+
+    if not forma:
+        # Fallback final: qualquer forma de PIX ativa
+        forma = db.query(FormaPagamento).filter(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.tipo == "pix",
+            FormaPagamento.ativo == True,
+        ).first()
+
+    if forma:
+        return forma.nome, installments
+
+    return "PIX", 1
+
+
+def _processar_pos_venda_ecommerce(
+    db,
+    venda_row,
+    vendedor,
+    tenant_id: str,
+    webhook_payload: dict,
+) -> None:
+    """
+    Executa os efeitos colaterais pós-venda para pedidos do ecommerce, espelhando
+    o que acontece quando uma venda é finalizada no PDV:
+
+      1. Cria VendaPagamento com a forma correta (extraída do webhook Pagar.me)
+      2. Gera DRE por competência (receita + CMV + desconto)
+      3. Cria Contas a Receber
+      4. Cria Contas a Pagar para taxas da operadora (ex: taxa PIX, taxa cartão)
+
+    Erros em cada etapa são logados mas NÃO abortam o fluxo.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+
+    from app.vendas_models import VendaPagamento
+
+    payment_method, installments = _extrair_pagamento_do_webhook(webhook_payload)
+    forma_pag_nome, parcelas = _mapear_forma_pagamento_ecommerce(
+        payment_method, installments, tenant_id, db
+    )
+
+    log.info(
+        f"💳 Ecommerce pós-venda: venda #{venda_row.id} | "
+        f"pagamento='{payment_method}' ({installments}x) → forma='{forma_pag_nome}' x{parcelas}"
+    )
+
+    # ─── 1. VendaPagamento ────────────────────────────────────────────────────
+    pagamento_obj = None
+    try:
+        pagamento_obj = VendaPagamento(
+            venda_id=venda_row.id,
+            tenant_id=tenant_id,
+            forma_pagamento=forma_pag_nome,
+            valor=venda_row.total,
+            numero_parcelas=parcelas,
+        )
+        db.add(pagamento_obj)
+        db.flush()
+        log.info(f"  ✅ VendaPagamento criado: '{forma_pag_nome}' R$ {float(venda_row.total):.2f}")
+    except Exception as e:
+        log.error(f"  ❌ Erro ao criar VendaPagamento (ecommerce): {e}", exc_info=True)
+
+    # ─── 2. DRE por competência ───────────────────────────────────────────────
+    try:
+        from app.vendas.service import gerar_dre_competencia_venda
+        resultado_dre = gerar_dre_competencia_venda(
+            venda_id=venda_row.id,
+            user_id=vendedor.id,
+            tenant_id=tenant_id,
+            db=db,
+        )
+        if resultado_dre.get("success"):
+            log.info(
+                f"  ✅ DRE gerada: {resultado_dre['lancamentos_criados']} lançamentos, "
+                f"receita R$ {resultado_dre.get('receita_gerada', 0):.2f}"
+            )
+        else:
+            log.info(f"  ℹ️  DRE: {resultado_dre.get('message')}")
+    except Exception as e:
+        log.error(f"  ❌ Erro ao gerar DRE (ecommerce): {e}", exc_info=True)
+
+    # ─── 3. Contas a Receber ──────────────────────────────────────────────────
+    try:
+        from app.financeiro import ContasReceberService
+        ContasReceberService.criar_de_venda(
+            venda=venda_row,
+            pagamentos=[{
+                "forma_pagamento": forma_pag_nome,
+                "valor": float(venda_row.total),
+                "numero_parcelas": parcelas,
+            }],
+            user_id=vendedor.id,
+            db=db,
+        )
+        log.info("  ✅ Contas a receber criadas")
+    except Exception as e:
+        log.error(f"  ❌ Erro ao criar contas a receber (ecommerce): {e}", exc_info=True)
+
+    # ─── 4. Contas a Pagar — taxas da operadora (PIX/cartão) ─────────────────
+    if pagamento_obj is not None:
+        try:
+            from app.vendas.service import processar_contas_pagar_taxas
+            resultado_taxas = processar_contas_pagar_taxas(
+                venda=venda_row,
+                pagamentos=[pagamento_obj],
+                user_id=vendedor.id,
+                tenant_id=tenant_id,
+                db=db,
+            )
+            if resultado_taxas.get("success") and resultado_taxas.get("total_contas", 0) > 0:
+                log.info(
+                    f"  ✅ Contas a pagar (taxas): {resultado_taxas['total_contas']} "
+                    f"conta(s) | R$ {resultado_taxas['valor_total']:.2f}"
+                )
+            else:
+                log.info(
+                    f"  ℹ️  Taxas: {resultado_taxas.get('detalhes') or resultado_taxas.get('error', 'sem taxa configurada')}"
+                )
+        except Exception as e:
+            log.error(f"  ❌ Erro ao criar contas a pagar taxas (ecommerce): {e}", exc_info=True)
+
+
 def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = None) -> int | None:
     from app.vendas.service import VendaService
     from app.vendas_models import Venda
@@ -335,6 +564,15 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
             # Repassa dados de retirada do ecommerce para a venda no PDV
             venda_row.tipo_retirada = pedido.tipo_retirada
             venda_row.palavra_chave_retirada = pedido.palavra_chave_retirada
+
+            # ── Efeitos colaterais completos (espelha finalização do PDV) ───────
+            _processar_pos_venda_ecommerce(
+                db=db,
+                venda_row=venda_row,
+                vendedor=vendedor,
+                tenant_id=str(pedido.tenant_id),
+                webhook_payload=webhook_payload or {},
+            )
 
     registry = IdempotencyKey(
         user_id=0,
