@@ -2,6 +2,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 import hashlib
 import json
+import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -23,6 +24,23 @@ security = HTTPBearer()
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
 RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
 
+# Palavras do mundo pet para código de retirada por terceiro
+_PALAVRAS_PET = [
+    "patinha", "focinho", "coleira", "bigodinho", "rabinho", "pelagem",
+    "latido", "miado", "ronronar", "arranhado", "mordisco", "felpudo",
+    "manchado", "listrado", "tigrao", "leaozinho", "pompom", "bolota",
+    "amendoim", "biscoito", "caramelo", "chocolate", "baunilha", "canela",
+    "malhado", "pintado", "bolinha", "fralda", "petisco", "ossinhos",
+    "aquario", "gaiola", "gambito", "pinscher", "vira-lata", "siames",
+    "labrador", "poodle", "bulldog", "dachshund", "beagle", "shih-tzu",
+    "periquito", "calopsita", "hamster", "coelho", "porquinho", "tartaruga",
+]
+
+
+def _gerar_palavra_chave_retirada() -> str:
+    """Gera código de retirada com 2 palavras do mundo pet, ex: 'patinha-bolota'"""
+    return "-".join(random.sample(_PALAVRAS_PET, 2))
+
 
 class EcommerceIdentity(BaseModel):
     user_id: int
@@ -37,6 +55,7 @@ class CheckoutFinalizarRequest(BaseModel):
     cidade_destino: str = Field(min_length=2)
     endereco_entrega: str | None = None
     cupom: str | None = None
+    tipo_retirada: str | None = None  # proprio, terceiro (usado quando delivery_mode=retirada)
 
 
 def _current_identity(credentials: HTTPAuthorizationCredentials = Depends(security)) -> EcommerceIdentity:
@@ -306,6 +325,14 @@ def finalizar_checkout(
     carrinho.total = total
     carrinho.status = "pendente"
 
+    # Tipo de retirada e palavra-chave para terceiro retirar
+    tipo_retirada = payload.tipo_retirada  # 'proprio' | 'terceiro' | None
+    palavra_chave = None
+    if tipo_retirada == "terceiro":
+        palavra_chave = _gerar_palavra_chave_retirada()
+    carrinho.tipo_retirada = tipo_retirada
+    carrinho.palavra_chave_retirada = palavra_chave
+
     response = {
         "status": "pedido_finalizado",
         "pedido_id": carrinho.pedido_id,
@@ -319,6 +346,8 @@ def finalizar_checkout(
         },
         "total": total,
         "endereco_entrega": payload.endereco_entrega,
+        "tipo_retirada": tipo_retirada,
+        "palavra_chave_retirada": palavra_chave,
     }
 
     if idem_row:
@@ -361,6 +390,8 @@ def listar_pedidos_cliente(
             "pedido_id": pedido.pedido_id,
             "status": pedido.status,
             "total": float(pedido.total or 0.0),
+            "tipo_retirada": pedido.tipo_retirada,
+            "palavra_chave_retirada": pedido.palavra_chave_retirada,
             "created_at": pedido.created_at.isoformat() if pedido.created_at else None,
             "itens": [
                 {

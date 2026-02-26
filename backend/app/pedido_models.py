@@ -28,6 +28,10 @@ class Pedido(Base):
 
     status = Column(String, default="criado")
 
+    # Retirada na loja
+    tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
+    palavra_chave_retirada = Column(String(100), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # =====================================

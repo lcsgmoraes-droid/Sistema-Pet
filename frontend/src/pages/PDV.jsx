@@ -763,6 +763,19 @@ export default function PDV() {
     }
   };
 
+  const marcarEntregue = async (e, vendaId) => {
+    e.stopPropagation(); // Não abre a venda ao clicar no botão
+    try {
+      await fetch(`/api/vendas/${vendaId}/marcar-entregue`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      carregarVendasRecentes();
+    } catch (error) {
+      console.error('Erro ao marcar entregue:', error);
+    }
+  };
+
   const carregarVendaEspecifica = async (vendaId, abrirModalPagamento = false) => {
     try {
       setLoading(true);
@@ -3251,72 +3264,108 @@ export default function PDV() {
               <p className="text-xs">Nenhuma venda encontrada</p>
             </div>
           ) : (
-            vendasRecentes.map((venda) => (
-              <div
-                key={venda.id}
-                onClick={() => reabrirVenda(venda)}
-                className="bg-gray-50 rounded-lg p-2.5 border border-gray-200 hover:border-blue-300 cursor-pointer transition-colors"
-              >
-                <div className="flex items-start justify-between mb-1.5">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">
-                      {venda.cliente_nome || 'Cliente não informado'}
+            vendasRecentes.map((venda) => {
+                const canalInfo = {
+                  ecommerce:    { cor: 'border-l-purple-500', bg: 'bg-purple-50', icon: '🛒', label: 'Ecommerce' },
+                  aplicativo:   { cor: 'border-l-green-500',  bg: 'bg-green-50',  icon: '📱', label: 'App' },
+                  loja_fisica:  { cor: 'border-l-blue-500',   bg: 'bg-blue-50',   icon: '🏪', label: 'PDV' },
+                }[venda.canal] || { cor: 'border-l-gray-400', bg: 'bg-gray-50', icon: '🏪', label: 'PDV' };
+
+                return (
+                  <div
+                    key={venda.id}
+                    onClick={() => reabrirVenda(venda)}
+                    className={`rounded-lg p-2.5 border border-gray-200 border-l-4 ${canalInfo.cor} hover:border-blue-300 cursor-pointer transition-colors ${canalInfo.bg}`}
+                  >
+                    {/* Linha topo: canal + entrega */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
+                        <span>{canalInfo.icon}</span>
+                        <span>{canalInfo.label}</span>
+                        {venda.tem_entrega && <span className="ml-1" title="Entrega">🚚</span>}
+                      </span>
+                      {venda.palavra_chave_retirada && (
+                        <span className="text-[10px] bg-orange-100 text-orange-700 font-semibold px-1.5 py-0.5 rounded-full border border-orange-200" title="Senha de retirada">
+                          🔑 {venda.palavra_chave_retirada}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500">#{venda.numero_venda}</div>
-                  </div>
-                  <div className="text-right ml-2 flex-shrink-0">
-                    {venda.status === 'baixa_parcial' ? (
-                      <>
-                        <div className="text-[10px] text-gray-500">Pago</div>
-                        <div className="text-xs font-semibold text-green-600">
-                          R$ {(venda.valor_pago || 0).toFixed(2)}
+
+                    <div className="flex items-start justify-between mb-1.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {venda.cliente_nome || 'Cliente não informado'}
                         </div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">
-                          de R$ {(venda.total || 0).toFixed(2)}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-sm font-semibold text-green-600">
-                        R$ {(venda.total || 0).toFixed(2)}
+                        <div className="text-xs text-gray-500">#{venda.numero_venda}</div>
                       </div>
-                    )}
-                    <div
-                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full mt-1 inline-block ${
-                        venda.status === 'pago_nf'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : venda.status === 'finalizada'
-                          ? 'bg-green-100 text-green-700'
-                          : venda.status === 'baixa_parcial'
-                          ? 'bg-blue-100 text-blue-700'
-                          : venda.status === 'aberta'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}
-                    >
-                      {venda.status === 'pago_nf' && 'Pago NF'}
-                      {venda.status === 'finalizada' && 'Pago'}
-                      {venda.status === 'baixa_parcial' && 'Parcial'}
-                      {venda.status === 'aberta' && 'Aberta'}
-                      {venda.status === 'cancelada' && 'Cancelada'}
+                      <div className="text-right ml-2 flex-shrink-0">
+                        {venda.status === 'baixa_parcial' ? (
+                          <>
+                            <div className="text-[10px] text-gray-500">Pago</div>
+                            <div className="text-xs font-semibold text-green-600">
+                              R$ {(venda.valor_pago || 0).toFixed(2)}
+                            </div>
+                            <div className="text-[10px] text-gray-500 mt-0.5">
+                              de R$ {(venda.total || 0).toFixed(2)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-sm font-semibold text-green-600">
+                            R$ {(venda.total || 0).toFixed(2)}
+                          </div>
+                        )}
+                        <div
+                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full mt-1 inline-block ${
+                            venda.status === 'pago_nf'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : venda.status === 'finalizada'
+                              ? 'bg-green-100 text-green-700'
+                              : venda.status === 'baixa_parcial'
+                              ? 'bg-blue-100 text-blue-700'
+                              : venda.status === 'aberta'
+                              ? 'bg-yellow-100 text-yellow-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {venda.status === 'pago_nf' && 'Pago NF'}
+                          {venda.status === 'finalizada' && 'Pago'}
+                          {venda.status === 'baixa_parcial' && 'Parcial'}
+                          {venda.status === 'aberta' && 'Aberta'}
+                          {venda.status === 'cancelada' && 'Cancelada'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Data + botão marcar entregue */}
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] text-gray-500">
+                        {(() => {
+                          const dataStr = venda.data_venda;
+                          if (typeof dataStr === 'string' && dataStr.includes('T')) {
+                            const [date, timeWithTz] = dataStr.split('T');
+                            const time = timeWithTz.split('-')[0].split('+')[0];
+                            const [y, m, d] = date.split('-');
+                            const [h, min] = time.split(':');
+                            return `${d}/${m} ${h}:${min}`;
+                          }
+                          return new Date(dataStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                        })()}
+                      </div>
+                      {venda.tipo_retirada === 'terceiro' && venda.status_entrega !== 'entregue' && (
+                        <button
+                          onClick={(e) => marcarEntregue(e, venda.id)}
+                          className="text-[10px] bg-green-600 hover:bg-green-700 text-white font-semibold px-2 py-0.5 rounded transition-colors"
+                        >
+                          ✅ Entregue
+                        </button>
+                      )}
+                      {venda.status_entrega === 'entregue' && (
+                        <span className="text-[10px] text-green-600 font-medium">✅ Retirado</span>
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="text-[10px] text-gray-500">
-                  {(() => {
-                    const dataStr = venda.data_venda;
-                    if (typeof dataStr === 'string' && dataStr.includes('T')) {
-                      // Extrair data e hora da string ISO: 2026-02-13T23:14:22-03:00
-                      const [date, timeWithTz] = dataStr.split('T');
-                      const time = timeWithTz.split('-')[0].split('+')[0]; // Remove timezone
-                      const [y, m, d] = date.split('-');
-                      const [h, min] = time.split(':');
-                      return `${d}/${m} ${h}:${min}`;
-                    }
-                    return new Date(dataStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-                  })()}
-                </div>
-              </div>
-            ))
+                );
+              })
           )}
         </div>
       </div>

@@ -63,6 +63,10 @@ class Venda(BaseTenantModel):
     
     # Canal de Venda (para DRE por canal)
     canal = Column(String(50), default='loja_fisica', nullable=False, index=True)  # loja_fisica, mercado_livre, shopee, amazon, site, instagram
+
+    # Retirada na loja (ecommerce)
+    tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
+    palavra_chave_retirada = Column(String(100), nullable=True)  # ex: 'patinha-bolota' (para terceiro retirar)
     
     # Financeiro (FASE 3) - COMENTADO até migração
     # nsu = Column(String(50), nullable=True, index=True)  # NSU da operadora de cartão (para conciliação)
@@ -184,6 +188,10 @@ class Venda(BaseTenantModel):
             'status_entrega': self.status_entrega,
             'status_pagamento': 'pago' if valor_pago >= safe_decimal_to_float(self.total) else 'parcial' if valor_pago > 0 else 'pendente',
             'forma_pagamento': self.pagamentos[0].forma_pagamento if (hasattr(self, 'pagamentos') and self.pagamentos and len(self.pagamentos) > 0) else None,
+            'canal': self.canal or 'loja_fisica',
+            'loja_origem': self.loja_origem,
+            'tipo_retirada': self.tipo_retirada,
+            'palavra_chave_retirada': self.palavra_chave_retirada,
             'data_venda': safe_datetime_to_iso(self.data_venda),
             'data_finalizacao': safe_datetime_to_iso(self.data_finalizacao),
             'observacoes': self.observacoes,

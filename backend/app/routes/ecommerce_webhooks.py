@@ -328,6 +328,9 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
             venda_row.data_finalizacao = datetime.utcnow()
             if venda_row.tem_entrega and not venda_row.status_entrega:
                 venda_row.status_entrega = "pendente"
+            # Repassa dados de retirada do ecommerce para a venda no PDV
+            venda_row.tipo_retirada = pedido.tipo_retirada
+            venda_row.palavra_chave_retirada = pedido.palavra_chave_retirada
 
     registry = IdempotencyKey(
         user_id=0,

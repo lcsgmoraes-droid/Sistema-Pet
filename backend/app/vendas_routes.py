@@ -798,6 +798,23 @@ def atualizar_venda(
     return venda.to_dict()
 
 
+@router.post('/{venda_id}/marcar-entregue')
+async def marcar_venda_entregue(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Confirma que o cliente retirou o pedido na loja (ou terceiro apresentou a palavra-chave)."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.tenant_id == tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+    venda.status_entrega = "entregue"
+    venda.data_entrega = datetime.now()
+    db.commit()
+    return {"id": venda_id, "status_entrega": "entregue", "data_entrega": venda.data_entrega.isoformat()}
+
+
 @router.post('/{venda_id}/finalizar')
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita finalização duplicada
 async def finalizar_venda(

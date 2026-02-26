@@ -311,6 +311,7 @@ export default function EcommerceMVP() {
 
   const [cidadeDestino, setCidadeDestino] = useState('');
   const [deliveryMode, setDeliveryMode] = useState('entrega');
+  const [tipoRetirada, setTipoRetirada] = useState('proprio'); // 'proprio' | 'terceiro'
   const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
   const [checkoutResumo, setCheckoutResumo] = useState(null);
   const [checkoutResult, setCheckoutResult] = useState(null);
@@ -942,6 +943,7 @@ export default function EcommerceMVP() {
           cidade_destino: cidadeFinal,
           endereco_entrega: enderecoFormatado || null,
           cupom: cupomResult?.codigo || null,
+          tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
         },
         {
           headers: {
@@ -1501,6 +1503,38 @@ export default function EcommerceMVP() {
                   Retirada na loja
                 </label>
               </div>
+
+              {/* Quem vai retirar — só aparece se escolher retirada */}
+              {deliveryMode === 'retirada' && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'grid', gap: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>Quem vai retirar o pedido?</div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="tipoRetirada"
+                      value="proprio"
+                      checked={tipoRetirada === 'proprio'}
+                      onChange={() => setTipoRetirada('proprio')}
+                    />
+                    <span>🙋 Eu mesmo(a) vou retirar</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="tipoRetirada"
+                      value="terceiro"
+                      checked={tipoRetirada === 'terceiro'}
+                      onChange={() => setTipoRetirada('terceiro')}
+                    />
+                    <span>👤 Outra pessoa vai retirar por mim</span>
+                  </label>
+                  {tipoRetirada === 'terceiro' && (
+                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, padding: 10, fontSize: 12, color: '#92400e' }}>
+                      ℹ️ Uma <strong>senha secreta de retirada</strong> será gerada após confirmar o pedido. Compartilhe essa senha com a pessoa que vai retirar.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <input
@@ -1587,8 +1621,17 @@ export default function EcommerceMVP() {
           )}
 
           {checkoutResult?.pedido_id && (
-            <div style={{ background: '#e8fff0', color: '#0a7d32', padding: 10, borderRadius: 6 }}>
-              Pedido confirmado: <strong>{checkoutResult.pedido_id}</strong>
+            <div style={{ background: '#e8fff0', color: '#0a7d32', padding: 10, borderRadius: 6, display: 'grid', gap: 6 }}>
+              <div>Pedido confirmado: <strong>{checkoutResult.pedido_id}</strong></div>
+              {checkoutResult.palavra_chave_retirada && (
+                <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 8, padding: 12, color: '#7c2d12', textAlign: 'center' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 2, color: '#ea580c' }}>{checkoutResult.palavra_chave_retirada}</div>
+                  <div style={{ fontSize: 11, marginTop: 6, color: '#92400e' }}>
+                    Compartilhe esta senha com a pessoa que vai retirar o pedido na loja.
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
