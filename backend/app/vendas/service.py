@@ -308,7 +308,7 @@ class VendaService:
                     if produto_id:
                         produto = db.query(Produto).filter(
                             Produto.id == produto_id,
-                            Produto.user_id == user_id
+                            Produto.tenant_id == payload.get('tenant_id')
                         ).first()
                         
                         if not produto:
@@ -1569,7 +1569,7 @@ class VendaService:
                         # Item com produto simples
                         produto = db.query(Produto).filter(
                             Produto.id == produto_id,
-                            Produto.user_id == user_id
+                            Produto.tenant_id == tenant_id
                         ).first()
                         
                         if not produto:
