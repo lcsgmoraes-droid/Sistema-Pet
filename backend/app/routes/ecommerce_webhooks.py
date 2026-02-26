@@ -169,7 +169,11 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         tem_entrega_payload = payload_data.get("tem_entrega")
 
     if tem_entrega_payload is None:
-        tem_entrega = entrega_mode != "retirada"
+        # Se o endereço for "RETIRADA NA LOJA" não é entrega, mesmo sem delivery_mode no payload
+        if endereco_entrega and "retirada" in str(endereco_entrega).lower():
+            tem_entrega = False
+        else:
+            tem_entrega = entrega_mode == "entrega"
     else:
         if isinstance(tem_entrega_payload, str):
             tem_entrega = tem_entrega_payload.strip().lower() in {"1", "true", "yes", "sim"}

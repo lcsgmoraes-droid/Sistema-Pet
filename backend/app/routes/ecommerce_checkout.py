@@ -38,8 +38,8 @@ _PALAVRAS_PET = [
 
 
 def _gerar_palavra_chave_retirada() -> str:
-    """Gera código de retirada com 2 palavras do mundo pet, ex: 'patinha-bolota'"""
-    return "-".join(random.sample(_PALAVRAS_PET, 2))
+    """Gera código de retirada com 1 palavra do mundo pet, ex: 'patinha'"""
+    return random.choice(_PALAVRAS_PET)
 
 
 class EcommerceIdentity(BaseModel):
