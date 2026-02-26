@@ -1,6 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
+import {
+  CreditCard,
+  Banknote,
+  QrCode,
+  ArrowLeftRight,
+  Receipt
+} from 'lucide-react';
+
+const getIconeFormaPagamento = (icone, tipo) => {
+  const key = (icone || tipo || '').toLowerCase();
+  if (key.includes('pix'))                                return <QrCode className="w-5 h-5" />;
+  if (key.includes('dinheiro') || key.includes('cash'))   return <Banknote className="w-5 h-5" />;
+  if (key.includes('transfer') || key.includes('banc'))   return <ArrowLeftRight className="w-5 h-5" />;
+  if (key.includes('boleto'))                             return <Receipt className="w-5 h-5" />;
+  if (key.includes('debito') || key.includes('débito') ||
+      key.includes('cartao_debito'))                      return <CreditCard className="w-5 h-5" />;
+  if (key.includes('credito') || key.includes('crédito') ||
+      key.includes('cartao_credito') || key.includes('parcelado')) return <CreditCard className="w-5 h-5" />;
+  return <CreditCard className="w-5 h-5" />;
+};
 
 
 const DEFAULT_ICON_BY_TIPO = {
@@ -153,8 +173,8 @@ const FormasPagamento = () => {
         parcelas_maximas: forma.parcelas_maximas,
         taxas_por_parcela: taxasPorParcela,
         permite_antecipacao: forma.permite_antecipacao || false,
-        dias_recebimento_antecipado: forma.dias_recebimento_antecipado || null,
-        taxa_antecipacao_percentual: forma.taxa_antecipacao_percentual || null,
+        dias_recebimento_antecipado: forma.dias_recebimento_antecipado ?? null,
+        taxa_antecipacao_percentual: forma.taxa_antecipacao_percentual ?? null,
         icone: normalizeFormaIcon(forma.icone, forma.tipo),
         cor: forma.cor || '#3B82F6'
       });
@@ -278,7 +298,7 @@ const FormasPagamento = () => {
                 <tr key={forma.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl">{forma.icone}</span>
+                      <span className="text-gray-500">{getIconeFormaPagamento(forma.icone, forma.tipo)}</span>
                       <div>
                         <div className="font-medium">{forma.nome}</div>
                         {forma.operadora_id && (
@@ -620,12 +640,15 @@ const FormasPagamento = () => {
                           className="w-full border border-gray-300 rounded px-3 py-2"
                           min="0"
                           max="30"
-                          value={formData.dias_recebimento_antecipado || ''}
-                          onChange={(e) => setFormData({...formData, dias_recebimento_antecipado: parseInt(e.target.value) || null})}
-                          placeholder="Ex: 1 (cai em D+1)"
+                          value={formData.dias_recebimento_antecipado != null ? formData.dias_recebimento_antecipado : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData({...formData, dias_recebimento_antecipado: val === '' ? null : parseInt(val)});
+                          }}
+                          placeholder="Ex: 0 (D+0) ou 1 (D+1)"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Quantos dias apos a venda o dinheiro cai na conta com antecipacao (geralmente D+1)
+                          Quantos dias apos a venda o dinheiro cai na conta com antecipacao. Use 0 para D+0 (cai na hora), 1 para D+1, etc.
                         </p>
                       </div>
 
