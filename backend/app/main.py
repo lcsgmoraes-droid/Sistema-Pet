@@ -137,6 +137,17 @@ from app.health_router import router as health_router  # Sprint 9: Health & Moni
 from app.admin_fix_routes import router as admin_fix_router  # Correções administrativas
 from app.routes.health_routes import router as health_check_router  # FASE 8: Healthcheck + Readiness
 
+# ============================================================================
+# E-COMMERCE - Loja Pública
+# ============================================================================
+from app.routes.ecommerce import router as ecommerce_router
+from app.routes.ecommerce_auth import router as ecommerce_auth_router
+from app.routes.ecommerce_public import router as ecommerce_public_router
+from app.routes.ecommerce_cart import router as ecommerce_cart_router
+from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
+from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
+from app.pedido_models import Pedido  # Modelo base ecommerce
+
 from app.tenancy.middleware import TenancyMiddleware
 import logging
 from pathlib import Path
@@ -518,6 +529,16 @@ app.include_router(whatsapp_analytics_router)  # Sprint 7: Analytics & Reports (
 app.include_router(whatsapp_security_router)  # Sprint 8: Security & LGPD (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
+
+# ============================================================================
+# E-COMMERCE - Loja Pública
+# ============================================================================
+app.include_router(ecommerce_router)
+app.include_router(ecommerce_auth_router)
+app.include_router(ecommerce_public_router)
+app.include_router(ecommerce_cart_router)
+app.include_router(ecommerce_checkout_router)
+app.include_router(ecommerce_webhooks_router)
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)

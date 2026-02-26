@@ -546,7 +546,8 @@ class Tenant(Base):
     
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default='false')
-    
+    ecommerce_slug = Column(String(80), nullable=True, unique=True, index=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     

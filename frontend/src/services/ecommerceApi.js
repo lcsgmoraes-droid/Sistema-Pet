@@ -5,12 +5,10 @@
  */
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.DEV
-  ? '/api'
-  : (import.meta.env.VITE_API_URL || '/api');
-
+// baseURL vazio: as chamadas já incluem /api/ no path (ex: /api/ecommerce/...)
+// Não usar VITE_API_URL aqui para não duplicar o prefixo /api
 const ecommerceApi = axios.create({
-  baseURL: BASE_URL,
+  baseURL: '',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
