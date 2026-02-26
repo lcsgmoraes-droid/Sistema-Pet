@@ -44,8 +44,6 @@
   "protected_files_never_delete": [
     "docker-compose.local-dev.yml",
     "docker-compose.prod.yml",
-    "docker-compose.cloud.yml",
-    "docker-compose.local-piloto.yml",
     ".env.example",
     ".env.development",
     ".env.local-prod",
