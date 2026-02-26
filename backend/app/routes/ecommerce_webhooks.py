@@ -14,7 +14,7 @@ from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
 
 
-router = APIRouter(prefix="/api/webhooks", tags=["ecommerce-webhooks"])
+router = APIRouter(prefix="/webhooks", tags=["ecommerce-webhooks"])
 
 
 def _get_signature_config() -> tuple[str, bool]:

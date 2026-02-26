@@ -15,7 +15,7 @@ from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
 
 
-router = APIRouter(prefix="/api/carrinho", tags=["ecommerce-cart"])
+router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
 security = HTTPBearer()
 
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
@@ -200,7 +200,7 @@ def adicionar_item_carrinho(
         .filter(
             Produto.id == payload.produto_id,
             Produto.tenant_id == identity.tenant_id,
-            Produto.situacao.is_(True),
+            Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
         )
         .first()
     )

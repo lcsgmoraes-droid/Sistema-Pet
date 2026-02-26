@@ -16,7 +16,7 @@ from app.db import get_session
 from app.models import Cliente, User
 
 
-router = APIRouter(prefix="/api/ecommerce/auth", tags=["ecommerce-auth"])
+router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
 security = HTTPBearer()
 
 RESET_TOKEN_MINUTES = 30

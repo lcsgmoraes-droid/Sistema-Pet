@@ -17,7 +17,7 @@ from app.idempotency_models import IdempotencyKey
 from app.pedido_models import Pedido, PedidoItem
 
 
-router = APIRouter(prefix="/api/checkout", tags=["ecommerce-checkout"])
+router = APIRouter(prefix="/checkout", tags=["ecommerce-checkout"])
 security = HTTPBearer()
 
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
