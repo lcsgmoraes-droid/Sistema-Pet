@@ -333,6 +333,50 @@ def finalizar_checkout(
     return response
 
 
+@router.get("/pedidos")
+def listar_pedidos_cliente(
+    limit: int = Query(default=20, ge=1, le=100),
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Lista todos os pedidos finalizados do cliente logado (exclui carrinho ativo)."""
+    _expirar_reservas_automaticamente(db, identity.tenant_id)
+
+    pedidos = (
+        db.query(Pedido)
+        .filter(
+            Pedido.cliente_id == identity.user_id,
+            Pedido.tenant_id == identity.tenant_id,
+            Pedido.status != "carrinho",
+        )
+        .order_by(Pedido.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+    resultado = []
+    for pedido in pedidos:
+        itens = _buscar_itens(db, pedido.pedido_id)
+        resultado.append({
+            "pedido_id": pedido.pedido_id,
+            "status": pedido.status,
+            "total": float(pedido.total or 0.0),
+            "created_at": pedido.created_at.isoformat() if pedido.created_at else None,
+            "itens": [
+                {
+                    "produto_id": item.produto_id,
+                    "nome": item.nome,
+                    "quantidade": item.quantidade,
+                    "preco_unitario": float(item.preco_unitario or 0.0),
+                    "subtotal": float(item.subtotal or 0.0),
+                }
+                for item in itens
+            ],
+        })
+
+    return {"pedidos": resultado}
+
+
 @router.get("/pedido/{pedido_id}/status")
 def consultar_status_pedido(
     pedido_id: str,
