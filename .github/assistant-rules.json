@@ -16,6 +16,7 @@
     "step_1": "Executar FLUXO_UNICO.bat check antes de qualquer acao relevante",
     "step_2": "Trabalhar no DEV usando FLUXO_UNICO.bat dev-up",
     "step_3": "Antes de subir producao, executar FLUXO_UNICO.bat release-check",
+    "step_3b": "Se houver alteracoes em frontend/src, executar npm run build dentro da pasta frontend ANTES do prod-up",
     "step_4": "Subir producao apenas com FLUXO_UNICO.bat prod-up",
     "step_5": "Conferir com FLUXO_UNICO.bat status"
   },
@@ -61,7 +62,8 @@
       "git sem arquivos proibidos rastreados",
       "sem multiplas heads de migration",
       "mudancas organizadas por escopo",
-      "comandos do fluxo unico executados"
+      "comandos do fluxo unico executados",
+      "se frontend/src foi alterado: npm run build executado e dist atualizado no commit"
     ]
   }
 }

@@ -49,8 +49,12 @@ Use para: ver se os servicos estao de pe e saudaveis.
 1. `FLUXO_UNICO.bat check`
 2. `FLUXO_UNICO.bat dev-up`
 3. `FLUXO_UNICO.bat release-check`
-4. `FLUXO_UNICO.bat prod-up`
-5. `FLUXO_UNICO.bat status`
+4. **Se mexeu em qualquer arquivo dentro de `frontend/src`:** rodar `npm run build` na pasta `frontend`
+   - Isso gera a pasta `dist` com o codigo novo empacotado
+   - Incluir o `dist` no commit junto com o restante
+   - Sem esse passo, a producao continua mostrando o codigo antigo
+5. `FLUXO_UNICO.bat prod-up`
+6. `FLUXO_UNICO.bat status`
 
 ---
 

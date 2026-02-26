@@ -19,8 +19,9 @@ Use sempre esta sequencia:
 1. `FLUXO_UNICO.bat check`
 2. `FLUXO_UNICO.bat dev-up`
 3. `FLUXO_UNICO.bat release-check`
-4. `FLUXO_UNICO.bat prod-up`
-5. `FLUXO_UNICO.bat status`
+4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend` e incluir o `dist` no commit**
+5. `FLUXO_UNICO.bat prod-up`
+6. `FLUXO_UNICO.bat status`
 
 ## Comunicacao com o usuario
 
@@ -35,6 +36,7 @@ Use sempre esta sequencia:
 - Nao enviar dados de DEV para producao.
 - Nao pular validacao de release.
 - Nao corrigir em producao manualmente sem refletir no Git.
+- **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` — sem build, o codigo novo nao aparece em producao.**
 
 ## Em caso de conflito
 
