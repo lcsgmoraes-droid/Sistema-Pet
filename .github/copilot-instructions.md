@@ -19,9 +19,10 @@ Use sempre esta sequencia:
 1. `FLUXO_UNICO.bat check`
 2. `FLUXO_UNICO.bat dev-up`
 3. `FLUXO_UNICO.bat release-check`
-4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend` e incluir o `dist` no commit**
-5. `FLUXO_UNICO.bat prod-up`
-6. `FLUXO_UNICO.bat status`
+4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend` e incluir o `dist` no commit com `git add -f frontend/dist`**
+5. `git push origin main`
+6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): via MCP SSH (conexao ID 1 ou nome mlprohub-producao), rodar: `cd /opt/petshop && git pull origin main && docker restart petshop-prod-nginx` (reiniciar o backend tambem se houver mudancas no backend: `docker restart petshop-prod-backend`)**
+7. `FLUXO_UNICO.bat status` (mostra containers locais; para ver estado real da producao, checar via SSH)
 
 ## Comunicacao com o usuario
 
@@ -38,6 +39,7 @@ Use sempre esta sequencia:
 - Nao corrigir em producao manualmente sem refletir no Git.
 - **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` — sem build, o codigo novo nao aparece em producao.**
 - **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
+- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: fazer `git push origin main` e depois SSH no servidor via MCP (ID 1) e rodar `cd /opt/petshop && git pull origin main && docker restart petshop-prod-nginx`. Se houver mudancas no backend, reiniciar tambem: `docker restart petshop-prod-backend`.**
 
 ## Em caso de conflito
 
