@@ -1526,7 +1526,7 @@ export default function EcommerceMVP() {
                       checked={tipoRetirada === 'terceiro'}
                       onChange={() => setTipoRetirada('terceiro')}
                     />
-                    <span>👤 Outra pessoa vai retirar por mim</span>
+                    <span>� Outra pessoa vai retirar por mim</span>
                   </label>
                   {tipoRetirada === 'terceiro' && (
                     <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, padding: 10, fontSize: 12, color: '#92400e' }}>
@@ -1662,6 +1662,15 @@ export default function EcommerceMVP() {
                     <div style={{ fontSize: 13 }}>
                       Data do pagamento: <strong>{order.data_pagamento ? formatDateTime(order.data_pagamento) : 'Aguardando pagamento'}</strong>
                     </div>
+
+                    {/* Senha de retirada por terceiro */}
+                    {order.palavra_chave_retirada && (
+                      <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#7c2d12', marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: '#ea580c' }}>{order.palavra_chave_retirada}</div>
+                        <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Apresente esta senha na loja para retirar o pedido</div>
+                      </div>
+                    )}
 
                     <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>Produtos do pedido ({order.itens_count || 0})</div>
                     {Array.isArray(order.itens) && order.itens.length > 0 ? (
