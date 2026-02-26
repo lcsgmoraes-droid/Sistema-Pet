@@ -95,5 +95,11 @@
       "comandos do fluxo unico executados",
       "se frontend/src foi alterado: npm run build executado e dist atualizado no commit"
     ]
+  },
+  "producao_deploy_rules": {
+    "frontend_changes": "npm run build + commit do dist + docker restart petshop-prod-nginx",
+    "backend_changes": "OBRIGATORIO reconstruir imagem: docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend",
+    "reason": "O codigo do backend fica DENTRO da imagem Docker (nao em volume montado). Um simples docker restart nao aplica mudancas de codigo. So o frontend usa volume (pasta dist). Sempre reconstruir imagem ao alterar qualquer arquivo em backend/.",
+    "never_do": "docker restart petshop-prod-backend como unico comando apos mudancas no codigo backend"
   }
 }

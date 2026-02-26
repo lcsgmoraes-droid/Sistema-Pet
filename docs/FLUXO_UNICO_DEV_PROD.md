@@ -83,6 +83,24 @@ Se `release-check` falhar, **nao subir producao**.
 
 ---
 
+## Regra critica de deploy do backend no servidor
+
+O codigo Python do backend fica **dentro da imagem Docker** (nao em uma pasta montada).
+
+Isso significa:
+- `git pull` no servidor: atualiza os arquivos no disco — mas o container ainda roda o codigo antigo
+- `docker restart petshop-prod-backend`: reinicia o mesmo container com o mesmo codigo antigo
+- **Para aplicar mudancas no backend, e obrigatorio reconstruir a imagem:**
+
+```
+docker compose -f docker-compose.prod.yml build backend
+docker compose -f docker-compose.prod.yml up -d backend
+```
+
+So o frontend e diferente: o nginx serve os arquivos estaticos da pasta `frontend/dist` diretamente, entao para o frontend basta copiar os arquivos novos (via `npm run build` + commit) e `docker restart petshop-prod-nginx`.
+
+---
+
 ## Assistente automatico (com confirmacao)
 
 Se quiser que o sistema te guie e pergunte antes de cada passo importante, use:
