@@ -262,19 +262,19 @@ function extractApiErrorMessage(err, fallback) {
 
 const BANNERS = [
   {
-    bg: 'linear-gradient(135deg, #c41c1c 0%, #9b1515 60%, #7a0f0f 100%)',
+    bg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 60%, #4338ca 100%)',
     title: 'Compre e receba no mesmo dia!',
     sub: 'Pedidos realizados até as 16h',
     emoji: '🚀',
   },
   {
-    bg: 'linear-gradient(135deg, #2e7d32 0%, #388e3c 60%, #43a047 100%)',
+    bg: 'linear-gradient(135deg, #10b981 0%, #059669 60%, #047857 100%)',
     title: 'Retire na loja',
     sub: 'Super simples e sem custo de frete!',
     emoji: '🏪',
   },
   {
-    bg: 'linear-gradient(135deg, #d97706 0%, #b45309 60%, #92400e 100%)',
+    bg: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)',
     title: 'As melhores rações em Prudente',
     sub: 'Cachorros, gatos, pássaros e mais 🐾',
     emoji: '🐶',
@@ -1115,7 +1115,7 @@ export default function EcommerceMVP() {
       {cart?.itens?.length > 0 && (
         <div
           onClick={() => setView('carrinho')}
-          style={{ position: 'sticky', top: 0, zIndex: 50, background: '#c41c1c', color: '#fff', padding: '9px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 10, marginBottom: 10, cursor: 'pointer', boxShadow: '0 3px 12px rgba(196,28,28,0.45)' }}
+          style={{ position: 'sticky', top: 0, zIndex: 50, background: '#6366f1', color: '#fff', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, marginBottom: 0, cursor: 'pointer', boxShadow: '0 2px 12px rgba(99,102,241,0.35)' }}
         >
           <span style={{ fontWeight: 600, fontSize: 14 }}>🛒 {cart.itens.length} item(ns) no carrinho</span>
           <span style={{ fontWeight: 800, fontSize: 14 }}>{formatCurrency(cartTotal)} →</span>
@@ -1125,47 +1125,48 @@ export default function EcommerceMVP() {
       {/* HEADER */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%)',
-          borderRadius: 16,
-          padding: '16px 20px',
-          marginBottom: 10,
-          border: '1px solid #fde68a',
-          boxShadow: '0 2px 8px rgba(196,28,28,0.07)',
+          background: '#fff',
+          borderRadius: 0,
+          padding: '14px 24px',
+          marginBottom: 0,
+          borderBottom: '1px solid #e5e7eb',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Loja Online</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {tenantContext?.logo_url ? (
               <img
                 src={resolveMediaUrl(tenantContext.logo_url)}
                 alt={storeDisplayName}
-                style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', margin: '4px 0' }}
+                style={{ height: 48, maxWidth: 180, objectFit: 'contain' }}
               />
             ) : (
-              <h1 style={{ margin: '2px 0 4px', fontSize: 30, lineHeight: 1.1, color: '#c41c1c', fontWeight: 900 }}>{storeDisplayName}</h1>
+              <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.1, color: '#1a1a2e', fontWeight: 800, letterSpacing: -0.5 }}>{storeDisplayName}</h1>
             )}
-            <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
-              📍 {tenantContext?.cidade || 'Cidade não informada'}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
-            </div>
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500, borderLeft: '1px solid #e5e7eb', paddingLeft: 14 }}>
+              {tenantContext?.cidade || ''}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
+            </span>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {customerDisplayName ? (
-              <div style={{ fontSize: 13, color: '#374151', background: '#fff', borderRadius: 20, padding: '6px 12px', border: '1px solid #d1d5db', fontWeight: 600 }}>
-                👤 {customerDisplayName.split(' ')[0]}
+              <div style={{ fontSize: 13, color: '#374151', background: '#f9fafb', borderRadius: 24, padding: '7px 16px', border: '1px solid #e5e7eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
+                {customerDisplayName.split(' ')[0]}
               </div>
             ) : (
-              <button onClick={() => setView('conta')} style={{ background: '#fff', border: '2px solid #2e7d32', color: '#2e7d32', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              <button onClick={() => setView('conta')} style={{ background: '#fff', border: '1px solid #d1d5db', color: '#374151', borderRadius: 24, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Entrar / Cadastrar
               </button>
             )}
             <button
               onClick={() => setView('carrinho')}
-              style={{ background: '#c41c1c', color: '#fff', border: 'none', borderRadius: 50, width: 48, height: 48, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxShadow: '0 2px 8px rgba(196,28,28,0.4)', flexShrink: 0 }}
+              style={{ background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 12, width: 44, height: 44, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'background 0.15s', flexShrink: 0 }}
             >
-              🛒
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
               {cart?.itens?.length > 0 && (
-                <span style={{ position: 'absolute', top: -4, right: -4, background: '#f5a623', color: '#7c2d12', borderRadius: 50, minWidth: 20, height: 20, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' }}>
+                <span style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', borderRadius: 50, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' }}>
                   {cart.itens.length}
                 </span>
               )}
@@ -1175,7 +1176,7 @@ export default function EcommerceMVP() {
       </div>
 
       {/* BANNER ROTATIVO */}
-      <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', marginBottom: 10, height: 112 }}>
+      <div style={{ position: 'relative', overflow: 'hidden', marginBottom: 0, height: 340, background: '#1a1a2e' }}>
         {activeBanners.map((b, i) => (
           <div
             key={i}
@@ -1187,33 +1188,34 @@ export default function EcommerceMVP() {
             }}
           >
             {b.type === 'image' ? (
-              <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
             ) : (
-              <div style={{ background: b.bg, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16, height: '100%' }}>
-                <span style={{ fontSize: 44, flexShrink: 0 }}>{b.emoji}</span>
+              <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
+                <span style={{ fontSize: 64, flexShrink: 0, filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }}>{b.emoji}</span>
                 <div>
-                  <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.2, textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{b.title}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 13, marginTop: 5 }}>{b.sub}</div>
+                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 32, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.3)', letterSpacing: -0.5 }}>{b.title}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.92)', fontSize: 16, marginTop: 8, fontWeight: 400 }}>{b.sub}</div>
                 </div>
               </div>
             )}
           </div>
         ))}
-        <div style={{ position: 'absolute', bottom: 9, right: 14, display: 'flex', gap: 5 }}>
+
+        <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
           {activeBanners.map((_, i) => (
             <button
               key={i}
               onClick={() => setBannerSlide(i)}
-              style={{ width: bannerSlide === i ? 22 : 8, height: 8, background: bannerSlide === i ? '#fff' : 'rgba(255,255,255,0.5)', borderRadius: 4, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s ease' }}
+              style={{ width: bannerSlide === i ? 28 : 10, height: 10, background: bannerSlide === i ? '#fff' : 'rgba(255,255,255,0.45)', borderRadius: 5, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s ease', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
             />
           ))}
         </div>
       </div>
 
       {/* BANNER APP */}
-      <div style={{ marginBottom: 10, background: 'linear-gradient(90deg, #2e7d32, #43a047)', color: '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 20 }}>📱</span>
-        <span>Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.</span>
+      <div style={{ marginBottom: 0, background: '#1a1a2e', color: '#fff', padding: '10px 24px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <span style={{ fontSize: 16 }}>📱</span>
+        <span style={{ fontWeight: 400 }}>Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.</span>
       </div>
 
       {!tenantRef && (
@@ -1223,7 +1225,7 @@ export default function EcommerceMVP() {
       )}
 
       {/* NAVEGAÇÃO */}
-      <div style={{ display: 'flex', gap: 6, background: '#f0fdf4', borderRadius: 12, overflow: 'hidden', marginBottom: 16, padding: 5, border: '1px solid #bbf7d0' }}>
+      <div style={{ display: 'flex', gap: 0, background: '#fff', borderRadius: 0, overflow: 'hidden', marginBottom: 0, padding: '0 24px', borderBottom: '2px solid #f1f5f9', maxWidth: 1280, margin: '0 auto' }}>
         {[
           ['loja', '🏪 Loja'],
           ['carrinho', `🛒 Carrinho${cart?.itens?.length ? ` (${cart.itens.length})` : ''}`],
@@ -1237,16 +1239,19 @@ export default function EcommerceMVP() {
               onClick={() => setView(tabId)}
               style={{
                 flex: 1,
-                background: active ? '#2e7d32' : '#fff',
-                color: active ? '#fff' : '#2e7d32',
-                padding: '10px 4px',
-                fontWeight: active ? 700 : 600,
+                maxWidth: 200,
+                background: 'transparent',
+                color: active ? '#1a1a2e' : '#6b7280',
+                padding: '14px 8px 12px',
+                fontWeight: active ? 700 : 500,
                 cursor: 'pointer',
-                fontSize: 13,
-                borderRadius: 8,
-                boxShadow: active ? '0 2px 8px rgba(46,125,50,0.3)' : '0 1px 3px rgba(0,0,0,0.08)',
+                fontSize: 14,
+                borderRadius: 0,
+                boxShadow: 'none',
                 transition: 'all 0.15s ease',
-                border: active ? '1px solid #2e7d32' : '1px solid #d1fae5',
+                border: 'none',
+                borderBottom: active ? '3px solid #6366f1' : '3px solid transparent',
+                letterSpacing: -0.2,
               }}
             >
               {label}
@@ -1268,24 +1273,31 @@ export default function EcommerceMVP() {
       )}
 
       {view === 'loja' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 16 }}>
-          <div style={{ background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e5e7eb' }}>
-          <h3 style={{ marginTop: 0, color: '#2e7d32', fontSize: 18 }}>🔍 Catálogo da loja</h3>
-              <div style={{ color: '#64748b', fontSize: 14, marginBottom: 12 }}>Selecione produtos, confira detalhes e adicione ao carrinho.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '24px 24px' }}>
+          <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <div>
+              <h3 style={{ margin: 0, color: '#1a1a2e', fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>Catálogo da loja</h3>
+              <div style={{ color: '#9ca3af', fontSize: 13, marginTop: 4 }}>Selecione produtos, confira detalhes e adicione ao carrinho.</div>
+            </div>
+          </div>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar produto..."
-                style={{ flex: 1, minWidth: 240, padding: 10, border: '1px solid #d1d5db', borderRadius: 10 }}
-              />
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ padding: 10, border: '1px solid #d1d5db', borderRadius: 10 }}>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="O que seu pet precisa?"
+                  style={{ width: '100%', padding: '11px 12px 11px 38px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, background: '#f9fafb', transition: 'border-color 0.15s', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ padding: '11px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, background: '#f9fafb', color: '#374151' }}>
                 {categorias.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>
-              <button className="btn-secondary" onClick={loadProducts} disabled={loading}>
+              <button onClick={loadProducts} disabled={loading} style={{ padding: '11px 18px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 13, fontWeight: 600, background: '#fff', color: '#374151', cursor: 'pointer' }}>
                 {loading ? 'Carregando...' : 'Atualizar'}
               </button>
             </div>
@@ -1293,8 +1305,8 @@ export default function EcommerceMVP() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                gap: 12,
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: 16,
               }}
             >
               {filteredProducts.map((product) => {
@@ -1318,69 +1330,86 @@ export default function EcommerceMVP() {
                   onMouseEnter={() => setHoveredCard(product.id)}
                   onMouseLeave={() => setHoveredCard(null)}
                   style={{
-                    border: hoveredCard === product.id ? '2px solid #c41c1c' : '1px solid #e5e7eb',
-                    borderRadius: 14,
-                    padding: 10,
+                    border: '1px solid #f1f5f9',
+                    borderRadius: 12,
+                    padding: 0,
                     background: '#fff',
                     textAlign: 'left',
                     cursor: 'pointer',
-                    display: 'grid',
-                    gap: 8,
-                    transition: 'all 0.18s ease',
-                    boxShadow: hoveredCard === product.id ? '0 6px 20px rgba(196,28,28,0.14)' : '0 1px 4px rgba(0,0,0,0.05)',
-                    transform: hoveredCard === product.id ? 'translateY(-3px)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.2s ease',
+                    boxShadow: hoveredCard === product.id ? '0 8px 30px rgba(0,0,0,0.1)' : '0 1px 3px rgba(0,0,0,0.04)',
+                    transform: hoveredCard === product.id ? 'translateY(-4px)' : 'none',
+                    overflow: 'hidden',
                   }}
                 >
                   <div
                     style={{
-                      borderRadius: 10,
-                      background: '#f1f5f9',
+                      borderRadius: 0,
+                      background: '#fafafa',
                       aspectRatio: '1 / 1',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       overflow: 'hidden',
+                      position: 'relative',
                     }}
                   >
                     {productImage ? (
                       <img
                         src={productImage}
                         alt={product.nome}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6, background: '#fff' }}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 16, background: '#fff' }}
                       />
                     ) : (
-                      <span style={{ color: '#64748b', fontSize: 12 }}>Sem imagem</span>
+                      <div style={{ color: '#cbd5e1', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        Sem imagem
+                      </div>
+                    )}
+                    {outOfStock && (
+                      <div style={{ position: 'absolute', top: 8, left: 8, background: '#fef3c7', color: '#92400e', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>Indisponível</div>
+                    )}
+                    {wished && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
+                        style={{ position: 'absolute', top: 8, right: 8, background: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', fontSize: 16 }}
+                      >❤️</button>
                     )}
                   </div>
 
-                  <div style={{ minHeight: 42 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.25 }}>{product.nome}</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                  <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: '#1a1a2e', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.nome}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
                       {product?.categoria_nome || product?.categoria || 'Sem categoria'}
                     </div>
-                    <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: '#9ca3af' }}>
                       SKU: {product?.codigo || '-'}
                     </div>
-                    <div style={{ fontSize: 12, color: outOfStock ? '#b45309' : '#0f766e', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: outOfStock ? '#d97706' : '#10b981', fontWeight: 500, marginTop: 2 }}>
                       {outOfStock ? 'Volto em breve' : Number.isFinite(stock) ? `Estoque disponível: ${stock}` : 'Estoque disponível'}
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <strong style={{ fontSize: 16 }}>{formatCurrency(resolveProductPrice(product))}</strong>
+                    <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e', letterSpacing: -0.5 }}>{formatCurrency(resolveProductPrice(product))}</div>
+                    </div>
+
                     <button
-                      className="btn-primary"
                       disabled={outOfStock}
                       style={{
-                        background: outOfStock ? '#9ca3af' : '#c41c1c',
+                        background: outOfStock ? '#f3f4f6' : '#6366f1',
                         border: 'none',
-                        color: '#fff',
+                        color: outOfStock ? '#9ca3af' : '#fff',
                         borderRadius: 8,
-                        padding: '8px 12px',
-                        fontWeight: 700,
+                        padding: '10px 0',
+                        fontWeight: 600,
                         fontSize: 13,
                         cursor: outOfStock ? 'not-allowed' : 'pointer',
-                        opacity: outOfStock ? 0.75 : 1,
+                        width: '100%',
+                        marginTop: 6,
+                        transition: 'background 0.15s',
+                        letterSpacing: -0.2,
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1389,31 +1418,6 @@ export default function EcommerceMVP() {
                     >
                       {outOfStock ? 'Indisponível' : '+ Adicionar'}
                     </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                    <button
-                      className="btn-secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleWishlist(product.id);
-                      }}
-                      style={{ fontSize: 12, padding: '6px 8px' }}
-                    >
-                      {wished ? 'Remover desejo' : 'Lista de desejos'}
-                    </button>
-                    {outOfStock && (
-                      <button
-                        className="btn-secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          registerNotifyMe(product);
-                        }}
-                        style={{ fontSize: 12, padding: '6px 8px' }}
-                      >
-                        Avise-me
-                      </button>
-                    )}
                   </div>
                 </div>
               );})}
@@ -1427,11 +1431,11 @@ export default function EcommerceMVP() {
 
           </div>
 
-          <aside style={{ background: '#fff', padding: 16, borderRadius: 14, border: '1px solid #e5e7eb', alignSelf: 'start', position: 'sticky', top: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 15, color: '#2e7d32' }}>🛒 Seu carrinho</h3>
+          <aside style={{ background: '#fff', padding: 20, borderRadius: 16, border: '1px solid #f1f5f9', alignSelf: 'start', position: 'sticky', top: 8, boxShadow: '0 2px 16px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: '#1a1a2e', fontWeight: 700 }}>🛒 Seu carrinho</h3>
               {cart?.itens?.length > 0 && (
-                <span style={{ background: '#c41c1c', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
+                <span style={{ background: '#6366f1', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
                   {cart.itens.length}
                 </span>
               )}
@@ -1456,18 +1460,18 @@ export default function EcommerceMVP() {
                 {cart.itens.length > 5 && (
                   <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>+ {cart.itens.length - 5} item(ns) a mais</div>
                 )}
-                <div style={{ background: '#fef2f2', borderRadius: 8, padding: '8px 10px', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Subtotal</span>
-                  <span style={{ fontWeight: 800, fontSize: 16, color: '#c41c1c' }}>{formatCurrency(cartTotal)}</span>
+                <div style={{ background: '#f5f3ff', borderRadius: 10, padding: '10px 12px', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: '#4b5563' }}>Subtotal</span>
+                  <span style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e' }}>{formatCurrency(cartTotal)}</span>
                 </div>
                 <button
                   className="btn-primary"
                   onClick={handleCheckoutFromLoja}
-                  style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' }}
+                  style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '12px 0', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}
                 >
-                  ✅ Finalizar compra
+                  Finalizar compra
                 </button>
-                <button className="btn-secondary" onClick={() => setView('carrinho')} style={{ borderRadius: 10, width: '100%' }}>Ver / Editar carrinho</button>
+                <button className="btn-secondary" onClick={() => setView('carrinho')} style={{ borderRadius: 10, width: '100%', background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', fontWeight: 700, fontSize: 14, padding: '11px 0', cursor: 'pointer', transition: 'all 0.15s' }}>Ver / Editar carrinho</button>
                 {!customerToken && (
                   <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>Login solicitado só no fechamento</div>
                 )}
@@ -1539,7 +1543,7 @@ export default function EcommerceMVP() {
                       key={img}
                       onClick={() => setActiveProductImage(img)}
                       style={{
-                        border: activeProductImage === img ? '2px solid #c41c1c' : '1px solid #d1d5db',
+                        border: activeProductImage === img ? '2px solid #6366f1' : '1px solid #d1d5db',
                         borderRadius: 8,
                         width: 74,
                         height: 74,
@@ -1562,7 +1566,7 @@ export default function EcommerceMVP() {
                 <button className="btn-secondary" onClick={() => setSelectedProduct(null)}>Fechar</button>
               </div>
 
-              <div style={{ fontSize: 26, fontWeight: 800, color: '#c41c1c' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a2e' }}>
                 {formatCurrency(resolveProductPrice(selectedProduct))}
               </div>
 
@@ -1584,7 +1588,7 @@ export default function EcommerceMVP() {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {!isProductOutOfStock(selectedProduct) ? (
-                  <button className="btn-primary" onClick={() => addToCart(selectedProduct)} style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer' }}>
+                  <button className="btn-primary" onClick={() => addToCart(selectedProduct)} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer', transition: 'background 0.15s' }}>
                     + Adicionar ao carrinho
                   </button>
                 ) : (
@@ -1605,8 +1609,8 @@ export default function EcommerceMVP() {
       )}
 
       {view === 'carrinho' && (
-        <div style={{ background: '#f8fafc', padding: 16, borderRadius: 14, minHeight: 200 }}>
-          <h3 style={{ marginTop: 0, color: '#2e7d32', fontSize: 18 }}>🛒 Carrinho de compras</h3>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 24px', minHeight: 200 }}>
+          <h3 style={{ marginTop: 0, color: '#1a1a2e', fontSize: 20, fontWeight: 700 }}>🛒 Carrinho de compras</h3>
           {cartLoading ? (
             <div style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>Carregando carrinho...</div>
           ) : cart?.itens?.length ? (
@@ -1621,7 +1625,7 @@ export default function EcommerceMVP() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, marginBottom: 4 }}>{item.nome}</div>
-                      <div style={{ fontSize: 13, color: '#c41c1c', fontWeight: 700, marginBottom: 8 }}>{formatCurrency(item.preco_unitario)} / un</div>
+                      <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 700, marginBottom: 8 }}>{formatCurrency(item.preco_unitario)} / un</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <button onClick={() => updateCartItem(item.item_id, item.quantidade - 1)} style={{ background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
                         <span style={{ fontWeight: 700, fontSize: 15, minWidth: 28, textAlign: 'center' }}>{item.quantidade}</span>
@@ -1637,10 +1641,10 @@ export default function EcommerceMVP() {
               })}
               <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
                 <span style={{ fontWeight: 600, fontSize: 15 }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: 20, color: '#c41c1c' }}>{formatCurrency(cartTotal)}</span>
+                <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1a2e' }}>{formatCurrency(cartTotal)}</span>
               </div>
-              <button className="btn-primary" onClick={handleCheckoutFromLoja} style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 12, padding: '14px 0', fontWeight: 800, fontSize: 16, cursor: 'pointer', width: '100%' }}>
-                ✅ Finalizar pedido
+              <button className="btn-primary" onClick={handleCheckoutFromLoja} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '14px 0', fontWeight: 700, fontSize: 16, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}>
+                Finalizar pedido
               </button>
             </div>
           ) : (
@@ -1804,7 +1808,7 @@ export default function EcommerceMVP() {
             </div>
           )}
 
-          <button className="btn-primary" onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete}>
+          <button className="btn-primary" onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '14px 0', fontWeight: 700, fontSize: 16, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}>
             {checkoutLoading ? 'Finalizando...' : 'Finalizar pedido'}
           </button>
 
@@ -2008,7 +2012,7 @@ export default function EcommerceMVP() {
                 )}
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn-primary" type="submit" disabled={profileSaving}>
+                  <button className="btn-primary" type="submit" disabled={profileSaving} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>
                     {profileSaving ? 'Salvando...' : 'Salvar cadastro'}
                   </button>
                   <button className="btn-secondary" type="button" onClick={logoutCustomer}>Sair</button>
@@ -2032,7 +2036,7 @@ export default function EcommerceMVP() {
                       {showRegisterPassword ? 'Ocultar' : '👁 Mostrar'}
                     </button>
                   </div>
-                  <button className="btn-primary" type="submit" disabled={authLoading}>Cadastrar</button>
+                  <button className="btn-primary" type="submit" disabled={authLoading} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>Cadastrar</button>
                 </form>
               </div>
 
@@ -2046,7 +2050,7 @@ export default function EcommerceMVP() {
                       {showLoginPassword ? 'Ocultar' : '👁 Mostrar'}
                     </button>
                   </div>
-                  <button className="btn-primary" type="submit" disabled={authLoading}>Entrar</button>
+                  <button className="btn-primary" type="submit" disabled={authLoading} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>Entrar</button>
                 </form>
               </div>
             </div>

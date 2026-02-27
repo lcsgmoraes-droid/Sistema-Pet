@@ -2,13 +2,58 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../../services/api'
 
 const TIPOS = [
-  { key: 'logo',     label: 'Logo da Loja',   desc: 'Aparece no cabeçalho da loja virtual (recomendado: 200×80 px)' },
-  { key: 'banner_1', label: 'Banner 1',        desc: 'Primeiro slide do banner rotativo (recomendado: 1200×400 px)' },
-  { key: 'banner_2', label: 'Banner 2',        desc: 'Segundo slide (opcional)' },
-  { key: 'banner_3', label: 'Banner 3',        desc: 'Terceiro slide (opcional)' },
+  { key: 'logo',     label: 'Logo da Loja',   desc: 'Aparece no cabeçalho da loja virtual (recomendado: 200×80 px)',   targetW: 400,  targetH: 160  },
+  { key: 'banner_1', label: 'Banner 1',        desc: 'Primeiro slide do banner rotativo — será redimensionado para até 1200 px de largura',  targetW: 1200, targetH: null },
+  { key: 'banner_2', label: 'Banner 2',        desc: 'Segundo slide (opcional)',    targetW: 1200, targetH: null },
+  { key: 'banner_3', label: 'Banner 3',        desc: 'Terceiro slide (opcional)',   targetW: 1200, targetH: null },
 ]
 
-function PreviewImage({ url, label, cacheBuster }) {
+/**
+ * Redimensiona a imagem no navegador usando Canvas.
+ * Banners: escala para até 1200px de largura mantendo proporção original (sem corte).
+ * Logo: centraliza em 400×160 com fundo branco.
+ */
+function resizeImage(file, targetW, targetH, quality = 0.9) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      if (targetH === null) {
+        // Modo banner: apenas limita a largura, mantém proporção
+        const scale = img.naturalWidth > targetW ? targetW / img.naturalWidth : 1
+        canvas.width  = Math.round(img.naturalWidth  * scale)
+        canvas.height = Math.round(img.naturalHeight * scale)
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      } else {
+        // Modo logo: cabe em targetW×targetH centralizado, fundo branco
+        canvas.width  = targetW
+        canvas.height = targetH
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, targetW, targetH)
+        const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight)
+        const drawW = img.naturalWidth  * scale
+        const drawH = img.naturalHeight * scale
+        const offsetX = (targetW - drawW) / 2
+        const offsetY = (targetH - drawH) / 2
+        ctx.drawImage(img, offsetX, offsetY, drawW, drawH)
+      }
+
+      canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error('canvas toBlob falhou')),
+        'image/jpeg',
+        quality
+      )
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Falha ao carregar imagem')) }
+    img.src = url
+  })
+}
+
+function PreviewImage({ url, label, cacheBuster, isBanner }) {
   if (!url) return (
     <div style={{
       width: '100%', minHeight: 120, background: '#f3f4f6', border: '2px dashed #d1d5db',
@@ -18,13 +63,20 @@ function PreviewImage({ url, label, cacheBuster }) {
       Sem imagem
     </div>
   )
-  // Adiciona ?t= para evitar que o navegador use a imagem antiga do cache
   const src = url.startsWith('/uploads/') ? `${url}?t=${cacheBuster}` : url
   return (
     <img
       src={src}
       alt={label}
-      style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid #e5e7eb' }}
+      style={{
+        width: '100%',
+        height: isBanner ? 140 : 100,
+        objectFit: 'contain',
+        background: '#111',
+        borderRadius: 8,
+        border: '1px solid #e5e7eb',
+        display: 'block',
+      }}
     />
   )
 }
@@ -53,9 +105,16 @@ export default function EcommerceAparencia() {
 
   async function uploadArquivo(tipo, arquivo) {
     setSalvando(s => ({ ...s, [tipo]: true }))
-    const form = new FormData()
-    form.append('file', arquivo)
     try {
+      // Redimensiona antes de enviar
+      const tipoConfig = TIPOS.find(t => t.key === tipo)
+      let fileToUpload = arquivo
+      if (tipoConfig && arquivo.type.startsWith('image/')) {
+        const blob = await resizeImage(arquivo, tipoConfig.targetW, tipoConfig.targetH)
+        fileToUpload = new File([blob], arquivo.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+      }
+      const form = new FormData()
+      form.append('file', fileToUpload)
       const r = await api.post(`/ecommerce-aparencia/upload/${tipo}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
@@ -128,7 +187,7 @@ export default function EcommerceAparencia() {
                 <span style={{ marginLeft: 10, fontSize: 13, color: '#9ca3af' }}>{desc}</span>
               </div>
 
-              <PreviewImage url={urlAtual} label={label} cacheBuster={cacheBuster} />
+              <PreviewImage url={urlAtual} label={label} cacheBuster={cacheBuster} isBanner={key !== 'logo'} />
 
               <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
@@ -143,7 +202,7 @@ export default function EcommerceAparencia() {
                   disabled={ocupado}
                   style={{
                     padding: '8px 18px',
-                    background: ocupado ? '#d1d5db' : '#2e7d32',
+                    background: ocupado ? '#d1d5db' : '#6366f1',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 7,
@@ -180,7 +239,7 @@ export default function EcommerceAparencia() {
       </div>
 
       <div style={{ marginTop: 32, padding: 16, background: '#fffbeb', borderRadius: 10, border: '1px solid #fde68a', fontSize: 13, color: '#92400e' }}>
-        <strong>💡 Dica:</strong> As imagens são atualizadas imediatamente na loja após o upload. Para ver o resultado, acesse a <a href="/ecommerce" style={{ color: '#c41c1c' }}>prévia da loja</a>.
+        <strong>💡 Dica:</strong> As imagens são redimensionadas automaticamente ao fazer upload. Para ver o resultado, acesse a <a href="/ecommerce" style={{ color: '#6366f1' }}>prévia da loja</a>.
       </div>
     </div>
   )
