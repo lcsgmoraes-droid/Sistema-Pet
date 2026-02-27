@@ -259,11 +259,34 @@ function extractApiErrorMessage(err, fallback) {
   return fallback;
 }
 
+const BANNERS = [
+  {
+    bg: 'linear-gradient(135deg, #c41c1c 0%, #9b1515 60%, #7a0f0f 100%)',
+    title: 'Compre e receba no mesmo dia!',
+    sub: 'Pedidos realizados até as 16h',
+    emoji: '🚀',
+  },
+  {
+    bg: 'linear-gradient(135deg, #2e7d32 0%, #388e3c 60%, #43a047 100%)',
+    title: 'Retire na loja',
+    sub: 'Super simples e sem custo de frete!',
+    emoji: '🏪',
+  },
+  {
+    bg: 'linear-gradient(135deg, #d97706 0%, #b45309 60%, #92400e 100%)',
+    title: 'As melhores rações em Prudente',
+    sub: 'Cachorros, gatos, pássaros e mais 🐾',
+    emoji: '🐶',
+  },
+];
+
 export default function EcommerceMVP() {
   const location = useLocation();
   const params = useParams();
 
   const [view, setView] = useState('loja');
+  const [bannerSlide, setBannerSlide] = useState(0);
+  const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
@@ -388,6 +411,7 @@ export default function EcommerceMVP() {
     });
   }, [products, search, categoria]);
 
+  const productMap = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
   const customerDisplayName = customer?.nome || customer?.email || '';
 
@@ -440,6 +464,11 @@ export default function EcommerceMVP() {
   useEffect(() => {
     localStorage.setItem(STORAGE_NOTIFY_KEY, JSON.stringify(notifyRequests));
   }, [notifyRequests]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % BANNERS.length), 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!customer) return;
@@ -1037,43 +1066,98 @@ export default function EcommerceMVP() {
 
   return (
     <div className="page">
+
+      {/* BARRA DE CARRINHO FLUTUANTE */}
+      {cart?.itens?.length > 0 && (
+        <div
+          onClick={() => setView('carrinho')}
+          style={{ position: 'sticky', top: 0, zIndex: 50, background: '#c41c1c', color: '#fff', padding: '9px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 10, marginBottom: 10, cursor: 'pointer', boxShadow: '0 3px 12px rgba(196,28,28,0.45)' }}
+        >
+          <span style={{ fontWeight: 600, fontSize: 14 }}>🛒 {cart.itens.length} item(ns) no carrinho</span>
+          <span style={{ fontWeight: 800, fontSize: 14 }}>{formatCurrency(cartTotal)} →</span>
+        </div>
+      )}
+
+      {/* HEADER */}
       <div
         style={{
-          background: 'linear-gradient(120deg, #1e293b 0%, #0f172a 100%)',
-          color: '#fff',
+          background: 'linear-gradient(135deg, #fff8e1 0%, #fff3cd 100%)',
           borderRadius: 16,
-          padding: 18,
-          marginBottom: 16,
-          border: '1px solid #1f2937',
+          padding: '16px 20px',
+          marginBottom: 10,
+          border: '1px solid #fde68a',
+          boxShadow: '0 2px 8px rgba(196,28,28,0.07)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: 0.4 }}>LOJA ONLINE</div>
-            <h1 style={{ margin: '4px 0 6px', fontSize: 28, lineHeight: 1.1 }}>{storeDisplayName}</h1>
-            <div style={{ fontSize: 13, opacity: 0.88 }}>
-              {tenantContext?.cidade || 'Cidade não informada'}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
+            <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Loja Online</div>
+            <h1 style={{ margin: '2px 0 4px', fontSize: 30, lineHeight: 1.1, color: '#c41c1c', fontWeight: 900 }}>{storeDisplayName}</h1>
+            <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
+              📍 {tenantContext?.cidade || 'Cidade não informada'}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
             </div>
           </div>
-
-          <div style={{ display: 'grid', gap: 6, justifyItems: 'end' }}>
-            <div style={{ fontSize: 12, opacity: 0.78 }}>Identificador da loja</div>
-            <div style={{ fontWeight: 700, background: 'rgba(148,163,184,0.2)', padding: '6px 10px', borderRadius: 999 }}>
-              {storefrontRef || '-'}
-            </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            {customerDisplayName ? (
+              <div style={{ fontSize: 13, color: '#374151', background: '#fff', borderRadius: 20, padding: '6px 12px', border: '1px solid #d1d5db', fontWeight: 600 }}>
+                👤 {customerDisplayName.split(' ')[0]}
+              </div>
+            ) : (
+              <button onClick={() => setView('conta')} style={{ background: '#fff', border: '2px solid #2e7d32', color: '#2e7d32', borderRadius: 20, padding: '6px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                Entrar / Cadastrar
+              </button>
+            )}
+            <button
+              onClick={() => setView('carrinho')}
+              style={{ background: '#c41c1c', color: '#fff', border: 'none', borderRadius: 50, width: 48, height: 48, cursor: 'pointer', fontSize: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxShadow: '0 2px 8px rgba(196,28,28,0.4)', flexShrink: 0 }}
+            >
+              🛒
+              {cart?.itens?.length > 0 && (
+                <span style={{ position: 'absolute', top: -4, right: -4, background: '#f5a623', color: '#7c2d12', borderRadius: 50, minWidth: 20, height: 20, fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' }}>
+                  {cart.itens.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </div>
 
-      {tenantContext?.storefront_path && (
-        <div style={{ marginBottom: 12, color: '#4b5563', fontSize: 13 }}>
-          URL da loja: {tenantContext.storefront_path}
-          {customerDisplayName ? ` • Cliente logado: ${customerDisplayName}` : ''}
+      {/* BANNER ROTATIVO */}
+      <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', marginBottom: 10, height: 112 }}>
+        {BANNERS.map((b, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute', inset: 0,
+              background: b.bg,
+              display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16,
+              opacity: bannerSlide === i ? 1 : 0,
+              transition: 'opacity 0.8s ease',
+              pointerEvents: bannerSlide === i ? 'auto' : 'none',
+            }}
+          >
+            <span style={{ fontSize: 44, flexShrink: 0 }}>{b.emoji}</span>
+            <div>
+              <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.2, textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{b.title}</div>
+              <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 13, marginTop: 5 }}>{b.sub}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{ position: 'absolute', bottom: 9, right: 14, display: 'flex', gap: 5 }}>
+          {BANNERS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setBannerSlide(i)}
+              style={{ width: bannerSlide === i ? 22 : 8, height: 8, background: bannerSlide === i ? '#fff' : 'rgba(255,255,255,0.5)', borderRadius: 4, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s ease' }}
+            />
+          ))}
         </div>
-      )}
+      </div>
 
-      <div style={{ marginBottom: 12, background: '#eef2ff', color: '#312e81', border: '1px solid #c7d2fe', borderRadius: 10, padding: '10px 12px', fontSize: 13 }}>
-        Baixe nosso APP para receber notificações de pedidos, promoções e aviso de reposição de estoque.
+      {/* BANNER APP */}
+      <div style={{ marginBottom: 10, background: 'linear-gradient(90deg, #2e7d32, #43a047)', color: '#fff', borderRadius: 10, padding: '10px 14px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 20 }}>📱</span>
+        <span>Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.</span>
       </div>
 
       {!tenantRef && (
@@ -1082,23 +1166,13 @@ export default function EcommerceMVP() {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          flexWrap: 'wrap',
-          marginBottom: 16,
-          background: '#fff',
-          border: '1px solid #e5e7eb',
-          borderRadius: 12,
-          padding: 8,
-        }}
-      >
+      {/* NAVEGAÇÃO */}
+      <div style={{ display: 'flex', gap: 6, background: '#f0fdf4', borderRadius: 12, overflow: 'hidden', marginBottom: 16, padding: 5, border: '1px solid #bbf7d0' }}>
         {[
-          ['loja', 'Loja'],
-          ['carrinho', 'Carrinho'],
-          ['pedidos', 'Meus pedidos'],
-          ['conta', 'Conta'],
+          ['loja', '🏪 Loja'],
+          ['carrinho', `🛒 Carrinho${cart?.itens?.length ? ` (${cart.itens.length})` : ''}`],
+          ['pedidos', '📦 Pedidos'],
+          ['conta', '👤 Conta'],
         ].map(([tabId, label]) => {
           const active = view === tabId;
           return (
@@ -1106,13 +1180,17 @@ export default function EcommerceMVP() {
               key={tabId}
               onClick={() => setView(tabId)}
               style={{
-                border: active ? '1px solid #6366f1' : '1px solid transparent',
-                background: active ? '#eef2ff' : 'transparent',
-                color: active ? '#4338ca' : '#334155',
-                borderRadius: 10,
-                padding: '9px 14px',
+                flex: 1,
+                background: active ? '#2e7d32' : '#fff',
+                color: active ? '#fff' : '#2e7d32',
+                padding: '10px 4px',
                 fontWeight: active ? 700 : 600,
                 cursor: 'pointer',
+                fontSize: 13,
+                borderRadius: 8,
+                boxShadow: active ? '0 2px 8px rgba(46,125,50,0.3)' : '0 1px 3px rgba(0,0,0,0.08)',
+                transition: 'all 0.15s ease',
+                border: active ? '1px solid #2e7d32' : '1px solid #d1fae5',
               }}
             >
               {label}
@@ -1136,10 +1214,8 @@ export default function EcommerceMVP() {
       {view === 'loja' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 16 }}>
           <div style={{ background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e5e7eb' }}>
-            <div style={{ marginBottom: 12 }}>
-              <h2 style={{ fontSize: 20, marginBottom: 4 }}>Catálogo da loja</h2>
-              <div style={{ color: '#64748b', fontSize: 14 }}>Selecione produtos, confira detalhes e adicione ao carrinho.</div>
-            </div>
+          <h3 style={{ marginTop: 0, color: '#2e7d32', fontSize: 18 }}>🔍 Catálogo da loja</h3>
+              <div style={{ color: '#64748b', fontSize: 14, marginBottom: 12 }}>Selecione produtos, confira detalhes e adicione ao carrinho.</div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
               <input
@@ -1183,15 +1259,20 @@ export default function EcommerceMVP() {
                       openProductDetails(product);
                     }
                   }}
+                  onMouseEnter={() => setHoveredCard(product.id)}
+                  onMouseLeave={() => setHoveredCard(null)}
                   style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 12,
+                    border: hoveredCard === product.id ? '2px solid #c41c1c' : '1px solid #e5e7eb',
+                    borderRadius: 14,
                     padding: 10,
                     background: '#fff',
                     textAlign: 'left',
                     cursor: 'pointer',
                     display: 'grid',
                     gap: 8,
+                    transition: 'all 0.18s ease',
+                    boxShadow: hoveredCard === product.id ? '0 6px 20px rgba(196,28,28,0.14)' : '0 1px 4px rgba(0,0,0,0.05)',
+                    transform: hoveredCard === product.id ? 'translateY(-3px)' : 'none',
                   }}
                 >
                   <div
@@ -1234,13 +1315,23 @@ export default function EcommerceMVP() {
                     <button
                       className="btn-primary"
                       disabled={outOfStock}
-                      style={outOfStock ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+                      style={{
+                        background: outOfStock ? '#9ca3af' : '#c41c1c',
+                        border: 'none',
+                        color: '#fff',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: outOfStock ? 'not-allowed' : 'pointer',
+                        opacity: outOfStock ? 0.75 : 1,
+                      }}
                       onClick={(e) => {
                         e.stopPropagation();
                         addToCart(product);
                       }}
                     >
-                      {outOfStock ? 'Indisponível' : 'Adicionar'}
+                      {outOfStock ? 'Indisponível' : '+ Adicionar'}
                     </button>
                   </div>
 
@@ -1280,28 +1371,56 @@ export default function EcommerceMVP() {
 
           </div>
 
-          <aside style={{ background: '#fff', padding: 16, borderRadius: 12, border: '1px solid #e5e7eb', alignSelf: 'start', position: 'sticky', top: 8 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 10 }}>Seu carrinho</h3>
+          <aside style={{ background: '#fff', padding: 16, borderRadius: 14, border: '1px solid #e5e7eb', alignSelf: 'start', position: 'sticky', top: 8, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: '#2e7d32' }}>🛒 Seu carrinho</h3>
+              {cart?.itens?.length > 0 && (
+                <span style={{ background: '#c41c1c', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
+                  {cart.itens.length}
+                </span>
+              )}
+            </div>
             {cart?.itens?.length ? (
               <div style={{ display: 'grid', gap: 8 }}>
-                {cart.itens.slice(0, 6).map((item) => (
-                  <div key={item.item_id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: 6, marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>{item.nome}</div>
-                    <div style={{ fontSize: 12, color: '#666' }}>{item.quantidade} x {formatCurrency(item.preco_unitario)}</div>
-                  </div>
-                ))}
-                {cart.itens.length > 6 && (
-                  <div style={{ fontSize: 12, color: '#666' }}>+ {cart.itens.length - 6} item(ns)</div>
+                {cart.itens.slice(0, 5).map((item) => {
+                  const prod = productMap[item.produto_id];
+                  const img = prod ? getProductImages(prod)[0] : null;
+                  return (
+                    <div key={item.item_id} style={{ display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 2 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f8fafc', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
+                        {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} /> : <span style={{ fontSize: 18 }}>📦</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>{item.quantidade}× {formatCurrency(item.preco_unitario)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {cart.itens.length > 5 && (
+                  <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>+ {cart.itens.length - 5} item(ns) a mais</div>
                 )}
-                <div style={{ marginTop: 4, fontWeight: 700, fontSize: 16 }}>Subtotal: {formatCurrency(cartTotal)}</div>
-                <button className="btn-primary" onClick={handleCheckoutFromLoja}>Finalizar</button>
-                <button className="btn-secondary" onClick={() => setView('carrinho')}>Editar carrinho</button>
+                <div style={{ background: '#fef2f2', borderRadius: 8, padding: '8px 10px', marginTop: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>Subtotal</span>
+                  <span style={{ fontWeight: 800, fontSize: 16, color: '#c41c1c' }}>{formatCurrency(cartTotal)}</span>
+                </div>
+                <button
+                  className="btn-primary"
+                  onClick={handleCheckoutFromLoja}
+                  style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%' }}
+                >
+                  ✅ Finalizar compra
+                </button>
+                <button className="btn-secondary" onClick={() => setView('carrinho')} style={{ borderRadius: 10, width: '100%' }}>Ver / Editar carrinho</button>
                 {!customerToken && (
-                  <div style={{ fontSize: 12, color: '#666' }}>Login/cadastro só será solicitado no fechamento.</div>
+                  <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>Login solicitado só no fechamento</div>
                 )}
               </div>
             ) : (
-              <div style={{ color: '#666' }}>Seu carrinho está vazio.</div>
+              <div style={{ color: '#94a3b8', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>
+                <div style={{ fontSize: 30, marginBottom: 6 }}>🛒</div>
+                Seu carrinho está vazio.
+              </div>
             )}
           </aside>
         </div>
@@ -1364,7 +1483,7 @@ export default function EcommerceMVP() {
                       key={img}
                       onClick={() => setActiveProductImage(img)}
                       style={{
-                        border: activeProductImage === img ? '2px solid #6366f1' : '1px solid #d1d5db',
+                        border: activeProductImage === img ? '2px solid #c41c1c' : '1px solid #d1d5db',
                         borderRadius: 8,
                         width: 74,
                         height: 74,
@@ -1387,7 +1506,7 @@ export default function EcommerceMVP() {
                 <button className="btn-secondary" onClick={() => setSelectedProduct(null)}>Fechar</button>
               </div>
 
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#0f172a' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: '#c41c1c' }}>
                 {formatCurrency(resolveProductPrice(selectedProduct))}
               </div>
 
@@ -1409,8 +1528,8 @@ export default function EcommerceMVP() {
 
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {!isProductOutOfStock(selectedProduct) ? (
-                  <button className="btn-primary" onClick={() => addToCart(selectedProduct)}>
-                    Adicionar ao carrinho
+                  <button className="btn-primary" onClick={() => addToCart(selectedProduct)} style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer' }}>
+                    + Adicionar ao carrinho
                   </button>
                 ) : (
                   <button className="btn-secondary" onClick={() => registerNotifyMe(selectedProduct)}>
@@ -1430,31 +1549,50 @@ export default function EcommerceMVP() {
       )}
 
       {view === 'carrinho' && (
-        <div style={{ background: '#fff', padding: 16, borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>Carrinho</h3>
+        <div style={{ background: '#f8fafc', padding: 16, borderRadius: 14, minHeight: 200 }}>
+          <h3 style={{ marginTop: 0, color: '#2e7d32', fontSize: 18 }}>🛒 Carrinho de compras</h3>
           {cartLoading ? (
-            <div>Carregando carrinho...</div>
+            <div style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>Carregando carrinho...</div>
           ) : cart?.itens?.length ? (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {cart.itens.map((item) => (
-                <div key={item.item_id} style={{ border: '1px solid #eee', borderRadius: 6, padding: 8 }}>
-                  <div style={{ fontWeight: 600 }}>{item.nome}</div>
-                  <div style={{ fontSize: 12, color: '#666' }}>{formatCurrency(item.preco_unitario)}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                    <button className="btn-secondary" onClick={() => updateCartItem(item.item_id, item.quantidade - 1)}>-</button>
-                    <span>{item.quantidade}</span>
-                    <button className="btn-secondary" onClick={() => updateCartItem(item.item_id, item.quantidade + 1)}>+</button>
-                    <button className="btn-secondary" onClick={() => updateCartItem(item.item_id, 0)}>Remover</button>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {cart.itens.map((item) => {
+                const prod = productMap[item.produto_id];
+                const img = prod ? getProductImages(prod)[0] : null;
+                return (
+                  <div key={item.item_id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 14, alignItems: 'center', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                    <div style={{ width: 80, height: 80, borderRadius: 10, background: '#f8fafc', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
+                      {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} /> : <span style={{ fontSize: 32 }}>📦</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, marginBottom: 4 }}>{item.nome}</div>
+                      <div style={{ fontSize: 13, color: '#c41c1c', fontWeight: 700, marginBottom: 8 }}>{formatCurrency(item.preco_unitario)} / un</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <button onClick={() => updateCartItem(item.item_id, item.quantidade - 1)} style={{ background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                        <span style={{ fontWeight: 700, fontSize: 15, minWidth: 28, textAlign: 'center' }}>{item.quantidade}</span>
+                        <button onClick={() => updateCartItem(item.item_id, item.quantidade + 1)} style={{ background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                        <button onClick={() => updateCartItem(item.item_id, 0)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, marginLeft: 4, padding: '4px 8px' }}>🗑 Remover</button>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: '#111' }}>{formatCurrency(item.preco_unitario * item.quantidade)}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <div style={{ marginTop: 8, fontWeight: 700 }}>Total: {formatCurrency(cartTotal)}</div>
-              <button className="btn-primary" onClick={handleCheckoutFromLoja}>
-                Finalizar
+                );
+              })}
+              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>Total</span>
+                <span style={{ fontWeight: 800, fontSize: 20, color: '#c41c1c' }}>{formatCurrency(cartTotal)}</span>
+              </div>
+              <button className="btn-primary" onClick={handleCheckoutFromLoja} style={{ background: '#c41c1c', border: 'none', color: '#fff', borderRadius: 12, padding: '14px 0', fontWeight: 800, fontSize: 16, cursor: 'pointer', width: '100%' }}>
+                ✅ Finalizar pedido
               </button>
             </div>
           ) : (
-            <div style={{ color: '#666' }}>Carrinho vazio</div>
+            <div style={{ color: '#94a3b8', textAlign: 'center', padding: '32px 0', fontSize: 14 }}>
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🛒</div>
+              <div>Seu carrinho está vazio</div>
+              <button className="btn-secondary" onClick={() => setView('loja')} style={{ marginTop: 12 }}>Ver produtos</button>
+            </div>
           )}
 
           <form onSubmit={applyCupom} style={{ marginTop: 12, display: 'flex', gap: 8 }}>
