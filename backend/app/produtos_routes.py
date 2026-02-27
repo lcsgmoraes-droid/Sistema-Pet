@@ -281,8 +281,8 @@ class ProdutoBase(BaseModel):
     promocao_inicio: Optional[datetime] = None
     promocao_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = False
-    estoque_minimo: Optional[int] = 0
-    estoque_maximo: Optional[int] = None
+    estoque_minimo: Optional[float] = 0
+    estoque_maximo: Optional[float] = None
     ncm: Optional[str] = None
     cest: Optional[str] = None
     origem: Optional[str] = None
@@ -354,8 +354,8 @@ class ProdutoUpdate(BaseModel):
     promocao_inicio: Optional[datetime] = None
     promocao_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = None
-    estoque_minimo: Optional[int] = None
-    estoque_maximo: Optional[int] = None
+    estoque_minimo: Optional[float] = None
+    estoque_maximo: Optional[float] = None
     ncm: Optional[str] = None
     cest: Optional[str] = None
     origem: Optional[str] = None
