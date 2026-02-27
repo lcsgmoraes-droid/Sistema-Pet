@@ -43,6 +43,16 @@ CANAIS_CONFIG = {
         'nome': 'Amazon',
         'cor': '#16a34a',  # Verde
         'cor_bg': '#dcfce7'
+    },
+    'ecommerce': {
+        'nome': 'E-commerce',
+        'cor': '#9333ea',  # Roxo
+        'cor_bg': '#faf5ff'
+    },
+    'app': {
+        'nome': 'App',
+        'cor': '#4f46e5',  # Índigo
+        'cor_bg': '#eef2ff'
     }
 }
 

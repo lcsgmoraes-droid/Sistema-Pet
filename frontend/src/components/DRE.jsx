@@ -25,7 +25,9 @@ const DRE = () => {
     { id: 'loja_fisica', nome: 'Loja Física', cor: 'blue' },
     { id: 'mercado_livre', nome: 'Mercado Livre', cor: 'yellow' },
     { id: 'shopee', nome: 'Shopee', cor: 'orange' },
-    { id: 'amazon', nome: 'Amazon', cor: 'green' }
+    { id: 'amazon', nome: 'Amazon', cor: 'green' },
+    { id: 'ecommerce', nome: 'E-commerce', cor: 'purple' },
+    { id: 'app', nome: 'App', cor: 'indigo' }
   ]);
   const [canaisSelecionados, setCanaisSelecionados] = useState(['loja_fisica']); // Loja Física por padrão
   
@@ -394,14 +396,16 @@ const DRE = () => {
               )}
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {canaisDisponiveis.map(canal => {
                 const selecionado = canaisSelecionados.includes(canal.id);
                 const corClasses = {
                   blue: selecionado ? 'bg-blue-600 text-white border-blue-600' : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
                   yellow: selecionado ? 'bg-yellow-500 text-white border-yellow-500' : 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100',
                   orange: selecionado ? 'bg-orange-500 text-white border-orange-500' : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100',
-                  green: selecionado ? 'bg-green-600 text-white border-green-600' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                  green: selecionado ? 'bg-green-600 text-white border-green-600' : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100',
+                  purple: selecionado ? 'bg-purple-600 text-white border-purple-600' : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100',
+                  indigo: selecionado ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
                 };
                 
                 return (
