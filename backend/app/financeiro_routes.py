@@ -78,15 +78,15 @@ class FormaPagamentoResponse(BaseModel):
     prazo_dias: int
     operadora: Optional[str]
     operadora_id: Optional[int]
-    gera_contas_receber: bool
-    split_parcelas: bool
+    gera_contas_receber: Optional[bool] = False
+    split_parcelas: Optional[bool] = False
     conta_bancaria_destino_id: Optional[int]
-    requer_nsu: bool
+    requer_nsu: Optional[bool] = False
     tipo_cartao: Optional[str]
     bandeira: Optional[str]
-    ativo: bool
-    permite_parcelamento: bool
-    parcelas_maximas: int
+    ativo: Optional[bool] = True
+    permite_parcelamento: Optional[bool] = False
+    parcelas_maximas: Optional[int] = 1
     taxas_por_parcela: Optional[str]
     permite_antecipacao: Optional[bool] = False
     dias_recebimento_antecipado: Optional[int] = None
