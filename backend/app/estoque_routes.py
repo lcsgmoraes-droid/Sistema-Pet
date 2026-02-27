@@ -246,6 +246,14 @@ def entrada_estoque(
     
     logger.info(f"✅ Entrada registrada - Estoque: {estoque_anterior} → {produto.estoque_atual}")
     
+    # ========== AVISE-ME: notificar clientes se estoque voltou do zero ==========
+    if estoque_anterior <= 0 and produto.estoque_atual > 0:
+        try:
+            from app.routes.ecommerce_notify_routes import notificar_clientes_estoque_disponivel
+            notificar_clientes_estoque_disponivel(db, str(tenant_id), produto.id, produto.nome)
+        except Exception as e_avise:
+            logger.warning(f"[AVISE-ME] Erro ao notificar clientes: {e_avise}")
+
     # ========== SENSIBILIZAÇÃO: KIT FÍSICO - ENTRADA diminui componentes ==========
     # LÓGICA: Entrada no kit físico significa que os unitários foram consumidos para montar os kits
     # Exemplo: Entrada de 5 kits = os componentes DIMINUEM (foram usados para montar)
