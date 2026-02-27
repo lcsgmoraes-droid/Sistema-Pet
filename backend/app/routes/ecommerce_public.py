@@ -126,12 +126,13 @@ def listar_produtos_publicos(
     )
 
     if busca:
-        termo = f"%{busca.strip()}%"
+        termo = busca.strip()
+        like_termo = f"%{termo}%"
         query = query.filter(
             or_(
-                Produto.nome.ilike(termo),
-                Produto.codigo.ilike(termo),
-                Produto.codigo_barras.ilike(termo),
+                func.unaccent(Produto.nome).ilike(func.unaccent(like_termo)),
+                Produto.codigo.ilike(like_termo),
+                Produto.codigo_barras.ilike(like_termo),
             )
         )
 
