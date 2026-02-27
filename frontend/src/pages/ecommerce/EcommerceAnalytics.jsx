@@ -118,8 +118,8 @@ export default function EcommerceAnalytics() {
                 </tr>
               </thead>
               <tbody>
-                {demanda.map((d) => (
-                  <tr key={d.product_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                {demanda.map((d, i) => (
+                  <tr key={`dem-${d.product_id ?? 'null'}-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ ...td, color: '#6b7280', fontFamily: 'monospace' }}>{d.codigo || '-'}</td>
                     <td style={{ ...td, fontWeight: 500 }}>{d.product_name || `Produto #${d.product_id}`}</td>
                     <td style={{ ...td, textAlign: 'center' }}>
@@ -160,7 +160,7 @@ export default function EcommerceAnalytics() {
               </thead>
               <tbody>
                 {maisVendidos.map((p, i) => (
-                  <tr key={p.produto_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <tr key={`mv-${p.produto_id ?? 'null'}-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                     <td style={{ ...td, color: '#9ca3af', width: 32 }}>
                       {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                     </td>
@@ -198,8 +198,8 @@ export default function EcommerceAnalytics() {
               </tr>
             </thead>
             <tbody>
-              {pedidosRecentes.map((p) => (
-                <tr key={p.pedido_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+              {pedidosRecentes.map((p, i) => (
+                <tr key={`pr-${p.pedido_id ?? i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{p.pedido_id?.slice(0, 8)}…</td>
                   <td style={{ ...td, textAlign: 'center' }}><StatusBadge status={p.status} /></td>
                   <td style={{ ...td, textAlign: 'center', color: '#6b7280' }}>{p.qtd_itens} item(ns)</td>

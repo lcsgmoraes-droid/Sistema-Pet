@@ -22,10 +22,15 @@ def get_resumo(
     _, tenant_id = current_user_and_tenant
     tid = str(tenant_id)
 
-    # Pedidos finalizados (não são carrinho)
+    # Pedidos finalizados do e-commerce (não são carrinho, só origens do canal digital)
+    ORIGENS_ECOMMERCE = ("web", "app", "marketplace")
     pedidos_validos = (
         db.query(Pedido)
-        .filter(Pedido.tenant_id == tid, Pedido.status != "carrinho")
+        .filter(
+            Pedido.tenant_id == tid,
+            Pedido.status != "carrinho",
+            Pedido.origem.in_(ORIGENS_ECOMMERCE),
+        )
         .all()
     )
     total_pedidos = len(pedidos_validos)
@@ -39,7 +44,7 @@ def get_resumo(
         if p.created_at and p.created_at >= hoje_inicio
     )
 
-    # Carrinhos abandonados (status = 'carrinho', criados há mais de 1 hora)
+    # Carrinhos abandonados (status = 'carrinho', criados há mais de 1 hora, só e-commerce)
     uma_hora_atras = datetime.now(timezone.utc) - timedelta(hours=1)
     carrinhos_abandonados = (
         db.query(Pedido)
@@ -47,6 +52,7 @@ def get_resumo(
             Pedido.tenant_id == tid,
             Pedido.status == "carrinho",
             Pedido.created_at <= uma_hora_atras,
+            Pedido.origem.in_(ORIGENS_ECOMMERCE),
         )
         .count()
     )
@@ -62,10 +68,10 @@ def get_resumo(
         or 0
     )
 
-    # Pedidos por status
+    # Pedidos por status (apenas e-commerce)
     status_counts = (
         db.query(Pedido.status, func.count(Pedido.id))
-        .filter(Pedido.tenant_id == tid)
+        .filter(Pedido.tenant_id == tid, Pedido.origem.in_(ORIGENS_ECOMMERCE))
         .group_by(Pedido.status)
         .all()
     )
@@ -146,7 +152,7 @@ def get_mais_vendidos(
     rows = (
         db.query(
             PedidoItem.produto_id,
-            PedidoItem.nome,
+            func.max(PedidoItem.nome).label("nome"),
             func.sum(PedidoItem.quantidade).label("total_vendido"),
             func.sum(PedidoItem.subtotal).label("receita"),
             func.count(PedidoItem.id.distinct()).label("qtd_pedidos"),
@@ -154,9 +160,11 @@ def get_mais_vendidos(
         .join(Pedido, Pedido.pedido_id == PedidoItem.pedido_id)
         .filter(
             PedidoItem.tenant_id == tid,
+            Pedido.tenant_id == tid,
             Pedido.status != "carrinho",
+            Pedido.origem.in_(("web", "app", "marketplace")),
         )
-        .group_by(PedidoItem.produto_id, PedidoItem.nome)
+        .group_by(PedidoItem.produto_id)
         .order_by(func.sum(PedidoItem.quantidade).desc())
         .limit(20)
         .all()
@@ -185,7 +193,11 @@ def get_pedidos_recentes(
 
     pedidos = (
         db.query(Pedido)
-        .filter(Pedido.tenant_id == tid, Pedido.status != "carrinho")
+        .filter(
+            Pedido.tenant_id == tid,
+            Pedido.status != "carrinho",
+            Pedido.origem.in_(("web", "app", "marketplace")),
+        )
         .order_by(Pedido.created_at.desc())
         .limit(30)
         .all()
