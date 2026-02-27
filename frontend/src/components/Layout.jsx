@@ -262,7 +262,16 @@ const Layout = () => {
     { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: true, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },
-    { path: '/ecommerce', icon: FiShoppingCart, label: 'E-commerce MVP', permission: 'vendas.visualizar' },
+    {
+      path: '/ecommerce',
+      icon: FiShoppingCart,
+      label: 'E-commerce',
+      permission: 'vendas.visualizar',
+      submenu: [
+        { path: '/ecommerce', label: '🏪 Prévia da Loja', permission: 'vendas.visualizar' },
+        { path: '/ecommerce/aparencia', label: '🖼️ Aparência da Loja', permission: 'vendas.visualizar' },
+      ],
+    },
     { path: '/notas-fiscais', icon: FiFileText, label: 'Notas Fiscais', permission: 'vendas.visualizar' }, // Vinculado a vendas
     { 
       path: '/compras', 

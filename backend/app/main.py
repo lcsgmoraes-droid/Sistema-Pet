@@ -146,6 +146,7 @@ from app.routes.ecommerce_public import router as ecommerce_public_router
 from app.routes.ecommerce_cart import router as ecommerce_cart_router
 from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
+from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 
 from app.tenancy.middleware import TenancyMiddleware
@@ -539,6 +540,7 @@ app.include_router(ecommerce_public_router)
 app.include_router(ecommerce_cart_router)
 app.include_router(ecommerce_checkout_router)
 app.include_router(ecommerce_webhooks_router)
+app.include_router(ecommerce_aparencia_router)
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)

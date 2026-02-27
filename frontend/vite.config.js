@@ -52,6 +52,12 @@ export default defineConfig(({ mode }) => {
           ws: true, // Habilita proxy de WebSocket (wss://localhost:5173/api/ws/...)
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+        // Em DEV: /uploads/* aponta para o backend local (imagens de produtos, logos, banners)
+        '/uploads': {
+          target: devApiProxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       }
     },
   };

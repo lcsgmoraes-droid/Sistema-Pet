@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ecommerceApi from '../../services/ecommerceApi';
+import { api } from '../../services/api';
 
 const STORAGE_TOKEN_KEY = 'ecommerce_customer_token';
 const STORAGE_ORDERS_KEY = 'ecommerce_customer_orders';
@@ -282,6 +283,7 @@ const BANNERS = [
 
 export default function EcommerceMVP() {
   const location = useLocation();
+  const navigate = useNavigate();
   const params = useParams();
 
   const [view, setView] = useState('loja');
@@ -368,6 +370,17 @@ export default function EcommerceMVP() {
   const [success, setSuccess] = useState('');
   const [tenantContext, setTenantContext] = useState(null);
 
+  // Banners: usa URLs do tenant se configuradas, senão exibe os padrões
+  const activeBanners = useMemo(() => {
+    const urls = [
+      tenantContext?.banner_1_url,
+      tenantContext?.banner_2_url,
+      tenantContext?.banner_3_url,
+    ].filter(Boolean);
+    if (urls.length > 0) return urls.map((url) => ({ type: 'image', url }));
+    return BANNERS.map((b) => ({ ...b, type: 'text' }));
+  }, [tenantContext?.banner_1_url, tenantContext?.banner_2_url, tenantContext?.banner_3_url]);
+
   const isProfileComplete = useMemo(() => {
     const fullName = String(customer?.nome || '').trim();
     const hasFullName = fullName.includes(' ');
@@ -427,16 +440,24 @@ export default function EcommerceMVP() {
   }, [tenantContext?.name, storefrontRef]);
 
   useEffect(() => {
-    if (!tenantRef) {
-      setProducts([]);
-      setTenantContext(null);
-      setError('Loja não informada na URL. Use /slug-da-loja.');
-      return;
-    }
-
+    // Sem slug = acesso pelo painel (usuario logado) → carrega via API autenticada
     loadTenantContext();
-    loadProducts();
+    if (tenantRef) {
+      loadProducts();
+    }
   }, [tenantRef]);
+
+  // Apos carregar o contexto via painel (sem slug), usar o tenant.id para buscar produtos
+  // e redirecionar para a URL real da loja (/{slug})
+  useEffect(() => {
+    if (!tenantRef && tenantContext?.id) {
+      if (tenantContext.ecommerce_slug) {
+        navigate(`/${tenantContext.ecommerce_slug}`, { replace: true });
+      } else {
+        loadProductsById(tenantContext.id);
+      }
+    }
+  }, [tenantContext?.id]);
 
   useEffect(() => {
     if (customerToken) {
@@ -466,9 +487,10 @@ export default function EcommerceMVP() {
   }, [notifyRequests]);
 
   useEffect(() => {
-    const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % BANNERS.length), 4000);
+    const total = activeBanners.length;
+    const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % total), 4000);
     return () => clearInterval(timer);
-  }, []);
+  }, [activeBanners.length]);
 
   useEffect(() => {
     if (!customer) return;
@@ -530,6 +552,12 @@ export default function EcommerceMVP() {
 
   async function loadTenantContext() {
     try {
+      // Sem slug na URL = acesso pelo painel (usuario logado) → usa API autenticada
+      if (!tenantRef) {
+        const response = await api.get('/ecommerce-aparencia/tenant-context');
+        setTenantContext(response?.data || null);
+        return;
+      }
       const response = await ecommerceApi.get('/api/ecommerce/tenant-context', {
         params: { tenant: tenantRef },
       });
@@ -547,6 +575,22 @@ export default function EcommerceMVP() {
     try {
       const response = await ecommerceApi.get('/api/ecommerce/produtos', {
         params: { tenant: tenantRef, limit: 100, busca: search || undefined },
+      });
+      setProducts(normalizeProductPayload(response?.data));
+    } catch (err) {
+      setProducts([]);
+      setError(extractApiErrorMessage(err, 'Erro ao carregar produtos vendáveis'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadProductsById(tenantId) {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await ecommerceApi.get('/api/ecommerce/produtos', {
+        params: { tenant: tenantId, limit: 100, busca: search || undefined },
       });
       setProducts(normalizeProductPayload(response?.data));
     } catch (err) {
@@ -1092,7 +1136,15 @@ export default function EcommerceMVP() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 11, color: '#92400e', fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase' }}>Loja Online</div>
-            <h1 style={{ margin: '2px 0 4px', fontSize: 30, lineHeight: 1.1, color: '#c41c1c', fontWeight: 900 }}>{storeDisplayName}</h1>
+            {tenantContext?.logo_url ? (
+              <img
+                src={resolveMediaUrl(tenantContext.logo_url)}
+                alt={storeDisplayName}
+                style={{ maxHeight: 56, maxWidth: 200, objectFit: 'contain', margin: '4px 0' }}
+              />
+            ) : (
+              <h1 style={{ margin: '2px 0 4px', fontSize: 30, lineHeight: 1.1, color: '#c41c1c', fontWeight: 900 }}>{storeDisplayName}</h1>
+            )}
             <div style={{ fontSize: 13, color: '#78350f', fontWeight: 500 }}>
               📍 {tenantContext?.cidade || 'Cidade não informada'}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
             </div>
@@ -1124,27 +1176,31 @@ export default function EcommerceMVP() {
 
       {/* BANNER ROTATIVO */}
       <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', marginBottom: 10, height: 112 }}>
-        {BANNERS.map((b, i) => (
+        {activeBanners.map((b, i) => (
           <div
             key={i}
             style={{
               position: 'absolute', inset: 0,
-              background: b.bg,
-              display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16,
               opacity: bannerSlide === i ? 1 : 0,
               transition: 'opacity 0.8s ease',
               pointerEvents: bannerSlide === i ? 'auto' : 'none',
             }}
           >
-            <span style={{ fontSize: 44, flexShrink: 0 }}>{b.emoji}</span>
-            <div>
-              <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.2, textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{b.title}</div>
-              <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 13, marginTop: 5 }}>{b.sub}</div>
-            </div>
+            {b.type === 'image' ? (
+              <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ background: b.bg, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16, height: '100%' }}>
+                <span style={{ fontSize: 44, flexShrink: 0 }}>{b.emoji}</span>
+                <div>
+                  <div style={{ color: '#fff', fontWeight: 900, fontSize: 20, lineHeight: 1.2, textShadow: '0 1px 3px rgba(0,0,0,0.25)' }}>{b.title}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 13, marginTop: 5 }}>{b.sub}</div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
         <div style={{ position: 'absolute', bottom: 9, right: 14, display: 'flex', gap: 5 }}>
-          {BANNERS.map((_, i) => (
+          {activeBanners.map((_, i) => (
             <button
               key={i}
               onClick={() => setBannerSlide(i)}

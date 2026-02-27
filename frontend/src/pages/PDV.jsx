@@ -107,6 +107,7 @@ export default function PDV() {
   const [vendasRecentes, setVendasRecentes] = useState([]);
   const [filtroVendas, setFiltroVendas] = useState('24h');
   const [filtroStatus, setFiltroStatus] = useState('todas');
+  const [confirmandoRetirada, setConfirmandoRetirada] = useState({ vendaId: null, nome: '' });
   const [filtroTemEntrega, setFiltroTemEntrega] = useState(false);
   const [buscaNumeroVenda, setBuscaNumeroVenda] = useState('');
   const [loading, setLoading] = useState(false);
@@ -763,16 +764,21 @@ export default function PDV() {
     }
   };
 
-  const marcarEntregue = async (e, vendaId) => {
-    e.stopPropagation(); // Não abre a venda ao clicar no botão
+  const abrirConfirmacaoRetirada = (e, vendaId) => {
+    e.stopPropagation();
+    setConfirmandoRetirada({ vendaId, nome: '' });
+  };
+
+  const confirmarRetirada = async (e, vendaId) => {
+    e.stopPropagation();
     try {
-      await fetch(`/api/vendas/${vendaId}/marcar-entregue`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      await api.post(`/vendas/${vendaId}/marcar-entregue`, {
+        retirado_por: confirmandoRetirada.nome.trim() || null,
       });
+      setConfirmandoRetirada({ vendaId: null, nome: '' });
       carregarVendasRecentes();
     } catch (error) {
-      console.error('Erro ao marcar entregue:', error);
+      console.error('Erro ao confirmar retirada:', error);
     }
   };
 
@@ -3351,18 +3357,53 @@ export default function PDV() {
                           return new Date(dataStr).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                         })()}
                       </div>
-                      {venda.tipo_retirada === 'terceiro' && venda.status_entrega !== 'entregue' && (
+                      {venda.tipo_retirada === 'terceiro' && venda.status_entrega !== 'entregue' && confirmandoRetirada.vendaId !== venda.id && (
                         <button
-                          onClick={(e) => marcarEntregue(e, venda.id)}
+                          onClick={(e) => abrirConfirmacaoRetirada(e, venda.id)}
                           className="text-[10px] bg-white hover:bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded border border-green-600 transition-colors"
                         >
                           Confirmar retirada
                         </button>
                       )}
-                      {venda.status_entrega === 'entregue' && (
+                      {venda.status_entrega === 'entregue' && venda.retirado_por && (
+                        <span className="text-[10px] text-green-600 font-medium" title={`Retirado por: ${venda.retirado_por}`}>✅ {venda.retirado_por}</span>
+                      )}
+                      {venda.status_entrega === 'entregue' && !venda.retirado_por && (
                         <span className="text-[10px] text-green-600 font-medium">✅ Retirado</span>
                       )}
                     </div>
+
+                    {/* Form inline de confirmação de retirada */}
+                    {confirmandoRetirada.vendaId === venda.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="mt-1.5 flex flex-col gap-1.5"
+                      >
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder="Nome de quem está retirando (opcional)"
+                          value={confirmandoRetirada.nome}
+                          onChange={(e) => setConfirmandoRetirada(prev => ({ ...prev, nome: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') confirmarRetirada(e, venda.id); if (e.key === 'Escape') setConfirmandoRetirada({ vendaId: null, nome: '' }); }}
+                          className="w-full text-[11px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:border-green-500"
+                        />
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => confirmarRetirada(e, venda.id)}
+                            className="flex-1 text-[10px] bg-green-600 hover:bg-green-700 text-white font-semibold py-1 rounded transition-colors"
+                          >
+                            ✅ Confirmar
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmandoRetirada({ vendaId: null, nome: '' }); }}
+                            className="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-600 font-semibold px-2 py-1 rounded transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })

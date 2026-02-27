@@ -67,6 +67,7 @@ class Venda(BaseTenantModel):
     # Retirada na loja (ecommerce)
     tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
     palavra_chave_retirada = Column(String(100), nullable=True)  # ex: 'patinha-bolota' (para terceiro retirar)
+    retirado_por = Column(String(150), nullable=True)  # Nome de quem retirou o pedido
     
     # Financeiro (FASE 3) - COMENTADO até migração
     # nsu = Column(String(50), nullable=True, index=True)  # NSU da operadora de cartão (para conciliação)
@@ -192,6 +193,7 @@ class Venda(BaseTenantModel):
             'loja_origem': self.loja_origem,
             'tipo_retirada': self.tipo_retirada,
             'palavra_chave_retirada': self.palavra_chave_retirada,
+            'retirado_por': self.retirado_por,
             'data_venda': safe_datetime_to_iso(self.data_venda),
             'data_finalizacao': safe_datetime_to_iso(self.data_finalizacao),
             'observacoes': self.observacoes,

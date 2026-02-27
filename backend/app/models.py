@@ -541,6 +541,9 @@ class Tenant(Base):
     email = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
     logo_url = Column(String(500), nullable=True)
+    banner_1_url = Column(String(500), nullable=True)
+    banner_2_url = Column(String(500), nullable=True)
+    banner_3_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, server_default='active')
     plan = Column(String(50), nullable=False, server_default='free')
     

@@ -103,6 +103,10 @@ def tenant_context(
         "status": tenant.status,
         "cidade": tenant.cidade,
         "uf": tenant.uf,
+        "logo_url": tenant.logo_url,
+        "banner_1_url": tenant.banner_1_url,
+        "banner_2_url": tenant.banner_2_url,
+        "banner_3_url": tenant.banner_3_url,
     }
 
 

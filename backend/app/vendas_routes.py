@@ -798,9 +798,14 @@ def atualizar_venda(
     return venda.to_dict()
 
 
+class MarcarEntregueRequest(BaseModel):
+    retirado_por: str | None = None
+
+
 @router.post('/{venda_id}/marcar-entregue')
 async def marcar_venda_entregue(
     venda_id: int,
+    dados: MarcarEntregueRequest = MarcarEntregueRequest(),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -811,8 +816,10 @@ async def marcar_venda_entregue(
         raise HTTPException(status_code=404, detail="Venda não encontrada")
     venda.status_entrega = "entregue"
     venda.data_entrega = datetime.now()
+    if dados.retirado_por:
+        venda.retirado_por = dados.retirado_por.strip()
     db.commit()
-    return {"id": venda_id, "status_entrega": "entregue", "data_entrega": venda.data_entrega.isoformat()}
+    return {"id": venda_id, "status_entrega": "entregue", "data_entrega": venda.data_entrega.isoformat(), "retirado_por": venda.retirado_por}
 
 
 @router.post('/{venda_id}/finalizar')

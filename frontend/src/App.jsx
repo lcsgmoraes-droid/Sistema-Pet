@@ -106,6 +106,7 @@ const RotasEntrega = lazy(() => import('./pages/entregas/RotasEntrega'));
 const HistoricoEntregas = lazy(() => import('./pages/entregas/HistoricoEntregas'));
 const DashEntregasFinanceiro = lazy(() => import('./pages/entregas/DashEntregasFinanceiro'));
 const EcommerceMVP = lazy(() => import('./pages/ecommerce/EcommerceMVP'));
+const EcommerceAparencia = lazy(() => import('./pages/ecommerce/EcommerceAparencia'));
 
 function AppRoutePreloader() {
   useEffect(() => {
@@ -266,6 +267,7 @@ function App() {
             } />
             <Route path="meus-caixas" element={<MeusCaixas />} />
             <Route path="notas-fiscais" element={<NotasFiscais />} />
+            <Route path="ecommerce/aparencia" element={<EcommerceAparencia />} />
             
             {/* Rotas de Compras */}
             <Route path="compras/pedidos" element={
