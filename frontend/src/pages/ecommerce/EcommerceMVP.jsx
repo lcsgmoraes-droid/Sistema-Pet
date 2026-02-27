@@ -418,8 +418,9 @@ export default function EcommerceMVP() {
     const query = search.trim().toLowerCase();
     return products.filter((item) => {
       const nome = String(item?.nome || '').toLowerCase();
+      const codigo = String(item?.codigo || '').toLowerCase();
       const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
-      const matchesSearch = !query || nome.includes(query);
+      const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
       const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
       return matchesSearch && matchesCategoria;
     });
