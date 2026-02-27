@@ -133,7 +133,7 @@ def notificar_clientes_estoque_disponivel(
     base_url = os.getenv("ECOMMERCE_BASE_URL", "https://mlprohub.com.br")
 
     # Buscar SKU do produto para incluir na URL (link direto filtrado)
-    from app.models import Produto
+    from app.produtos_models import Produto
     produto_obj = db.query(Produto).filter(Produto.id == product_id).first()
     sku_param = produto_obj.sku or produto_obj.codigo if produto_obj else None
     if sku_param:
