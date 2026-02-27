@@ -1,0 +1,1 @@
+import{a as t}from"./index-1772212548808.js";const o=()=>t.get("/estoque/alertas/pendentes"),n=(e={})=>t.get("/estoque/alertas/todos",{params:e}),u=()=>t.get("/estoque/alertas/dashboard"),l=(e,s,r=null)=>t.put(`/estoque/alertas/${e}/resolver`,{status:s,observacao:r}),g=e=>t.post("/estoque/alertas/verificar-estoque-negativo",{itens:e});export{n as a,u as b,o as g,l as r,g as v};
