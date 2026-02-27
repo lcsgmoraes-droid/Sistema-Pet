@@ -1,4 +1,6 @@
 """Rotas de Analytics do E-commerce."""
+import json
+import os
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
@@ -220,3 +222,109 @@ def get_pedidos_recentes(
         })
 
     return result
+
+
+@router.get("/ga-data")
+def get_ga_data(
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Busca dados de comportamento do Google Analytics 4 (sessões, páginas, etc)."""
+    credentials_json = os.environ.get("GOOGLE_ANALYTICS_CREDENTIALS_JSON", "")
+    property_id = os.environ.get("GA4_PROPERTY_ID", "526330617")
+
+    if not credentials_json:
+        return {"disponivel": False, "motivo": "Credenciais GA4 não configuradas"}
+
+    try:
+        from google.analytics.data_v1beta import BetaAnalyticsDataClient
+        from google.analytics.data_v1beta.types import (
+            DateRange,
+            Dimension,
+            Metric,
+            RunReportRequest,
+        )
+        from google.oauth2 import service_account
+
+        # Carrega as credenciais do JSON armazenado na variável de ambiente
+        creds_dict = json.loads(credentials_json)
+        credentials = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/analytics.readonly"],
+        )
+        client = BetaAnalyticsDataClient(credentials=credentials)
+
+        # Relatório principal: métricas gerais dos últimos 30 dias
+        request_geral = RunReportRequest(
+            property=f"properties/{property_id}",
+            date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
+            metrics=[
+                Metric(name="sessions"),
+                Metric(name="activeUsers"),
+                Metric(name="screenPageViews"),
+                Metric(name="bounceRate"),
+                Metric(name="averageSessionDuration"),
+            ],
+        )
+        resp_geral = client.run_report(request_geral)
+        row = resp_geral.rows[0].metric_values if resp_geral.rows else None
+
+        sessoes = int(row[0].value) if row else 0
+        usuarios_ativos = int(row[1].value) if row else 0
+        page_views = int(row[2].value) if row else 0
+        bounce_rate = round(float(row[3].value) * 100, 1) if row else 0
+        duracao_media_seg = round(float(row[4].value)) if row else 0
+
+        # Top 5 páginas mais visitadas
+        request_paginas = RunReportRequest(
+            property=f"properties/{property_id}",
+            date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
+            dimensions=[Dimension(name="pagePath")],
+            metrics=[Metric(name="screenPageViews")],
+            limit=5,
+        )
+        resp_paginas = client.run_report(request_paginas)
+        top_paginas = [
+            {
+                "pagina": r.dimension_values[0].value,
+                "visualizacoes": int(r.metric_values[0].value),
+            }
+            for r in resp_paginas.rows
+        ]
+
+        # Visitantes por dia (últimos 30 dias) para o gráfico
+        request_diario = RunReportRequest(
+            property=f"properties/{property_id}",
+            date_ranges=[DateRange(start_date="30daysAgo", end_date="today")],
+            dimensions=[Dimension(name="date")],
+            metrics=[Metric(name="sessions"), Metric(name="activeUsers")],
+            order_bys=[{"dimension": {"dimension_name": "date"}}],
+        )
+        resp_diario = client.run_report(request_diario)
+        visitantes_por_dia = [
+            {
+                "data": r.dimension_values[0].value,  # formato YYYYMMDD
+                "sessoes": int(r.metric_values[0].value),
+                "usuarios": int(r.metric_values[1].value),
+            }
+            for r in resp_diario.rows
+        ]
+
+        # Formata duração em minutos e segundos
+        minutos = duracao_media_seg // 60
+        segundos = duracao_media_seg % 60
+        duracao_formatada = f"{minutos}m {segundos}s"
+
+        return {
+            "disponivel": True,
+            "periodo": "últimos 30 dias",
+            "sessoes": sessoes,
+            "usuarios_ativos": usuarios_ativos,
+            "page_views": page_views,
+            "bounce_rate": bounce_rate,
+            "duracao_media": duracao_formatada,
+            "top_paginas": top_paginas,
+            "visitantes_por_dia": visitantes_por_dia,
+        }
+
+    except Exception as e:
+        return {"disponivel": False, "motivo": f"Erro ao consultar GA4: {str(e)}"}
