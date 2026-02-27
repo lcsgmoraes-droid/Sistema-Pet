@@ -49,11 +49,29 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     } catch (error) {
       console.error('Erro ao buscar usuário:', error);
-      // Limpar dados inválidos
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('tenants');
-      localStorage.removeItem('user');
-      setUser(null);
+
+      const status = error.response?.status;
+
+      // Só descarta a sessão em erros de autenticação (401) ou acesso negado (403).
+      // Erros 5xx (502, 503) são falhas TEMPORÁRIAS do servidor — não devem derrubar a sessão.
+      if (status === 401 || status === 403) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('tenants');
+        localStorage.removeItem('user');
+        setUser(null);
+      } else {
+        // Servidor temporariamente indisponível: usa dados do localStorage como fallback
+        const savedUser = localStorage.getItem('user');
+        if (savedUser) {
+          try {
+            setUser(JSON.parse(savedUser));
+          } catch {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
       setLoading(false);
     }
   };
