@@ -5,9 +5,25 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pet Shop Pro - Sistema de Gestão</title>
-    <script type="module" crossorigin src="/assets/index-1772214481029.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-react-1772214481029.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-1772214481029.css">
+    <!-- Google Analytics 4 -->
+    <!-- Troque G-XXXXXXXXXX pelo seu ID real quando criar a conta no analytics.google.com -->
+    <script>
+      (function(){
+        var id = '';
+        if (!id || id === '' || !id.startsWith('G-')) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function(){ window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { send_page_view: false });
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-1772216752245.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-react-1772216752245.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-1772216752245.css">
   </head>
   <body>
     <div id="root"></div>

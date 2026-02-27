@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pet Shop Pro - Sistema de Gestão</title>
+    <!-- Google Analytics 4 -->
+    <!-- Troque G-XXXXXXXXXX pelo seu ID real quando criar a conta no analytics.google.com -->
+    <script>
+      (function(){
+        var id = '%VITE_GA_MEASUREMENT_ID%';
+        if (!id || id === '%VITE_GA_MEASUREMENT_ID%' || !id.startsWith('G-')) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function(){ window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { send_page_view: false });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

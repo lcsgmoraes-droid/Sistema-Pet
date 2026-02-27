@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ecommerceApi from '../../services/ecommerceApi';
 import { api } from '../../services/api';
+import {
+  trackPageView,
+  trackViewItem,
+  trackAddToCart,
+  trackBeginCheckout,
+  trackPurchase,
+  trackViewCart,
+} from '../../services/analytics';
 
 const STORAGE_TOKEN_KEY = 'ecommerce_customer_token';
 const STORAGE_ORDERS_KEY = 'ecommerce_customer_orders';
@@ -287,6 +295,12 @@ export default function EcommerceMVP() {
   const params = useParams();
 
   const [view, setView] = useState('loja');
+
+  // Rastreia no Google Analytics sempre que o cliente muda de tela
+  useEffect(() => {
+    trackPageView(view);
+    if (view === 'carrinho') trackViewCart(cart);
+  }, [view]);
   const [bannerSlide, setBannerSlide] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -887,6 +901,7 @@ export default function EcommerceMVP() {
         return recalculateGuestCart(nextItems);
       });
       setSuccess('Produto adicionado ao carrinho. Faça login no checkout para finalizar.');
+      trackAddToCart(product);
       return;
     }
 
@@ -899,6 +914,7 @@ export default function EcommerceMVP() {
       );
       setCart(response.data);
       setSuccess('Produto adicionado ao carrinho.');
+      trackAddToCart(product);
     } catch (err) {
       setError(extractApiErrorMessage(err, 'Erro ao adicionar no carrinho'));
     }
@@ -1048,6 +1064,7 @@ export default function EcommerceMVP() {
 
       const result = response.data;
       setCheckoutResult(result);
+      trackPurchase(result, cart);
       setCart({ pedido_id: null, itens: [], subtotal: 0, total: 0 });
       setCheckoutResumo(null);
       setCupomResult(null);
@@ -1120,6 +1137,7 @@ export default function EcommerceMVP() {
       return;
     }
     setView('checkout');
+    trackBeginCheckout(cart);
   }
 
   function openProductDetails(product) {
@@ -1127,6 +1145,7 @@ export default function EcommerceMVP() {
     setSelectedProduct(product);
     setActiveProductImage(images[0] || '');
     navigate(`${location.pathname}?produto=${product.id}`, { replace: true });
+    trackViewItem(product);
   }
 
   function closeProductModal() {
