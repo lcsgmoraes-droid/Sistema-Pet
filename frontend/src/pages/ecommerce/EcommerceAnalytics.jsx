@@ -56,18 +56,23 @@ export default function EcommerceAnalytics() {
       setLoading(true)
       setError('')
       try {
-        const [r1, r2, r3, r4, r5] = await Promise.all([
+        const [r1, r2, r3, r4] = await Promise.all([
           api.get('/ecommerce-analytics/resumo'),
           api.get('/ecommerce-analytics/demanda'),
           api.get('/ecommerce-analytics/mais-vendidos'),
           api.get('/ecommerce-analytics/pedidos-recentes'),
-          api.get('/ecommerce-analytics/ga-data'),
         ])
         setResumo(r1.data)
         setDemanda(r2.data)
         setMaisVendidos(r3.data)
         setPedidosRecentes(r4.data)
-        setGaData(r5.data)
+        // GA4 é opcional — não trava o resto se falhar
+        try {
+          const r5 = await api.get('/ecommerce-analytics/ga-data')
+          setGaData(r5.data)
+        } catch {
+          setGaData({ disponivel: false, motivo: 'Endpoint GA4 não disponível neste ambiente' })
+        }
       } catch (e) {
         setError('Erro ao carregar dados de analytics.')
       } finally {

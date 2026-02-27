@@ -229,13 +229,15 @@ def get_ga_data(
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Busca dados de comportamento do Google Analytics 4 (sessões, páginas, etc)."""
-    credentials_json = os.environ.get("GOOGLE_ANALYTICS_CREDENTIALS_JSON", "")
+    import base64
+    credentials_b64 = os.environ.get("GA4_CREDENTIALS_B64", "")
     property_id = os.environ.get("GA4_PROPERTY_ID", "526330617")
 
-    if not credentials_json:
+    if not credentials_b64:
         return {"disponivel": False, "motivo": "Credenciais GA4 não configuradas"}
 
     try:
+        credentials_json = base64.b64decode(credentials_b64).decode("utf-8")
         from google.analytics.data_v1beta import BetaAnalyticsDataClient
         from google.analytics.data_v1beta.types import (
             DateRange,
