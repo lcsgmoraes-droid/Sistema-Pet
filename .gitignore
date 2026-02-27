@@ -128,3 +128,6 @@ Comparação*.csv
 
 # Certificados locais gerados automaticamente (NUNCA versionar)
 nginx/ssl/*.pem
+
+# Vite temp files
+frontend/vite.config.js.timestamp-*.mjs
