@@ -1106,7 +1106,33 @@ export default function EcommerceMVP() {
     const images = getProductImages(product);
     setSelectedProduct(product);
     setActiveProductImage(images[0] || '');
+    navigate(`${location.pathname}?produto=${product.id}`, { replace: true });
   }
+
+  function closeProductModal() {
+    setSelectedProduct(null);
+    navigate(location.pathname, { replace: true });
+  }
+
+  // Fecha o modal com ESC
+  useEffect(() => {
+    if (!selectedProduct) return;
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') closeProductModal();
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedProduct]);
+
+  // Abre produto automaticamente pelo link direto (?produto=ID)
+  useEffect(() => {
+    if (!products.length) return;
+    const searchParams = new URLSearchParams(location.search);
+    const prodIdFromUrl = searchParams.get('produto');
+    if (!prodIdFromUrl || selectedProduct) return;
+    const found = products.find((p) => String(p.id) === String(prodIdFromUrl));
+    if (found) openProductDetails(found);
+  }, [products.length, location.search]);
 
   return (
     <div className="page">
@@ -1371,12 +1397,11 @@ export default function EcommerceMVP() {
                     {outOfStock && (
                       <div style={{ position: 'absolute', top: 8, left: 8, background: '#fef3c7', color: '#92400e', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>Indisponível</div>
                     )}
-                    {wished && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
-                        style={{ position: 'absolute', top: 8, right: 8, background: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', fontSize: 16 }}
-                      >❤️</button>
-                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
+                      title={wished ? 'Remover da lista de desejos' : 'Salvar na lista de desejos'}
+                      style={{ position: 'absolute', top: 8, right: 8, background: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.12)', fontSize: 16 }}
+                    >{wished ? '❤️' : '🤍'}</button>
                   </div>
 
                   <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
@@ -1418,6 +1443,14 @@ export default function EcommerceMVP() {
                     >
                       {outOfStock ? 'Indisponível' : '+ Adicionar'}
                     </button>
+                    {outOfStock && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); registerNotifyMe(product); }}
+                        style={{ background: 'transparent', border: '1px solid #d97706', color: '#d97706', borderRadius: 8, padding: '7px 0', fontWeight: 600, fontSize: 12, cursor: 'pointer', width: '100%', marginTop: 6 }}
+                      >
+                        📧 Avise-me quando chegar
+                      </button>
+                    )}
                   </div>
                 </div>
               );})}
@@ -1500,7 +1533,7 @@ export default function EcommerceMVP() {
             padding: 16,
             zIndex: 60,
           }}
-          onClick={() => setSelectedProduct(null)}
+          onClick={() => closeProductModal()}
         >
           <div
             style={{
@@ -1563,7 +1596,7 @@ export default function EcommerceMVP() {
             <div style={{ display: 'grid', alignContent: 'start', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                 <h3 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>{selectedProduct.nome}</h3>
-                <button className="btn-secondary" onClick={() => setSelectedProduct(null)}>Fechar</button>
+                <button className="btn-secondary" onClick={() => closeProductModal()}>Fechar</button>
               </div>
 
               <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a2e' }}>
@@ -1586,21 +1619,32 @@ export default function EcommerceMVP() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 {!isProductOutOfStock(selectedProduct) ? (
-                  <button className="btn-primary" onClick={() => addToCart(selectedProduct)} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer', transition: 'background 0.15s' }}>
+                  <button onClick={() => addToCart(selectedProduct)} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer', transition: 'background 0.15s' }}>
                     + Adicionar ao carrinho
                   </button>
                 ) : (
-                  <button className="btn-secondary" onClick={() => registerNotifyMe(selectedProduct)}>
-                    Avise-me quando chegar
+                  <button onClick={() => registerNotifyMe(selectedProduct)} style={{ background: 'transparent', border: '2px solid #d97706', color: '#d97706', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
+                    📧 Avise-me quando chegar
                   </button>
                 )}
-                <button className="btn-secondary" onClick={() => toggleWishlist(selectedProduct.id)}>
-                  {wishlist.includes(selectedProduct.id) ? 'Remover da lista' : 'Salvar na lista'}
+                <button onClick={() => toggleWishlist(selectedProduct.id)} style={{ background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
+                  {wishlist.includes(selectedProduct.id) ? '💔 Remover da lista' : '🤍 Salvar na lista'}
                 </button>
-                <button className="btn-secondary" onClick={() => setView('carrinho')}>
-                  Ver carrinho
+                <button onClick={() => { closeProductModal(); setView('carrinho'); }} style={{ background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
+                  🛒 Ver carrinho
+                </button>
+                <button
+                  onClick={() => {
+                    const url = `${window.location.origin}${location.pathname}?produto=${selectedProduct.id}`;
+                    navigator.clipboard?.writeText(url)
+                      .then(() => setSuccess('Link copiado para a área de transferência!'))
+                      .catch(() => setSuccess(`Link: ${url}`));
+                  }}
+                  style={{ background: 'transparent', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 10, fontWeight: 500, fontSize: 13, padding: '8px 14px', cursor: 'pointer' }}
+                >
+                  🔗 Copiar link
                 </button>
               </div>
             </div>

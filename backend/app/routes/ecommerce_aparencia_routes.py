@@ -2,6 +2,7 @@
 Rotas de Aparência do E-commerce por lojista.
 Permite upload de logo e até 3 banners rotativos para a loja virtual.
 """
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -49,6 +50,10 @@ class AparenciaUrlUpdate(BaseModel):
     banner_1_url: str | None = None
     banner_2_url: str | None = None
     banner_3_url: str | None = None
+
+
+class SlugUpdate(BaseModel):
+    slug: str | None = None
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
@@ -198,6 +203,48 @@ def atualizar_aparencia_por_url(
         banner_2_url=tenant.banner_2_url,
         banner_3_url=tenant.banner_3_url,
     )
+
+
+@router.put("/slug")
+def atualizar_slug(
+    body: SlugUpdate,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """
+    Atualiza o slug (endereço público) da loja.
+    O slug define a URL: mlprohub.com.br/{slug}
+    """
+    _, tenant_id = user_and_tenant
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant não encontrado")
+
+    slug = (body.slug or "").strip().lower()
+    if slug:
+        if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", slug):
+            raise HTTPException(
+                status_code=400,
+                detail="Slug inválido. Use apenas letras minúsculas, números e hífens (ex: minha-loja).",
+            )
+        if len(slug) < 3:
+            raise HTTPException(status_code=400, detail="Slug muito curto. Use pelo menos 3 caracteres.")
+        if len(slug) > 80:
+            raise HTTPException(status_code=400, detail="Slug muito longo. Máximo 80 caracteres.")
+        # Verificar unicidade
+        existing = db.query(Tenant).filter(
+            Tenant.ecommerce_slug == slug,
+            Tenant.id != tenant_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Este slug já está em uso. Escolha outro.")
+        tenant.ecommerce_slug = slug
+    else:
+        tenant.ecommerce_slug = None
+
+    db.commit()
+    db.refresh(tenant)
+    return {"ecommerce_slug": tenant.ecommerce_slug}
 
 
 @router.delete("/{tipo}", response_model=AparenciaResponse)

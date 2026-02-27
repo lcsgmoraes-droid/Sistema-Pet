@@ -85,6 +85,9 @@ export default function EcommerceAparencia() {
   const [aparencia, setAparencia] = useState({
     logo_url: null, banner_1_url: null, banner_2_url: null, banner_3_url: null,
   })
+  const [slug, setSlug] = useState('')
+  const [slugOriginal, setSlugOriginal] = useState('')
+  const [salvandoSlug, setSalvandoSlug] = useState(false)
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState({})
   const [msg, setMsg] = useState(null)
@@ -92,15 +95,32 @@ export default function EcommerceAparencia() {
   const inputRefs = useRef({})
 
   useEffect(() => {
-    api.get('/ecommerce-aparencia')
+    const fetchAparencia = api.get('/ecommerce-aparencia')
       .then(r => setAparencia(r.data))
       .catch(() => setMsg({ tipo: 'erro', texto: 'Não foi possível carregar as configurações.' }))
-      .finally(() => setCarregando(false))
+    const fetchSlug = api.get('/ecommerce-aparencia/tenant-context')
+      .then(r => { setSlug(r.data.ecommerce_slug || ''); setSlugOriginal(r.data.ecommerce_slug || '') })
+      .catch(() => {})
+    Promise.all([fetchAparencia, fetchSlug]).finally(() => setCarregando(false))
   }, [])
 
   function mostrarMsg(tipo, texto) {
     setMsg({ tipo, texto })
     setTimeout(() => setMsg(null), 4000)
+  }
+
+  async function salvarSlug() {
+    setSalvandoSlug(true)
+    try {
+      await api.put('/ecommerce-aparencia/slug', { slug: slug.trim() })
+      setSlugOriginal(slug.trim())
+      mostrarMsg('ok', 'Endereço da loja salvo com sucesso!')
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      mostrarMsg('erro', detail || 'Erro ao salvar o endereço.')
+    } finally {
+      setSalvandoSlug(false)
+    }
   }
 
   async function uploadArquivo(tipo, arquivo) {
@@ -170,6 +190,56 @@ export default function EcommerceAparencia() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {/* Slug da loja */}
+        <div style={{
+          background: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: 12,
+          padding: 24,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        }}>
+          <div style={{ marginBottom: 4 }}>
+            <span style={{ fontWeight: 600, fontSize: 16, color: '#111827' }}>🔗 Endereço da loja</span>
+          </div>
+          <p style={{ fontSize: 13, color: '#9ca3af', margin: '0 0 12px' }}>
+            Define a URL pública da sua loja. Use apenas letras minúsculas, números e hífens.
+          </p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0 }}>mlprohub.com.br/</span>
+            <input
+              type="text"
+              value={slug}
+              onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              placeholder="nome-da-loja"
+              style={{ flex: 1, minWidth: 160, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 14 }}
+            />
+            <button
+              onClick={salvarSlug}
+              disabled={salvandoSlug || slug === slugOriginal}
+              style={{
+                padding: '8px 18px',
+                background: (salvandoSlug || slug === slugOriginal) ? '#d1d5db' : '#6366f1',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 7,
+                fontWeight: 600,
+                cursor: (salvandoSlug || slug === slugOriginal) ? 'not-allowed' : 'pointer',
+                fontSize: 14,
+                flexShrink: 0,
+              }}
+            >
+              {salvandoSlug ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+          {slugOriginal && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+              🌐 Loja pública:{' '}
+              <a href={`/${slugOriginal}`} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>
+                mlprohub.com.br/{slugOriginal}
+              </a>
+            </div>
+          )}
+        </div>
         {TIPOS.map(({ key, label, desc }) => {
           const urlAtual = aparencia[`${key}_url`]
           const ocupado = salvando[key]
