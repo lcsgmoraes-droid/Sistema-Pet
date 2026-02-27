@@ -17,7 +17,16 @@ from app.models import Tenant
 router = APIRouter(prefix="/ecommerce-aparencia", tags=["ecommerce-aparencia"])
 
 UPLOAD_DIR = Path("uploads/ecommerce")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    # O diretório é criado via volume montado; se já existir, não há problema.
+    import logging
+    logging.getLogger(__name__).warning(
+        "Não foi possível criar %s (PermissionError). "
+        "Certifique-se de que o diretório existe no host com chown 1000:1000.",
+        UPLOAD_DIR,
+    )
 
 ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 MAX_SIZE = 5 * 1024 * 1024  # 5MB
