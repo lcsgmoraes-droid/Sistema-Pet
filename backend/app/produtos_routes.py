@@ -2131,6 +2131,14 @@ def atualizar_produto(
         db.commit()
         db.refresh(produto)
         logger.info(f"âœ… Produto #{produto_id} atualizado com sucesso")
+
+        # Notificar clientes "Avise-me" se estoque voltou ao positivo
+        if 'estoque_atual' in dados_recebidos and produto.estoque_atual and produto.estoque_atual > 0:
+            try:
+                from app.routes.ecommerce_notify_routes import notificar_clientes_estoque_disponivel
+                notificar_clientes_estoque_disponivel(db, str(tenant_id), produto_id, produto.nome)
+            except Exception as _notify_err:
+                logger.warning(f"Aviso: erro ao enviar notificacoes avise-me: {_notify_err}")
         
         # Retornar com composiÃ§Ã£o e estoque virtual
         return obter_produto(produto_id, db, user_and_tenant)

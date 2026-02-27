@@ -270,6 +270,7 @@ const Layout = () => {
       submenu: [
         { path: '/ecommerce', label: '🏪 Prévia da Loja', permission: 'vendas.visualizar' },
         { path: '/ecommerce/aparencia', label: '🖼️ Aparência da Loja', permission: 'vendas.visualizar' },
+        { path: '/ecommerce/configuracoes', label: '⚙️ Configurações', permission: 'vendas.visualizar' },
       ],
     },
     { path: '/notas-fiscais', icon: FiFileText, label: 'Notas Fiscais', permission: 'vendas.visualizar' }, // Vinculado a vendas

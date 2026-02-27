@@ -551,6 +551,13 @@ class Tenant(Base):
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default='false')
     ecommerce_slug = Column(String(80), nullable=True, unique=True, index=True)
 
+    # Configurações da loja virtual
+    ecommerce_ativo = Column(Boolean, nullable=False, server_default='true')
+    ecommerce_descricao = Column(Text, nullable=True)
+    ecommerce_horario_abertura = Column(String(5), nullable=True)   # ex.: "08:00"
+    ecommerce_horario_fechamento = Column(String(5), nullable=True) # ex.: "18:00"
+    ecommerce_dias_funcionamento = Column(String(200), nullable=True)  # ex.: "seg,ter,qua,qui,sex"
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
     
@@ -560,6 +567,23 @@ class Tenant(Base):
     
     def __repr__(self):
         return f"<Tenant(id={self.id}, name={self.name})>"
+
+
+class EcommerceNotifyRequest(Base):
+    """Solicitações de aviso 'Avise-me quando chegar' do e-commerce."""
+    __tablename__ = 'ecommerce_notify_requests'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(36), nullable=False, index=True)
+    product_id = Column(Integer, nullable=False, index=True)
+    product_name = Column(String(255), nullable=True)
+    email = Column(String(255), nullable=False)
+    notified = Column(Boolean, nullable=False, server_default='false')
+    notified_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    def __repr__(self):
+        return f"<EcommerceNotifyRequest(id={self.id}, email={self.email}, product_id={self.product_id})>"
 
 
 class Role(BaseTenantModel):

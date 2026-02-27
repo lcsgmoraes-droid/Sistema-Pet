@@ -365,6 +365,7 @@ export default function EcommerceMVP() {
       return [];
     }
   });
+  const [notifyMeModal, setNotifyMeModal] = useState({ open: false, product: null, email: '', loading: false });
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -811,26 +812,35 @@ export default function EcommerceMVP() {
 
   function registerNotifyMe(product) {
     const fallbackEmail = customer?.email || registerForm.email || loginForm.email || '';
-    const informedEmail = window.prompt('Digite seu email para avisarmos quando chegar em estoque:', fallbackEmail);
-    if (!informedEmail) return;
+    setNotifyMeModal({ open: true, product, email: fallbackEmail, loading: false });
+  }
 
-    const request = {
-      productId: product.id,
-      productName: product.nome,
-      email: informedEmail.trim(),
-      tenant: storefrontRef || tenantRef,
-      createdAt: new Date().toISOString(),
-    };
-
-    setNotifyRequests((prev) => {
-      const exists = prev.some(
-        (item) => item.productId === request.productId && String(item.email || '').toLowerCase() === request.email.toLowerCase()
-      );
-      if (exists) return prev;
-      return [...prev, request];
-    });
-
-    setSuccess('Aviso registrado. Quando chegar estoque, você será notificado por email.');
+  async function submitNotifyMe(e) {
+    e.preventDefault();
+    const { product, email } = notifyMeModal;
+    if (!email.trim() || !product) return;
+    setNotifyMeModal((prev) => ({ ...prev, loading: true }));
+    const tenantParam = tenantContext?.id || storefrontRef || tenantRef;
+    try {
+      await ecommerceApi.post('/api/ecommerce-notify/registrar', {
+        email: email.trim(),
+        product_id: product.id,
+        product_name: product.nome,
+        tenant_id: tenantParam,
+      });
+      setNotifyMeModal({ open: false, product: null, email: '', loading: false });
+      setSuccess('Perfeito! Te avisaremos por e-mail quando o produto voltar ao estoque. 📧');
+      setNotifyRequests((prev) => {
+        const exists = prev.some(
+          (item) => item.productId === product.id && String(item.email || '').toLowerCase() === email.trim().toLowerCase()
+        );
+        if (exists) return prev;
+        return [...prev, { productId: product.id, productName: product.nome, email: email.trim(), createdAt: new Date().toISOString() }];
+      });
+    } catch {
+      setNotifyMeModal((prev) => ({ ...prev, loading: false }));
+      setError('Não foi possível registrar o aviso. Tente novamente.');
+    }
   }
 
   async function addToCart(product) {
@@ -2100,6 +2110,53 @@ export default function EcommerceMVP() {
             </div>
           )}
         </>
+      )}
+      {/* ── Modal Avise-me ── */}
+      {notifyMeModal.open && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 400, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>🔔 Avise-me quando chegar</h3>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>
+              <strong>{notifyMeModal.product?.nome}</strong> está sem estoque no momento.
+              Digite seu email e avisaremos quando voltar.
+            </p>
+            <form onSubmit={submitNotifyMe} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <input
+                type="email"
+                required
+                placeholder="seu@email.com"
+                value={notifyMeModal.email}
+                autoFocus
+                onChange={(e) => setNotifyMeModal((prev) => ({ ...prev, email: e.target.value }))}
+                style={{ padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: '1.5px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={notifyMeModal.loading}
+                  style={{ flex: 2, padding: '10px 0', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: notifyMeModal.loading ? 0.7 : 1 }}
+                >
+                  {notifyMeModal.loading ? 'Registrando…' : 'Me avise!'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
