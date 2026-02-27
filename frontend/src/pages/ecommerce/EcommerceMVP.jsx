@@ -440,6 +440,15 @@ export default function EcommerceMVP() {
     return 'Loja online';
   }, [tenantContext?.name, storefrontRef]);
 
+  // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const buscaParam = params.get('busca');
+    if (buscaParam) {
+      setSearch(buscaParam);
+    }
+  }, [location.search]);
+
   useEffect(() => {
     // Sem slug = acesso pelo painel (usuario logado) → carrega via API autenticada
     loadTenantContext();
