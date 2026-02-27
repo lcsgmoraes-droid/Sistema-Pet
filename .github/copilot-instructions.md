@@ -10,6 +10,19 @@ Antes de agir, leia e siga obrigatoriamente:
 - `docs/FLUXO_UNICO_DEV_PROD.md`
 - `README.md` (secao de fluxo unico)
 
+## REGRA ABSOLUTA — NUNCA SUBIR PARA PRODUCAO SEM AUTORIZACAO EXPLICITA
+
+**Antes de qualquer `git push origin main` ou qualquer comando SSH no servidor de producao (mlprohub.com.br / 192.241.150.121), o assistente DEVE:**
+
+1. Parar o que esta fazendo
+2. Perguntar em portugues simples: "Posso subir para producao agora? O que vai subir: [lista]"
+3. Aguardar o Lucas dizer "sim" ou "pode subir"
+4. SÓ ENTAO executar o deploy
+
+**Esta regra nao tem excecoes. Nem urgencia, nem simplicidade da mudanca justificam pular esta etapa.**
+
+---
+
 ## Regra principal
 
 Nunca sair do fluxo unico DEV -> PROD.

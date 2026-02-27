@@ -22,13 +22,14 @@ def get_resumo(
     _, tenant_id = current_user_and_tenant
     tid = str(tenant_id)
 
-    # Pedidos finalizados do e-commerce (não são carrinho, só origens do canal digital)
-    ORIGENS_ECOMMERCE = ("web", "app", "marketplace")
+    # Pedidos finalizados do e-commerce (somente pagos/aprovados — exclui criado, cancelado, expirado, carrinho)
+    ORIGENS_ECOMMERCE = ("web", "app", "marketplace", "ecommerce")
+    STATUS_PAGOS = ("aprovado", "finalizado", "pago")
     pedidos_validos = (
         db.query(Pedido)
         .filter(
             Pedido.tenant_id == tid,
-            Pedido.status != "carrinho",
+            Pedido.status.in_(STATUS_PAGOS),
             Pedido.origem.in_(ORIGENS_ECOMMERCE),
         )
         .all()
@@ -71,7 +72,7 @@ def get_resumo(
     # Pedidos por status (apenas e-commerce)
     status_counts = (
         db.query(Pedido.status, func.count(Pedido.id))
-        .filter(Pedido.tenant_id == tid, Pedido.origem.in_(ORIGENS_ECOMMERCE))
+        .filter(Pedido.tenant_id == tid, Pedido.origem.in_(("web", "app", "marketplace", "ecommerce")))
         .group_by(Pedido.status)
         .all()
     )
@@ -161,8 +162,8 @@ def get_mais_vendidos(
         .filter(
             PedidoItem.tenant_id == tid,
             Pedido.tenant_id == tid,
-            Pedido.status != "carrinho",
-            Pedido.origem.in_(("web", "app", "marketplace")),
+            Pedido.status.in_(("aprovado", "finalizado", "pago")),
+            Pedido.origem.in_(("web", "app", "marketplace", "ecommerce")),
         )
         .group_by(PedidoItem.produto_id)
         .order_by(func.sum(PedidoItem.quantidade).desc())
@@ -195,8 +196,8 @@ def get_pedidos_recentes(
         db.query(Pedido)
         .filter(
             Pedido.tenant_id == tid,
-            Pedido.status != "carrinho",
-            Pedido.origem.in_(("web", "app", "marketplace")),
+            Pedido.status.in_(("aprovado", "finalizado", "pago")),
+            Pedido.origem.in_(("web", "app", "marketplace", "ecommerce")),
         )
         .order_by(Pedido.created_at.desc())
         .limit(30)
