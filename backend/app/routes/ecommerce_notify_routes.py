@@ -135,7 +135,7 @@ def notificar_clientes_estoque_disponivel(
     # Buscar SKU do produto para incluir na URL (link direto filtrado)
     from app.produtos_models import Produto
     produto_obj = db.query(Produto).filter(Produto.id == product_id).first()
-    sku_param = produto_obj.sku or produto_obj.codigo if produto_obj else None
+    sku_param = produto_obj.codigo if produto_obj else None
     if sku_param:
         store_url = f"{base_url}/{store_ref}?busca={sku_param}"
     else:
