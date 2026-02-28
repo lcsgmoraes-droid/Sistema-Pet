@@ -88,6 +88,48 @@ def _get_active_tenant(db: Session, tenant_ref: tuple[str, str]) -> Tenant:
     return tenant
 
 
+@router.get("/tenant-slug/{slug}")
+def buscar_tenant_por_slug(
+    slug: str,
+    db: Session = Depends(get_session),
+):
+    """
+    Descobre um tenant pelo slug.
+    Usado pelo app mobile para vincular o app a uma loja.
+    Retorna informações básicas da loja (nome, logo).
+    """
+    slug_norm = _normalize_slug(slug)
+    if not slug_norm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Slug inválido. Use apenas letras minúsculas, números e hífens.",
+        )
+
+    tenant = db.query(Tenant).filter(
+        func.lower(Tenant.ecommerce_slug) == slug_norm
+    ).first()
+
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Loja não encontrada. Verifique o código e tente novamente.",
+        )
+    if str(tenant.status or "").lower() != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta loja não está ativa no momento.",
+        )
+
+    return {
+        "id": str(tenant.id),
+        "slug": tenant.ecommerce_slug,
+        "nome": tenant.name,
+        "logo_url": tenant.logo_url,
+        "cidade": tenant.cidade,
+        "uf": tenant.uf,
+    }
+
+
 @router.get("/tenant-context")
 def tenant_context(
     tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),

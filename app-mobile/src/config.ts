@@ -12,9 +12,6 @@ const IS_DEV = __DEV__;
 
 export const API_BASE_URL = IS_DEV ? DEV_API_URL : PROD_API_URL;
 
-// Tenant ID fixo do pet shop
-export const TENANT_ID = process.env.EXPO_PUBLIC_TENANT_ID || '180d9cbf-5dcb-4676-bf11-dcbd91ed444b';
-
 export const PONTOS = {
   // A cada R$1 gasto = X pontos
   PONTOS_POR_REAL: 1,

@@ -1,6 +1,16 @@
 import api from './api';
 import { Produto, Pedido } from '../types';
-import { API_BASE_URL, TENANT_ID } from '../config';
+import { API_BASE_URL } from '../config';
+import * as SecureStore from 'expo-secure-store';
+
+/** Retorna o tenant_id salvo, ou string vazia se não vinculado */
+async function getTenantId(): Promise<string> {
+  try {
+    const raw = await SecureStore.getItemAsync('tenant_info');
+    if (raw) return JSON.parse(raw)?.id ?? '';
+  } catch (_) {}
+  return '';
+}
 
 // Resolve URL de mídia: se relativa, usa a base da API
 function resolveMediaUrl(url: string | null | undefined): string | null {
@@ -19,11 +29,12 @@ export async function registrarAviseme(
   product_id: number,
   product_name: string,
 ): Promise<{ ok: boolean; message: string }> {
+  const tenant_id = await getTenantId();
   const { data } = await api.post('/ecommerce-notify/registrar', {
     email,
     product_id,
     product_name,
-    tenant_id: TENANT_ID,
+    tenant_id,
   });
   return data;
 }
