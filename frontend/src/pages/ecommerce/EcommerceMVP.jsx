@@ -308,6 +308,14 @@ export default function EcommerceMVP() {
 
   const [view, setView] = useState('loja');
 
+  // Detecta mobile (< 768px)
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   // Rastreia no Google Analytics sempre que o cliente muda de tela
   useEffect(() => {
     trackPageView(view);
@@ -1317,7 +1325,7 @@ export default function EcommerceMVP() {
           </div>
 
           {/* Search (desktop) */}
-          <div style={{ flex: 1, maxWidth: 440, display: 'flex' }} className="eco-search-wrap">
+          <div style={{ flex: 1, maxWidth: 440, display: isMobile ? 'none' : 'flex' }} className="eco-search-wrap">
             <div style={{ position: 'relative', width: '100%' }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input
@@ -1342,15 +1350,15 @@ export default function EcommerceMVP() {
                 {customerDisplayName.split(' ')[0]}
               </button>
             ) : (
-              <button onClick={() => setView('conta')} style={{ ...S.loginBtn, gap: 6 }}>
+              <button onClick={() => setView('conta')} style={{ ...S.loginBtn, gap: 6, padding: isMobile ? '7px 10px' : '7px 16px' }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Entrar
+                {!isMobile && 'Entrar'}
               </button>
             )}
             {/* Carrinho */}
-            <button onClick={() => setView('carrinho')} style={S.cartBtn}>
+            <button onClick={() => setView('carrinho')} style={{ ...S.cartBtn, padding: isMobile ? '0 12px' : '0 18px' }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-              Carrinho{cart?.itens?.length > 0 ? ` (${cart.itens.length})` : ''}
+              {isMobile ? (cart?.itens?.length > 0 ? `(${cart.itens.length})` : '') : `Carrinho${cart?.itens?.length > 0 ? ` (${cart.itens.length})` : ''}`}
             </button>
           </div>
         </div>
@@ -1359,7 +1367,7 @@ export default function EcommerceMVP() {
       {/* BANNER (só na aba loja) */}
       {view === 'loja' && (
         <div style={{ padding: '16px 20px 0', boxSizing: 'border-box' }}>
-          <div style={{ ...S.bannerWrap, borderRadius: 16, maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ ...S.bannerWrap, borderRadius: isMobile ? 12 : 16, maxWidth: 1280, margin: '0 auto', height: isMobile ? 180 : 260 }}>
             {activeBanners.map((b, i) => (
               <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
                 {b.type === 'image' ? (
@@ -1388,7 +1396,7 @@ export default function EcommerceMVP() {
       )}
 
       {/* BARRA APP */}
-      {view === 'loja' && (
+      {view === 'loja' && !isMobile && (
         <div style={S.appBar}>
           <div style={S.appBarInner}>
             <span style={{ background: '#16a34a', borderRadius: 8, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1400,7 +1408,7 @@ export default function EcommerceMVP() {
       )}
 
       {/* NAV TABS */}
-      <div style={S.navWrap}>
+      <div style={{ ...S.navWrap, overflowX: isMobile ? 'auto' : 'visible' }}>
         <div style={S.navInner}>
           {[
             { id: 'loja', label: 'Loja', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
@@ -1437,17 +1445,17 @@ export default function EcommerceMVP() {
       {view === 'loja' && (
         <>
           {/* Cabeçalho catálogo — fora do grid para não afetar alinhamento da sidebar */}
-          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px 0' }}>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '16px 12px 0' : '24px 20px 0' }}>
+            <h2 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
             <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
           </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '16px 20px 28px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
           {/* PRODUTOS */}
           <div>
 
             {/* Buscas e filtro */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
               <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input
@@ -1483,7 +1491,7 @@ export default function EcommerceMVP() {
             )}
 
             {/* Grid */}
-            <div style={S.grid}>
+            <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
               {filteredProducts.map((product) => {
                 const stock = resolveProductStock(product);
                 const outOfStock = isProductOutOfStock(product);
@@ -1562,7 +1570,7 @@ export default function EcommerceMVP() {
           </div>
 
           {/* SIDEBAR CARRINHO */}
-          <aside style={S.sidebar}>
+          <aside style={{ ...S.sidebar, display: isMobile ? 'none' : 'block' }}>
             <div style={S.sidebarTitle}>
               <span>🛒 Seu carrinho</span>
               {cart?.itens?.length > 0 && <span style={S.sidebarBadge}>{cart.itens.length}</span>}
@@ -1619,7 +1627,7 @@ export default function EcommerceMVP() {
           onClick={() => closeProductModal()}
         >
           <div
-            style={{ background: '#fff', width: 'min(960px, 100%)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 18, border: '1px solid #e5e7eb', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 0 }}
+            style={{ background: '#fff', width: 'min(960px, 100%)', maxHeight: isMobile ? '100dvh' : '90vh', overflowY: 'auto', borderRadius: isMobile ? 0 : 18, border: '1px solid #e5e7eb', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Galeria */}
