@@ -1,0 +1,37 @@
+name: 📱 App Mobile - EAS Build (Android APK)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app-mobile/**'
+
+jobs:
+  build:
+    name: 🔨 Build APK Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app-mobile/package-lock.json
+
+      - name: 📦 Instalar dependências
+        working-directory: app-mobile
+        run: npm install
+
+      - name: 🔧 Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🚀 Build APK (preview)
+        working-directory: app-mobile
+        run: eas build --platform android --profile preview --non-interactive
