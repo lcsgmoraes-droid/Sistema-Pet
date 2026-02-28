@@ -5,16 +5,25 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+      }
     }
   },
   "submit": {
