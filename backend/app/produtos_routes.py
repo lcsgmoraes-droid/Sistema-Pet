@@ -2988,6 +2988,7 @@ async def upload_imagem_produto(
         
         # Criar registro no banco
         nova_imagem = ProdutoImagem(
+            tenant_id=tenant_id,
             produto_id=produto_id,
             url=f"/uploads/produtos/{produto_id}/{filename}",
             ordem=max_ordem + 1,
