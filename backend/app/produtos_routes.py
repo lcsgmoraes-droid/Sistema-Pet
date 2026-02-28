@@ -475,12 +475,27 @@ class ProdutoResponse(ProdutoBase):
     @field_validator('imagem_principal', mode='before')
     @classmethod
     def set_imagem_principal(cls, v, info) -> Optional[str]:
-        # Se jÃ¡ tem valor, retornar
+        # Se já tem valor, retornar
         if v:
             return v
-        
-        # Tentar pegar das imagens (se disponÃ­vel no contexto)
-        return None
+
+        # Tentar pegar das imagens (se disponível no contexto)
+        imagens = info.data.get('imagens', []) or []
+        if not imagens:
+            return None
+
+        # Primeiro: buscar a marcada como principal
+        for img in imagens:
+            e_principal = getattr(img, 'e_principal', None) if hasattr(img, 'e_principal') else (img.get('e_principal') if isinstance(img, dict) else None)
+            if e_principal:
+                url = getattr(img, 'url', None) if hasattr(img, 'url') else (img.get('url') if isinstance(img, dict) else None)
+                if url:
+                    return url
+
+        # Fallback: retornar a primeira imagem
+        img = imagens[0]
+        url = getattr(img, 'url', None) if hasattr(img, 'url') else (img.get('url') if isinstance(img, dict) else None)
+        return url
 
 
 # Schema de resposta paginada (Sprint 1)
@@ -2998,8 +3013,13 @@ async def upload_imagem_produto(
         db.add(nova_imagem)
         db.commit()
         db.refresh(nova_imagem)
-        
-        logger.info(f"[UPLOAD] âœ… Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
+
+        # Se é a imagem principal, atualizar também o campo imagem_principal do produto
+        if e_principal:
+            produto.imagem_principal = nova_imagem.url
+            db.commit()
+
+        logger.info(f"[UPLOAD] ✅ Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
         
         return nova_imagem
         
