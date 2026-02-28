@@ -33,7 +33,9 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "VIBRATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -60,6 +62,11 @@
       "expo-asset",
       "expo-font"
     ],
-    "extra": {}
+    "extra": {
+      "eas": {
+        "projectId": "158693e8-177c-4be6-8e2f-143d0d8260dd"
+      }
+    },
+    "owner": "petshop"
   }
 }
