@@ -19,7 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('users', sa.Column('push_token', sa.String(500), nullable=True))
+    # Usa IF NOT EXISTS para ser idempotente (coluna pode já existir)
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS push_token VARCHAR(500)")
 
 
 def downgrade() -> None:

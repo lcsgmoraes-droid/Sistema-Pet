@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     libpq-dev \
     curl \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Criar usuário não-root para segurança
@@ -41,8 +42,12 @@ COPY --chown=appuser:appuser . .
 RUN mkdir -p /app/uploads /app/data && \
     chown -R appuser:appuser /app
 
-# Mudar para usuário não-root
-USER appuser
+# Copiar e configurar entrypoint (roda como root, dropa para appuser)
+COPY --chown=root:root entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Manter como root para o entrypoint poder fazer chown nos volumes montados
+# O entrypoint fará exec gosu appuser para dropar privilégios
 
 # Expor porta 8000 (FastAPI/Uvicorn)
 EXPOSE 8000
@@ -51,7 +56,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Comando para rodar a aplicação
-# SEM --reload em produção (performance)
+# Entrypoint corrige permissões e dropa para appuser
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

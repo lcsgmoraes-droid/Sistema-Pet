@@ -187,7 +187,6 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/:tenantId" element={<EcommerceMVP />} />
           <Route path="/ecommerce" element={<EcommerceMVP />} />
-          <Route path="/ecommerce/:tenantId" element={<EcommerceMVP />} />
           
           {/* Rotas Protegidas */}
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>

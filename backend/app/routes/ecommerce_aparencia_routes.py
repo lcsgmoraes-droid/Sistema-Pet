@@ -2,6 +2,7 @@
 Rotas de Aparência do E-commerce por lojista.
 Permite upload de logo e até 3 banners rotativos para a loja virtual.
 """
+import logging
 import re
 import shutil
 import uuid
@@ -10,6 +11,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
@@ -38,10 +41,10 @@ TIPOS_VALIDOS = {"logo", "banner_1", "banner_2", "banner_3"}
 # ─── Schemas ───────────────────────────────────────────────────────────────
 
 class AparenciaResponse(BaseModel):
-    logo_url: str | None
-    banner_1_url: str | None
-    banner_2_url: str | None
-    banner_3_url: str | None
+    logo_url: str | None = None
+    banner_1_url: str | None = None
+    banner_2_url: str | None = None
+    banner_3_url: str | None = None
 
 
 class AparenciaUrlUpdate(BaseModel):
@@ -152,13 +155,29 @@ async def upload_imagem_aparencia(
 
     # Remove imagem antiga do mesmo tipo se existir
     for old in tenant_dir.glob(f"{tipo}.*"):
-        old.unlink(missing_ok=True)
+        try:
+            old.unlink(missing_ok=True)
+        except (PermissionError, OSError):
+            # Arquivo com ownership errado (volume mount no Docker/Windows)
+            # Tentamos corrigir a permissão e deletar novamente
+            try:
+                import os as _os
+                _os.chmod(old, 0o666)
+                old.unlink(missing_ok=True)
+            except (PermissionError, OSError):
+                pass  # Se ainda falhar, open("wb") vai sobrescrever o conteúdo
 
     filename = f"{tipo}.{ext}"
     file_path = tenant_dir / filename
 
-    with file_path.open("wb") as buf:
-        shutil.copyfileobj(file.file, buf)
+    try:
+        with file_path.open("wb") as buf:
+            shutil.copyfileobj(file.file, buf)
+    except PermissionError:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro de permissão no servidor ao salvar o arquivo. Execute: docker exec -u root petshop-dev-backend chown -R 999:999 /app/uploads"
+        )
 
     url = f"/uploads/ecommerce/{tenant_id}/{filename}"
 
@@ -269,12 +288,20 @@ def remover_imagem_aparencia(
     campo = f"{tipo}_url"
     url_atual = getattr(tenant, campo, None)
     if url_atual and url_atual.startswith("/uploads/"):
-        file_path = Path(url_atual.lstrip("/"))
-        file_path.unlink(missing_ok=True)
+        try:
+            file_path = Path(url_atual.lstrip("/"))
+            file_path.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning("Não foi possível remover arquivo físico '%s': %s", url_atual, exc)
 
-    setattr(tenant, campo, None)
-    db.commit()
-    db.refresh(tenant)
+    try:
+        setattr(tenant, campo, None)
+        db.commit()
+        db.refresh(tenant)
+    except Exception as exc:
+        db.rollback()
+        logger.error("Erro ao remover campo '%s' do tenant %s: %s", campo, tenant_id, exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro interno ao remover imagem: {exc}")
 
     return AparenciaResponse(
         logo_url=tenant.logo_url,

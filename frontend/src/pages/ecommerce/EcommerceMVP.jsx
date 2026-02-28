@@ -1202,30 +1202,33 @@ export default function EcommerceMVP() {
   const S = {
     page: { minHeight: '100vh', background: '#faf7f4', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" },
     /* Topbar */
-    topbar: { background: 'linear-gradient(90deg,#f97316 0%,#fb923c 100%)', color: '#fff', padding: '8px 20px', fontSize: 13, fontWeight: 500 },
+    topbar: { background: 'linear-gradient(90deg,#f97316 0%,#fb923c 100%)', color: '#fff', padding: '6px 20px', fontSize: 11, fontWeight: 500, position: 'sticky', top: 0, zIndex: 50 },
     topbarInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-    header: { background: '#fff', borderBottom: '1px solid #e7e5e4', padding: '12px 20px', position: 'sticky', top: 0, zIndex: 40, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
+    header: { background: '#fff', borderBottom: '1px solid #e7e5e4', padding: '12px 20px', position: 'sticky', top: 32, zIndex: 40, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
     headerInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
     logo: { fontSize: 20, fontWeight: 800, color: '#1c1917', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' },
     cityChip: { fontSize: 11, color: '#a8a29e', borderLeft: '1px solid #e7e5e4', paddingLeft: 12, fontWeight: 400 },
     headerActions: { display: 'flex', gap: 10, alignItems: 'center' },
     avatarBtn: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 24, padding: '7px 14px', fontSize: 13, fontWeight: 600, color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
     loginBtn: { background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 24, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
-    cartBtn: { background: '#f97316', color: '#fff', border: 'none', borderRadius: 12, width: 42, height: 42, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 },
+    cartBtn: { background: '#f97316', color: '#fff', border: 'none', borderRadius: 12, height: 42, padding: '0 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, position: 'relative', flexShrink: 0, fontWeight: 700, fontSize: 14 },
+    headerWishBtn: { background: 'transparent', border: 'none', color: '#78716c', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 38, height: 38, borderRadius: '50%', transition: 'color 0.15s' },
     cartBadge: { position: 'absolute', top: -5, right: -5, background: '#10b981', color: '#fff', borderRadius: 20, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' },
     /* Floating cart bar */
     floatBar: { position: 'sticky', top: 0, zIndex: 45, background: '#ea580c', color: '#fff', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
     /* Nav tabs */
-    navWrap: { background: '#fff', borderBottom: '1px solid #e7e5e4' },
+    navWrap: { background: 'transparent', borderBottom: '1px solid #e7e5e4' },
     navInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', padding: '0 20px' },
     navTab: (active) => ({ flex: '0 0 auto', background: 'transparent', border: 'none', borderBottom: active ? '2px solid #f97316' : '2px solid transparent', color: active ? '#f97316' : '#78716c', padding: '13px 18px', fontWeight: active ? 700 : 500, fontSize: 14, cursor: 'pointer', transition: 'all 0.15s', marginBottom: -1 }),
     /* Banner */
-    bannerWrap: { position: 'relative', overflow: 'hidden', height: 320, background: '#1c1917' },
+    bannerWrap: { position: 'relative', overflow: 'hidden', height: 260, background: '#1c1917' },
+    appBar: { padding: '8px 20px 0' },
+    appBarInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: '#166534', background: '#dcfce7', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 16px' },
     bannerDots: { position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 },
     bannerDot: (active) => ({ width: active ? 26 : 9, height: 9, background: active ? '#fff' : 'rgba(255,255,255,0.4)', borderRadius: 5, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }),
     /* Alert messages */
-    alertError: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '12px 20px' },
-    alertSuccess: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '12px 20px' },
+    alertError: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '10px 0' },
+    alertSuccess: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '10px 0' },
     /* Main layout */
     main: { maxWidth: 1280, margin: '0 auto', padding: '24px 20px' },
     /* Product grid */
@@ -1287,11 +1290,11 @@ export default function EcommerceMVP() {
       {/* TOPBAR */}
       <div style={S.topbar}>
         <div style={S.topbarInner}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-            <span style={{ fontWeight: 600 }}>{cart?.itens?.length > 0 ? `${cart.itens.length} item(ns) no carrinho` : 'Carrinho vazio'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <span>{cart?.itens?.length > 0 ? `${cart.itens.length} item(ns) no carrinho` : 'Carrinho vazio'}</span>
           </div>
-          <span style={{ fontWeight: 600 }}>{cart?.itens?.length > 0 ? `${formatCurrency(cartTotal)} →` : 'Frete grátis acima de R$ 199'}</span>
+          <span>{cart?.itens?.length > 0 ? `${formatCurrency(cartTotal)} →` : 'Frete grátis acima de R$ 199'}</span>
         </div>
       </div>
 
@@ -1300,19 +1303,17 @@ export default function EcommerceMVP() {
         <div style={S.headerInner}>
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            {tenantContext?.logo_url ? (
-              <img src={resolveMediaUrl(tenantContext.logo_url)} alt={storeDisplayName} style={{ height: 44, maxWidth: 160, objectFit: 'contain' }} />
-            ) : (
-              <div style={S.logo} onClick={() => setView('loja')}>
-                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 18.5C8 19.9 7 21 5.5 21S3 19.9 3 18.5 4 16 5.5 16 8 17.1 8 18.5z"/><path d="M21 16.5c0 1.4-1 2.5-2.5 2.5S16 17.9 16 16.5 17 14 18.5 14 21 15.1 21 16.5z"/><path d="M5.5 7C5.5 5.6 6.5 4.5 8 4.5S10.5 5.6 10.5 7 9.5 9.5 8 9.5 5.5 8.4 5.5 7z"/><path d="M13.5 7c0-1.4 1-2.5 2.5-2.5S18.5 5.6 18.5 7 17.5 9.5 16 9.5 13.5 8.4 13.5 7z"/><path d="M12 20c-4 0-6-3-6-6 0-2.5 2-5 6-5s6 2.5 6 5c0 3-2 6-6 6z"/></svg>
-                {storeDisplayName}
+            <div style={S.logo} onClick={() => setView('loja')}>
+              <span style={{ fontSize: 42, lineHeight: 1, flexShrink: 0 }}>🐾</span>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#1c1917', lineHeight: 1.1 }}>{storeDisplayName}</div>
+                {(tenantContext?.cidade || tenantContext?.uf) && (
+                  <div style={{ fontSize: 11, color: '#a8a29e', fontWeight: 400, marginTop: 1 }}>
+                    📍 {tenantContext?.cidade || ''}{tenantContext?.uf ? ` - ${tenantContext.uf}` : ''}
+                  </div>
+                )}
               </div>
-            )}
-            {(tenantContext?.cidade || tenantContext?.uf) && (
-              <span style={S.cityChip}>
-                📍 {tenantContext?.cidade || ''}{tenantContext?.uf ? ` - ${tenantContext.uf}` : ''}
-              </span>
-            )}
+            </div>
           </div>
 
           {/* Search (desktop) */}
@@ -1330,50 +1331,92 @@ export default function EcommerceMVP() {
 
           {/* Actions */}
           <div style={S.headerActions}>
+            {/* Wishlist */}
+            <button onClick={() => setView('conta')} style={S.headerWishBtn} title={`Lista de desejos${wishlist.length > 0 ? ` (${wishlist.length})` : ''}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill={wishlist.length > 0 ? '#f97316' : 'none'} stroke={wishlist.length > 0 ? '#f97316' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </button>
+            {/* Login/Conta */}
             {customerDisplayName ? (
               <button onClick={() => setView('conta')} style={S.avatarBtn}>
                 <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
                 {customerDisplayName.split(' ')[0]}
               </button>
             ) : (
-              <button onClick={() => setView('conta')} style={S.loginBtn}>
+              <button onClick={() => setView('conta')} style={{ ...S.loginBtn, gap: 6 }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                 Entrar
               </button>
             )}
+            {/* Carrinho */}
             <button onClick={() => setView('carrinho')} style={S.cartBtn}>
-              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-              {cart?.itens?.length > 0 && (
-                <span style={S.cartBadge}>{cart.itens.length}</span>
-              )}
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+              Carrinho{cart?.itens?.length > 0 ? ` (${cart.itens.length})` : ''}
             </button>
           </div>
         </div>
       </div>
 
+      {/* BANNER (só na aba loja) */}
+      {view === 'loja' && (
+        <div style={{ padding: '16px 20px 0', boxSizing: 'border-box' }}>
+          <div style={{ ...S.bannerWrap, borderRadius: 16, maxWidth: 1280, margin: '0 auto' }}>
+            {activeBanners.map((b, i) => (
+              <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
+                {b.type === 'image' ? (
+                  <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
+                    <span style={{ fontSize: 72, flexShrink: 0, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>{b.emoji}</span>
+                    <div>
+                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 34, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>{b.title}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16, marginTop: 8 }}>{b.sub}</div>
+                      <button onClick={() => setView('loja')} style={{ marginTop: 16, background: '#fff', color: '#f97316', border: 'none', borderRadius: 24, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                        Ver produtos →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={S.bannerDots}>
+              {activeBanners.map((_, i) => (
+                <button key={i} onClick={() => setBannerSlide(i)} style={S.bannerDot(bannerSlide === i)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BARRA APP */}
+      {view === 'loja' && (
+        <div style={S.appBar}>
+          <div style={S.appBarInner}>
+            <span style={{ background: '#16a34a', borderRadius: 8, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </span>
+            Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.
+          </div>
+        </div>
+      )}
+
       {/* NAV TABS */}
       <div style={S.navWrap}>
         <div style={S.navInner}>
           {[
-            ['loja', '🏪 Loja'],
-            ['carrinho', `🛒 Carrinho${cart?.itens?.length ? ` (${cart.itens.length})` : ''}`],
-            ['pedidos', '📦 Pedidos'],
-            ['conta', '👤 Conta'],
-          ].map(([tabId, label]) => (
-            <button key={tabId} onClick={() => setView(tabId)} style={S.navTab(view === tabId)}>
+            { id: 'loja', label: 'Loja', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
+            { id: 'carrinho', label: cart?.itens?.length ? `Carrinho (${cart.itens.length})` : 'Carrinho', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> },
+            { id: 'pedidos', label: 'Pedidos', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> },
+            { id: 'conta', label: 'Conta', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+          ].map(({ id, label, icon }) => (
+            <button key={id} onClick={() => setView(id)} style={{ ...S.navTab(view === id), display: 'flex', alignItems: 'center', gap: 5 }}>
+              {icon}
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* BARRA FLUTUANTE CARRINHO */}
-      {cart?.itens?.length > 0 && view !== 'carrinho' && (
-        <div onClick={() => setView('carrinho')} style={S.floatBar}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>🛒 {cart.itens.length} item(ns) no carrinho</span>
-          <span style={{ fontWeight: 800, fontSize: 13 }}>{formatCurrency(cartTotal)} → Ver carrinho</span>
-        </div>
-      )}
+
 
       {!tenantRef && (
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '10px 20px', fontSize: 13, borderBottom: '1px solid #fecaca' }}>
@@ -1382,49 +1425,26 @@ export default function EcommerceMVP() {
       )}
 
       {/* ALERTAS */}
-      {error && <div style={S.alertError}>⚠️ {error}</div>}
-      {success && <div style={S.alertSuccess}>✓ {success}</div>}
-
-      {/* BANNER (só na aba loja) */}
-      {view === 'loja' && (
-        <div style={S.bannerWrap}>
-          {activeBanners.map((b, i) => (
-            <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
-              {b.type === 'image' ? (
-                <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-              ) : (
-                <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
-                  <span style={{ fontSize: 72, flexShrink: 0, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>{b.emoji}</span>
-                  <div>
-                    <div style={{ color: '#fff', fontWeight: 800, fontSize: 34, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>{b.title}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16, marginTop: 8 }}>{b.sub}</div>
-                    <button onClick={() => setView('loja')} style={{ marginTop: 16, background: '#fff', color: '#f97316', border: 'none', borderRadius: 24, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                      Ver produtos →
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          <div style={S.bannerDots}>
-            {activeBanners.map((_, i) => (
-              <button key={i} onClick={() => setBannerSlide(i)} style={S.bannerDot(bannerSlide === i)} />
-            ))}
+      {(error || success) && (
+        <div style={{ padding: '0 20px' }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+            {error && <div style={S.alertError}>⚠️ {error}</div>}
+            {success && <div style={S.alertSuccess}>✓ {success}</div>}
           </div>
         </div>
       )}
 
       {view === 'loja' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '28px 20px' }}>
+        <>
+          {/* Cabeçalho catálogo — fora do grid para não afetar alinhamento da sidebar */}
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px 0' }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
+            <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
+          </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '16px 20px 28px' }}>
           {/* PRODUTOS */}
           <div>
-            {/* Cabeçalho catalogo */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div>
-                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
-                <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
-              </div>
-            </div>
 
             {/* Buscas e filtro */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -1439,7 +1459,7 @@ export default function EcommerceMVP() {
               </div>
               <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ ...S.formInput, width: 'auto', paddingRight: 30 }}>
                 {categorias.map((item) => (
-                  <option key={item} value={item}>{item === 'todas' ? '🐾 Todas as categorias' : item}</option>
+                  <option key={item} value={item}>{item === 'todas' ? 'Todas as categorias' : item}</option>
                 ))}
               </select>
               <button onClick={loadProducts} disabled={loading} style={{ padding: '10px 16px', border: '1.5px solid #e7e5e4', borderRadius: 9, fontSize: 13, fontWeight: 600, background: '#fff', color: '#f97316', cursor: 'pointer' }}>
@@ -1449,14 +1469,14 @@ export default function EcommerceMVP() {
 
             {/* Chips de categorias */}
             {categorias.length > 2 && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, justifyContent: 'space-between' }}>
                 {categorias.map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setCategoria(cat)}
-                    style={{ padding: '6px 14px', borderRadius: 20, border: categoria === cat ? '1.5px solid #f97316' : '1.5px solid #e7e5e4', background: categoria === cat ? '#fff7ed' : '#fff', color: categoria === cat ? '#ea580c' : '#78716c', fontWeight: categoria === cat ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}
+                    style={{ flex: '1 1 auto', textAlign: 'center', padding: '6px 14px', borderRadius: 20, border: categoria === cat ? '1.5px solid #f97316' : '1.5px solid #e7e5e4', background: categoria === cat ? '#fff7ed' : '#fff', color: categoria === cat ? '#ea580c' : '#78716c', fontWeight: categoria === cat ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}
                   >
-                    {cat === 'todas' ? '🐾 Todas' : cat}
+                    {cat === 'todas' ? 'Todas' : cat}
                   </button>
                 ))}
               </div>
@@ -1492,7 +1512,12 @@ export default function EcommerceMVP() {
                           <span>Sem imagem</span>
                         </div>
                       )}
-                      {outOfStock && <div style={S.unavailBadge}>Indisponível</div>}
+                      {outOfStock
+                        ? <div style={S.unavailBadge}>Indisponível</div>
+                        : Number.isFinite(stock) && stock > 0 && stock < 9999
+                          ? <div style={{ position: 'absolute', top: 8, left: 8, background: '#dcfce7', color: '#166534', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>Estoque {stock}</div>
+                          : null
+                      }
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
                         title={wished ? 'Remover da lista de desejos' : 'Adicionar à lista de desejos'}
@@ -1505,9 +1530,6 @@ export default function EcommerceMVP() {
                       <div style={S.cardName}>{product.nome}</div>
                       <div style={S.cardCat}>{product?.categoria_nome || product?.categoria || 'Sem categoria'}</div>
                       <div style={S.cardSku}>SKU: {product?.codigo || '-'}</div>
-                      <div style={S.cardStock(outOfStock)}>
-                        {outOfStock ? '⚠️ Volto em breve' : Number.isFinite(stock) ? `✓ Em estoque: ${stock}` : '✓ Em estoque'}
-                      </div>
                       <div style={S.cardPrice}>{formatCurrency(resolveProductPrice(product))}</div>
 
                       <button
@@ -1586,6 +1608,7 @@ export default function EcommerceMVP() {
             )}
           </aside>
         </div>
+        </>
       )}
 
       {selectedProduct && (
