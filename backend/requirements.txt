@@ -28,9 +28,6 @@ slowapi==0.1.9
 httpx==0.26.0
 requests==2.31.0
 
-# Google Analytics Data API
-google-analytics-data==0.18.14
-
 # IA e Machine Learning
 openai==1.12.0
 

@@ -149,9 +149,13 @@ def listar_produtos_publicos(
                 "promocao_ativa": produto.promocao_ativa,
                 "categoria_id": produto.categoria_id,
                 "categoria_nome": getattr(produto.categoria, "nome", None),
+                "marca_nome": getattr(produto.marca, "nome", None) if hasattr(produto, "marca") else None,
                 "estoque_ecommerce": produto.estoque_ecommerce,
                 "estoque_atual": produto.estoque_atual,
                 "imagem_principal": produto.imagem_principal,
+                "peso_embalagem": produto.peso_embalagem,
+                "classificacao_racao": produto.classificacao_racao,
+                "categoria_racao": produto.categoria_racao,
             }
             for produto in itens
         ]

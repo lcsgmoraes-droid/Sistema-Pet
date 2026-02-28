@@ -145,6 +145,7 @@ from app.routes.ecommerce_auth import router as ecommerce_auth_router
 from app.routes.ecommerce_public import router as ecommerce_public_router
 from app.routes.ecommerce_cart import router as ecommerce_cart_router
 from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
+from app.routes.app_mobile_routes import router as app_mobile_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
@@ -547,6 +548,7 @@ app.include_router(ecommerce_aparencia_router)
 app.include_router(ecommerce_config_router)
 app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router)
+app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)

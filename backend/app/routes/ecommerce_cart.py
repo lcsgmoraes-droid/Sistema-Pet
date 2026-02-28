@@ -29,6 +29,7 @@ class CarrinhoAdicionarRequest(BaseModel):
 
 
 class CarrinhoAtualizarRequest(BaseModel):
+    produto_id: int
     quantidade: int = Field(ge=1)
 
 
@@ -268,9 +269,8 @@ def adicionar_item_carrinho(
     return _serialize_carrinho(db, carrinho)
 
 
-@router.put("/atualizar/{item_id}")
+@router.put("/atualizar")
 def atualizar_item_carrinho(
-    item_id: int,
     payload: CarrinhoAtualizarRequest,
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
@@ -282,7 +282,7 @@ def atualizar_item_carrinho(
     item = (
         db.query(PedidoItem)
         .filter(
-            PedidoItem.id == item_id,
+            PedidoItem.produto_id == payload.produto_id,
             PedidoItem.pedido_id == carrinho.pedido_id,
             PedidoItem.tenant_id == identity.tenant_id,
         )
@@ -297,7 +297,7 @@ def atualizar_item_carrinho(
         .filter(
             Produto.id == item.produto_id,
             Produto.tenant_id == identity.tenant_id,
-            Produto.situacao.is_(True),
+            Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
         )
         .first()
     )
@@ -328,9 +328,36 @@ def atualizar_item_carrinho(
     return _serialize_carrinho(db, carrinho)
 
 
-@router.delete("/remover/{item_id}")
+@router.delete("/limpar")
+def limpar_carrinho(
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Remove todos os itens do carrinho ativo."""
+    _expirar_reservas_automaticamente(db, identity.tenant_id)
+
+    carrinho = (
+        db.query(Pedido)
+        .filter(
+            Pedido.cliente_id == identity.user_id,
+            Pedido.tenant_id == identity.tenant_id,
+            Pedido.status == "carrinho",
+        )
+        .order_by(Pedido.id.desc())
+        .first()
+    )
+
+    if carrinho:
+        db.query(PedidoItem).filter(PedidoItem.pedido_id == carrinho.pedido_id).delete()
+        carrinho.total = 0.0
+        db.commit()
+
+    return {"pedido_id": carrinho.pedido_id if carrinho else None, "itens": [], "subtotal": 0.0, "total": 0.0}
+
+
+@router.delete("/remover/{produto_id}")
 def remover_item_carrinho(
-    item_id: int,
+    produto_id: int,
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
@@ -341,7 +368,7 @@ def remover_item_carrinho(
     item = (
         db.query(PedidoItem)
         .filter(
-            PedidoItem.id == item_id,
+            PedidoItem.produto_id == produto_id,
             PedidoItem.pedido_id == carrinho.pedido_id,
             PedidoItem.tenant_id == identity.tenant_id,
         )

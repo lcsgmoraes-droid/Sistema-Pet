@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "PetShop App",
+    "slug": "petshop-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "updates": {
+      "enabled": false
+    },
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2563EB"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.petshoppro.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Usado para escanear código de barras dos produtos.",
+        "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563EB"
+      },
+      "package": "com.petshoppro.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permite escanear códigos de barras dos produtos."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2563EB",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-secure-store"
+      ],
+      "expo-asset",
+      "expo-font"
+    ],
+    "extra": {}
+  }
+}

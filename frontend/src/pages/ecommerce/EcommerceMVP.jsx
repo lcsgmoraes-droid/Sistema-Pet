@@ -270,7 +270,7 @@ function extractApiErrorMessage(err, fallback) {
 
 const BANNERS = [
   {
-    bg: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 60%, #4338ca 100%)',
+    bg: 'linear-gradient(135deg, #f97316 0%, #ea580c 60%, #c2410c 100%)',
     title: 'Compre e receba no mesmo dia!',
     sub: 'Pedidos realizados até as 16h',
     emoji: '🚀',
@@ -290,6 +290,18 @@ const BANNERS = [
 ];
 
 export default function EcommerceMVP() {
+  // Inject Plus Jakarta Sans font (matches design system)
+  useEffect(() => {
+    const id = 'plus-jakarta-sans-font';
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
+      document.head.appendChild(link);
+    }
+  }, []);
+
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
@@ -354,6 +366,10 @@ export default function EcommerceMVP() {
   const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
   const [checkoutResumo, setCheckoutResumo] = useState(null);
   const [checkoutResult, setCheckoutResult] = useState(null);
+  const [pagamentoTipo, setPagamentoTipo] = useState(''); // 'dinheiro'|'pix'|'debito'|'credito'
+  const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
+  const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
+  const [pagamentoTroco, setPagamentoTroco] = useState('');
   const [activeProductImage, setActiveProductImage] = useState('');
 
   const [orderIds, setOrderIds] = useState(() => {
@@ -1013,6 +1029,8 @@ export default function EcommerceMVP() {
     }
   }
 
+
+
   async function finalizarCheckout() {
     if (!customerToken) {
       setError('Faça login para finalizar o pedido.');
@@ -1053,6 +1071,13 @@ export default function EcommerceMVP() {
           endereco_entrega: enderecoFormatado || null,
           cupom: cupomResult?.codigo || null,
           tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
+          forma_pagamento_nome: (() => {
+            if (pagamentoTipo === 'dinheiro') return pagamentoTroco ? `Dinheiro (troco p/ R$ ${pagamentoTroco})` : 'Dinheiro';
+            if (pagamentoTipo === 'pix') return 'PIX';
+            if (pagamentoTipo === 'debito') return `Débito ${pagamentoBandeira}`;
+            if (pagamentoTipo === 'credito') return `Crédito ${pagamentoBandeira} ${pagamentoParcelas}x`;
+            return null;
+          })(),
         },
         {
           headers: {
@@ -1173,344 +1198,352 @@ export default function EcommerceMVP() {
     if (found) openProductDetails(found);
   }, [products.length, location.search]);
 
-  return (
-    <div className="page">
+  /* ─────────────── ESTILOS INTERNOS ─────────────── */
+  const S = {
+    page: { minHeight: '100vh', background: '#faf7f4', fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif" },
+    /* Topbar */
+    topbar: { background: 'linear-gradient(90deg,#f97316 0%,#fb923c 100%)', color: '#fff', padding: '8px 20px', fontSize: 13, fontWeight: 500 },
+    topbarInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    header: { background: '#fff', borderBottom: '1px solid #e7e5e4', padding: '12px 20px', position: 'sticky', top: 0, zIndex: 40, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
+    headerInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
+    logo: { fontSize: 20, fontWeight: 800, color: '#1c1917', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' },
+    cityChip: { fontSize: 11, color: '#a8a29e', borderLeft: '1px solid #e7e5e4', paddingLeft: 12, fontWeight: 400 },
+    headerActions: { display: 'flex', gap: 10, alignItems: 'center' },
+    avatarBtn: { background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 24, padding: '7px 14px', fontSize: 13, fontWeight: 600, color: '#ea580c', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' },
+    loginBtn: { background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 24, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
+    cartBtn: { background: '#f97316', color: '#fff', border: 'none', borderRadius: 12, width: 42, height: 42, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', flexShrink: 0 },
+    cartBadge: { position: 'absolute', top: -5, right: -5, background: '#10b981', color: '#fff', borderRadius: 20, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' },
+    /* Floating cart bar */
+    floatBar: { position: 'sticky', top: 0, zIndex: 45, background: '#ea580c', color: '#fff', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' },
+    /* Nav tabs */
+    navWrap: { background: '#fff', borderBottom: '1px solid #e7e5e4' },
+    navInner: { maxWidth: 1280, margin: '0 auto', display: 'flex', padding: '0 20px' },
+    navTab: (active) => ({ flex: '0 0 auto', background: 'transparent', border: 'none', borderBottom: active ? '2px solid #f97316' : '2px solid transparent', color: active ? '#f97316' : '#78716c', padding: '13px 18px', fontWeight: active ? 700 : 500, fontSize: 14, cursor: 'pointer', transition: 'all 0.15s', marginBottom: -1 }),
+    /* Banner */
+    bannerWrap: { position: 'relative', overflow: 'hidden', height: 320, background: '#1c1917' },
+    bannerDots: { position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 },
+    bannerDot: (active) => ({ width: active ? 26 : 9, height: 9, background: active ? '#fff' : 'rgba(255,255,255,0.4)', borderRadius: 5, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }),
+    /* Alert messages */
+    alertError: { background: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '12px 20px' },
+    alertSuccess: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', fontSize: 13, margin: '12px 20px' },
+    /* Main layout */
+    main: { maxWidth: 1280, margin: '0 auto', padding: '24px 20px' },
+    /* Product grid */
+    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 },
+    /* Card */
+    card: (hovered) => ({ border: '1px solid #e7e5e4', borderRadius: 14, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'all 0.2s', boxShadow: hovered ? '0 10px 32px rgba(249,115,22,0.15)' : '0 1px 4px rgba(0,0,0,0.05)', transform: hovered ? 'translateY(-5px)' : 'none' }),
+    cardImgWrap: { aspectRatio: '1/1', background: '#f5f5f4', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+    cardBody: { padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 },
+    cardName: { fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: '#1c1917', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+    cardCat: { fontSize: 11, color: '#a8a29e', fontWeight: 500 },
+    cardSku: { fontSize: 10, color: '#d6d3d1', letterSpacing: 0.3 },
+    cardStock: (out) => ({ fontSize: 11, fontWeight: 600, color: out ? '#d97706' : '#059669' }),
+    cardPrice: { fontSize: 19, fontWeight: 800, color: '#1c1917', letterSpacing: -0.5, marginTop: 'auto', paddingTop: 6 },
+    addBtn: (out) => ({ background: out ? '#f5f5f4' : 'linear-gradient(135deg,#f97316,#fb923c)', border: 'none', color: out ? '#a8a29e' : '#fff', borderRadius: 9, padding: '10px 0', fontWeight: 700, fontSize: 13, cursor: out ? 'not-allowed' : 'pointer', width: '100%', marginTop: 6, transition: 'opacity 0.15s', boxShadow: out ? 'none' : '0 2px 8px rgba(249,115,22,0.3)' }),
+    notifyBtn: { background: '#fff', border: '1.5px solid #f59e0b', color: '#b45309', borderRadius: 9, padding: '8px 0', fontWeight: 600, fontSize: 12, cursor: 'pointer', width: '100%', marginTop: 6 },
+    wishBtn: { position: 'absolute', top: 8, right: 8, background: '#fff', border: 'none', borderRadius: '50%', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.12)', fontSize: 14 },
+    unavailBadge: { position: 'absolute', top: 8, left: 8, background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700 },
+    /* Sidebar */
+    sidebar: { background: '#fff', borderRadius: 16, border: '1px solid #e7e5e4', padding: 20, alignSelf: 'start', position: 'sticky', top: 80, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' },
+    sidebarTitle: { margin: '0 0 14px', fontSize: 15, fontWeight: 700, color: '#1c1917', display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+    sidebarBadge: { background: '#f97316', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 11, fontWeight: 700 },
+    miniItem: { display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid #f5f5f4', paddingBottom: 8, marginBottom: 4 },
+    miniImg: { width: 42, height: 42, borderRadius: 8, background: '#f5f5f4', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e7e5e4' },
+    subtotalBox: { background: '#fff7ed', borderRadius: 10, padding: '10px 12px', marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #fed7aa' },
+    checkoutBig: { background: 'linear-gradient(135deg,#f97316,#fb923c)', border: 'none', color: '#fff', borderRadius: 10, padding: '12px 0', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%', marginTop: 8, boxShadow: '0 4px 14px rgba(249,115,22,0.35)' },
+    viewCartBtn: { background: 'transparent', border: '2px solid #f97316', color: '#f97316', borderRadius: 10, padding: '10px 0', fontWeight: 700, fontSize: 13, cursor: 'pointer', width: '100%', marginTop: 6 },
+    /* Cart page */
+    cartItem: { border: '1px solid #e7e5e4', borderRadius: 14, padding: '14px', display: 'flex', gap: 14, alignItems: 'center', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
+    cartItemImg: { width: 80, height: 80, borderRadius: 10, background: '#f5f5f4', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e7e5e4' },
+    qtyBtn: { background: '#f5f5f4', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    removeBtn: { background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: '4px 8px' },
+    cartTotalRow: { border: '1px solid #e7e5e4', borderRadius: 12, padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' },
+    /* Checkout form */
+    formCard: { background: '#fff', borderRadius: 14, border: '1px solid #e7e5e4', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
+    formLabel: { fontSize: 12, fontWeight: 600, color: '#78716c', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'block' },
+    formInput: { width: '100%', padding: '10px 12px', border: '1.5px solid #e7e5e4', borderRadius: 9, fontSize: 14, background: '#faf7f4', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.15s' },
+    radioLabel: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e7e5e4', background: '#faf7f4', fontWeight: 500 },
+    radioLabelActive: { display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14, padding: '10px 14px', borderRadius: 10, border: '1.5px solid #f97316', background: '#fff7ed', fontWeight: 600, color: '#ea580c' },
+    payBtn: (active) => ({ padding: '10px 16px', borderRadius: 10, border: active ? '2px solid #f97316' : '2px solid #e7e5e4', background: active ? '#fff7ed' : '#fff', color: active ? '#ea580c' : '#374151', fontWeight: active ? 700 : 500, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }),
+    resumoBox: { background: '#fff', border: '1px solid #e7e5e4', borderRadius: 12, padding: '14px 16px', display: 'grid', gap: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
+    finalizarBtn: (disabled) => ({ background: disabled ? '#e5e7eb' : 'linear-gradient(135deg,#f97316,#fb923c)', border: 'none', color: disabled ? '#9ca3af' : '#fff', borderRadius: 12, padding: '14px 0', fontWeight: 700, fontSize: 16, cursor: disabled ? 'not-allowed' : 'pointer', width: '100%', boxShadow: disabled ? 'none' : '0 4px 14px rgba(249,115,22,0.35)' }),
+    /* Orders */
+    orderCard: { border: '1px solid #e7e5e4', borderRadius: 14, padding: '16px 20px', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', display: 'grid', gap: 10 },
+    statusBadge: (status) => {
+      const map = { confirmado: { bg: '#dcfce7', color: '#166534' }, pendente: { bg: '#fef9c3', color: '#854d0e' }, cancelado: { bg: '#fee2e2', color: '#991b1b' } };
+      const s = map[String(status).toLowerCase()] || { bg: '#f5f5f4', color: '#555' };
+      return { background: s.bg, color: s.color, borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 };
+    },
+    rewardBox: { background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 12, textAlign: 'center' },
+    /* Account */
+    accountCard: { background: '#fff', borderRadius: 14, border: '1px solid #e7e5e4', padding: '20px 24px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
+    saveBtn: { background: 'linear-gradient(135deg,#f97316,#fb923c)', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, padding: '11px 24px', cursor: 'pointer', fontSize: 14 },
+    /* Footer */
+    footer: { background: '#1c1917', color: '#a8a29e', padding: '32px 20px', marginTop: 40 },
+  };
 
-      {/* BARRA DE CARRINHO FLUTUANTE */}
-      {cart?.itens?.length > 0 && (
-        <div
-          onClick={() => setView('carrinho')}
-          style={{ position: 'sticky', top: 0, zIndex: 50, background: '#6366f1', color: '#fff', padding: '10px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: 0, marginBottom: 0, cursor: 'pointer', boxShadow: '0 2px 12px rgba(99,102,241,0.35)' }}
-        >
-          <span style={{ fontWeight: 600, fontSize: 14 }}>🛒 {cart.itens.length} item(ns) no carrinho</span>
-          <span style={{ fontWeight: 800, fontSize: 14 }}>{formatCurrency(cartTotal)} →</span>
+  return (
+    <div style={S.page}>
+      {/* TOPBAR */}
+      <div style={S.topbar}>
+        <div style={S.topbarInner}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <span style={{ fontWeight: 600 }}>{cart?.itens?.length > 0 ? `${cart.itens.length} item(ns) no carrinho` : 'Carrinho vazio'}</span>
+          </div>
+          <span style={{ fontWeight: 600 }}>{cart?.itens?.length > 0 ? `${formatCurrency(cartTotal)} →` : 'Frete grátis acima de R$ 199'}</span>
         </div>
-      )}
+      </div>
 
       {/* HEADER */}
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 0,
-          padding: '14px 24px',
-          marginBottom: 0,
-          borderBottom: '1px solid #e5e7eb',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, maxWidth: 1280, margin: '0 auto' }}>
+      <div style={S.header}>
+        <div style={S.headerInner}>
+          {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {tenantContext?.logo_url ? (
-              <img
-                src={resolveMediaUrl(tenantContext.logo_url)}
-                alt={storeDisplayName}
-                style={{ height: 48, maxWidth: 180, objectFit: 'contain' }}
-              />
+              <img src={resolveMediaUrl(tenantContext.logo_url)} alt={storeDisplayName} style={{ height: 44, maxWidth: 160, objectFit: 'contain' }} />
             ) : (
-              <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.1, color: '#1a1a2e', fontWeight: 800, letterSpacing: -0.5 }}>{storeDisplayName}</h1>
-            )}
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500, borderLeft: '1px solid #e5e7eb', paddingLeft: 14 }}>
-              {tenantContext?.cidade || ''}{tenantContext?.uf ? ` • ${tenantContext.uf}` : ''}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {customerDisplayName ? (
-              <div style={{ fontSize: 13, color: '#374151', background: '#f9fafb', borderRadius: 24, padding: '7px 16px', border: '1px solid #e5e7eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
-                {customerDisplayName.split(' ')[0]}
+              <div style={S.logo} onClick={() => setView('loja')}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 18.5C8 19.9 7 21 5.5 21S3 19.9 3 18.5 4 16 5.5 16 8 17.1 8 18.5z"/><path d="M21 16.5c0 1.4-1 2.5-2.5 2.5S16 17.9 16 16.5 17 14 18.5 14 21 15.1 21 16.5z"/><path d="M5.5 7C5.5 5.6 6.5 4.5 8 4.5S10.5 5.6 10.5 7 9.5 9.5 8 9.5 5.5 8.4 5.5 7z"/><path d="M13.5 7c0-1.4 1-2.5 2.5-2.5S18.5 5.6 18.5 7 17.5 9.5 16 9.5 13.5 8.4 13.5 7z"/><path d="M12 20c-4 0-6-3-6-6 0-2.5 2-5 6-5s6 2.5 6 5c0 3-2 6-6 6z"/></svg>
+                {storeDisplayName}
               </div>
+            )}
+            {(tenantContext?.cidade || tenantContext?.uf) && (
+              <span style={S.cityChip}>
+                📍 {tenantContext?.cidade || ''}{tenantContext?.uf ? ` - ${tenantContext.uf}` : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Search (desktop) */}
+          <div style={{ flex: 1, maxWidth: 440, display: 'flex' }} className="eco-search-wrap">
+            <div style={{ position: 'relative', width: '100%' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar produtos para o seu pet..."
+                style={{ ...S.formInput, paddingLeft: 36, borderRadius: 24, fontSize: 13 }}
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={S.headerActions}>
+            {customerDisplayName ? (
+              <button onClick={() => setView('conta')} style={S.avatarBtn}>
+                <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
+                {customerDisplayName.split(' ')[0]}
+              </button>
             ) : (
-              <button onClick={() => setView('conta')} style={{ background: '#fff', border: '1px solid #d1d5db', color: '#374151', borderRadius: 24, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                Entrar / Cadastrar
+              <button onClick={() => setView('conta')} style={S.loginBtn}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Entrar
               </button>
             )}
-            <button
-              onClick={() => setView('carrinho')}
-              style={{ background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: 12, width: 44, height: 44, cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', transition: 'background 0.15s', flexShrink: 0 }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            <button onClick={() => setView('carrinho')} style={S.cartBtn}>
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
               {cart?.itens?.length > 0 && (
-                <span style={{ position: 'absolute', top: -4, right: -4, background: '#ef4444', color: '#fff', borderRadius: 50, minWidth: 18, height: 18, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff', padding: '0 3px' }}>
-                  {cart.itens.length}
-                </span>
+                <span style={S.cartBadge}>{cart.itens.length}</span>
               )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* BANNER ROTATIVO */}
-      <div style={{ position: 'relative', overflow: 'hidden', marginBottom: 0, height: 340, background: '#1a1a2e' }}>
-        {activeBanners.map((b, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute', inset: 0,
-              opacity: bannerSlide === i ? 1 : 0,
-              transition: 'opacity 0.8s ease',
-              pointerEvents: bannerSlide === i ? 'auto' : 'none',
-            }}
-          >
-            {b.type === 'image' ? (
-              <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-            ) : (
-              <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
-                <span style={{ fontSize: 64, flexShrink: 0, filter: 'drop-shadow(0 2px 8px rgba(0,0,0,0.2))' }}>{b.emoji}</span>
-                <div>
-                  <div style={{ color: '#fff', fontWeight: 800, fontSize: 32, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.3)', letterSpacing: -0.5 }}>{b.title}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.92)', fontSize: 16, marginTop: 8, fontWeight: 400 }}>{b.sub}</div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-
-        <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
-          {activeBanners.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setBannerSlide(i)}
-              style={{ width: bannerSlide === i ? 28 : 10, height: 10, background: bannerSlide === i ? '#fff' : 'rgba(255,255,255,0.45)', borderRadius: 5, border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s ease', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
-            />
+      {/* NAV TABS */}
+      <div style={S.navWrap}>
+        <div style={S.navInner}>
+          {[
+            ['loja', '🏪 Loja'],
+            ['carrinho', `🛒 Carrinho${cart?.itens?.length ? ` (${cart.itens.length})` : ''}`],
+            ['pedidos', '📦 Pedidos'],
+            ['conta', '👤 Conta'],
+          ].map(([tabId, label]) => (
+            <button key={tabId} onClick={() => setView(tabId)} style={S.navTab(view === tabId)}>
+              {label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* BANNER APP */}
-      <div style={{ marginBottom: 0, background: '#1a1a2e', color: '#fff', padding: '10px 24px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        <span style={{ fontSize: 16 }}>📱</span>
-        <span style={{ fontWeight: 400 }}>Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.</span>
-      </div>
+      {/* BARRA FLUTUANTE CARRINHO */}
+      {cart?.itens?.length > 0 && view !== 'carrinho' && (
+        <div onClick={() => setView('carrinho')} style={S.floatBar}>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>🛒 {cart.itens.length} item(ns) no carrinho</span>
+          <span style={{ fontWeight: 800, fontSize: 13 }}>{formatCurrency(cartTotal)} → Ver carrinho</span>
+        </div>
+      )}
 
       {!tenantRef && (
-        <div style={{ marginBottom: 12, color: '#b00020' }}>
-          Use a URL no formato: /slug-da-loja
+        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '10px 20px', fontSize: 13, borderBottom: '1px solid #fecaca' }}>
+          ⚠️ Use a URL no formato: /slug-da-loja
         </div>
       )}
 
-      {/* NAVEGAÇÃO */}
-      <div style={{ display: 'flex', gap: 0, background: '#fff', borderRadius: 0, overflow: 'hidden', marginBottom: 0, padding: '0 24px', borderBottom: '2px solid #f1f5f9', maxWidth: 1280, margin: '0 auto' }}>
-        {[
-          ['loja', '🏪 Loja'],
-          ['carrinho', `🛒 Carrinho${cart?.itens?.length ? ` (${cart.itens.length})` : ''}`],
-          ['pedidos', '📦 Pedidos'],
-          ['conta', '👤 Conta'],
-        ].map(([tabId, label]) => {
-          const active = view === tabId;
-          return (
-            <button
-              key={tabId}
-              onClick={() => setView(tabId)}
-              style={{
-                flex: 1,
-                maxWidth: 200,
-                background: 'transparent',
-                color: active ? '#1a1a2e' : '#6b7280',
-                padding: '14px 8px 12px',
-                fontWeight: active ? 700 : 500,
-                cursor: 'pointer',
-                fontSize: 14,
-                borderRadius: 0,
-                boxShadow: 'none',
-                transition: 'all 0.15s ease',
-                border: 'none',
-                borderBottom: active ? '3px solid #6366f1' : '3px solid transparent',
-                letterSpacing: -0.2,
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
+      {/* ALERTAS */}
+      {error && <div style={S.alertError}>⚠️ {error}</div>}
+      {success && <div style={S.alertSuccess}>✓ {success}</div>}
 
-      {error && (
-        <div style={{ background: '#ffe8e8', color: '#8c0000', padding: 10, borderRadius: 6, marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div style={{ background: '#e8fff0', color: '#0a7d32', padding: 10, borderRadius: 6, marginBottom: 12 }}>
-          {success}
+      {/* BANNER (só na aba loja) */}
+      {view === 'loja' && (
+        <div style={S.bannerWrap}>
+          {activeBanners.map((b, i) => (
+            <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
+              {b.type === 'image' ? (
+                <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              ) : (
+                <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
+                  <span style={{ fontSize: 72, flexShrink: 0, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>{b.emoji}</span>
+                  <div>
+                    <div style={{ color: '#fff', fontWeight: 800, fontSize: 34, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>{b.title}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16, marginTop: 8 }}>{b.sub}</div>
+                    <button onClick={() => setView('loja')} style={{ marginTop: 16, background: '#fff', color: '#f97316', border: 'none', borderRadius: 24, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                      Ver produtos →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={S.bannerDots}>
+            {activeBanners.map((_, i) => (
+              <button key={i} onClick={() => setBannerSlide(i)} style={S.bannerDot(bannerSlide === i)} />
+            ))}
+          </div>
         </div>
       )}
 
       {view === 'loja' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '24px 24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: '28px 20px' }}>
+          {/* PRODUTOS */}
           <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div>
-              <h3 style={{ margin: 0, color: '#1a1a2e', fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>Catálogo da loja</h3>
-              <div style={{ color: '#9ca3af', fontSize: 13, marginTop: 4 }}>Selecione produtos, confira detalhes e adicione ao carrinho.</div>
+            {/* Cabeçalho catalogo */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
+                <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
+              </div>
             </div>
-          </div>
 
+            {/* Buscas e filtro */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 240, position: 'relative' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="O que seu pet precisa?"
-                  style={{ width: '100%', padding: '11px 12px 11px 38px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, background: '#f9fafb', transition: 'border-color 0.15s', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ ...S.formInput, paddingLeft: 36 }}
                 />
               </div>
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ padding: '11px 14px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 14, background: '#f9fafb', color: '#374151' }}>
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ ...S.formInput, width: 'auto', paddingRight: 30 }}>
                 {categorias.map((item) => (
-                  <option key={item} value={item}>{item}</option>
+                  <option key={item} value={item}>{item === 'todas' ? '🐾 Todas as categorias' : item}</option>
                 ))}
               </select>
-              <button onClick={loadProducts} disabled={loading} style={{ padding: '11px 18px', border: '1px solid #e5e7eb', borderRadius: 10, fontSize: 13, fontWeight: 600, background: '#fff', color: '#374151', cursor: 'pointer' }}>
-                {loading ? 'Carregando...' : 'Atualizar'}
+              <button onClick={loadProducts} disabled={loading} style={{ padding: '10px 16px', border: '1.5px solid #e7e5e4', borderRadius: 9, fontSize: 13, fontWeight: 600, background: '#fff', color: '#f97316', cursor: 'pointer' }}>
+                {loading ? '...' : '↺ Atualizar'}
               </button>
             </div>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                gap: 16,
-              }}
-            >
+            {/* Chips de categorias */}
+            {categorias.length > 2 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+                {categorias.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategoria(cat)}
+                    style={{ padding: '6px 14px', borderRadius: 20, border: categoria === cat ? '1.5px solid #f97316' : '1.5px solid #e7e5e4', background: categoria === cat ? '#fff7ed' : '#fff', color: categoria === cat ? '#ea580c' : '#78716c', fontWeight: categoria === cat ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}
+                  >
+                    {cat === 'todas' ? '🐾 Todas' : cat}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Grid */}
+            <div style={S.grid}>
               {filteredProducts.map((product) => {
                 const stock = resolveProductStock(product);
                 const outOfStock = isProductOutOfStock(product);
                 const wished = wishlist.includes(product.id);
                 const productImage = getProductImages(product)[0];
+                const isHovered = hoveredCard === product.id;
 
                 return (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  key={product.id}
-                  onClick={() => openProductDetails(product)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      openProductDetails(product);
-                    }
-                  }}
-                  onMouseEnter={() => setHoveredCard(product.id)}
-                  onMouseLeave={() => setHoveredCard(null)}
-                  style={{
-                    border: '1px solid #f1f5f9',
-                    borderRadius: 12,
-                    padding: 0,
-                    background: '#fff',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    transition: 'all 0.2s ease',
-                    boxShadow: hoveredCard === product.id ? '0 8px 30px rgba(0,0,0,0.1)' : '0 1px 3px rgba(0,0,0,0.04)',
-                    transform: hoveredCard === product.id ? 'translateY(-4px)' : 'none',
-                    overflow: 'hidden',
-                  }}
-                >
                   <div
-                    style={{
-                      borderRadius: 0,
-                      background: '#fafafa',
-                      aspectRatio: '1 / 1',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}
+                    role="button"
+                    tabIndex={0}
+                    key={product.id}
+                    onClick={() => openProductDetails(product)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProductDetails(product); } }}
+                    onMouseEnter={() => setHoveredCard(product.id)}
+                    onMouseLeave={() => setHoveredCard(null)}
+                    style={S.card(isHovered)}
                   >
-                    {productImage ? (
-                      <img
-                        src={productImage}
-                        alt={product.nome}
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 16, background: '#fff' }}
-                      />
-                    ) : (
-                      <div style={{ color: '#cbd5e1', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                        Sem imagem
-                      </div>
-                    )}
-                    {outOfStock && (
-                      <div style={{ position: 'absolute', top: 8, left: 8, background: '#fef3c7', color: '#92400e', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>Indisponível</div>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
-                      title={wished ? 'Remover da lista de desejos' : 'Salvar na lista de desejos'}
-                      style={{ position: 'absolute', top: 8, right: 8, background: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.12)', fontSize: 16 }}
-                    >{wished ? '❤️' : '🤍'}</button>
-                  </div>
-
-                  <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35, color: '#1a1a2e', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{product.nome}</div>
-                    <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500 }}>
-                      {product?.categoria_nome || product?.categoria || 'Sem categoria'}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                      SKU: {product?.codigo || '-'}
-                    </div>
-                    <div style={{ fontSize: 11, color: outOfStock ? '#d97706' : '#10b981', fontWeight: 500, marginTop: 2 }}>
-                      {outOfStock ? 'Volto em breve' : Number.isFinite(stock) ? `Estoque disponível: ${stock}` : 'Estoque disponível'}
-                    </div>
-
-                    <div style={{ marginTop: 'auto', paddingTop: 8 }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e', letterSpacing: -0.5 }}>{formatCurrency(resolveProductPrice(product))}</div>
-                    </div>
-
-                    <button
-                      disabled={outOfStock}
-                      style={{
-                        background: outOfStock ? '#f3f4f6' : '#6366f1',
-                        border: 'none',
-                        color: outOfStock ? '#9ca3af' : '#fff',
-                        borderRadius: 8,
-                        padding: '10px 0',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        cursor: outOfStock ? 'not-allowed' : 'pointer',
-                        width: '100%',
-                        marginTop: 6,
-                        transition: 'background 0.15s',
-                        letterSpacing: -0.2,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToCart(product);
-                      }}
-                    >
-                      {outOfStock ? 'Indisponível' : '+ Adicionar'}
-                    </button>
-                    {outOfStock && (
+                    {/* Imagem */}
+                    <div style={S.cardImgWrap}>
+                      {productImage ? (
+                        <img src={productImage} alt={product.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12, background: '#fff' }} />
+                      ) : (
+                        <div style={{ color: '#d1d5db', fontSize: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                          <span>Sem imagem</span>
+                        </div>
+                      )}
+                      {outOfStock && <div style={S.unavailBadge}>Indisponível</div>}
                       <button
-                        onClick={(e) => { e.stopPropagation(); registerNotifyMe(product); }}
-                        style={{ background: 'transparent', border: '1px solid #d97706', color: '#d97706', borderRadius: 8, padding: '7px 0', fontWeight: 600, fontSize: 12, cursor: 'pointer', width: '100%', marginTop: 6 }}
-                      >
-                        📧 Avise-me quando chegar
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );})}
+                        onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
+                        title={wished ? 'Remover da lista de desejos' : 'Adicionar à lista de desejos'}
+                        style={S.wishBtn}
+                      >{wished ? '❤️' : '🤍'}</button>
+                    </div>
 
+                    {/* Info */}
+                    <div style={S.cardBody}>
+                      <div style={S.cardName}>{product.nome}</div>
+                      <div style={S.cardCat}>{product?.categoria_nome || product?.categoria || 'Sem categoria'}</div>
+                      <div style={S.cardSku}>SKU: {product?.codigo || '-'}</div>
+                      <div style={S.cardStock(outOfStock)}>
+                        {outOfStock ? '⚠️ Volto em breve' : Number.isFinite(stock) ? `✓ Em estoque: ${stock}` : '✓ Em estoque'}
+                      </div>
+                      <div style={S.cardPrice}>{formatCurrency(resolveProductPrice(product))}</div>
+
+                      <button
+                        disabled={outOfStock}
+                        style={S.addBtn(outOfStock)}
+                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
+                      >
+                        {outOfStock ? 'Indisponível' : '🛒 Adicionar'}
+                      </button>
+                      {outOfStock && (
+                        <button onClick={(e) => { e.stopPropagation(); registerNotifyMe(product); }} style={S.notifyBtn}>
+                          🔔 Avise-me quando chegar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
               {!loading && filteredProducts.length === 0 && (
-                <div style={{ color: '#666', padding: 12, display: 'grid', gap: 10 }}>
-                  <div>Nenhum produto encontrado para o filtro atual.</div>
+                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
+                  <button onClick={() => { setSearch(''); setCategoria('todas'); }} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
+                    Limpar filtros
+                  </button>
                 </div>
               )}
             </div>
-
           </div>
 
-          <aside style={{ background: '#fff', padding: 20, borderRadius: 16, border: '1px solid #f1f5f9', alignSelf: 'start', position: 'sticky', top: 8, boxShadow: '0 2px 16px rgba(0,0,0,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 15, color: '#1a1a2e', fontWeight: 700 }}>🛒 Seu carrinho</h3>
-              {cart?.itens?.length > 0 && (
-                <span style={{ background: '#6366f1', color: '#fff', borderRadius: 20, padding: '2px 9px', fontSize: 12, fontWeight: 700 }}>
-                  {cart.itens.length}
-                </span>
-              )}
+          {/* SIDEBAR CARRINHO */}
+          <aside style={S.sidebar}>
+            <div style={S.sidebarTitle}>
+              <span>🛒 Seu carrinho</span>
+              {cart?.itens?.length > 0 && <span style={S.sidebarBadge}>{cart.itens.length}</span>}
             </div>
             {cart?.itens?.length ? (
               <div style={{ display: 'grid', gap: 8 }}>
@@ -1518,40 +1551,37 @@ export default function EcommerceMVP() {
                   const prod = productMap[item.produto_id];
                   const img = prod ? getProductImages(prod)[0] : null;
                   return (
-                    <div key={item.item_id} style={{ display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid #f1f5f9', paddingBottom: 8, marginBottom: 2 }}>
-                      <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f8fafc', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
-                        {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} /> : <span style={{ fontSize: 18 }}>📦</span>}
+                    <div key={item.item_id} style={S.miniItem}>
+                      <div style={S.miniImg}>
+                        {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} /> : <span style={{ fontSize: 16 }}>📦</span>}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.nome}</div>
-                        <div style={{ fontSize: 11, color: '#64748b' }}>{item.quantidade}× {formatCurrency(item.preco_unitario)}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>{item.nome}</div>
+                        <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>{item.quantidade}× {formatCurrency(item.preco_unitario)}</div>
                       </div>
                     </div>
                   );
                 })}
                 {cart.itens.length > 5 && (
-                  <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>+ {cart.itens.length - 5} item(ns) a mais</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>+ {cart.itens.length - 5} item(ns) a mais</div>
                 )}
-                <div style={{ background: '#f5f3ff', borderRadius: 10, padding: '10px 12px', marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600, fontSize: 14, color: '#4b5563' }}>Subtotal</span>
+                <div style={S.subtotalBox}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: '#374151' }}>Subtotal</span>
                   <span style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e' }}>{formatCurrency(cartTotal)}</span>
                 </div>
-                <button
-                  className="btn-primary"
-                  onClick={handleCheckoutFromLoja}
-                  style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '12px 0', fontWeight: 700, fontSize: 14, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}
-                >
-                  Finalizar compra
+                <button style={S.checkoutBig} onClick={handleCheckoutFromLoja}>
+                  Finalizar compra →
                 </button>
-                <button className="btn-secondary" onClick={() => setView('carrinho')} style={{ borderRadius: 10, width: '100%', background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', fontWeight: 700, fontSize: 14, padding: '11px 0', cursor: 'pointer', transition: 'all 0.15s' }}>Ver / Editar carrinho</button>
+                <button style={S.viewCartBtn} onClick={() => setView('carrinho')}>Ver / Editar carrinho</button>
                 {!customerToken && (
-                  <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>Login solicitado só no fechamento</div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>🔒 Login solicitado apenas no fechamento</div>
                 )}
               </div>
             ) : (
-              <div style={{ color: '#94a3b8', textAlign: 'center', padding: '20px 0', fontSize: 13 }}>
-                <div style={{ fontSize: 30, marginBottom: 6 }}>🛒</div>
-                Seu carrinho está vazio.
+              <div style={{ color: '#c4c4d4', textAlign: 'center', padding: '28px 0', fontSize: 13 }}>
+                <div style={{ fontSize: 34, marginBottom: 8 }}>🛒</div>
+                <div style={{ fontWeight: 600, color: '#9ca3af' }}>Carrinho vazio</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>Adicione produtos para começar</div>
               </div>
             )}
           </aside>
@@ -1562,631 +1592,555 @@ export default function EcommerceMVP() {
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-            zIndex: 60,
-          }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 60 }}
           onClick={() => closeProductModal()}
         >
           <div
-            style={{
-              background: '#fff',
-              width: 'min(980px, 100%)',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              borderRadius: 14,
-              border: '1px solid #e5e7eb',
-              padding: 16,
-              display: 'grid',
-              gridTemplateColumns: '1.1fr 1fr',
-              gap: 16,
-            }}
+            style={{ background: '#fff', width: 'min(960px, 100%)', maxHeight: '90vh', overflowY: 'auto', borderRadius: 18, border: '1px solid #e5e7eb', boxShadow: '0 24px 80px rgba(0,0,0,0.2)', display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div>
-              <div
-                style={{
-                  borderRadius: 12,
-                  background: '#f1f5f9',
-                  aspectRatio: '1 / 1',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
+            {/* Galeria */}
+            <div style={{ background: '#f5f5f4', borderRadius: '18px 0 0 18px', padding: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ borderRadius: 12, background: '#fff', aspectRatio: '1/1', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e7e5e4' }}>
                 {activeProductImage ? (
-                  <img src={activeProductImage} alt={selectedProduct.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }} />
+                  <img src={activeProductImage} alt={selectedProduct.nome} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 ) : (
-                  <span style={{ color: '#64748b' }}>Sem imagem disponível</span>
+                  <span style={{ color: '#9ca3af', fontSize: 13 }}>Sem imagem disponível</span>
                 )}
               </div>
-
               {getProductImages(selectedProduct).length > 1 && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto' }}>
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
                   {getProductImages(selectedProduct).map((img) => (
-                    <button
-                      key={img}
-                      onClick={() => setActiveProductImage(img)}
-                      style={{
-                        border: activeProductImage === img ? '2px solid #6366f1' : '1px solid #d1d5db',
-                        borderRadius: 8,
-                        width: 74,
-                        height: 74,
-                        overflow: 'hidden',
-                        padding: 0,
-                        background: '#fff',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <img src={img} alt="Miniatura do produto" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff' }} />
+                    <button key={img} onClick={() => setActiveProductImage(img)} style={{ border: activeProductImage === img ? '2.5px solid #f97316' : '1.5px solid #e7e5e4', borderRadius: 10, width: 70, height: 70, overflow: 'hidden', padding: 0, background: '#fff', cursor: 'pointer', flexShrink: 0 }}>
+                      <img src={img} alt="Miniatura" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            <div style={{ display: 'grid', alignContent: 'start', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <h3 style={{ margin: 0, fontSize: 24, lineHeight: 1.2 }}>{selectedProduct.nome}</h3>
-                <button className="btn-secondary" onClick={() => closeProductModal()}>Fechar</button>
+            {/* Detalhes */}
+            <div style={{ padding: 28, display: 'grid', alignContent: 'start', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#1c1917', lineHeight: 1.3 }}>{selectedProduct.nome}</h3>
+                <button onClick={() => closeProductModal()} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, width: 34, height: 34, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#6b7280' }}>✕</button>
               </div>
 
-              <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1a2e' }}>
+              <div style={{ fontSize: 30, fontWeight: 800, color: '#1a1a2e', letterSpacing: -1 }}>
                 {formatCurrency(resolveProductPrice(selectedProduct))}
               </div>
 
-              <div style={{ color: '#475569' }}>
-                Categoria: <strong>{selectedProduct?.categoria_nome || selectedProduct?.categoria || 'Sem categoria'}</strong>
-              </div>
-              <div style={{ color: '#475569' }}>
-                Estoque disponível: <strong>{Number.isFinite(resolveProductStock(selectedProduct)) ? resolveProductStock(selectedProduct) : 'Disponível'}</strong>
-              </div>
-              <div style={{ color: '#475569' }}>
-                SKU: <strong>{selectedProduct?.codigo || '-'}</strong>
-              </div>
-
-              {getProductImages(selectedProduct).length <= 1 && (
-                <div style={{ fontSize: 13, color: '#64748b' }}>
-                  Este produto ainda não possui galeria com múltiplas fotos cadastradas.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#faf7f4', borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>Categoria: <strong style={{ color: '#1a1a2e' }}>{selectedProduct?.categoria_nome || selectedProduct?.categoria || 'Sem categoria'}</strong></div>
+                <div style={{ fontSize: 13, color: '#6b7280' }}>SKU: <strong style={{ color: '#1a1a2e', fontFamily: 'monospace' }}>{selectedProduct?.codigo || '-'}</strong></div>
+                <div style={{ fontSize: 13, color: isProductOutOfStock(selectedProduct) ? '#b45309' : '#065f46' }}>
+                  {isProductOutOfStock(selectedProduct) ? '⚠️ Fora de estoque' : `✓ Em estoque: ${Number.isFinite(resolveProductStock(selectedProduct)) ? resolveProductStock(selectedProduct) : 'Disponível'}`}
                 </div>
-              )}
+              </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                 {!isProductOutOfStock(selectedProduct) ? (
-                  <button onClick={() => addToCart(selectedProduct)} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, fontSize: 15, padding: '10px 20px', cursor: 'pointer', transition: 'background 0.15s' }}>
-                    + Adicionar ao carrinho
+                  <button onClick={() => addToCart(selectedProduct)} style={{ ...S.addBtn(false), width: 'auto', padding: '12px 24px', fontSize: 14 }}>
+                    🛒 Adicionar ao carrinho
                   </button>
                 ) : (
-                  <button onClick={() => registerNotifyMe(selectedProduct)} style={{ background: 'transparent', border: '2px solid #d97706', color: '#d97706', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
-                    📧 Avise-me quando chegar
+                  <button onClick={() => registerNotifyMe(selectedProduct)} style={{ ...S.notifyBtn, width: 'auto', padding: '10px 20px', fontSize: 13 }}>
+                    🔔 Avise-me quando chegar
                   </button>
                 )}
-                <button onClick={() => toggleWishlist(selectedProduct.id)} style={{ background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
-                  {wishlist.includes(selectedProduct.id) ? '💔 Remover da lista' : '🤍 Salvar na lista'}
+                <button onClick={() => toggleWishlist(selectedProduct.id)} style={{ background: '#fff', border: '1.5px solid #f97316', color: '#f97316', borderRadius: 9, padding: '10px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  {wishlist.includes(selectedProduct.id) ? '💔 Remover' : '🤍 Salvar'}
                 </button>
-                <button onClick={() => { closeProductModal(); setView('carrinho'); }} style={{ background: 'transparent', border: '2px solid #6366f1', color: '#6366f1', borderRadius: 10, fontWeight: 700, fontSize: 14, padding: '10px 16px', cursor: 'pointer' }}>
-                  🛒 Ver carrinho
-                </button>
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}${location.pathname}?produto=${selectedProduct.id}`;
-                    navigator.clipboard?.writeText(url)
-                      .then(() => setSuccess('Link copiado para a área de transferência!'))
-                      .catch(() => setSuccess(`Link: ${url}`));
-                  }}
-                  style={{ background: 'transparent', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 10, fontWeight: 500, fontSize: 13, padding: '8px 14px', cursor: 'pointer' }}
-                >
-                  🔗 Copiar link
+                <button onClick={() => { closeProductModal(); setView('carrinho'); }} style={{ background: '#fff', border: '1.5px solid #e5e7eb', color: '#6b7280', borderRadius: 9, padding: '10px 16px', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
+                  Ver carrinho
                 </button>
               </div>
+
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}${location.pathname}?produto=${selectedProduct.id}`;
+                  navigator.clipboard?.writeText(url).then(() => setSuccess('Link copiado!')).catch(() => setSuccess(`Link: ${url}`));
+                }}
+                style={{ background: 'transparent', border: '1px solid #e5e7eb', color: '#9ca3af', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 12, justifySelf: 'start' }}
+              >
+                🔗 Copiar link do produto
+              </button>
             </div>
           </div>
         </div>
       )}
 
       {view === 'carrinho' && (
-        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 24px', minHeight: 200 }}>
-          <h3 style={{ marginTop: 0, color: '#1a1a2e', fontSize: 20, fontWeight: 700 }}>🛒 Carrinho de compras</h3>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px', minHeight: 200 }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 26, fontWeight: 800, color: '#1c1917' }}>Carrinho ({cart?.itens?.length || 0} {cart?.itens?.length === 1 ? 'item' : 'itens'})</h2>
           {cartLoading ? (
-            <div style={{ textAlign: 'center', color: '#64748b', padding: 20 }}>Carregando carrinho...</div>
+            <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Carregando carrinho...</div>
           ) : cart?.itens?.length ? (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {cart.itens.map((item) => {
-                const prod = productMap[item.produto_id];
-                const img = prod ? getProductImages(prod)[0] : null;
-                return (
-                  <div key={item.item_id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 14px', display: 'flex', gap: 14, alignItems: 'center', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-                    <div style={{ width: 80, height: 80, borderRadius: 10, background: '#f8fafc', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e7eb' }}>
-                      {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} /> : <span style={{ fontSize: 32 }}>📦</span>}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.3, marginBottom: 4 }}>{item.nome}</div>
-                      <div style={{ fontSize: 13, color: '#6366f1', fontWeight: 700, marginBottom: 8 }}>{formatCurrency(item.preco_unitario)} / un</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <button onClick={() => updateCartItem(item.item_id, item.quantidade - 1)} style={{ background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-                        <span style={{ fontWeight: 700, fontSize: 15, minWidth: 28, textAlign: 'center' }}>{item.quantidade}</span>
-                        <button onClick={() => updateCartItem(item.item_id, item.quantidade + 1)} style={{ background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
-                        <button onClick={() => updateCartItem(item.item_id, 0)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 13, marginLeft: 4, padding: '4px 8px' }}>🗑 Remover</button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+              {/* Lista de itens */}
+              <div style={{ display: 'grid', gap: 12 }}>
+                {cart.itens.map((item) => {
+                  const prod = productMap[item.produto_id];
+                  const img = prod ? getProductImages(prod)[0] : null;
+                  return (
+                    <div key={item.item_id} style={S.cartItem}>
+                      <div style={S.cartItemImg}>
+                        {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} /> : <span style={{ fontSize: 28 }}>📦</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 4 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, color: '#1a1a2e' }}>{item.nome}</div>
+                        <div style={{ fontSize: 13, color: '#f97316', fontWeight: 700 }}>{formatCurrency(item.preco_unitario)} / un</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                          <button onClick={() => updateCartItem(item.item_id, item.quantidade - 1)} style={S.qtyBtn}>−</button>
+                          <span style={{ fontWeight: 700, fontSize: 14, minWidth: 26, textAlign: 'center' }}>{item.quantidade}</span>
+                          <button onClick={() => updateCartItem(item.item_id, item.quantidade + 1)} style={S.qtyBtn}>+</button>
+                          <button onClick={() => updateCartItem(item.item_id, 0)} style={S.removeBtn}>🗑 Remover</button>
+                        </div>
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: 16, color: '#1a1a2e', flexShrink: 0 }}>
+                        {formatCurrency(item.preco_unitario * item.quantidade)}
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontWeight: 800, fontSize: 16, color: '#111' }}>{formatCurrency(item.preco_unitario * item.quantidade)}</div>
-                    </div>
+                  );
+                })}
+
+                {/* Cupom */}
+                <form onSubmit={applyCupom} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <input value={cupom} onChange={(e) => setCupom(e.target.value)} placeholder="Código de cupom" style={{ ...S.formInput, flex: 1 }} />
+                  <button type="submit" style={{ background: '#f1f5f9', border: '1.5px solid #e5e7eb', color: '#374151', borderRadius: 10, padding: '0 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Aplicar</button>
+                </form>
+                {cupomResult && (
+                  <div style={{ fontSize: 13, color: '#065f46', background: '#ecfdf5', borderRadius: 8, padding: '8px 12px', fontWeight: 600 }}>
+                    ✓ Cupom {cupomResult.codigo}: -{formatCurrency(cupomResult.desconto)}
                   </div>
-                );
-              })}
-              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: 20, color: '#1a1a2e' }}>{formatCurrency(cartTotal)}</span>
+                )}
               </div>
-              <button className="btn-primary" onClick={handleCheckoutFromLoja} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '14px 0', fontWeight: 700, fontSize: 16, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}>
-                Finalizar pedido
-              </button>
+
+              {/* Resumo lateral */}
+              <div style={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 16, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#1c1917', marginBottom: 14 }}>Resumo do pedido</div>
+                {cart.itens.map((item) => (
+                  <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
+                    <span>{item.nome} × {item.quantidade}</span>
+                    <span>{formatCurrency(item.preco_unitario * item.quantidade)}</span>
+                  </div>
+                ))}
+                <div style={S.cartTotalRow}>
+                  <span>Total</span>
+                  <span>{formatCurrency(cartTotal)}</span>
+                </div>
+                <button onClick={handleCheckoutFromLoja} style={{ ...S.checkoutBig, width: '100%', marginTop: 14 }}>
+                  Ir para o checkout →
+                </button>
+                <button onClick={() => setView('loja')} style={{ width: '100%', marginTop: 8, background: 'transparent', border: '1.5px solid #e5e7eb', color: '#6b7280', borderRadius: 10, padding: '10px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  Continuar comprando
+                </button>
+              </div>
             </div>
           ) : (
-            <div style={{ color: '#94a3b8', textAlign: 'center', padding: '32px 0', fontSize: 14 }}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>🛒</div>
-              <div>Seu carrinho está vazio</div>
-              <button className="btn-secondary" onClick={() => setView('loja')} style={{ marginTop: 12 }}>Ver produtos</button>
-            </div>
-          )}
-
-          <form onSubmit={applyCupom} style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-            <input
-              value={cupom}
-              onChange={(e) => setCupom(e.target.value)}
-              placeholder="Cupom"
-              style={{ flex: 1, padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-            />
-            <button className="btn-secondary" type="submit">Aplicar</button>
-          </form>
-
-          {cupomResult && (
-            <div style={{ marginTop: 8, color: '#0a7d32' }}>
-              Cupom {cupomResult.codigo}: -{formatCurrency(cupomResult.desconto)}
+            <div style={{ textAlign: 'center', padding: '48px 0', display: 'grid', gap: 12, justifyItems: 'center' }}>
+              <span style={{ fontSize: 52 }}>🛒</span>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>Seu carrinho está vazio</div>
+              <div style={{ fontSize: 14, color: '#9ca3af' }}>Explore nossa loja e adicione produtos!</div>
+              <button onClick={() => setView('loja')} style={{ ...S.checkoutBig, width: 'auto', padding: '12px 28px' }}>Ver produtos</button>
             </div>
           )}
         </div>
       )}
 
       {view === 'checkout' && (
-        <div style={{ background: '#fff', padding: 16, borderRadius: 8, display: 'grid', gap: 10 }}>
-          <h3 style={{ marginTop: 0 }}>Checkout</h3>
-          <form onSubmit={calcularResumoCheckout} style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gap: 6 }}>
-              <label style={{ fontSize: 13, color: '#334155' }}>Forma de recebimento</label>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="radio"
-                    name="deliveryMode"
-                    value="entrega"
-                    checked={deliveryMode === 'entrega'}
-                    onChange={() => setDeliveryMode('entrega')}
-                  />
-                  Entrega
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="radio"
-                    name="deliveryMode"
-                    value="retirada"
-                    checked={deliveryMode === 'retirada'}
-                    onChange={() => setDeliveryMode('retirada')}
-                  />
-                  Retirada na loja
-                </label>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px' }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 26, fontWeight: 800, color: '#1c1917' }}>Checkout</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20, alignItems: 'start' }}>
+
+            {/* Formulário */}
+            <div style={{ display: 'grid', gap: 16 }}>
+              {/* Entrega ou Retirada */}
+              <div style={S.formCard}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 12 }}>📦 Como quer receber?</div>
+                <form onSubmit={calcularResumoCheckout} style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    {[{ v: 'entrega', l: '🚚 Entrega' }, { v: 'retirada', l: '🏪 Retirada na loja' }].map(({ v, l }) => (
+                      <label key={v} style={deliveryMode === v ? S.radioLabelActive : S.radioLabel}>
+                        <input type="radio" name="deliveryMode" value={v} checked={deliveryMode === v} onChange={() => setDeliveryMode(v)} style={{ display: 'none' }} />
+                        {l}
+                      </label>
+                    ))}
+                  </div>
+
+                  {deliveryMode === 'retirada' && (
+                    <div style={{ background: '#faf7f4', border: '1px solid #e7e5e4', borderRadius: 10, padding: 14, display: 'grid', gap: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>Quem vai retirar?</div>
+                      {[{ v: 'proprio', l: '🙋 Eu mesmo(a)' }, { v: 'terceiro', l: '🤝 Outra pessoa por mim' }].map(({ v, l }) => (
+                        <label key={v} style={tipoRetirada === v ? S.radioLabelActive : S.radioLabel}>
+                          <input type="radio" name="tipoRetirada" value={v} checked={tipoRetirada === v} onChange={() => setTipoRetirada(v)} style={{ display: 'none' }} />
+                          {l}
+                        </label>
+                      ))}
+                      {tipoRetirada === 'terceiro' && (
+                        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 10, fontSize: 12, color: '#92400e' }}>
+                          ℹ️ Uma <strong>senha secreta de retirada</strong> será gerada. Compartilhe com quem vai buscar.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <input value={tenantContext?.cidade || cidadeDestino} onChange={(e) => setCidadeDestino(e.target.value)} placeholder="Cidade da loja" disabled={Boolean(tenantContext?.cidade)} style={{ ...S.formInput, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }} />
+
+                  {deliveryMode === 'entrega' && (
+                    <>
+                      <input value={addressFields.cep} onChange={(e) => setAddressFields((prev) => ({ ...prev, cep: e.target.value }))} onBlur={handleCheckoutCepBlur} placeholder="CEP" style={S.formInput} />
+                      <input value={addressFields.endereco} onChange={(e) => setAddressFields((prev) => ({ ...prev, endereco: e.target.value }))} placeholder="Rua / Avenida" style={S.formInput} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <input value={addressFields.numero} onChange={(e) => setAddressFields((prev) => ({ ...prev, numero: e.target.value }))} placeholder="Número" style={S.formInput} />
+                        <input value={addressFields.complemento} onChange={(e) => setAddressFields((prev) => ({ ...prev, complemento: e.target.value }))} placeholder="Complemento" style={S.formInput} />
+                      </div>
+                      <input value={addressFields.bairro} onChange={(e) => setAddressFields((prev) => ({ ...prev, bairro: e.target.value }))} placeholder="Bairro" style={S.formInput} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8 }}>
+                        <input value={addressFields.cidade || tenantContext?.cidade || ''} onChange={(e) => setAddressFields((prev) => ({ ...prev, cidade: e.target.value }))} placeholder="Cidade" disabled={Boolean(tenantContext?.cidade)} style={{ ...S.formInput, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }} />
+                        <input value={addressFields.estado || tenantContext?.uf || ''} onChange={(e) => setAddressFields((prev) => ({ ...prev, estado: e.target.value }))} placeholder="UF" style={S.formInput} />
+                      </div>
+                    </>
+                  )}
+                  <button type="submit" style={S.payBtn(true)}>Calcular resumo</button>
+                </form>
               </div>
 
-              {/* Quem vai retirar — só aparece se escolher retirada */}
-              {deliveryMode === 'retirada' && (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, display: 'grid', gap: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>Quem vai retirar o pedido?</div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="tipoRetirada"
-                      value="proprio"
-                      checked={tipoRetirada === 'proprio'}
-                      onChange={() => setTipoRetirada('proprio')}
-                    />
-                    <span>🙋 Eu mesmo(a) vou retirar</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="tipoRetirada"
-                      value="terceiro"
-                      checked={tipoRetirada === 'terceiro'}
-                      onChange={() => setTipoRetirada('terceiro')}
-                    />
-                    <span>� Outra pessoa vai retirar por mim</span>
-                  </label>
-                  {tipoRetirada === 'terceiro' && (
-                    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 6, padding: 10, fontSize: 12, color: '#92400e' }}>
-                      ℹ️ Uma <strong>senha secreta de retirada</strong> será gerada após confirmar o pedido. Compartilhe essa senha com a pessoa que vai retirar.
+              {/* Pagamento */}
+              <div style={S.formCard}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 12 }}>💳 Como vai pagar?</div>
+                {(() => {
+                  const opcs = [{ key: 'dinheiro', label: 'Dinheiro', icon: '💵' }, { key: 'pix', label: 'PIX', icon: '📱' }, { key: 'debito', label: 'Débito', icon: '💳' }, { key: 'credito', label: 'Crédito', icon: '💳' }];
+                  const bandeiras = ['Visa', 'Mastercard', 'Elo', 'Outra'];
+                  return (
+                    <div style={{ display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {opcs.map((o) => (
+                          <label key={o.key} style={pagamentoTipo === o.key ? S.radioLabelActive : S.radioLabel}>
+                            <input type="radio" name="pagamentoTipo" value={o.key} checked={pagamentoTipo === o.key} onChange={() => { setPagamentoTipo(o.key); if (o.key !== 'dinheiro') setPagamentoTroco(''); }} style={{ display: 'none' }} />
+                            {o.icon} {o.label}
+                          </label>
+                        ))}
+                      </div>
+                      {pagamentoTipo === 'dinheiro' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                          <span style={{ color: '#374151' }}>Troco para R$</span>
+                          <input type="number" min="0" placeholder="Ex: 100" value={pagamentoTroco} onChange={(e) => setPagamentoTroco(e.target.value)} style={{ ...S.formInput, width: 110 }} />
+                        </div>
+                      )}
+                      {(pagamentoTipo === 'debito' || pagamentoTipo === 'credito') && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, color: '#6b7280' }}>Bandeira:</span>
+                          {bandeiras.map((b) => (
+                            <label key={b} style={pagamentoBandeira === b ? S.radioLabelActive : { ...S.radioLabel, padding: '6px 12px', fontSize: 12 }}>
+                              <input type="radio" checked={pagamentoBandeira === b} onChange={() => setPagamentoBandeira(b)} style={{ display: 'none' }} /> {b}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      {pagamentoTipo === 'credito' && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 13, color: '#6b7280' }}>Parcelas:</span>
+                          {[1, 2, 3].map((p) => (
+                            <label key={p} style={pagamentoParcelas === p ? S.radioLabelActive : { ...S.radioLabel, padding: '6px 14px' }}>
+                              <input type="radio" checked={pagamentoParcelas === p} onChange={() => setPagamentoParcelas(p)} style={{ display: 'none' }} /> {p}x
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Resumo lateral */}
+            <div style={S.resumoBox}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: '#1c1917', marginBottom: 14 }}>Resumo do pedido</div>
+              {checkoutResumo ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280' }}><span>Itens ({checkoutResumo.itens_count})</span><span>{formatCurrency(checkoutResumo.subtotal)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280' }}><span>Frete</span><span>{formatCurrency(checkoutResumo?.frete?.valor_frete)}</span></div>
+                  {checkoutResumo?.cupom?.desconto > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#065f46' }}><span>Desconto</span><span>-{formatCurrency(checkoutResumo.cupom.desconto)}</span></div>
+                  )}
+                  <div style={S.cartTotalRow}><span>Total</span><span>{formatCurrency(checkoutResumo.total)}</span></div>
+                </div>
+              ) : (
+                cart?.itens?.length ? (
+                  <div>
+                    {cart.itens.map((item) => (
+                      <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
+                        <span>{item.nome} × {item.quantidade}</span>
+                        <span>{formatCurrency(item.preco_unitario * item.quantidade)}</span>
+                      </div>
+                    ))}
+                    <div style={S.cartTotalRow}><span>Total estimado</span><span>{formatCurrency(cartTotal)}</span></div>
+                  </div>
+                ) : null
+              )}
+
+              <button onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete} style={S.finalizarBtn(checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete)}>
+                {checkoutLoading ? 'Finalizando...' : '✓ Finalizar pedido'}
+              </button>
+
+              {!isProfileComplete && (
+                <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', borderRadius: 8, padding: '8px 10px', marginTop: 6 }}>
+                  ⚠️ Complete seu cadastro (nome, telefone, CPF e endereço) na aba Conta para finalizar.
+                </div>
+              )}
+
+              {checkoutResult?.pedido_id && (
+                <div style={{ background: '#ecfdf5', border: '1.5px solid #6ee7b7', borderRadius: 12, padding: 14, marginTop: 8, display: 'grid', gap: 6 }}>
+                  <div style={{ fontWeight: 700, color: '#065f46', fontSize: 14 }}>✓ Pedido confirmado!</div>
+                  <div style={{ fontSize: 13, color: '#374151' }}>Número: <strong>{checkoutResult.pedido_id}</strong></div>
+                  {checkoutResult.palavra_chave_retirada && (
+                    <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 12, textAlign: 'center', marginTop: 4 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#7c2d12', marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3, color: '#ea580c' }}>{checkoutResult.palavra_chave_retirada}</div>
+                      <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Compartilhe com quem vai retirar</div>
                     </div>
                   )}
                 </div>
               )}
             </div>
-
-            <input
-              value={tenantContext?.cidade || cidadeDestino}
-              onChange={(e) => setCidadeDestino(e.target.value)}
-              placeholder="Cidade da loja"
-              disabled={Boolean(tenantContext?.cidade)}
-              style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }}
-            />
-
-            {deliveryMode === 'entrega' && (
-              <>
-                <input
-                  value={addressFields.cep}
-                  onChange={(e) => setAddressFields((prev) => ({ ...prev, cep: e.target.value }))}
-                  onBlur={handleCheckoutCepBlur}
-                  placeholder="CEP"
-                  style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                />
-                <input
-                  value={addressFields.endereco}
-                  onChange={(e) => setAddressFields((prev) => ({ ...prev, endereco: e.target.value }))}
-                  placeholder="Rua / Avenida"
-                  style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <input
-                    value={addressFields.numero}
-                    onChange={(e) => setAddressFields((prev) => ({ ...prev, numero: e.target.value }))}
-                    placeholder="Número"
-                    style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                  />
-                  <input
-                    value={addressFields.complemento}
-                    onChange={(e) => setAddressFields((prev) => ({ ...prev, complemento: e.target.value }))}
-                    placeholder="Complemento"
-                    style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                  />
-                </div>
-                <input
-                  value={addressFields.bairro}
-                  onChange={(e) => setAddressFields((prev) => ({ ...prev, bairro: e.target.value }))}
-                  placeholder="Bairro"
-                  style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8 }}>
-                  <input
-                    value={addressFields.cidade || tenantContext?.cidade || ''}
-                    onChange={(e) => setAddressFields((prev) => ({ ...prev, cidade: e.target.value }))}
-                    placeholder="Cidade"
-                    disabled={Boolean(tenantContext?.cidade)}
-                    style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }}
-                  />
-                  <input
-                    value={addressFields.estado || tenantContext?.uf || ''}
-                    onChange={(e) => setAddressFields((prev) => ({ ...prev, estado: e.target.value }))}
-                    placeholder="UF"
-                    style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                  />
-                </div>
-              </>
-            )}
-            <button className="btn-secondary" type="submit">Calcular resumo</button>
-          </form>
-
-          {checkoutResumo && (
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
-              <div>Itens: {checkoutResumo.itens_count}</div>
-              <div>Subtotal: {formatCurrency(checkoutResumo.subtotal)}</div>
-              <div>Frete: {formatCurrency(checkoutResumo?.frete?.valor_frete)}</div>
-              <div>Desconto: {formatCurrency(checkoutResumo?.cupom?.desconto)}</div>
-              <div style={{ fontWeight: 700 }}>Total: {formatCurrency(checkoutResumo.total)}</div>
-            </div>
-          )}
-
-          <button className="btn-primary" onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, padding: '14px 0', fontWeight: 700, fontSize: 16, cursor: 'pointer', width: '100%', transition: 'background 0.15s' }}>
-            {checkoutLoading ? 'Finalizando...' : 'Finalizar pedido'}
-          </button>
-
-          {!isProfileComplete && (
-            <div style={{ fontSize: 12, color: '#b45309' }}>
-              Complete cadastro (nome completo, telefone, CPF e endereço) na aba Conta para finalizar.
-            </div>
-          )}
-
-          {checkoutResult?.pedido_id && (
-            <div style={{ background: '#e8fff0', color: '#0a7d32', padding: 10, borderRadius: 6, display: 'grid', gap: 6 }}>
-              <div>Pedido confirmado: <strong>{checkoutResult.pedido_id}</strong></div>
-              {checkoutResult.palavra_chave_retirada && (
-                <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 8, padding: 12, color: '#7c2d12', textAlign: 'center' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 2, color: '#ea580c' }}>{checkoutResult.palavra_chave_retirada}</div>
-                  <div style={{ fontSize: 11, marginTop: 6, color: '#92400e' }}>
-                    Compartilhe esta senha com a pessoa que vai retirar o pedido na loja.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          </div>
         </div>
       )}
 
       {view === 'pedidos' && (
-        <div style={{ background: '#fff', padding: 16, borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>Meus pedidos</h3>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+            <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: '#1c1917' }}>Meus Pedidos</h2>
+            <button onClick={loadOrdersDetailed} disabled={ordersLoading} style={{ background: '#f1f5f9', border: '1.5px solid #e5e7eb', color: '#374151', borderRadius: 10, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              {ordersLoading ? 'Atualizando...' : '↻ Atualizar'}
+            </button>
+          </div>
           {ordersLoading ? (
-            <div style={{ color: '#666' }}>Carregando pedidos...</div>
+            <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Carregando pedidos...</div>
           ) : ordersDetailed.length === 0 ? (
-            <div style={{ color: '#666' }}>Nenhum pedido encontrado para esta conta.</div>
+            <div style={{ textAlign: 'center', padding: '48px 0', display: 'grid', gap: 10, justifyItems: 'center' }}>
+              <span style={{ fontSize: 48 }}>📋</span>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e' }}>Nenhum pedido ainda</div>
+              <div style={{ fontSize: 13, color: '#9ca3af' }}>Seus pedidos aparecerão aqui após a compra.</div>
+              <button onClick={() => setView('loja')} style={{ ...S.checkoutBig, width: 'auto', padding: '10px 24px' }}>Ir às compras</button>
+            </div>
           ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'grid', gap: 14 }}>
               {ordersDetailed.map((order) => {
+                const statusMap = { pendente: '#f59e0b', confirmado: '#3b82f6', enviado: '#8b5cf6', entregue: '#10b981', cancelado: '#ef4444' };
+                const statusColor = statusMap[(order.status || '').toLowerCase()] || '#6b7280';
                 return (
-                  <div key={order.pedido_id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, display: 'grid', gap: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <div key={order.pedido_id} style={S.orderCard}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ fontWeight: 700 }}>{order.pedido_id}</div>
-                        <div style={{ fontSize: 12, color: '#64748b' }}>Origem: {order.origem || '-'}</div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#1a1a2e', marginBottom: 2 }}>Pedido {order.pedido_id}</div>
+                        <div style={{ fontSize: 12, color: '#9ca3af' }}>{order.created_at ? new Date(order.created_at).toLocaleString('pt-BR') : '-'}</div>
                       </div>
-                      <div style={{ fontWeight: 700 }}>{formatCurrency(order.total)}</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                        <span style={{ ...S.statusBadge(order.status), background: statusColor + '20', color: statusColor, border: `1px solid ${statusColor}40` }}>{order.status || 'Pendente'}</span>
+                        <div style={{ fontWeight: 800, fontSize: 16, color: '#1a1a2e' }}>{formatCurrency(order.total)}</div>
+                      </div>
                     </div>
 
-                    <div style={{ fontSize: 13 }}>Status do pedido: <strong>{order.status || '-'}</strong></div>
-                    <div style={{ fontSize: 13 }}>Data da compra: <strong>{formatDateTime(order.data_compra)}</strong></div>
-                    <div style={{ fontSize: 13 }}>
-                      Data do pagamento: <strong>{order.data_pagamento ? formatDateTime(order.data_pagamento) : 'Aguardando pagamento'}</strong>
-                    </div>
-
-                    {/* Senha de retirada por terceiro */}
                     {order.palavra_chave_retirada && (
-                      <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#7c2d12', marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
-                        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: 2, color: '#ea580c' }}>{order.palavra_chave_retirada}</div>
-                        <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Apresente esta senha na loja para retirar o pedido</div>
+                      <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 10, textAlign: 'center', marginTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#7c2d12', marginBottom: 2 }}>🔑 SENHA DE RETIRADA</div>
+                        <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 3, color: '#ea580c' }}>{order.palavra_chave_retirada}</div>
+                        <div style={{ fontSize: 10, color: '#92400e', marginTop: 2 }}>Apresente na loja para retirar</div>
                       </div>
                     )}
 
-                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>Produtos do pedido ({order.itens_count || 0})</div>
-                    {Array.isArray(order.itens) && order.itens.length > 0 ? (
-                      <div style={{ display: 'grid', gap: 6 }}>
+                    {Array.isArray(order.itens) && order.itens.length > 0 && (
+                      <div style={{ marginTop: 10, borderTop: '1px solid #f1f5f9', paddingTop: 10, display: 'grid', gap: 6 }}>
                         {order.itens.map((item, index) => (
-                          <div key={`${order.pedido_id}-${item.produto_id || index}`} style={{ border: '1px solid #f1f5f9', borderRadius: 6, padding: 8 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600 }}>{item.nome || 'Produto'}</div>
-                            <div style={{ fontSize: 12, color: '#475569' }}>
-                              {item.quantidade} x {formatCurrency(item.preco_unitario)} = {formatCurrency(item.subtotal)}
-                            </div>
+                          <div key={`${order.pedido_id}-${item.produto_id || index}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280' }}>
+                            <span>{item.nome || 'Produto'} × {item.quantidade}</span>
+                            <span>{formatCurrency(item.subtotal)}</span>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: '#666' }}>Sem itens detalhados para este pedido.</div>
+                    )}
+
+                    {order.data_pagamento && (
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>Pago em: {formatDateTime(order.data_pagamento)}</div>
                     )}
                   </div>
                 );
               })}
             </div>
           )}
-
-          <button className="btn-secondary" onClick={loadOrdersDetailed} style={{ marginTop: 10 }} disabled={ordersLoading}>
-            {ordersLoading ? 'Atualizando...' : 'Atualizar pedidos'}
-          </button>
         </div>
       )}
-
       {view === 'conta' && (
-        <>
+        <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 16px' }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 26, fontWeight: 800, color: '#1c1917' }}>Minha Conta</h2>
           {customerToken ? (
-            <div style={{ background: '#fff', padding: 16, borderRadius: 8, display: 'grid', gap: 10 }}>
-              <h3 style={{ marginTop: 0, marginBottom: 0 }}>Meus dados cadastrais</h3>
-              <div style={{ fontSize: 13, color: '#64748b' }}>
-                Esses dados ficam vinculados à sua conta e serão usados no pedido e no PDV.
-              </div>
-
-              <form onSubmit={saveProfile} style={{ display: 'grid', gap: 8 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <input value={profileForm.nome} onChange={(e) => setProfileForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input value={customer?.email || ''} disabled placeholder="Email" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6, background: '#f8fafc' }} />
+            <div style={{ display: 'grid', gap: 16 }}>
+              <div style={S.accountCard}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 4 }}>Olá, {customer?.nome || profileForm.nome || 'cliente'}! 👋</div>
+                <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 14 }}>
+                  {customer?.email} • Lista de desejos: {wishlist.length} • Avisos: {notifyRequests.length}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  <input value={profileForm.telefone} onChange={(e) => setProfileForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input value={profileForm.cpf} onChange={(e) => setProfileForm((prev) => ({ ...prev, cpf: e.target.value }))} placeholder="CPF" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                </div>
-
-                <input
-                  value={profileForm.cep}
-                  onChange={(e) => setProfileForm((prev) => ({ ...prev, cep: e.target.value }))}
-                  onBlur={handleProfileCepBlur}
-                  placeholder="CEP"
-                  style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                />
-
-                <input value={profileForm.endereco} onChange={(e) => setProfileForm((prev) => ({ ...prev, endereco: e.target.value }))} placeholder="Endereço" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-
-                <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
-                  <input value={profileForm.numero} onChange={(e) => setProfileForm((prev) => ({ ...prev, numero: e.target.value }))} placeholder="Número" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input value={profileForm.complemento} onChange={(e) => setProfileForm((prev) => ({ ...prev, complemento: e.target.value }))} placeholder="Complemento" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 8 }}>
-                  <input value={profileForm.bairro} onChange={(e) => setProfileForm((prev) => ({ ...prev, bairro: e.target.value }))} placeholder="Bairro" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input value={profileForm.cidade} onChange={(e) => setProfileForm((prev) => ({ ...prev, cidade: e.target.value }))} placeholder="Cidade" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input value={profileForm.estado} onChange={(e) => setProfileForm((prev) => ({ ...prev, estado: e.target.value }))} placeholder="UF" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                </div>
-
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() =>
-                    setProfileForm((prev) => ({
-                      ...prev,
-                      usar_endereco_entrega_diferente: !prev.usar_endereco_entrega_diferente,
-                    }))
-                  }
-                  style={{ justifySelf: 'start' }}
-                >
-                  {profileForm.usar_endereco_entrega_diferente ? 'Remover endereço de entrega diferente' : 'Usar endereço de entrega diferente'}
-                </button>
-
-                {profileForm.usar_endereco_entrega_diferente && (
-                  <div style={{ display: 'grid', gap: 8, border: '1px solid #e5e7eb', borderRadius: 8, padding: 10, background: '#f8fafc' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Endereço de entrega (dados complementares)</div>
-                    <input
-                      value={profileForm.entrega_nome}
-                      onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_nome: e.target.value }))}
-                      placeholder="Nome completo para entrega"
-                      style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                    />
-                    <input
-                      value={profileForm.entrega_cep}
-                      onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_cep: e.target.value }))}
-                      onBlur={handleDeliveryCepBlur}
-                      placeholder="CEP"
-                      style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                    />
-                    <input
-                      value={profileForm.entrega_endereco}
-                      onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_endereco: e.target.value }))}
-                      placeholder="Rua / Avenida"
-                      style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                    />
-                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8 }}>
-                      <input
-                        value={profileForm.entrega_numero}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_numero: e.target.value }))}
-                        placeholder="Número"
-                        style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                      />
-                      <input
-                        value={profileForm.entrega_complemento}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_complemento: e.target.value }))}
-                        placeholder="Complemento"
-                        style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                      />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 8 }}>
-                      <input
-                        value={profileForm.entrega_bairro}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_bairro: e.target.value }))}
-                        placeholder="Bairro"
-                        style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                      />
-                      <input
-                        value={profileForm.entrega_cidade}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_cidade: e.target.value }))}
-                        placeholder="Cidade"
-                        style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                      />
-                      <input
-                        value={profileForm.entrega_estado}
-                        onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_estado: e.target.value }))}
-                        placeholder="UF"
-                        style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }}
-                      />
-                    </div>
+                <form onSubmit={saveProfile} style={{ display: 'grid', gap: 10 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginBottom: 2 }}>Dados pessoais</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input value={profileForm.nome} onChange={(e) => setProfileForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={S.formInput} />
+                    <input value={customer?.email || ''} disabled placeholder="Email" style={{ ...S.formInput, background: '#f8fafc', color: '#9ca3af' }} />
                   </div>
-                )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <input value={profileForm.telefone} onChange={(e) => setProfileForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone" style={S.formInput} />
+                    <input value={profileForm.cpf} onChange={(e) => setProfileForm((prev) => ({ ...prev, cpf: e.target.value }))} placeholder="CPF" style={S.formInput} />
+                  </div>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn-primary" type="submit" disabled={profileSaving} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>
-                    {profileSaving ? 'Salvando...' : 'Salvar cadastro'}
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#374151', marginTop: 6, marginBottom: 2 }}>Endereço principal</div>
+                  <input value={profileForm.cep} onChange={(e) => setProfileForm((prev) => ({ ...prev, cep: e.target.value }))} onBlur={handleProfileCepBlur} placeholder="CEP" style={S.formInput} />
+                  <input value={profileForm.endereco} onChange={(e) => setProfileForm((prev) => ({ ...prev, endereco: e.target.value }))} placeholder="Rua / Avenida" style={S.formInput} />
+                  <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8 }}>
+                    <input value={profileForm.numero} onChange={(e) => setProfileForm((prev) => ({ ...prev, numero: e.target.value }))} placeholder="Número" style={S.formInput} />
+                    <input value={profileForm.complemento} onChange={(e) => setProfileForm((prev) => ({ ...prev, complemento: e.target.value }))} placeholder="Complemento" style={S.formInput} />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 8 }}>
+                    <input value={profileForm.bairro} onChange={(e) => setProfileForm((prev) => ({ ...prev, bairro: e.target.value }))} placeholder="Bairro" style={S.formInput} />
+                    <input value={profileForm.cidade} onChange={(e) => setProfileForm((prev) => ({ ...prev, cidade: e.target.value }))} placeholder="Cidade" style={S.formInput} />
+                    <input value={profileForm.estado} onChange={(e) => setProfileForm((prev) => ({ ...prev, estado: e.target.value }))} placeholder="UF" style={S.formInput} />
+                  </div>
+
+                  <button type="button" onClick={() => setProfileForm((prev) => ({ ...prev, usar_endereco_entrega_diferente: !prev.usar_endereco_entrega_diferente }))} style={{ justifySelf: 'start', background: 'transparent', border: '1.5px solid #e7e5e4', color: '#f97316', borderRadius: 8, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    {profileForm.usar_endereco_entrega_diferente ? '− Remover endereço alternativo' : '+ Adicionar endereço de entrega diferente'}
                   </button>
-                  <button className="btn-secondary" type="button" onClick={logoutCustomer}>Sair</button>
-                </div>
-              </form>
 
-              <div style={{ fontSize: 12, color: '#64748b' }}>
-                Lista de desejos: {wishlist.length} item(ns) • Avise-me: {notifyRequests.length} solicitação(ões)
+                  {profileForm.usar_endereco_entrega_diferente && (
+                    <div style={{ display: 'grid', gap: 8, background: '#faf7f4', border: '1px solid #e7e5e4', borderRadius: 12, padding: 14 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>Endereço de entrega alternativo</div>
+                      <input value={profileForm.entrega_nome} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_nome: e.target.value }))} placeholder="Nome para entrega" style={S.formInput} />
+                      <input value={profileForm.entrega_cep} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_cep: e.target.value }))} onBlur={handleDeliveryCepBlur} placeholder="CEP" style={S.formInput} />
+                      <input value={profileForm.entrega_endereco} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_endereco: e.target.value }))} placeholder="Rua / Avenida" style={S.formInput} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: 8 }}>
+                        <input value={profileForm.entrega_numero} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_numero: e.target.value }))} placeholder="Número" style={S.formInput} />
+                        <input value={profileForm.entrega_complemento} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_complemento: e.target.value }))} placeholder="Complemento" style={S.formInput} />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: 8 }}>
+                        <input value={profileForm.entrega_bairro} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_bairro: e.target.value }))} placeholder="Bairro" style={S.formInput} />
+                        <input value={profileForm.entrega_cidade} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_cidade: e.target.value }))} placeholder="Cidade" style={S.formInput} />
+                        <input value={profileForm.entrega_estado} onChange={(e) => setProfileForm((prev) => ({ ...prev, entrega_estado: e.target.value }))} placeholder="UF" style={S.formInput} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button type="submit" disabled={profileSaving} style={S.saveBtn}>
+                      {profileSaving ? 'Salvando...' : '✓ Salvar cadastro'}
+                    </button>
+                    <button type="button" onClick={logoutCustomer} style={{ background: '#f1f5f9', border: '1.5px solid #e5e7eb', color: '#ef4444', borderRadius: 10, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                      Sair da conta
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <div style={{ background: '#fff', padding: 16, borderRadius: 8 }}>
-                <h3 style={{ marginTop: 0 }}>Cadastro</h3>
-                <form onSubmit={handleRegister} autoComplete="off" style={{ display: 'grid', gap: 8 }}>
-                  <input name="ecommerce_register_nome" autoComplete="off" value={registerForm.nome} onChange={(e) => setRegisterForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <input name="ecommerce_register_email" autoComplete="off" value={registerForm.email} onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                    <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showRegisterPassword ? 'text' : 'password'} style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                    <button className="btn-secondary" type="button" onClick={() => setShowRegisterPassword((prev) => !prev)}>
-                      {showRegisterPassword ? 'Ocultar' : '👁 Mostrar'}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+              {/* Cadastro */}
+              <div style={S.accountCard}>
+                <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 14 }}>Criar conta</div>
+                <form onSubmit={handleRegister} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
+                  <input name="ecommerce_register_nome" autoComplete="off" value={registerForm.nome} onChange={(e) => setRegisterForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={S.formInput} />
+                  <input name="ecommerce_register_email" autoComplete="off" value={registerForm.email} onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
+                  <div style={{ position: 'relative' }}>
+                    <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showRegisterPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
+                    <button type="button" onClick={() => setShowRegisterPassword((prev) => !prev)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
+                      {showRegisterPassword ? 'Ocultar' : '👁 Ver'}
                     </button>
                   </div>
-                  <button className="btn-primary" type="submit" disabled={authLoading} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>Cadastrar</button>
+                  <button type="submit" disabled={authLoading} style={S.saveBtn}>{authLoading ? 'Criando...' : 'Criar minha conta'}</button>
                 </form>
               </div>
 
-              <div style={{ background: '#fff', padding: 16, borderRadius: 8 }}>
-                <h3 style={{ marginTop: 0 }}>Login</h3>
-                <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'grid', gap: 8 }}>
-                  <input name="ecommerce_login_email" autoComplete="off" value={loginForm.email} onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
-                    <input name="ecommerce_login_password" autoComplete="new-password" value={loginForm.password} onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showLoginPassword ? 'text' : 'password'} style={{ padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-                    <button className="btn-secondary" type="button" onClick={() => setShowLoginPassword((prev) => !prev)}>
-                      {showLoginPassword ? 'Ocultar' : '👁 Mostrar'}
+              {/* Login */}
+              <div style={S.accountCard}>
+                <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 14 }}>Entrar</div>
+                <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
+                  <input name="ecommerce_login_email" autoComplete="off" value={loginForm.email} onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
+                  <div style={{ position: 'relative' }}>
+                    <input name="ecommerce_login_password" autoComplete="new-password" value={loginForm.password} onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showLoginPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
+                    <button type="button" onClick={() => setShowLoginPassword((prev) => !prev)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
+                      {showLoginPassword ? 'Ocultar' : '👁 Ver'}
                     </button>
                   </div>
-                  <button className="btn-primary" type="submit" disabled={authLoading} style={{ background: '#6366f1', border: 'none', color: '#fff', borderRadius: 10, fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}>Entrar</button>
+                  <button type="submit" disabled={authLoading} style={S.saveBtn}>{authLoading ? 'Entrando...' : 'Entrar'}</button>
                 </form>
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
+
       {/* ── Modal Avise-me ── */}
       {notifyMeModal.open && (
         <div
           role="dialog"
           aria-modal="true"
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
         >
           <div
-            style={{ background: '#fff', borderRadius: 16, padding: 28, maxWidth: 400, width: '100%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+            style={{ background: '#fff', borderRadius: 18, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', border: '1px solid #e5e7eb' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>🔔 Avise-me quando chegar</h3>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280' }}>
-              <strong>{notifyMeModal.product?.nome}</strong> está sem estoque no momento.
-              Digite seu email e avisaremos quando voltar.
+            <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#1c1917' }}>Avise-me quando chegar</h3>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#6b7280' }}>
+              <strong>{notifyMeModal.product?.nome}</strong> está sem estoque agora. Informe seu email e te avisamos quando voltar!
             </p>
             <form onSubmit={submitNotifyMe} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input
-                type="email"
-                required
-                placeholder="seu@email.com"
-                value={notifyMeModal.email}
-                autoFocus
-                onChange={(e) => setNotifyMeModal((prev) => ({ ...prev, email: e.target.value }))}
-                style={{ padding: '10px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none' }}
-              />
+              <input type="email" required placeholder="seu@email.com" value={notifyMeModal.email} autoFocus onChange={(e) => setNotifyMeModal((prev) => ({ ...prev, email: e.target.value }))} style={S.formInput} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: '1.5px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={notifyMeModal.loading}
-                  style={{ flex: 2, padding: '10px 0', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: notifyMeModal.loading ? 0.7 : 1 }}
-                >
-                  {notifyMeModal.loading ? 'Registrando…' : 'Me avise!'}
+                <button type="button" onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+                <button type="submit" disabled={notifyMeModal.loading} style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: notifyMeModal.loading ? 0.7 : 1 }}>
+                  {notifyMeModal.loading ? 'Registrando…' : '🔔 Me avise!'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* ── Footer ── */}
+      <footer style={S.footer}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 20, color: '#fff', marginBottom: 8 }}>
+              🐾 {tenantContext?.nome_fantasia || tenantContext?.nome || 'Pet Store'}
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
+              Produtos de qualidade para o seu pet com carinho e dedicação. Compre online com facilidade!
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Navegação</div>
+            {[{ l: '🛍️ Loja', v: 'loja' }, { l: '🛒 Carrinho', v: 'carrinho' }, { l: '📦 Pedidos', v: 'pedidos' }, { l: '👤 Conta', v: 'conta' }].map(({ l, v }) => (
+              <button key={v} onClick={() => setView(v)} style={{ display: 'block', background: 'none', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', padding: '3px 0', textAlign: 'left' }}>{l}</button>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Contato</div>
+            {tenantContext?.whatsapp && (
+              <a href={`https://wa.me/55${tenantContext.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 13, textDecoration: 'none', marginBottom: 4 }}>📱 WhatsApp</a>
+            )}
+            {tenantContext?.email && (
+              <a href={`mailto:${tenantContext.email}`} style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 13, textDecoration: 'none' }}>✉️ {tenantContext.email}</a>
+            )}
+            {tenantContext?.cidade && (
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 8 }}>📍 {tenantContext.cidade}{tenantContext.uf ? `, ${tenantContext.uf}` : ''}</div>
+            )}
+          </div>
+        </div>
+        <div style={{ maxWidth: 1100, margin: '20px auto 0', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
+          © {new Date().getFullYear()} {tenantContext?.nome_fantasia || tenantContext?.nome || 'Pet Store'}. Todos os direitos reservados.
+        </div>
+      </footer>
     </div>
   );
 }

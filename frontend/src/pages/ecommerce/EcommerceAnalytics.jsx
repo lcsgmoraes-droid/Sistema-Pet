@@ -47,7 +47,6 @@ export default function EcommerceAnalytics() {
   const [demanda, setDemanda] = useState([])
   const [maisVendidos, setMaisVendidos] = useState([])
   const [pedidosRecentes, setPedidosRecentes] = useState([])
-  const [gaData, setGaData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -66,13 +65,6 @@ export default function EcommerceAnalytics() {
         setDemanda(r2.data)
         setMaisVendidos(r3.data)
         setPedidosRecentes(r4.data)
-        // GA4 é opcional — não trava o resto se falhar
-        try {
-          const r5 = await api.get('/ecommerce-analytics/ga-data')
-          setGaData(r5.data)
-        } catch {
-          setGaData({ disponivel: false, motivo: 'Endpoint GA4 não disponível neste ambiente' })
-        }
       } catch (e) {
         setError('Erro ao carregar dados de analytics.')
       } finally {
@@ -102,9 +94,6 @@ export default function EcommerceAnalytics() {
         <StatCard icon="🛒" label="Carrinhos abandonados" value={resumo?.carrinhos_abandonados ?? 0} sub="Há mais de 1h sem finalizar" color="#f59e0b" />
         <StatCard icon="🔔" label="Avise-me pendentes" value={resumo?.avise_me_pendentes ?? 0} sub="Clientes aguardando reposição" color="#ef4444" />
       </div>
-
-      {/* Seção Google Analytics */}
-      <GaSection gaData={gaData} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 24 }}>
         {/* Demanda reprimida */}
@@ -221,91 +210,6 @@ export default function EcommerceAnalytics() {
             </tbody>
           </table>
         )}
-      </div>
-    </div>
-  )
-}
-
-function GaSection({ gaData }) {
-  if (!gaData) return null
-
-  if (!gaData.disponivel) {
-    return (
-      <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: 24, color: '#9ca3af', textAlign: 'center' }}>
-        <span style={{ fontSize: 24 }}>📡</span>
-        <div style={{ marginTop: 8, fontSize: 14 }}>Dados do Google Analytics não disponíveis ainda.</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>{gaData.motivo}</div>
-      </div>
-    )
-  }
-
-  // Formata data YYYYMMDD → DD/MM
-  function fmtDia(d) {
-    if (!d || d.length < 8) return d
-    return `${d.slice(6, 8)}/${d.slice(4, 6)}`
-  }
-
-  // Para o mini gráfico de barras
-  const maxSessoes = Math.max(...(gaData.visitantes_por_dia?.map(d => d.sessoes) || [1]), 1)
-
-  return (
-    <div style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 22 }}>📈</span>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 17, color: '#1f2937' }}>Comportamento dos visitantes</div>
-          <div style={{ fontSize: 13, color: '#9ca3af' }}>Google Analytics — {gaData.periodo}</div>
-        </div>
-      </div>
-
-      {/* Cards GA */}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 20 }}>
-        <StatCard icon="👥" label="Usuários ativos" value={gaData.usuarios_ativos?.toLocaleString('pt-BR')} sub="30 dias" color="#6366f1" />
-        <StatCard icon="🔗" label="Sessões" value={gaData.sessoes?.toLocaleString('pt-BR')} sub="30 dias" color="#3b82f6" />
-        <StatCard icon="📄" label="Visualizações" value={gaData.page_views?.toLocaleString('pt-BR')} sub="páginas vistas" color="#10b981" />
-        <StatCard icon="⏱️" label="Tempo médio" value={gaData.duracao_media} sub="por sessão" color="#f59e0b" />
-        <StatCard icon="↩️" label="Taxa de rejeição" value={`${gaData.bounce_rate}%`} sub="saíram sem interagir" color="#ef4444" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
-        {/* Gráfico de barras simples — sessões por dia */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 16, fontSize: 14 }}>Sessões por dia</div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 100, overflowX: 'auto' }}>
-            {gaData.visitantes_por_dia?.map((d, i) => (
-              <div key={i} title={`${fmtDia(d.data)}: ${d.sessoes} sessões`}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto', minWidth: 18 }}>
-                <div style={{
-                  width: 14, background: '#6366f1', borderRadius: '3px 3px 0 0',
-                  height: `${Math.max(4, Math.round((d.sessoes / maxSessoes) * 90))}px`,
-                  transition: 'height 0.3s',
-                }} />
-                {i % 7 === 0 && <div style={{ fontSize: 9, color: '#9ca3af', marginTop: 3, whiteSpace: 'nowrap' }}>{fmtDia(d.data)}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top páginas */}
-        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-          <div style={{ fontWeight: 600, color: '#1f2937', marginBottom: 14, fontSize: 14 }}>Páginas mais vistas</div>
-          {gaData.top_paginas?.map((p, i) => (
-            <div key={i} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-                <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                  {p.pagina === '/' ? '🏠 Início' : p.pagina}
-                </span>
-                <span style={{ color: '#6b7280', fontWeight: 600 }}>{p.visualizacoes}</span>
-              </div>
-              <div style={{ background: '#e5e7eb', borderRadius: 99, height: 4 }}>
-                <div style={{
-                  background: '#6366f1', borderRadius: 99, height: 4,
-                  width: `${Math.round((p.visualizacoes / (gaData.top_paginas[0]?.visualizacoes || 1)) * 100)}%`
-                }} />
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   )

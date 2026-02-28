@@ -29,6 +29,7 @@ class User(BaseTenantModel):
     telefone = Column(String(50), nullable=True)
     cpf_cnpj = Column(String(20), nullable=True)
     foto_url = Column(String(500), nullable=True)
+    push_token = Column(String(500), nullable=True)  # Expo / FCM push token (App Mobile)
     
     # LGPD Compliance
     consent_date = Column(DateTime(timezone=True), nullable=True)  # Data de aceite dos Termos

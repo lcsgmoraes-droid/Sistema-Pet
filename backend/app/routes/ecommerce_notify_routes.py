@@ -154,8 +154,42 @@ def notificar_clientes_estoque_disponivel(
     if not pending:
         return 0
 
+    # Coletar push tokens dos usuários cadastrados para este produto
+    from app.models import User
+    import requests as http_requests
+
+    def _send_expo_push(tokens: list, title: str, body: str, data: dict = None):
+        """Envia push via Expo Push API para uma lista de tokens."""
+        if not tokens:
+            return
+        messages = [
+            {
+                "to": token,
+                "sound": "default",
+                "title": title,
+                "body": body,
+                "data": data or {},
+            }
+            for token in tokens
+            if token and token.startswith("ExponentPushToken")
+        ]
+        if not messages:
+            return
+        try:
+            http_requests.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={"Content-Type": "application/json"},
+                timeout=10,
+            )
+        except Exception as e_push:
+            logger.warning("[AVISE-ME] Erro ao enviar push: %s", e_push)
+
     count = 0
+    push_tokens = []
+
     for req in pending:
+        # Enviar e-mail
         sent = send_notify_me_email(
             to=req.email,
             product_name=product_name or req.product_name or "Produto",
@@ -167,7 +201,31 @@ def notificar_clientes_estoque_disponivel(
             req.notified_at = datetime.now(timezone.utc)
             count += 1
 
+        # Coletar push token do usuário (se tiver)
+        user = db.query(User).filter(
+            User.tenant_id == tenant_id,
+            User.email == req.email,
+        ).first()
+        if user and getattr(user, 'push_token', None):
+            push_tokens.append(user.push_token)
+
     db.commit()
+
+    # Enviar push em lote para todos que tinham token
+    _send_expo_push(
+        tokens=push_tokens,
+        title="📦 Produto disponível!",
+        body=f"{product_name or 'Produto'} voltou ao estoque. Corre antes que acabe!",
+        data={"product_id": product_id, "type": "stock_available"},
+    )
+    if push_tokens:
+        logger.info(
+            "[AVISE-ME] %d push(es) enviado(s) para produto #%d (%s)",
+            len(push_tokens),
+            product_id,
+            product_name,
+        )
+
     logger.info(
         "[AVISE-ME] %d email(s) enviado(s) para produto #%d (%s)",
         count,

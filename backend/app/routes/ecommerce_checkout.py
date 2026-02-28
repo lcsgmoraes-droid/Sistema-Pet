@@ -2,6 +2,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 import hashlib
 import json
+import logging
 import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
@@ -14,9 +15,15 @@ from sqlalchemy import text
 from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
+from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
+from app.models import Cliente
 from app.pedido_models import Pedido, PedidoItem
+from app.utils.timezone import now_brasilia
+from app.vendas_models import Venda as VendaPDV, VendaItem as VendaItemPDV, VendaPagamento as VendaPagPDV
+from app.vendas.service import VendaService
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/checkout", tags=["ecommerce-checkout"])
 security = HTTPBearer()
@@ -56,6 +63,8 @@ class CheckoutFinalizarRequest(BaseModel):
     endereco_entrega: str | None = None
     cupom: str | None = None
     tipo_retirada: str | None = None  # proprio, terceiro (usado quando delivery_mode=retirada)
+    forma_pagamento_nome: str | None = None  # Nome da forma de pagamento selecionada pelo cliente
+    origem: str | None = None  # 'app' | 'web' — canal de origem do pedido
 
 
 def _current_identity(credentials: HTTPAuthorizationCredentials = Depends(security)) -> EcommerceIdentity:
@@ -212,6 +221,29 @@ def _calcular_desconto(subtotal: float, cupom: str | None) -> tuple[str | None, 
     return codigo, percentual, valor
 
 
+@router.get("/formas-pagamento")
+def listar_formas_pagamento(
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Lista as formas de pagamento ativas cadastradas no ERP."""
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.tenant_id == identity.tenant_id,
+            FormaPagamento.ativo == True,
+        )
+        .order_by(FormaPagamento.nome)
+        .all()
+    )
+    return {
+        "formas_pagamento": [
+            {"id": f.id, "nome": f.nome, "tipo": f.tipo}
+            for f in formas
+        ]
+    }
+
+
 @router.post("/calcular-frete")
 def calcular_frete_local(
     payload: CheckoutCalcularFreteRequest,
@@ -318,7 +350,20 @@ def finalizar_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
-    frete = _frete_local_por_cidade(db, identity.tenant_id, payload.cidade_destino)
+
+    # Retirada na loja (próprio, terceiro ou app_loja): não valida frete por cidade
+    if payload.tipo_retirada in ("proprio", "terceiro", "app_loja"):
+        frete = {
+            "disponivel": True,
+            "valor_frete": 0.0,
+            "prazo_estimado": "Retirada na loja",
+            "tipo": "retirada",
+            "cidade_loja": None,
+            "cidade_destino": payload.cidade_destino,
+        }
+    else:
+        frete = _frete_local_por_cidade(db, identity.tenant_id, payload.cidade_destino)
+
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, payload.cupom)
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
@@ -326,9 +371,10 @@ def finalizar_checkout(
     carrinho.status = "pendente"
 
     # Tipo de retirada e palavra-chave para terceiro retirar
-    tipo_retirada = payload.tipo_retirada  # 'proprio' | 'terceiro' | None
+    tipo_retirada = payload.tipo_retirada  # 'proprio' | 'terceiro' | 'app_loja' | None
     palavra_chave = None
-    if tipo_retirada == "terceiro":
+    if tipo_retirada in ("terceiro", "app_loja"):
+        # app_loja: cliente comprou pelo app, vai à loja e fala a palavra no caixa
         palavra_chave = _gerar_palavra_chave_retirada()
     carrinho.tipo_retirada = tipo_retirada
     carrinho.palavra_chave_retirada = palavra_chave
@@ -356,8 +402,118 @@ def finalizar_checkout(
         idem_row.response_body = json.dumps(response, ensure_ascii=False)
         idem_row.completed_at = datetime.utcnow()
 
+    # Atualizar origem do carrinho se informada no payload (app envia 'app', web envia 'web' ou omite)
+    if payload.origem:
+        carrinho.origem = payload.origem
     db.commit()
     db.refresh(carrinho)
+
+    # ================================================================
+    # CRIAR VENDA NO PDV (status=aberta — pedido entra no caixa agora)
+    # ================================================================
+    try:
+        # Canal: app → 'aplicativo', ecommerce web → 'ecommerce'
+        canal_pdv = 'aplicativo' if getattr(carrinho, 'origem', 'web') == 'app' else 'ecommerce'
+
+        # Usuário admin do tenant (representante do sistema como vendedor)
+        admin_row = db.execute(
+            text(
+                "SELECT u.id FROM users u "
+                "JOIN user_tenants ut ON ut.user_id = u.id "
+                "WHERE ut.tenant_id = :tid ORDER BY u.id LIMIT 1"
+            ),
+            {"tid": identity.tenant_id},
+        ).fetchone()
+        admin_user_id = admin_row[0] if admin_row else 1
+
+        # Cliente do ERP vinculado ao usuário ecommerce
+        cliente_erp = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == identity.tenant_id,
+                Cliente.user_id == identity.user_id,
+            )
+            .first()
+        )
+        cliente_pdv_id = cliente_erp.id if cliente_erp else None
+
+        # Gerar número da venda
+        numero_venda = VendaService._gerar_numero_venda(db, admin_user_id)
+
+        # Taxa de entrega
+        taxa_entrega_val = float(frete.get("valor_frete", 0))
+        tem_entrega_pdv = taxa_entrega_val > 0 or bool(payload.endereco_entrega)
+
+        # Venda principal
+        venda_pdv = VendaPDV(
+            numero_venda=numero_venda,
+            cliente_id=cliente_pdv_id,
+            vendedor_id=admin_user_id,
+            subtotal=float(subtotal),
+            desconto_valor=float(desconto),
+            desconto_percentual=0,
+            total=float(total),
+            status='aberta',
+            canal=canal_pdv,
+            tem_entrega=tem_entrega_pdv,
+            taxa_entrega=taxa_entrega_val,
+            percentual_taxa_loja=100,
+            percentual_taxa_entregador=0,
+            valor_taxa_loja=taxa_entrega_val,
+            valor_taxa_entregador=0,
+            endereco_entrega=payload.endereco_entrega,
+            tipo_retirada=tipo_retirada,
+            palavra_chave_retirada=palavra_chave,
+            observacoes=f"Pedido #{carrinho.pedido_id}",
+            data_venda=now_brasilia(),
+            user_id=admin_user_id,
+            tenant_id=identity.tenant_id,
+        )
+        venda_pdv.id = None
+        db.add(venda_pdv)
+        db.flush()
+
+        # Itens
+        for item in itens:
+            vi = VendaItemPDV(
+                venda_id=venda_pdv.id,
+                tenant_id=identity.tenant_id,
+                tipo='produto',
+                produto_id=item.produto_id,
+                quantidade=float(item.quantidade),
+                preco_unitario=float(item.preco_unitario),
+                desconto_item=0,
+                subtotal=float(item.subtotal),
+            )
+            vi.id = None
+            db.add(vi)
+
+        # Pagamento (forma escolhida pelo cliente ou 'outros' como padrão)
+        forma_pag_nome = payload.forma_pagamento_nome or 'outros'
+        vpag = VendaPagPDV(
+            venda_id=venda_pdv.id,
+            tenant_id=identity.tenant_id,
+            forma_pagamento=forma_pag_nome,
+            valor=float(total),
+            status='pendente',
+        )
+        vpag.id = None
+        db.add(vpag)
+
+        db.commit()
+
+        response["venda_pdv_id"] = venda_pdv.id
+        response["venda_pdv_numero"] = numero_venda
+        logger.info(
+            f"✅ Checkout → PDV: Venda #{numero_venda} criada "
+            f"(status=aberta, canal={canal_pdv}, forma={forma_pag_nome})"
+        )
+    except Exception as _e:
+        logger.error(f"⚠️ Checkout → PDV: falha ao criar venda: {_e}", exc_info=True)
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
     return response
 
@@ -390,9 +546,11 @@ def listar_pedidos_cliente(
             "pedido_id": pedido.pedido_id,
             "status": pedido.status,
             "total": float(pedido.total or 0.0),
+            "origem": pedido.origem or '-',
             "tipo_retirada": pedido.tipo_retirada,
             "palavra_chave_retirada": pedido.palavra_chave_retirada,
             "created_at": pedido.created_at.isoformat() if pedido.created_at else None,
+            "itens_count": len(itens),
             "itens": [
                 {
                     "produto_id": item.produto_id,
