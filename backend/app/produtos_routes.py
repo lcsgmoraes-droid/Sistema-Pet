@@ -2912,6 +2912,7 @@ async def upload_imagem_produto(
     - Primeira imagem Ã© automaticamente marcada como principal
     """
     try:
+        current_user, tenant_id = user_and_tenant
         logger.info(f"[UPLOAD] Iniciando upload para produto {produto_id}")
         
         # Verificar se produto existe e pertence ao usuÃ¡rio
