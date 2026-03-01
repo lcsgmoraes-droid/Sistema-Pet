@@ -30,8 +30,10 @@ interface TenantState {
 
   // Carrega do storage persistido
   loadTenant: () => Promise<void>;
-  // Busca na API pelo slug e salva
-  selecionarPorSlug: (slug: string) => Promise<TenantInfo>;
+  // Consulta a API pelo slug SEM salvar (só para preview)
+  buscarPorSlug: (slug: string) => Promise<TenantInfo>;
+  // Salva o tenant no storage e atualiza o store (confirmar seleção)
+  confirmarTenant: (tenant: TenantInfo) => Promise<void>;
   // Remove a loja vinculada (forçar re-seleção)
   limparTenant: () => Promise<void>;
 }
@@ -57,7 +59,7 @@ export const useTenantStore = create<TenantState>()((set) => ({
     }
   },
 
-  selecionarPorSlug: async (slug: string) => {
+  buscarPorSlug: async (slug: string) => {
     // Normaliza: remove URL se o usuário colou a URL completa
     // Ex: "https://mlprohub.com.br/atacadao" → "atacadao"
     const slugLimpo = slug
@@ -74,15 +76,17 @@ export const useTenantStore = create<TenantState>()((set) => ({
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || 'Loja não encontrada');
+      throw new Error(body.detail || 'Loja não encontrada. Verifique o código.');
     }
 
     const tenant: TenantInfo = await response.json();
+    return tenant; // SÓ retorna — não salva ainda
+  },
 
-    // Persiste
+  confirmarTenant: async (tenant: TenantInfo) => {
+    // Persiste e atualiza o store — AppNavigator vai navegar automaticamente
     await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(tenant));
     set({ tenant });
-    return tenant;
   },
 
   limparTenant: async () => {

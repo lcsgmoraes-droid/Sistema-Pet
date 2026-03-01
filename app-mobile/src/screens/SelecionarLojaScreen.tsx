@@ -19,7 +19,7 @@ import { useTenantStore, TenantInfo } from '../store/tenant.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 
 export default function SelecionarLojaScreen() {
-  const { selecionarPorSlug } = useTenantStore();
+  const { buscarPorSlug, confirmarTenant } = useTenantStore();
 
   const [slug, setSlug] = useState('');
   const [carregando, setCarregando] = useState(false);
@@ -39,7 +39,8 @@ export default function SelecionarLojaScreen() {
     setCarregando(true);
     setLojaPrevia(null);
     try {
-      const loja = await selecionarPorSlug(slugDigitado);
+      // Só consulta, não salva ainda — aguarda confirmação do usuário
+      const loja = await buscarPorSlug(slugDigitado);
       setLojaPrevia(loja);
     } catch (err: any) {
       Alert.alert(
@@ -58,10 +59,10 @@ export default function SelecionarLojaScreen() {
     if (!lojaPrevia) return;
     setCarregando(true);
     try {
-      // Já foi salvo no store ao buscar — só precisamos aguardar
-      await selecionarPorSlug(lojaPrevia.slug);
-    } catch (_) {
-      // já salvo
+      // Agora salva no SecureStore e atualiza o store — AppNavigator vai navegar
+      await confirmarTenant(lojaPrevia);
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível vincular a loja. Tente novamente.');
     } finally {
       setCarregando(false);
     }
