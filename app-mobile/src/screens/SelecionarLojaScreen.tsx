@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useTenantStore, TenantInfo } from '../../store/tenant.store';
-import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
+import { useTenantStore, TenantInfo } from '../store/tenant.store';
+import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 
 export default function SelecionarLojaScreen() {
   const { selecionarPorSlug } = useTenantStore();
