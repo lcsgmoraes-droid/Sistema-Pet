@@ -201,24 +201,90 @@ BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
 _bling_token_stop_event = threading.Event()
 _bling_token_thread: Optional[threading.Thread] = None
 
+# Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
+_BLING_LOCK_FILE = "/tmp/bling_token_renewal.lock"
+_BLING_LAST_RENEWAL_FILE = "/tmp/bling_token_last_renewal.txt"
+# Janela de segurança: se outro worker renovou há menos de 60s, apenas recarrega do .env
+_BLING_RENEWAL_COOLDOWN = 60
+
+
+def _bling_recarregar_tokens_do_env():
+    """Relê o access_token e refresh_token do .env e atualiza os.environ."""
+    import os as _os
+    try:
+        from dotenv import dotenv_values
+        env_path = "/opt/petshop/.env"
+        if _os.path.exists(env_path):
+            vals = dotenv_values(env_path)
+            if vals.get("BLING_ACCESS_TOKEN"):
+                _os.environ["BLING_ACCESS_TOKEN"] = vals["BLING_ACCESS_TOKEN"]
+            if vals.get("BLING_REFRESH_TOKEN"):
+                _os.environ["BLING_REFRESH_TOKEN"] = vals["BLING_REFRESH_TOKEN"]
+    except Exception as e:
+        logger.warning(f"[BLING] ⚠️ Erro ao recarregar tokens do .env: {e}")
+
 
 def _loop_renovacao_token_bling():
-    """Loop em background para renovar token Bling periodicamente."""
-    logger.info("[BLING] Job de renovação automática iniciado (intervalo: 5h)")
+    """
+    Loop em background para renovar token Bling periodicamente.
+    Usa um arquivo de lock para garantir que apenas um dos múltiplos
+    workers uvicorn execute a renovação — os demais apenas recarregam
+    o token atualizado do .env.
+    """
+    import os as _os
+    worker_pid = _os.getpid()
+    logger.info(f"[BLING] Job de renovação automática iniciado (PID {worker_pid}, intervalo: 5h)")
 
     while not _bling_token_stop_event.is_set():
         try:
-            from app.bling_integration import BlingAPI
+            # Tenta importar fcntl (disponível no Linux/servidor)
+            try:
+                import fcntl
+                has_fcntl = True
+            except ImportError:
+                has_fcntl = False
 
-            bling = BlingAPI()
-            bling.renovar_access_token()
-            logger.info("[BLING] ✅ Token renovado automaticamente")
+            if has_fcntl:
+                # Coordenação via file lock entre workers
+                with open(_BLING_LOCK_FILE, "w") as lock_f:
+                    fcntl.flock(lock_f, fcntl.LOCK_EX)
+                    try:
+                        now = time.time()
+                        recently_renewed = False
+                        if _os.path.exists(_BLING_LAST_RENEWAL_FILE):
+                            try:
+                                with open(_BLING_LAST_RENEWAL_FILE, "r") as tf:
+                                    last_ts = float(tf.read().strip())
+                                if now - last_ts < _BLING_RENEWAL_COOLDOWN:
+                                    recently_renewed = True
+                            except Exception:
+                                pass
+
+                        if recently_renewed:
+                            logger.info(f"[BLING] PID {worker_pid} — token já renovado por outro worker, recarregando do .env")
+                            _bling_recarregar_tokens_do_env()
+                        else:
+                            from app.bling_integration import BlingAPI
+                            bling = BlingAPI()
+                            bling.renovar_access_token()
+                            with open(_BLING_LAST_RENEWAL_FILE, "w") as tf:
+                                tf.write(str(time.time()))
+                            logger.info(f"[BLING] ✅ PID {worker_pid} — Token renovado automaticamente")
+                    finally:
+                        fcntl.flock(lock_f, fcntl.LOCK_UN)
+            else:
+                # Ambiente de desenvolvimento (Windows) — renova diretamente
+                from app.bling_integration import BlingAPI
+                bling = BlingAPI()
+                bling.renovar_access_token()
+                logger.info(f"[BLING] ✅ Token renovado automaticamente")
+
         except Exception as e:
-            logger.warning(f"[BLING] ⚠️ Falha na renovação automática do token: {e}")
+            logger.warning(f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}")
 
         _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
 
-    logger.info("[BLING] Job de renovação automática finalizado")
+    logger.info(f"[BLING] Job de renovação automática finalizado (PID {worker_pid})")
 
 # ============================================================================
 # CONFIGURAR SISTEMA DE EVENTOS DE DOMÍNIO
