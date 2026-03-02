@@ -221,9 +221,9 @@ def status_sincronizacao(
         if sync.bling_produto_id:
             try:
                 bling = BlingAPI()
-                produto_bling = bling.consultar_produto(sync.bling_produto_id)
-                if produto_bling:
-                    estoque_bling = float(produto_bling.get('estoques', {}).get('saldoVirtualTotal', 0))
+                saldo = bling.consultar_saldo_estoque(sync.bling_produto_id)
+                if saldo:
+                    estoque_bling = float(saldo.get('saldoFisicoTotal', 0))
                     divergencia = (produto.estoque_atual or 0) - estoque_bling
             except Exception as e:
                 logger.error(f"❌ Erro ao consultar Bling: {e}")
@@ -294,9 +294,9 @@ def reconciliar_estoque(
             logger.info(f"✅ Sistema → Bling: {estoque_novo}")
             
         elif origem == "bling":
-            # Busca valor do Bling
-            produto_bling = bling.consultar_produto(sync.bling_produto_id)
-            estoque_novo = float(produto_bling.get('estoques', {}).get('saldoVirtualTotal', 0))
+            # Busca valor do Bling (saldo físico real)
+            saldo = bling.consultar_saldo_estoque(sync.bling_produto_id)
+            estoque_novo = float(saldo.get('saldoFisicoTotal', 0))
             produto.estoque_atual = estoque_novo
             logger.info(f"✅ Bling → Sistema: {estoque_novo}")
             
@@ -427,3 +427,103 @@ async def webhook_bling(
         return {"status": "error", "message": str(e)}
 
 logger.info("✅ Módulo de sincronização Bling carregado")
+
+
+# ============================================================================
+# VINCULAR TODOS POR SKU
+# ============================================================================
+
+@router.post("/vincular-todos")
+def vincular_todos_por_sku(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Vincula automaticamente produtos do sistema com o Bling pelo código (SKU).
+
+    Para cada produto sem vínculo:
+    - Busca no Bling pelo campo `codigo`
+    - Se encontrar, cria ou atualiza ProdutoBlingSync com o ID do Bling
+    - Produtos do tipo PAI são ignorados
+
+    Retorna resumo com vinculados, não encontrados e erros.
+    """
+    logger.info("🔗 Iniciando vinculação em massa por SKU")
+
+    # Produtos sem vínculo ou com bling_produto_id vazio
+    subq_vinculados = (
+        db.query(ProdutoBlingSync.produto_id)
+        .filter(ProdutoBlingSync.bling_produto_id.isnot(None))
+        .subquery()
+    )
+
+    produtos_sem_vinculo = (
+        db.query(Produto)
+        .filter(
+            Produto.codigo.isnot(None),
+            Produto.codigo != "",
+            Produto.tipo_produto != "PAI"
+        )
+        .filter(Produto.id.notin_(subq_vinculados))
+        .all()
+    )
+
+    total = len(produtos_sem_vinculo)
+    vinculados = []
+    nao_encontrados = []
+    erros = []
+
+    logger.info(f"📦 {total} produtos sem vínculo para processar")
+
+    bling = BlingAPI()
+
+    for produto in produtos_sem_vinculo:
+        try:
+            resultado = bling.listar_produtos(codigo=produto.codigo)
+            itens_bling = resultado.get("data", [])
+
+            if not itens_bling:
+                nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
+                continue
+
+            bling_produto = itens_bling[0]
+            bling_produto_id = str(bling_produto.get("id"))
+
+            # Buscar ou criar configuracao
+            sync = db.query(ProdutoBlingSync).filter(ProdutoBlingSync.produto_id == produto.id).first()
+            if not sync:
+                sync = ProdutoBlingSync(produto_id=produto.id)
+                db.add(sync)
+
+            sync.bling_produto_id = bling_produto_id
+            sync.sincronizar = True
+            sync.status = "ativo"
+            sync.erro_mensagem = None
+            sync.updated_at = datetime.utcnow()
+
+            vinculados.append({
+                "produto_id": produto.id,
+                "codigo": produto.codigo,
+                "nome": produto.nome,
+                "bling_produto_id": bling_produto_id
+            })
+
+            logger.info(f"✅ Vinculado: {produto.codigo} → Bling ID {bling_produto_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Erro ao vincular produto {produto.codigo}: {e}")
+            erros.append({"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)})
+
+    db.commit()
+
+    logger.info(f"🔗 Vinculação concluída: {len(vinculados)} vinculados, {len(nao_encontrados)} não encontrados, {len(erros)} erros")
+
+    return {
+        "total_processados": total,
+        "vinculados": len(vinculados),
+        "nao_encontrados_no_bling": len(nao_encontrados),
+        "erros": len(erros),
+        "detalhes_vinculados": vinculados,
+        "detalhes_nao_encontrados": nao_encontrados,
+        "detalhes_erros": erros
+    }

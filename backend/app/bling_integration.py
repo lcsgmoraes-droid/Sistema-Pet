@@ -470,23 +470,62 @@ class BlingAPI:
         resultado = self._request("GET", f"/produtos/{produto_id}")
         return resultado.get('data', resultado)
     
-    def atualizar_estoque_produto(self, produto_id: str, estoque_novo: float, deposito_id: Optional[int] = None) -> Dict:
+    def atualizar_estoque_produto(self, produto_id: str, estoque_novo: float, deposito_id: Optional[int] = None, observacao: str = "") -> Dict:
         """
-        Atualiza estoque de um produto no Bling
-        
+        Atualiza estoque de um produto no Bling via POST /estoques (Balanço absoluto).
+
+        Usa operação "B" (Balanço) para definir o saldo físico exato do produto.
+        Endpoint correto para Bling API v3.
+
         Args:
             produto_id: ID do produto no Bling
-            estoque_novo: Novo saldo de estoque
-            deposito_id: ID do depósito (opcional, usa o padrão se não informado)
+            estoque_novo: Novo saldo físico de estoque (valor absoluto)
+            deposito_id: ID do depósito (opcional, usa BLING_DEPOSITO_ID do .env se não informado)
+            observacao: Observação para o lançamento
         """
-        payload = {
-            "estoque": estoque_novo
+        # Deposito: parâmetro > variável de ambiente > sem especificar (Bling usa o padrão)
+        _deposito_id = deposito_id or os.getenv("BLING_DEPOSITO_ID")
+
+        payload: Dict = {
+            "produto": {"id": int(produto_id)},
+            "operacao": "B",  # B = Balanço: define saldo absoluto
+            "quantidade": float(estoque_novo),
+            "observacoes": observacao or "Sync automático - Sistema Pet Shop"
         }
-        
-        if deposito_id:
-            payload["deposito"] = {"id": deposito_id}
-        
-        return self._request("PUT", f"/produtos/{produto_id}/estoque", data=payload)
+
+        if _deposito_id:
+            payload["deposito"] = {"id": int(_deposito_id)}
+
+        return self._request("POST", "/estoques", data=payload)
+
+    def consultar_saldo_estoque(self, produto_id: str, deposito_id: Optional[int] = None) -> Dict:
+        """
+        Consulta o saldo de estoque de um produto no Bling.
+
+        Retorna saldoFisicoTotal (estoque físico real) e saldoVirtualTotal
+        (descontando reservas de pedidos online).
+
+        Args:
+            produto_id: ID do produto no Bling
+            deposito_id: ID do depósito específico (opcional)
+
+        Returns:
+            dict com saldoFisicoTotal, saldoVirtualTotal e lista de depositos
+        """
+        _deposito_id = deposito_id or os.getenv("BLING_DEPOSITO_ID")
+
+        params: Dict = {"idsProdutos[]": produto_id}
+
+        if _deposito_id:
+            endpoint = f"/estoques/saldos/{_deposito_id}"
+        else:
+            endpoint = "/estoques/saldos"
+
+        resultado = self._request("GET", endpoint, data=params)
+        itens = resultado.get("data", [])
+        if itens:
+            return itens[0]  # Retorna o primeiro (filtrado por produto_id)
+        return {}
     
     def listar_naturezas_operacoes(self) -> Dict:
         """

@@ -1,10 +1,10 @@
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime
 from decimal import Decimal
 
-from app.database.session import get_db
+from app.db import get_session
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 @router.post("/nf")
-async def receber_nf_bling(request: Request, db: Session = next(get_db())):
+async def receber_nf_bling(request: Request, db: Session = Depends(get_session)):
     payload = await request.json()
 
     nf_id = str(payload.get("id"))

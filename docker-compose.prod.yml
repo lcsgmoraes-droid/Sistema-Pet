@@ -64,6 +64,7 @@ services:
       BLING_CLIENT_SECRET: ${BLING_CLIENT_SECRET}
       BLING_ACCESS_TOKEN: ${BLING_ACCESS_TOKEN:-}
       BLING_REFRESH_TOKEN: ${BLING_REFRESH_TOKEN:-}
+      BLING_DEPOSITO_ID: ${BLING_DEPOSITO_ID:-14887364871}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs

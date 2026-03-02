@@ -21,6 +21,15 @@ from app.produtos_models import Produto, ProdutoLote, EstoqueMovimentacao
 logger = logging.getLogger(__name__)
 
 
+def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> None:
+    """Dispara sync de estoque com o Bling em background (fire-and-forget)."""
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto_id, estoque_novo, motivo)
+    except Exception:
+        pass  # Não deixar erro de import/import-circular travar operações de estoque
+
+
 class EstoqueService:
     """Service isolado para operações de estoque"""
     
@@ -228,7 +237,10 @@ class EstoqueService:
             f"Estoque baixado: Produto {produto.nome} - "
             f"Qtd: {quantidade} ({estoque_anterior} → {estoque_novo})"
         )
-        
+
+        # 🔄 Sincronizar com Bling em background (não bloqueia, não falha a operação)
+        _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
+
         return {
             'sucesso': True,
             'estoque_anterior': estoque_anterior,
@@ -319,7 +331,10 @@ class EstoqueService:
             f"Estoque estornado: Produto {produto.nome} - "
             f"Qtd: +{quantidade} ({estoque_anterior} → {estoque_novo})"
         )
-        
+
+        # 🔄 Sincronizar com Bling em background (não bloqueia, não falha o estorno)
+        _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
+
         return {
             'sucesso': True,
             'estoque_anterior': estoque_anterior,
