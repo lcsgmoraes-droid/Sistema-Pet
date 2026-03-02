@@ -100,7 +100,7 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
 
 
 @router.get("/callback", response_class=HTMLResponse)
-async def bling_oauth_callback(request: Request, code: str = None, error: str = None):
+async def bling_oauth_callback(request: Request, code: str = None, error: str = None, state: str = None):
     """
     Endpoint de callback OAuth do Bling.
     O Bling redireciona aqui após o usuário autorizar o aplicativo.
@@ -152,10 +152,14 @@ async def gerar_link_autorizacao(request: Request):
     base_url = str(request.base_url).rstrip("/")
     redirect_uri = f"{base_url}/auth/bling/callback"
 
+    import secrets
+    state = secrets.token_hex(16)
+
     auth_url = (
         f"https://www.bling.com.br/Api/v3/oauth/authorize"
         f"?response_type=code"
         f"&client_id={client_id}"
+        f"&state={state}"
     )
 
     return {
