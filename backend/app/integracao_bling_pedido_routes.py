@@ -204,43 +204,115 @@ def cancelar_pedido_manual(
     return {"status": "ok", "pedido_id": pedido.id}
 
 
+# Situações do pedido Bling que indicam cancelamento
+_SITUACOES_PEDIDO_CANCELADO = {
+    9,   # Cancelado
+    10,  # Cancelado pelo comprador
+    11,  # Cancelado por não pagamento
+}
+
+
 @router.post("/pedido")
 async def receber_pedido_bling(request: Request, db: Session = Depends(get_session)):
-    payload = await request.json()
+    """
+    Recebe webhooks de pedidos do Bling.
+    Formato envelope v1:
+      { eventId, date, version, event: 'order.created'|'order.updated'|'order.deleted', data: {...} }
+    """
+    body = await request.json()
 
-    pedido_id = str(payload.get("id"))
-    numero = payload.get("numero")
-    canal = payload.get("origem", "online")
-    itens = payload.get("itens", [])
+    # Desempacotar envelope Bling (v1)
+    event = body.get("event", "")  # ex: "order.created"
+    data = body.get("data", body)  # fallback p/ payload legado sem envelope
 
-    if not pedido_id:
-        raise HTTPException(status_code=400, detail="Pedido sem ID")
+    pedido_bling_id = str(data.get("id", ""))
+    if not pedido_bling_id or pedido_bling_id == "None":
+        return {"status": "ignorado", "motivo": "sem_id"}
 
+    # ========================
+    # EVENTO: EXCLUÍDO
+    # ========================
+    if event.endswith(".deleted"):
+        pedido = db.query(PedidoIntegrado).filter(
+            PedidoIntegrado.pedido_bling_id == pedido_bling_id
+        ).first()
+        if pedido and pedido.status not in ("confirmado", "cancelado"):
+            itens = db.query(PedidoIntegradoItem).filter(
+                PedidoIntegradoItem.pedido_integrado_id == pedido.id
+            ).all()
+            for item in itens:
+                if not item.liberado_em and not item.vendido_em:
+                    EstoqueReservaService.liberar(db, item)
+            pedido.status = "cancelado"
+            pedido.cancelado_em = datetime.utcnow()
+            db.add(pedido)
+            db.commit()
+        return {"status": "ok", "acao": "cancelado"}
+
+    # ========================
+    # EVENTO: ATUALIZADO — checar se pedido foi cancelado no Bling
+    # ========================
+    if event.endswith(".updated"):
+        situacao_id = data.get("situacao", {}).get("id") if isinstance(data.get("situacao"), dict) else None
+        if situacao_id and int(situacao_id) in _SITUACOES_PEDIDO_CANCELADO:
+            pedido = db.query(PedidoIntegrado).filter(
+                PedidoIntegrado.pedido_bling_id == pedido_bling_id
+            ).first()
+            if pedido and pedido.status not in ("confirmado", "cancelado"):
+                itens = db.query(PedidoIntegradoItem).filter(
+                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
+                ).all()
+                for item in itens:
+                    if not item.liberado_em and not item.vendido_em:
+                        EstoqueReservaService.liberar(db, item)
+                pedido.status = "cancelado"
+                pedido.cancelado_em = datetime.utcnow()
+                db.add(pedido)
+                db.commit()
+            return {"status": "ok", "acao": "cancelado_por_situacao"}
+        # updated sem cancelamento — ignorar para não duplicar reservas
+        return {"status": "ignorado", "motivo": "order_updated_sem_cancelamento"}
+
+    # ========================
+    # EVENTO: CRIADO
+    # ========================
     # Idempotência
     existente = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.pedido_bling_id == pedido_id
+        PedidoIntegrado.pedido_bling_id == pedido_bling_id
     ).first()
-
     if existente:
         return {"status": "ignorado", "motivo": "pedido_ja_existe"}
 
+    numero = data.get("numero")
+    canal = str(data.get("loja", {}).get("id", "online")) if isinstance(data.get("loja"), dict) else "online"
+
+    # O webhook NÃO inclui itens — buscar na API do Bling
+    itens_bling = []
+    try:
+        from app.bling_integration import BlingAPI
+        pedido_completo = BlingAPI().consultar_pedido(pedido_bling_id)
+        itens_bling = pedido_completo.get("itens", [])
+    except Exception as e:
+        logger.warning(f"[BLING WEBHOOK] Falha ao buscar itens do pedido {pedido_bling_id}: {e}")
+
     pedido = PedidoIntegrado(
-        pedido_bling_id=pedido_id,
+        pedido_bling_id=pedido_bling_id,
         pedido_bling_numero=numero,
         canal=canal,
         status="aberto",
         expira_em=PedidoIntegrado.calcular_expiracao(),
-        payload=payload
+        payload=data
     )
 
     db.add(pedido)
     db.commit()
     db.refresh(pedido)
 
-    for item in itens:
-        sku = item.get("sku")
+    for item in itens_bling:
+        # Bling usa "codigo" como SKU no item de pedido
+        sku = item.get("codigo") or item.get("sku")
         descricao = item.get("descricao")
-        quantidade = int(item.get("quantidade", 0))
+        quantidade = int(float(item.get("quantidade", 0)))
 
         if not sku or quantidade <= 0:
             continue
@@ -252,11 +324,8 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             quantidade=quantidade
         )
 
-        # Reserva de estoque
         EstoqueReservaService.reservar(db, item_pedido)
-
         db.add(item_pedido)
 
     db.commit()
-
     return {"status": "ok", "pedido_id": pedido.id}

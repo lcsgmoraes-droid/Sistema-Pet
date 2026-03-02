@@ -527,6 +527,14 @@ class BlingAPI:
             return itens[0]  # Retorna o primeiro (filtrado por produto_id)
         return {}
     
+    def consultar_pedido(self, pedido_id: str) -> Dict:
+        """
+        Busca pedido de venda completo pelo ID (incluindo itens).
+        Necessário porque o webhook order.created não inclui os itens.
+        """
+        resultado = self._request("GET", f"/pedidos/{pedido_id}")
+        return resultado.get("data", resultado)
+
     def listar_naturezas_operacoes(self) -> Dict:
         """
         Lista todas as naturezas de operação cadastradas no Bling

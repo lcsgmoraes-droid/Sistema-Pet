@@ -16,23 +16,68 @@ router = APIRouter(
     tags=["Integração Bling - NF"]
 )
 
+# Situações de NF no Bling (campo situacao é um número)
+# 1=Pendente, 2=Emitida, 4=Cancelada, 5=Denegada, 9=Autorizado pelo SEFAZ
+_NF_SITUACAO_AUTORIZADA = {2, 9}   # emitida ou autorizada
+_NF_SITUACAO_CANCELADA  = {4, 5}   # cancelada ou denegada
+
+
 @router.post("/nf")
 async def receber_nf_bling(request: Request, db: Session = Depends(get_session)):
-    payload = await request.json()
+    """
+    Recebe webhooks de NF-e e NF-e de consumidor do Bling.
+    Formato envelope v1:
+      { eventId, date, version, event: 'invoice.created'|'invoice.updated', data: {...} }
+    O campo data.situacao é um NÚMERO: 2=Emitida, 9=Autorizada, 4=Cancelada.
+    O payload do webhook NÃO inclui o pedido vinculado — precisa chamar a API.
+    """
+    body = await request.json()
 
-    nf_id = str(payload.get("id"))
-    pedido_id = str(payload.get("pedido_id"))
-    status_nf = payload.get("status")
+    # Desempacotar envelope Bling (v1)
+    event  = body.get("event", "")   # ex: "invoice.updated"
+    data   = body.get("data", body)  # fallback p/ payload legado
 
-    if not nf_id or not pedido_id:
-        raise HTTPException(status_code=400, detail="NF sem vínculo com pedido")
+    nf_id = str(data.get("id", ""))
+    if not nf_id or nf_id == "None":
+        return {"status": "ignorado", "motivo": "sem_id"}
+
+    situacao_num = data.get("situacao")
+    try:
+        situacao_num = int(situacao_num)
+    except (TypeError, ValueError):
+        situacao_num = 0
+
+    # Ignorar eventos que não são emissão ou cancelamento
+    if situacao_num not in _NF_SITUACAO_AUTORIZADA and situacao_num not in _NF_SITUACAO_CANCELADA:
+        return {"status": "ignorado", "motivo": f"situacao_{situacao_num}_nao_tratada"}
+
+    # Buscar NF completa na API do Bling para obter o pedido vinculado
+    pedido_bling_id = None
+    try:
+        from app.bling_integration import BlingAPI
+        nf_completa = BlingAPI().consultar_nfe(int(nf_id))
+        # Campo pode estar em 'pedido', 'pedidoCompra', 'pedidoVenda' dependendo da versão
+        pedido_ref = (
+            nf_completa.get("pedido")
+            or nf_completa.get("pedidoCompra")
+            or nf_completa.get("pedidoVenda")
+        )
+        if isinstance(pedido_ref, dict):
+            pedido_bling_id = str(pedido_ref.get("id", ""))
+        logger.info(f"[BLING NF] NF {nf_id} situacao={situacao_num} pedido_bling={pedido_bling_id}")
+    except Exception as e:
+        logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
+
+    if not pedido_bling_id:
+        # NF sem pedido vinculado (ex: NF emitida manualmente fora do fluxo)
+        return {"status": "ignorado", "motivo": "nf_sem_pedido_vinculado"}
 
     pedido = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.pedido_bling_id == pedido_id
+        PedidoIntegrado.pedido_bling_id == pedido_bling_id
     ).first()
 
     if not pedido:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+        return {"status": "ignorado", "motivo": "pedido_nao_encontrado_no_sistema"}
 
     itens = db.query(PedidoIntegradoItem).filter(
         PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -41,7 +86,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     # NF EMITIDA / AUTORIZADA
     # ============================
-    if status_nf in ["emitida", "autorizada"]:
+    if situacao_num in _NF_SITUACAO_AUTORIZADA:
         pedido.status = "confirmado"
         pedido.confirmado_em = datetime.utcnow()
 
@@ -83,8 +128,8 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         
         # 🔹 Gerar provisão de Simples Nacional no DRE
         try:
-            valor_total_nf = payload.get("valor_total", 0)
-            data_emissao = payload.get("data_emissao")
+            valor_total_nf = data.get("valorTotalNf") or data.get("valor_total", 0)
+            data_emissao = data.get("dataEmissao") or data.get("data_emissao")
             
             if valor_total_nf and data_emissao and pedido.tenant_id:
                 # Converter data_emissao para date
@@ -113,7 +158,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     # NF CANCELADA
     # ============================
-    if status_nf == "cancelada":
+    if situacao_num in _NF_SITUACAO_CANCELADA:
         pedido.status = "cancelado"
         pedido.cancelado_em = datetime.utcnow()
 
