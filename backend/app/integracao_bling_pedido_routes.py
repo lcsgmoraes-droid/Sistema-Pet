@@ -228,9 +228,10 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     """
     body = await request.json()
 
-    # Injetar tenant no contexto (webhook chega sem JWT)
-    if _BLING_WEBHOOK_TENANT_ID:
-        set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
+    # Tenant fixo para webhooks (chamadas sem JWT)
+    _tenant_uuid = UUID(_BLING_WEBHOOK_TENANT_ID) if _BLING_WEBHOOK_TENANT_ID else None
+    if _tenant_uuid:
+        set_current_tenant(_tenant_uuid)
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"
@@ -306,7 +307,12 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     except Exception as e:
         logger.warning(f"[BLING WEBHOOK] Falha ao buscar itens do pedido {pedido_bling_id}: {e}")
 
+    if not _tenant_uuid:
+        logger.error("[BLING WEBHOOK] BLING_WEBHOOK_TENANT_ID não configurado — pedido ignorado")
+        return {"status": "erro", "motivo": "tenant_nao_configurado"}
+
     pedido = PedidoIntegrado(
+        tenant_id=_tenant_uuid,
         pedido_bling_id=pedido_bling_id,
         pedido_bling_numero=numero,
         canal=canal,
@@ -329,6 +335,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             continue
 
         item_pedido = PedidoIntegradoItem(
+            tenant_id=_tenant_uuid,
             pedido_integrado_id=pedido.id,
             sku=sku,
             descricao=descricao,

@@ -11,7 +11,7 @@ class PedidoIntegradoItem(BaseTenantModel):
     __tablename__ = "pedidos_integrados_itens"
 
     pedido_integrado_id = Column(
-        String,
+        Integer,
         ForeignKey("pedidos_integrados.id"),
         nullable=False,
         index=True
