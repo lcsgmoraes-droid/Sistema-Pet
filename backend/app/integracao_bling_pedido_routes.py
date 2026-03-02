@@ -1,4 +1,7 @@
 
+import os
+from uuid import UUID
+
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -9,7 +12,11 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
+from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
+
+# Tenant fixo para webhooks do Bling (chamadas sem JWT)
+_BLING_WEBHOOK_TENANT_ID = os.getenv("BLING_WEBHOOK_TENANT_ID")
 
 router = APIRouter(
     prefix="/integracoes/bling",
@@ -220,6 +227,10 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
       { eventId, date, version, event: 'order.created'|'order.updated'|'order.deleted', data: {...} }
     """
     body = await request.json()
+
+    # Injetar tenant no contexto (webhook chega sem JWT)
+    if _BLING_WEBHOOK_TENANT_ID:
+        set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"

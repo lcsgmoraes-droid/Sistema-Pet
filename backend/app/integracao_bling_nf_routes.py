@@ -1,4 +1,7 @@
 
+import os
+from uuid import UUID
+
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -9,7 +12,11 @@ from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
+from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
+
+# Tenant fixo para webhooks do Bling (chamadas sem JWT)
+_BLING_WEBHOOK_TENANT_ID = os.getenv("BLING_WEBHOOK_TENANT_ID")
 
 router = APIRouter(
     prefix="/integracoes/bling",
@@ -32,6 +39,10 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     O payload do webhook NÃO inclui o pedido vinculado — precisa chamar a API.
     """
     body = await request.json()
+
+    # Injetar tenant no contexto (webhook chega sem JWT)
+    if _BLING_WEBHOOK_TENANT_ID:
+        set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
 
     # Desempacotar envelope Bling (v1)
     event  = body.get("event", "")   # ex: "invoice.updated"
