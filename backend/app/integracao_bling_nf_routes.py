@@ -48,6 +48,36 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         for item in itens:
             EstoqueReservaService.confirmar_venda(db, item)
 
+            # Baixar estoque real — busca produto pelo SKU e desconta estoque_atual
+            try:
+                from app.estoque.service import EstoqueService
+                from app.produtos_models import Produto
+
+                produto = db.query(Produto).filter(
+                    Produto.sku == item.sku,
+                    Produto.tenant_id == pedido.tenant_id
+                ).first()
+
+                if produto:
+                    EstoqueService.baixar_estoque(
+                        produto_id=produto.id,
+                        quantidade=float(item.quantidade),
+                        motivo="venda_bling",
+                        referencia_id=pedido.id,
+                        referencia_tipo="pedido_integrado",
+                        user_id=0,  # 0 = sistema / integração automática
+                        db=db,
+                        tenant_id=pedido.tenant_id,
+                        documento=pedido.pedido_bling_numero,
+                        observacao=f"Baixa automática via NF Bling #{nf_id}",
+                    )
+                else:
+                    logger.warning(f"⚠️  Produto com SKU '{item.sku}' não encontrado para baixa de estoque")
+
+            except Exception as e:
+                logger.warning(f"⚠️  Falha ao baixar estoque para SKU {item.sku}: {e}")
+                # Não bloqueia o fluxo — marca vendido_em e segue
+
         db.add(pedido)
         db.commit()
         

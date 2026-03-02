@@ -44,6 +44,7 @@ const ClienteTimelinePage = lazy(() => import('./pages/ClienteTimelinePage'));
 // Componentes de Estoque/Compras
 const MovimentacoesProduto = lazy(() => import('./components/MovimentacoesProduto'));
 const EstoqueBling = lazy(() => import('./components/EstoqueBling'));
+const PedidosBling = lazy(() => import('./pages/PedidosBling'));
 const PedidosCompra = lazy(() => import('./components/PedidosCompra'));
 const EntradaXML = lazy(() => import('./components/EntradaXML'));
 
@@ -286,6 +287,11 @@ function App() {
             <Route path="compras/bling" element={
               <ProtectedRoute permission="compras.gerenciar">
                 <EstoqueBling />
+              </ProtectedRoute>
+            } />
+            <Route path="compras/bling-pedidos" element={
+              <ProtectedRoute permission="compras.gerenciar">
+                <PedidosBling />
               </ProtectedRoute>
             } />
             

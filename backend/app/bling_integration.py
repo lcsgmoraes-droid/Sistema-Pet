@@ -579,23 +579,12 @@ class BlingAPI:
             # Atualizar token na instância
             self.access_token = tokens['access_token']
             
-            # Atualizar .env se possível
+            # Atualizar .env e variáveis em memória
             try:
-                from pathlib import Path
-                env_path = Path('.env')
-                if env_path.exists():
-                    lines = []
-                    for line in env_path.read_text(encoding='utf-8').split('\n'):
-                        if line.startswith('BLING_ACCESS_TOKEN='):
-                            lines.append(f'BLING_ACCESS_TOKEN={tokens["access_token"]}')
-                        elif line.startswith('BLING_REFRESH_TOKEN='):
-                            lines.append(f'BLING_REFRESH_TOKEN={tokens["refresh_token"]}')
-                        else:
-                            lines.append(line)
-                    env_path.write_text('\n'.join(lines), encoding='utf-8')
-                    logger.info("✅ Tokens atualizados no .env")
+                from app.bling_oauth_routes import _salvar_tokens
+                _salvar_tokens(tokens["access_token"], tokens["refresh_token"])
             except Exception as e:
-                logger.info(f"⚠️ Não foi possível atualizar .env: {e}")
+                logger.info(f"⚠️ Não foi possível persistir tokens no .env: {e}")
             
             return tokens
         else:

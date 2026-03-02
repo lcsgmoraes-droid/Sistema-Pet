@@ -5,6 +5,8 @@ FastAPI + SQLAlchemy + SQLite/PostgreSQL
 import app.database.orm_guards  # ✅ ORM Guards: força IDs=None antes do flush
 
 from typing import Optional
+import threading
+import time
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -193,6 +195,30 @@ configure_logging()  # Configura formato estruturado para produção
 # Configurar logging (legado)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
+_bling_token_stop_event = threading.Event()
+_bling_token_thread: Optional[threading.Thread] = None
+
+
+def _loop_renovacao_token_bling():
+    """Loop em background para renovar token Bling periodicamente."""
+    logger.info("[BLING] Job de renovação automática iniciado (intervalo: 5h)")
+
+    while not _bling_token_stop_event.is_set():
+        try:
+            from app.bling_integration import BlingAPI
+
+            bling = BlingAPI()
+            bling.renovar_access_token()
+            logger.info("[BLING] ✅ Token renovado automaticamente")
+        except Exception as e:
+            logger.warning(f"[BLING] ⚠️ Falha na renovação automática do token: {e}")
+
+        _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
+
+    logger.info("[BLING] Job de renovação automática finalizado")
 
 # ============================================================================
 # CONFIGURAR SISTEMA DE EVENTOS DE DOMÍNIO
@@ -659,6 +685,16 @@ def on_startup():
     #     logger.info("[OK] Scheduler de acertos iniciado!")
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao iniciar scheduler de acertos: {str(e)}")
+
+    # Iniciar renovação automática de token Bling (a cada 5h)
+    global _bling_token_thread
+    _bling_token_stop_event.clear()
+    _bling_token_thread = threading.Thread(
+        target=_loop_renovacao_token_bling,
+        name="bling-token-renovacao",
+        daemon=True,
+    )
+    _bling_token_thread.start()
     
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
@@ -676,6 +712,12 @@ def on_shutdown():
     #     logger.info("[STOP] Scheduler de acertos parado!")
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao parar scheduler: {str(e)}")
+
+    global _bling_token_thread
+    _bling_token_stop_event.set()
+    if _bling_token_thread and _bling_token_thread.is_alive():
+        _bling_token_thread.join(timeout=2)
+    _bling_token_thread = None
     
     logger.info("[STOP] Sistema encerrado")
 
