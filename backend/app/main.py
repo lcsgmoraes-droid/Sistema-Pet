@@ -201,6 +201,11 @@ BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
 _bling_token_stop_event = threading.Event()
 _bling_token_thread: Optional[threading.Thread] = None
 
+# Job de expiração de reservas de pedidos Bling vencidos
+_expirar_reservas_stop_event = threading.Event()
+_expirar_reservas_thread: Optional[threading.Thread] = None
+EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS = 30 * 60  # 30 minutos
+
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
 _BLING_LOCK_FILE = "/tmp/bling_token_renewal.lock"
 _BLING_LAST_RENEWAL_FILE = "/tmp/bling_token_last_renewal.txt"
@@ -285,6 +290,70 @@ def _loop_renovacao_token_bling():
         _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
 
     logger.info(f"[BLING] Job de renovação automática finalizado (PID {worker_pid})")
+
+
+def _loop_expirar_reservas():
+    """
+    Job em background para expirar reservas de pedidos Bling vencidos.
+    Roda a cada 30 minutos e marca como 'expirado' todos os pedidos
+    com status='aberto' cuja expira_em já passou, liberando o estoque reservado.
+    """
+    from datetime import datetime as _dt
+    import os as _os
+    worker_pid = _os.getpid()
+    logger.info(f"[RESERVAS] Job de expiração de reservas iniciado (PID {worker_pid}, intervalo: 30min)")
+
+    # Aguarda 2 minutos no startup para o backend estar totalmente pronto
+    _expirar_reservas_stop_event.wait(120)
+
+    while not _expirar_reservas_stop_event.is_set():
+        try:
+            from app.db import SessionLocal
+            from app.pedido_integrado_models import PedidoIntegrado
+            from app.pedido_integrado_item_models import PedidoIntegradoItem
+
+            db = SessionLocal()
+            try:
+                agora = _dt.utcnow()
+                pedidos_vencidos = db.query(PedidoIntegrado).filter(
+                    PedidoIntegrado.status == "aberto",
+                    PedidoIntegrado.expira_em < agora
+                ).all()
+
+                if pedidos_vencidos:
+                    logger.info(f"[RESERVAS] {len(pedidos_vencidos)} pedido(s) vencido(s) para expirar")
+
+                for pedido in pedidos_vencidos:
+                    # Libera apenas os itens ainda reservados (sem liberado_em nem vendido_em)
+                    itens = db.query(PedidoIntegradoItem).filter(
+                        PedidoIntegradoItem.pedido_integrado_id == pedido.id,
+                        PedidoIntegradoItem.liberado_em.is_(None),
+                        PedidoIntegradoItem.vendido_em.is_(None)
+                    ).all()
+                    for item in itens:
+                        item.liberado_em = agora
+                        db.add(item)
+
+                    pedido.status = "expirado"
+                    db.add(pedido)
+
+                if pedidos_vencidos:
+                    db.commit()
+                    logger.info(f"[RESERVAS] ✅ {len(pedidos_vencidos)} pedido(s) expirado(s), reservas liberadas")
+
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"[RESERVAS] ⚠️ Erro ao expirar reservas: {e}")
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.warning(f"[RESERVAS] ⚠️ PID {worker_pid} — Falha geral no job de expiração: {e}")
+
+        _expirar_reservas_stop_event.wait(EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS)
+
+    logger.info(f"[RESERVAS] Job de expiração de reservas finalizado (PID {worker_pid})")
+
 
 # ============================================================================
 # CONFIGURAR SISTEMA DE EVENTOS DE DOMÍNIO
@@ -761,6 +830,16 @@ def on_startup():
         daemon=True,
     )
     _bling_token_thread.start()
+
+    # Iniciar job de expiração de reservas de pedidos vencidos (a cada 30min)
+    global _expirar_reservas_thread
+    _expirar_reservas_stop_event.clear()
+    _expirar_reservas_thread = threading.Thread(
+        target=_loop_expirar_reservas,
+        name="expirar-reservas",
+        daemon=True,
+    )
+    _expirar_reservas_thread.start()
     
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
@@ -784,6 +863,12 @@ def on_shutdown():
     if _bling_token_thread and _bling_token_thread.is_alive():
         _bling_token_thread.join(timeout=2)
     _bling_token_thread = None
+
+    global _expirar_reservas_thread
+    _expirar_reservas_stop_event.set()
+    if _expirar_reservas_thread and _expirar_reservas_thread.is_alive():
+        _expirar_reservas_thread.join(timeout=2)
+    _expirar_reservas_thread = None
     
     logger.info("[STOP] Sistema encerrado")
 
