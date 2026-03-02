@@ -60,6 +60,7 @@ from app.admin_routes import router as admin_router
 from app.lancamentos_routes import router as lancamentos_router
 from app.categorias_routes import router as categorias_router
 from app.bling_routes import router as bling_router
+from app.bling_oauth_routes import router as bling_oauth_router
 from app.dashboard_routes import router as dashboard_router
 from app.relatorio_vendas_routes import router as relatorio_vendas_router
 from app.dre_routes import router as dre_router
@@ -486,6 +487,7 @@ app.include_router(financeiro_router, tags=["Financeiro - Configurações"])
 app.include_router(lancamentos_router, tags=["Financeiro - Lançamentos"])
 app.include_router(categorias_router, tags=["Financeiro - Categorias"])
 app.include_router(bling_router, tags=["Integração Bling"])
+app.include_router(bling_oauth_router, tags=["Bling OAuth"])
 app.include_router(dashboard_router, tags=["Dashboard Financeiro"])
 app.include_router(ia_router, tags=["IA - Fluxo de Caixa"])
 app.include_router(chat_router, tags=["IA - Chat Financeiro"])
