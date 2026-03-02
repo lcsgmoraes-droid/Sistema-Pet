@@ -1,6 +1,6 @@
 
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
-from app.database.base import BaseTenantModel
+from app.base_models import BaseTenantModel
 from datetime import datetime
 
 class PedidoIntegradoItem(BaseTenantModel):

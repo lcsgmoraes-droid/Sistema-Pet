@@ -1,6 +1,6 @@
 
 from sqlalchemy import Column, String, DateTime, JSON
-from app.database.base import BaseTenantModel
+from app.base_models import BaseTenantModel
 from datetime import datetime, timedelta
 
 class PedidoIntegrado(BaseTenantModel):
