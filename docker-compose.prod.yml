@@ -58,10 +58,17 @@ services:
       
       # Timezone
       TZ: America/Sao_Paulo
+
+      # Bling Integration
+      BLING_CLIENT_ID: ${BLING_CLIENT_ID}
+      BLING_CLIENT_SECRET: ${BLING_CLIENT_SECRET}
+      BLING_ACCESS_TOKEN: ${BLING_ACCESS_TOKEN:-}
+      BLING_REFRESH_TOKEN: ${BLING_REFRESH_TOKEN:-}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
       - ./backend/data:/app/data
+      - /opt/petshop/.env:/opt/petshop/.env:rw
     depends_on:
       postgres:
         condition: service_healthy
