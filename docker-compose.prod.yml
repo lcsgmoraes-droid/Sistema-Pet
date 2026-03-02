@@ -65,6 +65,7 @@ services:
       BLING_ACCESS_TOKEN: ${BLING_ACCESS_TOKEN:-}
       BLING_REFRESH_TOKEN: ${BLING_REFRESH_TOKEN:-}
       BLING_DEPOSITO_ID: ${BLING_DEPOSITO_ID:-14887364871}
+      BLING_WEBHOOK_TENANT_ID: ${BLING_WEBHOOK_TENANT_ID}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
