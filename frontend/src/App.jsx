@@ -289,7 +289,7 @@ function App() {
                 <EstoqueBling />
               </ProtectedRoute>
             } />
-            <Route path="compras/bling-pedidos" element={
+            <Route path="vendas/bling-pedidos" element={
               <ProtectedRoute permission="compras.gerenciar">
                 <PedidosBling />
               </ProtectedRoute>

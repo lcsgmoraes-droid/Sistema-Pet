@@ -275,6 +275,7 @@ const Layout = () => {
       ],
     },
     { path: '/notas-fiscais', icon: FiFileText, label: 'Notas Fiscais', permission: 'vendas.visualizar' }, // Vinculado a vendas
+    { path: '/vendas/bling-pedidos', icon: FiBox, label: '📦 Pedidos Bling', permission: 'compras.sincronizacao_bling' },
     { 
       path: '/compras', 
       icon: FiBox, 
@@ -284,7 +285,6 @@ const Layout = () => {
         { path: '/compras/pedidos', label: 'Pedidos de Compra', permission: 'compras.pedidos' },
         { path: '/compras/entrada-xml', label: 'Entrada por XML', permission: 'compras.entrada_xml' },
         { path: '/compras/bling', label: 'Sinc. Bling', permission: 'compras.sincronizacao_bling' },
-        { path: '/compras/bling-pedidos', label: '📦 Pedidos Bling', permission: 'compras.sincronizacao_bling' },
       ]
     },
     { 
