@@ -360,6 +360,8 @@ export default function MovimentacoesProduto() {
 
   const estoqueAtual = produto.estoque_atual || 0;
   const estoqueMinimo = produto.estoque_minimo || 0;
+  const estoqueReservado = produto.estoque_reservado || 0;
+  const saldoAposReserva = estoqueAtual - estoqueReservado;
   const corEstoque = estoqueAtual > estoqueMinimo ? 'text-green-600' : 
                      estoqueAtual === 0 ? 'text-red-600' : 'text-yellow-600';
 
@@ -443,7 +445,7 @@ export default function MovimentacoesProduto() {
           </div>
 
           {/* Totalizadores */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-200">
             <div className="bg-green-50 rounded-lg p-3">
               <div className="text-xs text-green-600 font-medium mb-1">Total Entradas</div>
               <div className="text-2xl font-bold text-green-700">{totalEntradas.toFixed(2)}</div>
@@ -465,11 +467,26 @@ export default function MovimentacoesProduto() {
                 estoqueAtual === 0 ? 'text-red-700' : 'text-yellow-700'
               }`}>{estoqueAtual.toFixed(2)} {produto.unidade || 'UN'}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="text-xs text-gray-600 font-medium mb-1">Estoque Mín/Máx</div>
-              <div className="text-lg font-bold text-gray-700">
-                {estoqueMinimo.toFixed(0)} / {(produto.estoque_maximo || 0).toFixed(0)}
+            <div className={`rounded-lg p-3 ${estoqueReservado > 0 ? 'bg-yellow-50' : 'bg-gray-50'}`}>
+              <div className={`text-xs font-medium mb-1 ${estoqueReservado > 0 ? 'text-yellow-600' : 'text-gray-500'}`}>Reservado</div>
+              <div className={`text-2xl font-bold ${estoqueReservado > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>
+                {estoqueReservado.toFixed(2)} {produto.unidade || 'UN'}
               </div>
+              {estoqueReservado > 0 && <div className="text-xs text-yellow-500 mt-1">Pedidos em aberto</div>}
+            </div>
+            <div className={`rounded-lg p-3 ${
+              saldoAposReserva > estoqueMinimo ? 'bg-teal-50' :
+              saldoAposReserva <= 0 ? 'bg-red-50' : 'bg-orange-50'
+            }`}>
+              <div className={`text-xs font-medium mb-1 ${
+                saldoAposReserva > estoqueMinimo ? 'text-teal-600' :
+                saldoAposReserva <= 0 ? 'text-red-600' : 'text-orange-600'
+              }`}>Saldo Disponível</div>
+              <div className={`text-2xl font-bold ${
+                saldoAposReserva > estoqueMinimo ? 'text-teal-700' :
+                saldoAposReserva <= 0 ? 'text-red-700' : 'text-orange-700'
+              }`}>{saldoAposReserva.toFixed(2)} {produto.unidade || 'UN'}</div>
+              <div className="text-xs text-gray-400 mt-1">Após reservas</div>
             </div>
           </div>
 
