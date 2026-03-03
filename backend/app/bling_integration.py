@@ -529,10 +529,11 @@ class BlingAPI:
     
     def consultar_pedido(self, pedido_id: str) -> Dict:
         """
-        Busca pedido de venda completo pelo ID (incluindo itens).
+        Busca pedido de VENDA completo pelo ID (incluindo itens).
         Necessário porque o webhook order.created não inclui os itens.
+        Endpoint correto: /pedidos/vendas/{id}  (não /pedidos/{id} que é compras)
         """
-        resultado = self._request("GET", f"/pedidos/{pedido_id}")
+        resultado = self._request("GET", f"/pedidos/vendas/{pedido_id}")
         return resultado.get("data", resultado)
 
     def listar_naturezas_operacoes(self) -> Dict:
