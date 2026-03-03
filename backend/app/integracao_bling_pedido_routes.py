@@ -57,25 +57,30 @@ def listar_pedidos_bling(
             PedidoIntegradoItem.pedido_integrado_id == p.id
         ).all()
 
+        def _dt(dt):
+            if not dt: return None
+            s = dt.isoformat()
+            return s if ('+' in s or s.endswith('Z')) else s + '+00:00'
+
         result.append({
             "id": p.id,
             "pedido_bling_id": p.pedido_bling_id,
             "pedido_bling_numero": p.pedido_bling_numero,
             "canal": p.canal,
             "status": p.status,
-            "criado_em": p.criado_em.isoformat() if p.criado_em else None,
-            "expira_em": p.expira_em.isoformat() if p.expira_em else None,
-            "confirmado_em": p.confirmado_em.isoformat() if p.confirmado_em else None,
-            "cancelado_em": p.cancelado_em.isoformat() if p.cancelado_em else None,
+            "criado_em": _dt(p.criado_em),
+            "expira_em": _dt(p.expira_em),
+            "confirmado_em": _dt(p.confirmado_em),
+            "cancelado_em": _dt(p.cancelado_em),
             "itens": [
                 {
                     "id": it.id,
                     "sku": it.sku,
                     "descricao": it.descricao,
                     "quantidade": it.quantidade,
-                    "reservado_em": it.reservado_em.isoformat() if it.reservado_em else None,
-                    "liberado_em": it.liberado_em.isoformat() if it.liberado_em else None,
-                    "vendido_em": it.vendido_em.isoformat() if it.vendido_em else None,
+                    "reservado_em": _dt(it.reservado_em),
+                    "liberado_em": _dt(it.liberado_em),
+                    "vendido_em": _dt(it.vendido_em),
                 }
                 for it in itens
             ],
@@ -296,7 +301,10 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         return {"status": "ignorado", "motivo": "pedido_ja_existe"}
 
     numero = data.get("numero")
-    canal = str(data.get("loja", {}).get("id", "online")) if isinstance(data.get("loja"), dict) else "online"
+    loja_data = data.get("loja", {}) if isinstance(data.get("loja"), dict) else {}
+    loja_id = loja_data.get("id", 0)
+    loja_nome = loja_data.get("nome", "")
+    canal = loja_nome or (str(loja_id) if loja_id else "online")
 
     # O webhook NÃO inclui itens — buscar na API do Bling
     itens_bling = []
