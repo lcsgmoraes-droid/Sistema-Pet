@@ -139,7 +139,7 @@ def confirmar_pedido_manual(
             from app.produtos_models import Produto
 
             produto = db.query(Produto).filter(
-                Produto.sku == item.sku,
+                Produto.codigo == item.sku,
                 Produto.tenant_id == tenant_id,
             ).first()
 
@@ -216,11 +216,17 @@ def cancelar_pedido_manual(
     return {"status": "ok", "pedido_id": pedido.id}
 
 
-# Situações do pedido Bling que indicam cancelamento
+# Situações do pedido Bling — referência API v3
+# https://developer.bling.com.br/referencia#/Pedidos%20de%20Venda/get_pedidos__idPedido_
 _SITUACOES_PEDIDO_CANCELADO = {
-    9,   # Cancelado
-    10,  # Cancelado pelo comprador
-    11,  # Cancelado por não pagamento
+    12,  # Cancelado
+    13,  # Cancelado pelo comprador
+    14,  # Cancelado por não pagamento
+    15,  # Em cancelamento
+}
+
+_SITUACOES_PEDIDO_ATENDIDO = {
+    9,   # Atendido (concluído/nota fiscal emitida)
 }
 
 
@@ -267,11 +273,17 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         return {"status": "ok", "acao": "cancelado"}
 
     # ========================
-    # EVENTO: ATUALIZADO — checar se pedido foi cancelado no Bling
+    # EVENTO: ATUALIZADO — checar situação no Bling
     # ========================
     if event.endswith(".updated"):
-        situacao_id = data.get("situacao", {}).get("id") if isinstance(data.get("situacao"), dict) else None
-        if situacao_id and int(situacao_id) in _SITUACOES_PEDIDO_CANCELADO:
+        situacao_raw = data.get("situacao")
+        situacao_id = situacao_raw.get("id") if isinstance(situacao_raw, dict) else situacao_raw
+        try:
+            situacao_id = int(situacao_id) if situacao_id is not None else None
+        except (ValueError, TypeError):
+            situacao_id = None
+
+        if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
             pedido = db.query(PedidoIntegrado).filter(
                 PedidoIntegrado.pedido_bling_id == pedido_bling_id
             ).first()
@@ -286,9 +298,30 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 pedido.cancelado_em = datetime.utcnow()
                 db.add(pedido)
                 db.commit()
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})")
             return {"status": "ok", "acao": "cancelado_por_situacao"}
-        # updated sem cancelamento — ignorar para não duplicar reservas
-        return {"status": "ignorado", "motivo": "order_updated_sem_cancelamento"}
+
+        if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
+            pedido = db.query(PedidoIntegrado).filter(
+                PedidoIntegrado.pedido_bling_id == pedido_bling_id
+            ).first()
+            if pedido and pedido.status not in ("confirmado", "cancelado"):
+                itens = db.query(PedidoIntegradoItem).filter(
+                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
+                ).all()
+                for item in itens:
+                    if item.vendido_em:
+                        continue
+                    EstoqueReservaService.confirmar_venda(db, item)
+                pedido.status = "confirmado"
+                pedido.confirmado_em = datetime.utcnow()
+                db.add(pedido)
+                db.commit()
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado por Atendido (situacao_id={situacao_id})")
+            return {"status": "ok", "acao": "confirmado_por_situacao"}
+
+        # updated sem situação relevante — ignorar
+        return {"status": "ignorado", "motivo": "order_updated_sem_situacao_relevante"}
 
     # ========================
     # EVENTO: CRIADO
