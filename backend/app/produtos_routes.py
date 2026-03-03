@@ -1984,7 +1984,22 @@ def obter_produto(
     
     # Mapear tipo_kit para e_kit_fisico (compatibilidade com frontend)
     response_data['e_kit_fisico'] = (produto.tipo_kit == 'FISICO')
-    
+
+    # Calcular estoque reservado (pedidos Bling em aberto)
+    try:
+        from app.pedido_integrado_item_models import PedidoIntegradoItem
+        if produto.codigo:
+            reservado = db.query(func.coalesce(func.sum(PedidoIntegradoItem.quantidade), 0)).filter(
+                PedidoIntegradoItem.sku == produto.codigo,
+                PedidoIntegradoItem.liberado_em.is_(None),
+                PedidoIntegradoItem.vendido_em.is_(None)
+            ).scalar()
+            response_data['estoque_reservado'] = float(reservado or 0)
+        else:
+            response_data['estoque_reservado'] = 0.0
+    except Exception:
+        response_data['estoque_reservado'] = 0.0
+
     return response_data
 
 
