@@ -357,6 +357,14 @@ async def mesclar_produtos(
     
     db.commit()
     
+    # Sincronizar estoque com Bling para o produto mantido (que recebeu o estoque)
+    if transferir_estoque and prod_remover.estoque_atual is not None:
+        try:
+            from app.bling_estoque_sync import sincronizar_bling_background
+            sincronizar_bling_background(prod_manter.id, prod_manter.estoque_atual or 0, "mesclagem_produto")
+        except Exception as e_sync:
+            pass
+    
     return {
         "success": True,
         "mensagem": f"Produto {produto_id_remover} mesclado com {produto_id_manter}",

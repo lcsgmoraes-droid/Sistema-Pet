@@ -1905,6 +1905,14 @@ def processar_entrada_estoque(
     
     db.commit()
     
+    # SINCRONIZAR ESTOQUE COM BLING para todos os itens processados
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        for item_proc in itens_processados:
+            sincronizar_bling_background(item_proc['produto_id'], item_proc['estoque_atual'], "entrada_nfe")
+    except Exception as e_sync:
+        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (entrada_nfe): {e_sync}")
+    
     # VERIFICAR E NOTIFICAR PENDÊNCIAS DE ESTOQUE
     from app.services.pendencia_estoque_service import verificar_e_notificar_pendencias
     try:
@@ -2104,6 +2112,14 @@ def reverter_entrada_estoque(
         nota.processada_em = None
         
         db.commit()
+        
+        # SINCRONIZAR ESTOQUE COM BLING para todos os itens revertidos
+        try:
+            from app.bling_estoque_sync import sincronizar_bling_background
+            for item_rev in itens_revertidos:
+                sincronizar_bling_background(item_rev['produto_id'], item_rev['estoque_atual'], "estorno_nfe")
+        except Exception as e_sync:
+            logger.warning(f"[BLING-SYNC] Erro ao agendar sync (estorno_nfe): {e_sync}")
         
         logger.info(f"âœ… Entrada revertida: {len(itens_revertidos)} produtos")
         

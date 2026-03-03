@@ -854,6 +854,12 @@ def excluir_movimentacao(
         
         logger.info(f"✅ Movimentação {movimentacao_id} excluída por {current_user.nome}")
         
+        # Sincronizar estoque com Bling automaticamente
+        try:
+            sincronizar_bling_background(produto.id, produto.estoque_atual, "exclusao_movimentacao")
+        except Exception as e_sync:
+            logger.warning(f"[BLING-SYNC] Erro ao agendar sync (exclusao_mov): {e_sync}")
+        
         return {
             "message": "Movimentação excluída com sucesso",
             "componentes_estornados": componentes_estornados
@@ -931,6 +937,13 @@ def editar_movimentacao(
         db.refresh(movimentacao)
         
         logger.info(f"✅ Movimentação {movimentacao_id} editada por {current_user.nome}")
+        
+        # Sincronizar estoque com Bling se quantidade foi alterada
+        if dados.quantidade is not None:
+            try:
+                sincronizar_bling_background(produto.id, produto.estoque_atual, "edicao_movimentacao")
+            except Exception as e_sync:
+                logger.warning(f"[BLING-SYNC] Erro ao agendar sync (edicao_mov): {e_sync}")
         
         return {
             "id": movimentacao.id,

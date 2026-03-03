@@ -299,6 +299,14 @@ def atualizar_variacao(
     db.commit()
     db.refresh(variacao)
     
+    # Sincronizar estoque com Bling se estoque foi alterado
+    if dados.estoque_atual is not None:
+        try:
+            from app.bling_estoque_sync import sincronizar_bling_background
+            sincronizar_bling_background(variacao.id, variacao.estoque_atual, "edicao_variacao")
+        except Exception as e_sync:
+            pass  # log silencioso para não quebrar resposta
+    
     return variacao
 
 

@@ -590,6 +590,7 @@ def receber_pedido(
     
     data_recebimento = request.data_recebimento or datetime.utcnow()
     itens_recebidos = []
+    para_sync_bling = []  # (produto_id, estoque_atual)
     
     # Processar cada item
     for receb_item in request.itens:
@@ -683,6 +684,7 @@ def receber_pedido(
             "lote": numero_lote,
             "status": item.status
         })
+        para_sync_bling.append((produto.id, produto.estoque_atual))
         
         logger.info(
             f"  ✅ Item {item.id}: {produto.nome} - "
@@ -704,6 +706,14 @@ def receber_pedido(
     pedido.updated_at = datetime.utcnow()
     
     db.commit()
+    
+    # SINCRONIZAR ESTOQUE COM BLING para todos os itens recebidos
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        for produto_id, estoque_novo in para_sync_bling:
+            sincronizar_bling_background(produto_id, estoque_novo, "recebimento_pedido_compra")
+    except Exception as e_sync:
+        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (pedido_compra): {e_sync}")
     
     logger.info(f"✅ Pedido {pedido.numero_pedido} recebido - Status: {pedido.status}")
     
