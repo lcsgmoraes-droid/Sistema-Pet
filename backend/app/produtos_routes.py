@@ -3071,9 +3071,11 @@ def atualizar_imagem(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Atualizar dados da imagem (ordem, se Ã© principal)
+    Atualizar dados da imagem (ordem, se é principal)
     """
-    # Buscar imagem e verificar permissÃ£o
+    user, tenant_id = user_and_tenant
+
+    # Buscar imagem e verificar permissão
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
         Produto.tenant_id == tenant_id

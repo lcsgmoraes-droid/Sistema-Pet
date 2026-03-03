@@ -25,7 +25,7 @@ class EstoqueReservaService:
     @staticmethod
     def reservar(db: Session, item: PedidoIntegradoItem):
         produto = db.query(Produto).filter(
-            Produto.sku == item.sku
+            Produto.codigo == item.sku
         ).first()
 
         if not produto:
