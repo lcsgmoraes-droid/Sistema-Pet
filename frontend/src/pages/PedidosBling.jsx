@@ -101,7 +101,7 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
               #{pedido.pedido_bling_numero || pedido.pedido_bling_id}
             </span>
             <BadgeStatus status={expirado && pedido.status === 'aberto' ? 'expirado' : pedido.status} />
-            <span className="text-xs text-gray-400 capitalize">{pedido.canal}</span>
+            <span className="text-xs text-gray-400 capitalize">{/^\d+$/.test(pedido.canal) || pedido.canal === 'online' ? 'Bling' : pedido.canal}</span>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
             Criado em {formatarData(pedido.criado_em)}
