@@ -306,6 +306,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 PedidoIntegrado.pedido_bling_id == pedido_bling_id
             ).first()
             if pedido and pedido.status not in ("confirmado", "cancelado"):
+                tenant_id = pedido.tenant_id
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
@@ -313,11 +314,36 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     if item.vendido_em:
                         continue
                     EstoqueReservaService.confirmar_venda(db, item)
+                    # Baixar estoque real
+                    try:
+                        from app.estoque.service import EstoqueService
+                        from app.produtos_models import Produto
+                        produto = db.query(Produto).filter(
+                            Produto.codigo == item.sku,
+                            Produto.tenant_id == tenant_id,
+                        ).first()
+                        if produto:
+                            EstoqueService.baixar_estoque(
+                                produto_id=produto.id,
+                                quantidade=float(item.quantidade),
+                                motivo="venda_bling_webhook",
+                                referencia_id=pedido.id,
+                                referencia_tipo="pedido_integrado",
+                                user_id=0,
+                                db=db,
+                                tenant_id=tenant_id,
+                                documento=pedido.pedido_bling_numero,
+                                observacao="Baixa automática via webhook Bling (Atendido)",
+                            )
+                        else:
+                            logger.warning(f"[BLING WEBHOOK] Produto não encontrado p/ baixa — SKU {item.sku}")
+                    except Exception as e:
+                        logger.warning(f"[BLING WEBHOOK] Erro ao baixar estoque SKU {item.sku}: {e}")
                 pedido.status = "confirmado"
                 pedido.confirmado_em = datetime.utcnow()
                 db.add(pedido)
                 db.commit()
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado por Atendido (situacao_id={situacao_id})")
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado e estoque baixado (situacao_id={situacao_id})")
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
         # updated sem situação relevante — ignorar

@@ -453,6 +453,7 @@ class ProdutoResponse(ProdutoBase):
     # Sprint 4: KIT - ComposiÃ§Ã£o e estoque virtual
     composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
+    estoque_reservado: Optional[float] = 0  # Unidades reservadas por pedidos Bling em aberto
     # Sistema Predecessor/Sucessor
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
     predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
@@ -1681,7 +1682,27 @@ def listar_produtos(
     
     # Filtro de seguranÃ§a: remover None
     produtos = [p for p in produtos if p is not None]
-    
+
+    # Reservas ativas por SKU (pedidos Bling em aberto)
+    try:
+        from app.pedido_integrado_item_models import PedidoIntegradoItem
+        skus_v2 = [p.codigo for p in produtos if p.codigo]
+        if skus_v2:
+            reservas_v2 = dict(
+                db.query(PedidoIntegradoItem.sku, func.coalesce(func.sum(PedidoIntegradoItem.quantidade), 0))
+                .filter(
+                    PedidoIntegradoItem.sku.in_(skus_v2),
+                    PedidoIntegradoItem.liberado_em.is_(None),
+                    PedidoIntegradoItem.vendido_em.is_(None)
+                )
+                .group_by(PedidoIntegradoItem.sku)
+                .all()
+            )
+        else:
+            reservas_v2 = {}
+    except Exception:
+        reservas_v2 = {}
+
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
     produtos_expandidos = []
@@ -1716,6 +1737,7 @@ def listar_produtos(
                 produto.composicao_kit = []
                 produto.estoque_virtual = 0
         
+        produto.estoque_reservado = float(reservas_v2.get(produto.codigo, 0))
         produtos_expandidos.append(produto)
         
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s

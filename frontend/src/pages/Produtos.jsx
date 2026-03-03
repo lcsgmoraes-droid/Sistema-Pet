@@ -358,14 +358,21 @@ const PRODUTOS_COLUNAS = [
       const estoqueAtual = isKitVirtual 
         ? (produto.estoque_virtual ?? 0)
         : (produto.estoque_atual || 0);
+      const reservado = produto.estoque_reservado || 0;
+      const estoqueDisponivel = estoqueAtual - reservado;
       
       return (
         <td className="px-4 py-3 text-center">
           {produto.controlar_estoque ? (
             <div className="flex flex-col items-center">
               <span className={`text-sm ${props.getCorEstoque(produto)}`}>
-                {estoqueAtual}
+                {estoqueDisponivel}
               </span>
+              {reservado > 0 && (
+                <span className="text-xs text-yellow-600 mt-0.5" title={`${reservado} unidade(s) reservada(s) em pedidos Bling`}>
+                  {reservado} reservado{reservado > 1 ? 's' : ''}
+                </span>
+              )}
               {isKitVirtual && (
                 <span className="text-xs text-gray-400 mt-0.5">
                   estoque virtual
