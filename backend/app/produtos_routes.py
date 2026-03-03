@@ -1263,17 +1263,6 @@ def criar_produto(
     logger.info(f"ðŸ“¦ Dados recebidos: {produto.model_dump()}")
     
     # ========================================
-    # ðŸ”„ AUTO-CONVERSÃƒO: classificacao_racao='sim' â†’ tipo='raÃ§Ã£o'
-    # ========================================
-    if produto.classificacao_racao == 'sim':
-        produto.tipo = 'raÃ§Ã£o'
-        logger.info("âœ… Produto marcado como raÃ§Ã£o (classificacao_racao='sim')")
-    elif produto.classificacao_racao in ['nao', 'nÃ£o', None]:
-        # Se nÃ£o Ã© raÃ§Ã£o, garantir que tipo seja 'produto'
-        if not produto.tipo or produto.tipo == 'raÃ§Ã£o':
-            produto.tipo = 'produto'
-    
-    # ========================================
     # VALIDAÃ‡Ã•ES DE INFRAESTRUTURA (mantidas na rota)
     # ========================================
     
