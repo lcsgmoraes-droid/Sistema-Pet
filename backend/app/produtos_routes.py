@@ -3105,7 +3105,7 @@ def atualizar_imagem(
     db.commit()
     db.refresh(imagem)
     
-    logger.info(f"Imagem {imagem_id} atualizada por {current_user.email}")
+    logger.info(f"Imagem {imagem_id} atualizada por {user.email}")
     
     return imagem
 

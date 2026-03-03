@@ -342,7 +342,12 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             quantidade=quantidade
         )
 
-        EstoqueReservaService.reservar(db, item_pedido)
+        try:
+            EstoqueReservaService.reservar(db, item_pedido)
+        except ValueError as e:
+            # Produto não cadastrado no sistema ainda — salva o item sem reserva
+            logger.warning(f"[BLING WEBHOOK] Reserva não criada para SKU {sku}: {e}")
+
         db.add(item_pedido)
 
     db.commit()
