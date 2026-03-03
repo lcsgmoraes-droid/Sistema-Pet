@@ -4,10 +4,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   FiHome, FiUsers, FiPackage, FiShoppingCart, FiDollarSign,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX,
-  FiBox, FiTrendingUp, FiFileText, FiChevronDown, FiChevronRight,
+  FiBox, FiShoppingBag, FiTrendingUp, FiFileText, FiChevronDown, FiChevronRight,
   FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
+import { api } from '../services/api';
 import FloatingCalculatorButton from './FloatingCalculatorButton';
 import ModalCalculadoraUniversal from './ModalCalculadoraUniversal';
 
@@ -71,6 +72,9 @@ const Layout = () => {
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
+
+  // Contagem de lembretes pendentes para badge dinâmico
+  const [lembretesCount, setLembretesCount] = useState(0);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
   const overlaySuspeitoDesdeRef = useRef(new Map());
 
@@ -243,11 +247,27 @@ const Layout = () => {
     };
   }, [calculadoraAberta]);
 
+  // Buscar contagem de lembretes pendentes para badge dinâmico
+  useEffect(() => {
+    const fetchLembretesCount = async () => {
+      try {
+        const response = await api.get('/api/lembretes/pendentes');
+        const lembretes = response.data || [];
+        setLembretesCount(Array.isArray(lembretes) ? lembretes.length : 0);
+      } catch {
+        // Silencioso — não bloqueia o layout
+      }
+    };
+    fetchLembretesCount();
+    const interval = setInterval(fetchLembretesCount, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const allMenuItems = [
     { path: '/dashboard', icon: FiHome, label: 'Dashboard', permission: 'relatorios.gerencial' }, // Precisa de permissão
-    { path: '/dashboard-gerencial', icon: FiBarChart2, label: '📊 Dashboard Gerencial', highlight: true, permission: 'relatorios.gerencial' },
+    { path: '/dashboard-gerencial', icon: FiBarChart2, label: 'Dashboard Gerencial', highlight: true, permission: 'relatorios.gerencial' },
     { path: '/clientes', icon: FiUsers, label: 'Pessoas', permission: 'clientes.visualizar' },
-    { path: '/pets', icon: PawPrint, label: '🐾 Pets', highlight: true, permission: 'clientes.visualizar' }, // Vinculado a clientes
+    { path: '/pets', icon: PawPrint, label: 'Pets', highlight: true, permission: 'clientes.visualizar' }, // Vinculado a clientes
     { 
       path: '/produtos', 
       icon: FiPackage, 
@@ -259,7 +279,7 @@ const Layout = () => {
         { path: '/estoque/alertas', label: 'Alertas de Estoque', permission: 'produtos.visualizar' },
       ]
     },
-    { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: true, permission: null }, // Sempre visível
+    { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: lembretesCount > 0, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },
     {
@@ -275,7 +295,7 @@ const Layout = () => {
       ],
     },
     { path: '/notas-fiscais', icon: FiFileText, label: 'Notas Fiscais', permission: 'vendas.visualizar' }, // Vinculado a vendas
-    { path: '/vendas/bling-pedidos', icon: FiBox, label: '📦 Pedidos Bling', permission: 'compras.sincronizacao_bling' },
+    { path: '/vendas/bling-pedidos', icon: FiShoppingBag, label: 'Pedidos Bling', permission: 'compras.sincronizacao_bling' },
     { 
       path: '/compras', 
       icon: FiBox, 
@@ -534,7 +554,7 @@ const Layout = () => {
                     <div className="flex items-center justify-between flex-1">
                       <span className="font-medium text-xs md:text-sm">{item.label}</span>
                       {item.badge && (
-                        <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
+                        <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
                       )}
                     </div>
                   )}
