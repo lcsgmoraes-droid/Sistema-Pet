@@ -346,7 +346,38 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado e estoque baixado (situacao_id={situacao_id})")
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
-        # updated sem situação relevante — ignorar
+        # updated sem situação relevante no payload — consultar API do Bling para verificar
+        try:
+            from app.bling_integration import BlingAPI
+            pedido_api = BlingAPI().consultar_pedido(pedido_bling_id)
+            situacao_api = pedido_api.get("situacao")
+            situacao_id_api = situacao_api.get("id") if isinstance(situacao_api, dict) else situacao_api
+            try:
+                situacao_id_api = int(situacao_id_api) if situacao_id_api is not None else None
+            except (ValueError, TypeError):
+                situacao_id_api = None
+        except Exception as e:
+            logger.warning(f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}")
+            situacao_id_api = None
+
+        if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_CANCELADO:
+            pedido = db.query(PedidoIntegrado).filter(
+                PedidoIntegrado.pedido_bling_id == pedido_bling_id
+            ).first()
+            if pedido and pedido.status not in ("confirmado", "cancelado"):
+                itens = db.query(PedidoIntegradoItem).filter(
+                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
+                ).all()
+                for item in itens:
+                    if not item.liberado_em and not item.vendido_em:
+                        EstoqueReservaService.liberar(db, item)
+                pedido.status = "cancelado"
+                pedido.cancelado_em = datetime.utcnow()
+                db.add(pedido)
+                db.commit()
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})")
+            return {"status": "ok", "acao": "cancelado_via_consulta_api"}
+
         return {"status": "ignorado", "motivo": "order_updated_sem_situacao_relevante"}
 
     # ========================
@@ -366,6 +397,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     canal = loja_nome or (str(loja_id) if loja_id else "online")
 
     # O webhook NÃO inclui itens — buscar na API do Bling
+    pedido_completo = {}
     itens_bling = []
     try:
         from app.bling_integration import BlingAPI
@@ -378,12 +410,26 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         logger.error("[BLING WEBHOOK] BLING_WEBHOOK_TENANT_ID não configurado — pedido ignorado")
         return {"status": "erro", "motivo": "tenant_nao_configurado"}
 
+    # Verificar situação atual no Bling — se já cancelado, não criar como aberto
+    situacao_criacao = pedido_completo.get("situacao") if pedido_completo else None
+    situacao_id_criacao = situacao_criacao.get("id") if isinstance(situacao_criacao, dict) else situacao_criacao
+    try:
+        situacao_id_criacao = int(situacao_id_criacao) if situacao_id_criacao is not None else None
+    except (ValueError, TypeError):
+        situacao_id_criacao = None
+
+    if situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_CANCELADO:
+        logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} order.created mas já cancelado (situacao_id={situacao_id_criacao}) — ignorado")
+        return {"status": "ignorado", "motivo": "order_created_ja_cancelado"}
+
+    status_inicial = "confirmado" if (situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO) else "aberto"
+
     pedido = PedidoIntegrado(
         tenant_id=_tenant_uuid,
         pedido_bling_id=pedido_bling_id,
         pedido_bling_numero=numero,
         canal=canal,
-        status="aberto",
+        status=status_inicial,
         expira_em=PedidoIntegrado.calcular_expiracao(),
         payload=data
     )
