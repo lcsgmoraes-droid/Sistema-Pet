@@ -33,6 +33,7 @@ from .models import User
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente
 )
+from .bling_estoque_sync import sincronizar_bling_background
 import logging
 logger = logging.getLogger(__name__)
 
@@ -331,6 +332,12 @@ def entrada_estoque(
         "componentes_sensibilizados": componentes_sensibilizados
     }
     
+    # Sincronizar estoque com Bling automaticamente
+    try:
+        sincronizar_bling_background(produto.id, produto.estoque_atual, "entrada_estoque")
+    except Exception as e_sync:
+        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (entrada): {e_sync}")
+    
     return response_data
 
 # ============================================================================
@@ -539,6 +546,12 @@ def saida_estoque(
         "created_at": movimentacao.created_at,
         "componentes_sensibilizados": componentes_sensibilizados if componentes_sensibilizados else None
     }
+    
+    # Sincronizar estoque com Bling automaticamente
+    try:
+        sincronizar_bling_background(produto.id, produto.estoque_atual, "saida_estoque")
+    except Exception as e_sync:
+        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida): {e_sync}")
     
     return response_data
 
