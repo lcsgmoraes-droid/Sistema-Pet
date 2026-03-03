@@ -2431,7 +2431,14 @@ def criar_lote(
     
     db.commit()
     db.refresh(novo_lote)
-    
+
+    # Sincronizar estoque com Bling em background
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto.id, float(produto.estoque_atual), "criacao_lote")
+    except Exception:
+        pass
+
     return novo_lote
 
 
@@ -2517,7 +2524,14 @@ def atualizar_lote(
     
     db.commit()
     db.refresh(lote)
-    
+
+    # Sincronizar estoque com Bling em background
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto.id, float(produto.estoque_atual), "edicao_lote")
+    except Exception:
+        pass
+
     return lote
 
 
@@ -2556,7 +2570,14 @@ def excluir_lote(
     lote.updated_at = datetime.utcnow()
     
     db.commit()
-    
+
+    # Sincronizar estoque com Bling em background
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto.id, float(produto.estoque_atual), "exclusao_lote")
+    except Exception:
+        pass
+
     return {"message": "Lote excluÃ­do com sucesso"}
 
 
@@ -2634,7 +2655,14 @@ def entrada_estoque(
     
     db.commit()
     db.refresh(lote)
-    
+
+    # Sincronizar estoque com Bling em background (fire-and-forget)
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto.id, float(produto.estoque_atual), "entrada_estoque")
+    except Exception:
+        pass
+
     return {
         "sucesso": True,
         "mensagem": "Entrada registrada com sucesso",
@@ -2744,7 +2772,14 @@ def saida_estoque_fifo(
     db.add(movimentacao)
     
     db.commit()
-    
+
+    # Sincronizar estoque com Bling em background (fire-and-forget)
+    try:
+        from app.bling_estoque_sync import sincronizar_bling_background
+        sincronizar_bling_background(produto.id, float(produto.estoque_atual), "saida_fifo")
+    except Exception:
+        pass
+
     return {
         "sucesso": True,
         "mensagem": "SaÃ­da registrada com sucesso usando FIFO",
