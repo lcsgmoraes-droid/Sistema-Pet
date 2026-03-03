@@ -35,10 +35,13 @@ class EstoqueReservaService:
         disponivel = produto.estoque_atual - reservado
 
         if disponivel < item.quantidade:
-            raise ValueError(
-                f"Estoque insuficiente para SKU {item.sku}. "
-                f"Disponível: {disponivel}, solicitado: {item.quantidade}"
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[RESERVA] Estoque insuficiente para SKU {item.sku}. "
+                f"Disponível: {disponivel}, solicitado: {item.quantidade}. "
+                f"Item registrado mesmo assim."
             )
+            return False  # reserva sem cobertura, mas item é salvo
 
         # Reserva é lógica: só manter o item ativo
         return True
