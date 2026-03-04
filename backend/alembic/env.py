@@ -52,6 +52,9 @@ import app.opportunities_models
 import app.opportunity_events_models
 import app.dre_plano_contas_models
 
+# Stone (pagamentos)
+import app.stone_models
+
 # IA models
 from app.ia import aba7_models, aba7_extrato_models
 
