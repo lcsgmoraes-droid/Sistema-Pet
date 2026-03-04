@@ -459,7 +459,7 @@ const Layout = () => {
           } bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 flex flex-col shadow-lg`}
         >
         {/* Logo/Header com Toggle */}
-        <div className="p-4 flex items-center justify-between border-b border-indigo-100 bg-white/50">
+        <div className={`p-4 flex items-center border-b border-indigo-100 bg-white/50 ${!isMobile && !sidebarOpen ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
             {!isMobile && (
               <button
@@ -470,24 +470,28 @@ const Layout = () => {
                 <FiMenu className="text-white w-6 h-6" />
               </button>
             )}
-            <div>
-              <h1 className="font-bold text-lg text-gray-800">Pet Shop Pro</h1>
-              <p className="text-xs text-gray-500">Central de Gestão</p>
-            </div>
+            {(isMobile || sidebarOpen) && (
+              <div>
+                <h1 className="font-bold text-lg text-gray-800">Pet Shop Pro</h1>
+                <p className="text-xs text-gray-500">Central de Gestão</p>
+              </div>
+            )}
           </div>
           
           {/* Botão Fechar (mobile) ou Patinha (desktop) */}
-          <button
-            onClick={() => isMobile ? setSidebarOpen(false) : setSidebarVisible(false)}
-            className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
-            title={isMobile ? 'Fechar menu' : 'Esconder menu completamente'}
-          >
-            {isMobile ? (
-              <FiX className="w-6 h-6 text-indigo-600" />
-            ) : (
-              <PawPrint className="w-5 h-5 text-indigo-600" />
-            )}
-          </button>
+          {(isMobile || sidebarOpen) && (
+            <button
+              onClick={() => isMobile ? setSidebarOpen(false) : setSidebarVisible(false)}
+              className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
+              title={isMobile ? 'Fechar menu' : 'Esconder menu completamente'}
+            >
+              {isMobile ? (
+                <FiX className="w-6 h-6 text-indigo-600" />
+              ) : (
+                <PawPrint className="w-5 h-5 text-indigo-600" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Menu Items */}
