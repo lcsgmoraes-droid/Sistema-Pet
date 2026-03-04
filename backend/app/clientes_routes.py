@@ -1759,7 +1759,7 @@ async def get_historico_compras(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.id,  # O nÃºmero da venda Ã© o prÃ³prio ID
+                "numero_venda": v.id,  # O número da venda é o próprio ID
                 "data_venda": v.data_venda.isoformat() if hasattr(v.data_venda, 'isoformat') else str(v.data_venda),
                 "total": float(v.total or 0),
                 "subtotal": float(v.subtotal or 0) if hasattr(v, 'subtotal') else float(v.total or 0),
@@ -1768,7 +1768,31 @@ async def get_historico_compras(
                 "saldo_devedor": float(v.total or 0) - (sum(float(pag.valor or 0) for pag in v.pagamentos) if hasattr(v, 'pagamentos') and v.pagamentos else 0),
                 "status": v.status,
                 "total_itens": len(v.itens) if v.itens else 0,
-                "forma_pagamento": v.pagamentos[0].forma_pagamento.nome if (v.pagamentos and v.pagamentos[0].forma_pagamento and hasattr(v.pagamentos[0].forma_pagamento, 'nome')) else (v.pagamentos[0].forma_pagamento if (v.pagamentos and hasattr(v.pagamentos[0], 'forma_pagamento')) else None)
+                "vendedor_nome": v.vendedor_nome if hasattr(v, 'vendedor_nome') else None,
+                "observacoes": v.observacoes if hasattr(v, 'observacoes') else None,
+                # Lista completa de formas de pagamento
+                "pagamentos": [
+                    {
+                        "forma": (
+                            pag.forma_pagamento.nome if (pag.forma_pagamento and hasattr(pag.forma_pagamento, 'nome'))
+                            else str(pag.forma_pagamento) if pag.forma_pagamento
+                            else "Não informado"
+                        ),
+                        "valor": float(pag.valor or 0)
+                    }
+                    for pag in (v.pagamentos or [])
+                ],
+                # Itens da venda
+                "itens": [
+                    {
+                        "nome": (item.produto.nome if item.produto else item.servico_descricao) or "Item",
+                        "quantidade": float(item.quantidade or 0),
+                        "preco_unitario": float(item.preco_unitario or 0),
+                        "subtotal": float(item.subtotal or 0),
+                        "tipo": item.tipo or "produto",
+                    }
+                    for item in (v.itens or [])
+                ]
             }
             for v in vendas
         ]
