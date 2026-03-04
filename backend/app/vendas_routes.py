@@ -882,7 +882,7 @@ async def finalizar_venda(
         venda_id=venda_id,
         pagamentos=pagamentos_list,
         user_id=current_user.id,
-        user_nome=current_user.nome,
+        user_nome=current_user.nome or current_user.email or 'Usuário',
         tenant_id=tenant_id,
         db=db
     )

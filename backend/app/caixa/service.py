@@ -244,7 +244,7 @@ class CaixaService:
             descricao=f'Venda #{venda_numero}',
             venda_id=venda_id,
             usuario_id=user_id,
-            usuario_nome=user_nome,
+            usuario_nome=user_nome or 'Usuário',  # fallback: usuario sem nome cadastrado
             tenant_id=tenant_id  # ✅ Garantir isolamento entre empresas
         )
         
