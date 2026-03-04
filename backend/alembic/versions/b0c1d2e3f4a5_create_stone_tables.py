@@ -24,11 +24,11 @@ def upgrade() -> None:
     op.create_table(
         'stone_transactions',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True, index=True),
+        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True),
 
         # IDs de referência
-        sa.Column('stone_payment_id', sa.String(100), nullable=False, unique=True),
-        sa.Column('external_id', sa.String(100), nullable=False, unique=True),
+        sa.Column('stone_payment_id', sa.String(100), nullable=False),
+        sa.Column('external_id', sa.String(100), nullable=False),
 
         # FK para vendas / contas a receber
         sa.Column('venda_id', sa.Integer(), sa.ForeignKey('vendas.id'), nullable=True),
@@ -99,7 +99,7 @@ def upgrade() -> None:
     op.create_table(
         'stone_transaction_logs',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True, index=True),
+        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True),
 
         sa.Column('transaction_id', sa.Integer(), sa.ForeignKey('stone_transactions.id'), nullable=False),
 
@@ -133,7 +133,7 @@ def upgrade() -> None:
     op.create_table(
         'stone_configs',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True, index=True),
+        sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True),
 
         # Credenciais
         sa.Column('client_id', sa.String(200), nullable=False),
