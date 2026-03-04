@@ -1759,7 +1759,7 @@ async def get_historico_compras(
         "vendas": [
             {
                 "id": v.id,
-                "numero_venda": v.id,  # O número da venda é o próprio ID
+                "numero_venda": v.numero_venda if hasattr(v, 'numero_venda') and v.numero_venda else v.id,
                 "data_venda": v.data_venda.isoformat() if hasattr(v.data_venda, 'isoformat') else str(v.data_venda),
                 "total": float(v.total or 0),
                 "subtotal": float(v.subtotal or 0) if hasattr(v, 'subtotal') else float(v.total or 0),

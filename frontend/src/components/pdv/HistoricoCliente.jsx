@@ -112,7 +112,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
 
     return origem.map((pag) => ({
       ...pag,
-      forma: pag?.forma || pag?.forma_pagamento_nome || pag?.forma_pagamento?.nome || 'Nao informado',
+      forma: pag?.forma || pag?.forma_pagamento_nome || pag?.forma_pagamento || pag?.forma_pagamento?.nome || 'Nao informado',
       valor: Number(pag?.valor || pag?.valor_pago || 0),
     }));
   };
