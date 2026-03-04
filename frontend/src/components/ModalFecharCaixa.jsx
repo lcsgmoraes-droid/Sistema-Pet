@@ -1,22 +1,28 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator } from 'lucide-react';
-import { fecharCaixa, obterResumoCaixa } from '../api/caixa';
+import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle } from 'lucide-react';
+import { fecharCaixa, obterResumoCaixa, obterVendasCaixa } from '../api/caixa';
+import CurrencyInput from './CurrencyInput';
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [resumo, setResumo] = useState(null);
-  const [valorContado, setValorContado] = useState('');
+  const [valorContado, setValorContado] = useState(0);
   const [observacoes, setObservacoes] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const [sucesso, setSucesso] = useState(false);
   const [mostrarContagem, setMostrarContagem] = useState(false);
+  const [formaExpandida, setFormaExpandida] = useState(null);
+  const [vendasDetalhe, setVendasDetalhe] = useState({});
+  const [loadingVendas, setLoadingVendas] = useState(null);
   const [notas, setNotas] = useState({
-    n100: 0,
-    n50: 0,
-    n20: 0,
-    n10: 0,
-    n5: 0,
-    n2: 0,
-    moedas: 0
+    n100: '',
+    n50: '',
+    n20: '',
+    n10: '',
+    n5: '',
+    n2: '',
+    moedas: ''
   });
 
   useEffect(() => {
@@ -26,14 +32,13 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const carregarResumo = async () => {
     try {
       const data = await obterResumoCaixa(caixaId);
-      console.log('📊 Resumo do caixa recebido:', data);
-      console.log('📊 vendas_por_forma_pagamento:', data.vendas_por_forma_pagamento);
       setResumo(data);
       // Preencher valor contado com o saldo esperado
-      setValorContado(data.totais.saldo_atual.toFixed(2));
+      const saldo = data?.totais?.saldo_atual ?? 0;
+      setValorContado(saldo);
     } catch (error) {
       console.error('Erro ao carregar resumo:', error);
-      alert('Erro ao carregar dados do caixa');
+      setErro('Não foi possível carregar os dados do caixa. Feche e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -41,42 +46,61 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
 
   const calcularDiferenca = () => {
     if (!resumo || !valorContado) return 0;
-    return parseFloat(valorContado) - resumo.totais.saldo_atual;
+    return valorContado - resumo.totais.saldo_atual;
   };
 
   const calcularTotalNotas = () => {
     return (
-      (notas.n100 * 100) +
-      (notas.n50 * 50) +
-      (notas.n20 * 20) +
-      (notas.n10 * 10) +
-      (notas.n5 * 5) +
-      (notas.n2 * 2) +
+      (parseInt(notas.n100) || 0) * 100 +
+      (parseInt(notas.n50) || 0) * 50 +
+      (parseInt(notas.n20) || 0) * 20 +
+      (parseInt(notas.n10) || 0) * 10 +
+      (parseInt(notas.n5) || 0) * 5 +
+      (parseInt(notas.n2) || 0) * 2 +
       parseFloat(notas.moedas || 0)
     );
   };
 
+  const carregarVendasForma = async (forma) => {
+    if (formaExpandida === forma) {
+      setFormaExpandida(null);
+      return;
+    }
+    setFormaExpandida(forma);
+    if (vendasDetalhe[forma]) return;
+    setLoadingVendas(forma);
+    try {
+      const data = await obterVendasCaixa(caixaId, forma);
+      setVendasDetalhe(prev => ({ ...prev, [forma]: data }));
+    } catch (err) {
+      console.error('Erro ao carregar vendas:', err);
+      setVendasDetalhe(prev => ({ ...prev, [forma]: [] }));
+    } finally {
+      setLoadingVendas(null);
+    }
+  };
+
   const aplicarContagem = () => {
     const total = calcularTotalNotas();
-    setValorContado(total.toFixed(2));
+    setValorContado(total);
     setMostrarContagem(false);
   };
 
   const limparContagem = () => {
     setNotas({
-      n100: 0,
-      n50: 0,
-      n20: 0,
-      n10: 0,
-      n5: 0,
-      n2: 0,
-      moedas: 0
+      n100: '',
+      n50: '',
+      n20: '',
+      n10: '',
+      n5: '',
+      n2: '',
+      moedas: ''
     });
   };
 
   const handleFechar = async () => {
-    if (!valorContado) {
-      alert('Informe o valor contado no caixa');
+    if (!(valorContado > 0)) {
+      setErro('Informe o valor contado no caixa');
       return;
     }
 
@@ -91,18 +115,22 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     }
 
     setSalvando(true);
+    setErro(null);
     try {
       await fecharCaixa(caixaId, {
-        valor_informado: parseFloat(valorContado),
+        valor_informado: valorContado,
         observacoes_fechamento: observacoes || null
       });
       
-      alert('Caixa fechado com sucesso!');
-      onSuccess();
-      onClose();
+      setSucesso(true);
+      // Aguarda 1s mostrando sucesso antes de fechar
+      setTimeout(() => {
+        onSuccess();
+      }, 800);
     } catch (error) {
       console.error('Erro ao fechar caixa:', error);
-      alert(error.response?.data?.detail || 'Erro ao fechar caixa');
+      const mensagem = error.response?.data?.detail || 'Erro ao fechar caixa. Tente novamente.';
+      setErro(mensagem);
     } finally {
       setSalvando(false);
     }
@@ -265,16 +293,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n2}
-                          onChange={(e) => setNotas({...notas, n2: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n2: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-gray-600">
-                        R$ {(notas.n2 * 2).toFixed(2)}
+                        R$ {((parseInt(notas.n2) || 0) * 2).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -288,16 +315,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n5}
-                          onChange={(e) => setNotas({...notas, n5: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n5: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-purple-600">
-                        R$ {(notas.n5 * 5).toFixed(2)}
+                        R$ {((parseInt(notas.n5) || 0) * 5).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -311,16 +337,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n10}
-                          onChange={(e) => setNotas({...notas, n10: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n10: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-red-500 focus:ring-2 focus:ring-red-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-red-600">
-                        R$ {(notas.n10 * 10).toFixed(2)}
+                        R$ {((parseInt(notas.n10) || 0) * 10).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -334,16 +359,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n20}
-                          onChange={(e) => setNotas({...notas, n20: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n20: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-yellow-600">
-                        R$ {(notas.n20 * 20).toFixed(2)}
+                        R$ {((parseInt(notas.n20) || 0) * 20).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -357,16 +381,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n50}
-                          onChange={(e) => setNotas({...notas, n50: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n50: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-blue-600">
-                        R$ {(notas.n50 * 50).toFixed(2)}
+                        R$ {((parseInt(notas.n50) || 0) * 50).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -380,16 +403,15 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         </div>
                         <input
                           type="number"
-                          min="0"
                           value={notas.n100}
-                          onChange={(e) => setNotas({...notas, n100: parseInt(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, n100: e.target.value})}
                           className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-green-500 focus:ring-2 focus:ring-green-200"
-                          placeholder="0"
+                          placeholder=""
                         />
                         <span className="text-xs text-gray-500">×</span>
                       </div>
                       <span className="text-lg font-bold text-green-600">
-                        R$ {(notas.n100 * 100).toFixed(2)}
+                        R$ {((parseInt(notas.n100) || 0) * 100).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -406,15 +428,14 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         <input
                           type="number"
                           step="0.01"
-                          min="0"
                           value={notas.moedas}
-                          onChange={(e) => setNotas({...notas, moedas: parseFloat(e.target.value) || 0})}
+                          onChange={(e) => setNotas({...notas, moedas: e.target.value})}
                           className="w-32 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
-                          placeholder="0.00"
+                          placeholder=""
                         />
                       </div>
                       <span className="text-lg font-bold text-amber-600">
-                        R$ {(notas.moedas || 0).toFixed(2)}
+                        R$ {(parseFloat(notas.moedas) || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -452,14 +473,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             
             <div className="relative">
               <DollarSign className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
                 value={valorContado}
-                onChange={(e) => setValorContado(e.target.value)}
+                onChange={setValorContado}
                 className="w-full pl-10 pr-4 py-3 text-lg font-semibold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
+                placeholder="0,00"
                 autoFocus
               />
             </div>
@@ -523,9 +541,12 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                     <div 
                       key={forma} 
                       className={`bg-white rounded-lg p-3 border ${
-                        ehDinheiro ? 'border-green-300 bg-green-50' : 'border-gray-200'
-                      } hover:shadow-sm transition-shadow cursor-pointer`}
+                        formaExpandida === forma
+                          ? 'border-blue-400 bg-blue-50 shadow-md'
+                          : ehDinheiro ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                      } hover:shadow-sm transition-shadow cursor-pointer select-none`}
                       title="Clique para ver detalhes das vendas"
+                      onClick={() => carregarVendasForma(forma)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -554,10 +575,64 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                   );
                 })}
               </div>
-              
+
+              {/* Painel de detalhes das vendas por forma */}
+              {formaExpandida && (
+                <div className="mt-3 border-t border-blue-200 pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-xs font-bold text-gray-700">Vendas — {formaExpandida}</h5>
+                    <button
+                      onClick={() => setFormaExpandida(null)}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >✕ fechar</button>
+                  </div>
+                  {loadingVendas === formaExpandida ? (
+                    <div className="text-xs text-gray-500 py-2">Carregando...</div>
+                  ) : (
+                    <div className="space-y-1 max-h-44 overflow-y-auto">
+                      {(vendasDetalhe[formaExpandida] || []).length === 0 ? (
+                        <div className="text-xs text-gray-400">Nenhuma venda encontrada.</div>
+                      ) : (
+                        (vendasDetalhe[formaExpandida] || []).map(v => (
+                          <div key={v.id} className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100">
+                            <div>
+                              <span className="font-semibold text-gray-700">{v.numero_venda}</span>
+                              <span className="text-gray-500 ml-1.5">{v.cliente_nome || 'Consumidor'}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-gray-400 mr-2">{v.hora_venda}</span>
+                              <span className="font-bold text-gray-800">R$ {(v.valor_nesta_forma ?? v.total).toFixed(2)}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mt-3 pt-3 border-t border-blue-200 text-xs text-gray-600">
                 💡 <strong>Dica:</strong> Apenas <strong>Dinheiro</strong> afeta o saldo físico do caixa. Demais formas vão para banco/financeiro.
               </div>
+            </div>
+          )}
+
+          {/* Mensagem de erro da API */}
+          {erro && (
+            <div className="bg-red-50 border-2 border-red-400 rounded-xl p-4 flex items-start space-x-3">
+              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold text-red-800 text-sm mb-1">Não foi possível fechar o caixa</div>
+                <div className="text-red-700 text-sm">{erro}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Mensagem de sucesso */}
+          {sucesso && (
+            <div className="bg-green-50 border-2 border-green-400 rounded-xl p-4 flex items-center space-x-3">
+              <CheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
+              <div className="font-bold text-green-800">Caixa fechado com sucesso!</div>
             </div>
           )}
 
@@ -573,7 +648,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             </button>
             <button
               onClick={handleFechar}
-              disabled={salvando || !valorContado}
+              disabled={salvando || valorContado <= 0}
               className="px-8 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {salvando ? (

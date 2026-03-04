@@ -525,6 +525,60 @@ def listar_movimentacoes_caixa(
     }
 
 
+@router.get("/{caixa_id}/vendas")
+def listar_vendas_caixa(
+    caixa_id: int,
+    forma_pagamento: str = None,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Lista as vendas de um caixa, opcionalmente filtradas por forma de pagamento"""
+    current_user, tenant_id = current_user_and_tenant
+
+    caixa = db.query(Caixa).filter_by(
+        id=caixa_id,
+        usuario_id=current_user.id,
+        tenant_id=tenant_id
+    ).first()
+    if not caixa:
+        raise HTTPException(status_code=404, detail='Caixa não encontrado')
+
+    from app.vendas_models import Venda, VendaPagamento
+
+    query = db.query(Venda).filter(
+        Venda.caixa_id == caixa_id,
+        Venda.tenant_id == tenant_id,
+        Venda.status.in_(['finalizada', 'baixa_parcial'])
+    )
+
+    if forma_pagamento:
+        query = query.join(VendaPagamento, VendaPagamento.venda_id == Venda.id).filter(
+            VendaPagamento.forma_pagamento == forma_pagamento
+        ).distinct()
+
+    vendas = query.order_by(Venda.data_venda.desc()).all()
+
+    resultado = []
+    for v in vendas:
+        if forma_pagamento:
+            valor_nesta_forma = sum(
+                float(p.valor) for p in v.pagamentos if p.forma_pagamento == forma_pagamento
+            )
+        else:
+            valor_nesta_forma = float(v.total)
+
+        resultado.append({
+            'id': v.id,
+            'numero_venda': v.numero_venda,
+            'cliente_nome': v.cliente.nome if v.cliente else 'Consumidor',
+            'total': float(v.total),
+            'valor_nesta_forma': valor_nesta_forma,
+            'hora_venda': v.data_venda.strftime('%H:%M') if v.data_venda else None,
+        })
+
+    return resultado
+
+
 @router.get("/{caixa_id}/pdf")
 def gerar_pdf_caixa(
     caixa_id: int,

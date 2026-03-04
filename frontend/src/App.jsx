@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const preloadPessoas = () => import('./pages/ClientesNovo');
@@ -177,6 +178,7 @@ function AppRoutePreloader() {
 
 function App() {
   return (
+    <ErrorBoundary>
     <AuthProvider>
       <BrowserRouter>
         <Toaster position="top-right" />
@@ -438,6 +440,7 @@ function App() {
         </Suspense>
       </BrowserRouter>
     </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

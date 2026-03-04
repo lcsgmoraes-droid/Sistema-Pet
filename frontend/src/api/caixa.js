@@ -67,3 +67,12 @@ export const obterResumoCaixa = async (caixaId) => {
   const response = await api.get(`/caixas/${caixaId}/resumo`);
   return response.data;
 };
+
+/**
+ * Listar vendas de um caixa (opcionalmente filtradas por forma de pagamento)
+ */
+export const obterVendasCaixa = async (caixaId, formaPagamento = null) => {
+  const params = formaPagamento ? { forma_pagamento: formaPagamento } : {};
+  const response = await api.get(`/caixas/${caixaId}/vendas`, { params });
+  return response.data;
+};

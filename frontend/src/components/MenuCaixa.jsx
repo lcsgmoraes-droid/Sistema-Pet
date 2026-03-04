@@ -355,7 +355,7 @@ export default function MenuCaixa({ onAbrirCaixa }) {
         />
       )}
 
-      {modalAtivo === 'fechar' && (
+      {modalAtivo === 'fechar' && caixaAberto && (
         <ModalFecharCaixa
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}
@@ -366,7 +366,7 @@ export default function MenuCaixa({ onAbrirCaixa }) {
         />
       )}
 
-      {modalAtivo === 'devolucao' && (
+      {modalAtivo === 'devolucao' && caixaAberto && (
         <ModalDevolucao
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}
@@ -374,7 +374,7 @@ export default function MenuCaixa({ onAbrirCaixa }) {
         />
       )}
 
-      {modalAtivo === 'movimentacoes' && (
+      {modalAtivo === 'movimentacoes' && caixaAberto && (
         <ModalMovimentacoesCaixa
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}

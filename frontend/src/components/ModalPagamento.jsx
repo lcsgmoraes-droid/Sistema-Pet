@@ -34,6 +34,7 @@ import { finalizarVenda, criarVenda } from '../api/vendas';
 import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
+import CurrencyInput from './CurrencyInput';
 
 const BANDEIRAS = [
   'Visa',
@@ -54,7 +55,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   const [bandeira, setBandeira] = useState('');
   const [nsuCartao, setNsuCartao] = useState(''); // NSU para conciliação bancária
   const [numeroParcelas, setNumeroParcelas] = useState(1);
-  const [valorRecebido, setValorRecebido] = useState('');
+  const [valorRecebido, setValorRecebido] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingPagamentos, setLoadingPagamentos] = useState(false);
   const [erro, setErro] = useState('');
@@ -149,7 +150,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   const valorTotal = venda.total;
   const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
   const valorRestante = valorTotal - valorPago;
-  const troco = valorRecebido ? parseFloat(valorRecebido) - valorRestante : 0;
+  const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
 
   // 🆕 Função para calcular status de margem operacional (INICIAL - À VISTA)
   const calcularStatusMargemInicial = async () => {
@@ -416,7 +417,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       return;
     }
 
-    const valor = parseFloat(valorRecebido) || 0;
+    const valor = valorRecebido || 0;
 
     if (valor <= 0) {
       setErro('Informe o valor recebido');
@@ -510,7 +511,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     // Adicionar pagamento normalmente
     setPagamentos([...pagamentos, novoPagamento]);
     setFormaPagamentoSelecionada(null);
-    setValorRecebido('');
+    setValorRecebido(0);
     setBandeira('');
     setOperadoraSelecionada(operadoras.find(op => op.padrao) || null); // 🆕 Resetar para padrão
     setNsuCartao(''); // Limpar NSU
@@ -873,7 +874,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                         setBandeira('');
                         setNsuCartao(''); // Limpar NSU
                         // Pre-preencher com o menor valor entre crédito e valor restante
-                        setValorRecebido(Math.min(parseFloat(venda.cliente.credito), valorRestante).toFixed(2));
+                        setValorRecebido(Math.min(parseFloat(venda.cliente.credito), valorRestante));
                       }}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formaPagamentoSelecionada?.id === 'credito_cliente'
@@ -905,6 +906,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                           setNumeroParcelas(1);
                           setBandeira('');
                           setNsuCartao(''); // Limpar NSU
+                          setValorRecebido(valorRestante); // Pré-preencher valor restante
                         }}
                         className={`p-4 rounded-lg border-2 transition-all ${
                           selecionada
@@ -956,30 +958,17 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
                         R$
                       </span>
-                      <input
-                        type="number"
-                        step="0.01"
+                      <CurrencyInput
                         value={valorRecebido}
-                        onChange={(e) => {
-                          // Permitir digitação livre, apenas limitar ao confirmar
-                          setValorRecebido(e.target.value);
-                        }}
-                        onBlur={(e) => {
-                          // Validar e limitar quando sair do campo
-                          const valor = parseFloat(e.target.value) || 0;
+                        onChange={(v) => {
                           if (formaPagamentoSelecionada.id === 'credito_cliente') {
                             const maxCredito = Math.min(formaPagamentoSelecionada.credito_disponivel, valorRestante);
-                            if (valor > maxCredito) {
-                              setValorRecebido(maxCredito.toFixed(2));
-                              setErro(`Valor ajustado para o crédito disponível: R$ ${maxCredito.toFixed(2)}`);
-                              setTimeout(() => setErro(''), 3000);
-                            }
+                            setValorRecebido(Math.min(v, maxCredito));
+                          } else {
+                            setValorRecebido(v);
                           }
                         }}
-                        placeholder={valorRestante.toFixed(2)}
-                        max={formaPagamentoSelecionada.id === 'credito_cliente' 
-                          ? Math.min(formaPagamentoSelecionada.credito_disponivel, valorRestante) 
-                          : undefined}
+                        placeholder={valorRestante.toFixed(2).replace('.', ',')}
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         autoFocus
                       />
@@ -992,7 +981,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                   </div>
 
                   {/* Troco (somente para dinheiro) */}
-                  {formaPagamentoSelecionada.tipo === 'dinheiro' && valorRecebido && (
+                  {formaPagamentoSelecionada.tipo === 'dinheiro' && valorRecebido > 0 && (
                     <div className={`rounded-lg p-3 ${troco > 0 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-100'}`}>
                       <div className="text-sm font-medium">
                         <span className={troco > 0 ? 'text-yellow-800' : 'text-gray-600'}>
@@ -1099,7 +1088,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                           length: operadoraSelecionada?.max_parcelas || formaPagamentoSelecionada.parcelas_maximas || 12 
                         }, (_, i) => i + 1).map(
                           (n) => {
-                            const valorParaParcelar = parseFloat(valorRecebido) || valorRestante;
+                            const valorParaParcelar = valorRecebido || valorRestante;
                             const valorParcela = valorParaParcelar / n;
                             
                             // ✅ Usar COR do BACKEND (única fonte da verdade)
@@ -1117,13 +1106,13 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                                 }
                               >
                                 {cor === 'vermelho' ? '🚫 ' : cor === 'amarelo' ? '⚠️ ' : ''}
-                                {n}x de R$ {valorParcela.toFixed(2)} {valorRecebido ? `(Total: R$ ${valorParaParcelar.toFixed(2)})` : ''}
+                                {n}x de R$ {valorParcela.toFixed(2)} {valorRecebido > 0 ? `(Total: R$ ${valorParaParcelar.toFixed(2)})` : ''}
                               </option>
                             );
                           }
                         )}
                       </select>
-                      {valorRecebido && numeroParcelas > 1 && (
+                      {valorRecebido > 0 && numeroParcelas > 1 && (
                         <div className={`mt-2 p-3 border rounded-lg ${
                           (() => {
                             // ✅ Usar COR do BACKEND (única fonte da verdade)
@@ -1156,7 +1145,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                                 <>
                                   {cor === 'vermelho' && '🚫 '}
                                   {cor === 'amarelo' && '⚠️ '}
-                                  💳 {numeroParcelas}x de R$ {(parseFloat(valorRecebido) / numeroParcelas).toFixed(2)}
+                                  💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
                                 </>
                               );
                             })()}
@@ -1173,7 +1162,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                                 : 'text-red-700';
                             })()
                           }`}>
-                            Valor total parcelado: R$ {parseFloat(valorRecebido).toFixed(2)}
+                            Valor total parcelado: R$ {valorRecebido.toFixed(2)}
                             {(() => {
                               const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
                               const cor = simulacao?.cor || statusMargem || 'verde';
