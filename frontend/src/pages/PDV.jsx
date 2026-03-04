@@ -983,13 +983,14 @@ export default function PDV() {
 
   // Buscar clientes
   useEffect(() => {
-    if (buscarCliente.length >= 2) {
+    if (buscarCliente.length >= 1) {
       const timer = setTimeout(async () => {
         try {
-          // Remove parênteses, traços e espaços para permitir busca de telefone
-          // colado do WhatsApp no formato (18)99740-1641 ou (18) 99740-1641
-          const termoBusca = buscarCliente.replace(/[()\-\s]/g, '');
-          const clientes = await buscarClientes({ search: termoBusca });
+          // Remove apenas parênteses e traços (formatação de telefone do WhatsApp)
+          // MAS mantém espaços para que busca por nome completo funcione
+          // Ex: "(18)99740-1641" → "1899740164", "Camila Silva" → "Camila Silva"
+          const termoBusca = buscarCliente.replace(/[()-]/g, '').trim();
+          const clientes = await buscarClientes({ search: termoBusca, limit: 20 });
           setClientesSugeridos(clientes || []);
         } catch (error) {
           console.error('Erro ao buscar clientes:', error);
