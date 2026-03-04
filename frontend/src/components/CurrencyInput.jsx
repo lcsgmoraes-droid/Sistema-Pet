@@ -2,11 +2,15 @@
  * CurrencyInput — campo monetário com máscara de preenchimento da direita.
  *
  * Comportamento:
- *   - Digitar "5"         → R$ 0,05
- *   - Digitar "5" novamente → R$ 0,55
- *   - Digitar "5" novamente → R$ 5,55
+ *   - Digitar "5"         → 0,05
+ *   - Digitar "5" novamente → 0,55
+ *   - Digitar "5" novamente → 5,55
+ *   - Digitar em valores grandes → 1.234,56
  *   - Backspace           → volta um dígito
  *   - Delete              → zera o campo
+ *
+ * PADRÃO OBRIGATÓRIO: ponto como separador de milhar, vírgula como decimal.
+ *   Exemplo: 17.555,25
  *
  * Props:
  *   value    (number)   — valor em reais (float), ex: 39.90
@@ -19,19 +23,28 @@ export default function CurrencyInput({ value, onChange, maxValue, className = '
   const cents = Math.round((value || 0) * 100);
   const maxCents = maxValue !== undefined ? Math.round(maxValue * 100) : 999999999;
 
-  // Exibição: se valor for zero mostra vazio (placeholder cuida disso)
+  // Exibição com separador de milhar: 17.555,25
   const display = cents > 0
-    ? (cents / 100).toFixed(2).replace('.', ',')
+    ? (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : '';
 
   const handleKeyDown = (e) => {
+    // Detectar se o campo está totalmente selecionado (Ctrl+A ou clique e arraste)
+    const tudoSelecionado =
+      e.target.selectionStart === 0 &&
+      e.target.selectionEnd === e.target.value.length &&
+      e.target.value.length > 0;
+
     if (e.key >= '0' && e.key <= '9') {
       e.preventDefault();
-      const novo = Math.min(cents * 10 + Number(e.key), maxCents);
+      // Se todo o conteúdo estava selecionado, começar do zero (substituir)
+      const base = tudoSelecionado ? 0 : cents;
+      const novo = Math.min(base * 10 + Number(e.key), maxCents);
       onChange(novo / 100);
     } else if (e.key === 'Backspace') {
       e.preventDefault();
-      onChange(Math.floor(cents / 10) / 100);
+      // Se tudo selecionado, apagar tudo
+      onChange(tudoSelecionado ? 0 : Math.floor(cents / 10) / 100);
     } else if (e.key === 'Delete') {
       e.preventDefault();
       onChange(0);

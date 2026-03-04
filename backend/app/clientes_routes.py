@@ -1614,19 +1614,25 @@ def adicionar_credito(
             detail="Valor deve ser maior que zero"
         )
     
-    # Adicionar crÃ©dito
+    from app.models import CreditoLog
+
+    # Adicionar crédito
     credito_anterior = float(cliente.credito or 0)
     cliente.credito = Decimal(str(credito_anterior + dados.valor))
     cliente.updated_at = dt.utcnow()
-    
-    # Adicionar observaÃ§Ã£o no histÃ³rico
-    observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] CrÃ©dito adicionado: R$ {dados.valor:.2f} - {dados.motivo}"
-    
-    if observacao_atual:
-        cliente.observacoes = f"{observacao_atual}\n{nova_observacao}"
-    else:
-        cliente.observacoes = nova_observacao
+
+    # Log estruturado de crédito
+    log_credito = CreditoLog(
+        tenant_id=tenant_id,
+        cliente_id=cliente.id,
+        tipo='adicao_manual',
+        valor=Decimal(str(dados.valor)),
+        saldo_anterior=Decimal(str(credito_anterior)),
+        saldo_atual=Decimal(str(float(cliente.credito))),
+        motivo=dados.motivo,
+        usuario_nome=current_user.nome or current_user.email,
+    )
+    db.add(log_credito)
     
     db.commit()
     
@@ -1679,19 +1685,26 @@ def remover_credito(
             detail=f"Valor a remover (R$ {dados.valor:.2f}) excede o crÃ©dito disponÃ­vel (R$ {credito_atual:.2f})"
         )
     
-    # Remover crÃ©dito
-    cliente.credito = Decimal(str(credito_atual - dados.valor))
+    from app.models import CreditoLog
+
+    # Remover crédito
+    novo_saldo = Decimal(str(credito_atual - dados.valor))
+    cliente.credito = novo_saldo
     cliente.updated_at = dt.utcnow()
-    
-    # Adicionar observaÃ§Ã£o no histÃ³rico
-    observacao_atual = cliente.observacoes or ""
-    nova_observacao = f"[{dt.now().strftime('%d/%m/%Y %H:%M')}] CrÃ©dito removido: R$ {dados.valor:.2f} - {dados.motivo}"
-    
-    if observacao_atual:
-        cliente.observacoes = f"{observacao_atual}\n{nova_observacao}"
-    else:
-        cliente.observacoes = nova_observacao
-    
+
+    # Log estruturado de crédito
+    log_credito = CreditoLog(
+        tenant_id=tenant_id,
+        cliente_id=cliente.id,
+        tipo='remocao_manual',
+        valor=Decimal(str(dados.valor)),
+        saldo_anterior=Decimal(str(credito_atual)),
+        saldo_atual=novo_saldo,
+        motivo=dados.motivo,
+        usuario_nome=current_user.nome or current_user.email,
+    )
+    db.add(log_credito)
+
     db.commit()
     
     # Log de auditoria
@@ -1714,6 +1727,49 @@ def remover_credito(
 # ============================================================================
 # HISTÃ“RICO DE COMPRAS
 # ============================================================================
+
+
+# ============================================================================
+# EXTRATO DE CRÉDITO
+# ============================================================================
+
+@router.get("/{cliente_id}/credito/extrato")
+def get_extrato_credito(
+    cliente_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Retorna o histórico de movimentações de crédito do cliente."""
+    from app.models import CreditoLog
+    from sqlalchemy import desc
+
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _obter_cliente_ou_404(db, cliente_id, tenant_id)
+
+    logs = (
+        db.query(CreditoLog)
+        .filter(CreditoLog.cliente_id == cliente_id, CreditoLog.tenant_id == tenant_id)
+        .order_by(desc(CreditoLog.created_at))
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": log.id,
+            "tipo": log.tipo,
+            "valor": float(log.valor),
+            "saldo_anterior": float(log.saldo_anterior),
+            "saldo_atual": float(log.saldo_atual),
+            "motivo": log.motivo,
+            "referencia_id": log.referencia_id,
+            "usuario_nome": log.usuario_nome,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]
+
 
 @router.get("/{cliente_id}/historico-compras")
 async def get_historico_compras(
@@ -2353,61 +2409,91 @@ def obter_timeline_cliente(
 
 
 def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Optional[str], pet_id: Optional[int], limit: int):
-    """FunÃ§Ã£o auxiliar para buscar timeline de qualquer entidade"""
-    # Query na VIEW otimizada
-    id_column = "cliente_id" if "cliente" in view_name else "fornecedor_id"
+    """Função auxiliar para buscar timeline de qualquer entidade — consulta tabelas diretamente."""
+    from .vendas_models import Venda
+    from .financeiro_models import ContaReceber
     
-    query = f"""
-        SELECT 
-            tipo_evento,
-            evento_id,
-            {id_column} as entity_id,
-            pet_id,
-            data_evento,
-            titulo,
-            descricao,
-            status,
-            cor_badge
-        FROM {view_name}
-        WHERE {id_column} = :entity_id
-    """
-    
-    params = {"entity_id": entity_id}
-    
-    # Filtro por tipo de evento
-    if tipo_evento:
-        query += " AND tipo_evento = :tipo_evento"
-        params["tipo_evento"] = tipo_evento
-    
-    # Filtro por pet (apenas para clientes)
-    if pet_id and "cliente" in view_name:
-        query += " AND (pet_id = :pet_id OR pet_id IS NULL)"
-        params["pet_id"] = pet_id
-    
-    # OrdenaÃ§Ã£o e limite
-    query += " ORDER BY data_evento DESC LIMIT :limit"
-    params["limit"] = limit
-    
-    # Executar query com SQLAlchemy
-    from sqlalchemy import text
-    
-    result = db.execute(text(query), params)
-    
-    eventos = []
-    for row in result:
-        eventos.append(TimelineEvento(
-            tipo_evento=row.tipo_evento,
-            evento_id=row.evento_id,
-            cliente_id=row.entity_id,
-            pet_id=row.pet_id,
-            data_evento=datetime.fromisoformat(row.data_evento) if isinstance(row.data_evento, str) else row.data_evento,
-            titulo=row.titulo,
-            descricao=row.descricao,
-            status=row.status,
-            cor_badge=row.cor_badge
-        ))
-    
-    return eventos
+    is_cliente = "cliente" in view_name
+    eventos: list[TimelineEvento] = []
+
+    # ─── 1. VENDAS ───────────────────────────────────────────────────────────
+    if is_cliente and (not tipo_evento or tipo_evento == "venda"):
+        filtro = [Venda.cliente_id == entity_id]
+        vendas_q = db.query(Venda).filter(*filtro).order_by(Venda.data_venda.desc()).limit(limit).all()
+        for v in vendas_q:
+            cor = {"finalizada": "green", "pendente": "yellow", "cancelada": "red"}.get(v.status or "", "gray")
+            eventos.append(TimelineEvento(
+                tipo_evento="venda",
+                evento_id=v.id,
+                cliente_id=entity_id,
+                pet_id=None,
+                data_evento=v.data_venda or v.created_at,
+                titulo=f"Venda #{v.numero_venda or v.id}",
+                descricao=f"R$ {float(v.total or 0):.2f} - {v.status or ''}",
+                status=v.status or "",
+                cor_badge=cor,
+            ))
+
+    # ─── 2. CONTAS A RECEBER ─────────────────────────────────────────────────
+    if is_cliente and (not tipo_evento or tipo_evento == "conta_receber"):
+        contas_q = (
+            db.query(ContaReceber)
+            .filter(ContaReceber.cliente_id == entity_id)
+            .order_by(ContaReceber.data_vencimento.desc())
+            .limit(limit)
+            .all()
+        )
+        for cr in contas_q:
+            cor = {"recebido": "green", "pendente": "yellow", "vencido": "red", "cancelado": "gray"}.get(cr.status or "", "blue")
+            eventos.append(TimelineEvento(
+                tipo_evento="conta_receber",
+                evento_id=cr.id,
+                cliente_id=entity_id,
+                pet_id=None,
+                data_evento=cr.data_vencimento or cr.data_emissao or cr.created_at,
+                titulo="Conta a Receber",
+                descricao=f"R$ {float(cr.valor_original or 0):.2f} - {cr.descricao or ''}",
+                status=cr.status or "",
+                cor_badge=cor,
+            ))
+
+    # ─── 3. PETS ─────────────────────────────────────────────────────────────
+    if is_cliente and (not tipo_evento or tipo_evento in ("pet_cadastro", "pet_atualizacao")):
+        filtro_pet = [Pet.cliente_id == entity_id]
+        if pet_id:
+            filtro_pet.append(Pet.id == pet_id)
+        pets_q = db.query(Pet).filter(*filtro_pet).all()
+        for p in pets_q:
+            cor = "blue" if p.ativo else "gray"
+            st = "ativo" if p.ativo else "inativo"
+            if not tipo_evento or tipo_evento == "pet_cadastro":
+                eventos.append(TimelineEvento(
+                    tipo_evento="pet_cadastro",
+                    evento_id=p.id,
+                    cliente_id=entity_id,
+                    pet_id=p.id,
+                    data_evento=p.created_at,
+                    titulo=f"🐾 Pet cadastrado: {p.nome}",
+                    descricao=f"{p.especie or ''}{(' - ' + p.raca) if p.raca else ''}",
+                    status=st,
+                    cor_badge=cor,
+                ))
+            if (not tipo_evento or tipo_evento == "pet_atualizacao") and p.updated_at and p.updated_at != p.created_at:
+                eventos.append(TimelineEvento(
+                    tipo_evento="pet_atualizacao",
+                    evento_id=p.id,
+                    cliente_id=entity_id,
+                    pet_id=p.id,
+                    data_evento=p.updated_at,
+                    titulo=f"✏️ Pet atualizado: {p.nome}",
+                    descricao="Informações atualizadas",
+                    status=st,
+                    cor_badge="purple",
+                ))
+
+    # Ordenar por data decrescente e aplicar limite
+    eventos.sort(key=lambda e: e.data_evento, reverse=True)
+    return eventos[:limit]
 
 
 # ============================================================

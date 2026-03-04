@@ -704,3 +704,22 @@ class ConfiguracaoEntrega(BaseTenantModel):
     
     # Relacionamento com o entregador padrão
     entregador_padrao = relationship("Cliente", foreign_keys=[entregador_padrao_id])
+
+
+# ====================
+# HISTÓRICO DE CRÉDITO
+# ====================
+
+class CreditoLog(BaseTenantModel):
+    """Registro de cada movimentação de crédito de um cliente."""
+    __tablename__ = "credito_logs"
+
+    cliente_id     = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo           = Column(String(30), nullable=False, index=True)
+    # tipos possíveis: 'adicao_manual', 'remocao_manual', 'uso_venda', 'troco', 'devolucao'
+    valor          = Column(DECIMAL(10, 2), nullable=False)      # sempre positivo
+    saldo_anterior = Column(DECIMAL(10, 2), nullable=False)
+    saldo_atual    = Column(DECIMAL(10, 2), nullable=False)
+    motivo         = Column(Text, nullable=True)
+    referencia_id  = Column(Integer, nullable=True)              # venda_id ou outro id relacionado
+    usuario_nome   = Column(String(255), nullable=True)          # nome de quem fez a operação

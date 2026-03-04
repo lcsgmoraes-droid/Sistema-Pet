@@ -8,6 +8,9 @@ import {
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import ModalImportacaoPessoas from '../components/ModalImportacaoPessoas';
+import ModalAdicionarCredito from '../components/ModalAdicionarCredito';
+import ModalRemoverCredito from '../components/ModalRemoverCredito';
+import ExtratoCredito from '../components/ExtratoCredito';
 import ClienteTimeline from '../components/ClienteTimeline';
 import { ClienteSegmentos, SegmentoBadge } from '../components/ClienteSegmentos';
 import ClienteInsights from '../components/ClienteInsights';
@@ -19,6 +22,9 @@ const Pessoas = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
+  const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] = useState(false);
+  const [mostrarModalRemoverCredito, setMostrarModalRemoverCredito] = useState(false);
+  const [refreshKeyCredito, setRefreshKeyCredito] = useState(0);
   const [editingCliente, setEditingCliente] = useState(null);
   const [error, setError] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState('todos'); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
@@ -2822,108 +2828,26 @@ const Pessoas = () => {
                           type="button"
                           className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                           disabled={!editingCliente}
-                          onClick={async () => {
-                            if (!editingCliente) {
-                              alert('Salve o cliente primeiro antes de adicionar crédito');
-                              return;
-                            }
-                            
-                            const valor = prompt('Digite o valor a adicionar ao crédito:');
-                            if (!valor || isNaN(parseFloat(valor))) return;
-                            
-                            const valorNum = parseFloat(valor);
-                            if (valorNum <= 0) {
-                              alert('Valor deve ser maior que zero');
-                              return;
-                            }
-                            
-                            const motivo = prompt('Motivo da adição de crédito:', 'Ajuste manual');
-                            if (!motivo) return;
-                            
-                            try {
-                              const response = await api.post(`/clientes/${editingCliente.id}/credito/adicionar`, {
-                                valor: valorNum,
-                                motivo: motivo
-                              });
-                              
-                              alert(`✅ ${response.data.message}\n\nCrédito anterior: R$ ${response.data.credito_anterior.toFixed(2)}\nValor adicionado: R$ ${response.data.valor_adicionado.toFixed(2)}\nNovo saldo: R$ ${response.data.credito_atual.toFixed(2)}`);
-                              
-                              // Atualizar crédito no estado local
-                              setEditingCliente({
-                                ...editingCliente,
-                                credito: response.data.credito_atual
-                              });
-                              
-                              // Recarregar lista de clientes
-                              loadClientes();
-                            } catch (error) {
-                              console.error('Erro ao adicionar crédito:', error);
-                              alert('❌ Erro ao adicionar crédito: ' + (error.response?.data?.detail || error.message));
-                            }
-                          }}
+                          onClick={() => setMostrarModalAdicionarCredito(true)}
                         >
-                          <FiTrendingUp /> Adicionar Crédito
+                          <FiTrendingUp /> Inserir Crédito
                         </button>
                         <button
                           type="button"
                           className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                           disabled={!editingCliente}
-                          onClick={async () => {
-                            if (!editingCliente) {
-                              alert('Salve o cliente primeiro antes de remover crédito');
-                              return;
-                            }
-                            
-                            const creditoAtual = parseFloat(editingCliente.credito || 0);
-                            if (creditoAtual <= 0) {
-                              alert('Cliente não possui crédito para remover');
-                              return;
-                            }
-                            
-                            const valor = prompt(`Digite o valor a remover (máx: R$ ${creditoAtual.toFixed(2)}):`);
-                            if (!valor || isNaN(parseFloat(valor))) return;
-                            
-                            const valorNum = parseFloat(valor);
-                            if (valorNum <= 0) {
-                              alert('Valor deve ser maior que zero');
-                              return;
-                            }
-                            
-                            if (valorNum > creditoAtual) {
-                              alert(`Valor excede o crédito disponível (R$ ${creditoAtual.toFixed(2)})`);
-                              return;
-                            }
-                            
-                            const motivo = prompt('Motivo da remoção de crédito:', 'Ajuste manual');
-                            if (!motivo) return;
-                            
-                            try {
-                              const response = await api.post(`/clientes/${editingCliente.id}/credito/remover`, {
-                                valor: valorNum,
-                                motivo: motivo
-                              });
-                              
-                              alert(`✅ ${response.data.message}\n\nCrédito anterior: R$ ${response.data.credito_anterior.toFixed(2)}\nValor removido: R$ ${response.data.valor_removido.toFixed(2)}\nNovo saldo: R$ ${response.data.credito_atual.toFixed(2)}`);
-                              
-                              // Atualizar crédito no estado local
-                              setEditingCliente({
-                                ...editingCliente,
-                                credito: response.data.credito_atual
-                              });
-                              
-                              // Recarregar lista de clientes
-                              loadClientes();
-                            } catch (error) {
-                              console.error('Erro ao remover crédito:', error);
-                              alert('❌ Erro ao remover crédito: ' + (error.response?.data?.detail || error.message));
-                            }
-                          }}
+                          onClick={() => setMostrarModalRemoverCredito(true)}
                         >
                           <FiTrendingDown /> Remover Crédito
                         </button>
                       </div>
                     </div>
                   </div>
+
+                  {/* Extrato de Crédito */}
+                  {editingCliente?.id && (
+                    <ExtratoCredito clienteId={editingCliente.id} refreshKey={refreshKeyCredito} />
+                  )}
 
                   {/* Resumo Financeiro Compacto - Nova abordagem leve */}
                   <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
@@ -3341,6 +3265,32 @@ const Pessoas = () => {
         }}
       />
       
+      {/* Modal de Adicionar Crédito */}
+      {mostrarModalAdicionarCredito && editingCliente && (
+        <ModalAdicionarCredito
+          cliente={editingCliente}
+          onConfirmar={(novoSaldo) => {
+            setEditingCliente({ ...editingCliente, credito: novoSaldo });
+            setRefreshKeyCredito(k => k + 1);
+            loadClientes();
+          }}
+          onClose={() => setMostrarModalAdicionarCredito(false)}
+        />
+      )}
+
+      {/* Modal de Remover Crédito */}
+      {mostrarModalRemoverCredito && editingCliente && (
+        <ModalRemoverCredito
+          cliente={editingCliente}
+          onConfirmar={(novoSaldo) => {
+            setEditingCliente({ ...editingCliente, credito: novoSaldo });
+            setRefreshKeyCredito(k => k + 1);
+            loadClientes();
+          }}
+          onClose={() => setMostrarModalRemoverCredito(false)}
+        />
+      )}
+
       {/* Estilos para animação do badge de parceiro */}
       <style>{`
         @keyframes fadeIn {

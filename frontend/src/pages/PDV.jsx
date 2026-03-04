@@ -54,6 +54,7 @@ import ClienteInfoWidget from '../components/ClienteInfoWidget';
 import AnaliseVendaDrawer from '../components/AnaliseVendaDrawer';
 import ModalCalculadoraRacaoPDV from '../components/pdv/ModalCalculadoraRacaoPDV';
 import ModalPendenciasEstoque from '../components/pdv/ModalPendenciasEstoque';
+import ModalAdicionarCredito from '../components/ModalAdicionarCredito';
 import api from '../api';
 import { formatarVariacao, nomeCompletoVariacao } from '../utils/variacoes';
 import { ehRacao, contarRacoes, obterUltimaRacao } from '../helpers/deteccaoRacao';
@@ -101,6 +102,7 @@ export default function PDV() {
   const [mostrarModalAbrirCaixa, setMostrarModalAbrirCaixa] = useState(false);
   const [mostrarVendasEmAberto, setMostrarVendasEmAberto] = useState(false);
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
+  const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] = useState(false);
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] = useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
@@ -2189,7 +2191,7 @@ export default function PDV() {
                     )}
 
                     {/* Botões de Ação */}
-                    <div className="mt-3 pt-3 border-t border-blue-300 flex gap-2">
+                    <div className="mt-3 pt-3 border-t border-blue-300 flex gap-2 flex-wrap">
                       <button
                         onClick={() => setMostrarHistoricoCliente(true)}
                         className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
@@ -2197,6 +2199,15 @@ export default function PDV() {
                         <History className="w-4 h-4" />
                         Histórico
                       </button>
+                      {!modoVisualizacao && (
+                        <button
+                          onClick={() => setMostrarModalAdicionarCredito(true)}
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <Wallet className="w-4 h-4" />
+                          Inserir Crédito
+                        </button>
+                      )}
                       {!modoVisualizacao && (
                         <button
                           onClick={() => {
@@ -4169,6 +4180,21 @@ export default function PDV() {
               })
               .catch(() => setVendasEmAbertoInfo(null));
           }}
+        />
+      )}
+
+      {/* Modal de Adicionar Crédito */}
+      {mostrarModalAdicionarCredito && vendaAtual.cliente && (
+        <ModalAdicionarCredito
+          cliente={vendaAtual.cliente}
+          onConfirmar={(novoSaldo) => {
+            setVendaAtual(prev => ({
+              ...prev,
+              cliente: { ...prev.cliente, credito: novoSaldo },
+            }));
+            setMostrarModalAdicionarCredito(false);
+          }}
+          onClose={() => setMostrarModalAdicionarCredito(false)}
         />
       )}
 

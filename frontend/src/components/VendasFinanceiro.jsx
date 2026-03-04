@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import HistoricoVendasClienteTab from '../pages/financeiro/HistoricoVendasClienteTab';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter, ChevronDown, ChevronRight, Download, FileText, BarChart3, ArrowUp, ArrowDown, Minus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
@@ -725,6 +726,16 @@ export default function VendasFinanceiro() {
             }`}
           >
             Resumo
+          </button>
+          <button
+            onClick={() => setAbaAtiva('historico-cliente')}
+            className={`px-4 py-2 font-medium ${
+              abaAtiva === 'historico-cliente'
+                ? 'border-b-2 border-purple-500 text-purple-600'
+                : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Histórico por Cliente
           </button>
           <button
             onClick={() => setAbaAtiva('produtos')}
@@ -1997,6 +2008,12 @@ export default function VendasFinanceiro() {
             </>
           )}
         </div>
-      )}    </div>
+      )}
+
+      {/* Aba Histórico por Cliente */}
+      {abaAtiva === 'historico-cliente' && (
+        <HistoricoVendasClienteTab />
+      )}
+    </div>
   );
 }

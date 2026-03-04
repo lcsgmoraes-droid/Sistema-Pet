@@ -35,6 +35,7 @@ import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
+import ModalAdicionarCredito from './ModalAdicionarCredito';
 
 const BANDEIRAS = [
   'Visa',
@@ -75,6 +76,11 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   const [simulacoesParcelamento, setSimulacoesParcelamento] = useState({});
   const [loadingSimulacao, setLoadingSimulacao] = useState(false);
   const [faixasParcelamento, setFaixasParcelamento] = useState(null);
+  
+  // 🆕 Estados para excedente (troco vs crédito) em métodos não-dinheiro
+  const [opcaoExcedente, setOpcaoExcedente] = useState(null); // 'troco' | 'credito'
+  const [mostrarModalCreditoExcedente, setMostrarModalCreditoExcedente] = useState(false);
+  const [valorExcedente, setValorExcedente] = useState(0);
   
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
@@ -509,6 +515,12 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     }
 
     // Adicionar pagamento normalmente
+    // Capturar troco excedente ANTES de resetar os estados
+    const trocoParaCredito =
+      opcaoExcedente === 'credito' && troco > 0 && formaPagamentoSelecionada?.tipo !== 'dinheiro'
+        ? troco
+        : 0;
+
     setPagamentos([...pagamentos, novoPagamento]);
     setFormaPagamentoSelecionada(null);
     setValorRecebido(0);
@@ -518,7 +530,14 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     setNumeroParcelas(1);
     setErro('');
     setErroJustificativa('');
+    setOpcaoExcedente(null);
     // ✅ NÃO limpar justificativaTexto - deve permanecer até finalizar venda
+
+    // Se escolheu gerar crédito, abrir modal após adicionar pagamento
+    if (trocoParaCredito > 0) {
+      setValorExcedente(trocoParaCredito);
+      setMostrarModalCreditoExcedente(true);
+    }
   };
 
   // Remover forma de pagamento
@@ -812,7 +831,8 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
@@ -979,6 +999,49 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                       </p>
                     )}
                   </div>
+
+                  {/* Aviso de excedente para métodos NÃO-dinheiro */}
+                  {formaPagamentoSelecionada?.tipo !== 'dinheiro' &&
+                    formaPagamentoSelecionada?.tipo !== 'credito_cliente' &&
+                    troco > 0.005 && (
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-amber-800 text-sm font-semibold">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        Valor R$ {valorRecebido.toFixed(2).replace('.', ',')} supera o total em{' '}
+                        <span className="font-bold">R$ {troco.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                      {venda.cliente ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setOpcaoExcedente(opcaoExcedente === 'troco' ? null : 'troco')}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-xl border-2 transition-colors ${
+                              opcaoExcedente === 'troco'
+                                ? 'bg-yellow-500 border-yellow-500 text-white'
+                                : 'bg-white border-yellow-300 text-yellow-800 hover:bg-yellow-50'
+                            }`}
+                          >
+                            💵 Troco em dinheiro
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOpcaoExcedente(opcaoExcedente === 'credito' ? null : 'credito')}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-xl border-2 transition-colors ${
+                              opcaoExcedente === 'credito'
+                                ? 'bg-green-500 border-green-500 text-white'
+                                : 'bg-white border-green-300 text-green-800 hover:bg-green-50'
+                            }`}
+                          >
+                            💳 Gerar crédito
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-amber-700">
+                          Sem cliente associado — o excedente será desconsiderado.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Troco (somente para dinheiro) */}
                   {formaPagamentoSelecionada.tipo === 'dinheiro' && valorRecebido > 0 && (
@@ -1518,5 +1581,17 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
         </div>
       </div>
     </div>
+
+    {/* Modal de Crédito para excedente */}
+    {mostrarModalCreditoExcedente && venda.cliente && (
+      <ModalAdicionarCredito
+        cliente={venda.cliente}
+        valorInicial={valorExcedente}
+        motivoPadrao="Crédito de excedente no pagamento"
+        onConfirmar={() => setMostrarModalCreditoExcedente(false)}
+        onClose={() => setMostrarModalCreditoExcedente(false)}
+      />
+    )}
+    </>
   );
 }

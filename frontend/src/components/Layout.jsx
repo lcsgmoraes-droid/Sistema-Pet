@@ -5,7 +5,7 @@ import {
   FiHome, FiUsers, FiPackage, FiShoppingCart, FiDollarSign,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX,
   FiBox, FiShoppingBag, FiTrendingUp, FiFileText, FiChevronDown, FiChevronRight,
-  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle
+  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle, FiGlobe
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import { api } from '../services/api';
@@ -284,7 +284,7 @@ const Layout = () => {
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },
     {
       path: '/ecommerce',
-      icon: FiShoppingCart,
+      icon: FiGlobe,
       label: 'E-commerce',
       permission: 'vendas.visualizar',
       submenu: [
