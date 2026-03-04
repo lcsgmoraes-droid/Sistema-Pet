@@ -45,6 +45,7 @@ import { getProdutos, getProdutosVendaveis } from '../api/produtos';
 import { buscarClientes, buscarClientePorId, criarCliente, buscarRacas } from '../api/clientes';
 import { useAuth } from '../contexts/AuthContext';
 import ModalPagamento from '../components/ModalPagamento';
+import QuantidadeInput from '../components/QuantidadeInput';
 import ModalAbrirCaixa from '../components/ModalAbrirCaixa';
 import MenuCaixa from '../components/MenuCaixa';
 import ImprimirCupom from '../components/ImprimirCupom';
@@ -2409,21 +2410,17 @@ export default function PDV() {
                               >
                                 <Minus className="w-4 h-4" />
                               </button>
-                              <input
-                                type="number"
+                              <QuantidadeInput
                                 value={item.quantidade}
-                                onChange={(e) => {
-                                  const novaQuantidade = parseFloat(e.target.value) || 0;
+                                onChange={(novaQuantidade) => {
                                   const novosItens = vendaAtual.itens.map((it, i) => {
                                     if (i === index) {
-                                      const quantidadeAjustada = Math.max(0.001, novaQuantidade);
-                                      const subtotalSemDesconto = quantidadeAjustada * it.preco_unitario;
+                                      const subtotalSemDesconto = novaQuantidade * it.preco_unitario;
                                       
                                       let novoDescontoValor = it.desconto_valor || 0;
                                       
-                                      // 🆕 LÓGICA CORRIGIDA: Só recalcula se foi desconto PERCENTUAL
+                                      // Só recalcula se foi desconto PERCENTUAL
                                       if (it.tipo_desconto_aplicado === 'percentual' && it.desconto_percentual > 0) {
-                                        // Desconto percentual: recalcular o valor baseado na nova quantidade
                                         novoDescontoValor = (subtotalSemDesconto * it.desconto_percentual) / 100;
                                       }
                                       // Se foi desconto em VALOR: mantém o desconto_valor fixo
@@ -2432,7 +2429,7 @@ export default function PDV() {
                                       
                                       return {
                                         ...it,
-                                        quantidade: quantidadeAjustada,
+                                        quantidade: novaQuantidade,
                                         desconto_valor: novoDescontoValor,
                                         subtotal: subtotalComDesconto
                                       };
@@ -2442,8 +2439,6 @@ export default function PDV() {
                                   recalcularTotais(novosItens);
                                 }}
                                 disabled={modoVisualizacao}
-                                step="0.001"
-                                min="0.001"
                                 className="w-20 px-2 py-1 text-center font-medium border-none focus:ring-0 disabled:bg-gray-50"
                               />
                               <button
