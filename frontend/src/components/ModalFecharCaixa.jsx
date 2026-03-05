@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { fecharCaixa, obterResumoCaixa, obterVendasCaixa } from '../api/caixa';
 import CurrencyInput from './CurrencyInput';
 
@@ -15,6 +15,8 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [formaExpandida, setFormaExpandida] = useState(null);
   const [vendasDetalhe, setVendasDetalhe] = useState({});
   const [loadingVendas, setLoadingVendas] = useState(null);
+  const [confirmandoDiferenca, setConfirmandoDiferenca] = useState(false);
+  const [mostrarDicasDiferenca, setMostrarDicasDiferenca] = useState(false);
   const [notas, setNotas] = useState({
     n100: '',
     n50: '',
@@ -33,9 +35,8 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     try {
       const data = await obterResumoCaixa(caixaId);
       setResumo(data);
-      // Preencher valor contado com o saldo esperado
-      const saldo = data?.totais?.saldo_atual ?? 0;
-      setValorContado(saldo);
+      // Campo vazio — o funcionário deve contar e preencher manualmente
+      setValorContado(0);
     } catch (error) {
       console.error('Erro ao carregar resumo:', error);
       setErro('Não foi possível carregar os dados do caixa. Feche e tente novamente.');
@@ -104,16 +105,16 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
       return;
     }
 
-    const diferenca = calcularDiferenca();
-    
-    if (Math.abs(diferenca) > 0.01) {
-      const confirmar = window.confirm(
-        `Diferença de R$ ${Math.abs(diferenca).toFixed(2)} ${diferenca > 0 ? 'a mais' : 'a menos'}\n\n` +
-        `Deseja continuar com o fechamento?`
-      );
-      if (!confirmar) return;
+    const dif = calcularDiferenca();
+    if (Math.abs(dif) > 0.01 && !confirmandoDiferenca) {
+      setConfirmandoDiferenca(true);
+      return;
     }
 
+    await executarFechamento();
+  };
+
+  const executarFechamento = async () => {
     setSalvando(true);
     setErro(null);
     try {
@@ -155,6 +156,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const diferenca = calcularDiferenca();
 
   return (
+    <>
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -483,26 +485,38 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             </div>
 
             {/* Diferença */}
-            {valorContado && Math.abs(diferenca) > 0.01 && (
-              <div className={`mt-3 p-4 rounded-lg border-2 ${
-                diferenca > 0 
-                  ? 'bg-blue-50 border-blue-300' 
-                  : 'bg-yellow-50 border-yellow-300'
-              }`}>
+            {!!valorContado && Math.abs(diferenca) > 0.01 && (
+              <button
+                type="button"
+                onClick={() => setMostrarDicasDiferenca(true)}
+                className={`mt-3 w-full p-4 rounded-lg border-2 text-left hover:opacity-90 transition-opacity ${
+                  diferenca > 0
+                    ? 'bg-blue-50 border-blue-300'
+                    : 'bg-yellow-50 border-yellow-300'
+                }`}
+                title="Clique para ver possíveis causas"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-900">
-                    {diferenca > 0 ? 'Sobra' : 'Falta'}:
+                    {diferenca > 0 ? '⚠️ Sobra' : '⚠️ Falta'}:
                   </span>
-                  <span className={`text-xl font-bold ${
-                    diferenca > 0 ? 'text-blue-600' : 'text-yellow-700'
-                  }`}>
-                    R$ {Math.abs(diferenca).toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xl font-bold ${
+                      diferenca > 0 ? 'text-blue-600' : 'text-yellow-700'
+                    }`}>
+                      R$ {Math.abs(diferenca).toFixed(2)}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      diferenca > 0 ? 'bg-blue-200 text-blue-800' : 'bg-yellow-200 text-yellow-800'
+                    }`}>
+                      Ver possíveis causas →
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </button>
             )}
 
-            {valorContado && Math.abs(diferenca) <= 0.01 && (
+            {!!valorContado && Math.abs(diferenca) <= 0.01 && (
               <div className="mt-3 p-4 rounded-lg border-2 bg-green-50 border-green-300">
                 <div className="flex items-center justify-center space-x-2 text-green-700 font-semibold">
                   <span className="text-2xl">✓</span>
@@ -636,7 +650,47 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Botões */}
+          {/* Botões / Confirmação de diferença */}
+          {confirmandoDiferenca ? (
+            <div className="pt-4 border-t">
+              <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 mb-3">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold text-amber-800">Diferença de caixa detectada</div>
+                    <div className="text-amber-700 text-sm mt-1">
+                      Existe uma diferença de{' '}
+                      <strong>R$ {Math.abs(calcularDiferenca()).toFixed(2)}</strong>{' '}
+                      <strong>{calcularDiferenca() > 0 ? 'a mais' : 'a menos'}</strong>{' '}no caixa.
+                      A diferença ficará registrada no histórico.
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoDiferenca(false)}
+                  disabled={salvando}
+                  className="flex-1 px-4 py-3 border-2 border-amber-300 text-amber-700 rounded-lg hover:bg-amber-100 font-semibold transition-colors disabled:opacity-50"
+                >
+                  Voltar e corrigir
+                </button>
+                <button
+                  type="button"
+                  onClick={executarFechamento}
+                  disabled={salvando}
+                  className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+                >
+                  {salvando ? (
+                    <><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div><span>Fechando...</span></>
+                  ) : (
+                    <><AlertTriangle className="w-4 h-4" /><span>Sim, fechar com diferença</span></>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
           <div className="flex items-center justify-end space-x-3 pt-4 border-t">
             <button
               type="button"
@@ -664,8 +718,114 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
               )}
             </button>
           </div>
+          )}
         </div>
       </div>
     </div>
+
+    {/* Modal de Dicas de Diferença */}
+    {mostrarDicasDiferenca && (
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
+          <div className={`p-5 rounded-t-xl text-white ${diferenca > 0 ? 'bg-blue-600' : 'bg-yellow-600'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">
+                  {diferenca > 0 ? '💰 Sobrou dinheiro no caixa' : '⚠️ Faltou dinheiro no caixa'}
+                </h3>
+                <p className="text-sm opacity-90 mt-0.5">
+                  Diferença de R$ {Math.abs(diferenca).toFixed(2)} — possíveis causas
+                </p>
+              </div>
+              <button onClick={() => setMostrarDicasDiferenca(false)} className="p-1 hover:bg-white hover:bg-opacity-20 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {diferenca < 0 ? (
+              // FALTOU dinheiro
+              <>
+                <p className="text-sm text-gray-600">
+                  O caixa deveria ter <strong>R$ {(resumo?.totais?.saldo_atual ?? 0).toFixed(2)}</strong>, mas você contou <strong>R$ {valorContado.toFixed(2)}</strong>. Alguém saiu com dinheiro que não foi registrado, ou houve um erro de registro. Veja as causas mais comuns:
+                </p>
+
+                <div className="space-y-3">
+                  <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-800 text-sm mb-1">💸 Troco dado a mais</div>
+                    <div className="text-xs text-yellow-700">O funcionário pode ter calculado errado o troco em alguma venda em dinheiro e devolvido mais do que devia. Verifique as vendas em dinheiro do dia e confira se os valores batem com o que foi recebido.</div>
+                  </div>
+
+                  <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-800 text-sm mb-1">🏷️ Forma de pagamento lançada errada</div>
+                    <div className="text-xs text-yellow-700">Uma venda pode ter sido registrada como "Dinheiro", mas o cliente pagou no cartão ou PIX. Nesse caso, o caixa esperava receber aquele valor em espécie, mas não recebeu. Verifique as vendas em dinheiro e confirme com o cliente ou pelo extrato do maquininha.</div>
+                  </div>
+
+                  <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-800 text-sm mb-1">📋 Despesa paga sem lançar no caixa</div>
+                    <div className="text-xs text-yellow-700">Alguém pode ter pago uma despesa (fornecedor, frete, material) com o dinheiro do caixa sem registrar como "Despesa". O dinheiro saiu fisicamente mas o sistema não sabe. Pergunte à equipe se houve algum pagamento assim.</div>
+                  </div>
+
+                  <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-800 text-sm mb-1">🔄 Sangria não registrada</div>
+                    <div className="text-xs text-yellow-700">Dinheiro pode ter sido retirado do caixa sem passar pelo fluxo de Sangria no sistema. Pergunte se alguém retirou dinheiro para troco ou outro fim sem registrar.</div>
+                  </div>
+
+                  <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-800 text-sm mb-1">🔢 Erro na contagem</div>
+                    <div className="text-xs text-yellow-700">Recomendamos contar o dinheiro uma segunda vez, separando por cédula (R$ 100, R$ 50, R$ 20, R$ 10, R$ 5, R$ 2) e somando as moedas por fim. Use o auxiliar de contagem desta tela.</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              // SOBROU dinheiro
+              <>
+                <p className="text-sm text-gray-600">
+                  O caixa deveria ter <strong>R$ {(resumo?.totais?.saldo_atual ?? 0).toFixed(2)}</strong>, mas você contou <strong>R$ {valorContado.toFixed(2)}</strong>. Entrou mais dinheiro do que foi registrado. Veja as causas mais comuns:
+                </p>
+
+                <div className="space-y-3">
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                    <div className="font-semibold text-blue-800 text-sm mb-1">📥 Venda recebida mas não registrada</div>
+                    <div className="text-xs text-blue-700">O cliente pagou em dinheiro, mas a venda não foi fechada no sistema. O dinheiro entrou no caixa físico sem que o sistema soubesse. Verifique se há vendas em aberto ou atendimentos que não foram finalizados.</div>
+                  </div>
+
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                    <div className="font-semibold text-blue-800 text-sm mb-1">💳 Forma de pagamento lançada errada</div>
+                    <div className="text-xs text-blue-700">Uma venda foi registrada como cartão ou PIX, mas o cliente pagou em dinheiro. O sistema não contou esse valor como dinheiro no caixa. Confira as vendas do dia e veja se todas as formas de pagamento foram registradas corretamente.</div>
+                  </div>
+
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                    <div className="font-semibold text-blue-800 text-sm mb-1">💰 Troco dado a menos</div>
+                    <div className="text-xs text-blue-700">O funcionário pode ter devolvido menos troco do que devia em alguma venda. O dinheiro ficou no caixa, mas o cliente levou menos do que era correto. Vale revisar as vendas com pagamento em dinheiro.</div>
+                  </div>
+
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                    <div className="font-semibold text-blue-800 text-sm mb-1">📋 Suprimento não registrado</div>
+                    <div className="text-xs text-blue-700">Alguém pode ter colocado dinheiro no caixa (para troco ou reforço) sem registrar como Suprimento no sistema. Pergunte se houve alguma entrada de dinheiro que não foi registrada.</div>
+                  </div>
+
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3">
+                    <div className="font-semibold text-blue-800 text-sm mb-1">🔢 Erro na contagem</div>
+                    <div className="text-xs text-blue-700">Recomendamos contar o dinheiro uma segunda vez, separando por cédula (R$ 100, R$ 50, R$ 20, R$ 10, R$ 5, R$ 2) e somando as moedas por fim. Use o auxiliar de contagem desta tela.</div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="pt-3 border-t">
+              <button
+                onClick={() => setMostrarDicasDiferenca(false)}
+                className="w-full px-4 py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-lg font-semibold transition-colors"
+              >
+                Entendi — voltar ao fechamento
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

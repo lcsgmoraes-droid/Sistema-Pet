@@ -25,6 +25,14 @@ export default function QuantidadeInput({ value, onChange, disabled, className, 
     // Permite: dígitos, ponto ou vírgula (uma vez), sem outros caracteres
     if (raw === '' || /^[0-9]*[.,]?[0-9]*$/.test(raw)) {
       setDisplay(raw);
+      // Atualiza em tempo real quando o valor é um número completo (não termina em . ou ,)
+      if (raw !== '' && !/[.,]$/.test(raw)) {
+        const normalized = raw.replace(',', '.');
+        const num = parseFloat(normalized);
+        if (!isNaN(num) && num > 0) {
+          onChange(num);
+        }
+      }
     }
   };
 

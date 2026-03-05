@@ -8,6 +8,7 @@ import {
   TrendingDown,
   Receipt,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   XCircle,
   RefreshCw,
@@ -95,19 +96,30 @@ export default function MeusCaixas() {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
-      aberto: { cor: 'bg-green-100 text-green-800', icone: CheckCircle, texto: 'Aberto' },
-      fechado: { cor: 'bg-gray-100 text-gray-800', icone: XCircle, texto: 'Fechado' }
-    };
-
-    const badge = badges[status] || badges.fechado;
-    const Icone = badge.icone;
-
+  const getStatusBadge = (caixa) => {
+    if (caixa.status === 'aberto') {
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+          <CheckCircle className="w-4 h-4" />
+          Aberto
+        </span>
+      );
+    }
+    // Fechado — verificar se tem diferença
+    const temDiferenca = caixa.diferenca !== null && caixa.diferenca !== undefined && Math.abs(caixa.diferenca) > 0.01;
+    if (temDiferenca) {
+      const dif = caixa.diferenca;
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+          <AlertTriangle className="w-4 h-4" />
+          Diferença {dif > 0 ? '+' : '-'}R$ {Math.abs(dif).toFixed(2)}
+        </span>
+      );
+    }
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${badge.cor}`}>
-        <Icone className="w-4 h-4" />
-        {badge.texto}
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+        <CheckCircle className="w-4 h-4 text-green-600" />
+        Fechado OK
       </span>
     );
   };
@@ -200,7 +212,11 @@ export default function MeusCaixas() {
               : null;
 
             return (
-              <div key={caixa.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+              <div key={caixa.id} className={`bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow ${
+                caixa.status === 'fechado' && caixa.diferenca !== null && Math.abs(caixa.diferenca ?? 0) > 0.01
+                  ? 'border-l-4 border-l-amber-400'
+                  : ''
+              }`}>
                 <div className="p-6">
                   {/* Header do Card */}
                   <div className="flex items-start justify-between mb-4">
@@ -215,7 +231,7 @@ export default function MeusCaixas() {
                         <p className="text-sm text-gray-600">{caixa.usuario_nome}</p>
                       </div>
                     </div>
-                    {getStatusBadge(caixa.status)}
+                    {getStatusBadge(caixa)}
                   </div>
 
                   {/* Datas */}

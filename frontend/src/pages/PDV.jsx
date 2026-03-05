@@ -38,7 +38,8 @@ import {
   Scale,
   Calculator,
   Bell,
-  Percent
+  Percent,
+  Tag
 } from 'lucide-react';
 import { criarVenda, finalizarVenda, listarVendas, buscarVenda } from '../api/vendas';
 import { getProdutos, getProdutosVendaveis } from '../api/produtos';
@@ -46,6 +47,7 @@ import { buscarClientes, buscarClientePorId, criarCliente, buscarRacas } from '.
 import { useAuth } from '../contexts/AuthContext';
 import ModalPagamento from '../components/ModalPagamento';
 import QuantidadeInput from '../components/QuantidadeInput';
+import SubtotalInput from '../components/SubtotalInput';
 import ModalAbrirCaixa from '../components/ModalAbrirCaixa';
 import MenuCaixa from '../components/MenuCaixa';
 import ImprimirCupom from '../components/ImprimirCupom';
@@ -57,6 +59,7 @@ import ModalCalculadoraRacaoPDV from '../components/pdv/ModalCalculadoraRacaoPDV
 import ModalPendenciasEstoque from '../components/pdv/ModalPendenciasEstoque';
 import ModalAdicionarCredito from '../components/ModalAdicionarCredito';
 import api from '../api';
+import { formatBRL } from '../utils/formatters';
 import { formatarVariacao, nomeCompletoVariacao } from '../utils/variacoes';
 import { ehRacao, contarRacoes, obterUltimaRacao } from '../helpers/deteccaoRacao';
 import toast from 'react-hot-toast';
@@ -130,7 +133,14 @@ export default function PDV() {
   const [mostrarModalDescontoTotal, setMostrarModalDescontoTotal] = useState(false);
   const [tipoDescontoTotal, setTipoDescontoTotal] = useState('valor');
   const [valorDescontoTotal, setValorDescontoTotal] = useState(0);
-  
+
+  // Estados de cupom de desconto
+  const [codigoCupom, setCodigoCupom] = useState('');
+  const [cupomAplicado, setCupomAplicado] = useState(null); // {code, discount_applied, message}
+  const [loadingCupom, setLoadingCupom] = useState(false);
+  const [erroCupom, setErroCupom] = useState('');
+  const [saldoCampanhas, setSaldoCampanhas] = useState(null); // {saldo_cashback, total_carimbos, cupons_ativos}
+
   // Estado de comissão
   const [vendaComissionada, setVendaComissionada] = useState(false);
   const [funcionarioComissao, setFuncionarioComissao] = useState(null);
@@ -719,6 +729,41 @@ export default function PDV() {
     recalcularTotais(itensAtualizados);
   };
 
+  // Cupom de desconto
+  const aplicarCupom = async () => {
+    const code = codigoCupom.trim().toUpperCase();
+    if (!code) return;
+    if (vendaAtual.itens.length === 0) {
+      setErroCupom('Adicione itens à venda antes de aplicar um cupom.');
+      return;
+    }
+    setLoadingCupom(true);
+    setErroCupom('');
+    try {
+      const res = await api.post(`/campanhas/cupons/${code}/resgatar`, {
+        venda_total: vendaAtual.total,
+        customer_id: vendaAtual.cliente?.id || null,
+      });
+      const dados = res.data;
+      setCupomAplicado(dados);
+      setCodigoCupom('');
+      // Aplicar desconto automaticamente
+      aplicarDescontoTotal('valor', dados.discount_applied);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Erro ao validar cupom';
+      setErroCupom(msg);
+    } finally {
+      setLoadingCupom(false);
+    }
+  };
+
+  const removerCupom = () => {
+    setCupomAplicado(null);
+    setCodigoCupom('');
+    setErroCupom('');
+    removerDescontoTotal();
+  };
+
   const carregarVendasRecentes = async () => {
     try {
       const hoje = new Date();
@@ -1030,7 +1075,8 @@ export default function PDV() {
     setVendaAtual({ ...vendaAtual, cliente, pet: null });
     setBuscarCliente('');
     setClientesSugeridos([]);
-    
+    setSaldoCampanhas(null);
+
     // Verificar se cliente tem vendas em aberto
     try {
       const response = await api.get(`/clientes/${cliente.id}/vendas-em-aberto`);
@@ -1042,6 +1088,14 @@ export default function PDV() {
     } catch (error) {
       console.error('Erro ao verificar vendas em aberto:', error);
       setVendasEmAbertoInfo(null);
+    }
+
+    // Buscar saldo de campanhas (cashback + carimbos + cupons ativos)
+    try {
+      const res = await api.get(`/campanhas/clientes/${cliente.id}/saldo`);
+      setSaldoCampanhas(res.data);
+    } catch (_) {
+      // Silencioso — campanhas são opcionais
     }
   };
 
@@ -2072,7 +2126,7 @@ export default function PDV() {
                 </h2>
                 {vendaAtual.cliente && !modoVisualizacao && (
                   <button
-                    onClick={() => setVendaAtual({ ...vendaAtual, cliente: null, pet: null })}
+                    onClick={() => { setVendaAtual({ ...vendaAtual, cliente: null, pet: null }); setSaldoCampanhas(null); }}
                     className="text-sm text-red-600 hover:text-red-700"
                   >
                     Remover
@@ -2191,6 +2245,47 @@ export default function PDV() {
                       </div>
                     )}
 
+                    {/* Campanhas: Rank + Cashback + Carimbos + Cupons ativos */}
+                    {saldoCampanhas && (saldoCampanhas.saldo_cashback > 0 || saldoCampanhas.total_carimbos > 0 || saldoCampanhas.cupons_ativos?.length > 0 || (saldoCampanhas.rank_level && saldoCampanhas.rank_level !== 'bronze')) && (
+                      <div className="mt-3 pt-3 border-t border-blue-300 space-y-1.5">
+                        {saldoCampanhas.rank_level && saldoCampanhas.rank_level !== 'bronze' && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-blue-800">🏆 Nível fidelidade:</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              saldoCampanhas.rank_level === 'platinum' ? 'bg-purple-100 text-purple-800' :
+                              saldoCampanhas.rank_level === 'diamond' ? 'bg-cyan-100 text-cyan-800' :
+                              saldoCampanhas.rank_level === 'gold' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {saldoCampanhas.rank_level === 'platinum' ? '👑 Platina' :
+                               saldoCampanhas.rank_level === 'diamond' ? '💎 Diamante' :
+                               saldoCampanhas.rank_level === 'gold' ? '🥇 Ouro' : '🥈 Prata'}
+                            </span>
+                          </div>
+                        )}
+                        {saldoCampanhas.total_carimbos > 0 && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-blue-800">🏷️ Carimbos fidelidade:</span>
+                            <span className="font-semibold text-blue-900">{saldoCampanhas.total_carimbos} carimbo(s)</span>
+                          </div>
+                        )}
+                        {saldoCampanhas.saldo_cashback > 0 && (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-blue-800">💰 Cashback acumulado:</span>
+                            <span className="font-semibold text-green-700">R$ {formatBRL(saldoCampanhas.saldo_cashback)}</span>
+                          </div>
+                        )}
+                        {saldoCampanhas.cupons_ativos?.length > 0 && (
+                          <div className="flex items-center flex-wrap gap-1 text-sm">
+                            <span className="text-blue-800">🎟️ Cupons:</span>
+                            {saldoCampanhas.cupons_ativos.map(c => (
+                              <span key={c.code} className="px-1.5 py-0.5 bg-yellow-100 border border-yellow-300 rounded text-xs font-mono text-yellow-800">{c.code}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Botões de Ação */}
                     <div className="mt-3 pt-3 border-t border-blue-300 flex gap-2 flex-wrap">
                       <button
@@ -2214,6 +2309,7 @@ export default function PDV() {
                           onClick={() => {
                             setVendaAtual({ ...vendaAtual, cliente: null, pet: null });
                             setVendasEmAbertoInfo(null);
+                            setSaldoCampanhas(null);
                           }}
                           className="px-4 py-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
                         >
@@ -2450,10 +2546,27 @@ export default function PDV() {
                               </button>
                             </div>
 
-                            {/* Subtotal */}
-                            <div className="text-lg font-semibold text-gray-900 w-24 text-right">
-                              R$ {item.subtotal.toFixed(2)}
-                            </div>
+                            {/* Subtotal — clique para digitar o valor total e calcular a quantidade */}
+                            <SubtotalInput
+                              subtotal={item.subtotal}
+                              precoUnitario={item.preco_unitario}
+                              disabled={modoVisualizacao}
+                              onQuantidadeChange={(novaQuantidade) => {
+                                const novosItens = vendaAtual.itens.map((it, i) => {
+                                  if (i === index) {
+                                    const subtotalSemDesconto = novaQuantidade * it.preco_unitario;
+                                    let novoDescontoValor = it.desconto_valor || 0;
+                                    if (it.tipo_desconto_aplicado === 'percentual' && it.desconto_percentual > 0) {
+                                      novoDescontoValor = (subtotalSemDesconto * it.desconto_percentual) / 100;
+                                    }
+                                    const subtotalComDesconto = subtotalSemDesconto - novoDescontoValor;
+                                    return { ...it, quantidade: novaQuantidade, desconto_valor: novoDescontoValor, subtotal: subtotalComDesconto };
+                                  }
+                                  return it;
+                                });
+                                recalcularTotais(novosItens);
+                              }}
+                            />
 
                             {/* Remover */}
                             <button
@@ -2886,6 +2999,57 @@ export default function PDV() {
                     <span className="font-medium">R$ {(vendaAtual.subtotal + vendaAtual.desconto_valor).toFixed(2)}</span>
                   </div>
                   
+                  {/* Cupom de desconto */}
+                  {!modoVisualizacao && (
+                    <div className="border rounded-lg p-3 bg-purple-50 border-purple-200">
+                      <div className="flex items-center gap-1 mb-2">
+                        <Tag className="w-3.5 h-3.5 text-purple-600" />
+                        <span className="text-xs font-medium text-purple-700">Cupom de desconto</span>
+                      </div>
+                      {cupomAplicado ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded font-mono">
+                              {cupomAplicado.code}
+                            </span>
+                            <span className="ml-2 text-xs text-green-700 font-medium">
+                              - R$ {cupomAplicado.discount_applied.toFixed(2)}
+                            </span>
+                          </div>
+                          <button
+                            onClick={removerCupom}
+                            className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
+                            title="Remover cupom"
+                          >
+                            <X className="w-3 h-3" /> Remover
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={codigoCupom}
+                            onChange={(e) => { setCodigoCupom(e.target.value.toUpperCase()); setErroCupom(''); }}
+                            onKeyDown={(e) => e.key === 'Enter' && aplicarCupom()}
+                            placeholder="Ex: FIDE-XK92P3"
+                            className="flex-1 text-xs px-2 py-1.5 border border-purple-300 rounded focus:outline-none focus:border-purple-500 bg-white font-mono uppercase"
+                            disabled={loadingCupom}
+                          />
+                          <button
+                            onClick={aplicarCupom}
+                            disabled={loadingCupom || !codigoCupom.trim()}
+                            className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded font-medium disabled:opacity-50 transition-colors"
+                          >
+                            {loadingCupom ? '...' : 'Aplicar'}
+                          </button>
+                        </div>
+                      )}
+                      {erroCupom && (
+                        <p className="text-xs text-red-600 mt-1">{erroCupom}</p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Desconto total — sempre visível com botão */}
                   <div className="flex justify-between items-center">
                     <span className={vendaAtual.desconto_valor > 0 ? 'text-orange-600 text-sm' : 'text-gray-500 text-sm'}>
@@ -2899,16 +3063,18 @@ export default function PDV() {
                           - R$ {vendaAtual.desconto_valor.toFixed(2)}
                         </span>
                       )}
-                      <button
-                        onClick={abrirModalDescontoTotal}
-                        disabled={modoVisualizacao}
-                        className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded border border-blue-200 disabled:opacity-50 transition-colors"
-                        title="Aplicar desconto no total da venda"
-                      >
-                        <Percent className="w-3 h-3" />
-                        <span>{vendaAtual.desconto_valor > 0 ? 'Editar' : 'Adicionar'}</span>
-                      </button>
-                      {vendaAtual.desconto_valor > 0 && (
+                      {!cupomAplicado && (
+                        <button
+                          onClick={abrirModalDescontoTotal}
+                          disabled={modoVisualizacao}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded border border-blue-200 disabled:opacity-50 transition-colors"
+                          title="Aplicar desconto no total da venda"
+                        >
+                          <Percent className="w-3 h-3" />
+                          <span>{vendaAtual.desconto_valor > 0 ? 'Editar' : 'Adicionar'}</span>
+                        </button>
+                      )}
+                      {vendaAtual.desconto_valor > 0 && !cupomAplicado && (
                         <button
                           onClick={removerDescontoTotal}
                           disabled={modoVisualizacao}

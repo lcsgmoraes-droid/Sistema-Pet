@@ -279,16 +279,7 @@ async def fechar_caixa(
         elif mov.tipo in ['sangria', 'despesa', 'transferencia']:
             valor_esperado -= mov.valor
     
-    # 🔒 VALIDAÇÃO CRÍTICA: Não permitir fechar caixa com saldo em dinheiro
-    # Exigir sangria antes do fechamento
-    if valor_esperado > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"❌ Não é possível fechar o caixa com R$ {valor_esperado:.2f} em dinheiro. "
-                   f"Faça uma SANGRIA antes de fechar o caixa para retirar o dinheiro."
-        )
-    
-    # Calcular diferença
+    # Calcular diferença (registrada no banco para auditoria)
     diferenca = dados.valor_informado - valor_esperado
     
     # Atualizar caixa
