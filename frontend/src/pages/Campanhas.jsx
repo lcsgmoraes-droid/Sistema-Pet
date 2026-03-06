@@ -116,6 +116,22 @@ const RANK_LABELS = {
   },
 };
 
+// Frases sugeridas para campanhas de aniversário (por tipo de campanha e tipo de presente)
+const FRASES_ANIVERSARIO = {
+  birthday_customer: {
+    brinde:
+      "🎂 Feliz aniversário, {nome}! Seu carinho merece uma celebração especial! Apareça na nossa loja para retirar seu presente surpresa. Será um prazer ver você! 🎁",
+    cupom:
+      "🎉 Feliz aniversário, {nome}! Neste dia tão especial preparamos um cupom de {desconto} de desconto pra você celebrar com muito mimo pro seu pet! Use o código {code}. 🐾",
+  },
+  birthday_pet: {
+    brinde:
+      "🐾🎂 Que dia mais fofo! {nome_pet} está fazendo aniversário e a gente não podia deixar passar em branco! Venha buscar o mimo especial que separamos pro seu melhor amigo — tem muito carinho esperando por vocês! Um beijo nas patinhas! 🥳",
+    cupom:
+      "🎈 O {nome_pet} tá de parabéns hoje, {nome}! Para comemorar esse dia tão especial, preparamos um cupom de {desconto} de desconto pra mimar o(a) aniversariante! Use o código {code} e vai fundo nos mimos! 🐕🎁",
+  },
+};
+
 const hoje = new Date().toISOString().slice(0, 10);
 const primeiroDiaMes = hoje.slice(0, 7) + "-01";
 
@@ -1202,7 +1218,17 @@ export default function Campanhas() {
 
   const abrirEdicao = (c) => {
     setCampanhaEditando(c.id);
-    setParamsEditando({ ...c.params });
+    const params = { ...c.params };
+    // Para campanhas de aniversário, pré-preenche a mensagem sugerida se ainda não foi configurada
+    if (
+      ["birthday_customer", "birthday_pet"].includes(c.campaign_type) &&
+      !params.notification_message
+    ) {
+      const tipoPresente = params.tipo_presente || "cupom";
+      const frases = FRASES_ANIVERSARIO[c.campaign_type] || FRASES_ANIVERSARIO.birthday_customer;
+      params.notification_message = frases[tipoPresente] || "";
+    }
+    setParamsEditando(params);
   };
 
   const fecharEdicao = () => {
@@ -1279,9 +1305,11 @@ export default function Campanhas() {
     if (tipo === "cashback")
       return `Bronze ${params.bronze_percent || 0}% / Prata ${params.silver_percent || 0}% / Ouro ${params.gold_percent || 0}%`;
     if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
+      const tipoPresente = params.tipo_presente || "cupom";
+      if (tipoPresente === "brinde") return "🎁 Brinde na loja";
       return params.coupon_type === "percent"
-        ? `${params.coupon_value || "?"}% de desconto • ${params.coupon_valid_days || "?"} dias`
-        : `R$ ${formatBRL(params.coupon_value || 0)} de desconto • ${params.coupon_valid_days || "?"} dias`;
+        ? `🎫 Cupom ${params.coupon_value || "?"}% de desconto · ${params.coupon_valid_days || "?"} dias`
+        : `🎫 Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto · ${params.coupon_valid_days || "?"} dias`;
     }
     if (tipo === "inactivity") {
       const valInact =
@@ -1478,56 +1506,130 @@ export default function Campanhas() {
       );
     }
 
-    if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo))
+    if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
+      const frases = FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
+      const tipoPresente = str("tipo_presente") || "cupom";
+      const fraseSugerida = frases[tipoPresente] || "";
+      const ehPet = tipo === "birthday_pet";
+
       return (
-        <div className="grid grid-cols-2 gap-3">
-          <CampanhaSel
-            label="Tipo de desconto"
-            id="p-bday-type"
-            value={str("coupon_type") || "fixed"}
-            onChange={(e) => set("coupon_type", e.target.value)}
-          >
-            <option value="fixed">Valor fixo (R$)</option>
-            <option value="percent">Percentual (%)</option>
-          </CampanhaSel>
-          <CampanhaField
-            label={
-              str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"
-            }
-            id="p-bday-val"
-            value={num("coupon_value")}
-            onChange={(e) =>
-              set("coupon_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Validade (dias)"
-            id="p-bday-days"
-            step="1"
-            min="1"
-            value={num("coupon_valid_days") || 3}
-            onChange={(e) =>
-              set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 3)
-            }
-          />
-          <div className="col-span-2">
-            <label
-              htmlFor="p-bday-msg"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
-              Mensagem personalizada
-            </label>
-            <input
+        <div className="space-y-4">
+          {/* Tipo de presente */}
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-2">🎁 O que o cliente recebe no aniversário?</p>
+            <div className="flex gap-4">
+              {[
+                { value: "cupom", label: "🎫 Cupom de desconto" },
+                { value: "brinde", label: "🎁 Brinde na loja" },
+              ].map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-colors ${
+                    tipoPresente === opt.value
+                      ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`tipo_presente_${tipo}`}
+                    value={opt.value}
+                    checked={tipoPresente === opt.value}
+                    onChange={() => {
+                      set("tipo_presente", opt.value);
+                      // Atualiza a frase automaticamente ao trocar o tipo
+                      set("notification_message", frases[opt.value] || "");
+                    }}
+                    className="accent-blue-600 w-4 h-4"
+                  />
+                  <span className="text-sm">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Campos do cupom (visível apenas se tipo_presente = cupom) */}
+          {tipoPresente === "cupom" && (
+            <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <CampanhaSel
+                label="Tipo de desconto"
+                id="p-bday-type"
+                value={str("coupon_type") || "fixed"}
+                onChange={(e) => set("coupon_type", e.target.value)}
+              >
+                <option value="fixed">Valor fixo (R$)</option>
+                <option value="percent">Percentual (%)</option>
+              </CampanhaSel>
+              <CampanhaField
+                label={str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"}
+                id="p-bday-val"
+                value={num("coupon_value")}
+                onChange={(e) =>
+                  set("coupon_value", Number.parseFloat(e.target.value) || 0)
+                }
+              />
+              <CampanhaField
+                label="Validade (dias)"
+                id="p-bday-days"
+                step="1"
+                min="1"
+                value={num("coupon_valid_days") || 3}
+                onChange={(e) =>
+                  set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 3)
+                }
+              />
+              <CampanhaSel
+                label="Canal"
+                id="p-bday-canal"
+                value={str("coupon_channel") || "all"}
+                onChange={(e) => set("coupon_channel", e.target.value)}
+              >
+                <option value="all">Todos os canais</option>
+                <option value="pdv">PDV</option>
+                <option value="app">App</option>
+                <option value="ecommerce">Ecommerce</option>
+              </CampanhaSel>
+            </div>
+          )}
+
+          {/* Mensagem personalizada */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor="p-bday-msg" className="block text-xs font-semibold text-gray-700">
+                ✉️ Mensagem enviada ao cliente
+              </label>
+              <button
+                type="button"
+                onClick={() => set("notification_message", fraseSugerida)}
+                className="text-xs text-blue-600 hover:text-blue-800 underline"
+              >
+                🔄 Usar frase sugerida
+              </button>
+            </div>
+            <textarea
               id="p-bday-msg"
-              type="text"
+              rows={4}
               value={str("notification_message")}
               onChange={(e) => set("notification_message", e.target.value)}
-              placeholder="Ex: Feliz aniversário! Use seu cupom especial."
-              className="w-full border rounded-lg px-3 py-1.5 text-sm"
+              className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Variáveis disponíveis:{" "}
+              <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
+              {ehPet && (
+                <> <code className="bg-gray-100 px-1 rounded">{"{nome_pet}"}</code></>
+              )}
+              {tipoPresente === "cupom" && (
+                <>
+                  {" "}<code className="bg-gray-100 px-1 rounded">{"{code}"}</code>
+                  {" "}<code className="bg-gray-100 px-1 rounded">{"{desconto}"}</code>
+                </>
+              )}
+            </p>
           </div>
         </div>
       );
+    }
 
     if (tipo === "quick_repurchase")
       return (

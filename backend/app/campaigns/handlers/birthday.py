@@ -10,19 +10,23 @@ Lógica:
   2. Para birthday_pet: busca pets cujo aniversário é hoje
   3. Para cada cliente elegível, verifica em campaign_executions se
      já recebeu recompensa neste período (reference_period = "YYYY-MM-DD")
-  4. Se não recebeu: gera cupom + registra execution + enfileira notificação
+  4. Se não recebeu: gera cupom (ou só notifica se tipo_presente=brinde) +
+     registra execution + enfileira notificação
 
 Parâmetros esperados em campaign.params:
   {
-    "coupon_type": "fixed",          # ou "percent"
-    "coupon_value": 20.00,           # R$ 20 ou 20%
-    "coupon_valid_days": 1,          # validade em dias (1 = só no aniversário, 0 = sem expirar)
+    "tipo_presente": "cupom",        # "cupom" (default) ou "brinde"
+    "coupon_type": "fixed",          # ou "percent" (usado quando tipo_presente=cupom)
+    "coupon_value": 20.00,           # R$ 20 ou 20% (usado quando tipo_presente=cupom)
+    "coupon_valid_days": 1,          # validade em dias (usado quando tipo_presente=cupom)
     "coupon_channel": "all",
     "notification_message": "Feliz aniversário! Seu cupom: {code}"
+    # Variáveis disponíveis na mensagem: {nome}, {nome_pet}, {code}, {desconto}
   }
 """
 
 import logging
+from collections import defaultdict
 from datetime import date
 
 from sqlalchemy import extract
@@ -191,6 +195,7 @@ class BirthdayHandler:
                     source_event_id=event.id,
                     prefix="PETANIV",
                     notification_extra=f" (aniversário do {pet.nome})",
+                    nome_pet=pet.nome,
                 )
             except Exception as exc:
                 errors += 1
@@ -226,6 +231,7 @@ class BirthdayHandler:
         source_event_id: int,
         prefix: str,
         notification_extra: str = "",
+        nome_pet: str = "",
     ) -> int:
         """
         Concede recompensa a um cliente de forma idempotente.
@@ -248,6 +254,7 @@ class BirthdayHandler:
             return 0  # Já recompensado — skip silencioso
 
         # Parâmetros da campanha (com defaults seguros)
+        tipo_presente = params.get("tipo_presente", "cupom")
         coupon_type = params.get("coupon_type", "fixed")
         coupon_value = params.get("coupon_value", 10.0)
         coupon_valid_days = params.get("coupon_valid_days", 7) or None
@@ -257,23 +264,38 @@ class BirthdayHandler:
             "Feliz aniversário{extra}! Use o cupom {code} em sua próxima compra.",
         )
 
-        # Gera cupom
-        discount_value = float(coupon_value) if coupon_type == "fixed" else None
-        discount_percent = float(coupon_value) if coupon_type == "percent" else None
+        coupon_code = ""
+        desconto_fmt = ""
+        reward_type_str = "brinde"
+        reward_meta: dict = {}
 
-        coupon = create_coupon(
-            db,
-            tenant_id=campaign.tenant_id,
-            campaign=campaign,
-            customer_id=customer_id,
-            coupon_type=coupon_type,
-            discount_value=discount_value,
-            discount_percent=discount_percent,
-            channel=coupon_channel,
-            valid_days=coupon_valid_days,
-            prefix=prefix,
-            meta={"reference_period": reference_period},
-        )
+        if tipo_presente != "brinde":
+            # Gera cupom
+            discount_value = float(coupon_value) if coupon_type == "fixed" else None
+            discount_percent = float(coupon_value) if coupon_type == "percent" else None
+
+            coupon = create_coupon(
+                db,
+                tenant_id=campaign.tenant_id,
+                campaign=campaign,
+                customer_id=customer_id,
+                coupon_type=coupon_type,
+                discount_value=discount_value,
+                discount_percent=discount_percent,
+                channel=coupon_channel,
+                valid_days=coupon_valid_days,
+                prefix=prefix,
+                meta={"reference_period": reference_period},
+            )
+            coupon_code = coupon.code
+            reward_type_str = f"coupon:{coupon_type}"
+            reward_meta = {"coupon_id": coupon.id, "coupon_code": coupon.code}
+
+            if coupon_type == "percent":
+                desconto_fmt = f"{coupon_value}%"
+            else:
+                val_str = f"{float(coupon_value):.2f}".replace(".", ",")
+                desconto_fmt = f"R$ {val_str}"
 
         # Registra execução (idempotente pelo UNIQUE constraint)
         execution = CampaignExecution(
@@ -281,19 +303,22 @@ class BirthdayHandler:
             campaign_id=campaign.id,
             customer_id=customer_id,
             reference_period=reference_period,
-            reward_type=f"coupon:{coupon_type}",
-            reward_value=coupon_value,
-            reward_meta={"coupon_id": coupon.id, "coupon_code": coupon.code},
+            reward_type=reward_type_str,
+            reward_value=float(coupon_value) if tipo_presente != "brinde" else 0,
+            reward_meta=reward_meta,
             source_event_id=source_event_id,
         )
         db.add(execution)
 
-        # Enfileira notificação
-        body = notification_msg.format(
-            code=coupon.code,
-            nome=customer_name,
-            extra=notification_extra,
-        )
+        # Enfileira notificação usando format_map com defaultdict (seguro contra variáveis desconhecidas)
+        fmt_vars = defaultdict(str, {
+            "code": coupon_code,
+            "nome": customer_name,
+            "extra": notification_extra,
+            "desconto": desconto_fmt,
+            "nome_pet": nome_pet,
+        })
+        body = notification_msg.format_map(fmt_vars)
         notif_key = f"bday:{campaign.id}:{customer_id}:{reference_period}"
 
         if customer_push_token:
