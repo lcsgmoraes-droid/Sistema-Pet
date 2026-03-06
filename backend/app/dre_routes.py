@@ -30,48 +30,48 @@ class DREResponse(BaseModel):
     periodo: str
     mes: int
     ano: int
-    
+
     # RECEITAS
     receita_bruta: Decimal
     vendas_produtos: Decimal
     vendas_servicos: Decimal
     outras_receitas: Decimal
-    
+
     # DEDUÇÕES
     deducoes_total: Decimal
     descontos: Decimal
     devolucoes: Decimal
-    
+
     # RECEITA LÍQUIDA
     receita_liquida: Decimal
-    
+
     # CUSTOS
     cmv: Decimal  # Custo das Mercadorias Vendidas
-    
+
     # LUCRO BRUTO
     lucro_bruto: Decimal
     margem_bruta: float
-    
+
     # DESPESAS OPERACIONAIS
     despesas_operacionais: Decimal
     despesas_pessoal: Decimal
     despesas_administrativas: Decimal
     taxas_cartao: Decimal
     outras_despesas: Decimal
-    
+
     # RESULTADO OPERACIONAL
     resultado_operacional: Decimal
     margem_operacional: float
-    
+
     # RESULTADO FINANCEIRO
     resultado_financeiro: Decimal
     receitas_financeiras: Decimal
     despesas_financeiras: Decimal
-    
+
     # LUCRO LÍQUIDO
     lucro_liquido: Decimal
     margem_liquida: float
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -81,7 +81,7 @@ class DREDetalhado(BaseModel):
     detalhes_despesas: List[dict]
     detalhes_receitas: List[dict]
     comparacao_mes_anterior: Optional[dict] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -100,20 +100,20 @@ def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
             Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial'])
         )
     ).all()
-    
+
     cmv_total = Decimal('0')
-    
+
     for venda in vendas:
         # Soma o custo de cada item vendido
         itens = db.query(VendaItem).filter(
             VendaItem.venda_id == venda.id
         ).all()
-        
+
         for item in itens:
             if item.produto and item.produto.preco_custo:
                 custo_item = Decimal(str(item.produto.preco_custo)) * item.quantidade
                 cmv_total += custo_item
-    
+
     return cmv_total
 
 
@@ -123,19 +123,19 @@ def calcular_frete_notas_entrada(db: Session, mes: int, ano: int) -> Decimal:
     O frete é despesa operacional, não CMV
     """
     from .produtos_models import NotaEntrada
-    
+
     notas = db.query(NotaEntrada).filter(
         and_(
             extract('month', NotaEntrada.data_emissao) == mes,
             extract('year', NotaEntrada.data_emissao) == ano
         )
     ).all()
-    
+
     frete_total = Decimal('0')
     for nota in notas:
         if nota.valor_frete:
             frete_total += Decimal(str(nota.valor_frete))
-    
+
     return frete_total
 
 
@@ -146,24 +146,37 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     - Despesas com Pessoal (salários, encargos)
     - Despesas Administrativas (água, luz, internet, telefone)
     - Despesas com Ocupação (aluguel, condomínio, IPTU)
-    - Despesas com Vendas (marketing, taxas, frete)
+    - Despesas com Vendas (marketing, frete)
     - Outras Despesas
-    
-    IMPORTANTE: Exclui apenas compras de mercadorias vinculadas a notas de entrada (essas entram no CMV).
-    Inclui despesas operacionais como fretes, custos de entrega, etc.
+
+    IMPORTANTE: Exclui compras de mercadorias (CMV) e Taxas Financeiras
+    (categoria_id=7), que já são tratadas por calcular_taxas_cartao.
     """
-    
-    # Busca contas a pagar do período (pagas ou não)
-    # EXCLUINDO apenas compras de mercadorias (vinculadas a notas de entrada)
-    # ✅ USA DATA_EMISSAO (regime de competência) em vez de data_vencimento
-    contas_pagar = db.query(ContaPagar).filter(
-        and_(
-            extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-            extract('year', ContaPagar.data_emissao) == ano,
-            ContaPagar.nota_entrada_id.is_(None)  # EXCLUI apenas compras de mercadorias (CMV)
+
+    # IDs de subcategorias de Taxas Financeiras para excluir (evitar dupla contagem)
+    subcategorias_taxas_ids = [
+        s.id for s in db.query(DRESubcategoria).filter(
+            DRESubcategoria.categoria_id == 7,
+            DRESubcategoria.ativo == True
+        ).all()
+    ]
+
+    # Busca contas a pagar do período excluindo CMV e Taxas Financeiras
+    filtros = [
+        extract('month', ContaPagar.data_emissao) == mes,
+        extract('year', ContaPagar.data_emissao) == ano,
+        ContaPagar.nota_entrada_id.is_(None)  # EXCLUI compras de mercadorias (CMV)
+    ]
+    if subcategorias_taxas_ids:
+        filtros.append(
+            or_(
+                ContaPagar.dre_subcategoria_id.is_(None),
+                ~ContaPagar.dre_subcategoria_id.in_(subcategorias_taxas_ids)
+            )
         )
-    ).all()
-    
+
+    contas_pagar = db.query(ContaPagar).filter(and_(*filtros)).all()
+
     categorias = {
         'Despesas com Pessoal': Decimal('0'),
         'Despesas Administrativas': Decimal('0'),
@@ -171,17 +184,18 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
         'Despesas com Vendas': Decimal('0'),
         'Outras Despesas': Decimal('0')
     }
-    
+
     # Palavras-chave para categorização automática
+    # Nota: 'taxa' foi removido — taxas financeiras são tratadas por calcular_taxas_cartao
     palavras_pessoal = ['salário', 'salario', 'folha', 'inss', 'fgts', 'vale', 'funcionario', 'funcionário', 'comissão', 'comissao']
     palavras_admin = ['luz', 'água', 'agua', 'internet', 'telefone', 'material', 'limpeza']
     palavras_ocupacao = ['aluguel', 'condomínio', 'condominio', 'iptu']
-    palavras_vendas = ['marketing', 'propaganda', 'anúncio', 'anuncio', 'taxa', 'frete', 'entrega', 'entregador']
-    
+    palavras_vendas = ['marketing', 'propaganda', 'anúncio', 'anuncio', 'frete', 'entrega', 'entregador']
+
     for conta in contas_pagar:
         descricao_lower = (conta.descricao or '').lower()
         valor = conta.valor_original
-        
+
         # Categorização inteligente baseada em palavras-chave
         if any(palavra in descricao_lower for palavra in palavras_pessoal):
             categorias['Despesas com Pessoal'] += valor
@@ -193,32 +207,28 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
             categorias['Despesas com Vendas'] += valor
         else:
             categorias['Outras Despesas'] += valor
-    
+
     return categorias
 
 
 def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
     """
-    Calcula o total de taxas de cartão do período a partir das contas a pagar
+    Calcula o total de taxas de cartão/PIX do período a partir das contas a pagar.
+    Usa a categoria_id=7 (Taxas Financeiras) para identificar as subcategorias corretas.
     """
-    # Buscar subcategorias de taxas de pagamento (categoria 11 = Despesas Financeiras)
+    # Buscar todas as subcategorias de Taxas Financeiras (categoria_id=7)
     subcategorias_taxas = db.query(DRESubcategoria).filter(
         and_(
-            DRESubcategoria.categoria_id == 11,
-            DRESubcategoria.ativo == True,
-            or_(
-                DRESubcategoria.nome.like('%Taxa%Cartão%'),
-                DRESubcategoria.nome.like('%Taxa%PIX%'),
-                DRESubcategoria.nome.like('%Taxa%Débito%')
-            )
+            DRESubcategoria.categoria_id == 7,
+            DRESubcategoria.ativo == True
         )
     ).all()
-    
+
     subcategoria_ids = [s.id for s in subcategorias_taxas]
-    
+
     if not subcategoria_ids:
         return Decimal('0')
-    
+
     # Buscar contas a pagar de taxas do período (regime de competência)
     taxas = db.query(ContaPagar).filter(
         and_(
@@ -228,9 +238,9 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
             ContaPagar.status != 'cancelado'
         )
     ).all()
-    
+
     taxas_total = sum([Decimal(str(t.valor_original or 0)) for t in taxas])
-    
+
     return taxas_total
 
 
@@ -245,21 +255,21 @@ def gerar_dre(
 ):
     """
     Gera DRE (Demonstração do Resultado do Exercício) automaticamente
-    
+
     O sistema categoriza automaticamente todas as transações e gera
     um relatório contábil completo seguindo as normas brasileiras.
     """
-    
+
     if mes < 1 or mes > 12:
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
-    
+
     # Nome do mês
     meses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
              'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
     periodo = f"{meses[mes]}/{ano}"
-    
+
     # ========== 1. RECEITAS ==========
-    
+
     # Vendas de produtos e serviços
     vendas = db.query(Venda).filter(
         and_(
@@ -268,37 +278,37 @@ def gerar_dre(
             Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial'])
         )
     ).all()
-    
+
     receita_bruta = sum([v.subtotal + (v.taxa_entrega or 0) for v in vendas])
     vendas_produtos = receita_bruta  # Por enquanto, tudo como produtos
     vendas_servicos = Decimal('0')
     outras_receitas = Decimal('0')  # Pode buscar de lançamentos manuais
-    
+
     # ========== 2. DEDUÇÕES ==========
-    
+
     descontos = sum([v.desconto_valor or 0 for v in vendas])
     devolucoes = Decimal('0')  # Implementar quando tiver sistema de devoluções
     deducoes_total = descontos + devolucoes
-    
+
     # ========== 3. RECEITA LÍQUIDA ==========
-    
+
     receita_liquida = receita_bruta - deducoes_total
-    
+
     # ========== 4. CMV ==========
-    
+
     cmv = calcular_cmv(db, mes, ano)
-    
+
     # ========== 5. LUCRO BRUTO ==========
-    
+
     lucro_bruto = receita_liquida - cmv
     margem_bruta = float((lucro_bruto / receita_bruta * 100) if receita_bruta > 0 else 0)
-    
+
     # ========== 6. DESPESAS OPERACIONAIS ==========
-    
+
     categorias_despesas = obter_despesas_por_categoria(db, mes, ano)
     taxas_cartao = calcular_taxas_cartao(db, mes, ano)
     frete_compras = calcular_frete_notas_entrada(db, mes, ano)  # Frete de notas de entrada
-    
+
     despesas_pessoal = categorias_despesas['Despesas com Pessoal']
     despesas_administrativas = (
         categorias_despesas['Despesas Administrativas'] +
@@ -309,32 +319,32 @@ def gerar_dre(
         categorias_despesas['Outras Despesas'] +
         frete_compras  # Adiciona frete das notas de entrada
     )
-    
+
     despesas_operacionais = (
         despesas_pessoal +
         despesas_administrativas +
         taxas_cartao +
         outras_despesas
     )
-    
+
     # ========== 7. RESULTADO OPERACIONAL ==========
-    
+
     resultado_operacional = lucro_bruto - despesas_operacionais
     margem_operacional = float((resultado_operacional / receita_bruta * 100) if receita_bruta > 0 else 0)
-    
+
     # ========== 8. RESULTADO FINANCEIRO ==========
-    
+
     receitas_financeiras = Decimal('0')  # Juros recebidos, etc
     despesas_financeiras = Decimal('0')  # Juros pagos, multas, etc
     resultado_financeiro = receitas_financeiras - despesas_financeiras
-    
+
     # ========== 9. LUCRO LÍQUIDO ==========
-    
+
     lucro_liquido = resultado_operacional + resultado_financeiro
     margem_liquida = float((lucro_liquido / receita_bruta * 100) if receita_bruta > 0 else 0)
-    
+
     # ========== RETORNO ==========
-    
+
     dre = DREResponse(
         periodo=periodo,
         mes=mes,
@@ -363,7 +373,7 @@ def gerar_dre(
         lucro_liquido=lucro_liquido,
         margem_liquida=margem_liquida
     )
-    
+
     return dre
 
 
@@ -377,10 +387,10 @@ def gerar_dre_detalhado(
     """
     Gera DRE com detalhamento de cada categoria de despesa e receita
     """
-    
+
     # Gera o DRE básico
     dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
-    
+
     # Busca detalhes das despesas (EXCLUINDO fornecedores)
     # ✅ USA DATA_EMISSAO (regime de competência)
     contas_pagar = db.query(ContaPagar).filter(
@@ -390,7 +400,7 @@ def gerar_dre_detalhado(
             ContaPagar.fornecedor_id.is_(None)  # EXCLUI pagamentos a fornecedores
         )
     ).all()
-    
+
     detalhes_despesas = [
         {
             'descricao': conta.descricao,
@@ -400,7 +410,7 @@ def gerar_dre_detalhado(
         }
         for conta in contas_pagar
     ]
-    
+
     # Busca detalhes das receitas (vendas)
     vendas = db.query(Venda).filter(
         and_(
@@ -409,7 +419,7 @@ def gerar_dre_detalhado(
             Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial'])
         )
     ).all()
-    
+
     detalhes_receitas = [
         {
             'numero_venda': venda.numero_venda,
@@ -420,11 +430,11 @@ def gerar_dre_detalhado(
         }
         for venda in vendas
     ]
-    
+
     # Comparação com mês anterior (opcional)
     mes_anterior = mes - 1 if mes > 1 else 12
     ano_anterior = ano if mes > 1 else ano - 1
-    
+
     try:
         dre_anterior = gerar_dre(ano=ano_anterior, mes=mes_anterior, db=db, current_user=current_user)
         comparacao = {
@@ -434,7 +444,7 @@ def gerar_dre_detalhado(
         }
     except:
         comparacao = None
-    
+
     return DREDetalhado(
         dre=dre,
         detalhes_despesas=detalhes_despesas,
@@ -463,20 +473,20 @@ async def exportar_dre_pdf(
             status_code=500,
             detail="Biblioteca reportlab não instalada. Execute: pip install reportlab"
         )
-    
+
     # Buscar dados da DRE
     dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
-    
+
     # Nomes dos meses
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
              'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
     mes_nome = meses[mes - 1]
-    
+
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm)
     elements = []
     styles = getSampleStyleSheet()
-    
+
     # Título
     title_style = ParagraphStyle(
         'CustomTitle',
@@ -488,7 +498,7 @@ async def exportar_dre_pdf(
     )
     elements.append(Paragraph("DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)", title_style))
     elements.append(Spacer(1, 5*mm))
-    
+
     # Período
     subtitle_style = ParagraphStyle(
         'Subtitle',
@@ -499,11 +509,11 @@ async def exportar_dre_pdf(
     periodo_text = f"Período: {mes_nome}/{ano}"
     elements.append(Paragraph(periodo_text, subtitle_style))
     elements.append(Spacer(1, 10*mm))
-    
+
     # Função para formatar moeda
     def formatar_moeda(valor):
         return f"R$ {float(valor):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    
+
     # Tabela DRE
     dre_data = [
         ['DESCRIÇÃO', 'VALOR', '%'],
@@ -537,7 +547,7 @@ async def exportar_dre_pdf(
         ['', '', ''],
         ['(=) LUCRO LÍQUIDO', formatar_moeda(dre.lucro_liquido), f"{dre.margem_liquida:.2f}%"],
     ]
-    
+
     dre_table = Table(dre_data, colWidths=[100*mm, 40*mm, 30*mm])
     dre_table.setStyle(TableStyle([
         # Cabeçalho
@@ -548,7 +558,7 @@ async def exportar_dre_pdf(
         ('ALIGN', (0, 0), (0, -1), 'LEFT'),
         ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
-        
+
         # Totais principais (negrito)
         ('FONTNAME', (0, 2), (0, 2), 'Helvetica-Bold'),  # RECEITA BRUTA
         ('FONTNAME', (0, 11), (0, 11), 'Helvetica-Bold'),  # RECEITA LÍQUIDA
@@ -556,7 +566,7 @@ async def exportar_dre_pdf(
         ('FONTNAME', (0, 23), (0, 23), 'Helvetica-Bold'),  # RESULTADO OPERACIONAL
         ('FONTNAME', (0, 29), (0, 29), 'Helvetica-Bold'),  # LUCRO LÍQUIDO
         ('FONTSIZE', (0, 29), (-1, 29), 12),  # LUCRO LÍQUIDO maior
-        
+
         # Background nos totais
         ('BACKGROUND', (0, 2), (-1, 2), colors.lightblue),
         ('BACKGROUND', (0, 11), (-1, 11), colors.lightgreen),
@@ -564,13 +574,13 @@ async def exportar_dre_pdf(
         ('BACKGROUND', (0, 23), (-1, 23), colors.lightcyan),
         ('BACKGROUND', (0, 29), (-1, 29), colors.HexColor('#10b981')),
         ('TEXTCOLOR', (0, 29), (-1, 29), colors.whitesmoke),
-        
+
         # Grid
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
     ]))
     elements.append(dre_table)
-    
+
     # Rodapé
     elements.append(Spacer(1, 10*mm))
     footer_style = ParagraphStyle(
@@ -580,11 +590,11 @@ async def exportar_dre_pdf(
         alignment=TA_CENTER
     )
     elements.append(Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
-    
+
     # Gerar PDF
     doc.build(elements)
     buffer.seek(0)
-    
+
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
@@ -608,20 +618,20 @@ async def exportar_dre_excel(
             status_code=500,
             detail="Biblioteca openpyxl não instalada. Execute: pip install openpyxl"
         )
-    
+
     # Buscar dados da DRE
     dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
-    
+
     # Nomes dos meses
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
              'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
     mes_nome = meses[mes - 1]
-    
+
     # Criar workbook
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "DRE"
-    
+
     # Estilos
     title_font = Font(name='Arial', size=14, bold=True, color='1a56db')
     header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
@@ -635,18 +645,18 @@ async def exportar_dre_excel(
         top=Side(style='thin'),
         bottom=Side(style='thin')
     )
-    
+
     # Título
     ws['A1'] = 'DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)'
     ws['A1'].font = title_font
     ws.merge_cells('A1:C1')
     ws['A1'].alignment = Alignment(horizontal='center')
-    
+
     # Período
     ws['A2'] = f'Período: {mes_nome}/{ano}'
     ws.merge_cells('A2:C2')
     ws['A2'].alignment = Alignment(horizontal='center')
-    
+
     # Cabeçalho
     row = 4
     ws[f'A{row}'] = 'DESCRIÇÃO'
@@ -657,7 +667,7 @@ async def exportar_dre_excel(
         ws[f'{col}{row}'].fill = header_fill
         ws[f'{col}{row}'].border = border
         ws[f'{col}{row}'].alignment = Alignment(horizontal='center')
-    
+
     # Função para adicionar linha
     def add_row(descricao, valor, percentual='', is_total=False, is_final=False):
         nonlocal row
@@ -665,7 +675,7 @@ async def exportar_dre_excel(
         ws[f'A{row}'] = descricao
         ws[f'B{row}'] = float(valor) if valor else ''
         ws[f'C{row}'] = percentual
-        
+
         # Aplicar estilos
         if is_final:
             for col in ['A', 'B', 'C']:
@@ -675,14 +685,14 @@ async def exportar_dre_excel(
             for col in ['A', 'B', 'C']:
                 ws[f'{col}{row}'].font = total_font
                 ws[f'{col}{row}'].fill = total_fill
-        
+
         for col in ['A', 'B', 'C']:
             ws[f'{col}{row}'].border = border
-        
+
         ws[f'B{row}'].number_format = 'R$ #,##0.00'
         ws[f'B{row}'].alignment = Alignment(horizontal='right')
         ws[f'C{row}'].alignment = Alignment(horizontal='right')
-    
+
     # Dados da DRE
     add_row('RECEITA BRUTA', dre.receita_bruta, '100,00%', is_total=True)
     add_row('  Vendas de Produtos', dre.vendas_produtos, f"{(float(dre.vendas_produtos)/float(dre.receita_bruta)*100 if float(dre.receita_bruta) > 0 else 0):.2f}%")
@@ -712,17 +722,17 @@ async def exportar_dre_excel(
     add_row('  (-) Despesas Financeiras', dre.despesas_financeiras)
     row += 1
     add_row('(=) LUCRO LÍQUIDO', dre.lucro_liquido, f"{dre.margem_liquida:.2f}%", is_final=True)
-    
+
     # Ajustar largura das colunas
     ws.column_dimensions['A'].width = 40
     ws.column_dimensions['B'].width = 20
     ws.column_dimensions['C'].width = 15
-    
+
     # Salvar em buffer
     buffer = BytesIO()
     wb.save(buffer)
     buffer.seek(0)
-    
+
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

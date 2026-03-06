@@ -2290,50 +2290,17 @@ def registrar_devolucao(
                     conta.status = 'estornada'
                     logger.info(f"💳 Estornando ContaReceber #{conta.id} (paga)")
 
-        # 🆕 ESTORNAR LANÇAMENTOS MANUAIS REALIZADOS (Fluxo de Caixa)
-        lancamentos = db.query(LancamentoManual).filter(
+        # 🆕 MARCAR LANÇAMENTOS MANUAIS REALIZADOS COMO ESTORNADOS (Fluxo de Caixa)
+        # Não criar novos lançamentos de estorno — o DEVOLUCAO acima já registra a saída.
+        # Apenas marcar os lançamentos de entrada da venda como estornados para controle.
+        lancamentos_entrada = db.query(LancamentoManual).filter(
             LancamentoManual.documento == f"VENDA-{venda_id}",
+            LancamentoManual.tipo == 'entrada',
             LancamentoManual.status == 'realizado'
         ).all()
-
-        if lancamentos:
-            # Buscar ou criar categoria de devoluções
-            categoria_devolucoes = db.query(CategoriaFinanceira).filter(
-                CategoriaFinanceira.nome.ilike('%devolução%'),
-                CategoriaFinanceira.tipo == 'despesa',
-                CategoriaFinanceira.user_id == current_user.id,
-                CategoriaFinanceira.tenant_id == tenant_id
-            ).first()
-
-            if not categoria_devolucoes:
-                categoria_devolucoes = CategoriaFinanceira(
-                    nome="Devoluções de Vendas",
-                    tipo="despesa",
-                    user_id=current_user.id,
-                    tenant_id=tenant_id
-                )
-                db.add(categoria_devolucoes)
-                db.flush()
-
-            for lanc in lancamentos:
-                proporcao = float(valor_total_devolucao) / float(venda.total)
-                estorno = float(lanc.valor) * proporcao
-
-                # Criar lançamento de estorno (saída)
-                estorno_lanc = LancamentoManual(
-                    tipo='saida',
-                    valor=Decimal(str(estorno)),
-                    descricao=f"Estorno devolução venda {venda.numero_venda} - {motivo}",
-                    data_lancamento=date.today(),
-                    status='realizado',
-                    categoria_id=categoria_devolucoes.id,
-                    documento=f"ESTORNO-VENDA-{venda_id}",
-                    fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
-                    user_id=current_user.id,
-                    tenant_id=tenant_id
-                )
-                db.add(estorno_lanc)
-                logger.info(f"💸 Estorno criado no LancamentoManual: -R$ {estorno:.2f}")
+        for lanc in lancamentos_entrada:
+            lanc.status = 'estornado'
+            logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
 
         # 🆕 ATUALIZAR STATUS DA VENDA
         if float(valor_total_devolucao) >= float(venda.total) * 0.99:  # 99% devolvido = total
