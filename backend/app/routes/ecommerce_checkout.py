@@ -508,6 +508,33 @@ def finalizar_checkout(
             f"✅ Checkout → PDV: Venda #{numero_venda} criada "
             f"(status=aberta, canal={canal_pdv}, forma={forma_pag_nome})"
         )
+
+        # 🎯 CAMPANHAS — Publicar purchase_completed com canal correto
+        if cliente_pdv_id and venda_pdv.id:
+            try:
+                from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+                canal_campanha = "app" if getattr(carrinho, "origem", "web") == "app" else "ecommerce"
+                evento_campanha = CampaignEventQueue(
+                    tenant_id=identity.tenant_id,
+                    event_type="purchase_completed",
+                    event_origin=EventOriginEnum.user_action,
+                    event_depth=0,
+                    payload={
+                        "customer_id": cliente_pdv_id,
+                        "venda_id": venda_pdv.id,
+                        "venda_total": float(total),
+                        "canal": canal_campanha,
+                    },
+                )
+                db.add(evento_campanha)
+                db.commit()
+                logger.info(
+                    "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d canal=%s",
+                    venda_pdv.id, cliente_pdv_id, canal_campanha,
+                )
+            except Exception as e_camp:
+                logger.error("[Campanhas] Erro ao publicar purchase_completed ecommerce: %s", e_camp)
+
     except Exception as _e:
         logger.error(f"⚠️ Checkout → PDV: falha ao criar venda: {_e}", exc_info=True)
         try:

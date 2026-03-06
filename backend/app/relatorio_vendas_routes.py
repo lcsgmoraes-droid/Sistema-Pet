@@ -111,6 +111,23 @@ async def obter_relatorio_vendas(
             formas_pagamento_map[fp.nome.lower().strip()] = fp
     except Exception as e:
         logger.warning(f"Erro ao buscar formas de pagamento (tabela pode não existir): {e}")
+
+    # OTIMIZAÇÃO: Carregar resgates de cashback por venda (negative amount, source_id = venda_id)
+    cashback_por_venda = {}  # venda_id → valor resgatado
+    if venda_ids:
+        try:
+            from app.campaigns.models import CashbackTransaction
+            resgates = db.query(
+                CashbackTransaction.source_id,
+                func.sum(CashbackTransaction.amount),
+            ).filter(
+                CashbackTransaction.tenant_id == tenant_id,
+                CashbackTransaction.amount < 0,
+                CashbackTransaction.source_id.in_(venda_ids),
+            ).group_by(CashbackTransaction.source_id).all()
+            cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
+        except Exception as e:
+            logger.warning(f"Erro ao buscar cashback por venda (tabela pode não existir): {e}")
     
     # ==============================================
     # RESUMO (Cards no topo)
@@ -651,6 +668,7 @@ async def obter_relatorio_vendas(
         
         # Calcular LUCRO
         imposto_total = float(venda.total) * (impostos_percentual / 100.0)
+        custo_campanha = cashback_por_venda.get(venda.id, 0.0)
         lucro = (
             float(venda.total)
             - custo_total
@@ -659,6 +677,7 @@ async def obter_relatorio_vendas(
             - imposto_total
             - float(venda.taxa_entrega or 0)
             - taxa_operacional_entrega
+            - custo_campanha
         )
         
         # Calcular MARGENS
@@ -684,6 +703,7 @@ async def obter_relatorio_vendas(
             "imposto": round(imposto_total, 2),
             "taxa_operacional": round(taxa_operacional_entrega, 2),
             "custo_produtos": round(custo_total, 2),
+            "custo_campanha": round(custo_campanha, 2),
             "venda_liquida": round(float(venda.total), 2),
             "lucro": round(lucro, 2),
             "margem_sobre_venda": round(margem_sobre_venda, 1),

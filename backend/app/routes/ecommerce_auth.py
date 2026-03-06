@@ -26,6 +26,7 @@ class EcommerceRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     nome: str | None = None
+    cpf: str = Field(min_length=11, max_length=14, description='CPF obrigatório (11 dígitos, com ou sem formatação)')
 
 
 class EcommerceLoginRequest(BaseModel):
@@ -312,7 +313,35 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     cliente = _get_or_create_cliente_for_user(db, user)
     if payload.nome:
         cliente.nome = payload.nome
+    if payload.cpf:
+        cpf_clean = payload.cpf.strip()
+        if cpf_clean:
+            user.cpf_cnpj = cpf_clean
+            cliente.cpf = cpf_clean
     db.commit()
+    db.refresh(cliente)
+
+    # 🎯 CAMPANHAS — Publicar evento customer_registered na fila
+    # Disparado tanto pelo app-mobile quanto pelo ecommerce (mesmo endpoint)
+    # Ativa WelcomeHandler (cupom de boas-vindas) se houver campanha ativa
+    try:
+        from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+        evento_campanha = CampaignEventQueue(
+            tenant_id=tenant_id,
+            event_type="customer_registered",
+            event_origin=EventOriginEnum.user_action,
+            event_depth=0,
+            payload={
+                "customer_id": cliente.id,
+                "canal": "app",
+                "email": user.email,
+            },
+        )
+        db.add(evento_campanha)
+        db.commit()
+    except Exception as e_camp:
+        import logging
+        logging.getLogger(__name__).error("[Campanhas] Erro ao publicar customer_registered: %s", e_camp)
 
     access_token = create_access_token(
         data={
@@ -568,3 +597,181 @@ def atualizar_perfil(
     db.refresh(current_user)
     db.refresh(cliente)
     return _serialize_profile(current_user, cliente)
+
+
+@router.get("/meus-cupons")
+def meus_cupons(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Retorna os cupons ativos do cliente autenticado no app.
+    """
+    from app.campaigns.models import Coupon, CouponStatusEnum
+
+    cliente = _get_or_create_cliente_for_user(db, current_user)
+
+    cupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.tenant_id == current_user.tenant_id,
+            Coupon.customer_id == cliente.id,
+            Coupon.status == CouponStatusEnum.active,
+        )
+        .order_by(Coupon.created_at.desc())
+        .all()
+    )
+
+    now = datetime.now(timezone.utc)
+    resultado = []
+    for c in cupons:
+        expirado = c.valid_until and c.valid_until < now
+        resultado.append({
+            "id": c.id,
+            "code": c.code,
+            "coupon_type": c.coupon_type.value,
+            "discount_value": float(c.discount_value) if c.discount_value else None,
+            "discount_percent": float(c.discount_percent) if c.discount_percent else None,
+            "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+            "expirado": expirado,
+            "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
+        })
+
+    return resultado
+
+
+@router.get("/meus-beneficios")
+def meus_beneficios(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Retorna em uma única chamada tudo que o app precisa para montar
+    a tela 'Meus Benefícios': ranking, carimbos, cashback e cupons ativos.
+    """
+    from sqlalchemy import func as sqlfunc
+    from app.campaigns.models import (
+        CashbackTransaction,
+        Campaign,
+        CampaignTypeEnum,
+        Coupon,
+        CouponStatusEnum,
+        CustomerRankHistory,
+        LoyaltyStamp,
+    )
+
+    cliente = _get_or_create_cliente_for_user(db, current_user)
+    tenant_id = current_user.tenant_id
+    now = datetime.now(timezone.utc)
+
+    # --- Cashback ---
+    saldo_raw = (
+        db.query(sqlfunc.sum(CashbackTransaction.amount))
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == cliente.id,
+        )
+        .scalar()
+    )
+    saldo_cashback = float(saldo_raw or 0)
+
+    # --- Carimbos ---
+    total_carimbos = (
+        db.query(LoyaltyStamp)
+        .filter(
+            LoyaltyStamp.tenant_id == tenant_id,
+            LoyaltyStamp.customer_id == cliente.id,
+            LoyaltyStamp.voided_at.is_(None),
+        )
+        .count()
+    )
+    loyalty_campaign = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.campaign_type == CampaignTypeEnum.loyalty_stamp,
+        )
+        .first()
+    )
+    stamps_to_complete = int((loyalty_campaign.params or {}).get("stamps_to_complete", 10)) if loyalty_campaign else 10
+    min_purchase_value = float((loyalty_campaign.params or {}).get("min_purchase_value", 0) or 0) if loyalty_campaign else 0.0
+    carimbos_no_cartao = total_carimbos % stamps_to_complete if stamps_to_complete > 0 else 0
+
+    # --- Ranking ---
+    rank_atual = (
+        db.query(CustomerRankHistory)
+        .filter(
+            CustomerRankHistory.tenant_id == tenant_id,
+            CustomerRankHistory.customer_id == cliente.id,
+        )
+        .order_by(CustomerRankHistory.period.desc())
+        .first()
+    )
+    rank_level = rank_atual.rank_level.value if rank_atual else "bronze"
+    rank_total_spent = float(rank_atual.total_spent) if rank_atual else 0.0
+    rank_total_purchases = rank_atual.total_purchases if rank_atual else 0
+
+    ranking_campaign = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.campaign_type == CampaignTypeEnum.ranking_monthly,
+        )
+        .first()
+    )
+    rp = ranking_campaign.params if ranking_campaign else {}
+    ranking_thresholds = {
+        "silver_min_spent": float(rp.get("silver_min_spent", 300)),
+        "silver_min_purchases": int(rp.get("silver_min_purchases", 4)),
+        "gold_min_spent": float(rp.get("gold_min_spent", 1000)),
+        "gold_min_purchases": int(rp.get("gold_min_purchases", 10)),
+        "diamond_min_spent": float(rp.get("diamond_min_spent", 3000)),
+        "diamond_min_purchases": int(rp.get("diamond_min_purchases", 20)),
+        "platinum_min_spent": float(rp.get("platinum_min_spent", 8000)),
+        "platinum_min_purchases": int(rp.get("platinum_min_purchases", 40)),
+    }
+
+    # --- Cupons ativos ---
+    cupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.tenant_id == tenant_id,
+            Coupon.customer_id == cliente.id,
+            Coupon.status == CouponStatusEnum.active,
+        )
+        .order_by(Coupon.created_at.desc())
+        .all()
+    )
+    cupons_lista = []
+    for c in cupons:
+        expirado = bool(c.valid_until and c.valid_until < now)
+        cupons_lista.append({
+            "id": c.id,
+            "code": c.code,
+            "coupon_type": c.coupon_type.value,
+            "discount_value": float(c.discount_value) if c.discount_value else None,
+            "discount_percent": float(c.discount_percent) if c.discount_percent else None,
+            "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+            "expirado": expirado,
+            "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
+        })
+
+    return {
+        "cashback": {
+            "saldo": saldo_cashback,
+        },
+        "carimbos": {
+            "total_geral": total_carimbos,
+            "carimbos_no_cartao": carimbos_no_cartao,
+            "meta": stamps_to_complete,
+            "min_purchase_value": min_purchase_value,
+        },
+        "ranking": {
+            "nivel": rank_level,
+            "total_spent": rank_total_spent,
+            "total_purchases": rank_total_purchases,
+            "thresholds": ranking_thresholds,
+        },
+        "cupons": cupons_lista,
+    }
+

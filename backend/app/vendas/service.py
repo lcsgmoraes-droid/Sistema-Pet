@@ -1415,7 +1415,86 @@ class VendaService:
                         f"Saldo restante: R$ {float(cliente.credito):.2f}"
                     )
                     continue
-                
+
+                # Processar cashback de campanhas
+                forma_eh_cashback = (
+                    pag_data['forma_pagamento'].lower() == 'cashback' or
+                    pag_data['forma_pagamento'] == 'Cashback'
+                )
+
+                if forma_eh_cashback:
+                    if not venda.cliente_id:
+                        raise HTTPException(
+                            status_code=400,
+                            detail='Cashback só pode ser usado em vendas com cliente vinculado'
+                        )
+
+                    from app.campaigns.models import CashbackTransaction, CashbackSourceTypeEnum
+
+                    saldo_raw = db.query(func.sum(CashbackTransaction.amount)).filter(
+                        CashbackTransaction.tenant_id == tenant_id,
+                        CashbackTransaction.customer_id == venda.cliente_id,
+                    ).scalar()
+                    saldo_disponivel = float(saldo_raw or 0)
+
+                    if pag_data['valor'] > saldo_disponivel + 0.01:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f'Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}'
+                        )
+
+                    debit = CashbackTransaction(
+                        tenant_id=tenant_id,
+                        customer_id=venda.cliente_id,
+                        amount=-Decimal(str(pag_data['valor'])),
+                        source_type=CashbackSourceTypeEnum.manual,
+                        source_id=venda.id,  # FK para rastreamento por venda
+                        description=f"Resgate em venda {venda.numero_venda}",
+                    )
+                    db.add(debit)
+
+                    # ── DRE: registrar como despesa de campanhas/marketing ──
+                    # Não gera fluxo de caixa (conta_bancaria_id=None)
+                    from app.financeiro_models import LancamentoManual, CategoriaFinanceira
+                    from datetime import date as _date
+
+                    cat_campanha = db.query(CategoriaFinanceira).filter(
+                        CategoriaFinanceira.nome.ilike('%campanha%'),
+                        CategoriaFinanceira.tipo == 'despesa',
+                        CategoriaFinanceira.tenant_id == tenant_id,
+                    ).first()
+                    if not cat_campanha:
+                        cat_campanha = CategoriaFinanceira(
+                            nome="Campanhas / Marketing",
+                            tipo="despesa",
+                            user_id=user_id,
+                            tenant_id=tenant_id,
+                        )
+                        db.add(cat_campanha)
+                        db.flush()
+
+                    cliente_nome = venda.cliente.nome if venda.cliente else "Cliente"
+                    lancamento_campanha = LancamentoManual(
+                        tipo="saida",
+                        valor=Decimal(str(pag_data['valor'])),
+                        descricao=f"Cashback resgatado — {cliente_nome} — Venda {venda.numero_venda}",
+                        data_lancamento=venda.data_venda.date() if hasattr(venda.data_venda, 'date') else _date.today(),
+                        status="realizado",
+                        categoria_id=cat_campanha.id,
+                        conta_bancaria_id=None,   # sem movimentação de caixa
+                        fornecedor_cliente=cliente_nome,
+                        documento=f"CASHBACK-{venda.numero_venda}",
+                        gerado_automaticamente=True,
+                        user_id=user_id,
+                        tenant_id=tenant_id,
+                    )
+                    db.add(lancamento_campanha)
+                    logger.info(
+                        "💰 Cashback utilizado: R$ %.2f — DRE despesa campanha criada — venda=%s",
+                        pag_data['valor'], venda.numero_venda,
+                    )
+                    continue
+
                 # Registrar no caixa (apenas dinheiro)
                 if CaixaService.eh_forma_dinheiro(pag_data['forma_pagamento']):
                     mov_info = CaixaService.registrar_movimentacao_venda(
@@ -1912,6 +1991,33 @@ class VendaService:
                 logger.error(f"⚠️ Erro ao criar contas a pagar de taxas: {str(e)}", exc_info=True)
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
             
+            # 📢 Enfileirar evento de campanha (purchase_completed)
+            if venda.status == 'finalizada' and venda.cliente_id:
+                try:
+                    from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+                    import uuid as _uuid
+                    evento_campanha = CampaignEventQueue(
+                        tenant_id=_uuid.UUID(str(tenant_id)),
+                        event_type="purchase_completed",
+                        event_origin=EventOriginEnum.user_action,
+                        event_depth=0,
+                        payload={
+                            "customer_id": venda.cliente_id,
+                            "venda_id": venda.id,
+                            "venda_total": float(venda.total),
+                        },
+                    )
+                    db.add(evento_campanha)
+                    db.commit()
+                    logger.info(
+                        "📢 [Campanhas] purchase_completed enfileirado: "
+                        "venda=%s cliente_id=%d total=R$%.2f",
+                        venda.numero_venda, venda.cliente_id, float(venda.total)
+                    )
+                except Exception as e:
+                    logger.warning("[Campanhas] Falha ao enfileirar purchase_completed (não crítico): %s", e)
+                    db.rollback()
+
             # Preparar retorno
             return {
                 'venda': {

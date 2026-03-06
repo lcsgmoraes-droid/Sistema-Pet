@@ -73,13 +73,13 @@
 
 ### 1.4 Boas-Vindas — 1ª Compra no App
 
-| Item                                                                          | Status      |
-| ----------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------- |
-| Tipo `welcome_app` existe no enum                                             | ✅ Feito    |
-| Worker: disparo no evento de cadastro no app                                  | ✅ Feito    | `ecommerce_auth.py` publica `customer_registered` após cadastro — Sprint 11 |
-| Worker: gera cupóm de boas-vindas                                             | ✅ Feito    | `WelcomeHandler._process()` via `coupon_service`                            |
-| Cupom visível em "Meus Cupons" no app                                         | ❌ Pendente |
-| **UI — Parametrizar** pets (birthday_pet): valor do cupom, mensagem, validade | ✅ Feito    | Sprint 10 — renderFormCampaign inclui birthday_pet                          |
+| Item                                                                          | Status   |
+| ----------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------- |
+| Tipo `welcome_app` existe no enum                                             | ✅ Feito |
+| Worker: disparo no evento de cadastro no app                                  | ✅ Feito | `ecommerce_auth.py` publica `customer_registered` após cadastro — Sprint 11 |
+| Worker: gera cupóm de boas-vindas                                             | ✅ Feito | `WelcomeHandler._process()` via `coupon_service`                            |
+| Cupom visível em "Meus Cupons" no app                                         | ✅ Feito | `CouponsScreen.tsx` — via aba Benefícios → "Ver todos os cupons"            |
+| **UI — Parametrizar** pets (birthday_pet): valor do cupom, mensagem, validade | ✅ Feito | Sprint 10 — renderFormCampaign inclui birthday_pet                          |
 
 ---
 
@@ -96,16 +96,16 @@
 
 ### 1.6 Dashboard de Campanhas
 
-| Item                                                                  | Status      | Detalhe                                        |
-| --------------------------------------------------------------------- | ----------- | ---------------------------------------------- |
-| Endpoint `GET /campanhas/dashboard` existe                            | ✅ Feito    | Retorna dados básicos                          |
-| Seção: campanhas ativas (por nome)                                    | ⚠️ Parcial  | Retorna lista, mas UI não mostra nomes         |
-| Seção: cupons emitidos/utilizados/expirados hoje                      | ⚠️ Parcial  | Dados no endpoint, UI incompleta               |
-| Alertas do dia: aniversariantes de hoje (clientes e pets)             | ✅ Feito    | Dashboard endpoint retorna `aniversarios_hoje` |
-| Alertas do dia: clientes inativos 30d/60d e sorteios pendentes        | ✅ Feito    | Sprint 9 — endpoint `alertas`                  |
-| Alertas do dia: brindes pendentes de retirada                         | ❌ Pendente | —                                              |
-| Próximos eventos: aniversários amanhã, fim do mês, sorteios da semana | ✅ Feito    | Sprint 9 — endpoint `proximos_eventos`         |
-| Próximos eventos: destaque mensal em X dias                           | ❌ Pendente | —                                              |
+| Item                                                                  | Status      | Detalhe                                                    |
+| --------------------------------------------------------------------- | ----------- | ---------------------------------------------------------- |
+| Endpoint `GET /campanhas/dashboard` existe                            | ✅ Feito    | Retorna dados básicos                                      |
+| Seção: campanhas ativas (por nome)                                    | ✅ Feito    | Backend retorna `{total, nomes}` — UI exibe lista de nomes |
+| Seção: cupons emitidos/utilizados/expirados hoje                      | ⚠️ Parcial  | Dados no endpoint, UI incompleta                           |
+| Alertas do dia: aniversariantes de hoje (clientes e pets)             | ✅ Feito    | Dashboard endpoint retorna `aniversarios_hoje`             |
+| Alertas do dia: clientes inativos 30d/60d e sorteios pendentes        | ✅ Feito    | Sprint 9 — endpoint `alertas`                              |
+| Alertas do dia: brindes pendentes de retirada                         | ✅ Feito    | Backend + Lembretes.jsx — card de brindes pendentes        |
+| Próximos eventos: aniversários amanhã, fim do mês, sorteios da semana | ✅ Feito    | Sprint 9 — endpoint `proximos_eventos`                     |
+| Próximos eventos: destaque mensal em X dias                           | ❌ Pendente | —                                                          |
 
 ---
 
@@ -267,7 +267,7 @@
 | Cupom: campo canal (PDV / app / ecommerce / todos)           | ✅ Feito (modelo) | —                                                                  |
 | PDV: campo para digitar código de cupóm na venda             | ✅ Feito          | PDV.jsx: `codigoCupom`, `aplicarCupom()`, card "Cupóm de desconto" |
 | PDV: validação e aplicação automática do cupóm               | ✅ Feito          | Endpoint de resgate encadeado na finalização                       |
-| App: aba "Meus Cupons" com lista de cupons ativos do cliente | ❌ Pendente       | —                                                                  |
+| App: aba "Meus Cupons" com lista de cupons ativos do cliente | ✅ Feito          | `CouponsScreen.tsx` — acessível via aba Benefícios                 |
 | App: QR code do cupom para mostrar no caixa                  | ❌ Pendente       | —                                                                  |
 | Ecommerce: campo de cupóm no checkout                        | ✅ Feito          | `ecommerce_checkout.py`: campo `cupom` no payload                  |
 | Ecommerce: validação e aplicação do desconto                 | ✅ Feito          | `_calcular_desconto()` aplica o cupom antes de fechar o pedido     |
@@ -291,11 +291,11 @@
 ### 5.2 Lembretes Integrados
 
 | Item                                                              | Status      |
-| ----------------------------------------------------------------- | ----------- | ------------------------------------- |
-| Mostrar aniversários amanhã na aba de Lembretes existente         | ❌ Pendente | Lembretes.jsx separado, não integrado |
-| Mostrar sorteios agendados para os próximos X dias                | ❌ Pendente | —                                     |
-| Mostrar brindes pendentes de retirada (campanhas destaque mensal) | ❌ Pendente | —                                     |
-| Mostrar clientes que atingiram inatividade hoje                   | ❌ Pendente | —                                     |
+| ----------------------------------------------------------------- | ----------- | -------------------------------------------------------- |
+| Mostrar aniversários amanhã na aba de Lembretes existente         | ✅ Feito    | Lembretes.jsx usa `proximos_eventos.aniversarios_amanha` |
+| Mostrar sorteios agendados para os próximos X dias                | ✅ Feito    | Card "Sorteio(s) esta semana" em Lembretes.jsx           |
+| Mostrar brindes pendentes de retirada (campanhas destaque mensal) | ❌ Pendente | —                                                        |
+| Mostrar clientes que atingiram inatividade hoje                   | ❌ Pendente | —                                                        |
 
 ---
 

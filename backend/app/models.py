@@ -152,6 +152,7 @@ class Cliente(BaseTenantModel):
     telefone = Column(String(50), nullable=True)
     celular = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
+    data_nascimento = Column(DateTime, nullable=True)  # Aniversário do cliente (usado em campanhas)
     
     # Dados de Pessoa Jurídica
     cnpj = Column(String(18), nullable=True, index=True)

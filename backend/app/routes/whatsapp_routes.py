@@ -122,6 +122,22 @@ async def get_ultimas_mensagens_cliente(
     except HTTPException:
         raise
     except Exception as e:
+        # Verifica se é erro de tabela inexistente (feature WhatsApp não migrada ainda)
+        from sqlalchemy.exc import ProgrammingError as SAProgError
+        orig = getattr(e, 'orig', None)
+        pgcode = getattr(orig, 'pgcode', '') if orig else ''
+        is_table_missing = (
+            isinstance(e, SAProgError)
+            or pgcode == '42P01'
+            or 'does not exist' in str(e)
+        )
+        if is_table_missing:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            logger.warning(f"Tabela WhatsApp não encontrada no banco para cliente {cliente_id} — retornando lista vazia")
+            return []
         logger.error(f"Erro ao buscar mensagens do cliente {cliente_id}: {e}")
         raise HTTPException(
             status_code=500,

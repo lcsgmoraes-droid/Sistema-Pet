@@ -158,6 +158,11 @@ from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 
+# ============================================================================
+# CAMPANHAS — Motor de Campanhas (Fase 1)
+# ============================================================================
+from app.campaigns.routes import router as campaigns_router
+
 from app.tenancy.middleware import TenancyMiddleware
 import logging
 from pathlib import Path
@@ -205,6 +210,9 @@ _bling_token_thread: Optional[threading.Thread] = None
 _expirar_reservas_stop_event = threading.Event()
 _expirar_reservas_thread: Optional[threading.Thread] = None
 EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS = 30 * 60  # 30 minutos
+
+# Campaign Engine — scheduler APScheduler
+_campaign_scheduler = None
 
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
 _BLING_LOCK_FILE = "/tmp/bling_token_renewal.lock"
@@ -716,6 +724,7 @@ app.include_router(ecommerce_config_router)
 app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router)
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
+app.include_router(campaigns_router)   # Motor de Campanhas
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)
@@ -821,6 +830,16 @@ def on_startup():
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao iniciar scheduler de acertos: {str(e)}")
 
+    # Iniciar scheduler de campanhas
+    try:
+        from app.campaigns.scheduler import CampaignScheduler
+        global _campaign_scheduler
+        _campaign_scheduler = CampaignScheduler()
+        _campaign_scheduler.start()
+        logger.info("[OK] Campaign Scheduler iniciado!")
+    except Exception as e:
+        logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
+
     # Iniciar renovação automática de token Bling (a cada 5h)
     global _bling_token_thread
     _bling_token_stop_event.clear()
@@ -857,6 +876,15 @@ def on_shutdown():
     #     logger.info("[STOP] Scheduler de acertos parado!")
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao parar scheduler: {str(e)}")
+
+    # Parar scheduler de campanhas
+    try:
+        global _campaign_scheduler
+        if _campaign_scheduler:
+            _campaign_scheduler.shutdown()
+            logger.info("[STOP] Campaign Scheduler parado!")
+    except Exception as e:
+        logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
 
     global _bling_token_thread
     _bling_token_stop_event.set()

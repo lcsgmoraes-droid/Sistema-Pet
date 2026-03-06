@@ -2478,7 +2478,9 @@ def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Op
                     status=st,
                     cor_badge=cor,
                 ))
-            if (not tipo_evento or tipo_evento == "pet_atualizacao") and p.updated_at and p.updated_at != p.created_at:
+            _upd = p.updated_at.replace(tzinfo=None) if p.updated_at else None
+            _crt = p.created_at.replace(tzinfo=None) if p.created_at else None
+            if (not tipo_evento or tipo_evento == "pet_atualizacao") and p.updated_at and _upd != _crt:
                 eventos.append(TimelineEvento(
                     tipo_evento="pet_atualizacao",
                     evento_id=p.id,
@@ -2492,7 +2494,17 @@ def _obter_timeline(db: Session, view_name: str, entity_id: int, tipo_evento: Op
                 ))
 
     # Ordenar por data decrescente e aplicar limite
-    eventos.sort(key=lambda e: e.data_evento, reverse=True)
+    # Normaliza timezone para evitar TypeError ao comparar naive vs aware
+    def _to_aware(d):
+        if d is None:
+            from datetime import timezone as _tz
+            return dt.min.replace(tzinfo=_tz.utc)
+        if d.tzinfo is None:
+            from datetime import timezone as _tz
+            return d.replace(tzinfo=_tz.utc)
+        return d
+
+    eventos.sort(key=lambda e: _to_aware(e.data_evento), reverse=True)
     return eventos[:limit]
 
 

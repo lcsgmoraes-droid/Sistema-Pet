@@ -1178,7 +1178,35 @@ async def finalizar_venda(
     # Adicionar dados do resultado do VendaService (se disponível)
     if 'operacoes' in resultado:
         venda_dict['resultado_operacoes'] = resultado['operacoes']
-    
+
+    # ============================================================
+    # 🎯 CAMPANHAS — Publicar evento purchase_completed na fila
+    # Nunca bloqueia a venda em caso de falha
+    # ============================================================
+    if venda.cliente_id:
+        try:
+            from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+            evento_campanha = CampaignEventQueue(
+                tenant_id=tenant_id,
+                event_type="purchase_completed",
+                event_origin=EventOriginEnum.user_action,
+                event_depth=0,
+                payload={
+                    "customer_id": venda.cliente_id,
+                    "venda_id": venda.id,
+                    "venda_total": float(venda.total or 0),
+                    "canal": "pdv",
+                },
+            )
+            db.add(evento_campanha)
+            db.commit()
+            logger.info(
+                "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d",
+                venda.id, venda.cliente_id,
+            )
+        except Exception as e_camp:
+            logger.error("[Campanhas] Erro ao publicar purchase_completed: %s", e_camp)
+
     return venda_dict
 
 
