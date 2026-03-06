@@ -114,20 +114,20 @@ async def listar_funcionarios(
     Lista todos os funcionários do tenant.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     query = db.query(Cliente).outerjoin(
         Cargo, Cliente.cargo_id == Cargo.id
     ).filter(
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario"
     )
-    
+
     if ativo is not None:
         query = query.filter(Cliente.ativo == ativo)
-    
+
     if cargo_id:
         query = query.filter(Cliente.cargo_id == cargo_id)
-    
+
     if search:
         search_term = f"%{search}%"
         query = query.filter(
@@ -135,10 +135,10 @@ async def listar_funcionarios(
             (Cliente.email.ilike(search_term)) |
             (Cliente.cpf.ilike(search_term))
         )
-    
+
     query = query.order_by(Cliente.nome)
     funcionarios = query.all()
-    
+
     result = []
     for func in funcionarios:
         cargo_dict = None
@@ -150,7 +150,7 @@ async def listar_funcionarios(
                     "nome": cargo.nome,
                     "salario_base": cargo.salario_base
                 }
-        
+
         func_dict = {
             "id": func.id,
             "codigo": func.codigo,
@@ -163,7 +163,7 @@ async def listar_funcionarios(
             "data_fechamento_comissao": func.data_fechamento_comissao
         }
         result.append(FuncionarioResponse(**func_dict))
-    
+
     return result
 
 
@@ -177,16 +177,16 @@ async def obter_funcionario(
     Obtém detalhes de um funcionário específico.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario"
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
-    
+
     cargo_dict = None
     if funcionario.cargo_id:
         cargo = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
@@ -196,7 +196,7 @@ async def obter_funcionario(
                 "nome": cargo.nome,
                 "salario_base": cargo.salario_base
             }
-    
+
     func_dict = {
         "id": funcionario.id,
         "codigo": funcionario.codigo,
@@ -207,7 +207,7 @@ async def obter_funcionario(
         "cargo": cargo_dict,
         "ativo": funcionario.ativo
     }
-    
+
     return FuncionarioResponse(**func_dict)
 
 
@@ -221,16 +221,16 @@ async def criar_funcionario(
     Cria um novo funcionário.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se cargo existe
     cargo = db.query(Cargo).filter(
         Cargo.id == funcionario_data.cargo_id,
         Cargo.tenant_id == tenant_id
     ).first()
-    
+
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     # Verificar CPF duplicado (se fornecido)
     if funcionario_data.cpf:
         cpf_existente = db.query(Cliente).filter(
@@ -238,17 +238,17 @@ async def criar_funcionario(
             Cliente.cpf == funcionario_data.cpf,
             Cliente.ativo == True
         ).first()
-        
+
         if cpf_existente:
             raise HTTPException(
                 status_code=400,
                 detail=f"Já existe um cadastro ativo com o CPF '{funcionario_data.cpf}'"
             )
-    
+
     # Gerar código de funcionário
     from app.clientes_routes import gerar_codigo_cliente
     codigo = gerar_codigo_cliente(db, "funcionario", "PF", tenant_id)
-    
+
     # Criar funcionário
     funcionario = Cliente(
         tenant_id=tenant_id,
@@ -263,17 +263,17 @@ async def criar_funcionario(
         cargo_id=funcionario_data.cargo_id,
         ativo=funcionario_data.ativo
     )
-    
+
     db.add(funcionario)
     db.commit()
     db.refresh(funcionario)
-    
+
     cargo_dict = {
         "id": cargo.id,
         "nome": cargo.nome,
         "salario_base": cargo.salario_base
     }
-    
+
     func_dict = {
         "id": funcionario.id,
         "codigo": funcionario.codigo,
@@ -284,7 +284,7 @@ async def criar_funcionario(
         "cargo": cargo_dict,
         "ativo": funcionario.ativo
     }
-    
+
     return FuncionarioResponse(**func_dict)
 
 
@@ -299,26 +299,26 @@ async def atualizar_funcionario(
     Atualiza um funcionário existente.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario"
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
-    
+
     # Verificar cargo se fornecido
     if funcionario_data.cargo_id:
         cargo = db.query(Cargo).filter(
             Cargo.id == funcionario_data.cargo_id,
             Cargo.tenant_id == tenant_id
         ).first()
-        
+
         if not cargo:
             raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     # Verificar CPF duplicado (se alterado)
     if funcionario_data.cpf and funcionario_data.cpf != funcionario.cpf:
         cpf_existente = db.query(Cliente).filter(
@@ -327,13 +327,13 @@ async def atualizar_funcionario(
             Cliente.id != funcionario_id,
             Cliente.ativo == True
         ).first()
-        
+
         if cpf_existente:
             raise HTTPException(
                 status_code=400,
                 detail=f"Já existe um cadastro ativo com o CPF '{funcionario_data.cpf}'"
             )
-    
+
     # Atualizar campos
     update_data = funcionario_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -341,10 +341,10 @@ async def atualizar_funcionario(
             setattr(funcionario, field, value.strip())
         else:
             setattr(funcionario, field, value)
-    
+
     db.commit()
     db.refresh(funcionario)
-    
+
     # Buscar cargo atualizado
     cargo_dict = None
     if funcionario.cargo_id:
@@ -355,7 +355,7 @@ async def atualizar_funcionario(
                 "nome": cargo.nome,
                 "salario_base": cargo.salario_base
             }
-    
+
     func_dict = {
         "id": funcionario.id,
         "codigo": funcionario.codigo,
@@ -366,7 +366,7 @@ async def atualizar_funcionario(
         "cargo": cargo_dict,
         "ativo": funcionario.ativo
     }
-    
+
     return FuncionarioResponse(**func_dict)
 
 
@@ -380,20 +380,20 @@ async def deletar_funcionario(
     Inativa um funcionário (soft delete).
     """
     user, tenant_id = current_user_and_tenant
-    
+
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario"
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
-    
+
     # Inativar
     funcionario.ativo = False
     db.commit()
-    
+
     return {"message": f"Funcionário '{funcionario.nome}' inativado com sucesso"}
 
 
@@ -410,13 +410,13 @@ async def api_conceder_ferias(
 ):
     """
     Concede férias a um funcionário.
-    
+
     - Consome provisão acumulada
     - Gera conta a pagar
     - Registra no DRE de competência
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se funcionário existe e está ativo
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
@@ -424,13 +424,13 @@ async def api_conceder_ferias(
         Cliente.tipo_cadastro == "funcionario",
         Cliente.ativo == True
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(
             status_code=404,
             detail="Funcionário não encontrado ou inativo"
         )
-    
+
     try:
         resultado = conceder_ferias(
             db=db,
@@ -442,13 +442,13 @@ async def api_conceder_ferias(
             data_pagamento=dados.data_pagamento,
             dias_ferias=dados.dias_ferias
         )
-        
+
         return {
             "success": True,
             "mensagem": f"Férias concedidas com sucesso para {funcionario.nome}",
             "dados": resultado
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -462,14 +462,14 @@ async def api_pagar_decimo_terceiro(
 ):
     """
     Paga 13º salário (parcial ou total).
-    
+
     - Percentual 50 = 1ª parcela
     - Percentual 100 = pagamento integral
     - Consome provisão acumulada
     - Gera conta a pagar
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se funcionário existe e está ativo
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
@@ -477,13 +477,13 @@ async def api_pagar_decimo_terceiro(
         Cliente.tipo_cadastro == "funcionario",
         Cliente.ativo == True
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(
             status_code=404,
             detail="Funcionário não encontrado ou inativo"
         )
-    
+
     try:
         resultado = pagar_decimo_terceiro(
             db=db,
@@ -496,13 +496,13 @@ async def api_pagar_decimo_terceiro(
             data_pagamento=dados.data_pagamento,
             descricao_parcela=dados.descricao_parcela
         )
-        
+
         return {
             "success": True,
             "mensagem": f"13º salário pago com sucesso para {funcionario.nome}",
             "dados": resultado
         }
-    
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -515,7 +515,7 @@ async def api_obter_provisoes_funcionario(
 ):
     """
     Obtém o saldo de provisões de um funcionário.
-    
+
     Retorna:
     - Provisão de férias
     - Provisão de 1/3 de férias
@@ -523,67 +523,78 @@ async def api_obter_provisoes_funcionario(
     - Total de provisões acumuladas
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Buscar funcionário
     funcionario = db.query(Cliente).filter(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario"
     ).first()
-    
+
     if not funcionario:
         raise HTTPException(
             status_code=404,
             detail="Funcionário não encontrado"
         )
-    
+
     if not funcionario.cargo_id:
         raise HTTPException(
             status_code=400,
             detail="Funcionário não possui cargo definido"
         )
-    
+
     cargo = db.query(Cargo).filter(
         Cargo.id == funcionario.cargo_id,
         Cargo.tenant_id == tenant_id
     ).first()
-    
+
     if not cargo:
         raise HTTPException(
             status_code=404,
             detail="Cargo do funcionário não encontrado"
         )
-    
-    # Calcular provisões acumuladas no DRE
-    # Buscar soma total de provisões no canal "provisao"
-    total_provisao_acum = (
-        db.query(func.coalesce(func.sum(DREDetalheCanal.despesas_pessoal), 0))
-        .filter(
-            DREDetalheCanal.tenant_id == tenant_id,
-            DREDetalheCanal.canal == "provisao"
-        )
-        .scalar() or Decimal("0")
-    )
-    
-    total_provisao = Decimal(str(total_provisao_acum))
-    
-    # Proporções baseadas nos percentuais padrão:
-    # Férias = 8,33% (1/12 do salário anual)
-    # 1/3 Férias = 2,78% (1/3 de 8,33%)
-    # 13º = 8,33% (1/12 do salário anual)
-    # Total mensal = 19,44%
-    
-    # Distribuir proporcionalmente:
-    prop_ferias = Decimal("0.4286")    # 42,86% do total
-    prop_terco = Decimal("0.1429")     # 14,29% do total
-    prop_13 = Decimal("0.4286")        # 42,86% do total
-    
-    prov_ferias = (total_provisao * prop_ferias).quantize(Decimal("0.01"))
-    prov_terco = (total_provisao * prop_terco).quantize(Decimal("0.01"))
-    prov_13 = (total_provisao * prop_13).quantize(Decimal("0.01"))
-    
+
+    # Calcular provisões individuais do funcionário com base no salário e tempo trabalhado.
+    # A tabela dre_detalhe_canais não tem funcionario_id (é agregada por período),
+    # portanto calculamos diretamente: salário/12 × meses acumulados.
+    salario = Decimal(str(cargo.salario_base or 0))
+
+    hoje = date.today()
+    data_contratacao = funcionario.created_at.date() if funcionario.created_at else hoje
+    delta_dias = (hoje - data_contratacao).days
+    meses_totais = int(delta_dias / 30.44)
+
+    # Férias: ciclo aquisitivo de 12 meses (reinicia a cada período completo)
+    meses_aquisitivos = meses_totais % 12
+    if meses_aquisitivos == 0 and meses_totais >= 12:
+        meses_aquisitivos = 12  # Ciclo completo acumulado
+
+    # 13º salário: acumula apenas nos meses do ano corrente
+    inicio_periodo_13 = max(data_contratacao, date(hoje.year, 1, 1))
+    meses_no_ano = int((hoje - inicio_periodo_13).days / 30.44)
+
+    # Garantir ao menos 1 mês para quem foi contratado há poucos dias
+    if delta_dias >= 1 and meses_aquisitivos == 0:
+        meses_aquisitivos = 1
+    if delta_dias >= 1 and meses_no_ano == 0:
+        meses_no_ano = 1
+
+    # Provisão de férias = salário/12 × meses do ciclo aquisitivo
+    if cargo.gera_ferias:
+        prov_ferias = (salario / 12 * meses_aquisitivos).quantize(Decimal("0.01"))
+        prov_terco = (prov_ferias / 3).quantize(Decimal("0.01"))
+    else:
+        prov_ferias = Decimal("0.00")
+        prov_terco = Decimal("0.00")
+
+    # Provisão de 13º = salário/12 × meses no ano corrente
+    if cargo.gera_decimo_terceiro:
+        prov_13 = (salario / 12 * meses_no_ano).quantize(Decimal("0.01"))
+    else:
+        prov_13 = Decimal("0.00")
+
     total = prov_ferias + prov_terco + prov_13
-    
+
     return ProvisoesResponse(
         funcionario_id=funcionario.id,
         funcionario_nome=funcionario.nome,
