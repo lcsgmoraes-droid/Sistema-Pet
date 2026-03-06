@@ -40,7 +40,7 @@ interface ExtratoCashback {
   transacoes: {
     id: number;
     amount: number;
-    tx_type: string;      // 'credit' | 'debit' | 'expired'
+    tx_type: string; // 'credit' | 'debit' | 'expired'
     source_type: string;
     description: string | null;
     created_at: string | null;
@@ -298,7 +298,13 @@ function SecaoCarimbos({ carimbos }: { carimbos: Beneficios["carimbos"] }) {
   );
 }
 
-function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: number }) {
+function SecaoCashback({
+  saldo,
+  customerId,
+}: {
+  saldo: number;
+  customerId?: number;
+}) {
   const [modalAberto, setModalAberto] = useState(false);
   const [extrato, setExtrato] = useState<ExtratoCashback | null>(null);
   const [sugestao, setSugestao] = useState<SugestaoCashback | null>(null);
@@ -323,7 +329,8 @@ function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: numb
   }, [extrato]);
 
   const iconeTransacao = (tx_type: string) => {
-    if (tx_type === "credit") return { nome: "arrow-down-circle", cor: CORES.sucesso };
+    if (tx_type === "credit")
+      return { nome: "arrow-down-circle", cor: CORES.sucesso };
     if (tx_type === "expired") return { nome: "time-outline", cor: CORES.erro };
     return { nome: "arrow-up-circle", cor: "#F59E0B" }; // debit
   };
@@ -375,7 +382,9 @@ function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: numb
 
             {/* Saldo */}
             <View style={styles.extratoSaldoBox}>
-              <Text style={styles.extratoSaldoLabel}>Saldo dispon\u00edvel</Text>
+              <Text style={styles.extratoSaldoLabel}>
+                Saldo dispon\u00edvel
+              </Text>
               <Text style={styles.extratoSaldoValor}>
                 R$ {brl(extrato?.saldo_atual ?? saldo)}
               </Text>
@@ -421,7 +430,10 @@ function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: numb
                 style={{ marginVertical: ESPACO.lg }}
               />
             ) : extrato && extrato.transacoes.length > 0 ? (
-              <ScrollView style={styles.extratoLista} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.extratoLista}
+                showsVerticalScrollIndicator={false}
+              >
                 {extrato.transacoes.map((tx) => {
                   const icone = iconeTransacao(tx.tx_type);
                   const dataF = tx.created_at
@@ -440,11 +452,21 @@ function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: numb
                           {tx.description ?? labelTransacao(tx.tx_type)}
                         </Text>
                         <Text style={styles.extratoItemData}>{dataF}</Text>
-                        {tx.expires_at && tx.tx_type === "credit" && !tx.expired && (
-                          <Text style={[styles.extratoItemData, { color: "#F59E0B" }]}>
-                            Expira: {new Date(tx.expires_at).toLocaleDateString("pt-BR")}
-                          </Text>
-                        )}
+                        {tx.expires_at &&
+                          tx.tx_type === "credit" &&
+                          !tx.expired && (
+                            <Text
+                              style={[
+                                styles.extratoItemData,
+                                { color: "#F59E0B" },
+                              ]}
+                            >
+                              Expira:{" "}
+                              {new Date(tx.expires_at).toLocaleDateString(
+                                "pt-BR",
+                              )}
+                            </Text>
+                          )}
                       </View>
                       <Text
                         style={[
