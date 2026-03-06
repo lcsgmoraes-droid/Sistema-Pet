@@ -461,6 +461,11 @@ export default function Campanhas() {
   const [rankingConfigLoading, setRankingConfigLoading] = useState(false);
   const [rankingConfigSalvando, setRankingConfigSalvando] = useState(false);
 
+  // Config de horários do scheduler
+  const [schedulerConfig, setSchedulerConfig] = useState(null);
+  const [schedulerConfigLoading, setSchedulerConfigLoading] = useState(false);
+  const [schedulerConfigSalvando, setSchedulerConfigSalvando] = useState(false);
+
   const carregarDashboard = useCallback(async () => {
     setLoadingDashboard(true);
     try {
@@ -1078,6 +1083,30 @@ export default function Campanhas() {
     }
   };
 
+  const carregarSchedulerConfig = useCallback(async () => {
+    setSchedulerConfigLoading(true);
+    try {
+      const res = await api.get("/campanhas/config/horarios");
+      setSchedulerConfig(res.data);
+    } catch (e) {
+      console.error("Erro ao carregar config de horários:", e);
+    } finally {
+      setSchedulerConfigLoading(false);
+    }
+  }, []);
+
+  const salvarSchedulerConfig = async () => {
+    setSchedulerConfigSalvando(true);
+    try {
+      await api.put("/campanhas/config/horarios", schedulerConfig);
+      alert("Horários de envio salvos com sucesso!");
+    } catch (e) {
+      alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
+    } finally {
+      setSchedulerConfigSalvando(false);
+    }
+  };
+
   useEffect(() => {
     carregarDashboard();
   }, [carregarDashboard]);
@@ -1090,6 +1119,9 @@ export default function Campanhas() {
       carregarRankingConfig();
     }
   }, [aba, carregarRanking, carregarRankingConfig]);
+  useEffect(() => {
+    if (aba === "config") carregarSchedulerConfig();
+  }, [aba, carregarSchedulerConfig]);
   useEffect(() => {
     if (aba === "destaque") carregarDestaque();
   }, [aba, carregarDestaque]);
@@ -1843,6 +1875,7 @@ export default function Campanhas() {
           { id: "unificacao", label: "🔗 Unificação" },
           { id: "relatorios", label: "📈 Relatórios" },
           { id: "gestor", label: "🛠️ Gestor" },
+          { id: "config", label: "⚙️ Configurações" },
         ].map((t) => (
           <button
             key={t.id}
@@ -5408,6 +5441,228 @@ export default function Campanhas() {
                 </div>
               </>
             )}
+        </div>
+      )}
+
+      {/* ── ABA: CONFIGURAÇÕES ── */}
+      {aba === "config" && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="bg-white rounded-xl border shadow-sm p-6">
+            <h2 className="font-semibold text-gray-800 mb-1">
+              ⚙️ Configurações de Envio
+            </h2>
+            <p className="text-xs text-gray-500">
+              Defina os horários em que o sistema envia as mensagens automáticas
+              de cada campanha.
+            </p>
+          </div>
+
+          {/* Loading */}
+          {schedulerConfigLoading && (
+            <div className="text-center py-12 text-gray-400">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
+              <p className="text-sm">Carregando configurações...</p>
+            </div>
+          )}
+
+          {/* Formulário */}
+          {schedulerConfig && !schedulerConfigLoading && (
+            <div className="space-y-4">
+              {/* Card: Aniversários */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-2xl">🎂</span>
+                  <div>
+                    <h3 className="font-medium text-gray-800">
+                      Mensagens de Aniversário
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Enviadas todos os dias para aniversariantes do dia
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-gray-600 w-44">
+                    Hora de envio:
+                  </label>
+                  <select
+                    value={schedulerConfig.birthday_send_hour}
+                    onChange={(e) =>
+                      setSchedulerConfig({
+                        ...schedulerConfig,
+                        birthday_send_hour: Number(e.target.value),
+                      })
+                    }
+                    className="border rounded-lg px-3 py-2 text-sm"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>
+                        {String(i).padStart(2, "0")}:00
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Card: Inatividade */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-2xl">😴</span>
+                  <div>
+                    <h3 className="font-medium text-gray-800">
+                      Mensagens de Reativação (Clientes Inativos)
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Enviadas uma vez por semana para clientes sem compras há
+                      muito tempo
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-600 w-44">
+                      Dia da semana:
+                    </label>
+                    <select
+                      value={schedulerConfig.inactivity_day_of_week}
+                      onChange={(e) =>
+                        setSchedulerConfig({
+                          ...schedulerConfig,
+                          inactivity_day_of_week: e.target.value,
+                        })
+                      }
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="mon">Segunda-feira</option>
+                      <option value="tue">Terça-feira</option>
+                      <option value="wed">Quarta-feira</option>
+                      <option value="thu">Quinta-feira</option>
+                      <option value="fri">Sexta-feira</option>
+                      <option value="sat">Sábado</option>
+                      <option value="sun">Domingo</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-600 w-44">
+                      Hora de envio:
+                    </label>
+                    <select
+                      value={schedulerConfig.inactivity_send_hour}
+                      onChange={(e) =>
+                        setSchedulerConfig({
+                          ...schedulerConfig,
+                          inactivity_send_hour: Number(e.target.value),
+                        })
+                      }
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>
+                          {String(i).padStart(2, "0")}:00
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card: Ranking Mensal */}
+              <div className="bg-white rounded-xl border shadow-sm p-6">
+                <div className="flex items-center gap-3 mb-5">
+                  <span className="text-2xl">🏆</span>
+                  <div>
+                    <h3 className="font-medium text-gray-800">
+                      Recálculo de Ranking Mensal
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Recalcula pontuações e níveis dos clientes uma vez por mês
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-600 w-44">
+                      Dia do mês:
+                    </label>
+                    <select
+                      value={schedulerConfig.ranking_send_day}
+                      onChange={(e) =>
+                        setSchedulerConfig({
+                          ...schedulerConfig,
+                          ranking_send_day: Number(e.target.value),
+                        })
+                      }
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {Array.from({ length: 28 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          Dia {i + 1}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-gray-600 w-44">
+                      Hora:
+                    </label>
+                    <select
+                      value={schedulerConfig.ranking_send_hour}
+                      onChange={(e) =>
+                        setSchedulerConfig({
+                          ...schedulerConfig,
+                          ranking_send_hour: Number(e.target.value),
+                        })
+                      }
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i}>
+                          {String(i).padStart(2, "0")}:00
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botão salvar */}
+              <div className="flex justify-end">
+                <button
+                  onClick={salvarSchedulerConfig}
+                  disabled={schedulerConfigSalvando}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {schedulerConfigSalvando
+                    ? "Salvando..."
+                    : "💾 Salvar Configurações"}
+                </button>
+              </div>
+
+              {/* Nota informativa */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-xs text-amber-700">
+                  ⚠️ <strong>Atenção:</strong> Os horários aqui salvos são
+                  registrados no sistema. O scheduler usará os novos valores a
+                  partir do próximo reinício do servidor. Para aplicar
+                  imediatamente em produção, avise o suporte técnico.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Estado vazio */}
+          {!schedulerConfig && !schedulerConfigLoading && (
+            <div className="bg-white rounded-xl border shadow-sm p-6 text-center">
+              <p className="text-sm text-gray-500 mb-2">
+                Não foi possível carregar as configurações.
+              </p>
+              <p className="text-xs text-gray-400">
+                Certifique-se de que as campanhas padrão foram inicializadas
+                (botão &quot;Inicializar Campanhas&quot; na aba Campanhas).
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

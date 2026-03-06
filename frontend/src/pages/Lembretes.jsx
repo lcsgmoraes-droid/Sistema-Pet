@@ -461,8 +461,14 @@ export default function Lembretes() {
             {alertasCampanhas.proximos_eventos?.dias_ate_fim_mes != null && (
               <div
                 style={{
-                  background: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "#fefce8" : "#f0fdf4",
-                  border: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "1px solid #fde047" : "1px solid #86efac",
+                  background:
+                    alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3
+                      ? "#fefce8"
+                      : "#f0fdf4",
+                  border:
+                    alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3
+                      ? "1px solid #fde047"
+                      : "1px solid #86efac",
                   borderRadius: "8px",
                   padding: "10px 14px",
                   minWidth: "160px",
@@ -471,7 +477,10 @@ export default function Lembretes() {
                 <p
                   style={{
                     fontWeight: "700",
-                    color: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "#a16207" : "#15803d",
+                    color:
+                      alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3
+                        ? "#a16207"
+                        : "#15803d",
                     fontSize: "22px",
                     margin: 0,
                   }}

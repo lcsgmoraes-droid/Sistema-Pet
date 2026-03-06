@@ -1541,6 +1541,61 @@ def salvar_ranking_config(
 
 
 # ---------------------------------------------------------------------------
+# Configuração global de horários do scheduler
+# ---------------------------------------------------------------------------
+
+class SchedulerConfigBody(BaseModel):
+    birthday_send_hour: int = 8          # hora de envio das mensagens de aniversário (0-23)
+    inactivity_send_hour: int = 9        # hora de envio das mensagens de inatividade (0-23)
+    inactivity_day_of_week: str = "mon"  # dia da semana: mon/tue/wed/thu/fri/sat/sun
+    ranking_send_day: int = 1            # dia do mês para recálculo do ranking (1-28)
+    ranking_send_hour: int = 6           # hora do recálculo de ranking (0-23)
+
+
+@router.get("/config/horarios")
+def get_scheduler_config(
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Retorna as configurações de horário do scheduler para o tenant."""
+    _, tenant_id = user_and_tenant
+    campanha = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.campaign_type == CampaignTypeEnum.birthday_customer,
+        )
+        .first()
+    )
+    params = campanha.params if campanha else {}
+    defaults = SchedulerConfigBody().model_dump()
+    return {k: params.get(k, v) for k, v in defaults.items()}
+
+
+@router.put("/config/horarios")
+def salvar_scheduler_config(
+    body: SchedulerConfigBody,
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Salva as configurações de horário do scheduler para o tenant."""
+    _, tenant_id = user_and_tenant
+    campanha = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.campaign_type == CampaignTypeEnum.birthday_customer,
+        )
+        .first()
+    )
+    if not campanha:
+        raise HTTPException(status_code=404, detail="Campanha de aniversário não encontrada. Execute o seed primeiro.")
+    campanha.params = {**(campanha.params or {}), **body.model_dump()}
+    db.commit()
+    return {"ok": True, "params": campanha.params}
+
+
+# ---------------------------------------------------------------------------
 # Ranking — forçar recálculo
 # ---------------------------------------------------------------------------
 
