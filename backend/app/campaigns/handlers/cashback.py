@@ -28,6 +28,7 @@ Nunca usar campo de saldo materializado como fonte da verdade.
 """
 
 import logging
+from datetime import timedelta
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -162,6 +163,13 @@ class CashbackHandler:
 
         canal_label = f"+{bonus_pct}% canal {canal}" if bonus_pct > 0 else f"canal {canal}"
 
+        # Prazo de validade do cashback (em dias, configurável em campaign.params)
+        valid_days = int(params.get("cashback_valid_days") or 0)
+        expires_at = None
+        if valid_days > 0:
+            from datetime import datetime, timezone
+            expires_at = datetime.now(timezone.utc) + timedelta(days=valid_days)
+
         # Registra transação de cashback (ledger append-only)
         db.add(CashbackTransaction(
             tenant_id=campaign.tenant_id,
@@ -170,6 +178,8 @@ class CashbackHandler:
             source_type=CashbackSourceTypeEnum.campaign,
             source_id=None,  # será preenchido após flush da execution
             description=f"Cashback {pct_total}% na venda #{venda_id} (rank {rank.value}, {canal_label})",
+            expires_at=expires_at,
+            tx_type="credit",
         ))
 
         # Registra execution

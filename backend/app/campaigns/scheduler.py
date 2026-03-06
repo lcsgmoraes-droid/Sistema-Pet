@@ -113,6 +113,15 @@ class CampaignScheduler:
             replace_existing=True,
         )
 
+        # Job 8: Expiração de cashback + alertas (diário às 07:00)
+        self.scheduler.add_job(
+            func=self._cashback_expiration_check,
+            trigger=CronTrigger(hour=7, minute=0),
+            id="campaign_cashback_expiration",
+            name="Campanhas: Expirar Cashback + Alertas",
+            replace_existing=True,
+        )
+
         logger.info("[CampaignScheduler] Jobs registrados:")
         logger.info("   - daily_birthday_check: 08:00")
         logger.info("   - weekly_inactivity_check: toda segunda às 09:00")
@@ -121,6 +130,7 @@ class CampaignScheduler:
         logger.info("   - campaign_notification_tick: a cada 5 min")
         logger.info("   - auto_drawings: 10:00 diário")
         logger.info("   - destaque_mensal: dia 1 às 08:00")
+        logger.info("   - cashback_expiration: 07:00 diário")
 
     def start(self) -> None:
         if not self.scheduler.running:
@@ -451,6 +461,164 @@ class CampaignScheduler:
                 "[CampaignScheduler] Erro ao publicar '%s': %s", event_type, exc
             )
             db.rollback()
+        finally:
+            db.close()
+
+    def _cashback_expiration_check(self) -> None:
+        """
+        Job diário (07:00): processa expiração de cashback em dois passos:
+        1. Insere lançamentos negativos para cashback que expirou HOJE (liquida saldo)
+        2. Envia alerta (e-mail ou push) para clientes com cashback expirando nos
+           próximos X dias (configurável via scheduler_config / alerta_dias_expiracao_cashback)
+        """
+        from datetime import timedelta, timezone
+        from decimal import Decimal
+        from sqlalchemy import and_, or_
+        from app.campaigns.models import (
+            CashbackTransaction, CashbackSourceTypeEnum,
+            Campaign, CampaignTypeEnum, NotificationQueue,
+            NotificationChannelEnum, NotificationStatusEnum,
+        )
+        from app.campaigns.notification_service import enqueue_email
+        from app.models import Cliente, Tenant
+
+        db = SessionLocal()
+        try:
+            now_utc = datetime.now(timezone.utc)
+            today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = today_start + timedelta(days=1)
+
+            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+
+            for tenant in tenants:
+                try:
+                    # Lê configuração: quantos dias antes de alertar
+                    cashback_campaign = (
+                        db.query(Campaign)
+                        .filter(
+                            Campaign.tenant_id == tenant.id,
+                            Campaign.campaign_type == CampaignTypeEnum.cashback,
+                        )
+                        .first()
+                    )
+                    params = cashback_campaign.params if cashback_campaign else {}
+                    alerta_dias = int(params.get("cashback_alerta_dias", 7))
+
+                    # --- PASSO 1: Expirar cashback vencido hoje ---
+                    expirados_hoje = (
+                        db.query(CashbackTransaction)
+                        .filter(
+                            CashbackTransaction.tenant_id == tenant.id,
+                            CashbackTransaction.tx_type == "credit",
+                            CashbackTransaction.expires_at >= today_start,
+                            CashbackTransaction.expires_at < today_end,
+                        )
+                        .all()
+                    )
+                    for tx in expirados_hoje:
+                        # Verifica se já existe um lançamento de expiração para este crédito
+                        ja_expirou = (
+                            db.query(CashbackTransaction.id)
+                            .filter(
+                                CashbackTransaction.tenant_id == tenant.id,
+                                CashbackTransaction.customer_id == tx.customer_id,
+                                CashbackTransaction.source_type == CashbackSourceTypeEnum.expiration,
+                                CashbackTransaction.source_id == tx.id,
+                            )
+                            .first()
+                        )
+                        if ja_expirou:
+                            continue
+                        # Insere lançamento negativo (estorna o crédito expirado)
+                        db.add(CashbackTransaction(
+                            tenant_id=tenant.id,
+                            customer_id=tx.customer_id,
+                            amount=-tx.amount,
+                            source_type=CashbackSourceTypeEnum.expiration,
+                            source_id=tx.id,
+                            description=f"Expiração do cashback #CBTX-{tx.id} (R$ {float(tx.amount):.2f})",
+                            tx_type="expired",
+                        ))
+                        # Notifica o cliente
+                        cliente = db.query(Cliente).filter(Cliente.id == tx.customer_id).first()
+                        if cliente and cliente.email:
+                            enqueue_email(
+                                db,
+                                tenant_id=tenant.id,
+                                customer_id=tx.customer_id,
+                                subject="Seu cashback expirou hoje 😢",
+                                body=(
+                                    f"Olá, {cliente.nome}! Infelizmente R$ {float(tx.amount):.2f} "
+                                    f"de cashback venceu hoje sem ser utilizado. "
+                                    f"Continue comprando para acumular novos créditos!"
+                                ),
+                                email_address=cliente.email,
+                                idempotency_key=f"cashback_expired:{tenant.id}:{tx.id}:email",
+                            )
+
+                    # --- PASSO 2: Alertar quem expira em X dias ---
+                    alerta_limite = now_utc + timedelta(days=alerta_dias)
+                    expirando_em_breve = (
+                        db.query(CashbackTransaction)
+                        .filter(
+                            CashbackTransaction.tenant_id == tenant.id,
+                            CashbackTransaction.tx_type == "credit",
+                            CashbackTransaction.expires_at > today_end,   # ainda não expirou hoje
+                            CashbackTransaction.expires_at <= alerta_limite,
+                        )
+                        .all()
+                    )
+                    # Agrupa por cliente para não mandar múltiplos e-mails no mesmo dia
+                    alertados: set = set()
+                    for tx in expirando_em_breve:
+                        if tx.customer_id in alertados:
+                            continue
+                        # Verifica idempotência: já enviou alerta hoje?
+                        idem_key = f"cashback_alerta:{tenant.id}:{tx.customer_id}:{today_start.date().isoformat()}"
+                        ja_alertou = (
+                            db.query(NotificationQueue.id)
+                            .filter(NotificationQueue.idempotency_key == idem_key)
+                            .first()
+                        )
+                        if ja_alertou:
+                            alertados.add(tx.customer_id)
+                            continue
+                        cliente = db.query(Cliente).filter(Cliente.id == tx.customer_id).first()
+                        if not cliente:
+                            continue
+                        dias_rest = max(0, (tx.expires_at - now_utc).days)
+                        if cliente.email:
+                            enqueue_email(
+                                db,
+                                tenant_id=tenant.id,
+                                customer_id=tx.customer_id,
+                                subject=f"Seu cashback expira em {dias_rest} dia(s)! ⏰",
+                                body=(
+                                    f"Olá, {cliente.nome}! Você tem R$ {float(tx.amount):.2f} "
+                                    f"de cashback que vai expirar em {dias_rest} dia(s). "
+                                    f"Venha fazer uma compra e não perca seus créditos!"
+                                ),
+                                email_address=cliente.email,
+                                idempotency_key=idem_key,
+                            )
+                        alertados.add(tx.customer_id)
+                        logger.info(
+                            "[CashbackExpiration] Alerta enviado: tenant=%s customer=%d dias=%d",
+                            tenant.id, tx.customer_id, dias_rest,
+                        )
+
+                    db.commit()
+                    logger.info(
+                        "[CashbackExpiration] tenant=%s: %d expirado(s), %d alertado(s)",
+                        tenant.id, len(expirados_hoje), len(alertados),
+                    )
+
+                except Exception as tenant_exc:
+                    logger.exception("[CashbackExpiration] Erro no tenant %s: %s", tenant.id, tenant_exc)
+                    db.rollback()
+
+        except Exception as exc:
+            logger.exception("[CashbackExpiration] Erro geral: %s", exc)
         finally:
             db.close()
 

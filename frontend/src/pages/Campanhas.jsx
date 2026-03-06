@@ -1527,6 +1527,26 @@ export default function Campanhas() {
               ))}
             </div>
           </div>
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-gray-700 mb-2">⏰ Validade e Alertas</p>
+            <div className="grid grid-cols-2 gap-3">
+              <CampanhaField
+                label="Validade do cashback (dias, 0 = sem prazo)"
+                id="p-cashback_valid_days"
+                value={num("cashback_valid_days")}
+                onChange={(e) => set("cashback_valid_days", Number.parseInt(e.target.value) || 0)}
+              />
+              <CampanhaField
+                label="Alertar cliente X dias antes de expirar"
+                id="p-cashback_alerta_dias"
+                value={num("cashback_alerta_dias") || 7}
+                onChange={(e) => set("cashback_alerta_dias", Number.parseInt(e.target.value) || 7)}
+              />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Se validade = 0, o cashback nunca expira. O alerta envia e-mail ou push ao cliente quando faltar X dias para o vencimento.
+            </p>
+          </div>
         </div>
       );
     }

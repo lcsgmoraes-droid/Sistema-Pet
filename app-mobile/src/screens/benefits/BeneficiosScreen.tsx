@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Clipboard,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -32,6 +33,32 @@ interface RankingThresholds {
   platinum_min_spent: number;
   platinum_min_purchases: number;
   platinum_min_months: number;
+}
+
+interface ExtratoCashback {
+  saldo_atual: number;
+  transacoes: {
+    id: number;
+    amount: number;
+    tx_type: string;      // 'credit' | 'debit' | 'expired'
+    source_type: string;
+    description: string | null;
+    created_at: string | null;
+    expires_at: string | null;
+    expired: boolean;
+  }[];
+}
+
+interface SugestaoCashback {
+  saldo_disponivel: number;
+  ticket_sugerido: number;
+  valor_com_cashback: number;
+  economia: number;
+  proximo_expirando: {
+    amount: number;
+    expires_at: string;
+    dias_restantes: number;
+  } | null;
 }
 
 interface Beneficios {
@@ -271,18 +298,187 @@ function SecaoCarimbos({ carimbos }: { carimbos: Beneficios["carimbos"] }) {
   );
 }
 
-function SecaoCashback({ saldo }: { saldo: number }) {
+function SecaoCashback({ saldo, customerId }: { saldo: number; customerId?: number }) {
+  const [modalAberto, setModalAberto] = useState(false);
+  const [extrato, setExtrato] = useState<ExtratoCashback | null>(null);
+  const [sugestao, setSugestao] = useState<SugestaoCashback | null>(null);
+  const [loadingExtrato, setLoadingExtrato] = useState(false);
+
+  const abrirExtrato = useCallback(async () => {
+    setModalAberto(true);
+    if (extrato) return; // já carregado
+    setLoadingExtrato(true);
+    try {
+      const [extRes, sugRes] = await Promise.all([
+        api.get<ExtratoCashback>("/ecommerce/auth/cashback/extrato"),
+        api.get<SugestaoCashback>("/ecommerce/auth/cashback/sugestao"),
+      ]);
+      setExtrato(extRes.data);
+      setSugestao(sugRes.data);
+    } catch {
+      // silencia, modal mostra fallback
+    } finally {
+      setLoadingExtrato(false);
+    }
+  }, [extrato]);
+
+  const iconeTransacao = (tx_type: string) => {
+    if (tx_type === "credit") return { nome: "arrow-down-circle", cor: CORES.sucesso };
+    if (tx_type === "expired") return { nome: "time-outline", cor: CORES.erro };
+    return { nome: "arrow-up-circle", cor: "#F59E0B" }; // debit
+  };
+
+  const labelTransacao = (tx_type: string) => {
+    if (tx_type === "credit") return "Entrada";
+    if (tx_type === "expired") return "Expirado";
+    return "Sa\u00edda";
+  };
+
   return (
-    <View style={[styles.secao, styles.secaoCashback]}>
-      <View style={styles.secaoTitulo}>
-        <Ionicons name="cash-outline" size={20} color={CORES.sucesso} />
-        <Text style={styles.secaoTituloTexto}>Saldo de Cashback</Text>
-      </View>
-      <Text style={styles.cashbackValor}>R$ {brl(saldo)}</Text>
-      <Text style={styles.cashbackInfo}>
-        Use ao fazer uma compra presencial no PetShop ou no checkout do app
-      </Text>
-    </View>
+    <>
+      <TouchableOpacity
+        style={[styles.secao, styles.secaoCashback]}
+        onPress={abrirExtrato}
+        activeOpacity={0.75}
+      >
+        <View style={styles.secaoTitulo}>
+          <Ionicons name="cash-outline" size={20} color={CORES.sucesso} />
+          <Text style={styles.secaoTituloTexto}>Saldo de Cashback</Text>
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={CORES.textoSecundario}
+            style={{ marginLeft: "auto" }}
+          />
+        </View>
+        <Text style={styles.cashbackValor}>R$ {brl(saldo)}</Text>
+        <Text style={styles.cashbackInfo}>
+          Toque para ver extrato e vantagens
+        </Text>
+      </TouchableOpacity>
+
+      <Modal
+        visible={modalAberto}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalAberto(false)}
+      >
+        <View style={styles.extratoOverlay}>
+          <View style={styles.extratoContainer}>
+            {/* Cabeçalho */}
+            <View style={styles.extratoHeader}>
+              <Text style={styles.extratoTitulo}>Cashback</Text>
+              <TouchableOpacity onPress={() => setModalAberto(false)}>
+                <Ionicons name="close" size={24} color={CORES.texto} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Saldo */}
+            <View style={styles.extratoSaldoBox}>
+              <Text style={styles.extratoSaldoLabel}>Saldo dispon\u00edvel</Text>
+              <Text style={styles.extratoSaldoValor}>
+                R$ {brl(extrato?.saldo_atual ?? saldo)}
+              </Text>
+            </View>
+
+            {/* Sugest\u00e3o inteligente */}
+            {sugestao && sugestao.economia > 0 && (
+              <View style={styles.extratoSugestao}>
+                <Ionicons name="bulb-outline" size={18} color="#F59E0B" />
+                <Text style={styles.extratoSugestaoTexto}>
+                  Numa pr\u00f3xima compra de{" "}
+                  <Text style={{ fontWeight: "700" }}>
+                    R$ {brl(sugestao.ticket_sugerido)}
+                  </Text>
+                  , voc\u00ea pagaria apenas{" "}
+                  <Text style={{ fontWeight: "700", color: CORES.sucesso }}>
+                    R$ {brl(sugestao.valor_com_cashback)}
+                  </Text>{" "}
+                  usando seu cashback!
+                </Text>
+              </View>
+            )}
+
+            {/* Alerta de expira\u00e7\u00e3o */}
+            {sugestao?.proximo_expirando && (
+              <View style={styles.extratoAlertaExpira}>
+                <Ionicons name="warning-outline" size={16} color={CORES.erro} />
+                <Text style={styles.extratoAlertaTexto}>
+                  R$ {brl(sugestao.proximo_expirando.amount)} expiram em{" "}
+                  {sugestao.proximo_expirando.dias_restantes === 0
+                    ? "hoje!"
+                    : `${sugestao.proximo_expirando.dias_restantes} dia(s)`}
+                </Text>
+              </View>
+            )}
+
+            {/* Extrato */}
+            <Text style={styles.extratoSubtitulo}>Movimenta\u00e7\u00f5es</Text>
+
+            {loadingExtrato ? (
+              <ActivityIndicator
+                color={CORES.primario}
+                style={{ marginVertical: ESPACO.lg }}
+              />
+            ) : extrato && extrato.transacoes.length > 0 ? (
+              <ScrollView style={styles.extratoLista} showsVerticalScrollIndicator={false}>
+                {extrato.transacoes.map((tx) => {
+                  const icone = iconeTransacao(tx.tx_type);
+                  const dataF = tx.created_at
+                    ? new Date(tx.created_at).toLocaleDateString("pt-BR")
+                    : "";
+                  return (
+                    <View key={tx.id} style={styles.extratoItem}>
+                      <Ionicons
+                        name={icone.nome as any}
+                        size={22}
+                        color={icone.cor}
+                        style={{ marginRight: ESPACO.sm }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.extratoItemDesc} numberOfLines={2}>
+                          {tx.description ?? labelTransacao(tx.tx_type)}
+                        </Text>
+                        <Text style={styles.extratoItemData}>{dataF}</Text>
+                        {tx.expires_at && tx.tx_type === "credit" && !tx.expired && (
+                          <Text style={[styles.extratoItemData, { color: "#F59E0B" }]}>
+                            Expira: {new Date(tx.expires_at).toLocaleDateString("pt-BR")}
+                          </Text>
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.extratoItemValor,
+                          {
+                            color:
+                              tx.tx_type === "credit"
+                                ? CORES.sucesso
+                                : CORES.erro,
+                          },
+                        ]}
+                      >
+                        {tx.amount > 0 ? "+" : ""}R$ {brl(Math.abs(tx.amount))}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <Text style={[styles.vazioTexto, { marginVertical: ESPACO.md }]}>
+                Nenhuma movimenta\u00e7\u00e3o ainda
+              </Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.extratoFechar}
+              onPress={() => setModalAberto(false)}
+            >
+              <Text style={styles.extratoFecharTexto}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -735,6 +931,123 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cashbackInfo: { fontSize: FONTE.pequena, color: CORES.textoSecundario },
+
+  // Modal Extrato Cashback
+  extratoOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  extratoContainer: {
+    backgroundColor: CORES.superficie,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: ESPACO.lg,
+    maxHeight: "85%",
+  },
+  extratoHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: ESPACO.md,
+  },
+  extratoTitulo: {
+    fontSize: FONTE.grande,
+    fontWeight: "800",
+    color: CORES.texto,
+  },
+  extratoSaldoBox: {
+    backgroundColor: CORES.primarioClaro,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    alignItems: "center",
+    marginBottom: ESPACO.md,
+  },
+  extratoSaldoLabel: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    marginBottom: 4,
+  },
+  extratoSaldoValor: {
+    fontSize: 36,
+    fontWeight: "900",
+    color: CORES.sucesso,
+  },
+  extratoSugestao: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFBEB",
+    borderRadius: RAIO.sm,
+    padding: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+    gap: ESPACO.xs,
+  },
+  extratoSugestaoTexto: {
+    flex: 1,
+    fontSize: FONTE.pequena,
+    color: CORES.texto,
+    lineHeight: 18,
+  },
+  extratoAlertaExpira: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    borderRadius: RAIO.sm,
+    padding: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+    gap: ESPACO.xs,
+  },
+  extratoAlertaTexto: {
+    fontSize: FONTE.pequena,
+    color: CORES.erro,
+    fontWeight: "600",
+  },
+  extratoSubtitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: "700",
+    color: CORES.texto,
+    marginBottom: ESPACO.sm,
+    marginTop: ESPACO.xs,
+  },
+  extratoLista: {
+    maxHeight: 280,
+  },
+  extratoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: ESPACO.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.borda,
+  },
+  extratoItemDesc: {
+    fontSize: FONTE.pequena,
+    color: CORES.texto,
+    flex: 1,
+  },
+  extratoItemData: {
+    fontSize: FONTE.pequena - 1,
+    color: CORES.textoSecundario,
+    marginTop: 2,
+  },
+  extratoItemValor: {
+    fontSize: FONTE.normal,
+    fontWeight: "700",
+    marginLeft: ESPACO.sm,
+    minWidth: 80,
+    textAlign: "right",
+  },
+  extratoFechar: {
+    backgroundColor: CORES.primario,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    alignItems: "center",
+    marginTop: ESPACO.md,
+  },
+  extratoFecharTexto: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: FONTE.normal,
+  },
 
   // Cupons
   cupomCard: {

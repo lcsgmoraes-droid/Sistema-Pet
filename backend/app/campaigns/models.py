@@ -128,6 +128,8 @@ class CashbackSourceTypeEnum(str, enum.Enum):
     campaign = "campaign"
     manual = "manual"
     reversal = "reversal"
+    expiration = "expiration"   # lançamento negativo ao expirar
+    redemption = "redemption"   # lançamento negativo ao resgatar no caixa
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +402,10 @@ class CashbackTransaction(Base):
     )
     source_id = Column(BigInteger, nullable=True)  # campaign_execution_id ou outro
     description = Column(String(500), nullable=True)
+    # expires_at: prazo de validade do crédito (apenas em lançamentos positivos)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    # tx_type: 'credit' | 'debit' | 'expired' — para o extrato
+    tx_type = Column(String(20), nullable=False, server_default="credit")
     created_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -660,12 +660,23 @@ def saldo_cliente(
     """
     _, tenant_id = user_and_tenant
 
-    # Saldo cashback = soma de todos os lançamentos (positivos e negativos)
+    # Saldo cashback = soma de todos os lançamentos.
+    # Lançamentos com expires_at no passado e tx_type='credit' são ignorados
+    # (o job de expiração já insere um lançamento negativo para eles,
+    # mas enquanto isso não aconteceu, excluímos manualmente da soma).
+    now_utc = datetime.now(timezone.utc)
     saldo_raw = (
         db.query(sqlfunc.sum(CashbackTransaction.amount))
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
+            # Inclui lançamentos sem prazo OU com prazo ainda no futuro
+            # OU lançamentos negativos (debit/expired/reversal) — sempre contam
+            sqlfunc.or_(
+                CashbackTransaction.expires_at.is_(None),
+                CashbackTransaction.expires_at > now_utc,
+                CashbackTransaction.tx_type != "credit",
+            ),
         )
         .scalar()
     )
@@ -724,6 +735,164 @@ def saldo_cliente(
             }
             for c in cupons_ativos
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Cashback — extrato do cliente
+# ---------------------------------------------------------------------------
+
+@router.get("/clientes/{customer_id}/cashback/extrato")
+def extrato_cashback(
+    customer_id: int,
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Retorna o extrato completo de cashback do cliente:
+    créditos (entrada), débitos por resgate/expiração (saída), expirados.
+    Usado no app mobile na tela de Benefícios.
+    """
+    _, tenant_id = user_and_tenant
+    now_utc = datetime.now(timezone.utc)
+
+    txs = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+        )
+        .order_by(CashbackTransaction.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    # Saldo atual (reaproveitando a mesma lógica do /saldo)
+    saldo_raw = (
+        db.query(sqlfunc.sum(CashbackTransaction.amount))
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            sqlfunc.or_(
+                CashbackTransaction.expires_at.is_(None),
+                CashbackTransaction.expires_at > now_utc,
+                CashbackTransaction.tx_type != "credit",
+            ),
+        )
+        .scalar()
+    )
+    saldo_atual = float(saldo_raw or 0)
+
+    items = []
+    for t in txs:
+        # Determina se este crédito específico está expirado
+        is_expired_credit = (
+            t.tx_type == "credit"
+            and t.expires_at is not None
+            and t.expires_at <= now_utc
+        )
+        items.append({
+            "id": t.id,
+            "amount": float(t.amount),
+            "tx_type": t.tx_type,   # 'credit' | 'debit' | 'expired'
+            "source_type": t.source_type.value,
+            "description": t.description,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+            "expired": is_expired_credit,
+        })
+
+    return {
+        "customer_id": customer_id,
+        "saldo_atual": saldo_atual,
+        "transacoes": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Cashback — sugestão de pedido inteligente
+# ---------------------------------------------------------------------------
+
+@router.get("/clientes/{customer_id}/cashback/sugestao")
+def sugestao_cashback(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Baseado no padrão de compra do cliente, sugere um valor de pedido mostrando
+    quanto ficaria após aplicar o saldo de cashback disponível.
+    """
+    _, tenant_id = user_and_tenant
+    now_utc = datetime.now(timezone.utc)
+
+    # Saldo disponível
+    saldo_raw = (
+        db.query(sqlfunc.sum(CashbackTransaction.amount))
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            sqlfunc.or_(
+                CashbackTransaction.expires_at.is_(None),
+                CashbackTransaction.expires_at > now_utc,
+                CashbackTransaction.tx_type != "credit",
+            ),
+        )
+        .scalar()
+    )
+    saldo = float(saldo_raw or 0)
+
+    # Ticket médio das últimas 10 compras (via cashback transactions de crédito)
+    ultimas_compras = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.tx_type == "credit",
+            CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
+        )
+        .order_by(CashbackTransaction.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    # Usa a descrição para extrair o valor original (cashback é % do valor)
+    # Alternativa: usar média dos valores de cashback como proxy
+    if ultimas_compras:
+        ticket_medio_cashback = sum(float(t.amount) for t in ultimas_compras) / len(ultimas_compras)
+        # Estimativa groossa: se o cashback médio é ~2%, ticket médio é ~50x
+        # Mas sem acesso direto às vendas, usamos o valor de cashback como referência
+        ticket_sugerido = round(ticket_medio_cashback * 50, 2)  # fallback heurístico
+    else:
+        ticket_sugerido = 100.0
+
+    valor_com_cashback = max(0.0, round(ticket_sugerido - saldo, 2))
+
+    # Próximo cashback que vai expirar
+    proximo_expirando = (
+        db.query(CashbackTransaction)
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == customer_id,
+            CashbackTransaction.tx_type == "credit",
+            CashbackTransaction.expires_at.isnot(None),
+            CashbackTransaction.expires_at > now_utc,
+        )
+        .order_by(CashbackTransaction.expires_at.asc())
+        .first()
+    )
+
+    return {
+        "saldo_disponivel": saldo,
+        "ticket_sugerido": ticket_sugerido,
+        "valor_com_cashback": valor_com_cashback,
+        "economia": min(saldo, ticket_sugerido),
+        "proximo_expirando": {
+            "amount": float(proximo_expirando.amount),
+            "expires_at": proximo_expirando.expires_at.isoformat(),
+            "dias_restantes": max(0, (proximo_expirando.expires_at - now_utc).days),
+        } if proximo_expirando else None,
     }
 
 
