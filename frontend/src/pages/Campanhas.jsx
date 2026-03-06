@@ -521,19 +521,10 @@ export default function Campanhas() {
   const carregarCampanhas = useCallback(async () => {
     setLoadingCampanhas(true);
     try {
+      // Seed é idempotente: garante que todos os tipos padrão (aniversário, cashback, etc.) existam
+      try { await api.post("/campanhas/seed"); } catch { /* ignora se já existem */ }
       const res = await api.get("/campanhas");
-      // Se não há nenhuma campanha, inicializa automaticamente as campanhas padrão
-      if (res.data.length === 0) {
-        try {
-          await api.post("/campanhas/seed");
-          const res2 = await api.get("/campanhas");
-          setCampanhas(res2.data);
-        } catch {
-          setCampanhas([]);
-        }
-      } else {
-        setCampanhas(res.data);
-      }
+      setCampanhas(res.data);
     } catch (e) {
       console.error("Erro ao carregar campanhas:", e);
     } finally {
@@ -1225,7 +1216,9 @@ export default function Campanhas() {
       !params.notification_message
     ) {
       const tipoPresente = params.tipo_presente || "cupom";
-      const frases = FRASES_ANIVERSARIO[c.campaign_type] || FRASES_ANIVERSARIO.birthday_customer;
+      const frases =
+        FRASES_ANIVERSARIO[c.campaign_type] ||
+        FRASES_ANIVERSARIO.birthday_customer;
       params.notification_message = frases[tipoPresente] || "";
     }
     setParamsEditando(params);
@@ -1507,7 +1500,8 @@ export default function Campanhas() {
     }
 
     if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
-      const frases = FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
+      const frases =
+        FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
       const tipoPresente = str("tipo_presente") || "cupom";
       const fraseSugerida = frases[tipoPresente] || "";
       const ehPet = tipo === "birthday_pet";
@@ -1516,7 +1510,9 @@ export default function Campanhas() {
         <div className="space-y-4">
           {/* Tipo de presente */}
           <div>
-            <p className="text-xs font-semibold text-gray-700 mb-2">🎁 O que o cliente recebe no aniversário?</p>
+            <p className="text-xs font-semibold text-gray-700 mb-2">
+              🎁 O que o cliente recebe no aniversário?
+            </p>
             <div className="flex gap-4">
               {[
                 { value: "cupom", label: "🎫 Cupom de desconto" },
@@ -1561,7 +1557,11 @@ export default function Campanhas() {
                 <option value="percent">Percentual (%)</option>
               </CampanhaSel>
               <CampanhaField
-                label={str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"}
+                label={
+                  str("coupon_type") === "percent"
+                    ? "Percentual (%)"
+                    : "Valor (R$)"
+                }
                 id="p-bday-val"
                 value={num("coupon_value")}
                 onChange={(e) =>
@@ -1575,7 +1575,10 @@ export default function Campanhas() {
                 min="1"
                 value={num("coupon_valid_days") || 3}
                 onChange={(e) =>
-                  set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 3)
+                  set(
+                    "coupon_valid_days",
+                    Number.parseInt(e.target.value, 10) || 3,
+                  )
                 }
               />
               <CampanhaSel
@@ -1595,7 +1598,10 @@ export default function Campanhas() {
           {/* Mensagem personalizada */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label htmlFor="p-bday-msg" className="block text-xs font-semibold text-gray-700">
+              <label
+                htmlFor="p-bday-msg"
+                className="block text-xs font-semibold text-gray-700"
+              >
                 ✉️ Mensagem enviada ao cliente
               </label>
               <button
@@ -1617,12 +1623,22 @@ export default function Campanhas() {
               Variáveis disponíveis:{" "}
               <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
               {ehPet && (
-                <> <code className="bg-gray-100 px-1 rounded">{"{nome_pet}"}</code></>
+                <>
+                  {" "}
+                  <code className="bg-gray-100 px-1 rounded">
+                    {"{nome_pet}"}
+                  </code>
+                </>
               )}
               {tipoPresente === "cupom" && (
                 <>
-                  {" "}<code className="bg-gray-100 px-1 rounded">{"{code}"}</code>
-                  {" "}<code className="bg-gray-100 px-1 rounded">{"{desconto}"}</code>
+                  {" "}
+                  <code className="bg-gray-100 px-1 rounded">
+                    {"{code}"}
+                  </code>{" "}
+                  <code className="bg-gray-100 px-1 rounded">
+                    {"{desconto}"}
+                  </code>
                 </>
               )}
             </p>
