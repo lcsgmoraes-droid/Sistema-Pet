@@ -1270,6 +1270,7 @@ export default function VendasFinanceiro() {
                   <th className="px-2 py-2 text-right">Comissão</th>
                   <th className="px-2 py-2 text-right">Imposto</th>
                   <th className="px-2 py-2 text-right">Custo</th>
+                  <th className="px-2 py-2 text-right" title="Cashback / cupons resgatados nesta venda">Custo Camp.</th>
                   <th className="px-2 py-2 text-right">Líquida</th>
                   <th className="px-2 py-2 text-right">Lucro</th>
                   <th className="px-2 py-2 text-right">MG Venda</th>
@@ -1298,6 +1299,9 @@ export default function VendasFinanceiro() {
                       <td className="px-2 py-2 text-right text-blue-600">-{formatarMoeda(venda.comissao)}</td>
                       <td className="px-2 py-2 text-right text-pink-600" title="Impostos sobre faturamento">-{formatarMoeda(venda.imposto || 0)}</td>
                       <td className="px-2 py-2 text-right text-orange-600">-{formatarMoeda(venda.custo_produtos)}</td>
+                      <td className="px-2 py-2 text-right text-teal-600" title="Custo com campanhas (cashback/cupom resgatado)">
+                        {venda.custo_campanha > 0 ? `-${formatarMoeda(venda.custo_campanha)}` : '—'}
+                      </td>
                       <td className="px-2 py-2 text-right font-medium">{formatarMoeda(venda.venda_liquida)}</td>
                       <td className={`px-2 py-2 text-right font-bold ${venda.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                         {formatarMoeda(venda.lucro)}
@@ -1318,9 +1322,9 @@ export default function VendasFinanceiro() {
                     </tr>
                     
                     {/* Linha expandida com detalhes dos produtos */}
-                    {vendasExpandidas.has(venda.id) && venda.itens && venda.itens.length > 0 && (
+                      {vendasExpandidas.has(venda.id) && venda.itens && venda.itens.length > 0 && (
                       <tr key={`${venda.id}-detalhes`} className="bg-blue-50">
-                        <td colSpan="17" className="px-4 py-3">
+                        <td colSpan="18" className="px-4 py-3">
                           <div className="pl-8">
                             <div className="font-semibold text-gray-700 mb-2">Produtos desta venda:</div>
                             <table className="w-full text-xs">

@@ -266,7 +266,13 @@ function SecaoCashback({ saldo }: { saldo: number }) {
   );
 }
 
-function SecaoCupons({ cupons }: { cupons: Beneficios["cupons"] }) {
+function SecaoCupons({
+  cupons,
+  onVerTodos,
+}: {
+  cupons: Beneficios["cupons"];
+  onVerTodos: () => void;
+}) {
   const [copiado, setCopiado] = useState<string | null>(null);
 
   const copiar = (codigo: string) => {
@@ -379,6 +385,10 @@ function SecaoCupons({ cupons }: { cupons: Beneficios["cupons"] }) {
           );
         })
       )}
+      <Pressable onPress={onVerTodos} style={styles.verTodosBotao}>
+        <Text style={styles.verTodosTexto}>Ver todos os cupons</Text>
+        <Ionicons name="chevron-forward" size={14} color={CORES.primario} />
+      </Pressable>
     </View>
   );
 }
@@ -388,6 +398,7 @@ function SecaoCupons({ cupons }: { cupons: Beneficios["cupons"] }) {
 // ---------------------------------------------------------------------------
 
 export default function BeneficiosScreen() {
+  const navigation = useNavigation<any>();
   const [dados, setDados] = useState<Beneficios | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -455,7 +466,10 @@ export default function BeneficiosScreen() {
       <SecaoRanking ranking={dados.ranking} />
       <SecaoCarimbos carimbos={dados.carimbos} />
       <SecaoCashback saldo={dados.cashback.saldo} />
-      <SecaoCupons cupons={dados.cupons} />
+      <SecaoCupons
+        cupons={dados.cupons}
+        onVerTodos={() => navigation.navigate("MeusCupons")}
+      />
     </ScrollView>
   );
 }
@@ -535,6 +549,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FONTE.normal,
     color: CORES.textoSecundario,
+  },
+  verTodosBotao: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingVertical: ESPACO.xs,
+    marginTop: ESPACO.sm,
+    gap: 4,
+  },
+  verTodosTexto: {
+    fontSize: FONTE.pequena,
+    color: CORES.primario,
+    fontWeight: "600",
   },
   progressoTrilha: {
     height: 8,

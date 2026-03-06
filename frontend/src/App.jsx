@@ -111,6 +111,7 @@ const EcommerceMVP = lazy(() => import('./pages/ecommerce/EcommerceMVP'));
 const EcommerceAparencia = lazy(() => import('./pages/ecommerce/EcommerceAparencia'));
 const EcommerceConfig = lazy(() => import('./pages/ecommerce/EcommerceConfig'));
 const EcommerceAnalytics = lazy(() => import('./pages/ecommerce/EcommerceAnalytics'));
+const Campanhas = lazy(() => import('./pages/Campanhas'));
 
 function AppRoutePreloader() {
   useEffect(() => {
@@ -271,6 +272,7 @@ function App() {
             } />
             <Route path="meus-caixas" element={<MeusCaixas />} />
             <Route path="notas-fiscais" element={<NotasFiscais />} />
+            <Route path="campanhas" element={<Campanhas />} />
             <Route path="ecommerce/aparencia" element={<EcommerceAparencia />} />
             <Route path="ecommerce/configuracoes" element={<EcommerceConfig />} />
             <Route path="ecommerce/analytics" element={<EcommerceAnalytics />} />

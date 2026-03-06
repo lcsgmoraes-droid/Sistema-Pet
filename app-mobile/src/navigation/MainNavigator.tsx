@@ -1,30 +1,32 @@
-import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { CORES } from '../theme';
-import { useCartStore } from '../store/cart.store';
-import { useWishlistStore } from '../store/wishlist.store';
+import { Ionicons } from "@expo/vector-icons";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useCartStore } from "../store/cart.store";
+import { useWishlistStore } from "../store/wishlist.store";
+import { CORES } from "../theme";
 
 // Screens
-import HomeScreen from '../screens/HomeScreen';
-import CatalogScreen from '../screens/shop/CatalogScreen';
-import CartScreen from '../screens/shop/CartScreen';
-import WishlistScreen from '../screens/shop/WishlistScreen';
-import BarcodeScannerScreen from '../screens/shop/BarcodeScannerScreen';
-import CheckoutSucessoScreen from '../screens/shop/CheckoutSucessoScreen';
-import PetListScreen from '../screens/pets/PetListScreen';
-import PetFormScreen from '../screens/pets/PetFormScreen';
-import FoodCalculatorScreen from '../screens/pets/FoodCalculatorScreen';
-import OrdersScreen from '../screens/orders/OrdersScreen';
-import BeneficiosScreen from '../screens/benefits/BeneficiosScreen';
-import ProfileScreen from '../screens/profile/ProfileScreen';
+import BeneficiosScreen from "../screens/benefits/BeneficiosScreen";
+import CouponsScreen from "../screens/coupons/CouponsScreen";
+import HomeScreen from "../screens/HomeScreen";
+import OrdersScreen from "../screens/orders/OrdersScreen";
+import FoodCalculatorScreen from "../screens/pets/FoodCalculatorScreen";
+import PetFormScreen from "../screens/pets/PetFormScreen";
+import PetListScreen from "../screens/pets/PetListScreen";
+import ProfileScreen from "../screens/profile/ProfileScreen";
+import BarcodeScannerScreen from "../screens/shop/BarcodeScannerScreen";
+import CartScreen from "../screens/shop/CartScreen";
+import CatalogScreen from "../screens/shop/CatalogScreen";
+import CheckoutSucessoScreen from "../screens/shop/CheckoutSucessoScreen";
+import WishlistScreen from "../screens/shop/WishlistScreen";
 
 const Tab = createBottomTabNavigator();
 const LojaStack = createNativeStackNavigator();
 const PetsStack = createNativeStackNavigator();
+const BeneficiosStack = createNativeStackNavigator();
 
 function LojaNavigator() {
   return (
@@ -32,22 +34,22 @@ function LojaNavigator() {
       <LojaStack.Screen
         name="Catalogo"
         component={CatalogScreen}
-        options={{ title: 'Produtos' }}
+        options={{ title: "Produtos" }}
       />
       <LojaStack.Screen
         name="Carrinho"
         component={CartScreen}
-        options={{ title: 'Meu Carrinho' }}
+        options={{ title: "Meu Carrinho" }}
       />
       <LojaStack.Screen
         name="BarcodeScanner"
         component={BarcodeScannerScreen}
-        options={{ title: 'Escanear Produto', headerShown: false }}
+        options={{ title: "Escanear Produto", headerShown: false }}
       />
       <LojaStack.Screen
         name="CheckoutSucesso"
         component={CheckoutSucessoScreen}
-        options={{ title: 'Pedido Confirmado', headerLeft: () => null }}
+        options={{ title: "Pedido Confirmado", headerLeft: () => null }}
       />
     </LojaStack.Navigator>
   );
@@ -59,19 +61,19 @@ function PetsNavigator() {
       <PetsStack.Screen
         name="ListaPets"
         component={PetListScreen}
-        options={{ title: 'Meus Pets' }}
+        options={{ title: "Meus Pets" }}
       />
       <PetsStack.Screen
         name="FormPet"
         component={PetFormScreen}
         options={({ route }: any) => ({
-          title: route.params?.pet ? 'Editar Pet' : 'Novo Pet',
+          title: route.params?.pet ? "Editar Pet" : "Novo Pet",
         })}
       />
       <PetsStack.Screen
         name="CalculadoraRacao"
         component={FoodCalculatorScreen}
-        options={{ title: 'Calculadora de Ração' }}
+        options={{ title: "Calculadora de Ração" }}
       />
     </PetsStack.Navigator>
   );
@@ -86,10 +88,27 @@ function CartIcon({ color, size }: { color: string; size: number }) {
       <Ionicons name="cart-outline" size={size} color={color} />
       {count > 0 && (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
+          <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
         </View>
       )}
     </View>
+  );
+}
+
+function BeneficiosNavigator() {
+  return (
+    <BeneficiosStack.Navigator>
+      <BeneficiosStack.Screen
+        name="MeusBeneficios"
+        component={BeneficiosScreen}
+        options={{ headerTitle: "Meus Benefícios" }}
+      />
+      <BeneficiosStack.Screen
+        name="MeusCupons"
+        component={CouponsScreen}
+        options={{ headerTitle: "Meus Cupons" }}
+      />
+    </BeneficiosStack.Navigator>
   );
 }
 
@@ -99,10 +118,14 @@ function HeartIcon({ color, size }: { color: string; size: number }) {
   const count = ids.length;
   return (
     <View>
-      <Ionicons name={count > 0 ? 'heart' : 'heart-outline'} size={size} color={count > 0 ? CORES.secundario : color} />
+      <Ionicons
+        name={count > 0 ? "heart" : "heart-outline"}
+        size={size}
+        color={count > 0 ? CORES.secundario : color}
+      />
       {count > 0 && (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>{count > 9 ? '9+' : count}</Text>
+          <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
         </View>
       )}
     </View>
@@ -129,7 +152,7 @@ export default function MainNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          title: 'Início',
+          title: "Início",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -140,11 +163,11 @@ export default function MainNavigator() {
         component={LojaNavigator}
         listeners={({ navigation }) => ({
           tabPress: () => {
-            navigation.navigate('Loja', { screen: 'Catalogo' });
+            navigation.navigate("Loja", { screen: "Catalogo" });
           },
         })}
         options={{
-          title: 'Loja',
+          title: "Loja",
           tabBarIcon: ({ color, size }) => (
             <CartIcon color={color} size={size} />
           ),
@@ -154,12 +177,12 @@ export default function MainNavigator() {
         name="Favoritos"
         component={WishlistScreen}
         options={{
-          title: 'Favoritos',
+          title: "Favoritos",
           tabBarIcon: ({ color, size }) => (
             <HeartIcon color={color} size={size} />
           ),
           headerShown: true,
-          headerTitle: 'Meus Favoritos',
+          headerTitle: "Meus Favoritos",
         }}
       />
       <Tab.Screen
@@ -167,11 +190,11 @@ export default function MainNavigator() {
         component={PetsNavigator}
         listeners={({ navigation }) => ({
           tabPress: () => {
-            navigation.navigate('Pets', { screen: 'ListaPets' });
+            navigation.navigate("Pets", { screen: "ListaPets" });
           },
         })}
         options={{
-          title: 'Pets',
+          title: "Pets",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="paw-outline" size={size} color={color} />
           ),
@@ -181,36 +204,35 @@ export default function MainNavigator() {
         name="Pedidos"
         component={OrdersScreen}
         options={{
-          title: 'Pedidos',
+          title: "Pedidos",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="receipt-outline" size={size} color={color} />
           ),
           headerShown: true,
-          headerTitle: 'Meus Pedidos',
+          headerTitle: "Meus Pedidos",
         }}
       />
       <Tab.Screen
         name="Beneficios"
-        component={BeneficiosScreen}
+        component={BeneficiosNavigator}
         options={{
-          title: 'Benefícios',
+          title: "Benefícios",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="gift-outline" size={size} color={color} />
           ),
-          headerShown: true,
-          headerTitle: 'Meus Benefícios',
+          headerShown: false,
         }}
       />
       <Tab.Screen
         name="Perfil"
         component={ProfileScreen}
         options={{
-          title: 'Perfil',
+          title: "Perfil",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
           headerShown: true,
-          headerTitle: 'Meu Perfil',
+          headerTitle: "Meu Perfil",
         }}
       />
     </Tab.Navigator>
@@ -219,20 +241,20 @@ export default function MainNavigator() {
 
 const styles = StyleSheet.create({
   badge: {
-    position: 'absolute',
+    position: "absolute",
     right: -6,
     top: -4,
     backgroundColor: CORES.secundario,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 3,
   },
   badgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
 });

@@ -361,7 +361,7 @@ export default function EcommerceMVP() {
     entrega_estado: '',
   });
 
-  const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '' });
+  const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '', cpf: '' });
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
 
   const [cart, setCart] = useState(() => getGuestCart());
@@ -785,6 +785,11 @@ export default function EcommerceMVP() {
       setError('Loja não identificada na URL.');
       return;
     }
+    const cpfDigits = (registerForm.cpf || '').replace(/\D/g, '');
+    if (cpfDigits.length !== 11) {
+      setError('Informe um CPF válido com 11 dígitos.');
+      return;
+    }
     setAuthLoading(true);
     setError('');
     setSuccess('');
@@ -798,8 +803,8 @@ export default function EcommerceMVP() {
       localStorage.setItem(STORAGE_TOKEN_KEY, token);
       setCustomerToken(token);
       await syncGuestCartToServer(token);
-      setRegisterForm({ email: '', password: '', nome: '' });
-      setSuccess('Cadastro realizado com sucesso. Complete seus dados na aba Conta.');
+      setRegisterForm({ email: '', password: '', nome: '', cpf: '' });
+      setSuccess('Cadastro realizado com sucesso!');
       setView('conta');
     } catch (err) {
       setError(extractApiErrorMessage(err, 'Erro ao cadastrar cliente'));
@@ -2078,6 +2083,7 @@ export default function EcommerceMVP() {
                 <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 14 }}>Criar conta</div>
                 <form onSubmit={handleRegister} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
                   <input name="ecommerce_register_nome" autoComplete="off" value={registerForm.nome} onChange={(e) => setRegisterForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={S.formInput} />
+                  <input name="ecommerce_register_cpf" autoComplete="off" value={registerForm.cpf} onChange={(e) => setRegisterForm((prev) => ({ ...prev, cpf: e.target.value }))} placeholder="CPF *  (000.000.000-00)" inputMode="numeric" style={S.formInput} required />
                   <input name="ecommerce_register_email" autoComplete="off" value={registerForm.email} onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
                   <div style={{ position: 'relative' }}>
                     <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showRegisterPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />

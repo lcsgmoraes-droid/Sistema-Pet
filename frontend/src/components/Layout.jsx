@@ -5,7 +5,7 @@ import {
   FiHome, FiUsers, FiPackage, FiShoppingCart, FiDollarSign,
   FiBarChart2, FiSettings, FiLogOut, FiMenu, FiX,
   FiBox, FiShoppingBag, FiTrendingUp, FiFileText, FiChevronDown, FiChevronRight,
-  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle, FiGlobe
+  FiCpu, FiBell, FiTarget, FiBriefcase, FiTruck, FiShield, FiAlertTriangle, FiGlobe, FiGift
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import { api } from '../services/api';
@@ -282,6 +282,7 @@ const Layout = () => {
     { path: '/lembretes', icon: FiBell, label: 'Lembretes', badge: lembretesCount > 0, permission: null }, // Sempre visível
     { path: '/calculadora-racao', icon: FiTarget, label: 'Calculadora de Ração', permission: null }, // Sempre visível
     { path: '/pdv', icon: FiShoppingCart, label: 'PDV (Vendas)', permission: 'vendas.criar' },
+    { path: '/campanhas', icon: FiGift, label: 'Campanhas', permission: 'vendas.criar' },
     {
       path: '/ecommerce',
       icon: FiGlobe,

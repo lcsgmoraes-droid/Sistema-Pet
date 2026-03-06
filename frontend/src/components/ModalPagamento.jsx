@@ -81,7 +81,10 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   const [opcaoExcedente, setOpcaoExcedente] = useState(null); // 'troco' | 'credito'
   const [mostrarModalCreditoExcedente, setMostrarModalCreditoExcedente] = useState(false);
   const [valorExcedente, setValorExcedente] = useState(0);
-  
+
+  // 💰 Cashback de campanhas
+  const [saldoCashback, setSaldoCashback] = useState(0);
+
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
 
@@ -89,7 +92,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   useEffect(() => {
     const carregarFormas = async () => {
       try {
-                const response = await api.get(`/financeiro/formas-pagamento`);
+        const response = await api.get(`/financeiro/formas-pagamento`);
         setFormasPagamento(response.data);
       } catch (error) {
         console.error('Erro ao carregar formas:', error);
@@ -97,6 +100,15 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     };
     carregarFormas();
   }, []);
+
+  // 💰 Carregar saldo de cashback do cliente
+  useEffect(() => {
+    if (!venda.cliente?.id) return;
+    const clienteId = venda.cliente.id;
+    api.get(`/campanhas/clientes/${clienteId}/saldo`)
+      .then(res => setSaldoCashback(parseFloat(res.data.saldo_cashback || 0)))
+      .catch(() => {}); // campanhas são opcionais
+  }, [venda.cliente?.id]);
 
   // 🆕 Carregar operadoras de cartão
   useEffect(() => {
@@ -211,7 +223,8 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
     try {
             const todosPagamentos = [
         ...pagamentosExistentes,
-        ...pagamentos
+        // Excluir cashback da análise de margem (não é uma forma real de pagamento)
+        ...pagamentos.filter(p => !p.is_cashback)
       ];
 
       // 🔧 Mapear itens para o formato correto do backend
@@ -438,6 +451,14 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       }
     }
 
+    // Validar cashback disponível
+    if (formaPagamentoSelecionada.id === 'cashback') {
+      if (valor > saldoCashback + 0.01) {
+        setErro(`Valor excede o cashback disponível (R$ ${saldoCashback.toFixed(2).replace('.', ',')})`);
+        return;
+      }
+    }
+
     // Validar bandeira para cartões
     if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !bandeira) {
       setErro('Selecione a bandeira do cartão');
@@ -481,7 +502,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       troco:
         formaPagamentoSelecionada.tipo === 'dinheiro' && troco > 0 ? troco : null,
       // Marcar se é crédito cliente
-      is_credito_cliente: formaPagamentoSelecionada.nome === 'Crédito Cliente' || formaPagamentoSelecionada.tipo === 'credito_cliente'
+      is_credito_cliente: formaPagamentoSelecionada.nome === 'Crédito Cliente' || formaPagamentoSelecionada.tipo === 'credito_cliente',
+      // Marcar se é cashback
+      is_cashback: formaPagamentoSelecionada.id === 'cashback'
     };
     
     console.log('📤 DEBUG novoPagamento:', novoPagamento);
@@ -914,6 +937,39 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                     </button>
                   )}
 
+                  {/* Cashback de campanhas (exibir se disponível) */}
+                  {venda.cliente && saldoCashback > 0 && (
+                    <button
+                      onClick={() => {
+                        setFormaPagamentoSelecionada({
+                          id: 'cashback',
+                          nome: 'Cashback',
+                          tipo: 'cashback',
+                          icone: '💰',
+                        });
+                        setNumeroParcelas(1);
+                        setBandeira('');
+                        setNsuCartao('');
+                        setValorRecebido(Math.min(saldoCashback, valorRestante));
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        formaPagamentoSelecionada?.id === 'cashback'
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-green-200 bg-green-50/50 hover:border-green-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-1">💰</div>
+                      <div className={`text-sm font-medium ${
+                        formaPagamentoSelecionada?.id === 'cashback' ? 'text-green-900' : 'text-green-700'
+                      }`}>
+                        Cashback
+                      </div>
+                      <div className="text-xs text-green-600 mt-1 font-semibold">
+                        R$ {saldoCashback.toFixed(2).replace('.', ',')}
+                      </div>
+                    </button>
+                  )}
+
                   {/* Formas de pagamento cadastradas */}
                   {formasPagamento.map((forma) => {
                     const selecionada = formaPagamentoSelecionada?.id === forma.id;
@@ -970,9 +1026,25 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                     </div>
                   )}
 
+                  {/* Informações de Cashback */}
+                  {formaPagamentoSelecionada.id === 'cashback' && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                      <div className="flex items-center gap-2 text-green-800 mb-2">
+                        <span className="text-base">💰</span>
+                        <span className="text-sm font-semibold">Cashback Disponível</span>
+                      </div>
+                      <div className="text-lg font-bold text-green-600">
+                        R$ {saldoCashback.toFixed(2).replace('.', ',')}
+                      </div>
+                      <p className="text-xs text-green-700 mt-1">
+                        💡 Saldo acumulado em campanhas — não gera movimentação de caixa
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {formaPagamentoSelecionada.id === 'credito_cliente' ? 'Valor a Utilizar' : 'Valor Recebido'}
+                      {formaPagamentoSelecionada.id === 'credito_cliente' ? 'Valor a Utilizar' : formaPagamentoSelecionada.id === 'cashback' ? 'Valor a Resgatar' : 'Valor Recebido'}
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
@@ -984,6 +1056,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                           if (formaPagamentoSelecionada.id === 'credito_cliente') {
                             const maxCredito = Math.min(formaPagamentoSelecionada.credito_disponivel, valorRestante);
                             setValorRecebido(Math.min(v, maxCredito));
+                          } else if (formaPagamentoSelecionada.id === 'cashback') {
+                            const maxCashback = Math.min(saldoCashback, valorRestante);
+                            setValorRecebido(Math.min(v, maxCashback));
                           } else {
                             setValorRecebido(v);
                           }
@@ -998,11 +1073,17 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                         Máximo: R$ {Math.min(formaPagamentoSelecionada.credito_disponivel, valorRestante).toFixed(2)}
                       </p>
                     )}
+                    {formaPagamentoSelecionada.id === 'cashback' && (
+                      <p className="text-xs text-gray-600 mt-1">
+                        Máximo: R$ {Math.min(saldoCashback, valorRestante).toFixed(2).replace('.', ',')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Aviso de excedente para métodos NÃO-dinheiro */}
                   {formaPagamentoSelecionada?.tipo !== 'dinheiro' &&
                     formaPagamentoSelecionada?.tipo !== 'credito_cliente' &&
+                    formaPagamentoSelecionada?.tipo !== 'cashback' &&
                     troco > 0.005 && (
                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
                       <div className="flex items-center gap-2 text-amber-800 text-sm font-semibold">
@@ -1359,13 +1440,21 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                       {pagamentos.map((pag, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg"
+                          className={`flex items-center justify-between p-4 rounded-lg border ${
+                            pag.is_cashback
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-blue-50 border-blue-200'
+                          }`}
                         >
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
-                              <div className="font-medium text-gray-900">{pag.nome}</div>
-                              <span className="px-2 py-0.5 bg-blue-200 text-blue-800 text-xs rounded-full font-medium">
-                                Novo
+                              <div className="font-medium text-gray-900">{pag.is_cashback ? '💰 ' : ''}{pag.nome}</div>
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                                pag.is_cashback
+                                  ? 'bg-green-200 text-green-800'
+                                  : 'bg-blue-200 text-blue-800'
+                              }`}>
+                                {pag.is_cashback ? 'Cashback' : 'Novo'}
                               </span>
                             </div>
                             {pag.bandeira && (
@@ -1386,7 +1475,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                             )}
                           </div>
                           <div className="flex items-center space-x-3">
-                            <span className="font-semibold text-blue-700 text-lg">
+                            <span className={`font-semibold text-lg ${pag.is_cashback ? 'text-green-700' : 'text-blue-700'}`}>
                               R$ {pag.valor.toFixed(2)}
                             </span>
                             <button
