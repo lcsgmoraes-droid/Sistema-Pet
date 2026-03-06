@@ -46,19 +46,19 @@ async def obter_relatorio_vendas(
     - Lista de vendas
     """
     current_user, tenant_id = user_and_tenant
-    
+
     # Definir datas padrão (hoje)
     if not data_inicio:
         data_inicio = date.today().isoformat()
     if not data_fim:
         data_fim = date.today().isoformat()
-    
+
     # Converter strings para datetime naive (datas no banco são naive em horário de Brasília)
     data_inicio_dt = datetime.fromisoformat(data_inicio)
     data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
     data_fim_dt = datetime.fromisoformat(data_fim)
     data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
-    
+
     # OTIMIZAÇÃO: Buscar vendas com EAGER LOADING para evitar N+1 queries
     # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
     vendas = db.query(Venda).options(
@@ -74,7 +74,7 @@ async def obter_relatorio_vendas(
             Venda.data_venda <= data_fim_dt
         )
     ).all()
-    
+
     # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
     # Tratamento de erro caso a tabela não exista
     try:
@@ -85,7 +85,7 @@ async def obter_relatorio_vendas(
     except Exception as e:
         logger.warning(f"Erro ao buscar config fiscal (tabela pode não existir): {e}")
         impostos_percentual_global = 0.0
-    
+
     # OTIMIZAÇÃO: Carregar todas as comissões de uma vez
     venda_ids = [v.id for v in vendas]
     comissoes_map = {}
@@ -100,7 +100,7 @@ async def obter_relatorio_vendas(
                 comissoes_map[com_item.venda_id].append(com_item)
         except Exception as e:
             logger.warning(f"Erro ao buscar comissões (tabela pode não existir): {e}")
-    
+
     # OTIMIZAÇÃO: Carregar todas as formas de pagamento ativas de uma vez
     formas_pagamento_map = {}
     try:
@@ -128,7 +128,7 @@ async def obter_relatorio_vendas(
             cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
         except Exception as e:
             logger.warning(f"Erro ao buscar cashback por venda (tabela pode não existir): {e}")
-    
+
     # ==============================================
     # RESUMO (Cards no topo)
     # ==============================================
@@ -136,7 +136,7 @@ async def obter_relatorio_vendas(
     taxa_entrega = sum(float(v.taxa_entrega or 0) for v in vendas)
     desconto = sum(float(v.desconto_valor or 0) for v in vendas)
     venda_liquida = sum(float(v.total) for v in vendas)
-    
+
     # Calcular em_aberto (vendas com status != finalizada)
     em_aberto = 0
     for v in vendas:
@@ -144,9 +144,9 @@ async def obter_relatorio_vendas(
             # OTIMIZAÇÃO: usar pagamentos já carregados em vez de query ao BD
             total_pago = sum(float(p.valor) for p in v.pagamentos) if v.pagamentos else 0
             em_aberto += (float(v.total) - total_pago)
-    
+
     percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
-    
+
     resumo = {
         "venda_bruta": round(venda_bruta, 2),
         "taxa_entrega": round(taxa_entrega, 2),
@@ -156,7 +156,7 @@ async def obter_relatorio_vendas(
         "em_aberto": round(em_aberto, 2),
         "quantidade_vendas": len(vendas)
     }
-    
+
     # ==============================================
     # VENDAS POR DATA
     # ==============================================
@@ -174,18 +174,18 @@ async def obter_relatorio_vendas(
                 "valor_recebido": 0,
                 "saldo_aberto": 0
             }
-        
+
         vendas_por_data[data_str]["quantidade"] += 1
         vendas_por_data[data_str]["valor_bruto"] += venda.subtotal
         vendas_por_data[data_str]["taxa_entrega"] += venda.taxa_entrega or 0
         vendas_por_data[data_str]["desconto"] += venda.desconto_valor or 0
         vendas_por_data[data_str]["valor_liquido"] += venda.total
-        
+
         # OTIMIZAÇÃO: usar pagamentos já carregados
         total_pago = sum(p.valor for p in venda.pagamentos) if venda.pagamentos else 0
         vendas_por_data[data_str]["valor_recebido"] += total_pago
         vendas_por_data[data_str]["saldo_aberto"] += (venda.total - total_pago) if venda.status != 'finalizada' else 0
-    
+
     # Calcular ticket médio
     for data_str in vendas_por_data:
         qtd = vendas_por_data[data_str]["quantidade"]
@@ -193,9 +193,9 @@ async def obter_relatorio_vendas(
         vendas_por_data[data_str]["percentual_desconto"] = round(
             (vendas_por_data[data_str]["desconto"] / vendas_por_data[data_str]["valor_bruto"] * 100) if vendas_por_data[data_str]["valor_bruto"] > 0 else 0, 1
         )
-    
+
     vendas_por_data_lista = sorted(vendas_por_data.values(), key=lambda x: x["data"])
-    
+
     # ==============================================
     # FORMAS DE RECEBIMENTO
     # ==============================================
@@ -215,14 +215,14 @@ async def obter_relatorio_vendas(
         'credito_parcelado': 'Cartão Crédito',
         'credito_cliente': 'Crédito do Cliente'
     }
-    
+
     formas_recebimento = {}
     for venda in vendas:
         # OTIMIZAÇÃO: usar pagamentos já carregados
         for pag in venda.pagamentos:
             forma_codigo = str(pag.forma_pagamento) if pag.forma_pagamento else "Não informado"
             forma_base = FORMAS_PAGAMENTO_MAP.get(forma_codigo, forma_codigo)
-            
+
             # Criar chave única com forma + parcelas
             if pag.numero_parcelas and pag.numero_parcelas > 1:
                 forma_completa = f"{forma_base} {pag.numero_parcelas}x"
@@ -230,7 +230,7 @@ async def obter_relatorio_vendas(
             else:
                 forma_completa = forma_base
                 parcelas = 1
-            
+
             if forma_completa not in formas_recebimento:
                 formas_recebimento[forma_completa] = {
                     "forma_pagamento": forma_completa,
@@ -239,18 +239,18 @@ async def obter_relatorio_vendas(
                     "ordem_parcelas": parcelas  # Para ordenar por número de parcelas
                 }
             formas_recebimento[forma_completa]["valor_total"] += pag.valor
-    
+
     # Ordenar por tipo de pagamento e depois por número de parcelas (crescente)
     formas_recebimento_lista = sorted(
-        formas_recebimento.values(), 
+        formas_recebimento.values(),
         key=lambda x: (x["ordem_forma"], x["ordem_parcelas"])
     )
-    
+
     # Remover campos auxiliares de ordenação
     for item in formas_recebimento_lista:
         item.pop("ordem_forma", None)
         item.pop("ordem_parcelas", None)
-    
+
     # ==============================================
     # VENDAS POR FUNCIONÁRIO
     # ==============================================
@@ -262,7 +262,7 @@ async def obter_relatorio_vendas(
             nome_func = venda.usuario.nome if venda.usuario else f"ID {funcionario_id}"
         else:
             nome_func = "Sem funcionário"
-        
+
         if nome_func not in vendas_por_funcionario:
             vendas_por_funcionario[nome_func] = {
                 "funcionario": nome_func,
@@ -271,35 +271,35 @@ async def obter_relatorio_vendas(
                 "desconto": 0,
                 "valor_liquido": 0
             }
-        
+
         vendas_por_funcionario[nome_func]["quantidade"] += 1
         vendas_por_funcionario[nome_func]["valor_bruto"] += venda.subtotal
         vendas_por_funcionario[nome_func]["desconto"] += venda.desconto_valor or 0
         vendas_por_funcionario[nome_func]["valor_liquido"] += venda.total
-    
+
     vendas_por_funcionario_lista = sorted(vendas_por_funcionario.values(), key=lambda x: x["valor_liquido"], reverse=True)
-    
+
     # ==============================================
     # VENDAS POR TIPO (Produto/Serviço)
     # ==============================================
     vendas_por_tipo = {
         "Produto": {"tipo": "Produto", "quantidade": 0, "valor_bruto": 0, "desconto": 0, "valor_liquido": 0}
     }
-    
+
     for venda in vendas:
         vendas_por_tipo["Produto"]["quantidade"] += 1
         vendas_por_tipo["Produto"]["valor_bruto"] += venda.subtotal
         vendas_por_tipo["Produto"]["desconto"] += venda.desconto_valor or 0
         vendas_por_tipo["Produto"]["valor_liquido"] += venda.total
-    
+
     vendas_por_tipo_lista = list(vendas_por_tipo.values())
-    
+
     # ==============================================
     # VENDAS POR GRUPO DE PRODUTO
     # ==============================================
     vendas_por_grupo = {}
     total_geral = sum(v.total for v in vendas)
-    
+
     for venda in vendas:
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
@@ -309,7 +309,7 @@ async def obter_relatorio_vendas(
                 grupo = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
                 grupo = "Sem categoria"
-            
+
             if grupo not in vendas_por_grupo:
                 vendas_por_grupo[grupo] = {
                     "grupo": grupo,
@@ -318,43 +318,43 @@ async def obter_relatorio_vendas(
                     "valor_liquido": 0,
                     "percentual": 0
                 }
-            
+
             valor_item = item.quantidade * item.preco_unitario
             desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
-            
+
             vendas_por_grupo[grupo]["valor_bruto"] += valor_item
             vendas_por_grupo[grupo]["desconto"] += desconto_item
             vendas_por_grupo[grupo]["valor_liquido"] += (valor_item - desconto_item)
-    
+
     # Calcular percentuais
     for grupo in vendas_por_grupo:
         vendas_por_grupo[grupo]["percentual"] = round(
             (vendas_por_grupo[grupo]["valor_liquido"] / total_geral * 100) if total_geral > 0 else 0, 1
         )
-    
+
     vendas_por_grupo_lista = sorted(vendas_por_grupo.values(), key=lambda x: x["valor_liquido"], reverse=True)
-    
+
     # ==============================================
     # PRODUTOS DETALHADOS AGRUPADOS POR CATEGORIA/SUBCATEGORIA
     # ==============================================
     produtos_por_categoria = {}
-    
+
     for venda in vendas:
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
             produto_id = item.produto_id
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
             produto = item.produto
-            
+
             # Determinar categoria e subcategoria
             if produto and produto.categoria:
                 categoria_nome = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
                 categoria_nome = "Sem categoria"
-            
+
             subcategoria_nome = produto.subcategoria if produto and hasattr(produto, 'subcategoria') and produto.subcategoria else None
             produto_nome = f"{produto.nome} ({produto.id})" if produto else f"Produto ID {produto_id}"
-            
+
             # Criar estrutura hierárquica
             if categoria_nome not in produtos_por_categoria:
                 produtos_por_categoria[categoria_nome] = {
@@ -366,7 +366,7 @@ async def obter_relatorio_vendas(
                     "total_desconto": 0,
                     "total_liquido": 0
                 }
-            
+
             # Se tem subcategoria, organizar em subcategoria
             if subcategoria_nome:
                 if subcategoria_nome not in produtos_por_categoria[categoria_nome]["subcategorias"]:
@@ -378,7 +378,7 @@ async def obter_relatorio_vendas(
                         "total_desconto": 0,
                         "total_liquido": 0
                     }
-                
+
                 if produto_nome not in produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"]:
                     produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome] = {
                         "produto": produto_nome,
@@ -387,16 +387,16 @@ async def obter_relatorio_vendas(
                         "desconto": 0,
                         "valor_liquido": 0
                     }
-                
+
                 valor_item = item.quantidade * item.preco_unitario
                 desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
-                
+
                 # Atualizar produto
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["valor_bruto"] += valor_item
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["desconto"] += desconto_item
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["valor_liquido"] += (valor_item - desconto_item)
-                
+
                 # Atualizar subcategoria
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_quantidade"] += item.quantidade
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_bruto"] += valor_item
@@ -412,15 +412,15 @@ async def obter_relatorio_vendas(
                         "desconto": 0,
                         "valor_liquido": 0
                     }
-                
+
                 valor_item = item.quantidade * item.preco_unitario
                 desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
-                
+
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_bruto"] += valor_item
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["desconto"] += desconto_item
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_liquido"] += (valor_item - desconto_item)
-            
+
             # Atualizar totais da categoria
             valor_item = item.quantidade * item.preco_unitario
             desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
@@ -428,7 +428,7 @@ async def obter_relatorio_vendas(
             produtos_por_categoria[categoria_nome]["total_bruto"] += valor_item
             produtos_por_categoria[categoria_nome]["total_desconto"] += desconto_item
             produtos_por_categoria[categoria_nome]["total_liquido"] += (valor_item - desconto_item)
-    
+
     # Converter para lista e ordenar
     produtos_detalhados_lista = []
     for cat_nome, cat_data in sorted(produtos_por_categoria.items(), key=lambda x: x[1]["total_liquido"], reverse=True):
@@ -441,7 +441,7 @@ async def obter_relatorio_vendas(
             "subcategorias": [],
             "produtos": []
         }
-        
+
         # Adicionar subcategorias
         for subcat_nome, subcat_data in sorted(cat_data["subcategorias"].items(), key=lambda x: x[1]["total_liquido"], reverse=True):
             subcat_obj = {
@@ -452,7 +452,7 @@ async def obter_relatorio_vendas(
                 "total_liquido": round(subcat_data["total_liquido"], 2),
                 "produtos": []
             }
-            
+
             # Produtos da subcategoria
             for prod in sorted(subcat_data["produtos"].values(), key=lambda x: x["valor_liquido"], reverse=True):
                 subcat_obj["produtos"].append({
@@ -462,9 +462,9 @@ async def obter_relatorio_vendas(
                     "desconto": round(prod["desconto"], 2),
                     "valor_liquido": round(prod["valor_liquido"], 2)
                 })
-            
+
             categoria_obj["subcategorias"].append(subcat_obj)
-        
+
         # Produtos diretos da categoria (sem subcategoria)
         for prod in sorted(cat_data["produtos"].values(), key=lambda x: x["valor_liquido"], reverse=True):
             categoria_obj["produtos"].append({
@@ -474,9 +474,9 @@ async def obter_relatorio_vendas(
                 "desconto": round(prod["desconto"], 2),
                 "valor_liquido": round(prod["valor_liquido"], 2)
             })
-        
+
         produtos_detalhados_lista.append(categoria_obj)
-    
+
     # ==============================================
     # LISTA DE VENDAS COM ANÁLISE DE RENTABILIDADE
     # ==============================================
@@ -485,7 +485,8 @@ async def obter_relatorio_vendas(
     taxa_total_geral = 0
     comissao_total_geral = 0
     lucro_total_geral = 0
-    
+    venda_liquida_geral = 0
+
     # Taxas de cartão (parametrizável futuramente)
     TAXAS_CARTAO = {
         'Dinheiro': 0,
@@ -506,10 +507,10 @@ async def obter_relatorio_vendas(
         '5': 3.5,  # Crédito Parcelado (código do PDV)
         'credito_cliente': 0  # Crédito do cliente (sem taxa)
     }
-    
+
     # Comissão padrão (será parametrizado por funcionário futuramente)
     COMISSAO_PADRAO = 5.0  # 5%
-    
+
     for venda in vendas:
         # OTIMIZAÇÃO: usar itens já carregados em vez de query ao BD
         itens = venda.itens
@@ -583,12 +584,12 @@ async def obter_relatorio_vendas(
                 logger.warning(f"Erro ao buscar entregador: {e}")
         else:
             pass  # Sem warning se não tem entrega
-        
+
         # Calcular CUSTO TOTAL e SUBTOTAL dos produtos para rateio
         custo_total = 0
         subtotal_itens = 0
         itens_detalhados = []
-        
+
         # Primeiro loop: calcular totais
         for item in itens:
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
@@ -596,10 +597,13 @@ async def obter_relatorio_vendas(
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             custo_item = custo_unitario * float(item.quantidade)
             subtotal_item = float(item.quantidade) * float(item.preco_unitario)
-            
+
             custo_total += custo_item
             subtotal_itens += subtotal_item
-        
+
+        # Custo de campanha (cashback/cupom) desta venda — necessário para rateio por item
+        custo_campanha = cashback_por_venda.get(venda.id, 0.0)
+
         # Segundo loop: calcular rateio para cada item
         for item in itens:
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
@@ -607,45 +611,45 @@ async def obter_relatorio_vendas(
             custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
             quantidade = float(item.quantidade)
             preco_unit = float(item.preco_unitario)
-            
+
             # Valores do item
             subtotal_item = quantidade * preco_unit
             custo_item = custo_unitario * quantidade
-            
-            # Calcular percentual do item no total da venda (para rateio)
+
+            # Calcular percentual do item no total da venda (para rateio proporcional)
             percentual_item = (subtotal_item / subtotal_itens) if subtotal_itens > 0 else 0
-            
+
             # RATEIO PROPORCIONAL de despesas
             desconto_rateado = float(venda.desconto_valor or 0) * percentual_item
             taxa_entrega_rateada = float(venda.taxa_entrega or 0) * percentual_item
             taxa_cartao_rateada = taxa_total * percentual_item
             comissao_rateada = comissao * percentual_item
-            imposto_rateado = (subtotal_item * impostos_percentual / 100.0) * percentual_item
+            imposto_rateado = subtotal_item * (impostos_percentual / 100.0)  # proporcional ao subtotal do item
             taxa_operacional_rateada = taxa_operacional_entrega * percentual_item
-            
-            # Valor líquido do item
-            valor_liquido_item = subtotal_item - desconto_rateado
-            
-            # Lucro do item
-            lucro_item = (
-                valor_liquido_item
-                - custo_item
+            campanha_rateada = custo_campanha * percentual_item
+
+            # Valor líquido do item (mesma lógica da venda: bruta - todas as deduções exceto custo)
+            valor_liquido_item = (
+                subtotal_item
+                - desconto_rateado
                 - taxa_entrega_rateada
+                - taxa_operacional_rateada
                 - taxa_cartao_rateada
                 - comissao_rateada
                 - imposto_rateado
-                - taxa_operacional_rateada
+                - campanha_rateada
             )
-            
-            # Margens do item
-            margem_sobre_venda_item = (lucro_item / valor_liquido_item * 100) if valor_liquido_item > 0 else 0
+
+            # Lucro do item = líquido - custo
+            lucro_item = valor_liquido_item - custo_item
+
+            # Margens do item (divisor = bruta do item, consistente com nível da venda)
+            margem_sobre_venda_item = (lucro_item / subtotal_item * 100) if subtotal_item > 0 else 0
             margem_sobre_custo_item = (lucro_item / custo_item * 100) if custo_item > 0 else 0
-            
+
             # Valores unitários (para tooltip)
             lucro_unitario = lucro_item / quantidade if quantidade > 0 else 0
-            margem_sobre_venda_unit = margem_sobre_venda_item  # Margem % é a mesma
-            margem_sobre_custo_unit = margem_sobre_custo_item
-            
+
             itens_detalhados.append({
                 "produto_nome": produto.nome if produto else "Produto removido",
                 "quantidade": quantidade,
@@ -657,39 +661,46 @@ async def obter_relatorio_vendas(
                 "comissao": round(comissao_rateada, 2),
                 "imposto": round(imposto_rateado, 2),
                 "taxa_operacional": round(taxa_operacional_rateada, 2),
+                "campanha": round(campanha_rateada, 2),
+                "valor_liquido": round(valor_liquido_item, 2),
                 "custo_unitario": round(custo_unitario, 2),
                 "custo_total": round(custo_item, 2),
-                "valor_liquido": round(valor_liquido_item, 2),
                 "lucro": round(lucro_item, 2),
                 "lucro_unitario": round(lucro_unitario, 2),
                 "margem_sobre_venda": round(margem_sobre_venda_item, 1),
                 "margem_sobre_custo": round(margem_sobre_custo_item, 1)
             })
-        
-        # Calcular LUCRO
+
+        # Calcular LÍQUIDA, LUCRO e MARGENS da venda (nível venda)
+        # Fórmula: líquida = bruta - desconto - entrega - operacional - cartão - comissão - imposto - campanha
+        #          lucro   = líquida - custo
+        venda_bruta_val = float(venda.subtotal)
+        desconto_val = float(venda.desconto_valor or 0)
+        taxa_entrega_val = float(venda.taxa_entrega or 0)
         imposto_total = float(venda.total) * (impostos_percentual / 100.0)
-        custo_campanha = cashback_por_venda.get(venda.id, 0.0)
-        lucro = (
-            float(venda.total)
-            - custo_total
+
+        venda_liquida_calc = (
+            venda_bruta_val
+            - desconto_val
+            - taxa_entrega_val
+            - taxa_operacional_entrega
             - taxa_total
             - comissao
             - imposto_total
-            - float(venda.taxa_entrega or 0)
-            - taxa_operacional_entrega
             - custo_campanha
         )
-        
-        # Calcular MARGENS
-        margem_sobre_venda = (lucro / float(venda.total) * 100) if venda.total > 0 else 0
+        lucro = venda_liquida_calc - custo_total
+
+        margem_sobre_venda = (lucro / venda_bruta_val * 100) if venda_bruta_val > 0 else 0
         margem_sobre_custo = (lucro / custo_total * 100) if custo_total > 0 else 0
-        
+
         # Acumular totais gerais
         custo_total_geral += custo_total
         taxa_total_geral += taxa_total
         comissao_total_geral += comissao
         lucro_total_geral += lucro
-        
+        venda_liquida_geral += venda_liquida_calc
+
         lista_vendas.append({
             "id": venda.id,
             "numero_venda": venda.numero_venda,
@@ -704,23 +715,24 @@ async def obter_relatorio_vendas(
             "taxa_operacional": round(taxa_operacional_entrega, 2),
             "custo_produtos": round(custo_total, 2),
             "custo_campanha": round(custo_campanha, 2),
-            "venda_liquida": round(float(venda.total), 2),
+            "venda_liquida": round(venda_liquida_calc, 2),
             "lucro": round(lucro, 2),
             "margem_sobre_venda": round(margem_sobre_venda, 1),
             "margem_sobre_custo": round(margem_sobre_custo, 1),
             "status": venda.status,
             "itens": itens_detalhados
         })
-    
+
     lista_vendas = sorted(lista_vendas, key=lambda x: x["data_venda"], reverse=True)
-    
+
     # Adicionar análise de rentabilidade ao resumo
     resumo["custo_total"] = round(custo_total_geral, 2)
     resumo["taxa_cartao_total"] = round(taxa_total_geral, 2)
     resumo["comissao_total"] = round(comissao_total_geral, 2)
     resumo["lucro_total"] = round(lucro_total_geral, 2)
+    resumo["venda_liquida"] = round(venda_liquida_geral, 2)
     resumo["margem_media"] = round((lucro_total_geral / venda_liquida * 100) if venda_liquida > 0 else 0, 1)
-    
+
     # ==============================================
     # PRODUTOS PARA ANÁLISE INTELIGENTE (flat list)
     # ==============================================
@@ -732,7 +744,7 @@ async def obter_relatorio_vendas(
             produto = item.produto
             if not produto:
                 continue
-                
+
             prod_nome = produto.nome
             if prod_nome not in produtos_analise:
                 produtos_analise[prod_nome] = {
@@ -744,21 +756,21 @@ async def obter_relatorio_vendas(
                     'valor_total': 0,
                     'custo_total': 0
                 }
-            
+
             produtos_analise[prod_nome]['quantidade'] += float(item.quantidade or 0)
             produtos_analise[prod_nome]['valor_total'] += float(item.subtotal or 0)
-            
+
             # Calcular custo
             if produto.preco_custo:
                 produtos_analise[prod_nome]['custo_total'] += float(produto.preco_custo) * float(item.quantidade or 0)
-    
+
     # Converter para lista e ordenar por valor
     produtos_analise_lista = sorted(
-        list(produtos_analise.values()), 
-        key=lambda x: x['valor_total'], 
+        list(produtos_analise.values()),
+        key=lambda x: x['valor_total'],
         reverse=True
     )
-    
+
     # ==============================================
     # RETORNO COMPLETO
     # ==============================================
@@ -789,10 +801,10 @@ async def exportar_vendas_pdf(
     from fastapi import HTTPException
     import logging
     import traceback
-    
+
     logger = logging.getLogger(__name__)
     current_user, tenant_id = user_and_tenant
-    
+
     try:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
@@ -806,7 +818,7 @@ async def exportar_vendas_pdf(
             status_code=500,
             detail="Biblioteca reportlab não instalada. Execute: pip install reportlab"
         )
-    
+
     # Buscar dados do relatório - obter_relatorio_vendas retorna um dict diretamente
     try:
         logger.info(f"Gerando PDF de vendas para período: {data_inicio} até {data_fim}")
@@ -815,7 +827,7 @@ async def exportar_vendas_pdf(
             data_inicio = datetime.now().replace(day=1).strftime('%Y-%m-%d')
         if not data_fim:
             data_fim = datetime.now().strftime('%Y-%m-%d')
-        
+
         # Buscar todas as vendas do período com filtro de tenant
         vendas_query = db.query(Venda).filter(
             and_(
@@ -825,9 +837,9 @@ async def exportar_vendas_pdf(
                 Venda.status != 'cancelada'
             )
         )
-        
+
         vendas = vendas_query.all()
-        
+
         # Calcular resumo
         venda_bruta = sum(float(v.subtotal or 0) for v in vendas)
         taxa_entrega = sum(float(v.taxa_entrega or 0) for v in vendas)
@@ -835,7 +847,7 @@ async def exportar_vendas_pdf(
         venda_liquida = sum(float(v.total or 0) for v in vendas)
         em_aberto = sum(float(v.total or 0) for v in vendas if v.status == 'aberta')
         quantidade_vendas = len(vendas)
-        
+
         resumo = {
             'venda_bruta': venda_bruta,
             'taxa_entrega': taxa_entrega,
@@ -844,7 +856,7 @@ async def exportar_vendas_pdf(
             'em_aberto': em_aberto,
             'quantidade_vendas': quantidade_vendas
         }
-        
+
         # Agrupar vendas por data
         vendas_por_data_dict = {}
         for v in vendas:
@@ -869,11 +881,11 @@ async def exportar_vendas_pdf(
                 vendas_por_data_dict[data_str]['valor_recebido'] += float(v.total or 0)
             else:
                 vendas_por_data_dict[data_str]['saldo_aberto'] += float(v.total or 0)
-        
+
         vendas_por_data = list(vendas_por_data_dict.values())
         for v in vendas_por_data:
             v['ticket_medio'] = v['valor_liquido'] / v['quantidade'] if v['quantidade'] > 0 else 0
-        
+
         # Formas de recebimento
         formas_dict = {}
         for v in vendas:
@@ -885,9 +897,9 @@ async def exportar_vendas_pdf(
                 if forma not in formas_dict:
                     formas_dict[forma] = 0
                 formas_dict[forma] += p.valor or 0
-        
+
         formas_recebimento = [{'forma_pagamento': k, 'valor_total': v} for k, v in formas_dict.items()]
-        
+
         # Vendas por funcionário
         func_dict = {}
         for v in vendas:
@@ -896,11 +908,11 @@ async def exportar_vendas_pdf(
                 func_dict[func_nome] = {'funcionario': func_nome, 'quantidade': 0, 'valor_total': 0}
             func_dict[func_nome]['quantidade'] += 1
             func_dict[func_nome]['valor_total'] += float(v.total or 0)
-        
+
         vendas_por_funcionario = list(func_dict.values())
         for f in vendas_por_funcionario:
             f['ticket_medio'] = f['valor_total'] / f['quantidade'] if f['quantidade'] > 0 else 0
-        
+
         # Produtos detalhados
         prod_dict = {}
         for v in vendas:
@@ -924,31 +936,31 @@ async def exportar_vendas_pdf(
                 # Adicionar custo do produto
                 if item.produto and item.produto.preco_custo:
                     prod_dict[prod_nome]['custo_total'] += float(item.produto.preco_custo) * float(item.quantidade or 0)
-        
+
         produtos_detalhados = sorted(list(prod_dict.values()), key=lambda x: x['valor_total'], reverse=True)
-        
+
         logger.info(f"Dados carregados: {len(vendas)} vendas, {len(produtos_detalhados)} produtos")
-        
+
     except Exception as e:
         logger.error(f"Erro ao buscar dados: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Erro ao buscar dados: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao buscar dados: {str(e)}")
-    
+
     # Aplicar filtros se fornecidos
     if funcionario:
         vendas_por_funcionario = [v for v in vendas_por_funcionario if v.get('funcionario') == funcionario]
     if forma_pagamento:
         formas_recebimento = [f for f in formas_recebimento if f.get('forma_pagamento') == forma_pagamento]
-    
+
     # Gerar PDF
     try:
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=15*mm, bottomMargin=15*mm)
         elements = []
         styles = getSampleStyleSheet()
-        
+
         # Título
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -960,7 +972,7 @@ async def exportar_vendas_pdf(
         )
         elements.append(Paragraph("RELATÓRIO DE VENDAS", title_style))
         elements.append(Spacer(1, 5*mm))
-        
+
         # Período
         subtitle_style = ParagraphStyle(
             'Subtitle',
@@ -971,7 +983,7 @@ async def exportar_vendas_pdf(
         periodo_text = f"Período: {data_inicio} até {data_fim}"
         elements.append(Paragraph(periodo_text, subtitle_style))
         elements.append(Spacer(1, 8*mm))
-    
+
         # Resumo Financeiro
         header_style = ParagraphStyle(
             'Header',
@@ -981,7 +993,7 @@ async def exportar_vendas_pdf(
             spaceAfter=6
         )
         elements.append(Paragraph("Resumo Financeiro", header_style))
-    
+
         resumo_data = [
             ['Métrica', 'Valor'],
             ['Venda Bruta', f"R$ {resumo['venda_bruta']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
@@ -992,7 +1004,7 @@ async def exportar_vendas_pdf(
             ['Em Aberto', f"R$ {resumo['em_aberto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
             ['Quantidade de Vendas', str(resumo['quantidade_vendas'])],
         ]
-    
+
         resumo_table = Table(resumo_data, colWidths=[60*mm, 40*mm])
         resumo_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
@@ -1009,11 +1021,11 @@ async def exportar_vendas_pdf(
         ]))
         elements.append(resumo_table)
         elements.append(Spacer(1, 10*mm))
-    
+
         # Vendas por Data (se houver)
         if vendas_por_data:
             elements.append(Paragraph("Vendas por Data", header_style))
-            
+
             vendas_data_list = [['Data', 'Qtd', 'Tkt Médio', 'Vl Bruto', 'Taxa', 'Desc.', 'Vl Líq.', 'Recebido', 'Aberto']]
             for v in vendas_por_data[:10]:  # Limitar a 10 linhas para caber na página
                 vendas_data_list.append([
@@ -1027,7 +1039,7 @@ async def exportar_vendas_pdf(
                     f"R$ {v['valor_recebido']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
                     f"R$ {v['saldo_aberto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 ])
-            
+
             vendas_table = Table(vendas_data_list, colWidths=[22*mm, 12*mm, 22*mm, 22*mm, 18*mm, 18*mm, 22*mm, 22*mm, 22*mm])
             vendas_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
@@ -1042,18 +1054,18 @@ async def exportar_vendas_pdf(
             ]))
             elements.append(vendas_table)
             elements.append(Spacer(1, 10*mm))
-    
+
         # Formas de Pagamento
         if formas_recebimento:
             elements.append(Paragraph("Formas de Pagamento", header_style))
-            
+
             formas_data_list = [['Forma de Pagamento', 'Valor Total']]
             for f in formas_recebimento:
                 formas_data_list.append([
                     f['forma_pagamento'],
                     f"R$ {f['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 ])
-            
+
             formas_table = Table(formas_data_list, colWidths=[80*mm, 40*mm])
             formas_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
@@ -1068,11 +1080,11 @@ async def exportar_vendas_pdf(
             ]))
             elements.append(formas_table)
             elements.append(Spacer(1, 10*mm))
-    
+
         # Vendas por Funcionário
         if vendas_por_funcionario:
             elements.append(Paragraph("Vendas por Funcionário", header_style))
-            
+
             func_data_list = [['Funcionário', 'Qtd Vendas', 'Valor Total', 'Ticket Médio']]
             for f in vendas_por_funcionario[:10]:
                 func_data_list.append([
@@ -1081,7 +1093,7 @@ async def exportar_vendas_pdf(
                     f"R$ {f['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
                     f"R$ {f['ticket_medio']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 ])
-            
+
             func_table = Table(func_data_list, colWidths=[80*mm, 25*mm, 35*mm, 35*mm])
             func_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
@@ -1097,11 +1109,11 @@ async def exportar_vendas_pdf(
             ]))
             elements.append(func_table)
             elements.append(Spacer(1, 10*mm))
-    
+
         # Produtos Mais Vendidos (Top 20)
         if produtos_detalhados:
             elements.append(Paragraph("Produtos Mais Vendidos (Top 20)", header_style))
-            
+
             prod_data_list = [['Produto', 'Qtd', 'Valor Total']]
             for p in produtos_detalhados[:20]:
                 prod_data_list.append([
@@ -1109,7 +1121,7 @@ async def exportar_vendas_pdf(
                     str(p['quantidade']),
                     f"R$ {p['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                 ])
-            
+
             prod_table = Table(prod_data_list, colWidths=[120*mm, 20*mm, 35*mm])
             prod_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ec4899')),
@@ -1124,7 +1136,7 @@ async def exportar_vendas_pdf(
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
             ]))
             elements.append(prod_table)
-    
+
         # Rodapé
         footer_style = ParagraphStyle(
             'Footer',
@@ -1134,19 +1146,19 @@ async def exportar_vendas_pdf(
         )
         elements.append(Spacer(1, 10*mm))
         elements.append(Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
-        
+
         # Gerar PDF
         doc.build(elements)
         buffer.seek(0)
-        
+
         logger.info("PDF gerado com sucesso")
-        
+
         return StreamingResponse(
             buffer,
             media_type="application/pdf",
             headers={"Content-Disposition": f"attachment; filename=relatorio_vendas_{data_inicio}_{data_fim}.pdf"}
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

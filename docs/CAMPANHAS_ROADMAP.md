@@ -230,16 +230,16 @@
 
 ### 3.4 Unificação via CPF Cross-Canal
 
-| Item                                                                                              | Status      | Detalhe                                  |
-| ------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------- |
-| PDV: campo CPF existe                                                                             | ✅ Feito    | Opcional                                 |
-| App: campo CPF no cadastro                                                                        | ✅ Feito    | Sprint 8 — RegisterScreen.tsx            |
-| Ecommerce: CPF obrigatório no cadastro                                                            | ✅ Feito    | Sprint 9 — validação + mínimo 11 dígitos |
-| Backend: endpoint `GET /campanhas/unificacao/sugestoes` (compara nome+fone+email e sugere merges) | ✅ Feito    | Sprint 8                                 |
-| Backend: endpoint `POST /campanhas/unificacao/confirmar` (merge manual com confirmação)           | ✅ Feito    | Sprint 8                                 |
-| Backend: endpoint `DELETE /campanhas/unificacao/{id}` (desfazer merge)                            | ✅ Feito    | Sprint 8                                 |
-| Após merge: todo histórico cross-canal conta junto para campanhas                                 | ✅ Feito    | Merge transfere Vendas + CampaignExecution + EventQueue; rollback também restaura os três |
-| **UI — Tela de sugestões de unificação** (aba 🔗 Unificação em Campanhas.jsx)                     | ✅ Feito    | Sprint 8                                 |
+| Item                                                                                              | Status   | Detalhe                                                                                   |
+| ------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| PDV: campo CPF existe                                                                             | ✅ Feito | Opcional                                                                                  |
+| App: campo CPF no cadastro                                                                        | ✅ Feito | Sprint 8 — RegisterScreen.tsx                                                             |
+| Ecommerce: CPF obrigatório no cadastro                                                            | ✅ Feito | Sprint 9 — validação + mínimo 11 dígitos                                                  |
+| Backend: endpoint `GET /campanhas/unificacao/sugestoes` (compara nome+fone+email e sugere merges) | ✅ Feito | Sprint 8                                                                                  |
+| Backend: endpoint `POST /campanhas/unificacao/confirmar` (merge manual com confirmação)           | ✅ Feito | Sprint 8                                                                                  |
+| Backend: endpoint `DELETE /campanhas/unificacao/{id}` (desfazer merge)                            | ✅ Feito | Sprint 8                                                                                  |
+| Após merge: todo histórico cross-canal conta junto para campanhas                                 | ✅ Feito | Merge transfere Vendas + CampaignExecution + EventQueue; rollback também restaura os três |
+| **UI — Tela de sugestões de unificação** (aba 🔗 Unificação em Campanhas.jsx)                     | ✅ Feito | Sprint 8                                                                                  |
 
 ---
 

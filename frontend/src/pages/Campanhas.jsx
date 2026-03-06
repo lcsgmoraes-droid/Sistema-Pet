@@ -4355,8 +4355,9 @@ export default function Campanhas() {
                     cashbacks, {resultadoMerge.transferencias?.carimbos ?? 0}{" "}
                     carimbos, {resultadoMerge.transferencias?.cupons ?? 0}{" "}
                     cupons, {resultadoMerge.transferencias?.ranking ?? 0}{" "}
-                    posições de ranking, {resultadoMerge.transferencias?.vendas ?? 0}{" "}
-                    vendas, {resultadoMerge.transferencias?.execucoes_campanhas ?? 0}{" "}
+                    posições de ranking,{" "}
+                    {resultadoMerge.transferencias?.vendas ?? 0} vendas,{" "}
+                    {resultadoMerge.transferencias?.execucoes_campanhas ?? 0}{" "}
                     execuções de campanha.
                   </p>
                 </div>
