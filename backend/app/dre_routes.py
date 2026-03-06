@@ -187,7 +187,7 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
 
     # Palavras-chave para categorização automática
     # Nota: 'taxa' foi removido — taxas financeiras são tratadas por calcular_taxas_cartao
-    palavras_pessoal = ['salário', 'salario', 'folha', 'inss', 'fgts', 'vale', 'funcionario', 'funcionário', 'comissão', 'comissao']
+    palavras_pessoal = ['salário', 'salario', 'folha', 'inss', 'fgts', 'vale', 'funcionario', 'funcionário', 'comissão', 'comissao', 'férias', 'ferias', 'décimo', 'decimo', '13º', 'rescisão', 'rescisao', 'abono', 'provisão de', 'provisao de']
     palavras_admin = ['luz', 'água', 'agua', 'internet', 'telefone', 'material', 'limpeza']
     palavras_ocupacao = ['aluguel', 'condomínio', 'condominio', 'iptu']
     palavras_vendas = ['marketing', 'propaganda', 'anúncio', 'anuncio', 'frete', 'entrega', 'entregador']

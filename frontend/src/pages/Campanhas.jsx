@@ -2037,12 +2037,6 @@ export default function Campanhas() {
             Gerencie campanhas automáticas, ranking de clientes e cupons.
           </p>
         </div>
-        <button
-          onClick={() => setModalCupomAberto(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Criar Cupom Manual
-        </button>
       </div>
 
       {/* Tabs */}

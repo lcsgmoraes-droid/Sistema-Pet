@@ -241,7 +241,7 @@ def conceder_ferias(
         descricao=f"Férias - {funcionario.nome} ({dias_ferias} dias)",
         fornecedor_id=funcionario_id,  # Funcionário como "fornecedor"
         categoria_id=cat_ferias_pagas.id,
-        dre_subcategoria_id=1,  # TODO: Mapear corretamente
+        dre_subcategoria_id=None,  # DRE usa keyword-matching na descrição, não subcategoria
         canal="loja_fisica",  # TODO: Parametrizar
         valor_original=float(valor_total),
         valor_final=float(valor_total),

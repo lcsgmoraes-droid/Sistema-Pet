@@ -230,7 +230,7 @@ def pagar_decimo_terceiro(
         descricao=f"13º Salário ({descricao_parcela} - {percentual}%) - {funcionario.nome}",
         fornecedor_id=funcionario_id,
         categoria_id=cat_13_pago.id,
-        dre_subcategoria_id=1,  # TODO: Mapear corretamente
+        dre_subcategoria_id=None,  # DRE usa keyword-matching na descrição, não subcategoria
         canal="loja_fisica",  # TODO: Parametrizar
         valor_original=float(valor_real),
         valor_final=float(valor_real),
