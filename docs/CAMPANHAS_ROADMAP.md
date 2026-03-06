@@ -22,7 +22,7 @@
 | **Ecommerce**            | CPF obrigatório no cadastro                                                                                                                                                                                                                                       |
 | **Lembretes**            | Alertas de campanhas integrados em Lembretes.jsx (Sprint 9)                                                                                                                                                                                                       |
 
-**O que ainda falta:** Destaque mensal (informar ao usuário quando o 2º colocado foi escolhido por desempate) e integrações cross-canal mais profundas.
+**O que ainda falta (06/03/2026):** Push FCM real (bloqueado — app não publicado na Play Store). Todos os demais itens do roadmap estão concluídos.
 
 ---
 
@@ -96,16 +96,16 @@
 
 ### 1.6 Dashboard de Campanhas
 
-| Item                                                                  | Status      | Detalhe                                                    |
-| --------------------------------------------------------------------- | ----------- | ---------------------------------------------------------- |
-| Endpoint `GET /campanhas/dashboard` existe                            | ✅ Feito    | Retorna dados básicos                                      |
-| Seção: campanhas ativas (por nome)                                    | ✅ Feito    | Backend retorna `{total, nomes}` — UI exibe lista de nomes |
-| Seção: cupons emitidos/utilizados/expirados hoje                      | ✅ Feito    | Dashboard exibe card de cupons ativos no total             |
-| Alertas do dia: aniversariantes de hoje (clientes e pets)             | ✅ Feito    | Dashboard endpoint retorna `aniversarios_hoje`             |
-| Alertas do dia: clientes inativos 30d/60d e sorteios pendentes        | ✅ Feito    | Sprint 9 — endpoint `alertas`                              |
-| Alertas do dia: brindes pendentes de retirada                         | ✅ Feito    | Backend + Lembretes.jsx — card de brindes pendentes        |
-| Próximos eventos: aniversários amanhã, fim do mês, sorteios da semana | ✅ Feito    | Sprint 9 — endpoint `proximos_eventos`                     |
-| Próximos eventos: destaque mensal em X dias                           | ❌ Pendente | —                                                          |
+| Item                                                                  | Status   | Detalhe                                                          |
+| --------------------------------------------------------------------- | -------- | ---------------------------------------------------------------- |
+| Endpoint `GET /campanhas/dashboard` existe                            | ✅ Feito | Retorna dados básicos                                            |
+| Seção: campanhas ativas (por nome)                                    | ✅ Feito | Backend retorna `{total, nomes}` — UI exibe lista de nomes       |
+| Seção: cupons emitidos/utilizados/expirados hoje                      | ✅ Feito | Dashboard exibe card de cupons ativos no total                   |
+| Alertas do dia: aniversariantes de hoje (clientes e pets)             | ✅ Feito | Dashboard endpoint retorna `aniversarios_hoje`                   |
+| Alertas do dia: clientes inativos 30d/60d e sorteios pendentes        | ✅ Feito | Sprint 9 — endpoint `alertas`                                    |
+| Alertas do dia: brindes pendentes de retirada                         | ✅ Feito | Backend + Lembretes.jsx — card de brindes pendentes              |
+| Próximos eventos: aniversários amanhã, fim do mês, sorteios da semana | ✅ Feito | Sprint 9 — endpoint `proximos_eventos`                           |
+| Próximos eventos: destaque mensal em X dias                           | ✅ Feito | Card no Dashboard com countdown + alerta amarelo quando ≤ 3 dias |
 
 ---
 
@@ -130,17 +130,17 @@
 
 ### 2.2 Cashback
 
-| Item                                                                                       | Status      | Detalhe                                                                            |
-| ------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------------------------------------- |
-| Modelo `CashbackTransaction` existe                                                        | ✅ Feito    | —                                                                                  |
-| Endpoint de saldo retorna `saldo_cashback`                                                 | ✅ Feito    | —                                                                                  |
-| Worker: gera cashback automático ao fechar venda                                           | ✅ Feito    | `CashbackHandler` + evento `purchase_completed` em vendas_routes                   |
-| **Cashback % por nível de ranking**: Bronze 0%, Prata 1%, Ouro 2%, Diamante 3%, Platina 5% | ✅ Feito    | Worker CashbackHandler usa `{nivel}_percent` dos params                            |
-| **Cashback % por canal**: PDV, App e Ecommerce com percentuais diferentes                  | ✅ Feito    | Bônus aditivo: `pdv_bonus_percent`, `app_bonus_percent`, `ecommerce_bonus_percent` |
-| Cashback entra no sistema de crédito existente                                             | ❌ Pendente | —                                                                                  |
-| **UI — Parametrizar % por nível**: tabela editável com Bronze→Platina                      | ✅ Feito    | Sprint 10 — grid com CampanhaField para cada nível                                 |
-| **UI — Parametrizar % por canal**: PDV / App / Ecommerce                                   | ✅ Feito    | Seção de bônus no formulário de cashback em Campanhas.jsx                          |
-| Endpoint `GET /campanhas/relatorio` mostra histórico de cashback                           | ✅ Feito    | —                                                                                  |
+| Item                                                                                       | Status   | Detalhe                                                                            |
+| ------------------------------------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------- |
+| Modelo `CashbackTransaction` existe                                                        | ✅ Feito | —                                                                                  |
+| Endpoint de saldo retorna `saldo_cashback`                                                 | ✅ Feito | —                                                                                  |
+| Worker: gera cashback automático ao fechar venda                                           | ✅ Feito | `CashbackHandler` + evento `purchase_completed` em vendas_routes                   |
+| **Cashback % por nível de ranking**: Bronze 0%, Prata 1%, Ouro 2%, Diamante 3%, Platina 5% | ✅ Feito | Worker CashbackHandler usa `{nivel}_percent` dos params                            |
+| **Cashback % por canal**: PDV, App e Ecommerce com percentuais diferentes                  | ✅ Feito | Bônus aditivo: `pdv_bonus_percent`, `app_bonus_percent`, `ecommerce_bonus_percent` |
+| Cashback entra no sistema de crédito existente                                             | ✅ Feito | Crédito manual via PDV — não descontado automático por decisão do produto          |
+| **UI — Parametrizar % por nível**: tabela editável com Bronze→Platina                      | ✅ Feito | Sprint 10 — grid com CampanhaField para cada nível                                 |
+| **UI — Parametrizar % por canal**: PDV / App / Ecommerce                                   | ✅ Feito | Seção de bônus no formulário de cashback em Campanhas.jsx                          |
+| Endpoint `GET /campanhas/relatorio` mostra histórico de cashback                           | ✅ Feito | —                                                                                  |
 
 ---
 
@@ -238,7 +238,7 @@
 | Backend: endpoint `GET /campanhas/unificacao/sugestoes` (compara nome+fone+email e sugere merges) | ✅ Feito    | Sprint 8                                 |
 | Backend: endpoint `POST /campanhas/unificacao/confirmar` (merge manual com confirmação)           | ✅ Feito    | Sprint 8                                 |
 | Backend: endpoint `DELETE /campanhas/unificacao/{id}` (desfazer merge)                            | ✅ Feito    | Sprint 8                                 |
-| Após merge: todo histórico cross-canal conta junto para campanhas                                 | ❌ Pendente | —                                        |
+| Após merge: todo histórico cross-canal conta junto para campanhas                                 | ✅ Feito    | Merge transfere Vendas + CampaignExecution + EventQueue; rollback também restaura os três |
 | **UI — Tela de sugestões de unificação** (aba 🔗 Unificação em Campanhas.jsx)                     | ✅ Feito    | Sprint 8                                 |
 
 ---
@@ -253,7 +253,7 @@
 | E-mail: infraestrutura configurada                                         | ✅ Feito    | Provedor cadastrado, funciona                                                  |
 | Push FCM: configurado                                                      | ✅ Feito    | —                                                                              |
 | Worker real de despacho de e-mails (consome NotificationQueue e envia)     | ✅ Feito    | `NotificationSender.process_batch()` SMTP real, a cada 5 min                   |
-| Worker real de despacho de push FCM                                        | ❌ Pendente | App ainda não publicado na Play Store                                          |
+| Worker real de despacho de push FCM                                        | ❌ Pendente | App ainda não publicado na Play Store (testar com EAS Preview APK)             |
 | Template de e-mail por tipo de campanha (aniversário, boas-vindas, cupom…) | ✅ Feito    | `_render_email_html()` com cores distintas por tipo de campanha                |
 | Envio escalonado em lotes (ex: 50 e-mails a cada 30 min) para evitar spam  | ✅ Feito    | BATCH_SIZE=50 em `notification_sender.py`                                      |
 | **UI — Configurar horário de envio** preferencial por tipo de campanha     | ✅ Feito    | Aba Configurações — tabela de horários por tipo de campanha (scheduler config) |
@@ -367,7 +367,7 @@ SPRINT 11 — Boas-Vindas, Cashback por Canal, Triggers Pendentes
   4. ✅ Retenção dinâmica: CRUD de regras (30d / 60d / 90d) + aba UI em Campanhas.jsx
   5. ✅ Critérios de ranking parametrizáveis (gasto mín., nº compras, meses ativos) — `_calculate_rank()` já lê de `params`
   6. ✅ Botão "Lançar Carimbo" no cadastro do cliente (ClientesNovo.jsx) — já implementado
-  7. 🔄 Destaque Mensal: aviso de desempate na UI (backend já aplica desempate; falta exibir ao usuário qual candidato foi pulado)
+  7. ✅ Destaque Mensal: aviso de desempate na UI — bloco ⊠ Desempate aplicado mostra nome do pulado, eleito e posição
   8. ✅ Gestor de Benefícios: aba completa com modo Por Cliente e Por Campanha (carimbos/cashback/cupons/ranking)
   8. ✅ Aniversariantes de hoje: exibir lista no Dashboard — já implementado (UI + backend)
 ```

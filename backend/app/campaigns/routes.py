@@ -72,7 +72,7 @@ from app.campaigns.models import (
     NotificationStatusEnum,
     CustomerMergeLog,
 )
-from app.campaigns.models import CampaignTypeEnum
+from app.campaigns.models import CampaignTypeEnum, CampaignExecution, CampaignEventQueue, EventStatusEnum
 from app.db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -3159,6 +3159,60 @@ def confirmar_unificacao(
         ).update({"customer_id": keep.id}, synchronize_session=False)
     snapshot["notif_ids"] = notif_ids
 
+    # Transfere Vendas (para ranking e destaque mensal contarem o histórico completo)
+    from app.vendas_models import Venda
+    venda_ids = [
+        r.id for r in db.query(Venda.id).filter(
+            Venda.cliente_id == remove.id,
+        ).all()
+    ]
+    if venda_ids:
+        db.query(Venda).filter(
+            Venda.id.in_(venda_ids)
+        ).update({"cliente_id": keep.id}, synchronize_session=False)
+    snapshot["venda_ids"] = venda_ids
+
+    # Transfere CampaignExecution (idempotência: evita remissolicitada duplicada)
+    # Se já existe execution para o keep com o mesmo (campaign_id, reference_period),
+    # apenas descarta a do remove (não podemos ter duplicata pela constraint UNIQUE).
+    exec_transferidos = []
+    exec_descartados = []
+    executions_remove = db.query(CampaignExecution).filter(
+        CampaignExecution.tenant_id == tenant_id,
+        CampaignExecution.customer_id == remove.id,
+    ).all()
+    for exc_row in executions_remove:
+        conflito = db.query(CampaignExecution).filter(
+            CampaignExecution.tenant_id == tenant_id,
+            CampaignExecution.campaign_id == exc_row.campaign_id,
+            CampaignExecution.customer_id == keep.id,
+            CampaignExecution.reference_period == exc_row.reference_period,
+        ).first()
+        if conflito:
+            # keep já tem esse registro — descarta o do remove
+            exec_descartados.append(exc_row.id)
+            db.delete(exc_row)
+        else:
+            exc_row.customer_id = keep.id
+            exec_transferidos.append(exc_row.id)
+    snapshot["exec_transferidos"] = exec_transferidos
+    snapshot["exec_descartados"] = exec_descartados
+
+    # Transfere CampaignEventQueue (eventos pendentes do cliente removido)
+    event_ids = [
+        r.id for r in db.query(CampaignEventQueue.id).filter(
+            CampaignEventQueue.tenant_id == tenant_id,
+            CampaignEventQueue.status == EventStatusEnum.pending,
+            CampaignEventQueue.payload["customer_id"].astext == str(remove.id),
+        ).all()
+    ]
+    if event_ids:
+        for ev in db.query(CampaignEventQueue).filter(CampaignEventQueue.id.in_(event_ids)).all():
+            payload = dict(ev.payload)
+            payload["customer_id"] = keep.id
+            ev.payload = payload
+    snapshot["event_ids"] = event_ids
+
     # Copiar CPF para o cliente mantido (se não tiver)
     if not keep.cpf and remove.cpf:
         keep.cpf = remove.cpf
@@ -3188,6 +3242,10 @@ def confirmar_unificacao(
             "ranking": len(rank_ids),
             "sorteios": len(drawing_ids),
             "notificacoes": len(notif_ids),
+            "vendas": len(venda_ids),
+            "execucoes_campanhas": len(exec_transferidos),
+            "execucoes_descartadas": len(exec_descartados),
+            "eventos_pendentes": len(event_ids),
         },
     }
 
@@ -3251,6 +3309,29 @@ def desfazer_unificacao(
         db.query(NotificationQueue).filter(
             NotificationQueue.id.in_(notif_ids)
         ).update({"customer_id": remove_id}, synchronize_session=False)
+
+    # Restaura Vendas
+    from app.vendas_models import Venda
+    venda_ids = snap.get("venda_ids", [])
+    if venda_ids:
+        db.query(Venda).filter(
+            Venda.id.in_(venda_ids)
+        ).update({"cliente_id": remove_id}, synchronize_session=False)
+
+    # Restaura CampaignExecution (apenas os transferidos; os descartados são perdidos)
+    exec_transferidos = snap.get("exec_transferidos", [])
+    if exec_transferidos:
+        db.query(CampaignExecution).filter(
+            CampaignExecution.id.in_(exec_transferidos)
+        ).update({"customer_id": remove_id}, synchronize_session=False)
+
+    # Restaura CampaignEventQueue (recoloca customer_id original no payload)
+    event_ids = snap.get("event_ids", [])
+    if event_ids:
+        for ev in db.query(CampaignEventQueue).filter(CampaignEventQueue.id.in_(event_ids)).all():
+            payload = dict(ev.payload)
+            payload["customer_id"] = remove_id
+            ev.payload = payload
 
     merge_log.undone = True
     merge_log.undone_at = datetime.now(timezone.utc)
