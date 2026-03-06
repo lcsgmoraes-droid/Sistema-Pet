@@ -501,7 +501,18 @@ export default function Campanhas() {
     setLoadingCampanhas(true);
     try {
       const res = await api.get("/campanhas");
-      setCampanhas(res.data);
+      // Se não há nenhuma campanha, inicializa automaticamente as campanhas padrão
+      if (res.data.length === 0) {
+        try {
+          await api.post("/campanhas/seed");
+          const res2 = await api.get("/campanhas");
+          setCampanhas(res2.data);
+        } catch {
+          setCampanhas([]);
+        }
+      } else {
+        setCampanhas(res.data);
+      }
     } catch (e) {
       console.error("Erro ao carregar campanhas:", e);
     } finally {
