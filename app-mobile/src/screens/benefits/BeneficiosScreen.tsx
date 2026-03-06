@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Clipboard,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
