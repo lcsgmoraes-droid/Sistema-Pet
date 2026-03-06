@@ -393,6 +393,61 @@ function SecaoCupons({
   );
 }
 
+function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
+  const { nivel, thresholds } = ranking;
+  const idxAtual = NIVEL_ORDEM.indexOf(nivel);
+  const proximosNiveis = NIVEL_ORDEM.slice(idxAtual + 1);
+
+  if (proximosNiveis.length === 0) return null;
+
+  return (
+    <View style={styles.secao}>
+      <View style={styles.secaoTitulo}>
+        <Ionicons name="trending-up-outline" size={20} color={CORES.primario} />
+        <Text style={styles.secaoTituloTexto}>Próximos Níveis</Text>
+      </View>
+      <Text style={styles.proximosSubtitulo}>
+        Veja o que você ganha ao subir de nível
+      </Text>
+      {proximosNiveis.map((lvl) => {
+        const cor = NIVEL_COR[lvl] ?? CORES.primario;
+        const key = THRESHOLD_KEY[lvl] as keyof RankingThresholds | undefined;
+        const meta = key ? thresholds[key] : null;
+        const vantagens = NIVEL_VANTAGENS[lvl] ?? [];
+        return (
+          <View key={lvl} style={[styles.nivelCard, { borderLeftColor: cor }]}>
+            <View style={styles.nivelCardTopo}>
+              <View style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}>
+                <Text style={styles.nivelBadgePequenoTexto}>
+                  {NIVEL_PT[lvl]?.[0] ?? "?"}
+                </Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: ESPACO.sm }}>
+                <Text style={[styles.nivelNome, { color: cor }]}>
+                  {NIVEL_PT[lvl]}
+                </Text>
+                {meta != null && (
+                  <Text style={styles.nivelMeta}>
+                    A partir de R$ {brl(meta)} em compras no período
+                  </Text>
+                )}
+              </View>
+            </View>
+            {vantagens.map((v, i) => (
+              <View key={i} style={styles.vantagemItemFuturo}>
+                <Text style={[styles.vantagemCheckmarkFuturo, { color: cor }]}>
+                  ✦
+                </Text>
+                <Text style={styles.vantagemTextoFuturo}>{v}</Text>
+              </View>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tela principal
 // ---------------------------------------------------------------------------
@@ -464,6 +519,7 @@ export default function BeneficiosScreen() {
       }
     >
       <SecaoRanking ranking={dados.ranking} />
+      <SecaoProximosNiveis ranking={dados.ranking} />
       <SecaoCarimbos carimbos={dados.carimbos} />
       <SecaoCashback saldo={dados.cashback.saldo} />
       <SecaoCupons
@@ -688,5 +744,54 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: FONTE.normal,
+  },
+
+  // Próximos Níveis
+  proximosSubtitulo: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    marginBottom: ESPACO.sm,
+  },
+  nivelCard: {
+    borderLeftWidth: 3,
+    borderRadius: RAIO.sm,
+    backgroundColor: CORES.fundo,
+    padding: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+  },
+  nivelCardTopo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: ESPACO.xs,
+  },
+  nivelBadgePequeno: {
+    width: 36,
+    height: 36,
+    borderRadius: RAIO.circulo,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nivelBadgePequenoTexto: { fontSize: 16, fontWeight: "800", color: "#fff" },
+  nivelNome: { fontSize: FONTE.normal, fontWeight: "700" },
+  nivelMeta: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    marginTop: 1,
+  },
+  vantagemItemFuturo: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 2,
+  },
+  vantagemCheckmarkFuturo: {
+    fontSize: FONTE.pequena,
+    fontWeight: "700",
+    marginRight: 6,
+    marginTop: 1,
+  },
+  vantagemTextoFuturo: {
+    flex: 1,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
   },
 });
