@@ -9,7 +9,7 @@ interface AuthState {
 
   // Ações
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, nome?: string) => Promise<void>;
+  register: (email: string, password: string, nome?: string, cpf?: string) => Promise<void>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (updates: Partial<EcommerceUser>) => void;
@@ -25,8 +25,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ isAuthenticated: true, user });
   },
 
-  register: async (email, password, nome) => {
-    const { user } = await AuthService.register(email, password, nome);
+  register: async (email, password, nome, cpf) => {
+    const { user } = await AuthService.register(email, password, nome, cpf);
     set({ isAuthenticated: true, user });
   },
 

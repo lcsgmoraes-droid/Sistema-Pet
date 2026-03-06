@@ -19,6 +19,7 @@ import PetListScreen from '../screens/pets/PetListScreen';
 import PetFormScreen from '../screens/pets/PetFormScreen';
 import FoodCalculatorScreen from '../screens/pets/FoodCalculatorScreen';
 import OrdersScreen from '../screens/orders/OrdersScreen';
+import BeneficiosScreen from '../screens/benefits/BeneficiosScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -186,6 +187,18 @@ export default function MainNavigator() {
           ),
           headerShown: true,
           headerTitle: 'Meus Pedidos',
+        }}
+      />
+      <Tab.Screen
+        name="Beneficios"
+        component={BeneficiosScreen}
+        options={{
+          title: 'Benefícios',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="gift-outline" size={size} color={color} />
+          ),
+          headerShown: true,
+          headerTitle: 'Meus Benefícios',
         }}
       />
       <Tab.Screen

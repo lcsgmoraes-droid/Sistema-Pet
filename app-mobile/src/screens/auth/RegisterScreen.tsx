@@ -17,6 +17,7 @@ import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 
 export default function RegisterScreen({ navigation }: any) {
   const [nome, setNome] = useState('');
+  const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -30,6 +31,11 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha.');
       return;
     }
+    const cpfDigits = cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11) {
+      Alert.alert('CPF obrigatório', 'Informe um CPF válido com 11 dígitos.');
+      return;
+    }
     if (senha !== confirmarSenha) {
       Alert.alert('Senhas diferentes', 'A confirmação de senha não confere.');
       return;
@@ -40,7 +46,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
     setCarregando(true);
     try {
-      await register(email.trim().toLowerCase(), senha, nome.trim() || undefined);
+      await register(email.trim().toLowerCase(), senha, nome.trim() || undefined, cpf.trim());
       // Login automático após registro — AppNavigator redireciona sozinho
     } catch (err: any) {
       console.log('=== ERRO REGISTRO ===');
@@ -93,6 +99,16 @@ export default function RegisterScreen({ navigation }: any) {
             value={nome}
             onChangeText={setNome}
             autoCapitalize="words"
+          />
+
+          <Text style={styles.label}>CPF *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="000.000.000-00"
+            placeholderTextColor={CORES.textoClaro}
+            keyboardType="numeric"
+            value={cpf}
+            onChangeText={setCpf}
           />
 
           <Text style={styles.label}>E-mail *</Text>

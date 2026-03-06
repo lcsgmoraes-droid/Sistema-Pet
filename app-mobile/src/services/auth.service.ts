@@ -16,12 +16,14 @@ export async function login(email: string, password: string): Promise<AuthRespon
 export async function register(
   email: string,
   password: string,
-  nome?: string
+  nome?: string,
+  cpf?: string
 ): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/registrar', {
     email,
     password,
     nome,
+    cpf: cpf || undefined,
   });
   await SecureStore.setItemAsync('auth_token', data.access_token);
   return data;
