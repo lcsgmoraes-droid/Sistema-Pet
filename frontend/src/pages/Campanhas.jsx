@@ -1860,7 +1860,7 @@ export default function Campanhas() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
                   <p className="text-3xl font-bold text-blue-700">
                     {dashboard.campanhas_ativas?.total ??
@@ -1903,6 +1903,31 @@ export default function Campanhas() {
                     💰 Saldo passivo (cashback)
                   </p>
                 </div>
+                <div
+                  className={`rounded-xl border shadow-sm p-4 text-center ${dashboard.proximos_eventos?.dias_ate_fim_mes <= 3 ? "bg-yellow-50 border-yellow-300" : "bg-white"}`}
+                >
+                  <p
+                    className={`text-3xl font-bold ${dashboard.proximos_eventos?.dias_ate_fim_mes <= 3 ? "text-yellow-700" : "text-indigo-700"}`}
+                  >
+                    {dashboard.proximos_eventos?.dias_ate_fim_mes ?? "—"}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    🌟{" "}
+                    {dashboard.proximos_eventos?.dias_ate_fim_mes === 0
+                      ? "Último dia — calcule o destaque!"
+                      : "dia(s) p/ Destaque Mensal"}
+                  </p>
+                </div>
+                {(dashboard.cupons_expirados_hoje ?? 0) > 0 && (
+                  <div className="bg-red-50 rounded-xl border border-red-200 shadow-sm p-4 text-center">
+                    <p className="text-3xl font-bold text-red-700">
+                      {dashboard.cupons_expirados_hoje}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ⏰ Cupons expiram hoje
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white rounded-xl border shadow-sm overflow-hidden">

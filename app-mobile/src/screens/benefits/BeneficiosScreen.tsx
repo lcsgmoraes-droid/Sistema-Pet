@@ -417,7 +417,9 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
         return (
           <View key={lvl} style={[styles.nivelCard, { borderLeftColor: cor }]}>
             <View style={styles.nivelCardTopo}>
-              <View style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}>
+              <View
+                style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}
+              >
                 <Text style={styles.nivelBadgePequenoTexto}>
                   {NIVEL_PT[lvl]?.[0] ?? "?"}
                 </Text>

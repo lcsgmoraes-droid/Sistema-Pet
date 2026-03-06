@@ -275,6 +275,38 @@ export default function Lembretes() {
                 </p>
               </div>
             )}
+            {/* Novos inativos hoje */}
+            {alertasCampanhas.alertas?.novos_inativos_hoje > 0 && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1px solid #fca5a5",
+                  borderRadius: "8px",
+                  padding: "10px 14px",
+                  minWidth: "160px",
+                }}
+              >
+                <p
+                  style={{
+                    fontWeight: "700",
+                    color: "#b91c1c",
+                    fontSize: "22px",
+                    margin: 0,
+                  }}
+                >
+                  {alertasCampanhas.alertas.novos_inativos_hoje}
+                </p>
+                <p
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "12px",
+                    margin: "2px 0 0",
+                  }}
+                >
+                  🚨 Atingiram 30 dias de inatividade hoje
+                </p>
+              </div>
+            )}
             {/* Sorteios pendentes */}
             {alertasCampanhas.alertas?.total_sorteios_pendentes > 0 && (
               <div
@@ -425,12 +457,12 @@ export default function Lembretes() {
                 </div>
               </div>
             )}
-            {/* Fim do mês */}
-            {alertasCampanhas.proximos_eventos?.dias_ate_fim_mes <= 5 && (
+            {/* Fim do mês - sempre visível */}
+            {alertasCampanhas.proximos_eventos?.dias_ate_fim_mes != null && (
               <div
                 style={{
-                  background: "#f0fdf4",
-                  border: "1px solid #86efac",
+                  background: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "#fefce8" : "#f0fdf4",
+                  border: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "1px solid #fde047" : "1px solid #86efac",
                   borderRadius: "8px",
                   padding: "10px 14px",
                   minWidth: "160px",
@@ -439,14 +471,12 @@ export default function Lembretes() {
                 <p
                   style={{
                     fontWeight: "700",
-                    color: "#15803d",
+                    color: alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "#a16207" : "#15803d",
                     fontSize: "22px",
                     margin: 0,
                   }}
                 >
-                  {alertasCampanhas.proximos_eventos.dias_ate_fim_mes === 0
-                    ? "0"
-                    : alertasCampanhas.proximos_eventos.dias_ate_fim_mes}
+                  {alertasCampanhas.proximos_eventos.dias_ate_fim_mes}
                 </p>
                 <p
                   style={{

@@ -874,6 +874,16 @@ def dashboard_campanhas(
         .scalar()
     ) or 0
 
+    # Cupons expirados hoje (valid_until = hoje)
+    cupons_expirados_hoje = (
+        db.query(sqlfunc.count(Coupon.id))
+        .filter(
+            Coupon.tenant_id == tenant_id,
+            sqlfunc.date(Coupon.valid_until) == hoje,
+        )
+        .scalar()
+    ) or 0
+
     # Cupons ativos (todos)
     cupons_ativos_total = (
         db.query(sqlfunc.count(Coupon.id))
@@ -1001,8 +1011,33 @@ def dashboard_campanhas(
         )
         inativos_30d = len(todos_com_venda_ids - ativos_30d_ids)
         inativos_60d = len(todos_com_venda_ids - ativos_60d_ids)
+
+        # Clientes que atingiram inatividade HOJE (última compra foi há exatamente 30 dias)
+        corte_31 = datetime.combine(hoje - timedelta(days=31), datetime.min.time())
+        ultimas_compras_subq = (
+            db.query(
+                VendaModel.cliente_id,
+                sqlfunc.max(VendaModel.data_venda).label("ultima_compra"),
+            )
+            .filter(
+                VendaModel.tenant_id == tenant_id,
+                VendaModel.cliente_id.isnot(None),
+                VendaModel.status == "finalizada",
+            )
+            .group_by(VendaModel.cliente_id)
+            .subquery()
+        )
+        novos_inativos_hoje = (
+            db.query(sqlfunc.count())
+            .select_from(ultimas_compras_subq)
+            .filter(
+                ultimas_compras_subq.c.ultima_compra >= corte_31,
+                ultimas_compras_subq.c.ultima_compra < corte_30,
+            )
+            .scalar()
+        ) or 0
     except Exception:
-        pass
+        novos_inativos_hoje = 0
 
     # ── Sorteios pendentes (não concluídos) ───────────────────────────────
     sorteios_pendentes = []
@@ -1091,6 +1126,7 @@ def dashboard_campanhas(
         "campanhas_ativas": campanhas_ativas,
         "cupons_emitidos_hoje": cupons_hoje,
         "cupons_usados_hoje": cupons_usados_hoje,
+        "cupons_expirados_hoje": cupons_expirados_hoje,
         "cupons_ativos_total": cupons_ativos_total,
         "saldo_passivo_cashback": round(saldo_passivo, 2),
         "aniversarios_hoje": aniversarios_clientes + aniversarios_pets,
@@ -1099,6 +1135,7 @@ def dashboard_campanhas(
         "alertas": {
             "inativos_30d": inativos_30d,
             "inativos_60d": inativos_60d,
+            "novos_inativos_hoje": novos_inativos_hoje,
             "sorteios_pendentes": sorteios_pendentes,
             "total_sorteios_pendentes": len(sorteios_pendentes),
             "brindes_pendentes": brindes_pendentes,
