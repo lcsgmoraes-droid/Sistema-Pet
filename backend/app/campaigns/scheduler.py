@@ -95,12 +95,32 @@ class CampaignScheduler:
             replace_existing=True,
         )
 
+        # Job 6: Execução automática de sorteios (diário às 10:00)
+        self.scheduler.add_job(
+            func=self._auto_execute_drawings,
+            trigger=CronTrigger(hour=10, minute=0),
+            id="campaign_auto_drawings",
+            name="Campanhas: Executar Sorteios Automáticos",
+            replace_existing=True,
+        )
+
+        # Job 7: Destaque Mensal automático (dia 1 às 08:00)
+        self.scheduler.add_job(
+            func=self._auto_enviar_destaque_mensal,
+            trigger=CronTrigger(day=1, hour=8, minute=0),
+            id="campaign_destaque_mensal",
+            name="Campanhas: Destaque Mensal Automático",
+            replace_existing=True,
+        )
+
         logger.info("[CampaignScheduler] Jobs registrados:")
         logger.info("   - daily_birthday_check: 08:00")
         logger.info("   - weekly_inactivity_check: toda segunda às 09:00")
         logger.info("   - monthly_ranking_recalc: dia 1 às 06:00")
         logger.info("   - campaign_worker_tick: a cada 10s")
         logger.info("   - campaign_notification_tick: a cada 5 min")
+        logger.info("   - auto_drawings: 10:00 diário")
+        logger.info("   - destaque_mensal: dia 1 às 08:00")
 
     def start(self) -> None:
         if not self.scheduler.running:
@@ -148,6 +168,230 @@ class CampaignScheduler:
                 logger.info("[CampaignScheduler] Notificações: %s", stats)
         except Exception as exc:
             logger.exception("[CampaignScheduler] Erro no notification tick: %s", exc)
+
+    def _auto_execute_drawings(self) -> None:
+        """Executa automaticamente sorteios com auto_execute=True cuja draw_date já passou."""
+        from datetime import datetime, timezone as _tz
+        from app.campaigns.models import Drawing, DrawingEntry, DrawingStatusEnum
+        from app.campaigns.notification_service import enqueue_email
+        import hashlib, random as _random, uuid as _uuid
+
+        db = SessionLocal()
+        try:
+            now = datetime.now(_tz.utc)
+            due = (
+                db.query(Drawing)
+                .filter(
+                    Drawing.auto_execute == True,
+                    Drawing.status == DrawingStatusEnum.open,
+                    Drawing.draw_date <= now,
+                )
+                .all()
+            )
+            for drawing in due:
+                try:
+                    entries = (
+                        db.query(DrawingEntry)
+                        .filter(DrawingEntry.drawing_id == drawing.id)
+                        .order_by(DrawingEntry.id.asc())
+                        .all()
+                    )
+                    if not entries:
+                        logger.warning("[AutoDrawings] Sorteio %d sem participantes, pulando.", drawing.id)
+                        continue
+
+                    ids_csv = ",".join(str(e.id) for e in entries)
+                    entries_hash = hashlib.sha256(ids_csv.encode()).hexdigest()
+                    seed_uuid = _uuid.uuid4()
+                    pool = []
+                    for e in entries:
+                        pool.extend([e] * max(1, e.ticket_count))
+                    rng = _random.Random(str(seed_uuid))
+                    rng.shuffle(pool)
+                    winner_entry = pool[0]
+
+                    drawing.status = DrawingStatusEnum.drawn
+                    drawing.seed_uuid = seed_uuid
+                    drawing.entries_hash = entries_hash
+                    drawing.entries_frozen_at = now
+                    drawing.winner_entry_id = winner_entry.id
+                    db.flush()
+
+                    # Notificar ganhador
+                    from app.models import Cliente
+                    cliente = db.query(Cliente).filter(
+                        Cliente.id == winner_entry.customer_id,
+                        Cliente.tenant_id == drawing.tenant_id,
+                    ).first()
+                    if cliente and cliente.email:
+                        prize_text = drawing.prize_description or "o prêmio"
+                        enqueue_email(
+                            db,
+                            tenant_id=drawing.tenant_id,
+                            customer_id=cliente.id,
+                            subject=f"🏆 Você ganhou o sorteio: {drawing.name}!",
+                            body=(
+                                f"Parabéns, {cliente.nome}! 🎉\n\n"
+                                f"Você foi sorteado(a) como ganhador(a) do sorteio **{drawing.name}**.\n"
+                                f"Prêmio: {prize_text}\n\n"
+                                "Entre em contato conosco para retirar seu prêmio!"
+                            ),
+                            email_address=cliente.email,
+                            idempotency_key=f"sorteio:{drawing.id}:ganhador:{cliente.id}",
+                        )
+                    logger.info(
+                        "[AutoDrawings] Sorteio %d executado. Ganhador: customer_id=%d",
+                        drawing.id, winner_entry.customer_id,
+                    )
+                except Exception as draw_exc:
+                    logger.exception("[AutoDrawings] Erro no sorteio %d: %s", drawing.id, draw_exc)
+            db.commit()
+        except Exception as exc:
+            logger.exception("[AutoDrawings] Erro geral: %s", exc)
+            db.rollback()
+        finally:
+            db.close()
+
+    def _auto_enviar_destaque_mensal(self) -> None:
+        """
+        Envia automaticamente o destaque mensal no dia 1 de cada mês,
+        para tenants que têm auto_destaque_mensal=True na campanha ranking_monthly.
+        """
+        from datetime import datetime, timezone as _tz, timedelta
+        from app.campaigns.models import Campaign, CampaignTypeEnum, Coupon, CouponStatusEnum
+        from app.campaigns.coupon_service import create_coupon
+        from app.campaigns.notification_service import enqueue_email
+        from app.models import Tenant
+
+        db = SessionLocal()
+        try:
+            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+            now = datetime.now(_tz.utc)
+            first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_month = (first_day_this_month - timedelta(days=1))
+            period = last_month.strftime("%Y-%m")
+
+            for tenant in tenants:
+                try:
+                    # Checar se tem destaque automático ativado
+                    campanha = (
+                        db.query(Campaign)
+                        .filter(
+                            Campaign.tenant_id == tenant.id,
+                            Campaign.campaign_type == CampaignTypeEnum.ranking_monthly,
+                        )
+                        .first()
+                    )
+                    if not campanha:
+                        continue
+                    params = campanha.params or {}
+                    if not params.get("auto_destaque_mensal"):
+                        continue
+
+                    # Importar localmente para calcular vencedores
+                    from app.vendas_models import Venda
+                    from app.models import Cliente
+                    from sqlalchemy import func as sqlfunc
+                    from app.core.security import get_user_tenant_from_db
+                    from app.models import User
+
+                    agg = (
+                        db.query(
+                            Venda.cliente_id,
+                            sqlfunc.sum(Venda.total).label("total_spent"),
+                            sqlfunc.count(Venda.id).label("total_purchases"),
+                        )
+                        .join(User, User.id == Venda.user_id)
+                        .filter(
+                            User.tenant_id == tenant.id,
+                            Venda.status == "finalizada",
+                            Venda.cliente_id.isnot(None),
+                            Venda.data_finalizacao >= first_day_this_month - timedelta(days=31),
+                            Venda.data_finalizacao < first_day_this_month,
+                        )
+                        .group_by(Venda.cliente_id)
+                        .all()
+                    )
+                    if not agg:
+                        continue
+
+                    rows = [
+                        {
+                            "customer_id": r.cliente_id,
+                            "total_spent": float(r.total_spent or 0),
+                            "total_purchases": r.total_purchases or 0,
+                        }
+                        for r in agg
+                    ]
+                    by_spent = sorted(rows, key=lambda x: x["total_spent"], reverse=True)
+                    by_purchases = sorted(rows, key=lambda x: x["total_purchases"], reverse=True)
+
+                    vencedores = {}
+                    usados = set()
+                    for categoria, lista in [("maior_gasto", by_spent), ("mais_compras", by_purchases)]:
+                        for candidato in lista:
+                            if candidato["customer_id"] not in usados:
+                                vencedores[categoria] = candidato
+                                usados.add(candidato["customer_id"])
+                                break
+
+                    coupon_value = float(params.get("auto_destaque_coupon_value", 50.0))
+                    coupon_days = int(params.get("auto_destaque_coupon_days", 10))
+
+                    for categoria, info in vencedores.items():
+                        customer_id = info["customer_id"]
+                        meta_key = f"destaque:{period}:{categoria}"
+                        # Anti-duplicidade
+                        existing = db.query(Coupon).filter(
+                            Coupon.tenant_id == tenant.id,
+                            Coupon.meta["destaque_key"].astext == meta_key,
+                        ).first()
+                        if existing:
+                            continue
+                        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+                        if not cliente:
+                            continue
+
+                        coupon = create_coupon(
+                            db,
+                            tenant_id=tenant.id,
+                            campaign=campanha,
+                            customer_id=customer_id,
+                            coupon_type="fixed",
+                            discount_value=coupon_value,
+                            channel="all",
+                            valid_days=coupon_days,
+                            prefix="DEST",
+                            meta={"destaque_key": meta_key, "categoria": categoria, "periodo": period},
+                        )
+                        if cliente.email:
+                            cat_label = "Maior Destaque do Mês" if categoria == "maior_gasto" else "Mais Compras do Mês"
+                            enqueue_email(
+                                db,
+                                tenant_id=tenant.id,
+                                customer_id=customer_id,
+                                subject=f"🌟 Parabéns! Você é o {cat_label}!",
+                                body=(
+                                    f"Olá {cliente.nome}! 🥇\n\n"
+                                    f"Você ganhou o prêmio de **{cat_label}** de {period}!\n"
+                                    f"Seu cupom de R$ {coupon_value:.0f} de desconto: {coupon.code}\n"
+                                    f"Válido por {coupon_days} dias. Aproveite!"
+                                ),
+                                email_address=cliente.email,
+                                idempotency_key=f"destaque:{tenant.id}:{period}:{categoria}:email",
+                            )
+                        logger.info(
+                            "[AutoDestaque] tenant=%s period=%s categoria=%s customer=%d cupom=%s",
+                            tenant.id, period, categoria, customer_id, coupon.code,
+                        )
+                    db.commit()
+                except Exception as tenant_exc:
+                    logger.exception("[AutoDestaque] Erro no tenant %s: %s", tenant.id, tenant_exc)
+                    db.rollback()
+        except Exception as exc:
+            logger.exception("[AutoDestaque] Erro geral: %s", exc)
+        finally:
+            db.close()
 
     def _auto_seed_all_tenants(self) -> None:
         """Garante que todos os tenants ativos têm campanhas padrão criadas."""

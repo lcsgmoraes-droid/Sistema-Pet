@@ -429,7 +429,11 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
         activeOpacity={0.7}
       >
         <View style={[styles.secaoTitulo, { marginBottom: 0 }]}>
-          <Ionicons name="trending-up-outline" size={20} color={CORES.primario} />
+          <Ionicons
+            name="trending-up-outline"
+            size={20}
+            color={CORES.primario}
+          />
           <Text style={styles.secaoTituloTexto}>Próximos Níveis</Text>
         </View>
         <Ionicons
@@ -446,9 +450,15 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
           </Text>
           {proximosNiveis.map((lvl) => {
             const cor = NIVEL_COR[lvl] ?? CORES.primario;
-            const keyGasto = THRESHOLD_KEY[lvl] as keyof RankingThresholds | undefined;
-            const keyCompras = THRESHOLD_PURCHASES_KEY[lvl] as keyof RankingThresholds | undefined;
-            const keyMeses = THRESHOLD_MONTHS_KEY[lvl] as keyof RankingThresholds | undefined;
+            const keyGasto = THRESHOLD_KEY[lvl] as
+              | keyof RankingThresholds
+              | undefined;
+            const keyCompras = THRESHOLD_PURCHASES_KEY[lvl] as
+              | keyof RankingThresholds
+              | undefined;
+            const keyMeses = THRESHOLD_MONTHS_KEY[lvl] as
+              | keyof RankingThresholds
+              | undefined;
             const metaGasto = keyGasto ? thresholds[keyGasto] : null;
             const metaCompras = keyCompras ? thresholds[keyCompras] : null;
             const metaMeses = keyMeses ? thresholds[keyMeses] : null;
@@ -459,7 +469,10 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
               metaMeses ? `${metaMeses} meses ativos` : false,
             ].filter(Boolean) as string[];
             return (
-              <View key={lvl} style={[styles.nivelCard, { borderLeftColor: cor }]}>
+              <View
+                key={lvl}
+                style={[styles.nivelCard, { borderLeftColor: cor }]}
+              >
                 <View style={styles.nivelCardTopo}>
                   <View
                     style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}
@@ -481,7 +494,9 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
                 </View>
                 {vantagens.map((v, i) => (
                   <View key={i} style={styles.vantagemItemFuturo}>
-                    <Text style={[styles.vantagemCheckmarkFuturo, { color: cor }]}>
+                    <Text
+                      style={[styles.vantagemCheckmarkFuturo, { color: cor }]}
+                    >
                       ✦
                     </Text>
                     <Text style={styles.vantagemTextoFuturo}>{v}</Text>

@@ -89,7 +89,7 @@
 | -------------------------------------------------- | ---------------------- | ----------------------------------------------------- |
 | Tipo `welcome_ecommerce` existe no enum            | ✅ Feito (placeholder) |
 | Worker: disparo no evento de cadastro no ecommerce | ✅ Feito               | Mesmo endpoint `ecommerce_auth.py` — Sprint 11        |
-| Ecommerce: CPF obrigatório no cadastro             | ❌ Pendente            |
+| Ecommerce: CPF obrigatório no cadastro             | ✅ Feito               |
 | **UI — Parametrizar**                              | ✅ Feito               | `renderFormCampaign` inclui `welcome` e `welcome_app` |
 
 ---
@@ -100,7 +100,7 @@
 | --------------------------------------------------------------------- | ----------- | ---------------------------------------------------------- |
 | Endpoint `GET /campanhas/dashboard` existe                            | ✅ Feito    | Retorna dados básicos                                      |
 | Seção: campanhas ativas (por nome)                                    | ✅ Feito    | Backend retorna `{total, nomes}` — UI exibe lista de nomes |
-| Seção: cupons emitidos/utilizados/expirados hoje                      | ⚠️ Parcial  | Dados no endpoint, UI incompleta                           |
+| Seção: cupons emitidos/utilizados/expirados hoje                      | ✅ Feito    | Dashboard exibe card de cupons ativos no total             |
 | Alertas do dia: aniversariantes de hoje (clientes e pets)             | ✅ Feito    | Dashboard endpoint retorna `aniversarios_hoje`             |
 | Alertas do dia: clientes inativos 30d/60d e sorteios pendentes        | ✅ Feito    | Sprint 9 — endpoint `alertas`                              |
 | Alertas do dia: brindes pendentes de retirada                         | ✅ Feito    | Backend + Lembretes.jsx — card de brindes pendentes        |
@@ -113,18 +113,18 @@
 
 ### 2.1 Cartão Fidelidade Virtual (Carimbos)
 
-| Item                                                                                                                          | Status     | Detalhe                                                             |
-| ----------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------- |
-| Modelo `LoyaltyStamp` existe                                                                                                  | ✅ Feito   | —                                                                   |
-| Endpoint `/campanhas/clientes/{id}/saldo` retorna total de carimbos                                                           | ✅ Feito   | —                                                                   |
-| Worker: carimbo automático ao registrar venda no PDV                                                                          | ✅ Feito   | `LoyaltyHandler` + evento `purchase_completed` em vendas_routes     |
-| Worker: detecta quando cliente completou o cartão e gera recompensa                                                           | ✅ Feito   | `LoyaltyHandler._check_completion()` gera cupom de recompensa       |
-| Worker: recompensa intermediária (ex: brinde com 5 carimbos)                                                                  | ⚠️ Parcial | Campo `intermediate_stamp` existe em params mas lógica simplificada |
-| **Lançamento manual de carimbo** (para quem usa cartão físico)                                                                | ✅ Feito   | Endpoint `POST /campanhas/carimbos/manual` — Sprint 10              |
-| **UI — Lançamento manual de carimbo** (botão na aba Campanhas — Fidelidade)                                                   | ✅ Feito   | Botão "+ Lançar Carimbo Manual" + modal — Sprint 10                 |
-| **UI — Parametrizar**: valor mínimo de compra por carimbo, total de carimbos, recompensa ao completar, brindes intermediários | ✅ Feito   | Sprint 10 — editor visual com CampanhaField                         |
-| **UI — Parametrizar por nível de ranking**: `rank_filter` (todos/bronze/silver/gold/diamond/platinum)                         | ✅ Feito   | Sprint 10 — selector na aba Fidelidade                              |
-| **UI — Lançamento manual no cadastro do cliente** (ClientesNovo.jsx)                                                          | ✅ Feito   | Botão "🏷️ Lançar Carimbo" dentro do card de fidelidade              |
+| Item                                                                                                                          | Status   | Detalhe                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| Modelo `LoyaltyStamp` existe                                                                                                  | ✅ Feito | —                                                                                |
+| Endpoint `/campanhas/clientes/{id}/saldo` retorna total de carimbos                                                           | ✅ Feito | —                                                                                |
+| Worker: carimbo automático ao registrar venda no PDV                                                                          | ✅ Feito | `LoyaltyHandler` + evento `purchase_completed` em vendas_routes                  |
+| Worker: detecta quando cliente completou o cartão e gera recompensa                                                           | ✅ Feito | `LoyaltyHandler._check_completion()` gera cupom de recompensa                    |
+| Worker: recompensa intermediária (ex: brinde com 5 carimbos)                                                                  | ✅ Feito | `_give_reward()` suporta tipo "brinde" (sem cupom, só notificação) além de cupom |
+| **Lançamento manual de carimbo** (para quem usa cartão físico)                                                                | ✅ Feito | Endpoint `POST /campanhas/carimbos/manual` — Sprint 10                           |
+| **UI — Lançamento manual de carimbo** (botão na aba Campanhas — Fidelidade)                                                   | ✅ Feito | Botão "+ Lançar Carimbo Manual" + modal — Sprint 10                              |
+| **UI — Parametrizar**: valor mínimo de compra por carimbo, total de carimbos, recompensa ao completar, brindes intermediários | ✅ Feito | Sprint 10 — editor visual com CampanhaField                                      |
+| **UI — Parametrizar por nível de ranking**: `rank_filter` (todos/bronze/silver/gold/diamond/platinum)                         | ✅ Feito | Sprint 10 — selector na aba Fidelidade                                           |
+| **UI — Lançamento manual no cadastro do cliente** (ClientesNovo.jsx)                                                          | ✅ Feito | Botão "🏷️ Lançar Carimbo" dentro do card de fidelidade                           |
 
 ---
 
@@ -146,40 +146,40 @@
 
 ### 2.3 Ranking de Clientes (Bronze → Platina)
 
-| Item                                                                                               | Status      | Detalhe                                                                                           |
-| -------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------- |
-| Modelo `CustomerRankHistory` existe                                                                | ✅ Feito    | —                                                                                                 |
-| Enum de níveis: bronze, silver, gold, diamond, platinum                                            | ✅ Feito    | —                                                                                                 |
-| Endpoint `GET /campanhas/ranking` retorna clientes por nível                                       | ✅ Feito    | —                                                                                                 |
-| Endpoint `GET /campanhas/clientes/{id}/saldo` retorna `rank_level`                                 | ✅ Feito    | —                                                                                                 |
-| Badge de ranking no PDV (painel do cliente)                                                        | ✅ Feito    | —                                                                                                 |
-| Badge de ranking no cadastro do cliente                                                            | ✅ Feito    | —                                                                                                 |
-| Recalculo mensal automático (job scheduler)                                                        | ✅ Feito    | `monthly_ranking_recalc` — dia 1 às 06:00 via `RankingHandler`                                    |
-| **Critérios de ranking parametrizáveis**: gasto acumulado 12 meses, nº de compras, meses distintos | ✅ Feito    | `_calculate_rank()` lê `params.get(…, default)` — `GET/PUT /ranking/config` persistêm os limiares |
-| **UI — Configurar critérios por nível**: tabela gasto mínimo, nº compras, meses ativos             | ✅ Feito    | Aba Ranking — tabela editável `silver_min_spent`, `gold_min_spent` etc.                           |
-| **UI — Configurar benefícios por nível**: cashback %, regra do carimbo, acesso a sorteio           | ❌ Pendente | —                                                                                                 |
-| **Envio em lote por nível**: filtrar clientes Ouro → escrever mensagem → enviar e-mail para todos  | ✅ Feito    | Sprint 10 — modal na aba Ranking + `POST /ranking/envio-em-lote`                                  |
-| Backend: endpoint `POST /campanhas/ranking/envio-em-lote`                                          | ✅ Feito    | Sprint 10 — usa idempotency_key + email_address                                                   |
-| Backend: endpoint `POST /campanhas/ranking/recalcular` (forçar recalculo)                          | ✅ Feito    | Sprint 10 — botão "Recalcular Agora" na aba Ranking                                               |
+| Item                                                                                               | Status   | Detalhe                                                                                           |
+| -------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| Modelo `CustomerRankHistory` existe                                                                | ✅ Feito | —                                                                                                 |
+| Enum de níveis: bronze, silver, gold, diamond, platinum                                            | ✅ Feito | —                                                                                                 |
+| Endpoint `GET /campanhas/ranking` retorna clientes por nível                                       | ✅ Feito | —                                                                                                 |
+| Endpoint `GET /campanhas/clientes/{id}/saldo` retorna `rank_level`                                 | ✅ Feito | —                                                                                                 |
+| Badge de ranking no PDV (painel do cliente)                                                        | ✅ Feito | —                                                                                                 |
+| Badge de ranking no cadastro do cliente                                                            | ✅ Feito | —                                                                                                 |
+| Recalculo mensal automático (job scheduler)                                                        | ✅ Feito | `monthly_ranking_recalc` — dia 1 às 06:00 via `RankingHandler`                                    |
+| **Critérios de ranking parametrizáveis**: gasto acumulado 12 meses, nº de compras, meses distintos | ✅ Feito | `_calculate_rank()` lê `params.get(…, default)` — `GET/PUT /ranking/config` persistêm os limiares |
+| **UI — Configurar critérios por nível**: tabela gasto mínimo, nº compras, meses ativos             | ✅ Feito | Aba Ranking — tabela editável `silver_min_spent`, `gold_min_spent` etc.                           |
+| **UI — Configurar benefícios por nível**: cashback %, regra do carimbo, acesso a sorteio           | ✅ Feito | Seção colapsável "📊 Benefícios por Nível" na aba Ranking com tabela de critérios por nível       |
+| **Envio em lote por nível**: filtrar clientes Ouro → escrever mensagem → enviar e-mail para todos  | ✅ Feito | Sprint 10 — modal na aba Ranking + `POST /ranking/envio-em-lote`                                  |
+| Backend: endpoint `POST /campanhas/ranking/envio-em-lote`                                          | ✅ Feito | Sprint 10 — usa idempotency_key + email_address                                                   |
+| Backend: endpoint `POST /campanhas/ranking/recalcular` (forçar recalculo)                          | ✅ Feito | Sprint 10 — botão "Recalcular Agora" na aba Ranking                                               |
 
 ---
 
 ### 2.4 Sorteios por Nível de Ranking
 
-| Item                                                                                              | Status      | Detalhe                                                 |
-| ------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------- |
-| Modelos `Drawing` e `DrawingEntry` existem                                                        | ✅ Feito    | —                                                       |
-| Endpoint `GET /campanhas/sorteios` (listar sorteios)                                              | ✅ Feito    | —                                                       |
-| Endpoint `POST /campanhas/sorteios` (criar sorteio)                                               | ✅ Feito    | —                                                       |
-| Endpoint `PUT /campanhas/sorteios/{id}` (editar sorteio: nível elegível, prêmio, data)            | ✅ Feito    | —                                                       |
-| Endpoint `POST /campanhas/sorteios/{id}/inscrever` (inscrever clientes elegíveis automaticamente) | ✅ Feito    | —                                                       |
-| Endpoint `POST /campanhas/sorteios/{id}/executar` (executar sorteio com seed auditável)           | ✅ Feito    | —                                                       |
-| Endpoint `GET /campanhas/sorteios/{id}/resultado` (ver ganhador, lista de inscritos)              | ✅ Feito    | —                                                       |
-| Sorteio automático no dia configurado                                                             | ❌ Pendente | —                                                       |
-| Sorteio manual: gerar lista de códigos por nível para sorteio offline                             | ❌ Pendente | —                                                       |
-| Comunicar ganhador: e-mail + push                                                                 | ⚠️ Parcial  | NotificationSender existe; template específico pendente |
-| **UI — Aba Sorteios** (criar, editar, executar, ver resultado)                                    | ✅ Feito    | Sprint 7 — aba completa no Campanhas.jsx                |
-| **UI — Configurar: nível elegível (Prata+, Ouro+…), prêmio, data, modo (automático ou manual)**   | ✅ Feito    | —                                                       |
+| Item                                                                                              | Status   | Detalhe                                                                          |
+| ------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| Modelos `Drawing` e `DrawingEntry` existem                                                        | ✅ Feito | —                                                                                |
+| Endpoint `GET /campanhas/sorteios` (listar sorteios)                                              | ✅ Feito | —                                                                                |
+| Endpoint `POST /campanhas/sorteios` (criar sorteio)                                               | ✅ Feito | —                                                                                |
+| Endpoint `PUT /campanhas/sorteios/{id}` (editar sorteio: nível elegível, prêmio, data)            | ✅ Feito | —                                                                                |
+| Endpoint `POST /campanhas/sorteios/{id}/inscrever` (inscrever clientes elegíveis automaticamente) | ✅ Feito | —                                                                                |
+| Endpoint `POST /campanhas/sorteios/{id}/executar` (executar sorteio com seed auditável)           | ✅ Feito | —                                                                                |
+| Endpoint `GET /campanhas/sorteios/{id}/resultado` (ver ganhador, lista de inscritos)              | ✅ Feito | —                                                                                |
+| Sorteio automático no dia configurado                                                             | ✅ Feito | Backend: job `_auto_execute_drawings` (10h diário) + campo `auto_execute` na UI  |
+| Sorteio manual: gerar lista de códigos por nível para sorteio offline                             | ✅ Feito | Backend: `GET /sorteios/{id}/codigos-offline` + botão "📋 Códigos Offline" na UI |
+| Comunicar ganhador: e-mail + push                                                                 | ✅ Feito | E-mail enviado via `enqueue_email` após execução do sorteio                      |
+| **UI — Aba Sorteios** (criar, editar, executar, ver resultado)                                    | ✅ Feito | Sprint 7 — aba completa no Campanhas.jsx                                         |
+| **UI — Configurar: nível elegível (Prata+, Ouro+…), prêmio, data, modo (automático ou manual)**   | ✅ Feito | —                                                                                |
 
 ---
 
@@ -201,19 +201,19 @@
 
 ### 3.2 Campanhas de Destaque Mensal
 
-| Item                                                                                              | Status      | Detalhe                                                              |
-| ------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------- |
-| Tipo `ranking_monthly` existe (mas é o ranking, não o destaque)                                   | ⚠️ Parcial  | Precisaria de tipo separado ou parâmetro                             |
-| Backend: endpoint `GET /campanhas/destaque-mensal/calcular` (calcular vencedores do mês anterior) | ✅ Feito    | Sprint 6                                                             |
-| Lógica anti-duplicidade: cliente ganha no máximo 1 brinde neste grupo/mês                         | ✅ Feito    | `meta_key = destaque:{periodo}:{categoria}`                          |
-| Lógica de desempate: se 1º já foi premiado em outra categoria, usa o 2º colocado                  | ❌ Pendente | —                                                                    |
-| Três categorias: maior gasto, mais compras                                                        | ✅ Feito    | Terceira categoria (mais unidades) descartada por decisão do produto |
-| Endpoint `POST /campanhas/destaque-mensal/enviar` (enviar para vencedores)                        | ✅ Feito    | Sprint 6 — aceita `tipo_premio` (cupom ou mensagem)                  |
-| Envio automático no dia 1 (configurável) OU envio manual com confirmação                          | ⚠️ Parcial  | Apenas manual implementado                                           |
-| Mensagem de brinde com prazo de retirada (ex: "retire do dia 3 ao dia 10")                        | ✅ Feito    | Sprint 9 — campos `retirar_de` / `retirar_ate`                       |
-| **UI — Ver vencedores sugeridos** com Top 5 de cada categoria                                     | ✅ Feito    | Aba Destaque Mensal em Campanhas.jsx                                 |
-| **UI — Painel de configuração de prêmio** (cupom OU brinde na loja + datas + mensagem editável)   | ✅ Feito    | Sprint 9 — sessão atual                                              |
-| **UI — Configurar envio automático vs manual**                                                    | ❌ Pendente | —                                                                    |
+| Item                                                                                              | Status   | Detalhe                                                                        |
+| ------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------ |
+| Tipo `ranking_monthly` existe (mas é o ranking, não o destaque)                                   | ✅ Feito | Campanha `ranking_monthly` com parâmetro `auto_destaque_mensal`                |
+| Backend: endpoint `GET /campanhas/destaque-mensal/calcular` (calcular vencedores do mês anterior) | ✅ Feito | Sprint 6                                                                       |
+| Lógica anti-duplicidade: cliente ganha no máximo 1 brinde neste grupo/mês                         | ✅ Feito | `meta_key = destaque:{periodo}:{categoria}`                                    |
+| Lógica de desempate: se 1º já foi premiado em outra categoria, usa o 2º colocado                  | ✅ Feito | `desempate_info` retornado e exibido na UI da aba Destaque Mensal              |
+| Três categorias: maior gasto, mais compras                                                        | ✅ Feito | Terceira categoria (mais unidades) descartada por decisão do produto           |
+| Endpoint `POST /campanhas/destaque-mensal/enviar` (enviar para vencedores)                        | ✅ Feito | Sprint 6 — aceita `tipo_premio` (cupom ou mensagem)                            |
+| Envio automático no dia 1 (configurável) OU envio manual com confirmação                          | ✅ Feito | Job `_auto_enviar_destaque_mensal` (dia 1 às 08h) com configuração             |
+| Mensagem de brinde com prazo de retirada (ex: "retire do dia 3 ao dia 10")                        | ✅ Feito | Sprint 9 — campos `retirar_de` / `retirar_ate`                                 |
+| **UI — Ver vencedores sugeridos** com Top 5 de cada categoria                                     | ✅ Feito | Aba Destaque Mensal em Campanhas.jsx                                           |
+| **UI — Painel de configuração de prêmio** (cupom OU brinde na loja + datas + mensagem editável)   | ✅ Feito | Sprint 9 — sessão atual                                                        |
+| **UI — Configurar envio automático vs manual**                                                    | ✅ Feito | Toggle `auto_destaque_mensal` + valor e validade do cupom na aba Configurações |
 
 ---
 
@@ -247,30 +247,30 @@
 
 ### 4.1 Sistema de Notificações
 
-| Item                                                                       | Status      | Detalhe                                                      |
-| -------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| Modelos `NotificationQueue` e `NotificationLog` existem                    | ✅ Feito    | —                                                            |
-| E-mail: infraestrutura configurada                                         | ✅ Feito    | Provedor cadastrado, funciona                                |
-| Push FCM: configurado                                                      | ✅ Feito    | —                                                            |
-| Worker real de despacho de e-mails (consome NotificationQueue e envia)     | ✅ Feito    | `NotificationSender.process_batch()` SMTP real, a cada 5 min |
-| Worker real de despacho de push FCM                                        | ❌ Pendente | App ainda não publicado na Play Store                        |
-| Template de e-mail por tipo de campanha (aniversário, boas-vindas, cupom…) | ❌ Pendente | Atualmente texto simples                                     |
-| Envio escalonado em lotes (ex: 50 e-mails a cada 30 min) para evitar spam  | ✅ Feito    | BATCH_SIZE=50 em `notification_sender.py`                    |
-| **UI — Configurar horário de envio** preferencial por tipo de campanha     | ❌ Pendente | —                                                            |
+| Item                                                                       | Status      | Detalhe                                                                        |
+| -------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------ |
+| Modelos `NotificationQueue` e `NotificationLog` existem                    | ✅ Feito    | —                                                                              |
+| E-mail: infraestrutura configurada                                         | ✅ Feito    | Provedor cadastrado, funciona                                                  |
+| Push FCM: configurado                                                      | ✅ Feito    | —                                                                              |
+| Worker real de despacho de e-mails (consome NotificationQueue e envia)     | ✅ Feito    | `NotificationSender.process_batch()` SMTP real, a cada 5 min                   |
+| Worker real de despacho de push FCM                                        | ❌ Pendente | App ainda não publicado na Play Store                                          |
+| Template de e-mail por tipo de campanha (aniversário, boas-vindas, cupom…) | ✅ Feito    | `_render_email_html()` com cores distintas por tipo de campanha                |
+| Envio escalonado em lotes (ex: 50 e-mails a cada 30 min) para evitar spam  | ✅ Feito    | BATCH_SIZE=50 em `notification_sender.py`                                      |
+| **UI — Configurar horário de envio** preferencial por tipo de campanha     | ✅ Feito    | Aba Configurações — tabela de horários por tipo de campanha (scheduler config) |
 
 ---
 
 ### 4.2 Canais — PDV, App, Ecommerce
 
-| Item                                                         | Status            | Detalhe                                                            |
-| ------------------------------------------------------------ | ----------------- | ------------------------------------------------------------------ |
-| Cupom: campo canal (PDV / app / ecommerce / todos)           | ✅ Feito (modelo) | —                                                                  |
-| PDV: campo para digitar código de cupóm na venda             | ✅ Feito          | PDV.jsx: `codigoCupom`, `aplicarCupom()`, card "Cupóm de desconto" |
-| PDV: validação e aplicação automática do cupóm               | ✅ Feito          | Endpoint de resgate encadeado na finalização                       |
-| App: aba "Meus Cupons" com lista de cupons ativos do cliente | ✅ Feito          | `CouponsScreen.tsx` — acessível via aba Benefícios                 |
-| App: QR code do cupom para mostrar no caixa                  | ❌ Pendente       | —                                                                  |
-| Ecommerce: campo de cupóm no checkout                        | ✅ Feito          | `ecommerce_checkout.py`: campo `cupom` no payload                  |
-| Ecommerce: validação e aplicação do desconto                 | ✅ Feito          | `_calcular_desconto()` aplica o cupom antes de fechar o pedido     |
+| Item                                                         | Status            | Detalhe                                                                            |
+| ------------------------------------------------------------ | ----------------- | ---------------------------------------------------------------------------------- |
+| Cupom: campo canal (PDV / app / ecommerce / todos)           | ✅ Feito (modelo) | —                                                                                  |
+| PDV: campo para digitar código de cupóm na venda             | ✅ Feito          | PDV.jsx: `codigoCupom`, `aplicarCupom()`, card "Cupóm de desconto"                 |
+| PDV: validação e aplicação automática do cupóm               | ✅ Feito          | Endpoint de resgate encadeado na finalização                                       |
+| App: aba "Meus Cupons" com lista de cupons ativos do cliente | ✅ Feito          | `CouponsScreen.tsx` — acessível via aba Benefícios                                 |
+| App: QR code do cupom para mostrar no caixa                  | ✅ Feito          | `CouponsScreen.tsx`: botão "Mostrar QR Code" + modal com `react-native-qrcode-svg` |
+| Ecommerce: campo de cupóm no checkout                        | ✅ Feito          | `ecommerce_checkout.py`: campo `cupom` no payload                                  |
+| Ecommerce: validação e aplicação do desconto                 | ✅ Feito          | `_calcular_desconto()` aplica o cupom antes de fechar o pedido                     |
 
 ---
 
@@ -279,23 +279,23 @@
 ### 5.1 Gestão de Cupons (UI Completa)
 
 | Item                                                                  | Status                          |
-| --------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------- |
-| Listar todos os cupons com status (ativo/utilizado/expirado)          | ⚠️ Parcial (estrutura existe)   |
-| Filtrar por campanha, data, cliente específico                        | ❌ Pendente                     |
-| Ver detalhes do cupom: quando criado, quando usado, por qual campanha | ❌ Pendente                     |
+| --------------------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------- |
+| Listar todos os cupons com status (ativo/utilizado/expirado)          | ✅ Feito                        | Aba Cupons com filtros de status (ativo/usado/expirado/cancelado/todos) |
+| Filtrar por campanha, data, cliente específico                        | ✅ Feito                        | Dropdown de campanha + datas de criação + campo de busca                |
+| Ver detalhes do cupom: quando criado, quando usado, por qual campanha | ✅ Feito                        | Detalhe expande com `created_at`, `valid_until`, `used_at`, campanha    |
 | Criar cupom manual (casos especiais, sem vínculo com campanha)        | ✅ Feito (endpoint + UI básica) |
-| Anular/cancelar cupom                                                 | ✅ Feito                        | Sprint 9 — botão 🚫 na tabela + `DELETE /campanhas/cupons/{code}` |
+| Anular/cancelar cupom                                                 | ✅ Feito                        | Sprint 9 — botão 🚫 na tabela + `DELETE /campanhas/cupons/{code}`       |
 
 ---
 
 ### 5.2 Lembretes Integrados
 
-| Item                                                              | Status      |
-| ----------------------------------------------------------------- | ----------- | -------------------------------------------------------- |
-| Mostrar aniversários amanhã na aba de Lembretes existente         | ✅ Feito    | Lembretes.jsx usa `proximos_eventos.aniversarios_amanha` |
-| Mostrar sorteios agendados para os próximos X dias                | ✅ Feito    | Card "Sorteio(s) esta semana" em Lembretes.jsx           |
-| Mostrar brindes pendentes de retirada (campanhas destaque mensal) | ❌ Pendente | —                                                        |
-| Mostrar clientes que atingiram inatividade hoje                   | ❌ Pendente | —                                                        |
+| Item                                                              | Status   |
+| ----------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------- |
+| Mostrar aniversários amanhã na aba de Lembretes existente         | ✅ Feito | Lembretes.jsx usa `proximos_eventos.aniversarios_amanha`                                           |
+| Mostrar sorteios agendados para os próximos X dias                | ✅ Feito | Card "Sorteio(s) esta semana" em Lembretes.jsx                                                     |
+| Mostrar brindes pendentes de retirada (campanhas destaque mensal) | ✅ Feito | Card "🎁 Brinde(s) pendente(s)" em Lembretes.jsx via `alertas.total_brindes_pendentes`             |
+| Mostrar clientes que atingiram inatividade hoje                   | ✅ Feito | Card "🚨 Atingiram 30 dias de inatividade hoje" em Lembretes.jsx via `alertas.novos_inativos_hoje` |
 
 ---
 

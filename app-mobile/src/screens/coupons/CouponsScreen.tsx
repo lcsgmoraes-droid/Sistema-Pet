@@ -8,8 +8,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   Clipboard,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
 import api from '../../services/api';
 import { CORES } from '../../theme';
 
@@ -28,6 +30,7 @@ export default function CouponsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [qrModal, setQrModal] = useState<string | null>(null); // codigo do cupom cujo QR está aberto
 
   const carregar = useCallback(async () => {
     try {
@@ -140,9 +143,58 @@ export default function CouponsScreen() {
           {copiado === item.codigo && (
             <Text style={styles.copiouTexto}>Código copiado!</Text>
           )}
+
+          {!item.expirado && (
+            <TouchableOpacity
+              style={styles.qrBtn}
+              onPress={() => setQrModal(item.codigo)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="qr-code-outline" size={14} color={CORES.primario} />
+              <Text style={styles.qrBtnTexto}>Mostrar QR Code</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     />
+
+    {/* Modal QR Code */}
+    <Modal
+      visible={!!qrModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setQrModal(null)}
+    >
+      <TouchableOpacity
+        style={styles.qrOverlay}
+        activeOpacity={1}
+        onPress={() => setQrModal(null)}
+      >
+        <View style={styles.qrContainer}>
+          <Text style={styles.qrTitulo}>QR Code do Cupom</Text>
+          {qrModal && (
+            <>
+              <QRCode
+                value={qrModal}
+                size={200}
+                color="#1a1a2e"
+                backgroundColor="#ffffff"
+              />
+              <Text style={styles.qrCodigo}>{qrModal}</Text>
+            </>
+          )}
+          <Text style={styles.qrDica}>
+            Mostre este QR Code no caixa para usar o cupom
+          </Text>
+          <TouchableOpacity
+            style={styles.qrFechar}
+            onPress={() => setQrModal(null)}
+          >
+            <Text style={styles.qrFecharTexto}>Fechar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
   );
 }
 
@@ -245,5 +297,74 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: CORES.sucesso ?? '#2e7d32',
     fontWeight: '600',
+  },
+  qrBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    alignSelf: 'flex-start',
+  },
+  qrBtnTexto: {
+    fontSize: 12,
+    color: CORES.primario,
+    fontWeight: '600',
+  },
+  qrOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  qrContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  qrTitulo: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: CORES.texto,
+    marginBottom: 20,
+  },
+  qrCodigo: {
+    marginTop: 16,
+    fontSize: 22,
+    fontWeight: 'bold',
+    letterSpacing: 3,
+    color: CORES.primario,
+  },
+  qrDica: {
+    marginTop: 12,
+    fontSize: 12,
+    color: CORES.textoClaro,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  qrFechar: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 32,
+    backgroundColor: CORES.primario,
+    borderRadius: 12,
+  },
+  qrFecharTexto: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

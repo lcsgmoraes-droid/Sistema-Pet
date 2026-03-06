@@ -655,6 +655,7 @@ class Drawing(Base):
         default=DrawingStatusEnum.draft,
     )
     draw_date = Column(DateTime(timezone=True), nullable=True)
+    auto_execute = Column(Boolean, nullable=False, default=False)  # True = executar automaticamente na data
     entries_frozen_at = Column(DateTime(timezone=True), nullable=True)
     entries_hash = Column(String(64), nullable=True)  # SHA-256
     seed_uuid = Column(UUID(as_uuid=True), nullable=True)

@@ -229,7 +229,16 @@ class LoyaltyHandler:
 
         reward_meta = {}
         code = None
-        if reward_tp == "coupon":
+        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+
+        if reward_tp == "brinde":
+            # Brinde na loja: sem cupom, apenas registra execução e notifica
+            reward_meta = {"tipo": "brinde", "reference_period": ref_period}
+            mensagem = notif_msg
+            if cliente:
+                from collections import defaultdict
+                mensagem = notif_msg.format_map(defaultdict(str, nome=cliente.nome))
+        elif reward_tp == "coupon":
             coupon = create_coupon(
                 db, tenant_id=campaign.tenant_id, campaign=campaign,
                 customer_id=customer_id, coupon_type="fixed",
@@ -248,13 +257,19 @@ class LoyaltyHandler:
         ))
 
         # Notificação por e-mail
-        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
-        if cliente and cliente.email and code:
-            body = notif_msg.format(code=code, nome=cliente.nome)
-            enqueue_email(
-                db, tenant_id=campaign.tenant_id, customer_id=customer_id,
-                subject="Sua recompensa de fidelidade chegou! 🎁",
-                body=body, email_address=cliente.email,
-                idempotency_key=f"loyalty:{campaign.id}:{customer_id}:{ref_period}:email",
-            )
+        if cliente and cliente.email:
+            if reward_tp == "brinde":
+                body = mensagem
+            elif code:
+                from collections import defaultdict
+                body = notif_msg.format_map(defaultdict(str, code=code, nome=cliente.nome if cliente else ""))
+            else:
+                body = None
+            if body:
+                enqueue_email(
+                    db, tenant_id=campaign.tenant_id, customer_id=customer_id,
+                    subject="Sua recompensa de fidelidade chegou! 🎁",
+                    body=body, email_address=cliente.email,
+                    idempotency_key=f"loyalty:{campaign.id}:{customer_id}:{ref_period}:email",
+                )
         return 1

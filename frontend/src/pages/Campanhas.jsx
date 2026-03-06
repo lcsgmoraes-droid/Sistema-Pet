@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import api from "../api";
 import { formatBRL } from "../utils/formatters";
 
@@ -349,6 +349,7 @@ export default function Campanhas() {
   const [filtroCupomBusca, setFiltroCupomBusca] = useState("");
   const [filtroCupomDataInicio, setFiltroCupomDataInicio] = useState("");
   const [filtroCupomDataFim, setFiltroCupomDataFim] = useState("");
+  const [filtroCupomCampanha, setFiltroCupomCampanha] = useState("");
   const [cupomDetalhes, setCupomDetalhes] = useState(null);
   const [anulando, setAnulando] = useState(null);
   const [modalCupomAberto, setModalCupomAberto] = useState(false);
@@ -406,12 +407,16 @@ export default function Campanhas() {
     prize_description: "",
     rank_filter: "",
     draw_date: "",
+    auto_execute: false,
   });
   const [criandoSorteio, setCriandoSorteio] = useState(false);
   const [erroCriarSorteio, setErroCriarSorteio] = useState("");
   const [executandoSorteio, setExecutandoSorteio] = useState(null);
   const [inscrevendo, setInscrevendo] = useState(null);
   const [sorteioResultado, setSorteioResultado] = useState(null);
+  const [modalCodigosOffline, setModalCodigosOffline] = useState(null); // sorteio obj
+  const [codigosOffline, setCodigosOffline] = useState([]);
+  const [loadingCodigosOffline, setLoadingCodigosOffline] = useState(false);
 
   // Envio em lote
   const [modalLote, setModalLote] = useState(false);
@@ -522,7 +527,11 @@ export default function Campanhas() {
     setLoadingCampanhas(true);
     try {
       // Seed é idempotente: garante que todos os tipos padrão (aniversário, cashback, etc.) existam
-      try { await api.post("/campanhas/seed"); } catch { /* ignora se já existem */ }
+      try {
+        await api.post("/campanhas/seed");
+      } catch {
+        /* ignora se já existem */
+      }
       const res = await api.get("/campanhas");
       setCampanhas(res.data);
     } catch (e) {
@@ -555,6 +564,7 @@ export default function Campanhas() {
       if (filtroCupomDataInicio)
         params.set("data_inicio", filtroCupomDataInicio);
       if (filtroCupomDataFim) params.set("data_fim", filtroCupomDataFim);
+      if (filtroCupomCampanha) params.set("campaign_id", filtroCupomCampanha);
       const qs = params.toString() ? `?${params.toString()}` : "";
       const res = await api.get(`/campanhas/cupons${qs}`);
       setCupons(res.data);
@@ -568,6 +578,7 @@ export default function Campanhas() {
     filtroCupomBusca,
     filtroCupomDataInicio,
     filtroCupomDataFim,
+    filtroCupomCampanha,
   ]);
 
   const anularCupom = useCallback(async (code) => {
@@ -795,6 +806,7 @@ export default function Campanhas() {
         prize_description: "",
         rank_filter: "",
         draw_date: "",
+        auto_execute: false,
       });
       carregarSorteios();
     } catch (e) {
@@ -850,6 +862,26 @@ export default function Campanhas() {
       setSorteios((prev) => prev.filter((s) => s.id !== drawingId));
     } catch (e) {
       alert("Erro ao cancelar: " + (e?.response?.data?.detail || e.message));
+    }
+  };
+
+  const abrirCodigosOffline = async (sorteio) => {
+    setModalCodigosOffline(sorteio);
+    setCodigosOffline([]);
+    setLoadingCodigosOffline(true);
+    try {
+      const res = await api.get(
+        `/campanhas/sorteios/${sorteio.id}/codigos-offline`,
+        { params: { limit: 500 } },
+      );
+      setCodigosOffline(res.data.codigos || res.data);
+    } catch (e) {
+      alert(
+        "Erro ao carregar códigos: " + (e?.response?.data?.detail || e.message),
+      );
+      setModalCodigosOffline(null);
+    } finally {
+      setLoadingCodigosOffline(false);
     }
   };
 
@@ -2090,6 +2122,14 @@ export default function Campanhas() {
                     </p>
                   </div>
                 )}
+                <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
+                  <p className="text-3xl font-bold text-teal-700">
+                    {dashboard.cupons_ativos_total ?? 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    📦 Cupons ativos no total
+                  </p>
+                </div>
               </div>
 
               <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -3275,6 +3315,14 @@ export default function Campanhas() {
                             Cancelar
                           </button>
                         )}
+                        {(s.status === "open" || s.status === "drawn") && (
+                          <button
+                            onClick={() => abrirCodigosOffline(s)}
+                            className="px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-100 border"
+                          >
+                            📋 Códigos Offline
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3592,6 +3640,108 @@ export default function Campanhas() {
               </div>
             )}
           </div>
+
+          {/* Benefícios por Nível */}
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <button
+              className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+              onClick={() =>
+                setRankingConfig((prev) => ({
+                  ...prev,
+                  _beneficios_aberto: !prev?._beneficios_aberto,
+                }))
+              }
+            >
+              <span className="font-semibold text-gray-800">
+                📊 Benefícios por Nível
+              </span>
+              <span className="text-gray-400 text-sm">
+                {rankingConfig?._beneficios_aberto ? "▲ Fechar" : "▼ Expandir"}
+              </span>
+            </button>
+            {rankingConfig?._beneficios_aberto && (
+              <div className="px-6 pb-6 space-y-4">
+                <p className="text-xs text-gray-500">
+                  Visão geral dos critérios de cada nível. Para configurar
+                  benefícios específicos (cashback %, carimbos, sorteios
+                  exclusivos), acesse a campanha correspondente.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
+                        <th className="text-left p-3 border-b">Nível</th>
+                        <th className="text-center p-3 border-b">
+                          Gasto mín. (R$)
+                        </th>
+                        <th className="text-center p-3 border-b">
+                          Compras mín.
+                        </th>
+                        <th className="text-center p-3 border-b">
+                          Meses ativos mín.
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { key: "bronze", label: "🥉 Bronze", base: true },
+                        { key: "silver", label: "🥈 Prata" },
+                        { key: "gold", label: "🥇 Ouro" },
+                        { key: "diamond", label: "👑 Platina" },
+                        { key: "platinum", label: "💸 Diamante" },
+                      ].map(({ key, label, base }) => (
+                        <tr
+                          key={key}
+                          className="border-b last:border-0 hover:bg-gray-50"
+                        >
+                          <td className="p-3 font-medium text-gray-700">
+                            {label}
+                          </td>
+                          <td className="p-3 text-center text-gray-600">
+                            {base
+                              ? "—"
+                              : rankingConfig
+                                ? `R$ ${formatBRL(rankingConfig[`${key}_min_spent`] ?? 0)}`
+                                : "…"}
+                          </td>
+                          <td className="p-3 text-center text-gray-600">
+                            {base
+                              ? "—"
+                              : (rankingConfig?.[`${key}_min_purchases`] ??
+                                "…")}
+                          </td>
+                          <td className="p-3 text-center text-gray-600">
+                            {base
+                              ? "—"
+                              : (rankingConfig?.[`${key}_min_months`] ?? "…")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 text-xs text-blue-700 space-y-1.5">
+                  <p className="font-semibold">
+                    ℹ️ Como configurar os benefícios por nível:
+                  </p>
+                  <p>
+                    • <strong>Cashback % por nível:</strong> acesse a campanha
+                    de Cashback e configure os campos Bronze / Prata / Ouro /
+                    Platina / Diamante.
+                  </p>
+                  <p>
+                    • <strong>Carimbos exclusivos:</strong> crie uma campanha de
+                    Carimbo com o campo "Nível mínimo" definido para restringir
+                    a um grupo.
+                  </p>
+                  <p>
+                    • <strong>Sorteios exclusivos:</strong> na aba Sorteios,
+                    defina o campo "Restrição de nível" ao criar o sorteio.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       {aba === "cupons" && (
@@ -3633,6 +3783,23 @@ export default function Campanhas() {
                 className="border rounded-lg px-3 py-2 text-sm"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Campanha
+              </label>
+              <select
+                value={filtroCupomCampanha}
+                onChange={(e) => setFiltroCupomCampanha(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Todas as campanhas</option>
+                {campanhas.map((cp) => (
+                  <option key={cp.id} value={cp.id}>
+                    {cp.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               onClick={carregarCupons}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -3641,12 +3808,14 @@ export default function Campanhas() {
             </button>
             {(filtroCupomBusca ||
               filtroCupomDataInicio ||
-              filtroCupomDataFim) && (
+              filtroCupomDataFim ||
+              filtroCupomCampanha) && (
               <button
                 onClick={() => {
                   setFiltroCupomBusca("");
                   setFiltroCupomDataInicio("");
                   setFiltroCupomDataFim("");
+                  setFiltroCupomCampanha("");
                 }}
                 className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 underline"
               >
@@ -3733,9 +3902,8 @@ export default function Campanhas() {
                       };
                       const isDetalhes = cupomDetalhes?.id === c.id;
                       return (
-                        <>
+                        <Fragment key={c.id}>
                           <tr
-                            key={c.id}
                             className={`hover:bg-gray-50 cursor-pointer ${isDetalhes ? "bg-blue-50" : ""}`}
                             onClick={() =>
                               setCupomDetalhes(isDetalhes ? null : c)
@@ -3868,6 +4036,18 @@ export default function Campanhas() {
                                         : "Sem validade"}
                                     </p>
                                   </div>
+                                  {c.used_at && (
+                                    <div>
+                                      <p className="text-xs text-gray-500 font-medium mb-0.5">
+                                        Usado em
+                                      </p>
+                                      <p className="text-gray-700">
+                                        {new Date(c.used_at).toLocaleString(
+                                          "pt-BR",
+                                        )}
+                                      </p>
+                                    </div>
+                                  )}
                                   {c.coupon_type === "gift" &&
                                     c.meta?.mensagem && (
                                       <div className="col-span-2">
@@ -3931,7 +4111,7 @@ export default function Campanhas() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -4403,6 +4583,22 @@ export default function Campanhas() {
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
               </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={novoSorteio.auto_execute}
+                  onChange={(e) =>
+                    setNovoSorteio((p) => ({
+                      ...p,
+                      auto_execute: e.target.checked,
+                    }))
+                  }
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm text-gray-700">
+                  🤖 Executar automaticamente na data do sorteio
+                </span>
+              </label>
               {erroCriarSorteio && (
                 <p className="text-sm text-red-600">{erroCriarSorteio}</p>
               )}
@@ -4421,6 +4617,83 @@ export default function Campanhas() {
               >
                 {criandoSorteio ? "Criando..." : "Criar Sorteio"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: CÓDIGOS OFFLINE (SORTEIO) ── */}
+      {modalCodigosOffline && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  📋 Códigos Offline — {modalCodigosOffline.name}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Lista de participantes para sorteio físico
+                </p>
+              </div>
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200"
+                >
+                  🖨️ Imprimir
+                </button>
+                <button
+                  onClick={() => setModalCodigosOffline(null)}
+                  className="text-gray-400 hover:text-gray-600 text-xl ml-2"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {loadingCodigosOffline ? (
+                <div className="text-center text-gray-400 py-8">
+                  Carregando...
+                </div>
+              ) : codigosOffline.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">
+                  Nenhum participante encontrado.
+                </div>
+              ) : (
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
+                      <th className="text-center p-2 border-b w-16">Nº</th>
+                      <th className="text-left p-2 border-b">Cliente</th>
+                      <th className="text-center p-2 border-b">Nível</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {codigosOffline.map((c) => (
+                      <tr
+                        key={c.numero}
+                        className="border-b last:border-0 hover:bg-gray-50"
+                      >
+                        <td className="p-2 text-center font-mono font-semibold text-gray-700">
+                          {c.numero}
+                        </td>
+                        <td className="p-2 text-gray-700">
+                          {c.nome || `Cliente #${c.customer_id}`}
+                        </td>
+                        <td className="p-2 text-center text-xs text-gray-500">
+                          {c.rank_level
+                            ? `${RANK_LABELS[c.rank_level]?.emoji || ""} ${RANK_LABELS[c.rank_level]?.label || c.rank_level}`
+                            : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="px-6 py-3 border-t text-xs text-gray-400">
+              {codigosOffline.length} participante(s) · Sorteio:{" "}
+              {modalCodigosOffline.name}
             </div>
           </div>
         </div>
@@ -5739,6 +6012,86 @@ export default function Campanhas() {
                       ))}
                     </select>
                   </div>
+                </div>
+              </div>
+
+              {/* Auto-envio do Destaque Mensal */}
+              <div className="border rounded-xl p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-2xl">🏅</span>
+                  <div>
+                    <h3 className="font-medium text-gray-800">
+                      Auto-envio do Destaque Mensal
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      Calcula e envia automaticamente o cupom ao vencedor do mês
+                      no dia 1 às 08:00
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={schedulerConfig.auto_destaque_mensal ?? false}
+                      onChange={(e) =>
+                        setSchedulerConfig({
+                          ...schedulerConfig,
+                          auto_destaque_mensal: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Ativar envio automático do Destaque Mensal
+                    </span>
+                  </label>
+                  {schedulerConfig.auto_destaque_mensal && (
+                    <div className="flex flex-col sm:flex-row gap-4 pl-6">
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm text-gray-600 w-44">
+                          Valor do cupom (R$):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={
+                            schedulerConfig.auto_destaque_coupon_value ?? 50
+                          }
+                          onChange={(e) =>
+                            setSchedulerConfig({
+                              ...schedulerConfig,
+                              auto_destaque_coupon_value:
+                                parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="border rounded-lg px-3 py-2 text-sm w-28"
+                        />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm text-gray-600 w-44">
+                          Validade (dias):
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={
+                            schedulerConfig.auto_destaque_coupon_days ?? 10
+                          }
+                          onChange={(e) =>
+                            setSchedulerConfig({
+                              ...schedulerConfig,
+                              auto_destaque_coupon_days:
+                                parseInt(e.target.value, 10) || 10,
+                            })
+                          }
+                          className="border rounded-lg px-3 py-2 text-sm w-28"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

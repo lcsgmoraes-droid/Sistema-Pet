@@ -34,9 +34,70 @@ def _smtp_config_ok() -> bool:
     return bool(SMTP_SERVER and SMTP_EMAIL and SMTP_PASSWORD)
 
 
-def _send_email(to_address: str, subject: str, body_text: str) -> None:
+def _render_email_html(subject: str, body_text: str, campaign_type: str | None = None) -> str:
     """
-    Envia um e-mail via SMTP TLS.
+    Gera HTML bonito para o e-mail, com cor de destaque conforme o tipo de campanha.
+    """
+    COLOR_MAP = {
+        "birthday_customer": ("#e91e8c", "#fff0f7"),
+        "birthday_pet":      ("#8e44ad", "#f8f0ff"),
+        "welcome_app":       ("#1976d2", "#f0f6ff"),
+        "welcome_ecommerce": ("#1976d2", "#f0f6ff"),
+        "inactivity":        ("#e67e22", "#fff8f0"),
+        "quick_repurchase":  ("#2e7d32", "#f0fff4"),
+        "loyalty_stamp":     ("#f9a825", "#fffde7"),
+        "cashback":          ("#00838f", "#e0f7fa"),
+        "ranking_monthly":   ("#37474f", "#f5f5f5"),
+    }
+    accent, bg = COLOR_MAP.get(campaign_type or "", ("#1565c0", "#f0f6ff"))
+
+    # Converte texto simples em parágrafos HTML
+    paragraphs = ""
+    for line in body_text.split("\n"):
+        line_stripped = line.strip()
+        if line_stripped:
+            # Negrito para **texto**
+            import re
+            line_stripped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", line_stripped)
+            paragraphs += f"<p style='margin:0 0 12px 0;color:#333;font-size:15px;line-height:1.6'>{line_stripped}</p>\n"
+
+    return f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:24px 0">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+        <!-- Header -->
+        <tr>
+          <td style="background:{accent};padding:28px 32px;text-align:center">
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.3px">{subject}</h1>
+          </td>
+        </tr>
+        <!-- Body -->
+        <tr>
+          <td style="padding:28px 32px;background:{bg}">
+            {paragraphs}
+          </td>
+        </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="padding:16px 32px;background:#f9f9f9;border-top:1px solid #eee;text-align:center">
+            <p style="margin:0;font-size:12px;color:#999">
+              Esta mensagem foi enviada automaticamente pelo sistema de campanhas do seu petshop.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+def _send_email(to_address: str, subject: str, body_text: str, campaign_type: str | None = None) -> None:
+    """
+    Envia um e-mail via SMTP TLS com template HTML bonito por tipo de campanha.
 
     Levanta exceção em caso de falha (tratada no chamador).
     """
@@ -47,14 +108,10 @@ def _send_email(to_address: str, subject: str, body_text: str) -> None:
     msg["From"] = SMTP_EMAIL
     msg["To"] = to_address
 
-    # Corpo em texto simples e HTML (versão simples)
+    # Corpo em texto simples e HTML bonito
     part_text = MIMEText(body_text, "plain", "utf-8")
-    html_body = body_text.replace("\n", "<br>")
-    part_html = MIMEText(
-        f"<html><body style='font-family:sans-serif;line-height:1.6'>{html_body}</body></html>",
-        "html",
-        "utf-8",
-    )
+    html_body = _render_email_html(subject, body_text, campaign_type)
+    part_html = MIMEText(html_body, "html", "utf-8")
     msg.attach(part_text)
     msg.attach(part_html)
 
@@ -148,4 +205,23 @@ class NotificationSender:
             return
 
         subject = notif.subject or "Mensagem especial para você"
-        _send_email(notif.email_address, subject, notif.body)
+        # Infere o tipo de campanha pelo prefixo da chave de idempotência para selecionar o template
+        ikey = notif.idempotency_key or ""
+        _KEY_TYPE_MAP = {
+            "bday": "birthday_customer",
+            "birthday": "birthday_customer",
+            "pet_bday": "birthday_pet",
+            "loyalty": "loyalty_stamp",
+            "cashback": "cashback",
+            "inactivity": "inactivity",
+            "welcome": "welcome_app",
+            "quick": "quick_repurchase",
+            "sorteio": "drawing",
+            "destaque": "ranking_monthly",
+        }
+        campaign_type = None
+        for prefix, ctype in _KEY_TYPE_MAP.items():
+            if ikey.startswith(prefix):
+                campaign_type = ctype
+                break
+        _send_email(notif.email_address, subject, notif.body, campaign_type)

@@ -269,6 +269,18 @@ def listar_cupons(
         for camp in db.query(CampaignModel).filter(CampaignModel.id.in_(camp_ids)).all():
             campanhas_map[camp.id] = camp.name
 
+    # Enriquecer com data de uso (redeemed_at) de cada cupom
+    coupon_ids = [c.id for c in cupons]
+    redeemed_at_map: dict = {}
+    if coupon_ids:
+        redemptions = (
+            db.query(CouponRedemption.coupon_id, CouponRedemption.redeemed_at)
+            .filter(CouponRedemption.coupon_id.in_(coupon_ids))
+            .all()
+        )
+        for r in redemptions:
+            redeemed_at_map[r.coupon_id] = r.redeemed_at
+
     return [
         {
             "id": c.id,
@@ -285,6 +297,7 @@ def listar_cupons(
             "campaign_id": c.campaign_id,
             "nome_campanha": campanhas_map.get(c.campaign_id),
             "created_at": c.created_at.isoformat() if c.created_at else None,
+            "used_at": redeemed_at_map[c.id].isoformat() if c.id in redeemed_at_map else None,
             "meta": c.meta,
         }
         for c in cupons
@@ -1550,6 +1563,9 @@ class SchedulerConfigBody(BaseModel):
     inactivity_day_of_week: str = "mon"  # dia da semana: mon/tue/wed/thu/fri/sat/sun
     ranking_send_day: int = 1            # dia do mês para recálculo do ranking (1-28)
     ranking_send_hour: int = 6           # hora do recálculo de ranking (0-23)
+    auto_destaque_mensal: bool = False   # True = enviar destaque mensal automaticamente no dia 1
+    auto_destaque_coupon_value: float = 50.0  # valor do cupom do destaque automático
+    auto_destaque_coupon_days: int = 10       # validade do cupom do destaque automático
 
 
 @router.get("/config/horarios")
@@ -1591,6 +1607,24 @@ def salvar_scheduler_config(
     if not campanha:
         raise HTTPException(status_code=404, detail="Campanha de aniversário não encontrada. Execute o seed primeiro.")
     campanha.params = {**(campanha.params or {}), **body.model_dump()}
+
+    # Salvar params de destaque automático na campanha ranking_monthly também
+    ranking_camp = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.campaign_type == CampaignTypeEnum.ranking_monthly,
+        )
+        .first()
+    )
+    if ranking_camp:
+        ranking_camp.params = {
+            **(ranking_camp.params or {}),
+            "auto_destaque_mensal": body.auto_destaque_mensal,
+            "auto_destaque_coupon_value": body.auto_destaque_coupon_value,
+            "auto_destaque_coupon_days": body.auto_destaque_coupon_days,
+        }
+
     db.commit()
     return {"ok": True, "params": campanha.params}
 
@@ -2157,6 +2191,7 @@ class CriarSorteioBody(BaseModel):
     prize_description: Optional[str] = None
     rank_filter: Optional[str] = None   # bronze | silver | gold | diamond | platinum | None = todos
     draw_date: Optional[str] = None     # ISO 8601 date string
+    auto_execute: bool = False          # True = executar automaticamente na draw_date
 
 
 class EditarSorteioBody(BaseModel):
@@ -2165,6 +2200,7 @@ class EditarSorteioBody(BaseModel):
     prize_description: Optional[str] = None
     rank_filter: Optional[str] = None
     draw_date: Optional[str] = None
+    auto_execute: Optional[bool] = None
 
 
 def _drawing_to_dict(d: Drawing, entry_count: int = 0) -> dict:
@@ -2176,6 +2212,7 @@ def _drawing_to_dict(d: Drawing, entry_count: int = 0) -> dict:
         "rank_filter": d.rank_filter.value if d.rank_filter else None,
         "status": d.status.value,
         "draw_date": d.draw_date.isoformat() if d.draw_date else None,
+        "auto_execute": d.auto_execute,
         "entries_frozen_at": d.entries_frozen_at.isoformat() if d.entries_frozen_at else None,
         "entries_hash": d.entries_hash,
         "seed_uuid": str(d.seed_uuid) if d.seed_uuid else None,
@@ -2247,6 +2284,7 @@ def criar_sorteio(
         rank_filter=rank_filter,
         status=DrawingStatusEnum.draft,
         draw_date=draw_date,
+        auto_execute=body.auto_execute,
     )
     db.add(drawing)
     db.commit()
@@ -2291,6 +2329,8 @@ def editar_sorteio(
             drawing.draw_date = _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc) if body.draw_date else None
         except ValueError:
             raise HTTPException(400, detail="draw_date inválido (use ISO 8601)")
+    if body.auto_execute is not None:
+        drawing.auto_execute = body.auto_execute
 
     db.commit()
     db.refresh(drawing)
@@ -2453,6 +2493,26 @@ def executar_sorteio(
     from app.models import Cliente
     cliente = db.query(Cliente).filter(Cliente.id == winner_entry.customer_id, Cliente.tenant_id == tenant_id).first()
 
+    # Enfileirar notificação de parabéns para o ganhador
+    if cliente and cliente.email:
+        from app.campaigns.notification_service import enqueue_email
+        prize_text = drawing.prize_description or "o prêmio"
+        enqueue_email(
+            db,
+            tenant_id=tenant_id,
+            customer_id=cliente.id,
+            subject=f"🏆 Você ganhou o sorteio: {drawing.name}!",
+            body=(
+                f"Parabéns, {cliente.nome}! 🎉\n\n"
+                f"Você foi sorteado(a) como ganhador(a) do sorteio **{drawing.name}**.\n"
+                f"Prêmio: {prize_text}\n\n"
+                f"Entre em contato conosco para retirar seu prêmio. Boa sorte sempre!"
+            ),
+            email_address=cliente.email,
+            idempotency_key=f"sorteio:{drawing.id}:ganhador:{cliente.id}",
+        )
+        db.commit()
+
     return {
         "ok": True,
         "winner_entry_id": winner_entry.id,
@@ -2519,6 +2579,65 @@ def resultado_sorteio(
             }
             for e in entries
         ],
+    }
+
+
+@router.get("/sorteios/{drawing_id}/codigos-offline")
+def codigos_offline_sorteio(
+    drawing_id: int,
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Retorna a lista de participantes com códigos numerados para sorteio offline.
+    Útil para imprimir e sortear fisicamente (coloca em um chapéu, etc).
+    Cada participante tem tantos 'tickets' quanto seu ticket_count.
+    """
+    from app.models import Cliente
+
+    _, tenant_id = user_and_tenant
+
+    drawing = (
+        db.query(Drawing)
+        .filter(Drawing.id == drawing_id, Drawing.tenant_id == tenant_id)
+        .first()
+    )
+    if not drawing:
+        raise HTTPException(404, detail="Sorteio não encontrado.")
+
+    entries = (
+        db.query(DrawingEntry)
+        .filter(DrawingEntry.drawing_id == drawing_id)
+        .order_by(DrawingEntry.id.asc())
+        .all()
+    )
+    cids = [e.customer_id for e in entries]
+    clientes_map = {}
+    if cids:
+        for cl in db.query(Cliente).filter(Cliente.id.in_(cids), Cliente.tenant_id == tenant_id).all():
+            clientes_map[cl.id] = cl.nome
+
+    # Gera lista com 1 linha por ticket
+    tickets = []
+    numero = 1
+    for e in entries:
+        nome = clientes_map.get(e.customer_id, f"Cliente #{e.customer_id}")
+        for _ in range(max(1, e.ticket_count)):
+            tickets.append({
+                "numero": numero,
+                "customer_id": e.customer_id,
+                "nome": nome,
+                "rank_level": e.rank_level.value if e.rank_level else None,
+            })
+            numero += 1
+
+    return {
+        "sorteio_id": drawing.id,
+        "sorteio_nome": drawing.name,
+        "premio": drawing.prize_description,
+        "total_tickets": len(tickets),
+        "total_participantes": len(entries),
+        "tickets": tickets,
     }
 
 
