@@ -723,12 +723,16 @@ def meus_beneficios(
     ranking_thresholds = {
         "silver_min_spent": float(rp.get("silver_min_spent", 300)),
         "silver_min_purchases": int(rp.get("silver_min_purchases", 4)),
+        "silver_min_months": int(rp.get("silver_min_months", 2)),
         "gold_min_spent": float(rp.get("gold_min_spent", 1000)),
         "gold_min_purchases": int(rp.get("gold_min_purchases", 10)),
+        "gold_min_months": int(rp.get("gold_min_months", 4)),
         "diamond_min_spent": float(rp.get("diamond_min_spent", 3000)),
         "diamond_min_purchases": int(rp.get("diamond_min_purchases", 20)),
+        "diamond_min_months": int(rp.get("diamond_min_months", 6)),
         "platinum_min_spent": float(rp.get("platinum_min_spent", 8000)),
         "platinum_min_purchases": int(rp.get("platinum_min_purchases", 40)),
+        "platinum_min_months": int(rp.get("platinum_min_months", 10)),
     }
 
     # --- Cupons ativos ---

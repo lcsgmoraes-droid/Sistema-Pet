@@ -22,12 +22,16 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 interface RankingThresholds {
   silver_min_spent: number;
   silver_min_purchases: number;
+  silver_min_months: number;
   gold_min_spent: number;
   gold_min_purchases: number;
+  gold_min_months: number;
   diamond_min_spent: number;
   diamond_min_purchases: number;
+  diamond_min_months: number;
   platinum_min_spent: number;
   platinum_min_purchases: number;
+  platinum_min_months: number;
 }
 
 interface Beneficios {
@@ -114,6 +118,20 @@ const THRESHOLD_KEY: Record<string, keyof RankingThresholds> = {
   platinum: "platinum_min_spent",
 };
 
+const THRESHOLD_PURCHASES_KEY: Record<string, keyof RankingThresholds> = {
+  silver: "silver_min_purchases",
+  gold: "gold_min_purchases",
+  diamond: "diamond_min_purchases",
+  platinum: "platinum_min_purchases",
+};
+
+const THRESHOLD_MONTHS_KEY: Record<string, keyof RankingThresholds> = {
+  silver: "silver_min_months",
+  gold: "gold_min_months",
+  diamond: "diamond_min_months",
+  platinum: "platinum_min_months",
+};
+
 function brl(valor: number): string {
   return valor.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -165,7 +183,7 @@ function SecaoRanking({ ranking }: { ranking: Beneficios["ranking"] }) {
         <View style={{ flex: 1, marginLeft: ESPACO.md }}>
           <Text style={styles.rankingNivel}>{nomeNivel}</Text>
           <Text style={styles.rankingGasto}>
-            Total gasto no período: R$ {brl(total_spent)}
+            Gasto nos últimos 12 meses: R$ {brl(total_spent)}
           </Text>
         </View>
       </View>
@@ -197,7 +215,7 @@ function SecaoRanking({ ranking }: { ranking: Beneficios["ranking"] }) {
             <Text style={{ fontWeight: "bold", color: cor }}>
               R$ {brl(faltam)}
             </Text>{" "}
-            para {NIVEL_PT[proximoNivel]}
+            em gastos nos últimos 12 meses para {NIVEL_PT[proximoNivel]}
           </Text>
         </View>
       ) : (
@@ -399,55 +417,81 @@ function SecaoProximosNiveis({ ranking }: { ranking: Beneficios["ranking"] }) {
   const { nivel, thresholds } = ranking;
   const idxAtual = NIVEL_ORDEM.indexOf(nivel);
   const proximosNiveis = NIVEL_ORDEM.slice(idxAtual + 1);
+  const [aberto, setAberto] = useState(false);
 
   if (proximosNiveis.length === 0) return null;
 
   return (
     <View style={styles.secao}>
-      <View style={styles.secaoTitulo}>
-        <Ionicons name="trending-up-outline" size={20} color={CORES.primario} />
-        <Text style={styles.secaoTituloTexto}>Próximos Níveis</Text>
-      </View>
-      <Text style={styles.proximosSubtitulo}>
-        Veja o que você ganha ao subir de nível
-      </Text>
-      {proximosNiveis.map((lvl) => {
-        const cor = NIVEL_COR[lvl] ?? CORES.primario;
-        const key = THRESHOLD_KEY[lvl] as keyof RankingThresholds | undefined;
-        const meta = key ? thresholds[key] : null;
-        const vantagens = NIVEL_VANTAGENS[lvl] ?? [];
-        return (
-          <View key={lvl} style={[styles.nivelCard, { borderLeftColor: cor }]}>
-            <View style={styles.nivelCardTopo}>
-              <View
-                style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}
-              >
-                <Text style={styles.nivelBadgePequenoTexto}>
-                  {NIVEL_PT[lvl]?.[0] ?? "?"}
-                </Text>
+      <TouchableOpacity
+        onPress={() => setAberto(!aberto)}
+        style={styles.secaoTituloExpansivel}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.secaoTitulo, { marginBottom: 0 }]}>
+          <Ionicons name="trending-up-outline" size={20} color={CORES.primario} />
+          <Text style={styles.secaoTituloTexto}>Próximos Níveis</Text>
+        </View>
+        <Ionicons
+          name={aberto ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={CORES.textoSecundario}
+        />
+      </TouchableOpacity>
+
+      {aberto && (
+        <>
+          <Text style={styles.proximosSubtitulo}>
+            Requisitos medidos nos últimos 12 meses
+          </Text>
+          {proximosNiveis.map((lvl) => {
+            const cor = NIVEL_COR[lvl] ?? CORES.primario;
+            const keyGasto = THRESHOLD_KEY[lvl] as keyof RankingThresholds | undefined;
+            const keyCompras = THRESHOLD_PURCHASES_KEY[lvl] as keyof RankingThresholds | undefined;
+            const keyMeses = THRESHOLD_MONTHS_KEY[lvl] as keyof RankingThresholds | undefined;
+            const metaGasto = keyGasto ? thresholds[keyGasto] : null;
+            const metaCompras = keyCompras ? thresholds[keyCompras] : null;
+            const metaMeses = keyMeses ? thresholds[keyMeses] : null;
+            const vantagens = NIVEL_VANTAGENS[lvl] ?? [];
+            const requisitos = [
+              metaGasto ? `R$ ${brl(metaGasto)} em gastos` : false,
+              metaCompras ? `${metaCompras} compras` : false,
+              metaMeses ? `${metaMeses} meses ativos` : false,
+            ].filter(Boolean) as string[];
+            return (
+              <View key={lvl} style={[styles.nivelCard, { borderLeftColor: cor }]}>
+                <View style={styles.nivelCardTopo}>
+                  <View
+                    style={[styles.nivelBadgePequeno, { backgroundColor: cor }]}
+                  >
+                    <Text style={styles.nivelBadgePequenoTexto}>
+                      {NIVEL_PT[lvl]?.[0] ?? "?"}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: ESPACO.sm }}>
+                    <Text style={[styles.nivelNome, { color: cor }]}>
+                      {NIVEL_PT[lvl]}
+                    </Text>
+                    {requisitos.length > 0 && (
+                      <Text style={styles.nivelMeta}>
+                        {requisitos.join(" · ")} nos últimos 12 meses
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                {vantagens.map((v, i) => (
+                  <View key={i} style={styles.vantagemItemFuturo}>
+                    <Text style={[styles.vantagemCheckmarkFuturo, { color: cor }]}>
+                      ✦
+                    </Text>
+                    <Text style={styles.vantagemTextoFuturo}>{v}</Text>
+                  </View>
+                ))}
               </View>
-              <View style={{ flex: 1, marginLeft: ESPACO.sm }}>
-                <Text style={[styles.nivelNome, { color: cor }]}>
-                  {NIVEL_PT[lvl]}
-                </Text>
-                {meta != null && (
-                  <Text style={styles.nivelMeta}>
-                    A partir de R$ {brl(meta)} em compras no período
-                  </Text>
-                )}
-              </View>
-            </View>
-            {vantagens.map((v, i) => (
-              <View key={i} style={styles.vantagemItemFuturo}>
-                <Text style={[styles.vantagemCheckmarkFuturo, { color: cor }]}>
-                  ✦
-                </Text>
-                <Text style={styles.vantagemTextoFuturo}>{v}</Text>
-              </View>
-            ))}
-          </View>
-        );
-      })}
+            );
+          })}
+        </>
+      )}
     </View>
   );
 }
@@ -523,13 +567,13 @@ export default function BeneficiosScreen() {
       }
     >
       <SecaoRanking ranking={dados.ranking} />
-      <SecaoProximosNiveis ranking={dados.ranking} />
       <SecaoCarimbos carimbos={dados.carimbos} />
       <SecaoCashback saldo={dados.cashback.saldo} />
       <SecaoCupons
         cupons={dados.cupons}
         onVerTodos={() => navigation.navigate("MeusCupons")}
       />
+      <SecaoProximosNiveis ranking={dados.ranking} />
     </ScrollView>
   );
 }
@@ -751,9 +795,16 @@ const styles = StyleSheet.create({
   },
 
   // Próximos Níveis
+  secaoTituloExpansivel: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 0,
+  },
   proximosSubtitulo: {
     fontSize: FONTE.pequena,
     color: CORES.textoSecundario,
+    marginTop: ESPACO.xs,
     marginBottom: ESPACO.sm,
   },
   nivelCard: {

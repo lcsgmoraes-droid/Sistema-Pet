@@ -5603,9 +5603,7 @@ export default function Campanhas() {
                     </select>
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-600 w-44">
-                      Hora:
-                    </label>
+                    <label className="text-sm text-gray-600 w-44">Hora:</label>
                     <select
                       value={schedulerConfig.ranking_send_hour}
                       onChange={(e) =>
