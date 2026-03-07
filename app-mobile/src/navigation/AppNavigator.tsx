@@ -1,14 +1,15 @@
-import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useAuthStore } from '../store/auth.store';
 import { useTenantStore } from '../store/tenant.store';
-import { ActivityIndicator, View } from 'react-native';
 import { CORES } from '../theme';
-import { usePushNotifications } from '../hooks/usePushNotifications';
 
 // Navegadores
 import AuthNavigator from './AuthNavigator';
+import EntregadorNavigator from './EntregadorNavigator';
 import MainNavigator from './MainNavigator';
 
 // Tela de seleção de loja
@@ -17,7 +18,7 @@ import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading: authLoading, loadUser } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, loadUser, user } = useAuthStore();
   const { tenant, isLoading: tenantLoading, loadTenant } = useTenantStore();
 
   // Configura push notifications automaticamente após login
@@ -50,9 +51,18 @@ export default function AppNavigator() {
   }
 
   // Loja escolhida → fluxo normal (login ou app)
+  let activeNav: React.ReactNode;
+  if (!isAuthenticated) {
+    activeNav = <AuthNavigator />;
+  } else if (user?.is_entregador) {
+    activeNav = <EntregadorNavigator />;
+  } else {
+    activeNav = <MainNavigator />;
+  }
+
   return (
     <NavigationContainer>
-      {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
+      {activeNav}
     </NavigationContainer>
   );
 }

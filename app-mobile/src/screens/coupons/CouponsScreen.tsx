@@ -1,16 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-  Clipboard,
-  Modal,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Clipboard,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import api from '../../services/api';
 import { CORES } from '../../theme';
@@ -75,6 +75,7 @@ export default function CouponsScreen() {
   }
 
   return (
+    <>
     <FlatList
       data={cupons}
       keyExtractor={(item) => item.codigo}
@@ -195,6 +196,7 @@ export default function CouponsScreen() {
         </View>
       </TouchableOpacity>
     </Modal>
+    </>
   );
 }
 

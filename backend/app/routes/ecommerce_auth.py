@@ -286,6 +286,9 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
             "entrega_estado": delivery.get("entrega_estado", ""),
         },
         "cliente_id": cliente.id if cliente else None,
+        # Perfil entregador — usado pelo app mobile para mostrar interface correta
+        "is_entregador": cliente.is_entregador if cliente else False,
+        "funcionario_id": cliente.id if (cliente and cliente.is_entregador) else None,
     }
 
 

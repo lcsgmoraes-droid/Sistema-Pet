@@ -156,6 +156,7 @@ from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
 from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
+from app.routes.ecommerce_entregador import router as ecommerce_entregador_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 
 # ============================================================================
@@ -715,6 +716,7 @@ app.include_router(admin_fix_router)  # Correções administrativas
 # ============================================================================
 app.include_router(ecommerce_router)
 app.include_router(ecommerce_auth_router)
+app.include_router(ecommerce_entregador_router)
 app.include_router(ecommerce_public_router)
 app.include_router(ecommerce_cart_router)
 app.include_router(ecommerce_checkout_router)

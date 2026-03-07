@@ -25,6 +25,9 @@ export interface EcommerceUser {
   bairro?: string | null;
   cidade?: string | null;
   estado?: string | null;
+  // perfil entregador
+  is_entregador?: boolean;
+  funcionario_id?: number | null;
 }
 
 // =====================

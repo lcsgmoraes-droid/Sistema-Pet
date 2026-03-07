@@ -3,7 +3,7 @@
 
 // ⚠️ Se mudar de rede Wi-Fi, verifique o IP rodando no terminal:
 //    Get-NetIPAddress -AddressFamily IPv4
-const DEV_API_URL = 'https://postdiscoidal-grouty-chandra.ngrok-free.dev'; // ngrok tunnel (temporário para teste)
+const DEV_API_URL = 'https://mlprohub.com.br/api'; // aponta para produção durante testes via Expo Go
 const PROD_API_URL = 'https://mlprohub.com.br/api';
 
 // Durante desenvolvimento via Expo Go: use o IP local
