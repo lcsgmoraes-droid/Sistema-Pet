@@ -18,6 +18,9 @@ class ConfiguracaoEntregaBase(BaseModel):
     bairro: Optional[str] = None
     cidade: Optional[str] = None
     estado: Optional[str] = None
+    # Método de registro de KM ao marcar entrega
+    # Valores: "auto_rota" | "gps" | "manual"
+    metodo_km_entrega: Optional[str] = "auto_rota"
 
 
 class ConfiguracaoEntregaUpdate(ConfiguracaoEntregaBase):

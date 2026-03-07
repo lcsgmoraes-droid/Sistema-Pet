@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
+import { api as apiServices } from "../../services/api";
 
 export default function RotasEntrega() {
   const navigate = useNavigate();
@@ -8,9 +9,14 @@ export default function RotasEntrega() {
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState("");
   const [rotaExpandida, setRotaExpandida] = useState(null);
+  const [metodoKm, setMetodoKm] = useState("auto_rota"); // default seguro
 
   useEffect(() => {
     carregarRotas();
+    // Carregar config de entrega para saber o método configurado
+    apiServices.get("/configuracoes/entregas")
+      .then(r => setMetodoKm(r.data?.metodo_km_entrega || "auto_rota"))
+      .catch(() => {}); // silencioso — usa default se falhar
   }, [filtroStatus]);
 
   async function carregarRotas() {
@@ -20,7 +26,7 @@ export default function RotasEntrega() {
       if (filtroStatus) {
         params.append("status", filtroStatus);
       }
-      
+
       const response = await api.get(`/rotas-entrega/?${params.toString()}`);
       setRotas(response.data);
     } catch (err) {
@@ -44,16 +50,16 @@ export default function RotasEntrega() {
       // API call para atualizar ordem das paradas
       // Backend espera lista de IDs na nova ordem
       const novaOrdem = paradasOrdenadas.map(p => p.id);
-      
+
       await api.put(`/rotas-entrega/${rotaId}/paradas/reordenar`, novaOrdem);
-      
+
       // Atualizar localmente
-      setRotas(prev => prev.map(r => 
-        r.id === rotaId 
+      setRotas(prev => prev.map(r =>
+        r.id === rotaId
           ? { ...r, paradas: paradasOrdenadas.map((p, idx) => ({ ...p, ordem: idx + 1 })) }
           : r
       ));
-      
+
       alert("Ordem das paradas atualizada!");
     } catch (err) {
       console.error("Erro ao reordenar paradas:", err);
@@ -65,7 +71,7 @@ export default function RotasEntrega() {
     if (!confirm("Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.")) {
       return;
     }
-    
+
     // Sem prompt de km — motoqueiro não precisa digitar nada
 
     try {
@@ -114,13 +120,13 @@ export default function RotasEntrega() {
 
   function calcularTempoEstimado(rota) {
     if (!rota.paradas || rota.paradas.length === 0) return null;
-    
+
     // Só mostrar tempo se a rota foi otimizada (tem tempo_acumulado nas paradas)
     const ultimaParada = rota.paradas[rota.paradas.length - 1];
     if (ultimaParada.tempo_acumulado) {
       return ultimaParada.tempo_acumulado;
     }
-    
+
     // Se não foi otimizada, retornar null (não mostrar estimativa)
     return null;
   }
@@ -227,6 +233,7 @@ export default function RotasEntrega() {
               getStatusLabel={getStatusLabel}
               calcularTempoEstimado={calcularTempoEstimado}
               formatarTempo={formatarTempo}
+              metodoKm={metodoKm}
             />
           ))}
         </div>
@@ -236,10 +243,10 @@ export default function RotasEntrega() {
 }
 
 // Componente separado para o card da rota
-function RotaCard({ 
-  rota, 
-  expandida, 
-  onToggleExpand, 
+function RotaCard({
+  rota,
+  expandida,
+  onToggleExpand,
   onReordenar,
   onIniciarRota,
   onExcluirRota,
@@ -247,7 +254,8 @@ function RotaCard({
   getStatusColor,
   getStatusLabel,
   calcularTempoEstimado,
-  formatarTempo
+  formatarTempo,
+  metodoKm
 }) {
   const [paradasOrdenadas, setParadasOrdenadas] = useState(rota.paradas || []);
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -263,7 +271,7 @@ function RotaCard({
   }, [rota.paradas]);
 
   const tempoEstimado = calcularTempoEstimado(rota);
-  
+
   // Calcular paradas pendentes
   const paradasPendentes = paradasOrdenadas.filter(p => p.status !== "entregue").length;
   const todasEntregue = paradasOrdenadas.length > 0 && paradasPendentes === 0;
@@ -301,17 +309,27 @@ function RotaCard({
 
     try {
       setProcessandoEntrega(paradaId);
-      
+
       const params = {};
-      
-      // Cenário 2: auto-calcular km_entrega a partir da distância acumulada + km_inicial da rota
-      const parada = paradasOrdenadas.find(p => p.id === paradaId);
-      if (parada?.distancia_acumulada && rota.km_inicial) {
-        const kmAuto = parseFloat(rota.km_inicial) + parseFloat(parada.distancia_acumulada);
-        params.km_entrega = parseFloat(kmAuto.toFixed(2));
+      const metodo = metodoKm || "auto_rota";
+
+      if (metodo === "manual") {
+        // Entregador digita o km do odômetro manualmente
+        const kmDigitado = prompt("🏁 Digite o KM atual do odômetro (opcional):\n\nDeixe em branco para pular.");
+        if (kmDigitado && !isNaN(kmDigitado) && parseFloat(kmDigitado) > 0) {
+          params.km_entrega = parseFloat(kmDigitado);
+        }
+      } else if (metodo === "auto_rota") {
+        // Auto-calcular a partir da distância da rota otimizada
+        const parada = paradasOrdenadas.find(p => p.id === paradaId);
+        if (parada?.distancia_acumulada && rota.km_inicial) {
+          const kmAuto = parseFloat(rota.km_inicial) + parseFloat(parada.distancia_acumulada);
+          params.km_entrega = parseFloat(kmAuto.toFixed(2));
+        }
       }
-      
-      // Cenário 3: capturar GPS silenciosamente (não bloqueia se não disponível)
+      // Se metodo === "gps": não registra km_entrega, só coordenadas GPS abaixo
+
+      // GPS: capturar localização silenciosamente em qualquer método (para rastreamento)
       try {
         const gps = await new Promise((resolve) => {
           if (!navigator.geolocation) { resolve(null); return; }
@@ -328,17 +346,17 @@ function RotaCard({
       } catch (_) {
         // GPS não disponível — continua sem coordenadas
       }
-      
+
       const response = await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/marcar-entregue`, null, { params });
       alert("✅ " + response.data.message);
-      
+
       // Atualizar estado local da parada
-      setParadasOrdenadas(prev => prev.map(p => 
-        p.id === paradaId 
+      setParadasOrdenadas(prev => prev.map(p =>
+        p.id === paradaId
           ? { ...p, status: "entregue", data_entrega: new Date().toISOString(), km_entrega: params.km_entrega || null }
           : p
       ));
-      
+
       // Recarregar a rota completa para garantir sincronização
       window.location.reload();
     } catch (err) {
@@ -352,7 +370,7 @@ function RotaCard({
 
   async function adicionarObservacao(paradaId, rotaId) {
     const observacao = prompt("📋 Digite a observação sobre esta entrega:\n\n(Ex: 'Sempre entregar no vizinho', 'Chamar na casa da frente')");
-    
+
     if (!observacao || observacao.trim() === "") {
       return;
     }
@@ -361,12 +379,12 @@ function RotaCard({
       await api.put(`/rotas-entrega/${rotaId}/paradas/${paradaId}/observacao`, null, {
         params: { observacao: observacao.trim() }
       });
-      
+
       alert("✅ Observação salva com sucesso!");
-      
+
       // Atualizar localmente
-      setParadasOrdenadas(prev => prev.map(p => 
-        p.id === paradaId 
+      setParadasOrdenadas(prev => prev.map(p =>
+        p.id === paradaId
           ? { ...p, observacoes: observacao.trim() }
           : p
       ));
@@ -378,7 +396,7 @@ function RotaCard({
 
   async function marcarNaoEntregue(paradaId, rotaId, vendaId) {
     const motivo = prompt("⚠️ Por que a entrega não foi realizada?\n\n(Ex: 'Cliente ausente', 'Cartão recusado', 'Endereço não encontrado')");
-    
+
     if (!motivo || motivo.trim() === "") {
       return;
     }
@@ -392,7 +410,7 @@ function RotaCard({
       await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`, null, {
         params: { motivo: motivo.trim() }
       });
-      
+
       alert("✅ Entrega marcada como não realizada. Venda #" + vendaId + " voltou para entregas em aberto.");
       window.location.reload();
     } catch (err) {
@@ -404,18 +422,19 @@ function RotaCard({
   }
 
   async function finalizarRota(rotaId, kmInicial) {
-    // Cenário 2: auto-calcular distância a partir da última parada com distancia_acumulada
+    const metodo = metodoKm || "auto_rota";
+
+    // Distância total da rota otimizada (última parada com distancia_acumulada)
     const ultimaParadaComDistancia = [...paradasOrdenadas]
       .reverse()
       .find(p => p.distancia_acumulada);
-    
     const distanciaRouteTotal = ultimaParadaComDistancia
       ? parseFloat(ultimaParadaComDistancia.distancia_acumulada)
       : null;
-    
-    // Montar mensagem de confirmação com distância auto se disponível
+
+    // Montar mensagem de confirmação com distância se disponível
     let msgConfirm = "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
-    if (distanciaRouteTotal) {
+    if (metodo === "auto_rota" && distanciaRouteTotal) {
       msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância percorrida estimada: ${distanciaRouteTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     }
 
@@ -425,20 +444,31 @@ function RotaCard({
 
     try {
       setProcessandoFinalizacao(true);
-      
+
       const payload = {};
-      
-      if (distanciaRouteTotal) {
-        payload.distancia_real = distanciaRouteTotal;
+
+      if (metodo === "manual") {
+        // Entregador digita km final do odômetro
+        const kmFinalDigitado = prompt("🏁 Digite o KM final do odômetro (opcional):\n\nDeixe em branco para pular.");
+        if (kmFinalDigitado && !isNaN(kmFinalDigitado) && parseFloat(kmFinalDigitado) > 0) {
+          payload.km_final = parseFloat(kmFinalDigitado);
+          if (kmInicial) {
+            payload.distancia_real = parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
+          }
+        }
+      } else if (metodo === "auto_rota") {
+        // Auto-calcular a partir da distância da rota
+        if (distanciaRouteTotal) {
+          payload.distancia_real = distanciaRouteTotal;
+        }
+        if (kmInicial && distanciaRouteTotal) {
+          payload.km_final = parseFloat(kmInicial) + distanciaRouteTotal;
+        }
       }
-      
-      // Calcular km_final automaticamente se tiver km_inicial e distância
-      if (kmInicial && distanciaRouteTotal) {
-        payload.km_final = parseFloat(kmInicial) + distanciaRouteTotal;
-      }
-      
+      // Se metodo === "gps": não calcula km, apenas registra a finalização
+
       await api.post(`/rotas-entrega/${rotaId}/fechar`, payload);
-      
+
       alert("✅ Rota finalizada com sucesso!");
       window.location.reload();
     } catch (err) {
@@ -463,7 +493,7 @@ function RotaCard({
     const draggedItem = newParadas[draggedIndex];
     newParadas.splice(draggedIndex, 1);
     newParadas.splice(index, 0, draggedItem);
-    
+
     setParadasOrdenadas(newParadas);
     setDraggedIndex(index);
   };
@@ -498,56 +528,56 @@ function RotaCard({
               🚚 {rota.numero || `Rota #${rota.id}`}
               {expandida ? " 🔽" : " ▶️"}
             </h3>
-            
+
             <div style={{ display: "flex", flexDirection: "column", gap: 5, color: "#555" }}>
               <div>
                 <strong>Entregador:</strong> {rota.entregador?.nome || "Não informado"}
               </div>
-              
+
               <div>
                 <strong>Paradas:</strong> {rota.paradas?.length || 0} entrega(s)
               </div>
-              
+
               {rota.distancia_prevista && (
                 <div>
                   <strong>Distância Prevista:</strong> {rota.distancia_prevista} km
                 </div>
               )}
-              
+
               {tempoEstimado && (
                 <div>
                   <strong>Tempo Estimado:</strong> {formatarTempo(tempoEstimado)}
                 </div>
               )}
-              
+
               {/* KM Inicial - Mostra quando a rota foi iniciada */}
               {rota.km_inicial && (
                 <div>
                   <strong>🏁 KM Inicial:</strong> {parseFloat(rota.km_inicial).toFixed(1)} km
                 </div>
               )}
-              
+
               {/* KM Final - Mostra quando a rota foi finalizada */}
               {rota.km_final && (
                 <div>
                   <strong>🏁 KM Final:</strong> {parseFloat(rota.km_final).toFixed(1)} km
                 </div>
               )}
-              
+
               {/* Total de KM Rodados - Calcula se tiver inicial e final */}
               {rota.km_inicial && rota.km_final && (
                 <div style={{ color: "#007BFF", fontWeight: "600" }}>
                   <strong>📏 Total Rodado:</strong> {(parseFloat(rota.km_final) - parseFloat(rota.km_inicial)).toFixed(1)} km
-                  
+
                   {/* Comparação com Projetado - Se existir distância prevista */}
                   {rota.distancia_prevista && (() => {
                     const realizado = parseFloat(rota.km_final) - parseFloat(rota.km_inicial);
                     const projetado = parseFloat(rota.distancia_prevista);
                     const diferenca = realizado - projetado;
                     const percentual = ((diferenca / projetado) * 100).toFixed(1);
-                    
+
                     return (
-                      <span style={{ 
+                      <span style={{
                         marginLeft: 10,
                         color: diferenca > 0 ? "#DC3545" : "#28A745",
                         fontSize: 13
@@ -558,12 +588,12 @@ function RotaCard({
                   })()}
                 </div>
               )}
-              
+
               <div>
                 <strong>Criada em:</strong>{" "}
                 {new Date(rota.created_at).toLocaleString("pt-BR")}
               </div>
-              
+
               {rota.data_conclusao && (
                 <div>
                   <strong>Concluída em:</strong>{" "}
@@ -598,7 +628,7 @@ function RotaCard({
                 🚀 Iniciar Rota
               </button>
             )}
-            
+
             {/* Botão Finalizar Rota - visível quando rota em_rota e todas entregas concluídas */}
             {(rota.status === "em_rota" || rota.status === "em_andamento") && todasEntregue && (
               <button
@@ -624,7 +654,7 @@ function RotaCard({
                 {processandoFinalizacao ? "⏳ Processando..." : "✅ Finalizar Rota"}
               </button>
             )}
-            
+
             {/* Botão Reverter Início - visível quando rota em_rota mas nenhuma entrega foi feita */}
             {(rota.status === "em_rota" || rota.status === "em_andamento") && paradasPendentes === paradasOrdenadas.length && (
               <button
@@ -649,7 +679,7 @@ function RotaCard({
                 ↩️ Reverter Início
               </button>
             )}
-            
+
             {/* Botão Excluir Rota - visível para rotas pendentes ou em_rota */}
             {(rota.status === "pendente" || rota.status === "em_rota" || rota.status === "em_andamento") && (
               <button
@@ -674,7 +704,7 @@ function RotaCard({
                 🗑️ Excluir
               </button>
             )}
-            
+
             <div
               style={{
                 padding: "5px 15px",
@@ -711,7 +741,7 @@ function RotaCard({
       {expandida && paradasOrdenadas.length > 0 && (
         <div style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}>
           <h4 style={{ marginBottom: 15 }}>📍 Paradas da Rota (arraste para reordenar)</h4>
-          
+
           {paradasOrdenadas.map((parada, index) => (
             <div key={parada.id}>
               <div
@@ -733,8 +763,8 @@ function RotaCard({
               >
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", marginBottom: 5 }}>
-                    <span style={{ 
-                      fontWeight: "bold", 
+                    <span style={{
+                      fontWeight: "bold",
                       marginRight: 10,
                       fontSize: 18,
                       color: "#007BFF"
@@ -750,10 +780,10 @@ function RotaCard({
                         padding: "2px 8px",
                         borderRadius: 12,
                         fontSize: 12,
-                        backgroundColor: 
+                        backgroundColor:
                           parada.status === "entregue" ? "#d4edda" :
                           parada.status === "tentativa" ? "#fff3cd" : "#e2e3e5",
-                        color: 
+                        color:
                           parada.status === "entregue" ? "#155724" :
                           parada.status === "tentativa" ? "#856404" : "#383d41",
                       }}>
@@ -762,7 +792,7 @@ function RotaCard({
                       </span>
                     )}
                   </div>
-                  
+
                   {/* Cliente e Informações em layout compacto */}
                   <div style={{ fontSize: 13, color: "#333", lineHeight: 1.6 }}>
                     {/* Nome e Telefones */}
@@ -781,7 +811,7 @@ function RotaCard({
                         )}
                       </div>
                     )}
-                    
+
                     {/* Endereço */}
                     <div style={{ color: "#555" }}>
                       📍 {parada.endereco}
@@ -797,16 +827,16 @@ function RotaCard({
                       )}
                     </div>
                   </div>
-                  
+
                   {parada.data_entrega && (
                     <div style={{ color: "#28a745", fontSize: 12, marginTop: 3 }}>
                       ✓ Entregue em: {new Date(parada.data_entrega).toLocaleString("pt-BR")}
                     </div>
                   )}
-                  
+
                   {/* Observações da parada */}
                   {parada.observacoes && (
-                    <div style={{ 
+                    <div style={{
                       marginTop: 6,
                       padding: 6,
                       backgroundColor: "#fff3cd",
@@ -847,7 +877,7 @@ function RotaCard({
                       {processandoEntrega === parada.id ? "⏳..." : "✅ Entregue"}
                     </button>
                   )}
-                  
+
                   {/* Botão Não Entregue - só aparece para rotas em andamento */}
                   {parada.status !== "entregue" && (rota.status === "em_rota" || rota.status === "em_andamento") && (
                     <button
@@ -873,7 +903,7 @@ function RotaCard({
                       {processandoNaoEntregue === parada.id ? "⏳..." : "⚠️ Falta Entregar"}
                     </button>
                   )}
-                  
+
                   {/* Botão Observação */}
                   <button
                     onClick={(e) => {
@@ -896,7 +926,7 @@ function RotaCard({
                   >
                     📝 Observação
                   </button>
-                  
+
                   {/* Botão Detalhes */}
                   <button
                     onClick={(e) => {
@@ -907,7 +937,7 @@ function RotaCard({
                         carregarDetalhesVenda(parada.id, parada.venda_id);
                       }
                     }}
-                    style={{ 
+                    style={{
                       padding: "8px 12px",
                       backgroundColor: "#17A2B8",
                       color: "#fff",
@@ -966,7 +996,7 @@ function RotaCard({
                           ✕ Fechar
                         </button>
                       </div>
-                      
+
                       {/* Informações do Cliente */}
                       <div style={{
                         backgroundColor: "#e7f3ff",
@@ -982,7 +1012,7 @@ function RotaCard({
                           <div>
                             <strong>📅 Data:</strong> {vendaDetalhes.data_venda ? new Date(vendaDetalhes.data_venda).toLocaleString("pt-BR") : "N/A"}
                           </div>
-                          
+
                           {vendaDetalhes.cliente?.telefone && (
                             <div>
                               <strong>📞 Telefone:</strong> {vendaDetalhes.cliente.telefone}
@@ -1000,14 +1030,14 @@ function RotaCard({
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Informações Financeiras */}
-                      <div style={{ 
-                        display: "grid", 
-                        gridTemplateColumns: "1fr 1fr 1fr", 
-                        gap: 10, 
+                      <div style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr 1fr",
+                        gap: 10,
                         fontSize: 14,
-                        marginBottom: 15 
+                        marginBottom: 15
                       }}>
                         <div style={{ padding: 10, backgroundColor: "#d4edda", borderRadius: 4, border: "1px solid #28a745" }}>
                           <div style={{ fontSize: 11, color: "#155724", marginBottom: 3 }}>VALOR TOTAL</div>
@@ -1030,10 +1060,10 @@ function RotaCard({
                       </div>
 
                       {vendaDetalhes.endereco_entrega && (
-                        <div style={{ 
-                          padding: 12, 
-                          backgroundColor: "#e3f2fd", 
-                          borderRadius: 6, 
+                        <div style={{
+                          padding: 12,
+                          backgroundColor: "#e3f2fd",
+                          borderRadius: 6,
                           marginBottom: 15,
                           border: "1px solid #2196F3"
                         }}>
@@ -1045,12 +1075,12 @@ function RotaCard({
                           </div>
                         </div>
                       )}
-                      
+
                       {vendaDetalhes.observacoes && (
-                        <div style={{ 
-                          padding: 12, 
-                          backgroundColor: "#fff3cd", 
-                          borderRadius: 6, 
+                        <div style={{
+                          padding: 12,
+                          backgroundColor: "#fff3cd",
+                          borderRadius: 6,
                           marginBottom: 15,
                           border: "1px solid #ffc107"
                         }}>
@@ -1065,25 +1095,25 @@ function RotaCard({
 
                       {vendaDetalhes.itens && vendaDetalhes.itens.length > 0 && (
                         <div>
-                          <div style={{ 
-                            fontWeight: "bold", 
-                            fontSize: 15, 
+                          <div style={{
+                            fontWeight: "bold",
+                            fontSize: 15,
                             marginBottom: 10,
                             color: "#424242"
                           }}>
                             🛒 Itens da Venda ({vendaDetalhes.itens.length})
                           </div>
-                          <div style={{ 
-                            backgroundColor: "#fff", 
-                            borderRadius: 6, 
+                          <div style={{
+                            backgroundColor: "#fff",
+                            borderRadius: 6,
                             border: "1px solid #ddd",
                             overflow: "hidden",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                           }}>
                             {vendaDetalhes.itens.map((item, idx) => (
-                              <div 
-                                key={idx} 
-                                style={{ 
+                              <div
+                                key={idx}
+                                style={{
                                   padding: 12,
                                   borderBottom: idx < vendaDetalhes.itens.length - 1 ? "1px solid #eee" : "none",
                                   display: "flex",
@@ -1112,7 +1142,7 @@ function RotaCard({
                                 </div>
                               </div>
                             ))}
-                            
+
                             {/* Total geral */}
                             <div style={{
                               padding: 14,

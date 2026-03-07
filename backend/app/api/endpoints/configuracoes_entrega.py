@@ -20,6 +20,7 @@ router = APIRouter(prefix="/configuracoes/entregas", tags=["Configurações - En
 def ensure_configuracoes_entrega_schema(db: Session) -> None:
     """Compatibilidade de schema em ambiente legado (sem migrations completas)."""
     db.execute(text("ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS user_id INTEGER"))
+    db.execute(text("ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS metodo_km_entrega VARCHAR(20) DEFAULT 'auto_rota'"))
     db.execute(text("""
         UPDATE configuracoes_entrega ce
         SET user_id = u.id
@@ -46,18 +47,18 @@ def get_configuracao_entrega(
     """
     Retorna a configuração de entrega do tenant atual.
     Cria automaticamente se não existir.
-    
+
     ✅ Multi-tenant: usa tenant_id do contexto
     ✅ Idempotente: cria se não existir
     """
     current_user, tenant_id = user_and_tenant
     ensure_configuracoes_entrega_schema(db)
-    
+
     # Verifica se tenant existe
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
-    
+
     # Busca ou cria configuração
     config = (
         db.query(ConfiguracaoEntrega)
@@ -74,7 +75,7 @@ def get_configuracao_entrega(
             Cliente.entregador_ativo == True,
             Cliente.ativo == True
         ).first()
-        
+
         # Cria configuração padrão com entregador padrão se existir
         config = ConfiguracaoEntrega(
             tenant_id=tenant_id,
@@ -123,19 +124,19 @@ def update_configuracao_entrega(
 ):
     """
     Atualiza a configuração de entrega do tenant atual.
-    
+
     ✅ Multi-tenant: usa tenant_id do contexto
     ✅ Idempotente: cria se não existir
     ✅ Parcial: aceita campos opcionais
     """
     current_user, tenant_id = user_and_tenant
     ensure_configuracoes_entrega_schema(db)
-    
+
     # Verifica se tenant existe
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
-    
+
     # Busca ou cria configuração
     config = (
         db.query(ConfiguracaoEntrega)

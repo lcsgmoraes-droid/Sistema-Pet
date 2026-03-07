@@ -16,6 +16,7 @@ export default function EntregasConfig() {
     bairro: "",
     cidade: "",
     estado: "",
+    metodo_km_entrega: "auto_rota",
   });
 
   useEffect(() => {
@@ -23,11 +24,11 @@ export default function EntregasConfig() {
       try {
         const [cfg, pessoas] = await Promise.all([
           api.get("/configuracoes/entregas"),
-          api.get("/clientes/", { 
-            params: { 
-              is_entregador: true, 
-              entregador_ativo: true 
-            } 
+          api.get("/clientes/", {
+            params: {
+              is_entregador: true,
+              entregador_ativo: true
+            }
           }),
         ]);
 
@@ -42,13 +43,14 @@ export default function EntregasConfig() {
           bairro: cfg.data.bairro ?? "",
           cidade: cfg.data.cidade ?? "",
           estado: cfg.data.estado ?? "",
+          metodo_km_entrega: cfg.data.metodo_km_entrega ?? "auto_rota",
         });
-        
+
         // 🛡️ PROTEÇÃO: Garantir que entregadores seja SEMPRE um array
-        const entregadoresList = Array.isArray(pessoas.data) 
-          ? pessoas.data 
+        const entregadoresList = Array.isArray(pessoas.data)
+          ? pessoas.data
           : (pessoas.data?.clientes || pessoas.data?.items || []);
-        
+
         console.log('🚚 Entregadores carregados:', entregadoresList);
         setEntregadores(entregadoresList);
       } catch (e) {
@@ -65,7 +67,7 @@ export default function EntregasConfig() {
 
   async function buscarCep() {
     const cep = form.cep.replace(/\D/g, "");
-    
+
     if (cep.length !== 8) {
       alert("CEP inválido. Digite 8 dígitos.");
       return;
@@ -110,6 +112,7 @@ export default function EntregasConfig() {
         bairro: form.bairro || null,
         cidade: form.cidade || null,
         estado: form.estado || null,
+        metodo_km_entrega: form.metodo_km_entrega || "auto_rota",
       });
       alert("Configurações salvas com sucesso");
     } catch (e) {
@@ -268,8 +271,71 @@ export default function EntregasConfig() {
           Este endereço será usado como ponto de partida para calcular as rotas de entrega.
         </p>
 
-        <button 
-          type="submit" 
+        <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #ddd" }} />
+
+        <h3 style={{ marginBottom: 8 }}>Método de Registro ao Marcar Entregue</h3>
+        <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
+          Escolha como o sistema vai registrar o km percorrido quando o entregador clicar em ✅ Entregue.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {[
+            {
+              valor: "auto_rota",
+              titulo: "🗺️ Distância da rota otimizada (recomendado)",
+              descricao: "Usa automaticamente a distância calculada pelo Google Maps ao otimizar a rota. Nenhuma ação do entregador. Só funciona se a rota foi otimizada antes.",
+              custo: "Custo: zero (usa dados já calculados)",
+            },
+            {
+              valor: "gps",
+              titulo: "📍 GPS do celular",
+              descricao: "Captura as coordenadas exatas do celular no momento da entrega. O entregador só precisa aceitar a permissão de localização no navegador, uma única vez.",
+              custo: "Custo: zero (usa o GPS do próprio telefone, sem chamada ao Google)",
+            },
+            {
+              valor: "manual",
+              titulo: "✏️ Preenchimento manual",
+              descricao: "O entregador digita o km atual do odômetro da moto ao clicar em Entregue. Útil para empresas que precisam controlar o hodômetro com precisão real.",
+              custo: "Custo: zero",
+            },
+          ].map((opcao) => (
+            <label
+              key={opcao.valor}
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                padding: "14px 16px",
+                borderRadius: 8,
+                border: `2px solid ${form.metodo_km_entrega === opcao.valor ? "#2563eb" : "#e5e7eb"}`,
+                backgroundColor: form.metodo_km_entrega === opcao.valor ? "#eff6ff" : "#fafafa",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              <input
+                type="radio"
+                name="metodo_km_entrega"
+                value={opcao.valor}
+                checked={form.metodo_km_entrega === opcao.valor}
+                onChange={(e) => setForm({ ...form, metodo_km_entrega: e.target.value })}
+                style={{ marginTop: 3, accentColor: "#2563eb" }}
+              />
+              <div>
+                <div style={{ fontWeight: "600", fontSize: 14, marginBottom: 4 }}>{opcao.titulo}</div>
+                <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>{opcao.descricao}</div>
+                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: "500" }}>{opcao.custo}</div>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <p style={{ fontSize: 12, color: "#888", marginTop: 12, marginBottom: 24 }}>
+          💡 Dica: todas as opções também capturam a posição GPS silenciosamente para o rastreio público do cliente (quando disponível).
+        </p>
+
+        <button
+          type="submit"
           disabled={saving}
           style={{
             backgroundColor: "#2563eb",
