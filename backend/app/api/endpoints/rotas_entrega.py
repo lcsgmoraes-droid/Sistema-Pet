@@ -4,6 +4,7 @@ from sqlalchemy import text
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
+import secrets
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -34,8 +35,11 @@ def ensure_rotas_entrega_schema(db: Session) -> None:
 
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"))
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS token_rastreio VARCHAR(64)"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lon_entrega NUMERIC(10,6)"))
     db.commit()
     _rotas_schema_checked = True
 
@@ -358,6 +362,7 @@ def criar_rota(
             created_by=user.id,
         )
         rota.numero = f"ROTA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        rota.token_rastreio = secrets.token_urlsafe(32)
         
         # Somar taxas de entrega de todas as vendas
         taxa_total = sum(v.taxa_entrega for v in vendas if v.taxa_entrega)
@@ -506,6 +511,7 @@ def criar_rota(
 
     # Número da rota (simples por enquanto)
     rota.numero = f"ROTA-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    rota.token_rastreio = secrets.token_urlsafe(32)
 
     db.add(rota)
     
@@ -814,6 +820,8 @@ def marcar_parada_entregue(
     parada_id: int,
     tentativa: bool = False,
     km_entrega: Optional[float] = None,
+    lat_entrega: Optional[float] = None,
+    lon_entrega: Optional[float] = None,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -823,6 +831,8 @@ def marcar_parada_entregue(
     Args:
         tentativa: True se cliente ausente (não entregue)
         km_entrega: KM da moto no momento da entrega (opcional)
+        lat_entrega: Latitude GPS no momento da entrega (opcional)
+        lon_entrega: Longitude GPS no momento da entrega (opcional)
     """
     user, tenant_id = user_and_tenant
     
@@ -864,6 +874,17 @@ def marcar_parada_entregue(
         if km_entrega is not None:
             parada.km_entrega = Decimal(str(km_entrega))
             logger.info(f"KM da entrega {parada_id}: {km_entrega}")
+        
+        # Registrar coordenadas GPS da entrega (opcional)
+        if lat_entrega is not None and lon_entrega is not None:
+            try:
+                db.execute(
+                    text("UPDATE rotas_entrega_paradas SET lat_entrega = :lat, lon_entrega = :lon WHERE id = :pid"),
+                    {"lat": lat_entrega, "lon": lon_entrega, "pid": parada_id}
+                )
+                logger.info(f"GPS da entrega {parada_id}: lat={lat_entrega}, lon={lon_entrega}")
+            except Exception as e:
+                logger.warning(f"Não foi possível salvar GPS da entrega: {e}")
         
         mensagem = "Parada marcada como entregue!"
         
@@ -1037,4 +1058,136 @@ def excluir_rota(
         "message": "Rota excluída com sucesso",
         "vendas_liberadas": vendas_liberadas,
         "total_vendas": len(vendas_liberadas)
+    }
+
+
+# ─── CENÁRIO 2+: Otimizar apenas as vendas selecionadas ───────────────────────
+
+from pydantic import BaseModel as _BaseModel
+
+class OtimizarSelecionadasPayload(_BaseModel):
+    venda_ids: List[int]
+
+
+@router.post("/vendas-pendentes/otimizar-selecionadas")
+def otimizar_vendas_selecionadas(
+    payload: OtimizarSelecionadasPayload,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Otimiza ordem de entrega APENAS das vendas selecionadas.
+    Não afeta as demais vendas pendentes.
+    """
+    from app.services.google_maps_service import calcular_rota_otimizada
+
+    user, tenant_id = user_and_tenant
+
+    config = db.query(ConfiguracaoEntrega).filter(
+        ConfiguracaoEntrega.tenant_id == tenant_id
+    ).first()
+
+    if not config or not config.logradouro:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure o endereço da loja em Configurações > Entregas primeiro"
+        )
+
+    origem = ", ".join(filter(None, [
+        config.logradouro, config.numero, config.bairro,
+        config.cidade, config.estado, config.cep
+    ]))
+
+    vendas = db.query(Venda).filter(
+        Venda.id.in_(payload.venda_ids),
+        Venda.tenant_id == tenant_id,
+        Venda.tem_entrega == True,
+        ~Venda.status_entrega.in_(["entregue", "cancelada"]),
+        Venda.endereco_entrega.isnot(None)
+    ).all()
+
+    if not vendas:
+        raise HTTPException(status_code=404, detail="Nenhuma venda encontrada para otimizar")
+
+    if len(vendas) == 1:
+        vendas[0].ordem_entrega_otimizada = 1
+        db.commit()
+        return {"message": "Apenas 1 venda, ordem definida como 1", "total_otimizado": 1}
+
+    destinos = [v.endereco_entrega for v in vendas]
+    ordem_indices, legs = calcular_rota_otimizada(origem, destinos)
+
+    for posicao, indice_original in enumerate(ordem_indices, start=1):
+        if indice_original < len(vendas):
+            vendas[indice_original].ordem_entrega_otimizada = posicao
+
+    db.commit()
+
+    return {
+        "message": f"{len(ordem_indices)} entregas selecionadas otimizadas com sucesso!",
+        "total_otimizado": len(ordem_indices),
+    }
+
+
+# ─── CENÁRIO 4: Rastreio público (sem autenticação) ───────────────────────────
+
+@router.get("/rastreio/{token}")
+def rastreio_publico(
+    token: str,
+    db: Session = Depends(get_session),
+):
+    """
+    Endpoint público para rastreamento de rota por token.
+    Retorna última posição GPS e status das paradas (sem dados sensíveis).
+    """
+    rota = db.query(RotaEntrega).filter(
+        RotaEntrega.token_rastreio == token
+    ).first()
+
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rastreio não encontrado ou link inválido")
+
+    # Buscar paradas com última posição GPS conhecida
+    paradas = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota.id
+    ).order_by(RotaEntregaParada.ordem).all()
+
+    # Última posição GPS (última parada entregue com GPS)
+    ultima_posicao = None
+    for p in reversed(paradas):
+        lat = None
+        lon = None
+        try:
+            result = db.execute(
+                text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
+                {"pid": p.id}
+            ).fetchone()
+            if result:
+                lat, lon = result
+        except Exception:
+            pass
+        if lat is not None and lon is not None:
+            ultima_posicao = {"lat": float(lat), "lon": float(lon)}
+            break
+
+    entregues = sum(1 for p in paradas if p.status == "entregue")
+    total = len(paradas)
+
+    return {
+        "rota_numero": rota.numero,
+        "status": rota.status,
+        "entregador_nome": rota.entregador.nome if rota.entregador else "Entregador",
+        "total_paradas": total,
+        "entregues": entregues,
+        "pendentes": total - entregues,
+        "ultima_posicao_gps": ultima_posicao,
+        "paradas": [
+            {
+                "ordem": p.ordem,
+                "endereco": p.endereco,
+                "status": p.status,
+                "data_entrega": p.data_entrega.isoformat() if p.data_entrega else None,
+            }
+            for p in paradas
+        ],
     }

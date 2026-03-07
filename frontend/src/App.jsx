@@ -137,6 +137,7 @@ const Cargos = lazy(() => import("./pages/Cadastros/Cargos"));
 const Funcionarios = lazy(() => import("./pages/RH/Funcionarios"));
 const EntregasAbertas = lazy(() => import("./pages/entregas/EntregasAbertas"));
 const RotasEntrega = lazy(() => import("./pages/entregas/RotasEntrega"));
+const RastreioPublico = lazy(() => import("./pages/entregas/RastreioPublico"));
 const HistoricoEntregas = lazy(
   () => import("./pages/entregas/HistoricoEntregas"),
 );
@@ -237,6 +238,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/landing" element={<LandingPage />} />
+              <Route path="/rastreio/:token" element={<RastreioPublico />} />
               <Route path="/ecommerce" element={<EcommerceMVP />} />
 
               {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}

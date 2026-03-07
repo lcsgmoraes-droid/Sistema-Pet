@@ -80,6 +80,41 @@ export default function EntregasAbertas() {
     }
   }
 
+  async function handleOtimizarSelecionadas() {
+    if (selecionadas.length === 0) {
+      alert("Selecione pelo menos uma entrega para otimizar");
+      return;
+    }
+
+    if (!configEntrega || !configEntrega.logradouro) {
+      alert("⚠️ Configure o endereço da loja em Configurações > Entregas antes de otimizar rotas");
+      return;
+    }
+
+    const confirmar = confirm(
+      `⚠️ Otimizar apenas as ${selecionadas.length} entrega(s) selecionadas?\n\n` +
+      `💵 Custo estimado: 5 centavos\n` +
+      `🗺️ Será feita 1 chamada ao Google Maps API\n\n` +
+      `Deseja continuar?`
+    );
+
+    if (!confirmar) return;
+
+    setOtimizando(true);
+    try {
+      const response = await api.post("/rotas-entrega/vendas-pendentes/otimizar-selecionadas", {
+        venda_ids: selecionadas,
+      });
+      alert(`✅ ${response.data.message}`);
+      await carregarDados();
+    } catch (err) {
+      console.error("❌ Erro ao otimizar selecionadas:", err);
+      alert(`❌ ${err.response?.data?.detail || "Erro ao otimizar entregas selecionadas"}`);
+    } finally {
+      setOtimizando(false);
+    }
+  }
+
   function toggleVenda(vendaId) {
     setSelecionadas((prev) =>
       prev.includes(vendaId)
@@ -142,15 +177,26 @@ export default function EntregasAbertas() {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: 20, display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ marginBottom: 20, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <button
               onClick={handleOtimizarRotas}
               disabled={otimizando || loading}
               className="btn-secondary"
-              title="Reorganizar entregas usando Google Maps para menor distância"
+              title="Reorganizar todas as entregas usando Google Maps para menor distância"
             >
-              {otimizando ? "🔄 Otimizando..." : "🗺️ Otimizar Rotas"}
+              {otimizando ? "🔄 Otimizando..." : "🗺️ Otimizar Todas"}
             </button>
+            {selecionadas.length > 0 && (
+              <button
+                onClick={handleOtimizarSelecionadas}
+                disabled={otimizando || loading}
+                className="btn-secondary"
+                title="Otimizar apenas as entregas selecionadas"
+                style={{ backgroundColor: "#17a2b8", color: "#fff", border: "none" }}
+              >
+                {otimizando ? "🔄 Otimizando..." : `🗺️ Otimizar Selecionadas (${selecionadas.length})`}
+              </button>
+            )}
             <span style={{ color: "#666", fontSize: "0.9em" }}>
               ℹ️ {vendas.filter(v => v.ordem_otimizada).length > 0 
                 ? `${vendas.filter(v => v.ordem_otimizada).length} entregas já otimizadas. ` 

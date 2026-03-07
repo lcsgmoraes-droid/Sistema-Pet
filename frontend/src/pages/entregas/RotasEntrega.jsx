@@ -66,18 +66,12 @@ export default function RotasEntrega() {
       return;
     }
     
-    // Solicitar KM inicial (opcional)
-    const kmInicial = prompt("🏍️ Digite o KM atual da moto (opcional):\n\nDeixe em branco se não quiser registrar.");
+    // Sem prompt de km — motoqueiro não precisa digitar nada
 
     try {
-      const params = {};
-      if (kmInicial && !isNaN(kmInicial) && parseFloat(kmInicial) > 0) {
-        params.km_inicial = parseFloat(kmInicial);
-      }
-      
-      await api.post(`/rotas-entrega/${rotaId}/iniciar`, null, { params });
+      await api.post(`/rotas-entrega/${rotaId}/iniciar`, null, { params: {} });
       alert("✅ Rota iniciada! Mensagem enviada ao primeiro cliente.");
-      carregarRotas(); // Recarregar lista para atualizar status
+      carregarRotas();
     } catch (err) {
       console.error("Erro ao iniciar rota:", err);
       const mensagem = err.response?.data?.detail || "Erro ao iniciar rota";
@@ -304,16 +298,35 @@ function RotaCard({
     if (!confirm("✅ Confirmar entrega realizada?\n\nUma mensagem será enviada automaticamente para o próximo cliente da rota.")) {
       return;
     }
-    
-    // Solicitar KM da entrega (opcional)
-    const kmEntrega = prompt("🏍️ Digite o KM atual da moto (opcional):\n\nDeixe em branco se não quiser registrar.");
 
     try {
       setProcessandoEntrega(paradaId);
       
       const params = {};
-      if (kmEntrega && !isNaN(kmEntrega) && parseFloat(kmEntrega) > 0) {
-        params.km_entrega = parseFloat(kmEntrega);
+      
+      // Cenário 2: auto-calcular km_entrega a partir da distância acumulada + km_inicial da rota
+      const parada = paradasOrdenadas.find(p => p.id === paradaId);
+      if (parada?.distancia_acumulada && rota.km_inicial) {
+        const kmAuto = parseFloat(rota.km_inicial) + parseFloat(parada.distancia_acumulada);
+        params.km_entrega = parseFloat(kmAuto.toFixed(2));
+      }
+      
+      // Cenário 3: capturar GPS silenciosamente (não bloqueia se não disponível)
+      try {
+        const gps = await new Promise((resolve) => {
+          if (!navigator.geolocation) { resolve(null); return; }
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            () => resolve(null),
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          );
+        });
+        if (gps) {
+          params.lat_entrega = gps.lat;
+          params.lon_entrega = gps.lon;
+        }
+      } catch (_) {
+        // GPS não disponível — continua sem coordenadas
       }
       
       const response = await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/marcar-entregue`, null, { params });
@@ -322,7 +335,7 @@ function RotaCard({
       // Atualizar estado local da parada
       setParadasOrdenadas(prev => prev.map(p => 
         p.id === paradaId 
-          ? { ...p, status: "entregue", data_entrega: new Date().toISOString(), km_entrega: kmEntrega ? parseFloat(kmEntrega) : null }
+          ? { ...p, status: "entregue", data_entrega: new Date().toISOString(), km_entrega: params.km_entrega || null }
           : p
       ));
       
@@ -391,53 +404,37 @@ function RotaCard({
   }
 
   async function finalizarRota(rotaId, kmInicial) {
-    // Solicitar KM final (opcional)
-    const kmFinal = prompt("🏍️ Digite o KM final da moto (opcional):\n\nDeixe em branco se não quiser registrar.");
+    // Cenário 2: auto-calcular distância a partir da última parada com distancia_acumulada
+    const ultimaParadaComDistancia = [...paradasOrdenadas]
+      .reverse()
+      .find(p => p.distancia_acumulada);
     
-    let distanciaReal = null;
+    const distanciaRouteTotal = ultimaParadaComDistancia
+      ? parseFloat(ultimaParadaComDistancia.distancia_acumulada)
+      : null;
     
-    // Se tiver KM inicial e final, mostrar distância calculada
-    if (kmInicial && kmFinal && !isNaN(kmFinal) && parseFloat(kmFinal) > parseFloat(kmInicial)) {
-      const distanciaCalculada = (parseFloat(kmFinal) - parseFloat(kmInicial)).toFixed(2);
-      const confirmaDistancia = confirm(
-        `📏 Distância calculada: ${distanciaCalculada} km\n\n` +
-        `KM Inicial: ${kmInicial}\n` +
-        `KM Final: ${kmFinal}\n\n` +
-        `Deseja usar esta distância?`
-      );
-      
-      if (confirmaDistancia) {
-        distanciaReal = parseFloat(distanciaCalculada);
-      }
-    }
-    
-    // Se não calculou automaticamente, solicitar manualmente (opcional)
-    if (!distanciaReal) {
-      const distanciaManual = prompt("📏 Digite a distância percorrida em km (opcional):\n\nDeixe em branco se não souber.");
-      if (distanciaManual && !isNaN(distanciaManual) && parseFloat(distanciaManual) > 0) {
-        distanciaReal = parseFloat(distanciaManual);
-      }
+    // Montar mensagem de confirmação com distância auto se disponível
+    let msgConfirm = "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
+    if (distanciaRouteTotal) {
+      msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância percorrida estimada: ${distanciaRouteTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     }
 
-    const observacoes = prompt("📋 Observações sobre a rota (opcional):") || "";
-
-    if (!confirm("✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.")) {
+    if (!confirm(msgConfirm)) {
       return;
     }
 
     try {
       setProcessandoFinalizacao(true);
       
-      const payload = {
-        observacoes: observacoes.trim()
-      };
+      const payload = {};
       
-      if (kmFinal && !isNaN(kmFinal) && parseFloat(kmFinal) > 0) {
-        payload.km_final = parseFloat(kmFinal);
+      if (distanciaRouteTotal) {
+        payload.distancia_real = distanciaRouteTotal;
       }
       
-      if (distanciaReal) {
-        payload.distancia_real = distanciaReal;
+      // Calcular km_final automaticamente se tiver km_inicial e distância
+      if (kmInicial && distanciaRouteTotal) {
+        payload.km_final = parseFloat(kmInicial) + distanciaRouteTotal;
       }
       
       await api.post(`/rotas-entrega/${rotaId}/fechar`, payload);
