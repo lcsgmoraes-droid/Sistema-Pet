@@ -1,15 +1,16 @@
 """
-Cliente para integração com a API da Stone (Ton)
-Documentação: https://docs.stone.com.br/
+Cliente para integração com Stone Connect via API Pagar.me
+Documentação: https://connect-stone.stone.com.br/reference/
 
-A Stone oferece APIs para:
-- Pagamentos via PIX
-- Pagamentos via Cartão (débito/crédito)
-- Consulta de transações
-- Webhooks para notificações
+Stone Connect usa a API do Pagar.me com:
+- Autenticação Basic Auth: base64(sk_*:)  (senha vazia)
+- Header obrigatório: ServiceRefererName
+- Base URL: https://api.pagar.me/core/v5/
+- Split OBRIGATÓRIO em todos os pedidos desde fevereiro/2026
 """
 
 import httpx
+import base64
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -18,416 +19,138 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 
 
-class StoneAPIClient:
-    """Cliente para integração com a API da Stone"""
-    
-    # URLs da API
-    SANDBOX_URL = "https://payments.stone.com.br"
-    PRODUCTION_URL = "https://payments.stone.com.br"
-    
-    def __init__(
-        self,
-        client_id: str,
-        client_secret: str,
-        merchant_id: str,
-        sandbox: bool = True
-    ):
+class PagarmeConnectClient:
+    """
+    Cliente para Stone Connect via API Pagar.me.
+    Usado para criar pedidos em terminais POS (maquininhas Stone).
+    """
+
+    BASE_URL = "https://api.pagar.me/core/v5"
+    SERVICE_REFERER_NAME = "698babbf7ef14a04992e3e0a"
+
+    def __init__(self, secret_key: str):
         """
-        Inicializa o cliente Stone
-        
         Args:
-            client_id: ID da aplicação Stone
-            client_secret: Secret da aplicação Stone
-            merchant_id: ID do estabelecimento (merchant)
-            sandbox: Se True, usa ambiente de testes
+            secret_key: Chave secreta do Pagar.me (formato sk_*).
+                        Obtida em https://id.pagar.me/ → Desenvolvimento → Chaves
         """
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.merchant_id = merchant_id
-        self.base_url = self.SANDBOX_URL if sandbox else self.PRODUCTION_URL
-        self.access_token: Optional[str] = None
-        self.token_expires_at: Optional[datetime] = None
-    
-    async def _get_access_token(self) -> str:
-        """
-        Obtém access token OAuth2
-        Stone usa OAuth2 Client Credentials flow
-        """
-        # Verifica se já tem token válido
-        if self.access_token and self.token_expires_at:
-            if datetime.utcnow() < self.token_expires_at:
-                return self.access_token
-        
-        # Solicita novo token
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.base_url}/auth/oauth/token",
-                data={
-                    "grant_type": "client_credentials",
-                    "client_id": self.client_id,
-                    "client_secret": self.client_secret
-                },
-                headers={"Content-Type": "application/x-www-form-urlencoded"}
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Erro ao obter token Stone: {response.text}")
-                raise Exception(f"Falha na autenticação Stone: {response.status_code}")
-            
-            data = response.json()
-            self.access_token = data["access_token"]
-            
-            # Token geralmente expira em 3600 segundos (1 hora)
-            expires_in = data.get("expires_in", 3600)
-            from datetime import timedelta
-            self.token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in - 60)
-            
-            logger.info("Token Stone obtido com sucesso")
-            return self.access_token
-    
-    async def _make_request(
+        self.secret_key = secret_key
+
+    def _headers(self) -> Dict[str, str]:
+        """Monta os headers de autenticação. Senha é sempre vazia."""
+        credentials = base64.b64encode(f"{self.secret_key}:".encode()).decode()
+        return {
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json",
+            "ServiceRefererName": self.SERVICE_REFERER_NAME,
+        }
+
+    # ---------------------------------------------------------------------------
+    # Alias para manter compatibilidade com código que usava StoneAPIClient
+    # ---------------------------------------------------------------------------
+
+    @classmethod
+    def from_legacy_config(cls, client_id: str, client_secret: str, merchant_id: str, sandbox: bool = False) -> "PagarmeConnectClient":
+        """Cria instância usando a secret_key armazenada no campo client_id do StoneConfig."""
+        return cls(secret_key=client_id)
+
+    # ---------------------------------------------------------------------------
+    # Requisições HTTP
+    # ---------------------------------------------------------------------------
+
+    async def _request(
         self,
         method: str,
-        endpoint: str,
-        data: Optional[Dict] = None,
-        params: Optional[Dict] = None
-    ) -> Dict[Any, Any]:
-        """Faz requisição autenticada para a API Stone"""
-        token = await self._get_access_token()
-        
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-        
-        url = f"{self.base_url}{endpoint}"
-        
+        path: str,
+        json: Optional[Dict] = None,
+        params: Optional[Dict] = None,
+    ) -> Dict[str, Any]:
+        url = f"{self.BASE_URL}{path}"
         async with httpx.AsyncClient(timeout=30.0) as client:
-            if method.upper() == "GET":
-                response = await client.get(url, headers=headers, params=params)
-            elif method.upper() == "POST":
-                response = await client.post(url, headers=headers, json=data)
-            elif method.upper() == "PUT":
-                response = await client.put(url, headers=headers, json=data)
-            elif method.upper() == "DELETE":
-                response = await client.delete(url, headers=headers)
-            else:
-                raise ValueError(f"Método HTTP inválido: {method}")
-            
-            # Log para debug
-            logger.info(f"Stone API {method} {endpoint} - Status: {response.status_code}")
-            
-            if response.status_code >= 400:
-                logger.error(f"Erro Stone API: {response.text}")
-                response.raise_for_status()
-            
-            return response.json()
-    
-    # ==========================================
-    # PAGAMENTOS PIX
-    # ==========================================
-    
-    async def criar_pagamento_pix(
+            response = await client.request(
+                method=method,
+                url=url,
+                headers=self._headers(),
+                json=json,
+                params=params,
+            )
+        logger.info(f"Pagar.me {method} {path} → {response.status_code}")
+        if response.status_code >= 400:
+            logger.error(f"Pagar.me erro: {response.text[:500]}")
+            response.raise_for_status()
+        return response.json()
+
+    # ---------------------------------------------------------------------------
+    # Pedidos POS (maquininha)
+    # ---------------------------------------------------------------------------
+
+    async def criar_pedido_pos(
         self,
-        amount: Decimal,
-        description: str,
-        external_id: str,
-        customer_name: Optional[str] = None,
-        customer_document: Optional[str] = None,
-        customer_email: Optional[str] = None,
-        expiration_minutes: int = 30
-    ) -> Dict[Any, Any]:
+        items: List[Dict],
+        customer: Dict,
+        serial_number: str,
+        split_rules: Optional[List[Dict]] = None,
+        payment_setup: Optional[Dict] = None,
+        metadata: Optional[Dict] = None,
+    ) -> Dict[str, Any]:
         """
-        Cria um pagamento via PIX
-        
-        Args:
-            amount: Valor em reais (ex: 100.50)
-            description: Descrição do pagamento
-            external_id: ID único do seu sistema (evita duplicação)
-            customer_name: Nome do cliente
-            customer_document: CPF/CNPJ do cliente
-            customer_email: Email do cliente
-            expiration_minutes: Tempo para expirar o QR Code
-            
-        Returns:
-            Dict com dados do pagamento incluindo QR Code
+        Cria um pedido para ser pago na maquininha (POS).
+
+        Parâmetros
+        ----------
+        items : lista de {"amount": int_centavos, "description": str, "quantity": int, "code": str}
+        customer : {"name": str, "email": str, "type": "individual", "document": str}
+        serial_number : número de série da maquininha (terminal_serial_number)
+        split_rules : lista de splits — OBRIGATÓRIO desde fev/2026 se o account tiver subcontas.
+            Formato: {"amount": int, "recipient_id": "rp_XXX", "type": "flat",
+                      "options": {"liable": true, "charge_remainder_fee": true, "charge_processing_fee": true}}
+        payment_setup : (fluxo Pagamento Direto) define a forma de pagamento na criação.
+            Se omitido, usa fluxo Listagem (cliente escolhe na maquininha).
         """
-        # Converte para centavos (Stone trabalha com centavos)
-        amount_cents = int(amount * 100)
-        
-        payload = {
-            "merchant_id": self.merchant_id,
-            "amount": amount_cents,
-            "description": description,
-            "external_id": external_id,
-            "payment_method": "pix",
-            "expiration_time": expiration_minutes
+        body: Dict[str, Any] = {
+            "closed": False,
+            "items": items,
+            "customer": customer,
+            "poi_payment_settings": {
+                "terminal_serial_number": serial_number,
+            },
         }
-        
-        # Adiciona dados do cliente se fornecidos
-        if customer_name or customer_document or customer_email:
-            payload["customer"] = {}
-            if customer_name:
-                payload["customer"]["name"] = customer_name
-            if customer_document:
-                payload["customer"]["document"] = customer_document
-            if customer_email:
-                payload["customer"]["email"] = customer_email
-        
-        result = await self._make_request("POST", "/v1/payments", data=payload)
-        
-        logger.info(f"Pagamento PIX criado: {result.get('id')} - R$ {amount}")
+        if payment_setup:
+            body["poi_payment_settings"]["payment_setup"] = payment_setup
+        if split_rules:
+            body["payment_setup"] = {"split": split_rules}
+        if metadata:
+            body["metadata"] = metadata
+
+        result = await self._request("POST", "/orders", json=body)
+        logger.info(f"Pedido POS criado: {result.get('id')}")
         return result
-    
-    # ==========================================
-    # PAGAMENTOS CARTÃO
-    # ==========================================
-    
-    async def criar_pagamento_cartao(
-        self,
-        amount: Decimal,
-        description: str,
-        external_id: str,
-        card_number: str,
-        card_holder_name: str,
-        card_expiration_date: str,  # MM/YY
-        card_cvv: str,
-        installments: int = 1,
-        customer_name: Optional[str] = None,
-        customer_document: Optional[str] = None,
-        customer_email: Optional[str] = None
-    ) -> Dict[Any, Any]:
+
+    async def obter_pedido(self, order_id: str) -> Dict[str, Any]:
+        """Consulta status atualizado de um pedido."""
+        return await self._request("GET", f"/orders/{order_id}")
+
+    async def cancelar_pedido(self, order_id: str) -> Dict[str, Any]:
+        """Cancela um pedido aberto."""
+        return await self._request("DELETE", f"/orders/{order_id}")
+
+    # ---------------------------------------------------------------------------
+    # Webhook
+    # ---------------------------------------------------------------------------
+
+    @staticmethod
+    def validar_webhook_signature(payload_bytes: bytes, signature: str, secret: str) -> bool:
         """
-        Cria um pagamento via cartão de crédito/débito
-        
-        Args:
-            amount: Valor em reais
-            description: Descrição do pagamento
-            external_id: ID único do seu sistema
-            card_number: Número do cartão (16 dígitos)
-            card_holder_name: Nome impresso no cartão
-            card_expiration_date: Data de expiração no formato MM/YY
-            card_cvv: Código de segurança (3 ou 4 dígitos)
-            installments: Número de parcelas (1 a 12)
-            customer_name: Nome do cliente
-            customer_document: CPF/CNPJ
-            customer_email: Email
-            
-        Returns:
-            Dict com dados da transação
-        """
-        amount_cents = int(amount * 100)
-        
-        payload = {
-            "merchant_id": self.merchant_id,
-            "amount": amount_cents,
-            "description": description,
-            "external_id": external_id,
-            "payment_method": "credit_card",
-            "installments": installments,
-            "card": {
-                "number": card_number,
-                "holder_name": card_holder_name,
-                "expiration_date": card_expiration_date,
-                "cvv": card_cvv
-            }
-        }
-        
-        # Adiciona dados do cliente
-        if customer_name or customer_document or customer_email:
-            payload["customer"] = {}
-            if customer_name:
-                payload["customer"]["name"] = customer_name
-            if customer_document:
-                payload["customer"]["document"] = customer_document
-            if customer_email:
-                payload["customer"]["email"] = customer_email
-        
-        result = await self._make_request("POST", "/v1/payments", data=payload)
-        
-        logger.info(f"Pagamento Cartão criado: {result.get('id')} - R$ {amount}")
-        return result
-    
-    # ==========================================
-    # CONSULTAS
-    # ==========================================
-    
-    async def consultar_pagamento(self, payment_id: str) -> Dict[Any, Any]:
-        """
-        Consulta status de um pagamento
-        
-        Args:
-            payment_id: ID do pagamento retornado pela Stone
-            
-        Returns:
-            Dict com dados atualizados do pagamento
-        """
-        result = await self._make_request(
-            "GET",
-            f"/v1/payments/{payment_id}"
-        )
-        return result
-    
-    async def listar_pagamentos(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        status: Optional[str] = None,
-        limit: int = 100,
-        offset: int = 0
-    ) -> List[Dict[Any, Any]]:
-        """
-        Lista pagamentos com filtros
-        
-        Args:
-            start_date: Data inicial (formato: YYYY-MM-DD)
-            end_date: Data final (formato: YYYY-MM-DD)
-            status: Filtrar por status (pending, approved, cancelled, etc)
-            limit: Quantidade de registros por página
-            offset: Offset para paginação
-            
-        Returns:
-            Lista de pagamentos
-        """
-        params = {
-            "merchant_id": self.merchant_id,
-            "limit": limit,
-            "offset": offset
-        }
-        
-        if start_date:
-            params["start_date"] = start_date
-        if end_date:
-            params["end_date"] = end_date
-        if status:
-            params["status"] = status
-        
-        result = await self._make_request(
-            "GET",
-            "/v1/payments",
-            params=params
-        )
-        
-        return result.get("payments", [])
-    
-    # ==========================================
-    # CANCELAMENTOS E ESTORNOS
-    # ==========================================
-    
-    async def cancelar_pagamento(
-        self,
-        payment_id: str,
-        reason: Optional[str] = None
-    ) -> Dict[Any, Any]:
-        """
-        Cancela um pagamento pendente ou estorna um pagamento aprovado
-        
-        Args:
-            payment_id: ID do pagamento
-            reason: Motivo do cancelamento
-            
-        Returns:
-            Dict com confirmação do cancelamento
-        """
-        payload = {}
-        if reason:
-            payload["reason"] = reason
-        
-        result = await self._make_request(
-            "POST",
-            f"/v1/payments/{payment_id}/cancel",
-            data=payload
-        )
-        
-        logger.info(f"Pagamento cancelado: {payment_id}")
-        return result
-    
-    async def estornar_pagamento(
-        self,
-        payment_id: str,
-        amount: Optional[Decimal] = None,
-        reason: Optional[str] = None
-    ) -> Dict[Any, Any]:
-        """
-        Estorna um pagamento (total ou parcial)
-        
-        Args:
-            payment_id: ID do pagamento
-            amount: Valor a estornar (None = estorno total)
-            reason: Motivo do estorno
-            
-        Returns:
-            Dict com confirmação do estorno
-        """
-        payload = {}
-        
-        if amount:
-            payload["amount"] = int(amount * 100)  # Converte para centavos
-        
-        if reason:
-            payload["reason"] = reason
-        
-        result = await self._make_request(
-            "POST",
-            f"/v1/payments/{payment_id}/refund",
-            data=payload
-        )
-        
-        logger.info(f"Pagamento estornado: {payment_id} - Valor: {amount or 'Total'}")
-        return result
-    
-    # ==========================================
-    # WEBHOOKS
-    # ==========================================
-    
-    def validar_webhook_signature(
-        self,
-        payload: str,
-        signature: str,
-        webhook_secret: str
-    ) -> bool:
-        """
-        Valida a assinatura de um webhook recebido da Stone
-        
-        Args:
-            payload: Corpo da requisição (raw string)
-            signature: Header X-Stone-Signature
-            webhook_secret: Secret configurado no dashboard Stone
-            
-        Returns:
-            True se a assinatura é válida
+        Valida o header X-Hub-Signature do webhook Pagar.me (HMAC-SHA256).
+        A Stone envia `sha256=<hex>` no header.
         """
         import hmac
         import hashlib
-        
-        expected_signature = hmac.new(
-            webhook_secret.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        return hmac.compare_digest(expected_signature, signature)
-    
-    async def processar_webhook(self, webhook_data: Dict[Any, Any]) -> Dict[Any, Any]:
-        """
-        Processa dados de um webhook recebido
-        
-        Args:
-            webhook_data: Dados do webhook
-            
-        Returns:
-            Dados processados
-        """
-        event_type = webhook_data.get("event")
-        payment_data = webhook_data.get("payment", {})
-        
-        logger.info(f"Webhook Stone recebido: {event_type} - Payment ID: {payment_data.get('id')}")
-        
-        # Retorna os dados processados
-        return {
-            "event_type": event_type,
-            "payment_id": payment_data.get("id"),
-            "status": payment_data.get("status"),
-            "amount": payment_data.get("amount", 0) / 100,  # Centavos para reais
-            "processed_at": datetime.utcnow().isoformat()
-        }
+        expected = "sha256=" + hmac.new(secret.encode(), payload_bytes, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature)
+
+
+# ---------------------------------------------------------------------------
+# Alias de compatibilidade — código antigo referenciava StoneAPIClient
+# ---------------------------------------------------------------------------
+StoneAPIClient = PagarmeConnectClient

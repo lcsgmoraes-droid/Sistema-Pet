@@ -20,7 +20,7 @@ const ProtectedRoute = ({ children, permission, requiredPermissions }) => {
   if (permission || requiredPermissions) {
     const userPermissions = user?.permissions || [];
     const roleName = user?.role?.name?.toLowerCase();
-    
+
     // Admin tem acesso a tudo
     if (roleName === 'admin') {
       return children;
@@ -37,8 +37,8 @@ const ProtectedRoute = ({ children, permission, requiredPermissions }) => {
               <h1 className="text-2xl font-bold text-gray-800 mb-2">Acesso Negado</h1>
               <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
               <p className="text-sm text-gray-500">Permissão necessária: {permission}</p>
-              <button 
-                onClick={() => window.history.back()} 
+              <button
+                onClick={() => window.history.back()}
                 className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Voltar
@@ -62,8 +62,8 @@ const ProtectedRoute = ({ children, permission, requiredPermissions }) => {
               <h1 className="text-2xl font-bold text-gray-800 mb-2">Acesso Negado</h1>
               <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
               <p className="text-sm text-gray-500">Permissões necessárias: {requiredPermissions.join(', ')}</p>
-              <button 
-                onClick={() => window.history.back()} 
+              <button
+                onClick={() => window.history.back()}
                 className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Voltar

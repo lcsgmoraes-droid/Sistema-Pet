@@ -1,79 +1,95 @@
-import { Link } from 'react-router-dom';
-import { FiUsers, FiShield, FiSettings, FiTruck, FiPackage } from 'react-icons/fi';
+import {
+  FiCreditCard,
+  FiPackage,
+  FiSettings,
+  FiShield,
+  FiTruck,
+  FiUsers,
+} from "react-icons/fi";
+import { Link } from "react-router-dom";
 
 export default function Configuracoes() {
-  console.log('🔧 Configuracoes carregou - Total de cards:', 7);
-  
+  console.log("🔧 Configuracoes carregou - Total de cards:", 7);
+
   const cards = [
     {
-      title: 'Usuários',
-      description: 'Gerenciar usuários do sistema',
+      title: "Usuários",
+      description: "Gerenciar usuários do sistema",
       icon: FiUsers,
-      link: '/admin/usuarios',
-      color: 'blue'
+      link: "/admin/usuarios",
+      color: "blue",
     },
     {
-      title: 'Permissões',
-      description: 'Gerenciar roles e permissões',
+      title: "Permissões",
+      description: "Gerenciar roles e permissões",
       icon: FiShield,
-      link: '/admin/roles',
-      color: 'purple'
+      link: "/admin/roles",
+      color: "purple",
     },
     {
-      title: 'Configurações Fiscais',
-      description: 'Configurar tributação padrão da empresa',
+      title: "Configurações Fiscais",
+      description: "Configurar tributação padrão da empresa",
       icon: FiSettings,
-      link: '/configuracoes/fiscal',
-      color: 'green'
+      link: "/configuracoes/fiscal",
+      color: "green",
     },
     {
-      title: 'Entregas',
-      description: 'Configurar entregadores e ponto inicial de rotas',
+      title: "Entregas",
+      description: "Configurar entregadores e ponto inicial de rotas",
       icon: FiTruck,
-      link: '/configuracoes/entregas',
-      color: 'blue'
+      link: "/configuracoes/entregas",
+      color: "blue",
     },
     {
-      title: 'Custos da Moto',
-      description: 'Configurar custos operacionais da moto de entregas',
+      title: "Custos da Moto",
+      description: "Configurar custos operacionais da moto de entregas",
       icon: FiSettings,
-      link: '/configuracoes/custos-moto',
-      color: 'orange'
+      link: "/configuracoes/custos-moto",
+      color: "orange",
     },
     {
-      title: 'Estoque',
-      description: 'Configurar comportamento do controle de estoque',
+      title: "Estoque",
+      description: "Configurar comportamento do controle de estoque",
       icon: FiPackage,
-      link: '/configuracoes/estoque',
-      color: 'indigo'
+      link: "/configuracoes/estoque",
+      color: "indigo",
     },
     {
-      title: 'Sistema',
-      description: 'Configurações gerais do sistema',
+      title: "Integrações",
+      description: "Stone, maquininha e conciliação financeira",
+      icon: FiCreditCard,
+      link: "/configuracoes/integracoes",
+      color: "green",
+    },
+    {
+      title: "Sistema",
+      description: "Configurações gerais do sistema",
       icon: FiSettings,
-      link: '#',
-      color: 'gray',
-      disabled: true
-    }
+      link: "#",
+      color: "gray",
+      disabled: true,
+    },
   ];
 
   return (
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-gray-600 mt-2">Gerencie usuários, permissões e configurações do sistema</p>
+        <p className="text-gray-600 mt-2">
+          Gerencie usuários, permissões e configurações do sistema
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cards.map((card) => {
           const Icon = card.icon;
           const colorClasses = {
-            blue: 'bg-blue-50 text-blue-600 hover:bg-blue-100',
-            purple: 'bg-purple-50 text-purple-600 hover:bg-purple-100',
-            green: 'bg-green-50 text-green-600 hover:bg-green-100',
-            orange: 'bg-orange-50 text-orange-600 hover:bg-orange-100',
-            indigo: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100',
-            gray: 'bg-gray-50 text-gray-400'
+            blue: "bg-blue-50 text-blue-600 hover:bg-blue-100",
+            purple: "bg-purple-50 text-purple-600 hover:bg-purple-100",
+            green: "bg-green-50 text-green-600 hover:bg-green-100",
+            orange: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+            indigo: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100",
+            gray: "bg-gray-50 text-gray-400",
           };
 
           if (card.disabled) {
@@ -87,7 +103,9 @@ export default function Configuracoes() {
                   <h3 className="text-lg font-semibold">{card.title}</h3>
                 </div>
                 <p className="text-sm text-gray-500">{card.description}</p>
-                <span className="text-xs text-gray-400 mt-2 block">Em breve</span>
+                <span className="text-xs text-gray-400 mt-2 block">
+                  Em breve
+                </span>
               </div>
             );
           }
@@ -105,8 +123,18 @@ export default function Configuracoes() {
               <p className="text-sm opacity-80">{card.description}</p>
               <div className="mt-4 flex items-center text-sm font-medium">
                 Acessar
-                <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg
+                  className="w-4 h-4 ml-1"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
                 </svg>
               </div>
             </Link>

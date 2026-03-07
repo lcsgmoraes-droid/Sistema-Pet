@@ -20,8 +20,7 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente
 from app.pedido_models import Pedido, PedidoItem
 from app.utils.timezone import now_brasilia
-from app.vendas_models import Venda as VendaPDV, VendaItem as VendaItemPDV, VendaPagamento as VendaPagPDV
-from app.vendas.service import VendaService
+
 
 logger = logging.getLogger(__name__)
 
@@ -406,142 +405,11 @@ def finalizar_checkout(
     if payload.origem:
         carrinho.origem = payload.origem
     db.commit()
-    db.refresh(carrinho)
 
-    # ================================================================
-    # CRIAR VENDA NO PDV (status=aberta — pedido entra no caixa agora)
-    # ================================================================
-    try:
-        # Canal: app → 'aplicativo', ecommerce web → 'ecommerce'
-        canal_pdv = 'aplicativo' if getattr(carrinho, 'origem', 'web') == 'app' else 'ecommerce'
-
-        # Usuário admin do tenant (representante do sistema como vendedor)
-        admin_row = db.execute(
-            text(
-                "SELECT u.id FROM users u "
-                "JOIN user_tenants ut ON ut.user_id = u.id "
-                "WHERE ut.tenant_id = :tid ORDER BY u.id LIMIT 1"
-            ),
-            {"tid": identity.tenant_id},
-        ).fetchone()
-        admin_user_id = admin_row[0] if admin_row else 1
-
-        # Cliente do ERP vinculado ao usuário ecommerce
-        cliente_erp = (
-            db.query(Cliente)
-            .filter(
-                Cliente.tenant_id == identity.tenant_id,
-                Cliente.user_id == identity.user_id,
-            )
-            .first()
-        )
-        cliente_pdv_id = cliente_erp.id if cliente_erp else None
-
-        # Gerar número da venda
-        numero_venda = VendaService._gerar_numero_venda(db, admin_user_id)
-
-        # Taxa de entrega
-        taxa_entrega_val = float(frete.get("valor_frete", 0))
-        tem_entrega_pdv = taxa_entrega_val > 0 or bool(payload.endereco_entrega)
-
-        # Venda principal
-        venda_pdv = VendaPDV(
-            numero_venda=numero_venda,
-            cliente_id=cliente_pdv_id,
-            vendedor_id=admin_user_id,
-            subtotal=float(subtotal),
-            desconto_valor=float(desconto),
-            desconto_percentual=0,
-            total=float(total),
-            status='aberta',
-            canal=canal_pdv,
-            tem_entrega=tem_entrega_pdv,
-            taxa_entrega=taxa_entrega_val,
-            percentual_taxa_loja=100,
-            percentual_taxa_entregador=0,
-            valor_taxa_loja=taxa_entrega_val,
-            valor_taxa_entregador=0,
-            endereco_entrega=payload.endereco_entrega,
-            tipo_retirada=tipo_retirada,
-            palavra_chave_retirada=palavra_chave,
-            observacoes=f"Pedido #{carrinho.pedido_id}",
-            data_venda=now_brasilia(),
-            user_id=admin_user_id,
-            tenant_id=identity.tenant_id,
-        )
-        venda_pdv.id = None
-        db.add(venda_pdv)
-        db.flush()
-
-        # Itens
-        for item in itens:
-            vi = VendaItemPDV(
-                venda_id=venda_pdv.id,
-                tenant_id=identity.tenant_id,
-                tipo='produto',
-                produto_id=item.produto_id,
-                quantidade=float(item.quantidade),
-                preco_unitario=float(item.preco_unitario),
-                desconto_item=0,
-                subtotal=float(item.subtotal),
-            )
-            vi.id = None
-            db.add(vi)
-
-        # Pagamento (forma escolhida pelo cliente ou 'outros' como padrão)
-        forma_pag_nome = payload.forma_pagamento_nome or 'outros'
-        vpag = VendaPagPDV(
-            venda_id=venda_pdv.id,
-            tenant_id=identity.tenant_id,
-            forma_pagamento=forma_pag_nome,
-            valor=float(total),
-            status='pendente',
-        )
-        vpag.id = None
-        db.add(vpag)
-
-        db.commit()
-
-        response["venda_pdv_id"] = venda_pdv.id
-        response["venda_pdv_numero"] = numero_venda
-        logger.info(
-            f"✅ Checkout → PDV: Venda #{numero_venda} criada "
-            f"(status=aberta, canal={canal_pdv}, forma={forma_pag_nome})"
-        )
-
-        # 🎯 CAMPANHAS — Publicar purchase_completed com canal correto
-        if cliente_pdv_id and venda_pdv.id:
-            try:
-                from app.campaigns.models import CampaignEventQueue, EventOriginEnum
-                canal_campanha = "app" if getattr(carrinho, "origem", "web") == "app" else "ecommerce"
-                evento_campanha = CampaignEventQueue(
-                    tenant_id=identity.tenant_id,
-                    event_type="purchase_completed",
-                    event_origin=EventOriginEnum.user_action,
-                    event_depth=0,
-                    payload={
-                        "customer_id": cliente_pdv_id,
-                        "venda_id": venda_pdv.id,
-                        "venda_total": float(total),
-                        "canal": canal_campanha,
-                    },
-                )
-                db.add(evento_campanha)
-                db.commit()
-                logger.info(
-                    "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d canal=%s",
-                    venda_pdv.id, cliente_pdv_id, canal_campanha,
-                )
-            except Exception as e_camp:
-                logger.error("[Campanhas] Erro ao publicar purchase_completed ecommerce: %s", e_camp)
-
-    except Exception as _e:
-        logger.error(f"⚠️ Checkout → PDV: falha ao criar venda: {_e}", exc_info=True)
-        try:
-            db.rollback()
-        except Exception:
-            pass
-
+    logger.info(
+        f"✅ Checkout finalizado: pedido #{carrinho.pedido_id} aguardando pagamento "
+        f"(tipo_retirada={tipo_retirada})"
+    )
     return response
 
 

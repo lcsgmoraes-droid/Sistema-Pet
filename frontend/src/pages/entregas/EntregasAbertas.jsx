@@ -52,7 +52,7 @@ export default function EntregasAbertas() {
       `💾 A ordem será salva no banco (não cobra novamente)\n\n` +
       `Deseja continuar?`
     );
-    
+
     if (!confirmar) {
       return;
     }
@@ -62,13 +62,13 @@ export default function EntregasAbertas() {
       console.log("🗺️ Chamando endpoint de otimização...");
       const response = await api.post("/rotas-entrega/vendas-pendentes/otimizar");
       console.log("✅ Resposta da otimização:", response.data);
-      
+
       alert(
         `✅ ROTAS OTIMIZADAS COM SUCESSO!\n\n` +
         `${response.data.message}\n\n` +
         `Total otimizado: ${response.data.total_otimizado || vendas.length} entregas`
       );
-      
+
       await carregarDados();
     } catch (err) {
       console.error("❌ Erro ao otimizar:", err);
@@ -135,16 +135,16 @@ export default function EntregasAbertas() {
 
     try {
       setLoading(true);
-      
+
       const vendasSelecionadas = vendas.filter(v => selecionadas.includes(v.id));
-      
+
       const semEntregador = vendasSelecionadas.filter(v => !v.entregador_id);
       if (semEntregador.length > 0) {
         alert(`❌ As seguintes vendas não têm entregador atribuído:\n${semEntregador.map(v => v.numero_venda).join(', ')}\n\nAtribua um entregador antes de criar a rota.`);
         setLoading(false);
         return;
       }
-      
+
       await api.post("/rotas-entrega/", {
         vendas_ids: selecionadas,
         entregador_id: vendasSelecionadas[0].entregador_id,
@@ -198,8 +198,8 @@ export default function EntregasAbertas() {
               </button>
             )}
             <span style={{ color: "#666", fontSize: "0.9em" }}>
-              ℹ️ {vendas.filter(v => v.ordem_otimizada).length > 0 
-                ? `${vendas.filter(v => v.ordem_otimizada).length} entregas já otimizadas. ` 
+              ℹ️ {vendas.filter(v => v.ordem_otimizada).length > 0
+                ? `${vendas.filter(v => v.ordem_otimizada).length} entregas já otimizadas. `
                 : ""}
               Clique para ordenar pela rota mais eficiente
             </span>
@@ -232,10 +232,10 @@ export default function EntregasAbertas() {
             </thead>
             <tbody>
               {vendas.map((venda, index) => (
-                <tr key={venda.id} style={{ 
-                  backgroundColor: selecionadas.includes(venda.id) 
-                    ? "#e3f2fd" 
-                    : venda.ordem_otimizada ? "#f0f8ff" : "white" 
+                <tr key={venda.id} style={{
+                  backgroundColor: selecionadas.includes(venda.id)
+                    ? "#e3f2fd"
+                    : venda.ordem_otimizada ? "#f0f8ff" : "white"
                 }}>
                   <td>
                     <input
@@ -245,9 +245,9 @@ export default function EntregasAbertas() {
                     />
                   </td>
                   <td>
-                    <strong style={{ 
-                      color: venda.ordem_otimizada ? "#007bff" : "#999", 
-                      fontSize: "1.1em" 
+                    <strong style={{
+                      color: venda.ordem_otimizada ? "#007bff" : "#999",
+                      fontSize: "1.1em"
                     }}>
                       {index + 1}
                       {venda.ordem_otimizada && " 🗺️"}
@@ -259,7 +259,7 @@ export default function EntregasAbertas() {
                   </td>
                   <td>{venda.cliente_nome}</td>
                   <td>
-                    <span style={{ 
+                    <span style={{
                       color: venda.entregador_nome ? "#28a745" : "#999",
                       fontWeight: venda.entregador_nome ? "600" : "normal"
                     }}>
@@ -270,10 +270,10 @@ export default function EntregasAbertas() {
                   <td>R$ {parseFloat(venda.taxa_entrega || 0).toFixed(2)}</td>
                   <td>R$ {parseFloat(venda.total || 0).toFixed(2)}</td>
                   <td>
-                    <span style={{ 
-                      padding: "4px 8px", 
-                      borderRadius: 4, 
-                      fontSize: 12, 
+                    <span style={{
+                      padding: "4px 8px",
+                      borderRadius: 4,
+                      fontSize: 12,
                       fontWeight: "bold",
                       color: "#fff",
                       backgroundColor: "#ffa500"
@@ -291,7 +291,7 @@ export default function EntregasAbertas() {
               onClick={handleCriarRota}
               disabled={selecionadas.length === 0 || loading}
               className="btn-primary"
-              style={{ 
+              style={{
                 backgroundColor: selecionadas.length > 0 ? "#28a745" : "#ccc",
                 cursor: selecionadas.length > 0 ? "pointer" : "not-allowed"
               }}

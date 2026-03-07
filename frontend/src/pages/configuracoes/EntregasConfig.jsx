@@ -123,36 +123,55 @@ export default function EntregasConfig() {
     }
   }
 
-  if (loading) return <div>Carregando...</div>;
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "#64748b" }}>
+      Carregando configurações...
+    </div>
+  );
 
   return (
     <div className="page">
-      <h1>Configurações de Entregas</h1>
+      <div style={{ marginBottom: 28 }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e293b" }}>🚚 Configurações de Entregas</h1>
+        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>Gerencie entregadores, ponto de partida e como o sistema registra a distância percorrida.</p>
+      </div>
 
-      <form onSubmit={handleSave} style={{ maxWidth: 600 }}>
-        <div className="form-group">
-          <label>Entregador padrão</label>
+      <form onSubmit={handleSave} style={{ maxWidth: 640 }}>
+
+        {/* ── Entregador Padrão ─────────────────────────────────────── */}
+        <div style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "20px 24px",
+          marginBottom: 16,
+        }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>👤 Entregador padrão</h3>
           <select
             value={form.entregador_padrao_id}
-            onChange={(e) =>
-              setForm({ ...form, entregador_padrao_id: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, entregador_padrao_id: e.target.value })}
+            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 14 }}
           >
             <option value="">Nenhum (escolher manualmente)</option>
             {Array.isArray(entregadores) && entregadores.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
+              <option key={p.id} value={p.id}>{p.nome}</option>
             ))}
           </select>
-          <p style={{ fontSize: 12, color: "#666", marginTop: 5 }}>
-            Este entregador será pré-selecionado ao criar novas rotas.
+          <p style={{ fontSize: 12, color: "#64748b", marginTop: 8, marginBottom: 0 }}>
+            Será pré-selecionado ao criar novas rotas de entrega.
           </p>
         </div>
 
-        <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #ddd" }} />
-
-        <h3 style={{ marginBottom: 20 }}>Ponto Inicial Padrão da Rota</h3>
+        {/* ── Ponto Inicial ─────────────────────────────────────────── */}
+        <div style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "20px 24px",
+          marginBottom: 16,
+        }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>📍 Ponto inicial da rota</h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>Endereço usado como ponto de partida ao calcular rotas.</p>
 
         {/* CEP com busca */}
         <div className="form-group">
@@ -267,72 +286,116 @@ export default function EntregasConfig() {
           </div>
         </div>
 
-        <p style={{ fontSize: 12, color: "#666", marginTop: 15, marginBottom: 20 }}>
-          Este endereço será usado como ponto de partida para calcular as rotas de entrega.
+        <p style={{ fontSize: 12, color: "#64748b", marginTop: 12, marginBottom: 0 }}>
+          💡 Endereço da loja: preencha o CEP acima para buscar automaticamente.
         </p>
+        </div>
 
-        <hr style={{ margin: "30px 0", border: "none", borderTop: "1px solid #ddd" }} />
 
-        <h3 style={{ marginBottom: 8 }}>Método de Registro ao Marcar Entregue</h3>
-        <p style={{ fontSize: 13, color: "#666", marginBottom: 16 }}>
-          Escolha como o sistema vai registrar o km percorrido quando o entregador clicar em ✅ Entregue.
-        </p>
+        {/* ── Método de KM ─────────────────────────────────────────── */}
+        <div style={{
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: 12,
+          padding: "20px 24px",
+          marginBottom: 24,
+        }}>
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            📏 Como registrar a distância percorrida
+          </h3>
+          <p style={{ margin: "0 0 16px", fontSize: 13, color: "#64748b" }}>
+            Define o que acontece quando o entregador marca uma entrega como concluída.
+          </p>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {[
-            {
-              valor: "auto_rota",
-              titulo: "🗺️ Distância da rota otimizada (recomendado)",
-              descricao: "Usa automaticamente a distância calculada pelo Google Maps ao otimizar a rota. Nenhuma ação do entregador. Só funciona se a rota foi otimizada antes.",
-              custo: "Custo: zero (usa dados já calculados)",
-            },
-            {
-              valor: "gps",
-              titulo: "📍 GPS do celular",
-              descricao: "Captura as coordenadas exatas do celular no momento da entrega. O entregador só precisa aceitar a permissão de localização no navegador, uma única vez.",
-              custo: "Custo: zero (usa o GPS do próprio telefone, sem chamada ao Google)",
-            },
-            {
-              valor: "manual",
-              titulo: "✏️ Preenchimento manual",
-              descricao: "O entregador digita o km atual do odômetro da moto ao clicar em Entregue. Útil para empresas que precisam controlar o hodômetro com precisão real.",
-              custo: "Custo: zero",
-            },
-          ].map((opcao) => (
-            <label
-              key={opcao.valor}
-              style={{
-                display: "flex",
-                gap: 14,
-                alignItems: "flex-start",
-                padding: "14px 16px",
-                borderRadius: 8,
-                border: `2px solid ${form.metodo_km_entrega === opcao.valor ? "#2563eb" : "#e5e7eb"}`,
-                backgroundColor: form.metodo_km_entrega === opcao.valor ? "#eff6ff" : "#fafafa",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-            >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* Opção 1: Automático */}
+            <label style={{
+              display: "flex",
+              gap: 14,
+              alignItems: "flex-start",
+              padding: "14px 16px",
+              borderRadius: 10,
+              border: `2px solid ${form.metodo_km_entrega === "auto_rota" ? "#2563eb" : "#e2e8f0"}`,
+              backgroundColor: form.metodo_km_entrega === "auto_rota" ? "#eff6ff" : "#fff",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}>
               <input
                 type="radio"
                 name="metodo_km_entrega"
-                value={opcao.valor}
-                checked={form.metodo_km_entrega === opcao.valor}
+                value="auto_rota"
+                checked={form.metodo_km_entrega === "auto_rota"}
                 onChange={(e) => setForm({ ...form, metodo_km_entrega: e.target.value })}
-                style={{ marginTop: 3, accentColor: "#2563eb" }}
+                style={{ marginTop: 4, accentColor: "#2563eb", flexShrink: 0 }}
               />
               <div>
-                <div style={{ fontWeight: "600", fontSize: 14, marginBottom: 4 }}>{opcao.titulo}</div>
-                <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>{opcao.descricao}</div>
-                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: "500" }}>{opcao.custo}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 3 }}>
+                  ✨ Automático <span style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 999, marginLeft: 6 }}>Recomendado</span>
+                </div>
+                <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
+                  Se a rota foi otimizada, o sistema usa a distância calculada automaticamente — <strong>sem precisar de nenhuma ação do entregador</strong>. Se a rota não foi otimizada, o sistema pede para o entregador informar o km.
+                </div>
+                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>Custo: zero</div>
               </div>
             </label>
-          ))}
-        </div>
 
-        <p style={{ fontSize: 12, color: "#888", marginTop: 12, marginBottom: 24 }}>
-          💡 Dica: todas as opções também capturam a posição GPS silenciosamente para o rastreio público do cliente (quando disponível).
-        </p>
+            {/* Opção 2: Sempre manual */}
+            <label style={{
+              display: "flex",
+              gap: 14,
+              alignItems: "flex-start",
+              padding: "14px 16px",
+              borderRadius: 10,
+              border: `2px solid ${form.metodo_km_entrega === "manual" ? "#2563eb" : "#e2e8f0"}`,
+              backgroundColor: form.metodo_km_entrega === "manual" ? "#eff6ff" : "#fff",
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}>
+              <input
+                type="radio"
+                name="metodo_km_entrega"
+                value="manual"
+                checked={form.metodo_km_entrega === "manual"}
+                onChange={(e) => setForm({ ...form, metodo_km_entrega: e.target.value })}
+                style={{ marginTop: 4, accentColor: "#2563eb", flexShrink: 0 }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 3 }}>
+                  ✏️ Sempre manual
+                </div>
+                <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
+                  O entregador digita o km do hodômetro em cada entrega e ao finalizar a rota. Útil para quem precisa de controle rigoroso de quilometragem real.
+                </div>
+                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>Custo: zero</div>
+              </div>
+            </label>
+
+            {/* Opção 3: App (em breve) */}
+            <div style={{
+              display: "flex",
+              gap: 14,
+              alignItems: "flex-start",
+              padding: "14px 16px",
+              borderRadius: 10,
+              border: "2px solid #e2e8f0",
+              backgroundColor: "#f8fafc",
+              opacity: 0.6,
+              cursor: "not-allowed",
+              position: "relative",
+            }}>
+              <input type="radio" disabled style={{ marginTop: 4, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#94a3b8", marginBottom: 3 }}>
+                  📱 GPS via App Mobile
+                  <span style={{ background: "#fef3c7", color: "#b45309", fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 999, marginLeft: 6 }}>Em breve</span>
+                </div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>
+                  O entregador usa o app no celular para rastrear toda a rota em tempo real via GPS — mesmo com a tela apagada. Distância real calculada automaticamente sem nenhuma ação manual.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <button
           type="submit"

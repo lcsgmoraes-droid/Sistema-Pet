@@ -13,6 +13,7 @@ import BeneficiosScreen from "../screens/benefits/BeneficiosScreen";
 import CouponsScreen from "../screens/coupons/CouponsScreen";
 import HomeScreen from "../screens/HomeScreen";
 import OrdersScreen from "../screens/orders/OrdersScreen";
+import TrackDeliveryScreen from "../screens/orders/TrackDeliveryScreen";
 import FoodCalculatorScreen from "../screens/pets/FoodCalculatorScreen";
 import PetFormScreen from "../screens/pets/PetFormScreen";
 import PetListScreen from "../screens/pets/PetListScreen";
@@ -26,6 +27,7 @@ import WishlistScreen from "../screens/shop/WishlistScreen";
 const Tab = createBottomTabNavigator();
 const LojaStack = createNativeStackNavigator();
 const PetsStack = createNativeStackNavigator();
+const PedidosStack = createNativeStackNavigator();
 const BeneficiosStack = createNativeStackNavigator();
 
 function LojaNavigator() {
@@ -109,6 +111,26 @@ function BeneficiosNavigator() {
         options={{ headerTitle: "Meus Cupons" }}
       />
     </BeneficiosStack.Navigator>
+  );
+}
+
+function PedidosNavigator() {
+  return (
+    <PedidosStack.Navigator>
+      <PedidosStack.Screen
+        name="ListaPedidos"
+        component={OrdersScreen}
+        options={{ headerTitle: "Meus Pedidos" }}
+      />
+      <PedidosStack.Screen
+        name="Rastreio"
+        component={TrackDeliveryScreen}
+        options={{
+          headerTitle: "Acompanhar Entrega",
+          headerBackTitle: "Pedidos",
+        }}
+      />
+    </PedidosStack.Navigator>
   );
 }
 
@@ -202,14 +224,13 @@ export default function MainNavigator() {
       />
       <Tab.Screen
         name="Pedidos"
-        component={OrdersScreen}
+        component={PedidosNavigator}
         options={{
           title: "Pedidos",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="receipt-outline" size={size} color={color} />
           ),
-          headerShown: true,
-          headerTitle: "Meus Pedidos",
+          headerShown: false,
         }}
       />
       <Tab.Screen

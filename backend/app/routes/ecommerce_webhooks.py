@@ -574,6 +574,35 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
                 webhook_payload=webhook_payload or {},
             )
 
+        # 🎯 CAMPANHAS — Publicar purchase_completed após pagamento confirmado
+        if venda_id and cliente_id:
+            try:
+                from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+                canal_campanha = "app" if canal_origem == "app" else "ecommerce"
+                evento_campanha = CampaignEventQueue(
+                    tenant_id=pedido.tenant_id,
+                    event_type="purchase_completed",
+                    event_origin=EventOriginEnum.user_action,
+                    event_depth=0,
+                    payload={
+                        "customer_id": cliente_id,
+                        "venda_id": venda_id,
+                        "venda_total": float(venda_row.total) if venda_row else 0,
+                        "canal": canal_campanha,
+                    },
+                )
+                db.add(evento_campanha)
+                import logging
+                logging.getLogger(__name__).info(
+                    "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d canal=%s",
+                    venda_id, cliente_id, canal_campanha,
+                )
+            except Exception as e_camp:
+                import logging
+                logging.getLogger(__name__).error(
+                    "[Campanhas] Erro ao publicar purchase_completed webhook: %s", e_camp
+                )
+
     registry = IdempotencyKey(
         user_id=0,
         tenant_id=pedido.tenant_id,

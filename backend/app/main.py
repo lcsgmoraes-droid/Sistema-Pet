@@ -21,9 +21,9 @@ from app import db
 from app.db import get_session as get_db
 from app.db.migration_check import ensure_db_ready  # Pré-Prod Block 3: verificação de migrations
 from app.config import (
-    SYSTEM_NAME, 
-    SYSTEM_VERSION, 
-    ALLOWED_ORIGINS, 
+    SYSTEM_NAME,
+    SYSTEM_VERSION,
+    ALLOWED_ORIGINS,
     print_config,
     ENVIRONMENT,
     DEBUG,
@@ -175,7 +175,7 @@ from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto  # ETAPA 8.
 from app.pendencia_estoque_models import PendenciaEstoque  # Sistema de Lista de Espera
 from app.ia.aba7_extrato_models import (
     PadraoCategoriacaoIA,
-    LancamentoImportado, 
+    LancamentoImportado,
     ArquivoExtratoImportado,
     HistoricoAtualizacaoDRE,
     ConfiguracaoTributaria
@@ -370,11 +370,11 @@ def _loop_expirar_reservas():
 try:
     from app.domain.events.setup import setup_event_handlers
     from app.db import get_session
-    
+
     # Configurar handlers de eventos
     setup_event_handlers(db_session_factory=get_session)
     logger.info("✅ Sistema de eventos de domínio configurado")
-    
+
 except Exception as e:
     logger.warning(f"⚠️  Não foi possível configurar sistema de eventos: {str(e)}")
     # Não aborta a inicialização
@@ -386,7 +386,7 @@ except Exception as e:
 # Configurar Rate Limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=["1000/hour"])
 
-# Criar app  
+# Criar app
 app = FastAPI(
     title=SYSTEM_NAME,
     description="Sistema completo de gestão para Pet Shop",
@@ -518,7 +518,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         pass  # Silencioso - é normal cliente não ter segmento calculado
     else:
         logger.warning(f"⚠️ HTTP {exc.status_code}: {exc.detail}")
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
@@ -536,7 +536,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     # Log estruturado de erro (ERROR)
     from app.utils.logger import logger as structured_logger
     from app.config import ENVIRONMENT
-    
+
     structured_logger.error(
         event="unhandled_exception",
         message=f"Erro 500: {str(exc)}",
@@ -545,12 +545,12 @@ async def general_exception_handler(request: Request, exc: Exception):
         exception_type=type(exc).__name__
     )
     logger.error(f"❌ Erro 500: {str(exc)}", exc_info=True)
-    
+
     # Sanitização de erros em produção
     # Em produção: NÃO expor detalhes internos
     # Em dev/staging: Mostrar detalhes para debugging
     is_production = ENVIRONMENT.lower() in ["production", "prod"]
-    
+
     if is_production:
         # Produção: Mensagem genérica (sem detalhes)
         return JSONResponse(
@@ -620,8 +620,8 @@ app.include_router(pdv_racoes_router, tags=["PDV - Rações Inteligentes"])  # F
 app.include_router(sugestoes_racoes_router, tags=["Sugestões Inteligentes - Rações"])  # Fase 6: Detecção e Otimização
 app.include_router(ml_racoes_router, tags=["Machine Learning - Rações"])  # Fase 7: Aprendizado e Previsão
 app.include_router(variacoes_router, tags=["Produtos - Variações"])  # Sprint 2
-app.include_router(calculadora_racao_router, prefix="/api", tags=["Calculadora de Ração"])
-app.include_router(lembretes_router, prefix="/api", tags=["Lembretes de Recorrência"])
+app.include_router(calculadora_racao_router, tags=["Calculadora de Ração"])
+app.include_router(lembretes_router, tags=["Lembretes de Recorrência"])
 app.include_router(relatorio_vendas_router, tags=["Relatório de Vendas"])  # ANTES de vendas_router!
 app.include_router(vendas_router, tags=["Vendas & PDV"])
 app.include_router(caixa_router, tags=["Controle de Caixa"])
@@ -736,18 +736,18 @@ app.include_router(campaigns_router)   # Motor de Campanhas
 def validate_environment():
     """
     Valida configurações críticas antes do startup.
-    
+
     NOVO (Pré-Prod Block 1):
     - Usa validate_settings() do módulo settings_validation
     - Validações rigorosas de ENV, DATABASE_URL, SQL_AUDIT_*
     - Validações específicas por ambiente (DEV/TEST/PROD)
     - Falha imediatamente se algo estiver incorreto
     """
-    
+
     # ============================================================================
     # 1️⃣ VALIDAÇÃO COMPLETA DE SETTINGS (Pré-Prod Block 1)
     # ============================================================================
-    
+
     try:
         validate_settings(settings)
         logger.info("✅ [PRÉ-PROD] Validação de settings concluída com sucesso")
@@ -755,11 +755,11 @@ def validate_environment():
         # A exceção já foi logada pelo validate_settings
         # Apenas re-levanta para impedir inicialização
         raise
-    
+
     # ============================================================================
     # 2️⃣ VALIDAÇÕES ADICIONAIS LEGACY (compatibilidade)
     # ============================================================================
-    
+
     errors = []
 
     # Validação rigorosa de JWT_SECRET_KEY (mantida para compatibilidade)
@@ -786,13 +786,13 @@ def validate_environment():
 def on_startup():
     """
     Inicialização do sistema.
-    
+
     Ordem de validações (Pré-Prod):
     1. Validação de ambiente (Bloco 1)
     2. Validação de migrations (Bloco 3)
     3. Inicialização de serviços
     """
-    
+
     # ============================================================================
     # 1️⃣ PRÉ-PROD BLOCO 1: Validação de Ambiente
     # ============================================================================
@@ -800,7 +800,7 @@ def on_startup():
     logger.info("\n" + "="*60)
     print_config()
     logger.info("="*60 + "\n")
-    
+
     # ============================================================================
     # 2️⃣ PRÉ-PROD BLOCO 3: Validação de Migrations
     # ============================================================================
@@ -813,14 +813,14 @@ def on_startup():
     # except Exception as e:
     #     logger.error(f"❌ [PRÉ-PROD] Database migrations check failed: {str(e)}")
     #     raise  # Bloqueia inicialização
-    
+
     # ============================================================================
     # 3️⃣ Inicialização de Serviços
     # ============================================================================
-    
+
     # Inicializar banco de dados
     # db.init_db()  # REMOVIDO: schema gerenciado por Alembic
-    
+
     # Iniciar scheduler de acertos
     # TEMPORARIAMENTE DESABILITADO PARA DEBUG
     # try:
@@ -859,7 +859,7 @@ def on_startup():
         daemon=True,
     )
     _expirar_reservas_thread.start()
-    
+
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
     logger.info("[DOCS] Documentacao em: http://127.0.0.1:8000/docs")
@@ -897,7 +897,7 @@ def on_shutdown():
     if _expirar_reservas_thread and _expirar_reservas_thread.is_alive():
         _expirar_reservas_thread.join(timeout=2)
     _expirar_reservas_thread = None
-    
+
     logger.info("[STOP] Sistema encerrado")
 
 
@@ -981,7 +981,7 @@ def get_racas(especie: Optional[str] = None):
         {"id": 10, "nome": "Chihuahua", "especie": "Cão"},
         {"id": 11, "nome": "SRD (Sem Raça Definida)", "especie": "Cão"},
     ]
-    
+
     racas_gato = [
         {"id": 12, "nome": "Siamês", "especie": "Gato"},
         {"id": 13, "nome": "Persa", "especie": "Gato"},
@@ -991,7 +991,7 @@ def get_racas(especie: Optional[str] = None):
         {"id": 17, "nome": "Ragdoll", "especie": "Gato"},
         {"id": 18, "nome": "SRD (Sem Raça Definida)", "especie": "Gato"},
     ]
-    
+
     if especie == "Cão":
         return racas_cao
     elif especie == "Gato":
