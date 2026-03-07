@@ -13,6 +13,7 @@ import {
   FiGift,
   FiGlobe,
   FiHome,
+  FiLock,
   FiLogOut,
   FiMenu,
   FiPackage,
@@ -23,11 +24,13 @@ import {
   FiTarget,
   FiTrendingUp,
   FiTruck,
+  FiUnlock,
   FiUsers,
   FiX,
 } from "react-icons/fi";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
@@ -35,6 +38,25 @@ import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 const Layout = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const {
+    moduloAtivo,
+    devControlesAtivos,
+    devModoModulos,
+    definirModoDevModulos,
+    alternarModuloDev,
+  } = useModulos();
+
+  const getModoDevLabel = () => {
+    if (devModoModulos === "all_unlocked") return "Todos liberados";
+    if (devModoModulos === "all_locked") return "Premium bloqueado";
+    return "Modo normal";
+  };
+
+  const onToggleModuloDev = (event, modulo) => {
+    event.preventDefault();
+    event.stopPropagation();
+    alternarModuloDev(modulo);
+  };
 
   // Estado para detectar mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -382,12 +404,14 @@ const Layout = () => {
       path: "/campanhas",
       icon: FiGift,
       label: "Campanhas",
+      modulo: "campanhas",
       permission: "vendas.criar",
     },
     {
       path: "/ecommerce",
       icon: FiGlobe,
       label: "E-commerce",
+      modulo: "ecommerce",
       permission: "vendas.visualizar",
       submenu: [
         {
@@ -529,6 +553,7 @@ const Layout = () => {
       path: "/entregas",
       icon: FiTruck,
       label: "Entregas",
+      modulo: "entregas",
       permission: "vendas.visualizar", // Vinculado a vendas
       submenu: [
         {
@@ -629,6 +654,7 @@ const Layout = () => {
         {
           path: "/ia/whatsapp",
           label: "Bot WhatsApp",
+          modulo: "whatsapp",
           permission: "ia.whatsapp",
         },
         {
@@ -756,6 +782,45 @@ const Layout = () => {
                     Pet Shop Pro
                   </h1>
                   <p className="text-xs text-gray-500">Central de Gestão</p>
+                  {devControlesAtivos && sidebarOpen && (
+                    <div className="mt-2 space-y-1.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+                        DEV modulos: {getModoDevLabel()}
+                      </p>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => definirModoDevModulos("normal")}
+                          className={`px-2 py-1 rounded text-[10px] border ${
+                            devModoModulos === "normal"
+                              ? "bg-indigo-100 border-indigo-200 text-indigo-700"
+                              : "bg-white/70 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          Normal
+                        </button>
+                        <button
+                          onClick={() => definirModoDevModulos("all_unlocked")}
+                          className={`px-2 py-1 rounded text-[10px] border ${
+                            devModoModulos === "all_unlocked"
+                              ? "bg-green-100 border-green-200 text-green-700"
+                              : "bg-white/70 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          Liberar tudo
+                        </button>
+                        <button
+                          onClick={() => definirModoDevModulos("all_locked")}
+                          className={`px-2 py-1 rounded text-[10px] border ${
+                            devModoModulos === "all_locked"
+                              ? "bg-amber-100 border-amber-200 text-amber-700"
+                              : "bg-white/70 border-gray-200 text-gray-500"
+                          }`}
+                        >
+                          Bloquear premium
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -807,7 +872,26 @@ const Layout = () => {
                           )}
                         </div>
                         {sidebarOpen &&
-                          (submenusOpen[item.path] ? (
+                          (item.modulo && devControlesAtivos ? (
+                            <button
+                              onClick={(event) =>
+                                onToggleModuloDev(event, item.modulo)
+                              }
+                              className="p-1 rounded hover:bg-white/70"
+                              title="DEV: clicar para travar/destravar modulo"
+                            >
+                              {moduloAtivo(item.modulo) ? (
+                                <FiUnlock className="text-xs md:text-sm text-green-500 flex-shrink-0" />
+                              ) : (
+                                <FiLock className="text-xs md:text-sm text-amber-400 flex-shrink-0" />
+                              )}
+                            </button>
+                          ) : item.modulo && !moduloAtivo(item.modulo) ? (
+                            <FiLock
+                              className="text-xs md:text-sm text-amber-400 flex-shrink-0"
+                              title="Módulo premium"
+                            />
+                          ) : submenusOpen[item.path] ? (
                             <FiChevronDown className="text-xs md:text-sm text-gray-400" />
                           ) : (
                             <FiChevronRight className="text-xs md:text-sm text-gray-400" />
@@ -827,7 +911,36 @@ const Layout = () => {
                                     : "text-gray-600 hover:bg-white/50"
                                 }`}
                               >
-                                <span>{subitem.label}</span>
+                                {sidebarOpen && <span>{subitem.label}</span>}
+                                {!sidebarOpen && (
+                                  <span className="sr-only">
+                                    {subitem.label}
+                                  </span>
+                                )}
+                                {subitem.modulo &&
+                                  sidebarOpen &&
+                                  (devControlesAtivos ? (
+                                    <button
+                                      onClick={(event) =>
+                                        onToggleModuloDev(event, subitem.modulo)
+                                      }
+                                      className="p-1 rounded hover:bg-white/80 ml-auto"
+                                      title="DEV: clicar para travar/destravar modulo"
+                                    >
+                                      {moduloAtivo(subitem.modulo) ? (
+                                        <FiUnlock className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                      ) : (
+                                        <FiLock className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                      )}
+                                    </button>
+                                  ) : (
+                                    !moduloAtivo(subitem.modulo) && (
+                                      <FiLock
+                                        className="w-3 h-3 text-amber-400 flex-shrink-0 ml-auto"
+                                        title="Módulo premium"
+                                      />
+                                    )
+                                  ))}
                               </Link>
                             ))}
                         </div>
@@ -850,9 +963,34 @@ const Layout = () => {
                           <span className="font-medium text-xs md:text-sm">
                             {item.label}
                           </span>
-                          {item.badge && (
+                          {item.modulo && devControlesAtivos ? (
+                            <button
+                              onClick={(event) =>
+                                onToggleModuloDev(event, item.modulo)
+                              }
+                              className="p-1 rounded hover:bg-white/80"
+                              title="DEV: clicar para travar/destravar modulo"
+                            >
+                              {moduloAtivo(item.modulo) ? (
+                                <FiUnlock
+                                  className="w-3 h-3 text-green-500 flex-shrink-0"
+                                  title="Modulo liberado em DEV"
+                                />
+                              ) : (
+                                <FiLock
+                                  className="w-3 h-3 text-amber-400 flex-shrink-0"
+                                  title="Modulo bloqueado"
+                                />
+                              )}
+                            </button>
+                          ) : item.modulo && !moduloAtivo(item.modulo) ? (
+                            <FiLock
+                              className="w-3 h-3 text-amber-400 flex-shrink-0"
+                              title="Módulo premium"
+                            />
+                          ) : item.badge ? (
                             <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
-                          )}
+                          ) : null}
                         </div>
                       )}
                     </Link>

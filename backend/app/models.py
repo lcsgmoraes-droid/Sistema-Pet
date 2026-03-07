@@ -560,6 +560,10 @@ class Tenant(Base):
     ecommerce_horario_fechamento = Column(String(5), nullable=True) # ex.: "18:00"
     ecommerce_dias_funcionamento = Column(String(200), nullable=True)  # ex.: "seg,ter,qua,qui,sex"
 
+    # Módulos premium ativos — JSON com lista de módulos contratados
+    # Ex.: '["entregas", "campanhas"]'
+    modulos_ativos = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
@@ -569,6 +573,26 @@ class Tenant(Base):
 
     def __repr__(self):
         return f"<Tenant(id={self.id}, name={self.name})>"
+
+
+class AssinaturaModulo(Base):
+    """Assinaturas de módulos premium por tenant."""
+    __tablename__ = 'assinaturas_modulos'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tenant_id = Column(String(36), nullable=False, index=True)
+    modulo = Column(String(50), nullable=False)  # entregas, campanhas, whatsapp...
+    status = Column(String(20), nullable=False, server_default='ativo')  # ativo | cancelado | expirado
+    valor_mensal = Column(Numeric(10, 2), nullable=True)
+    data_inicio = Column(DateTime(timezone=True), nullable=True)
+    data_fim = Column(DateTime(timezone=True), nullable=True)
+    payment_id = Column(String(200), nullable=True)
+    gateway = Column(String(50), nullable=True)  # mercadopago | pagarme | manual
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    def __repr__(self):
+        return f"<AssinaturaModulo(tenant={self.tenant_id}, modulo={self.modulo}, status={self.status})>"
 
 
 class EcommerceNotifyRequest(Base):

@@ -157,6 +157,7 @@ from app.routes.ecommerce_config_routes import router as ecommerce_config_router
 from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
 from app.routes.ecommerce_entregador import router as ecommerce_entregador_router
+from app.routes.modulos_routes import router as modulos_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 
 # ============================================================================
@@ -727,6 +728,7 @@ app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router)
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(campaigns_router)   # Motor de Campanhas
+app.include_router(modulos_router)     # Módulos Premium
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)

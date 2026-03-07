@@ -36,7 +36,13 @@ function Get-AlembicHeads {
 
         $revMatch = [regex]::Match($content, "revision\s*:\s*[^=]+\s*=\s*'([^']+)'")
         if (-not $revMatch.Success) {
+            $revMatch = [regex]::Match($content, 'revision\s*:\s*[^=]+\s*=\s*"([^"]+)"')
+        }
+        if (-not $revMatch.Success) {
             $revMatch = [regex]::Match($content, "revision\s*=\s*'([^']+)'")
+        }
+        if (-not $revMatch.Success) {
+            $revMatch = [regex]::Match($content, 'revision\s*=\s*"([^"]+)"')
         }
 
         if ($revMatch.Success) {
@@ -50,8 +56,13 @@ function Get-AlembicHeads {
 
         if ($downLine.Success) {
             $downRaw = $downLine.Groups[1].Value
-            $matches = [regex]::Matches($downRaw, "'([^']+)'")
-            foreach ($m in $matches) {
+            $matchesSingle = [regex]::Matches($downRaw, "'([^']+)'")
+            foreach ($m in $matchesSingle) {
+                [void]$downRevisionSet.Add($m.Groups[1].Value)
+            }
+
+            $matchesDouble = [regex]::Matches($downRaw, '"([^"]+)"')
+            foreach ($m in $matchesDouble) {
                 [void]$downRevisionSet.Add($m.Groups[1].Value)
             }
         }

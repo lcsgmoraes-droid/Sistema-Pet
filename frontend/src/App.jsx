@@ -3,8 +3,10 @@ import { Toaster } from "react-hot-toast";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
+import ModuloBloqueado from "./components/ModuloBloqueado";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ModulosProvider } from "./contexts/ModulosContext";
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
@@ -225,450 +227,495 @@ function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <BrowserRouter>
-          <Toaster position="top-right" />
-          <AppRoutePreloader />
-          <Suspense
-            fallback={
-              <div className="p-4 text-sm text-gray-500">Carregando...</div>
-            }
-          >
-            <Routes>
-              {/* Rotas Públicas */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/landing" element={<LandingPage />} />
-              <Route path="/rastreio/:token" element={<RastreioPublico />} />
-              <Route path="/ecommerce" element={<EcommerceMVP />} />
+        <ModulosProvider>
+          <BrowserRouter>
+            <Toaster position="top-right" />
+            <AppRoutePreloader />
+            <Suspense
+              fallback={
+                <div className="p-4 text-sm text-gray-500">Carregando...</div>
+              }
+            >
+              <Routes>
+                {/* Rotas Públicas */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/landing" element={<LandingPage />} />
+                <Route path="/rastreio/:token" element={<RastreioPublico />} />
+                <Route path="/ecommerce" element={<EcommerceMVP />} />
 
-              {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}
-              <Route path="/:tenantId" element={<EcommerceMVP />} />
+                {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}
+                <Route path="/:tenantId" element={<EcommerceMVP />} />
 
-              {/* Rotas Protegidas */}
-              <Route
-                path="/"
-                element={
-                  <ProtectedRoute>
-                    <Layout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<Navigate to="/lembretes" replace />} />
+                {/* Rotas Protegidas */}
                 <Route
-                  path="dashboard"
+                  path="/"
                   element={
-                    <ProtectedRoute permission="relatorios.gerencial">
-                      <DashboardFinanceiro />
+                    <ProtectedRoute>
+                      <Layout />
                     </ProtectedRoute>
                   }
-                />
-                <Route
-                  path="dashboard-gerencial"
-                  element={
-                    <ProtectedRoute permission="relatorios.gerencial">
-                      <DashboardGerencial />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="clientes"
-                  element={
-                    <ProtectedRoute permission="clientes.visualizar">
-                      <Pessoas />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="clientes/:clienteId/financeiro"
-                  element={
-                    <ProtectedRoute permission="clientes.visualizar">
-                      <ClienteFinanceiro />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="clientes/:clienteId/timeline"
-                  element={
-                    <ProtectedRoute permission="clientes.visualizar">
-                      <ClienteTimelinePage />
-                    </ProtectedRoute>
-                  }
-                />
+                >
+                  <Route index element={<Navigate to="/lembretes" replace />} />
+                  <Route
+                    path="dashboard"
+                    element={
+                      <ProtectedRoute permission="relatorios.gerencial">
+                        <DashboardFinanceiro />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="dashboard-gerencial"
+                    element={
+                      <ProtectedRoute permission="relatorios.gerencial">
+                        <DashboardGerencial />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="clientes"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <Pessoas />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="clientes/:clienteId/financeiro"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <ClienteFinanceiro />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="clientes/:clienteId/timeline"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <ClienteTimelinePage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* Rotas de Pets - Módulo Dedicado */}
-                <Route path="pets" element={<GerenciamentoPets />} />
-                <Route path="pets/novo" element={<PetForm />} />
-                <Route path="pets/:petId" element={<PetDetalhes />} />
-                <Route path="pets/:petId/editar" element={<PetForm />} />
+                  {/* Rotas de Pets - Módulo Dedicado */}
+                  <Route path="pets" element={<GerenciamentoPets />} />
+                  <Route path="pets/novo" element={<PetForm />} />
+                  <Route path="pets/:petId" element={<PetDetalhes />} />
+                  <Route path="pets/:petId/editar" element={<PetForm />} />
 
-                {/* ========================================
+                  {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS
                 ======================================== */}
-                <Route
-                  path="produtos"
-                  element={
-                    <ProtectedRoute permission="produtos.visualizar">
-                      <Produtos />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="produtos/novo"
-                  element={
-                    <ProtectedRoute permission="produtos.criar">
-                      <ProdutosNovo />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="produtos/:id/editar"
-                  element={
-                    <ProtectedRoute permission="produtos.editar">
-                      <ProdutosNovo />
-                    </ProtectedRoute>
-                  }
-                />
+                  <Route
+                    path="produtos"
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <Produtos />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="produtos/novo"
+                    element={
+                      <ProtectedRoute permission="produtos.criar">
+                        <ProdutosNovo />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="produtos/:id/editar"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <ProdutosNovo />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* ========================================
+                  {/* ========================================
                 🆕 SPRINT 7 - ROTAS TYPESCRIPT (DESATIVADAS)
                 ======================================== */}
-                {/* <Route path="produtos" element={<ProdutosPage />} /> */}
-                {/* <Route path="produtos/novo" element={<ProdutoForm mode="create" />} /> */}
-                {/* <Route path="produtos/:id/editar" element={<ProdutoEditPage />} /> */}
+                  {/* <Route path="produtos" element={<ProdutosPage />} /> */}
+                  {/* <Route path="produtos/novo" element={<ProdutoForm mode="create" />} /> */}
+                  {/* <Route path="produtos/:id/editar" element={<ProdutoEditPage />} /> */}
 
-                {/* Rotas auxiliares de produtos (mantidas) */}
-                <Route
-                  path="produtos/:id/movimentacoes"
-                  element={<MovimentacoesProduto />}
-                />
-                <Route
-                  path="produtos/relatorio"
-                  element={<ProdutosRelatorio />}
-                />
-                <Route
-                  path="estoque/alertas"
-                  element={
-                    <ProtectedRoute permission="produtos.visualizar">
-                      <AlertasEstoque />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="lembretes" element={<Lembretes />} />
-                <Route
-                  path="calculadora-racao"
-                  element={<CalculadoraRacao />}
-                />
+                  {/* Rotas auxiliares de produtos (mantidas) */}
+                  <Route
+                    path="produtos/:id/movimentacoes"
+                    element={<MovimentacoesProduto />}
+                  />
+                  <Route
+                    path="produtos/relatorio"
+                    element={<ProdutosRelatorio />}
+                  />
+                  <Route
+                    path="estoque/alertas"
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <AlertasEstoque />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="lembretes" element={<Lembretes />} />
+                  <Route
+                    path="calculadora-racao"
+                    element={<CalculadoraRacao />}
+                  />
 
-                {/* Rotas de Vendas */}
-                <Route
-                  path="pdv"
-                  element={
-                    <ProtectedRoute permission="vendas.criar">
-                      <PDV />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="meus-caixas" element={<MeusCaixas />} />
-                <Route path="notas-fiscais" element={<NotasFiscais />} />
-                <Route path="campanhas" element={<Campanhas />} />
-                <Route
-                  path="ecommerce/aparencia"
-                  element={<EcommerceAparencia />}
-                />
-                <Route
-                  path="ecommerce/configuracoes"
-                  element={<EcommerceConfig />}
-                />
-                <Route
-                  path="ecommerce/analytics"
-                  element={<EcommerceAnalytics />}
-                />
+                  {/* Rotas de Vendas */}
+                  <Route
+                    path="pdv"
+                    element={
+                      <ProtectedRoute permission="vendas.criar">
+                        <PDV />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="meus-caixas" element={<MeusCaixas />} />
+                  <Route path="notas-fiscais" element={<NotasFiscais />} />
+                  <Route
+                    path="campanhas"
+                    element={
+                      <ModuloBloqueado modulo="campanhas">
+                        <Campanhas />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="ecommerce/aparencia"
+                    element={
+                      <ModuloBloqueado modulo="ecommerce">
+                        <EcommerceAparencia />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="ecommerce/configuracoes"
+                    element={
+                      <ModuloBloqueado modulo="ecommerce">
+                        <EcommerceConfig />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="ecommerce/analytics"
+                    element={
+                      <ModuloBloqueado modulo="ecommerce">
+                        <EcommerceAnalytics />
+                      </ModuloBloqueado>
+                    }
+                  />
 
-                {/* Rotas de Compras */}
-                <Route
-                  path="compras/pedidos"
-                  element={
-                    <ProtectedRoute permission="compras.gerenciar">
-                      <PedidosCompra />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="compras/entrada-xml"
-                  element={
-                    <ProtectedRoute permission="compras.gerenciar">
-                      <EntradaXML />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="compras/bling"
-                  element={
-                    <ProtectedRoute permission="compras.gerenciar">
-                      <EstoqueBling />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="vendas/bling-pedidos"
-                  element={
-                    <ProtectedRoute permission="compras.gerenciar">
-                      <PedidosBling />
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* Rotas de Compras */}
+                  <Route
+                    path="compras/pedidos"
+                    element={
+                      <ProtectedRoute permission="compras.gerenciar">
+                        <PedidosCompra />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="compras/entrada-xml"
+                    element={
+                      <ProtectedRoute permission="compras.gerenciar">
+                        <EntradaXML />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="compras/bling"
+                    element={
+                      <ProtectedRoute permission="compras.gerenciar">
+                        <EstoqueBling />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="vendas/bling-pedidos"
+                    element={
+                      <ProtectedRoute permission="compras.gerenciar">
+                        <PedidosBling />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* Rotas Financeiras */}
-                <Route
-                  path="financeiro"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <DashboardFinanceiro />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/vendas"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <VendasFinanceiro />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/relatorio-vendas"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <RelatorioVendas />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/contas-pagar"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <ContasPagar />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/contas-receber"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <ContasReceber />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/conciliacao-3abas"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <ConciliacaoCartoesTabs />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/historico-conciliacoes"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <HistoricoConciliacoes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/conciliacao-bancaria"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <ConciliacaoBancaria />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/fluxo-caixa"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <FluxoCaixa />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="financeiro/dre"
-                  element={
-                    <ProtectedRoute permission="relatorios.financeiro">
-                      <DRE />
-                    </ProtectedRoute>
-                  }
-                />
+                  {/* Rotas Financeiras */}
+                  <Route
+                    path="financeiro"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <DashboardFinanceiro />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/vendas"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <VendasFinanceiro />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/relatorio-vendas"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <RelatorioVendas />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/contas-pagar"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <ContasPagar />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/contas-receber"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <ContasReceber />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/conciliacao-3abas"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <ConciliacaoCartoesTabs />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/historico-conciliacoes"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <HistoricoConciliacoes />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/conciliacao-bancaria"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <ConciliacaoBancaria />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/fluxo-caixa"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <FluxoCaixa />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/dre"
+                    element={
+                      <ProtectedRoute permission="relatorios.financeiro">
+                        <DRE />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                {/* Rotas de Comissões */}
-                <Route path="comissoes" element={<Comissoes />} />
-                <Route
-                  path="comissoes/demonstrativo"
-                  element={<ComissoesListagem />}
-                />
-                <Route
-                  path="comissoes/relatorios"
-                  element={<RelatoriosComissoes />}
-                />
-                <Route
-                  path="comissoes/abertas"
-                  element={<ComissoesAbertas />}
-                />
-                <Route
-                  path="comissoes/fechamento/:funcionario_id"
-                  element={<ConferenciaAvancada />}
-                />
-                <Route
-                  path="comissoes/fechamentos"
-                  element={<ComissoesHistoricoFechamentos />}
-                />
-                <Route
-                  path="comissoes/fechamentos/detalhe"
-                  element={<ComissoesFechamentoDetalhe />}
-                />
-                <Route path="subcategorias" element={<Subcategorias />} />
+                  {/* Rotas de Comissões */}
+                  <Route path="comissoes" element={<Comissoes />} />
+                  <Route
+                    path="comissoes/demonstrativo"
+                    element={<ComissoesListagem />}
+                  />
+                  <Route
+                    path="comissoes/relatorios"
+                    element={<RelatoriosComissoes />}
+                  />
+                  <Route
+                    path="comissoes/abertas"
+                    element={<ComissoesAbertas />}
+                  />
+                  <Route
+                    path="comissoes/fechamento/:funcionario_id"
+                    element={<ConferenciaAvancada />}
+                  />
+                  <Route
+                    path="comissoes/fechamentos"
+                    element={<ComissoesHistoricoFechamentos />}
+                  />
+                  <Route
+                    path="comissoes/fechamentos/detalhe"
+                    element={<ComissoesFechamentoDetalhe />}
+                  />
+                  <Route path="subcategorias" element={<Subcategorias />} />
 
-                {/* Rotas de Cadastros */}
-                <Route path="cadastros/categorias" element={<Categorias />} />
-                <Route
-                  path="cadastros/categorias-financeiras"
-                  element={<CategoriasFinanceiras />}
-                />
-                <Route
-                  path="cadastros/especies-racas"
-                  element={<EspeciesRacas />}
-                />
-                <Route path="cadastros/cargos" element={<Cargos />} />
-                <Route
-                  path="cadastros/financeiro/bancos"
-                  element={
-                    <ProtectedRoute permission="configuracoes.editar">
-                      <ContasBancarias />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="cadastros/financeiro/formas-pagamento"
-                  element={
-                    <ProtectedRoute permission="configuracoes.editar">
-                      <FormasPagamento />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="cadastros/financeiro/operadoras"
-                  element={
-                    <ProtectedRoute permission="configuracoes.editar">
-                      <OperadorasCartao />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="subcategorias" element={<Subcategorias />} />
+                  {/* Rotas de Cadastros */}
+                  <Route path="cadastros/categorias" element={<Categorias />} />
+                  <Route
+                    path="cadastros/categorias-financeiras"
+                    element={<CategoriasFinanceiras />}
+                  />
+                  <Route
+                    path="cadastros/especies-racas"
+                    element={<EspeciesRacas />}
+                  />
+                  <Route path="cadastros/cargos" element={<Cargos />} />
+                  <Route
+                    path="cadastros/financeiro/bancos"
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <ContasBancarias />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cadastros/financeiro/formas-pagamento"
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <FormasPagamento />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cadastros/financeiro/operadoras"
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <OperadorasCartao />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="subcategorias" element={<Subcategorias />} />
 
-                {/* Rotas de Administração */}
-                <Route
-                  path="admin/usuarios"
-                  element={
-                    <ProtectedRoute permission="usuarios.manage">
-                      <UsuariosPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="configuracoes"
-                  element={
-                    <ProtectedRoute permission="configuracoes.editar">
-                      <Configuracoes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="configuracoes/fiscal"
-                  element={<ConfiguracaoFiscalEmpresa />}
-                />
-                <Route
-                  path="configuracoes/entregas"
-                  element={<EntregasConfig />}
-                />
-                <Route
-                  path="configuracoes/custos-moto"
-                  element={<CustosMoto />}
-                />
-                <Route
-                  path="configuracoes/estoque"
-                  element={<ConfiguracaoEstoque />}
-                />
-                <Route
-                  path="configuracoes/integracoes"
-                  element={<StoneIntegracao />}
-                />
-                {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
-                <Route
-                  path="auditoria/provisoes"
-                  element={<AuditoriaMensal />}
-                />
-                <Route path="projecao-caixa" element={<ProjecaoCaixa />} />
-                <Route
-                  path="simulacao-contratacao"
-                  element={<SimulacaoContratacao />}
-                />
-                <Route path="rh/funcionarios" element={<Funcionarios />} />
-                <Route path="admin/roles" element={<RolesPage />} />
+                  {/* Rotas de Administração */}
+                  <Route
+                    path="admin/usuarios"
+                    element={
+                      <ProtectedRoute permission="usuarios.manage">
+                        <UsuariosPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="configuracoes"
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <Configuracoes />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="configuracoes/fiscal"
+                    element={<ConfiguracaoFiscalEmpresa />}
+                  />
+                  <Route
+                    path="configuracoes/entregas"
+                    element={<EntregasConfig />}
+                  />
+                  <Route
+                    path="configuracoes/custos-moto"
+                    element={<CustosMoto />}
+                  />
+                  <Route
+                    path="configuracoes/estoque"
+                    element={<ConfiguracaoEstoque />}
+                  />
+                  <Route
+                    path="configuracoes/integracoes"
+                    element={<StoneIntegracao />}
+                  />
+                  {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
+                  <Route
+                    path="auditoria/provisoes"
+                    element={<AuditoriaMensal />}
+                  />
+                  <Route path="projecao-caixa" element={<ProjecaoCaixa />} />
+                  <Route
+                    path="simulacao-contratacao"
+                    element={<SimulacaoContratacao />}
+                  />
+                  <Route path="rh/funcionarios" element={<Funcionarios />} />
+                  <Route path="admin/roles" element={<RolesPage />} />
 
-                {/* Rotas de Entregas */}
-                <Route path="entregas/abertas" element={<EntregasAbertas />} />
-                <Route path="entregas/rotas" element={<RotasEntrega />} />
-                <Route
-                  path="entregas/historico"
-                  element={<HistoricoEntregas />}
-                />
-                <Route
-                  path="entregas/financeiro"
-                  element={<DashEntregasFinanceiro />}
-                />
+                  {/* Rotas de Entregas */}
+                  <Route
+                    path="entregas/abertas"
+                    element={
+                      <ModuloBloqueado modulo="entregas">
+                        <EntregasAbertas />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="entregas/rotas"
+                    element={
+                      <ModuloBloqueado modulo="entregas">
+                        <RotasEntrega />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="entregas/historico"
+                    element={
+                      <ModuloBloqueado modulo="entregas">
+                        <HistoricoEntregas />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="entregas/financeiro"
+                    element={
+                      <ModuloBloqueado modulo="entregas">
+                        <DashEntregasFinanceiro />
+                      </ModuloBloqueado>
+                    }
+                  />
 
-                {/* Rotas de E-commerce MVP */}
+                  {/* Rotas de E-commerce MVP */}
 
-                <Route
-                  path="ia/fluxo-caixa"
-                  element={
-                    <ProtectedRoute permission="ia.fluxo_caixa">
-                      <IAFluxoCaixa />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="ia/chat" element={<ChatIA />} />
-                <Route
-                  path="ia/whatsapp"
-                  element={
-                    <ProtectedRoute permission="ia.whatsapp">
-                      <WhatsAppDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="ia/alertas-racao"
-                  element={
-                    <ProtectedRoute permission="produtos.editar">
-                      <AlertasRacao />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="cadastros/opcoes-racao"
-                  element={
-                    <ProtectedRoute permission="produtos.editar">
-                      <OpcoesRacao />
-                    </ProtectedRoute>
-                  }
-                />
-              </Route>
+                  <Route
+                    path="ia/fluxo-caixa"
+                    element={
+                      <ProtectedRoute permission="ia.fluxo_caixa">
+                        <IAFluxoCaixa />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="ia/chat" element={<ChatIA />} />
+                  <Route
+                    path="ia/whatsapp"
+                    element={
+                      <ProtectedRoute permission="ia.whatsapp">
+                        <ModuloBloqueado modulo="whatsapp">
+                          <WhatsAppDashboard />
+                        </ModuloBloqueado>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="ia/alertas-racao"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <AlertasRacao />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cadastros/opcoes-racao"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <OpcoesRacao />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
 
-              {/* Redirect para dashboard */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+                {/* Redirect para dashboard */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ModulosProvider>
       </AuthProvider>
     </ErrorBoundary>
   );
