@@ -238,6 +238,8 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/ecommerce" element={<EcommerceMVP />} />
+
+              {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}
               <Route path="/:tenantId" element={<EcommerceMVP />} />
 
               {/* Rotas Protegidas */}

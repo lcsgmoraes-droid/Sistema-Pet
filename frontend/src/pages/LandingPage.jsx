@@ -14,7 +14,9 @@ import {
   Smartphone,
   Star,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
 
 const features = [
   {
@@ -121,6 +123,15 @@ function StarRating({ count }) {
 export default function LandingPage() {
   const whatsappUrl =
     "https://wa.me/5518997401641?text=Olá!%20Quero%20conhecer%20o%20Pet%20Shop%20Pro.";
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // Se já está logado, vai direto para o sistema
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/lembretes', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-800">
@@ -156,9 +167,9 @@ export default function LandingPage() {
           <div className="flex items-center gap-3">
             <Link
               to="/login"
-              className="text-sm font-medium text-gray-600 hover:text-purple-600 transition-colors hidden md:block"
+              className="hidden md:inline-flex items-center gap-1.5 text-sm font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 px-4 py-2 rounded-lg transition-colors border border-purple-200"
             >
-              Entrar
+              🔐 Já sou cliente
             </Link>
             <a
               href={whatsappUrl}

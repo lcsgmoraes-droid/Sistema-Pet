@@ -13,7 +13,7 @@ const ProtectedRoute = ({ children, permission, requiredPermissions }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   // Se uma permissão específica é exigida
