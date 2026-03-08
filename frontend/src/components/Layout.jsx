@@ -12,6 +12,7 @@ import {
   FiFileText,
   FiGift,
   FiGlobe,
+  FiHelpCircle,
   FiHome,
   FiLock,
   FiLogOut,
@@ -34,6 +35,7 @@ import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
+import TooltipPremium from "./TooltipPremium";
 
 const Layout = () => {
   const location = useLocation();
@@ -887,10 +889,12 @@ const Layout = () => {
                               )}
                             </button>
                           ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <FiLock
-                              className="text-xs md:text-sm text-amber-400 flex-shrink-0"
-                              title="Módulo premium"
-                            />
+                            <TooltipPremium modulo={item.modulo} placement="right">
+                              <FiLock
+                                className="text-xs md:text-sm text-amber-400 flex-shrink-0"
+                                aria-label="Módulo premium"
+                              />
+                            </TooltipPremium>
                           ) : submenusOpen[item.path] ? (
                             <FiChevronDown className="text-xs md:text-sm text-gray-400" />
                           ) : (
@@ -935,10 +939,12 @@ const Layout = () => {
                                     </button>
                                   ) : (
                                     !moduloAtivo(subitem.modulo) && (
-                                      <FiLock
-                                        className="w-3 h-3 text-amber-400 flex-shrink-0 ml-auto"
-                                        title="Módulo premium"
-                                      />
+                                      <TooltipPremium modulo={subitem.modulo} placement="right">
+                                        <FiLock
+                                          className="w-3 h-3 text-amber-400 flex-shrink-0 ml-auto"
+                                          aria-label="Módulo premium"
+                                        />
+                                      </TooltipPremium>
                                     )
                                   ))}
                               </Link>
@@ -984,10 +990,12 @@ const Layout = () => {
                               )}
                             </button>
                           ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <FiLock
-                              className="w-3 h-3 text-amber-400 flex-shrink-0"
-                              title="Módulo premium"
-                            />
+                            <TooltipPremium modulo={item.modulo} placement="right">
+                              <FiLock
+                                className="w-3 h-3 text-amber-400 flex-shrink-0"
+                                aria-label="Módulo premium"
+                              />
+                            </TooltipPremium>
                           ) : item.badge ? (
                             <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
                           ) : null}
@@ -1001,6 +1009,17 @@ const Layout = () => {
 
           {/* Bottom Actions */}
           <div className="border-t border-indigo-100 bg-white/30">
+            <Link
+              to="/ajuda"
+              onClick={handleMenuClick}
+              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all"
+              title={!sidebarOpen ? "Ajuda & Planos" : ""}
+            >
+              <FiHelpCircle className="text-lg flex-shrink-0" />
+              {sidebarOpen && (
+                <span className="font-medium text-sm">Ajuda & Planos</span>
+              )}
+            </Link>
             <button
               onClick={logout}
               className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all text-left"

@@ -155,6 +155,7 @@ const EcommerceAnalytics = lazy(
   () => import("./pages/ecommerce/EcommerceAnalytics"),
 );
 const Campanhas = lazy(() => import("./pages/Campanhas"));
+const Ajuda = lazy(() => import("./pages/Ajuda"));
 
 function AppRoutePreloader() {
   useEffect(() => {
@@ -636,6 +637,9 @@ function App() {
                   />
                   <Route path="rh/funcionarios" element={<Funcionarios />} />
                   <Route path="admin/roles" element={<RolesPage />} />
+
+                  {/* Página de ajuda, planos e dúvidas — acessível sem módulo */}
+                  <Route path="ajuda" element={<Ajuda />} />
 
                   {/* Rotas de Entregas */}
                   <Route

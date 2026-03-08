@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import {
   FiCheckCircle,
   FiCreditCard,
+  FiHelpCircle,
   FiLock,
   FiMessageCircle,
   FiTrendingUp,
 } from "react-icons/fi";
+import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
 
 const WHATSAPP_NUMERO = "5518997401641";
@@ -735,7 +737,31 @@ function getBeneficiosPorSecao(modulo, beneficios) {
    Componente principal
 --------------------------------------------------- */
 const ModuloBloqueado = ({ modulo, children }) => {
-  const { moduloAtivo } = useModulos();
+  const { moduloAtivo, modulosAtivos } = useModulos();
+
+  // Registrar tentativa de acesso a módulo bloqueado (tracking leve)
+  useEffect(() => {
+    if (modulosAtivos !== null && !moduloAtivo(modulo)) {
+      // Evento local — pode ser expandido para analytics no futuro
+      try {
+        const tentativas = JSON.parse(
+          sessionStorage.getItem("modulos_tentativas") || "{}",
+        );
+        tentativas[modulo] = (tentativas[modulo] || 0) + 1;
+        sessionStorage.setItem(
+          "modulos_tentativas",
+          JSON.stringify(tentativas),
+        );
+      } catch {
+        // Silencioso — não bloqueia a UI
+      }
+    }
+  }, [modulo, moduloAtivo, modulosAtivos]);
+
+  // Enquanto carrega status dos módulos, não bloqueia (evita flash de bloqueio)
+  if (modulosAtivos === null) {
+    return children;
+  }
 
   if (moduloAtivo(modulo)) {
     return children;
@@ -880,11 +906,20 @@ const ModuloBloqueado = ({ modulo, children }) => {
             </div>
 
             {/* Rodape */}
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-400 mt-4">
-              <FiLock className="w-3 h-3 flex-shrink-0" />
-              <span>
-                Liberado automaticamente em ate 5 minutos apos confirmacao.
-              </span>
+            <div className="flex flex-col items-center gap-2 mt-4">
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+                <FiLock className="w-3 h-3 flex-shrink-0" />
+                <span>
+                  Liberado automaticamente em ate 5 minutos apos confirmacao.
+                </span>
+              </div>
+              <Link
+                to="/ajuda"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
+              >
+                <FiHelpCircle className="w-3.5 h-3.5" />
+                Ver todos os planos e duvidas frequentes
+              </Link>
             </div>
           </div>
         </div>
