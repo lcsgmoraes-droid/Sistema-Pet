@@ -1,48 +1,72 @@
-import { FiUsers, FiPackage, FiShoppingCart, FiDollarSign, FiTrendingUp } from 'react-icons/fi';
+import {
+  FiDollarSign,
+  FiHelpCircle,
+  FiPackage,
+  FiShoppingCart,
+  FiTrendingUp,
+  FiUsers,
+} from "react-icons/fi";
+import { useTour } from "../hooks/useTour";
+import { tourDashboard } from "../tours/tourDefinitions";
 
 const Dashboard = () => {
+  const { iniciarTour } = useTour("dashboard", tourDashboard);
+
   // Dados mock - depois virão da API
   const stats = [
     {
-      title: 'Total de Vendas',
-      value: 'R$ 15.432,50',
+      title: "Total de Vendas",
+      value: "R$ 15.432,50",
       icon: FiShoppingCart,
-      color: 'bg-green-500',
-      change: '+12%'
+      color: "bg-green-500",
+      change: "+12%",
     },
     {
-      title: 'Clientes Ativos',
-      value: '248',
+      title: "Clientes Ativos",
+      value: "248",
       icon: FiUsers,
-      color: 'bg-blue-500',
-      change: '+5%'
+      color: "bg-blue-500",
+      change: "+5%",
     },
     {
-      title: 'Produtos',
-      value: '1.234',
+      title: "Produtos",
+      value: "1.234",
       icon: FiPackage,
-      color: 'bg-purple-500',
-      change: '+8'
+      color: "bg-purple-500",
+      change: "+8",
     },
     {
-      title: 'Faturamento',
-      value: 'R$ 45.890,00',
+      title: "Faturamento",
+      value: "R$ 45.890,00",
       icon: FiDollarSign,
-      color: 'bg-yellow-500',
-      change: '+18%'
+      color: "bg-yellow-500",
+      change: "+18%",
     },
   ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Visão geral do seu negócio</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-1">Visão geral do seu negócio</p>
+        </div>
+        <button
+          onClick={iniciarTour}
+          title="Ver tour guiado desta página"
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+        >
+          <FiHelpCircle className="text-lg" />
+          <span className="hidden sm:inline">Tour</span>
+        </button>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div
+        id="tour-stats"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
         {stats.map((stat, index) => (
           <div
             key={index}
@@ -52,7 +76,9 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">
+                  {stat.value}
+                </h3>
                 <p className="text-sm text-green-600 mt-2 font-medium">
                   <FiTrendingUp className="inline mr-1" />
                   {stat.change} este mês
@@ -67,41 +93,58 @@ const Dashboard = () => {
       </div>
 
       {/* Resumo Financeiro */}
-      <div className="bg-white rounded-xl shadow-card p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Resumo Financeiro</h2>
-        
+      <div id="tour-financeiro" className="bg-white rounded-xl shadow-card p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">
+          Resumo Financeiro
+        </h2>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-4 bg-blue-50 rounded-lg">
             <p className="text-sm text-blue-600 font-medium">BRUTO</p>
-            <p className="text-2xl font-bold text-blue-900 mt-2">R$ 52.320,00</p>
+            <p className="text-2xl font-bold text-blue-900 mt-2">
+              R$ 52.320,00
+            </p>
             <p className="text-xs text-blue-600 mt-1">Total em vendas</p>
           </div>
-          
+
           <div className="p-4 bg-red-50 rounded-lg">
             <p className="text-sm text-red-600 font-medium">DESPESAS</p>
             <p className="text-2xl font-bold text-red-900 mt-2">R$ 12.450,00</p>
             <p className="text-xs text-red-600 mt-1">Custos e taxas</p>
           </div>
-          
+
           <div className="p-4 bg-green-50 rounded-lg">
             <p className="text-sm text-green-600 font-medium">LÍQUIDO</p>
-            <p className="text-2xl font-bold text-green-900 mt-2">R$ 39.870,00</p>
+            <p className="text-2xl font-bold text-green-900 mt-2">
+              R$ 39.870,00
+            </p>
             <p className="text-xs text-green-600 mt-1">Lucro do período</p>
           </div>
         </div>
       </div>
 
       {/* Barra de composição */}
-      <div className="bg-white rounded-xl shadow-card p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Composição do Faturamento</h3>
+      <div id="tour-composicao" className="bg-white rounded-xl shadow-card p-6">
+        <h3 className="font-semibold text-gray-900 mb-4">
+          Composição do Faturamento
+        </h3>
         <div className="flex h-8 rounded-lg overflow-hidden">
-          <div className="bg-green-500 flex items-center justify-center text-white text-xs font-semibold" style={{width: '76%'}}>
+          <div
+            className="bg-green-500 flex items-center justify-center text-white text-xs font-semibold"
+            style={{ width: "76%" }}
+          >
             Líquido 76%
           </div>
-          <div className="bg-red-500 flex items-center justify-center text-white text-xs font-semibold" style={{width: '15%'}}>
+          <div
+            className="bg-red-500 flex items-center justify-center text-white text-xs font-semibold"
+            style={{ width: "15%" }}
+          >
             Despesas 15%
           </div>
-          <div className="bg-yellow-500 flex items-center justify-center text-white text-xs font-semibold" style={{width: '9%'}}>
+          <div
+            className="bg-yellow-500 flex items-center justify-center text-white text-xs font-semibold"
+            style={{ width: "9%" }}
+          >
             Impostos 9%
           </div>
         </div>
@@ -131,8 +174,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ações Rápidas</h3>
+        <div
+          id="tour-acoes-rapidas"
+          className="bg-white rounded-xl shadow-card p-6"
+        >
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            Ações Rápidas
+          </h3>
           <div className="space-y-3">
             <button className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-left flex items-center gap-3">
               <FiShoppingCart />

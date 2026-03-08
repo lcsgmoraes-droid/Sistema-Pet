@@ -11,6 +11,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { FiHelpCircle } from 'react-icons/fi';
 import { 
   getProdutos, 
   getCategorias, 
@@ -21,6 +22,8 @@ import {
 } from '../api/produtos';
 import api from '../api';
 import ModalImportacaoProdutos from '../components/ModalImportacaoProdutos';
+import { useTour } from '../hooks/useTour';
+import { tourProdutos } from '../tours/tourDefinitions';
 
 // ====================================================
 // DEFINIÇÃO DE COLUNAS DA LISTAGEM
@@ -449,6 +452,7 @@ const PRODUTOS_COLUNAS = [
 
 export default function Produtos() {
   const navigate = useNavigate();
+  const { iniciarTour } = useTour('produtos', tourProdutos);
   const [produtosBrutos, setProdutosBrutos] = useState([]); // Dados originais da API
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -935,9 +939,19 @@ export default function Produtos() {
     <div className="p-6">
       {/* Cabeçalho */}
       <div className="mb-6 flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Produtos</h1>
-          <p className="text-gray-600 mt-1">Gerencie seu estoque de produtos</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Produtos</h1>
+            <p className="text-gray-600 mt-1">Gerencie seu estoque de produtos</p>
+          </div>
+          <button
+            onClick={iniciarTour}
+            title="Ver tour guiado desta página"
+            className="flex items-center gap-1 px-2 py-1 text-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors mt-1"
+          >
+            <FiHelpCircle className="text-base" />
+            <span className="hidden sm:inline text-xs">Tour</span>
+          </button>
         </div>
         <div className="flex gap-2">
           {selecionados.length > 0 && (
@@ -957,6 +971,7 @@ export default function Produtos() {
             </>
           )}
           <button
+            id="tour-produtos-importar"
             onClick={() => setModalImportacao(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
           >
@@ -977,6 +992,7 @@ export default function Produtos() {
             Colunas
           </button>
           <button
+            id="tour-produtos-novo"
             onClick={() => navigate('/produtos/novo')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
@@ -986,10 +1002,10 @@ export default function Produtos() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+      <div id="tour-produtos-filtros" className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Busca Geral */}
-          <div className="md:col-span-2">
+          <div id="tour-produtos-busca" className="md:col-span-2">
             <input
               type="text"
               placeholder="Buscar por código, nome ou código de barras..."
@@ -1142,7 +1158,7 @@ export default function Produtos() {
       )}
 
       {/* Tabela */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div id="tour-produtos-lista" className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
