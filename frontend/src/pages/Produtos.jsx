@@ -8,36 +8,39 @@
 /**
  * Página de Listagem de Produtos - Estilo Bling
  */
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { FiHelpCircle } from 'react-icons/fi';
-import { 
-  getProdutos, 
-  getCategorias, 
-  getMarcas, 
+import React, { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { FiHelpCircle } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import api from "../api";
+import {
   deleteProduto,
+  formatarData,
   formatarMoeda,
-  formatarData
-} from '../api/produtos';
-import api from '../api';
-import ModalImportacaoProdutos from '../components/ModalImportacaoProdutos';
-import { useTour } from '../hooks/useTour';
-import { tourProdutos } from '../tours/tourDefinitions';
+  getCategorias,
+  getMarcas,
+  getProdutos,
+} from "../api/produtos";
+import ModalImportacaoProdutos from "../components/ModalImportacaoProdutos";
+import { useTour } from "../hooks/useTour";
+import { tourProdutos } from "../tours/tourDefinitions";
 
 // ====================================================
 // DEFINIÇÃO DE COLUNAS DA LISTAGEM
 // ====================================================
 const PRODUTOS_COLUNAS = [
   {
-    key: 'checkbox',
-    label: '',
+    key: "checkbox",
+    label: "",
     visible: true,
     renderHeader: (props) => (
       <th className="px-4 py-3 text-left">
         <input
           type="checkbox"
-          checked={props.produtos.length > 0 && props.selecionados.length === props.produtos.length}
+          checked={
+            props.produtos.length > 0 &&
+            props.selecionados.length === props.produtos.length
+          }
           onChange={props.handleSelecionarTodos}
           className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
         />
@@ -52,11 +55,11 @@ const PRODUTOS_COLUNAS = [
           className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
         />
       </td>
-    )
+    ),
   },
   {
-    key: 'imagem',
-    label: 'Imagem',
+    key: "imagem",
+    label: "Imagem",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -64,34 +67,52 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => {
-      const isVariacao = produto.tipo_produto === 'VARIACAO';
+      const isVariacao = produto.tipo_produto === "VARIACAO";
       return (
-        <td className={`px-4 py-3 ${isVariacao ? 'pl-12' : ''}`}>
+        <td className={`px-4 py-3 ${isVariacao ? "pl-12" : ""}`}>
           <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden border border-gray-200 flex-shrink-0">
             {produto.imagem_principal ? (
-              <img 
-                src={produto.imagem_principal.startsWith('http') ? produto.imagem_principal : `${window.location.origin}${produto.imagem_principal}`} 
+              <img
+                src={
+                  produto.imagem_principal.startsWith("http")
+                    ? produto.imagem_principal
+                    : `${window.location.origin}${produto.imagem_principal}`
+                }
                 alt={produto.nome}
                 className="w-full h-full object-cover object-center"
                 onError={(e) => {
-                  console.error('Erro ao carregar imagem:', produto.imagem_principal);
-                  e.target.style.display = 'none';
-                  e.target.parentElement.innerHTML = '<svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>';
+                  console.error(
+                    "Erro ao carregar imagem:",
+                    produto.imagem_principal,
+                  );
+                  e.target.style.display = "none";
+                  e.target.parentElement.innerHTML =
+                    '<svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>';
                 }}
               />
             ) : (
-              <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              <svg
+                className="w-8 h-8 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
             )}
           </div>
         </td>
       );
-    }
+    },
   },
   {
-    key: 'descricao',
-    label: 'Descrição',
+    key: "descricao",
+    label: "Descrição",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -99,20 +120,30 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => {
-      const isVariacao = produto.tipo_produto === 'VARIACAO';
-      const isPai = produto.tipo_produto === 'PAI';
-      const isKit = produto.tipo_produto === 'KIT';
+      const isVariacao = produto.tipo_produto === "VARIACAO";
+      const isPai = produto.tipo_produto === "PAI";
+      const isKit = produto.tipo_produto === "KIT";
       const isKitExpandido = (props.kitsExpandidos || []).includes(produto.id);
       const isPaiExpandido = (props.paisExpandidos || []).includes(produto.id);
-      
+
       return (
         <td className="px-4 py-3">
           <div className="flex items-center gap-2">
-            <div className={`flex-1 ${isVariacao ? 'pl-6' : ''}`}>
+            <div className={`flex-1 ${isVariacao ? "pl-6" : ""}`}>
               <div className="flex items-center">
                 {isVariacao && (
-                  <svg className="w-4 h-4 text-blue-400 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  <svg
+                    className="w-4 h-4 text-blue-400 mr-1"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 )}
                 {isPai && (
@@ -123,15 +154,22 @@ const PRODUTOS_COLUNAS = [
                       props.togglePaiExpandido(produto.id);
                     }}
                     className="flex items-center text-blue-600 hover:text-blue-700 transition-colors mr-1"
-                    title={isPaiExpandido ? "Ocultar variações" : "Ver variações"}
+                    title={
+                      isPaiExpandido ? "Ocultar variações" : "Ver variações"
+                    }
                   >
-                    <svg 
-                      className={`w-4 h-4 transition-transform ${isPaiExpandido ? 'rotate-90' : ''}`}
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      className={`w-4 h-4 transition-transform ${isPaiExpandido ? "rotate-90" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                 )}
@@ -143,19 +181,26 @@ const PRODUTOS_COLUNAS = [
                       props.toggleKitExpandido(produto.id);
                     }}
                     className={`flex items-center transition-colors mr-1 ${
-                      produto.tipo_kit === 'VIRTUAL' 
-                        ? 'text-indigo-600 hover:text-indigo-700' 
-                        : 'text-green-600 hover:text-green-700'
+                      produto.tipo_kit === "VIRTUAL"
+                        ? "text-indigo-600 hover:text-indigo-700"
+                        : "text-green-600 hover:text-green-700"
                     }`}
-                    title={isKitExpandido ? "Ocultar composição" : "Ver composição"}
+                    title={
+                      isKitExpandido ? "Ocultar composição" : "Ver composição"
+                    }
                   >
-                    <svg 
-                      className={`w-4 h-4 transition-transform ${isKitExpandido ? 'rotate-90' : ''}`}
-                      fill="none" 
-                      viewBox="0 0 24 24" 
+                    <svg
+                      className={`w-4 h-4 transition-transform ${isKitExpandido ? "rotate-90" : ""}`}
+                      fill="none"
+                      viewBox="0 0 24 24"
                       stroke="currentColor"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
                     </svg>
                   </button>
                 )}
@@ -166,12 +211,12 @@ const PRODUTOS_COLUNAS = [
                       (Pai {produto.total_variacoes || 0})
                     </span>
                   )}
-                  {isKit && produto.tipo_kit === 'VIRTUAL' && (
+                  {isKit && produto.tipo_kit === "VIRTUAL" && (
                     <span className="ml-2 text-xs text-indigo-600">
                       (Kit • Virtual)
                     </span>
                   )}
-                  {isKit && produto.tipo_kit === 'FISICO' && (
+                  {isKit && produto.tipo_kit === "FISICO" && (
                     <span className="ml-2 text-xs text-green-600">
                       (Kit • Físico)
                     </span>
@@ -192,23 +237,33 @@ const PRODUTOS_COLUNAS = [
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                props.copiarTexto(produto.nome, 'Nome');
+                props.copiarTexto(produto.nome, "Nome");
               }}
               className="text-gray-400 hover:text-gray-600"
               title="Copiar nome"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                />
               </svg>
             </button>
           </div>
         </td>
       );
-    }
+    },
   },
   {
-    key: 'codigo',
-    label: 'Código',
+    key: "codigo",
+    label: "Código",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -219,30 +274,44 @@ const PRODUTOS_COLUNAS = [
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <div>
-            <div className="text-sm text-gray-900 font-mono">{produto.codigo || produto.sku}</div>
+            <div className="text-sm text-gray-900 font-mono">
+              {produto.codigo || produto.sku}
+            </div>
             {produto.codigo_barras && (
-              <div className="text-xs text-gray-500 font-mono">{produto.codigo_barras}</div>
+              <div className="text-xs text-gray-500 font-mono">
+                {produto.codigo_barras}
+              </div>
             )}
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              props.copiarTexto(produto.codigo || produto.sku, 'SKU');
+              props.copiarTexto(produto.codigo || produto.sku, "SKU");
             }}
             className="text-gray-400 hover:text-gray-600"
             title="Copiar SKU"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
             </svg>
           </button>
         </div>
       </td>
-    )
+    ),
   },
   {
-    key: 'unidade',
-    label: 'Unidade',
+    key: "unidade",
+    label: "Unidade",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -251,13 +320,13 @@ const PRODUTOS_COLUNAS = [
     ),
     renderCell: (produto) => (
       <td className="px-4 py-3 text-center">
-        <span className="text-sm text-gray-700">{produto.unidade || 'UN'}</span>
+        <span className="text-sm text-gray-700">{produto.unidade || "UN"}</span>
       </td>
-    )
+    ),
   },
   {
-    key: 'custo',
-    label: 'Custo',
+    key: "custo",
+    label: "Custo",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -266,13 +335,15 @@ const PRODUTOS_COLUNAS = [
     ),
     renderCell: (produto, props) => (
       <td className="px-4 py-3 text-right">
-        <span className="text-sm text-gray-900">{formatarMoeda(produto.preco_custo)}</span>
+        <span className="text-sm text-gray-900">
+          {formatarMoeda(produto.preco_custo)}
+        </span>
       </td>
-    )
+    ),
   },
   {
-    key: 'preco_venda',
-    label: 'PV',
+    key: "preco_venda",
+    label: "PV",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -282,7 +353,10 @@ const PRODUTOS_COLUNAS = [
     renderCell: (produto, props) => (
       <td className="px-4 py-3 text-right">
         {props.editandoPreco === produto.id ? (
-          <div className="flex items-center gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-1 justify-end"
+            onClick={(e) => e.stopPropagation()}
+          >
             <input
               type="number"
               step="0.01"
@@ -296,8 +370,18 @@ const PRODUTOS_COLUNAS = [
               className="text-green-600 hover:text-green-800"
               title="Salvar"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </button>
             <button
@@ -305,8 +389,18 @@ const PRODUTOS_COLUNAS = [
               className="text-red-600 hover:text-red-800"
               title="Cancelar"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -323,18 +417,28 @@ const PRODUTOS_COLUNAS = [
               className="text-blue-600 hover:text-blue-800"
               title="Editar preço"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
               </svg>
             </button>
           </div>
         )}
       </td>
-    )
+    ),
   },
   {
-    key: 'validade',
-    label: 'Validade',
+    key: "validade",
+    label: "Validade",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -345,11 +449,11 @@ const PRODUTOS_COLUNAS = [
       <td className="px-4 py-3 text-center text-sm">
         {props.getValidadeMaisProxima(produto)}
       </td>
-    )
+    ),
   },
   {
-    key: 'estoque',
-    label: 'Estoque',
+    key: "estoque",
+    label: "Estoque",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -357,13 +461,14 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => {
-      const isKitVirtual = produto.tipo_produto === 'KIT' && produto.tipo_kit === 'VIRTUAL';
-      const estoqueAtual = isKitVirtual 
+      const isKitVirtual =
+        produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL";
+      const estoqueAtual = isKitVirtual
         ? (produto.estoque_virtual ?? 0)
-        : (produto.estoque_atual || 0);
+        : produto.estoque_atual || 0;
       const reservado = produto.estoque_reservado || 0;
       const estoqueDisponivel = estoqueAtual - reservado;
-      
+
       return (
         <td className="px-4 py-3 text-center">
           {produto.controlar_estoque ? (
@@ -372,8 +477,11 @@ const PRODUTOS_COLUNAS = [
                 {estoqueDisponivel}
               </span>
               {reservado > 0 && (
-                <span className="text-xs text-yellow-600 mt-0.5" title={`${reservado} unidade(s) reservada(s) em pedidos Bling`}>
-                  {reservado} reservado{reservado > 1 ? 's' : ''}
+                <span
+                  className="text-xs text-yellow-600 mt-0.5"
+                  title={`${reservado} unidade(s) reservada(s) em pedidos Bling`}
+                >
+                  {reservado} reservado{reservado > 1 ? "s" : ""}
                 </span>
               )}
               {isKitVirtual && (
@@ -387,11 +495,11 @@ const PRODUTOS_COLUNAS = [
           )}
         </td>
       );
-    }
+    },
   },
   {
-    key: 'acoes',
-    label: 'Ações',
+    key: "acoes",
+    label: "Ações",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -399,20 +507,32 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => (
-      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+      <td
+        className="px-4 py-3 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-center gap-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              console.log('Produto:', produto.nome, 'Controla estoque:', produto.controlar_estoque, 'Estoque atual:', produto.estoque_atual);
+              console.log(
+                "Produto:",
+                produto.nome,
+                "Controla estoque:",
+                produto.controlar_estoque,
+                "Estoque atual:",
+                produto.estoque_atual,
+              );
               props.navigate(`/produtos/${produto.id}/movimentacoes`);
             }}
             className={`rounded hover:opacity-80 transition-opacity ${
-              produto.controlar_estoque === true && (produto.estoque_atual || 0) > 0 
-                ? 'text-green-600 hover:text-green-800' 
-                : produto.controlar_estoque === true && (produto.estoque_atual || 0) === 0
-                ? 'text-red-600 hover:text-red-800'
-                : 'text-gray-400 hover:text-gray-600'
+              produto.controlar_estoque === true &&
+              (produto.estoque_atual || 0) > 0
+                ? "text-green-600 hover:text-green-800"
+                : produto.controlar_estoque === true &&
+                    (produto.estoque_atual || 0) === 0
+                  ? "text-red-600 hover:text-red-800"
+                  : "text-gray-400 hover:text-gray-600"
             }`}
             title="Ver movimentações de estoque"
           >
@@ -428,8 +548,18 @@ const PRODUTOS_COLUNAS = [
             className="text-blue-600 hover:text-blue-800 transition-colors"
             title="Editar"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
           </button>
           <button
@@ -440,19 +570,29 @@ const PRODUTOS_COLUNAS = [
             className="text-red-600 hover:text-red-800 transition-colors"
             title="Excluir"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         </div>
       </td>
-    )
-  }
+    ),
+  },
 ];
 
 export default function Produtos() {
   const navigate = useNavigate();
-  const { iniciarTour } = useTour('produtos', tourProdutos);
+  const { iniciarTour } = useTour("produtos", tourProdutos);
   const [produtosBrutos, setProdutosBrutos] = useState([]); // Dados originais da API
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -460,41 +600,41 @@ export default function Produtos() {
   const [selecionados, setSelecionados] = useState([]);
   const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
   const [editandoPreco, setEditandoPreco] = useState(null);
-  const [novoPreco, setNovoPreco] = useState('');
-  
+  const [novoPreco, setNovoPreco] = useState("");
+
   // Estado para KITs expandidos
   const [kitsExpandidos, setKitsExpandidos] = useState([]);
-  
+
   // Estado para PAIs expandidos (mostrar variações)
   const [paisExpandidos, setPaisExpandidos] = useState([]);
-  
+
   // Estado de colunas visíveis (localStorage)
   const [colunasVisiveis, setColunasVisiveis] = useState(() => {
-    const salvo = localStorage.getItem('produtos_colunas_visiveis');
+    const salvo = localStorage.getItem("produtos_colunas_visiveis");
     return salvo ? JSON.parse(salvo) : null;
   });
-  
+
   // Modal de configuração de colunas
   const [modalColunas, setModalColunas] = useState(false);
   const [colunasTemporarias, setColunasTemporarias] = useState([]);
-  
+
   // Modal de edição em lote
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
-    marca_id: '',
-    categoria_id: '',
-    departamento_id: ''
+    marca_id: "",
+    categoria_id: "",
+    departamento_id: "",
   });
   const [departamentos, setDepartamentos] = useState([]);
-  
+
   // Modal de importação
   const [modalImportacao, setModalImportacao] = useState(false);
-  
+
   // Filtros
   const [filtros, setFiltros] = useState({
-    busca: '',
-    categoria_id: '',
-    marca_id: '',
+    busca: "",
+    categoria_id: "",
+    marca_id: "",
     estoque_baixo: false,
     em_promocao: false,
   });
@@ -510,28 +650,34 @@ export default function Produtos() {
   // SEM fazer nova requisição à API (evita scroll ao topo)
   const produtosOrganizados = useMemo(() => {
     if (!produtosBrutos || produtosBrutos.length === 0) return [];
-    
+
     const resultado = [];
-    
+
     // Separar produtos por tipo
-    const produtosPai = produtosBrutos.filter(p => p.tipo_produto === 'PAI');
-    const variacoes = produtosBrutos.filter(p => p.tipo_produto === 'VARIACAO');
-    const outrosProdutos = produtosBrutos.filter(p => p.tipo_produto !== 'PAI' && p.tipo_produto !== 'VARIACAO');
-    
+    const produtosPai = produtosBrutos.filter((p) => p.tipo_produto === "PAI");
+    const variacoes = produtosBrutos.filter(
+      (p) => p.tipo_produto === "VARIACAO",
+    );
+    const outrosProdutos = produtosBrutos.filter(
+      (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO",
+    );
+
     // Adicionar produtos não-PAI primeiro (SIMPLES e KIT)
     resultado.push(...outrosProdutos);
-    
+
     // Adicionar produtos PAI seguidos de suas variações
-    produtosPai.forEach(pai => {
+    produtosPai.forEach((pai) => {
       resultado.push(pai);
-      
+
       // Se PAI está expandido, adicionar suas variações
       if (paisExpandidos.includes(pai.id)) {
-        const variacoesDoPai = variacoes.filter(v => v.produto_pai_id === pai.id);
+        const variacoesDoPai = variacoes.filter(
+          (v) => v.produto_pai_id === pai.id,
+        );
         resultado.push(...variacoesDoPai);
       }
     });
-    
+
     return resultado;
   }, [produtosBrutos, paisExpandidos]);
 
@@ -545,32 +691,32 @@ export default function Produtos() {
     // Filtro de busca (nome ou código)
     if (filtros.busca.trim()) {
       const termo = filtros.busca.toLowerCase();
-      produtosTemp = produtosTemp.filter(p =>
-        (p.nome && p.nome.toLowerCase().includes(termo)) ||
-        (p.codigo && p.codigo.toLowerCase().includes(termo))
+      produtosTemp = produtosTemp.filter(
+        (p) =>
+          (p.nome && p.nome.toLowerCase().includes(termo)) ||
+          (p.codigo && p.codigo.toLowerCase().includes(termo)),
       );
     }
 
     // Filtro de categoria
     if (filtros.categoria_id) {
-      produtosTemp = produtosTemp.filter(p => 
-        p.categoria_id == filtros.categoria_id
+      produtosTemp = produtosTemp.filter(
+        (p) => p.categoria_id == filtros.categoria_id,
       );
     }
 
     // Filtro de marca
     if (filtros.marca_id) {
-      produtosTemp = produtosTemp.filter(p => 
-        p.marca_id == filtros.marca_id
-      );
+      produtosTemp = produtosTemp.filter((p) => p.marca_id == filtros.marca_id);
     }
 
     // Filtro de estoque baixo
     if (filtros.estoque_baixo) {
-      produtosTemp = produtosTemp.filter(p => {
-        const estoque = p.tipo_produto === 'KIT' && p.tipo_kit === 'VIRTUAL'
-          ? (p.estoque_virtual ?? 0)
-          : (p.estoque_atual || 0);
+      produtosTemp = produtosTemp.filter((p) => {
+        const estoque =
+          p.tipo_produto === "KIT" && p.tipo_kit === "VIRTUAL"
+            ? (p.estoque_virtual ?? 0)
+            : p.estoque_atual || 0;
         const minimo = p.estoque_minimo || 0;
         return p.controlar_estoque && estoque <= minimo;
       });
@@ -578,9 +724,7 @@ export default function Produtos() {
 
     // Filtro de em promoção
     if (filtros.em_promocao) {
-      produtosTemp = produtosTemp.filter(p => 
-        p.promocao_ativa === true
-      );
+      produtosTemp = produtosTemp.filter((p) => p.promocao_ativa === true);
     }
 
     return produtosTemp;
@@ -592,11 +736,11 @@ export default function Produtos() {
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
     const paginados = produtosFiltrados.slice(inicio, fim);
-    
+
     return {
       produtosPaginados: paginados,
       totalPaginas: total,
-      totalItens: produtosFiltrados.length
+      totalItens: produtosFiltrados.length,
     };
   }, [produtosFiltrados, paginaAtual, itensPorPagina]);
 
@@ -621,16 +765,15 @@ export default function Produtos() {
       setLoading(true);
       // Remover campos vazios dos filtros
       const filtrosLimpos = {};
-      Object.keys(filtros).forEach(key => {
+      Object.keys(filtros).forEach((key) => {
         const valor = filtros[key];
         // Só incluir se não for string vazia
-        if (valor !== '' && valor !== null && valor !== undefined) {
+        if (valor !== "" && valor !== null && valor !== undefined) {
           filtrosLimpos[key] = valor;
         }
       });
       const response = await getProdutos(filtrosLimpos);
 
-      
       // API retorna { itens: [], total: 0, pagina: 1, ... } ou apenas array
       let produtosData;
       if (Array.isArray(response.data)) {
@@ -643,14 +786,16 @@ export default function Produtos() {
         produtosData = response.data.data;
       } else {
         // Procurar por qualquer propriedade que seja um array
-        const arrayKeys = Object.keys(response.data).filter(key => Array.isArray(response.data[key]));
+        const arrayKeys = Object.keys(response.data).filter((key) =>
+          Array.isArray(response.data[key]),
+        );
         if (arrayKeys.length > 0) {
           produtosData = response.data[arrayKeys[0]];
         } else {
           produtosData = [];
         }
       }
-      
+
       // ========================================
       // 🔒 SPRINT 2 - SALVAR DADOS BRUTOS (SEM ORGANIZAR)
       // ========================================
@@ -658,8 +803,8 @@ export default function Produtos() {
       // A organização será feita no useMemo abaixo
       setProdutosBrutos(produtosData);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      alert('Erro ao carregar produtos');
+      console.error("Erro ao carregar produtos:", error);
+      alert("Erro ao carregar produtos");
     } finally {
       setLoading(false);
     }
@@ -670,7 +815,7 @@ export default function Produtos() {
       const response = await getCategorias();
       setCategorias(response.data);
     } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
+      console.error("Erro ao carregar categorias:", error);
     }
   };
 
@@ -679,44 +824,44 @@ export default function Produtos() {
       const response = await getMarcas();
       setMarcas(response.data);
     } catch (error) {
-      console.error('Erro ao carregar marcas:', error);
+      console.error("Erro ao carregar marcas:", error);
     }
   };
 
   const carregarDepartamentos = async () => {
     try {
-      const response = await api.get('/produtos/departamentos');
+      const response = await api.get("/produtos/departamentos");
       setDepartamentos(response.data);
     } catch (error) {
-      console.error('Erro ao carregar departamentos:', error);
+      console.error("Erro ao carregar departamentos:", error);
       // Não é erro crítico, apenas não mostra departamentos
     }
   };
 
   const handleFiltroChange = (campo, valor) => {
-    setFiltros(prev => ({ ...prev, [campo]: valor }));
+    setFiltros((prev) => ({ ...prev, [campo]: valor }));
   };
 
   const handleSelecionar = (id, event) => {
     if (!id) {
-      console.error('Erro: ID do produto é undefined ou null');
+      console.error("Erro: ID do produto é undefined ou null");
       return;
     }
 
     // Se for Shift+click e houver um último selecionado, selecionar intervalo
     if (event?.shiftKey && ultimoSelecionado !== null) {
-      const indexUltimo = produtos.findIndex(p => p.id === ultimoSelecionado);
-      const indexAtual = produtos.findIndex(p => p.id === id);
-      
+      const indexUltimo = produtos.findIndex((p) => p.id === ultimoSelecionado);
+      const indexAtual = produtos.findIndex((p) => p.id === id);
+
       if (indexUltimo !== -1 && indexAtual !== -1) {
         const inicio = Math.min(indexUltimo, indexAtual);
         const fim = Math.max(indexUltimo, indexAtual);
-        const intervalo = produtos.slice(inicio, fim + 1).map(p => p.id);
-        
+        const intervalo = produtos.slice(inicio, fim + 1).map((p) => p.id);
+
         // Adicionar todos do intervalo aos já selecionados
-        setSelecionados(prev => {
+        setSelecionados((prev) => {
           const novo = new Set(prev);
-          intervalo.forEach(prodId => novo.add(prodId));
+          intervalo.forEach((prodId) => novo.add(prodId));
           return Array.from(novo);
         });
         setUltimoSelecionado(id);
@@ -725,10 +870,8 @@ export default function Produtos() {
     }
 
     // Seleção normal
-    setSelecionados(prev => 
-      prev.includes(id) 
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
+    setSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
     setUltimoSelecionado(id);
   };
@@ -737,34 +880,35 @@ export default function Produtos() {
     if (selecionados.length === produtos.length) {
       setSelecionados([]);
     } else {
-      setSelecionados(produtos.map(p => p.id));
+      setSelecionados(produtos.map((p) => p.id));
     }
   };
 
   const handleExcluir = async (id) => {
-    if (!confirm('Deseja realmente excluir este produto?')) return;
-    
+    if (!confirm("Deseja realmente excluir este produto?")) return;
+
     try {
       await deleteProduto(id);
-      alert('Produto excluído com sucesso!');
+      alert("Produto excluído com sucesso!");
       carregarDados();
     } catch (error) {
-      console.error('Erro ao excluir produto:', error);
-      alert('Erro ao excluir produto');
+      console.error("Erro ao excluir produto:", error);
+      alert("Erro ao excluir produto");
     }
   };
 
   const handleExcluirSelecionados = async () => {
-    if (!confirm(`Deseja realmente excluir ${selecionados.length} produtos?`)) return;
-    
+    if (!confirm(`Deseja realmente excluir ${selecionados.length} produtos?`))
+      return;
+
     try {
-      await Promise.all(selecionados.map(id => deleteProduto(id)));
-      alert('Produtos excluídos com sucesso!');
+      await Promise.all(selecionados.map((id) => deleteProduto(id)));
+      alert("Produtos excluídos com sucesso!");
       setSelecionados([]);
       carregarDados();
     } catch (error) {
-      console.error('Erro ao excluir produtos:', error);
-      alert('Erro ao excluir produtos');
+      console.error("Erro ao excluir produtos:", error);
+      alert("Erro ao excluir produtos");
     }
   };
 
@@ -780,16 +924,13 @@ export default function Produtos() {
 
   const handleSalvarPreco = async (produtoId) => {
     try {
-      await api.patch(
-        `/produtos/${produtoId}?preco_venda=${novoPreco}`,
-        {}
-      );
-      toast.success('Preço atualizado!');
+      await api.patch(`/produtos/${produtoId}?preco_venda=${novoPreco}`, {});
+      toast.success("Preço atualizado!");
       setEditandoPreco(null);
       carregarDados();
     } catch (error) {
-      console.error('Erro ao atualizar preço:', error);
-      toast.error('Erro ao atualizar preço');
+      console.error("Erro ao atualizar preço:", error);
+      toast.error("Erro ao atualizar preço");
     }
   };
 
@@ -799,13 +940,13 @@ export default function Produtos() {
 
   const handleAbrirEdicaoLote = () => {
     if (selecionados.length === 0) {
-      toast.error('Selecione pelo menos um produto');
+      toast.error("Selecione pelo menos um produto");
       return;
     }
     setDadosEdicaoLote({
-      marca_id: '',
-      categoria_id: '',
-      departamento_id: ''
+      marca_id: "",
+      categoria_id: "",
+      departamento_id: "",
     });
     setModalEdicaoLote(true);
   };
@@ -813,121 +954,131 @@ export default function Produtos() {
   const handleSalvarEdicaoLote = async () => {
     try {
       // Validar se pelo menos um campo foi preenchido
-      const camposPreenchidos = Object.values(dadosEdicaoLote).filter(v => v !== '');
+      const camposPreenchidos = Object.values(dadosEdicaoLote).filter(
+        (v) => v !== "",
+      );
       if (camposPreenchidos.length === 0) {
-        toast.error('Preencha pelo menos um campo para atualizar');
+        toast.error("Preencha pelo menos um campo para atualizar");
         return;
       }
 
       // Enviar apenas campos preenchidos
       const dadosEnvio = {};
-      if (dadosEdicaoLote.marca_id) dadosEnvio.marca_id = parseInt(dadosEdicaoLote.marca_id);
-      if (dadosEdicaoLote.categoria_id) dadosEnvio.categoria_id = parseInt(dadosEdicaoLote.categoria_id);
-      if (dadosEdicaoLote.departamento_id) dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id);
+      if (dadosEdicaoLote.marca_id)
+        dadosEnvio.marca_id = parseInt(dadosEdicaoLote.marca_id);
+      if (dadosEdicaoLote.categoria_id)
+        dadosEnvio.categoria_id = parseInt(dadosEdicaoLote.categoria_id);
+      if (dadosEdicaoLote.departamento_id)
+        dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id);
 
-      await api.patch(
-        '/produtos/atualizar-lote',
-        {
-          produto_ids: selecionados,
-          ...dadosEnvio
-        }
+      await api.patch("/produtos/atualizar-lote", {
+        produto_ids: selecionados,
+        ...dadosEnvio,
+      });
+
+      toast.success(
+        `${selecionados.length} produto(s) atualizado(s) com sucesso!`,
       );
-
-      toast.success(`${selecionados.length} produto(s) atualizado(s) com sucesso!`);
       setModalEdicaoLote(false);
       setSelecionados([]);
       carregarDados();
     } catch (error) {
-      console.error('Erro ao atualizar produtos:', error);
-      toast.error('Erro ao atualizar produtos');
+      console.error("Erro ao atualizar produtos:", error);
+      toast.error("Erro ao atualizar produtos");
     }
   };
 
   // Determinar cor do estoque
   const getCorEstoque = (produto) => {
-    if (!produto.controlar_estoque) return 'text-gray-500';
-    
+    if (!produto.controlar_estoque) return "text-gray-500";
+
     // KIT virtual usa estoque_virtual, outros usam estoque_atual
-    const estoque = produto.tipo_produto === 'KIT' && produto.tipo_kit === 'VIRTUAL'
-      ? (produto.estoque_virtual ?? 0)
-      : (produto.estoque_atual || 0);
+    const estoque =
+      produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
+        ? (produto.estoque_virtual ?? 0)
+        : produto.estoque_atual || 0;
     const minimo = produto.estoque_minimo || 0;
-    
+
     // Estoque zerado
-    if (estoque <= 0) return 'text-red-600 font-semibold';
-    
+    if (estoque <= 0) return "text-red-600 font-semibold";
+
     // Estoque baixo
-    if (estoque <= minimo) return 'text-yellow-600 font-medium';
-    
+    if (estoque <= minimo) return "text-yellow-600 font-medium";
+
     // Estoque normal
-    return 'text-gray-700';
+    return "text-gray-700";
   };
 
   // Obter validade mais próxima dos lotes
   const getValidadeMaisProxima = (produto) => {
-    if (!produto.lotes || produto.lotes.length === 0) return '-';
-    
+    if (!produto.lotes || produto.lotes.length === 0) return "-";
+
     const lotes = produto.lotes
-      .filter(l => l.data_validade)
+      .filter((l) => l.data_validade)
       .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
-    
-    if (lotes.length === 0) return '-';
-    
+
+    if (lotes.length === 0) return "-";
+
     const proximaValidade = lotes[0].data_validade;
-    const dias = Math.floor((new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24));
-    
-    let cor = 'text-gray-700';
-    if (dias < 0) cor = 'text-red-600 font-bold'; // Vencido
-    else if (dias <= 30) cor = 'text-orange-600 font-semibold'; // Próximo do vencimento
-    else if (dias <= 90) cor = 'text-yellow-600'; // Atenção
-    
+    const dias = Math.floor(
+      (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
+    );
+
+    let cor = "text-gray-700";
+    if (dias < 0)
+      cor = "text-red-600 font-bold"; // Vencido
+    else if (dias <= 30)
+      cor = "text-orange-600 font-semibold"; // Próximo do vencimento
+    else if (dias <= 90) cor = "text-yellow-600"; // Atenção
+
     return <span className={cor}>{formatarData(proximaValidade)}</span>;
   };
 
   // Expandir/colapsar KIT
   const toggleKitExpandido = (produtoId) => {
-    setKitsExpandidos(prev => 
-      prev.includes(produtoId) 
-        ? prev.filter(id => id !== produtoId)
-        : [...prev, produtoId]
+    setKitsExpandidos((prev) =>
+      prev.includes(produtoId)
+        ? prev.filter((id) => id !== produtoId)
+        : [...prev, produtoId],
     );
   };
 
   // Expandir/colapsar PAI (mostrar variações)
   const togglePaiExpandido = (produtoId) => {
-    setPaisExpandidos(prev => 
-      prev.includes(produtoId) 
-        ? prev.filter(id => id !== produtoId)
-        : [...prev, produtoId]
+    setPaisExpandidos((prev) =>
+      prev.includes(produtoId)
+        ? prev.filter((id) => id !== produtoId)
+        : [...prev, produtoId],
     );
   };
 
   const abrirModalColunas = () => {
-    const keys = colunasVisiveis || PRODUTOS_COLUNAS.map(c => c.key);
+    const keys = colunasVisiveis || PRODUTOS_COLUNAS.map((c) => c.key);
     setColunasTemporarias(keys);
     setModalColunas(true);
   };
 
   const toggleColuna = (key) => {
-    setColunasTemporarias(prev => 
-      prev.includes(key)
-        ? prev.filter(k => k !== key)
-        : [...prev, key]
+    setColunasTemporarias((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   };
 
   const salvarColunas = () => {
-    localStorage.setItem('produtos_colunas_visiveis', JSON.stringify(colunasTemporarias));
+    localStorage.setItem(
+      "produtos_colunas_visiveis",
+      JSON.stringify(colunasTemporarias),
+    );
     setColunasVisiveis(colunasTemporarias);
     setModalColunas(false);
-    toast.success('Preferências de colunas salvas!');
+    toast.success("Preferências de colunas salvas!");
   };
 
   const restaurarColunasPadrao = () => {
-    localStorage.removeItem('produtos_colunas_visiveis');
+    localStorage.removeItem("produtos_colunas_visiveis");
     setColunasVisiveis(null);
-    setColunasTemporarias(PRODUTOS_COLUNAS.map(c => c.key));
-    toast.success('Colunas restauradas para o padrão!');
+    setColunasTemporarias(PRODUTOS_COLUNAS.map((c) => c.key));
+    toast.success("Colunas restauradas para o padrão!");
   };
 
   const filtrarColunas = (coluna) => {
@@ -942,7 +1093,9 @@ export default function Produtos() {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-800">Produtos</h1>
-            <p className="text-gray-600 mt-1">Gerencie seu estoque de produtos</p>
+            <p className="text-gray-600 mt-1">
+              Gerencie seu estoque de produtos
+            </p>
           </div>
           <button
             onClick={iniciarTour}
@@ -975,8 +1128,18 @@ export default function Produtos() {
             onClick={() => setModalImportacao(true)}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
             </svg>
             Importar Excel
           </button>
@@ -985,15 +1148,30 @@ export default function Produtos() {
             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
             title="Configurar colunas visíveis"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
             Colunas
           </button>
           <button
             id="tour-produtos-novo"
-            onClick={() => navigate('/produtos/novo')}
+            onClick={() => navigate("/produtos/novo")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             + Novo Produto
@@ -1002,7 +1180,10 @@ export default function Produtos() {
       </div>
 
       {/* Filtros */}
-      <div id="tour-produtos-filtros" className="bg-white rounded-lg shadow-sm p-4 mb-6">
+      <div
+        id="tour-produtos-filtros"
+        className="bg-white rounded-lg shadow-sm p-4 mb-6"
+      >
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Busca Geral */}
           <div id="tour-produtos-busca" className="md:col-span-2">
@@ -1010,7 +1191,7 @@ export default function Produtos() {
               type="text"
               placeholder="Buscar por código, nome ou código de barras..."
               value={filtros.busca}
-              onChange={(e) => handleFiltroChange('busca', e.target.value)}
+              onChange={(e) => handleFiltroChange("busca", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -1019,13 +1200,16 @@ export default function Produtos() {
           <div>
             <select
               value={filtros.categoria_id}
-              onChange={(e) => handleFiltroChange('categoria_id', e.target.value)}
+              onChange={(e) =>
+                handleFiltroChange("categoria_id", e.target.value)
+              }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Todas as Categorias</option>
-              {categorias.map(cat => (
+              {categorias.map((cat) => (
                 <option key={cat.id} value={cat.id}>
-                  {cat.categoria_pai_id ? '  └─ ' : ''}{cat.nome}
+                  {cat.categoria_pai_id ? "  └─ " : ""}
+                  {cat.nome}
                 </option>
               ))}
             </select>
@@ -1035,12 +1219,14 @@ export default function Produtos() {
           <div>
             <select
               value={filtros.marca_id}
-              onChange={(e) => handleFiltroChange('marca_id', e.target.value)}
+              onChange={(e) => handleFiltroChange("marca_id", e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Todas as Marcas</option>
-              {marcas.map(marca => (
-                <option key={marca.id} value={marca.id}>{marca.nome}</option>
+              {marcas.map((marca) => (
+                <option key={marca.id} value={marca.id}>
+                  {marca.nome}
+                </option>
               ))}
             </select>
           </div>
@@ -1051,17 +1237,21 @@ export default function Produtos() {
               <input
                 type="checkbox"
                 checked={filtros.estoque_baixo}
-                onChange={(e) => handleFiltroChange('estoque_baixo', e.target.checked)}
+                onChange={(e) =>
+                  handleFiltroChange("estoque_baixo", e.target.checked)
+                }
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">Estoque Baixo</span>
             </label>
-            
+
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={filtros.em_promocao}
-                onChange={(e) => handleFiltroChange('em_promocao', e.target.checked)}
+                onChange={(e) =>
+                  handleFiltroChange("em_promocao", e.target.checked)
+                }
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">Em Promoção</span>
@@ -1075,7 +1265,9 @@ export default function Produtos() {
         <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg flex items-center justify-between mt-6 mb-0">
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-600">
-              Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a {Math.min(paginaAtual * itensPorPagina, totalItens)} de {totalItens} produtos
+              Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a{" "}
+              {Math.min(paginaAtual * itensPorPagina, totalItens)} de{" "}
+              {totalItens} produtos
             </span>
             <select
               value={itensPorPagina}
@@ -1102,7 +1294,7 @@ export default function Produtos() {
               Primeira
             </button>
             <button
-              onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+              onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
               disabled={paginaAtual === 1}
               className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -1129,8 +1321,8 @@ export default function Produtos() {
                     onClick={() => setPaginaAtual(pageNum)}
                     className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
                       paginaAtual === pageNum
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                        ? "bg-blue-600 text-white"
+                        : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     {pageNum}
@@ -1140,7 +1332,9 @@ export default function Produtos() {
             </div>
 
             <button
-              onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+              onClick={() =>
+                setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+              }
               disabled={paginaAtual === totalPaginas}
               className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -1158,17 +1352,20 @@ export default function Produtos() {
       )}
 
       {/* Tabela */}
-      <div id="tour-produtos-lista" className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div
+        id="tour-produtos-lista"
+        className="bg-white rounded-lg shadow-sm overflow-hidden"
+      >
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {PRODUTOS_COLUNAS.filter(filtrarColunas).map(coluna => (
+                {PRODUTOS_COLUNAS.filter(filtrarColunas).map((coluna) => (
                   <React.Fragment key={coluna.key}>
                     {coluna.renderHeader({
                       produtos,
                       selecionados,
-                      handleSelecionarTodos
+                      handleSelecionarTodos,
                     })}
                   </React.Fragment>
                 ))}
@@ -1177,101 +1374,142 @@ export default function Produtos() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                  <td
+                    colSpan="10"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
                     Carregando produtos...
                   </td>
                 </tr>
               ) : produtos.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                  <td
+                    colSpan="10"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
                     Nenhum produto encontrado
                   </td>
                 </tr>
               ) : (
                 produtos.map((produto, idx) => {
                   if (!produto || !produto.id) {
-                    console.error(`Produto inválido no índice ${idx}:`, produto);
+                    console.error(
+                      `Produto inválido no índice ${idx}:`,
+                      produto,
+                    );
                     return null;
                   }
-                  
-                  const isKit = produto.tipo_produto === 'KIT';
-                  const isKitExpandido = kitsExpandidos.includes(produto.id);
-                  
-                  return (
-                  <React.Fragment key={produto.id}>
-                  <tr 
-                    className={`hover:bg-gray-50 transition-colors cursor-pointer ${
-                      produto.tipo_produto === 'VARIACAO' ? 'bg-blue-50/30' : ''
-                    } ${isKit ? 'bg-amber-50/30' : ''}`}
-                    onClick={(e) => {
-                      if (!e.target.closest('button, input, a, svg')) {
-                        navigate(`/produtos/${produto.id}/editar`);
-                      }
-                    }}
-                  >
-                    {PRODUTOS_COLUNAS.filter(filtrarColunas).map(coluna => (
-                      <React.Fragment key={coluna.key}>
-                        {coluna.renderCell(produto, {
-                          selecionados,
-                          handleSelecionar,
-                          kitsExpandidos,
-                          toggleKitExpandido,
-                          paisExpandidos,
-                          togglePaiExpandido,
-                          copiarTexto,
-                          editandoPreco,
-                          novoPreco,
-                          setNovoPreco,
-                          handleSalvarPreco,
-                          handleCancelarEdicaoPreco,
-                          handleEditarPreco,
-                          getValidadeMaisProxima,
-                          getCorEstoque,
-                          navigate,
-                          handleExcluir
-                        })}
-                      </React.Fragment>
-                    ))}
-                  </tr>
 
-                  {/* Linha expansível com composição do KIT */}
-                  {isKit && isKitExpandido && produto.composicao_kit && produto.composicao_kit.length > 0 && (
-                    <tr key={`kit-${produto.id}`} className="bg-amber-50/50 border-l-4 border-amber-400">
-                      <td colSpan="10" className="px-4 py-3">
-                        <div className="ml-12">
-                          <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                            COMPOSIÇÃO DO KIT:
-                          </div>
-                          <div className="grid gap-1">
-                            {produto.composicao_kit.map((componente, idx) => (
-                              <div 
-                                key={idx} 
-                                className="flex items-center gap-3 text-xs bg-white rounded px-3 py-2 border border-amber-200"
-                              >
-                                <span className="font-mono font-semibold text-amber-700 min-w-[40px]">
-                                  {componente.quantidade}x
-                                </span>
-                                <span className="flex-1 text-gray-700">
-                                  {componente.produto_nome || componente.nome || `Produto #${componente.produto_id || componente.produto_componente_id}`}
-                                </span>
-                                {componente.produto_estoque !== undefined && (
-                                  <span className="text-gray-500">
-                                    Estoque: <span className={componente.produto_estoque > 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
-                                      {componente.produto_estoque}
-                                    </span>
-                                  </span>
-                                )}
+                  const isKit = produto.tipo_produto === "KIT";
+                  const isKitExpandido = kitsExpandidos.includes(produto.id);
+
+                  return (
+                    <React.Fragment key={produto.id}>
+                      <tr
+                        className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                          produto.tipo_produto === "VARIACAO"
+                            ? "bg-blue-50/30"
+                            : ""
+                        } ${isKit ? "bg-amber-50/30" : ""}`}
+                        onClick={(e) => {
+                          if (!e.target.closest("button, input, a, svg")) {
+                            navigate(`/produtos/${produto.id}/editar`);
+                          }
+                        }}
+                      >
+                        {PRODUTOS_COLUNAS.filter(filtrarColunas).map(
+                          (coluna) => (
+                            <React.Fragment key={coluna.key}>
+                              {coluna.renderCell(produto, {
+                                selecionados,
+                                handleSelecionar,
+                                kitsExpandidos,
+                                toggleKitExpandido,
+                                paisExpandidos,
+                                togglePaiExpandido,
+                                copiarTexto,
+                                editandoPreco,
+                                novoPreco,
+                                setNovoPreco,
+                                handleSalvarPreco,
+                                handleCancelarEdicaoPreco,
+                                handleEditarPreco,
+                                getValidadeMaisProxima,
+                                getCorEstoque,
+                                navigate,
+                                handleExcluir,
+                              })}
+                            </React.Fragment>
+                          ),
+                        )}
+                      </tr>
+
+                      {/* Linha expansível com composição do KIT */}
+                      {isKit &&
+                        isKitExpandido &&
+                        produto.composicao_kit &&
+                        produto.composicao_kit.length > 0 && (
+                          <tr
+                            key={`kit-${produto.id}`}
+                            className="bg-amber-50/50 border-l-4 border-amber-400"
+                          >
+                            <td colSpan="10" className="px-4 py-3">
+                              <div className="ml-12">
+                                <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                    />
+                                  </svg>
+                                  COMPOSIÇÃO DO KIT:
+                                </div>
+                                <div className="grid gap-1">
+                                  {produto.composicao_kit.map(
+                                    (componente, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-3 text-xs bg-white rounded px-3 py-2 border border-amber-200"
+                                      >
+                                        <span className="font-mono font-semibold text-amber-700 min-w-[40px]">
+                                          {componente.quantidade}x
+                                        </span>
+                                        <span className="flex-1 text-gray-700">
+                                          {componente.produto_nome ||
+                                            componente.nome ||
+                                            `Produto #${componente.produto_id || componente.produto_componente_id}`}
+                                        </span>
+                                        {componente.produto_estoque !==
+                                          undefined && (
+                                          <span className="text-gray-500">
+                                            Estoque:{" "}
+                                            <span
+                                              className={
+                                                componente.produto_estoque > 0
+                                                  ? "text-green-600 font-semibold"
+                                                  : "text-red-600 font-semibold"
+                                              }
+                                            >
+                                              {componente.produto_estoque}
+                                            </span>
+                                          </span>
+                                        )}
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                  </React.Fragment>
+                            </td>
+                          </tr>
+                        )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -1284,7 +1522,9 @@ export default function Produtos() {
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-600">
-                Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a {Math.min(paginaAtual * itensPorPagina, totalItens)} de {totalItens} produtos
+                Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a{" "}
+                {Math.min(paginaAtual * itensPorPagina, totalItens)} de{" "}
+                {totalItens} produtos
               </span>
               <select
                 value={itensPorPagina}
@@ -1311,7 +1551,7 @@ export default function Produtos() {
                 Primeira
               </button>
               <button
-                onClick={() => setPaginaAtual(prev => Math.max(prev - 1, 1))}
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 1))}
                 disabled={paginaAtual === 1}
                 className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -1338,8 +1578,8 @@ export default function Produtos() {
                       onClick={() => setPaginaAtual(pageNum)}
                       className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
                         paginaAtual === pageNum
-                          ? 'bg-blue-600 text-white'
-                          : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                          ? "bg-blue-600 text-white"
+                          : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
                       }`}
                     >
                       {pageNum}
@@ -1349,7 +1589,9 @@ export default function Produtos() {
               </div>
 
               <button
-                onClick={() => setPaginaAtual(prev => Math.min(prev + 1, totalPaginas))}
+                onClick={() =>
+                  setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas))
+                }
                 disabled={paginaAtual === totalPaginas}
                 className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -1370,7 +1612,11 @@ export default function Produtos() {
         {!loading && selecionados.length > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <div className="flex justify-between items-center text-sm text-gray-600">
-              <span>{selecionados.length} produto{selecionados.length > 1 ? 's' : ''} selecionado{selecionados.length > 1 ? 's' : ''}</span>
+              <span>
+                {selecionados.length} produto
+                {selecionados.length > 1 ? "s" : ""} selecionado
+                {selecionados.length > 1 ? "s" : ""}
+              </span>
             </div>
           </div>
         )}
@@ -1388,14 +1634,25 @@ export default function Produtos() {
                 onClick={() => setModalEdicaoLote(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             <p className="text-sm text-gray-600 mb-4">
-              Atualizar <strong>{selecionados.length}</strong> produto(s) selecionado(s)
+              Atualizar <strong>{selecionados.length}</strong> produto(s)
+              selecionado(s)
             </p>
 
             <div className="space-y-4">
@@ -1406,11 +1663,16 @@ export default function Produtos() {
                 </label>
                 <select
                   value={dadosEdicaoLote.marca_id}
-                  onChange={(e) => setDadosEdicaoLote({ ...dadosEdicaoLote, marca_id: e.target.value })}
+                  onChange={(e) =>
+                    setDadosEdicaoLote({
+                      ...dadosEdicaoLote,
+                      marca_id: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Não alterar</option>
-                  {marcas.map(marca => (
+                  {marcas.map((marca) => (
                     <option key={marca.id} value={marca.id}>
                       {marca.nome}
                     </option>
@@ -1425,13 +1687,19 @@ export default function Produtos() {
                 </label>
                 <select
                   value={dadosEdicaoLote.categoria_id}
-                  onChange={(e) => setDadosEdicaoLote({ ...dadosEdicaoLote, categoria_id: e.target.value })}
+                  onChange={(e) =>
+                    setDadosEdicaoLote({
+                      ...dadosEdicaoLote,
+                      categoria_id: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Não alterar</option>
-                  {categorias.map(cat => (
+                  {categorias.map((cat) => (
                     <option key={cat.id} value={cat.id}>
-                      {cat.categoria_pai_id ? '  └─ ' : ''}{cat.nome}
+                      {cat.categoria_pai_id ? "  └─ " : ""}
+                      {cat.nome}
                     </option>
                   ))}
                 </select>
@@ -1444,11 +1712,16 @@ export default function Produtos() {
                 </label>
                 <select
                   value={dadosEdicaoLote.departamento_id}
-                  onChange={(e) => setDadosEdicaoLote({ ...dadosEdicaoLote, departamento_id: e.target.value })}
+                  onChange={(e) =>
+                    setDadosEdicaoLote({
+                      ...dadosEdicaoLote,
+                      departamento_id: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="">Não alterar</option>
-                  {departamentos.map(dep => (
+                  {departamentos.map((dep) => (
                     <option key={dep.id} value={dep.id}>
                       {dep.nome}
                     </option>
@@ -1474,20 +1747,32 @@ export default function Produtos() {
           </div>
         </div>
       )}
-      
+
       {/* Modal de Configuração de Colunas */}
       {modalColunas && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             {/* Header */}
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Configurar Colunas</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Configurar Colunas
+              </h3>
               <button
                 onClick={() => setModalColunas(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -1497,9 +1782,9 @@ export default function Produtos() {
               <p className="text-sm text-gray-600 mb-4">
                 Selecione quais colunas deseja visualizar na tabela:
               </p>
-              
+
               <div className="space-y-2">
-                {PRODUTOS_COLUNAS.map(coluna => (
+                {PRODUTOS_COLUNAS.map((coluna) => (
                   <label
                     key={coluna.key}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
@@ -1544,7 +1829,7 @@ export default function Produtos() {
           </div>
         </div>
       )}
-      
+
       {/* Modal de Importação */}
       <ModalImportacaoProdutos
         isOpen={modalImportacao}
