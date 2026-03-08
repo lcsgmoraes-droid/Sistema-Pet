@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -501,17 +502,28 @@ def rastreio_entrega(
             posicao_cliente = i + 1
             break
 
-    # Última posição GPS do entregador (última parada entregue com GPS)
+    # Última posição GPS do entregador.
+    # Prioridade:
+    # 1) posição atual contínua da rota (lat_atual/lon_atual)
+    # 2) fallback para última parada entregue com GPS
     ultima_posicao = None
     try:
-        for p in reversed(todas_paradas):
-            result = db.execute(
-                text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
-                {"pid": p.id}
-            ).fetchone()
-            if result and result[0] is not None and result[1] is not None:
-                ultima_posicao = {"lat": float(result[0]), "lon": float(result[1])}
-                break
+        rota_posicao = db.execute(
+            text("SELECT lat_atual, lon_atual FROM rotas_entrega WHERE id = :rid"),
+            {"rid": rota.id},
+        ).fetchone()
+
+        if rota_posicao and rota_posicao[0] is not None and rota_posicao[1] is not None:
+            ultima_posicao = {"lat": float(rota_posicao[0]), "lon": float(rota_posicao[1])}
+        else:
+            for p in reversed(todas_paradas):
+                result = db.execute(
+                    text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
+                    {"pid": p.id}
+                ).fetchone()
+                if result and result[0] is not None and result[1] is not None:
+                    ultima_posicao = {"lat": float(result[0]), "lon": float(result[1])}
+                    break
     except Exception:
         pass
 

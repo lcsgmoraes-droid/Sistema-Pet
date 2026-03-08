@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
@@ -27,6 +28,12 @@ router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
 _rotas_schema_checked = False
 
 
+class RegistrarRecebimentoPayload(BaseModel):
+    forma_pagamento: str = Field(..., description="pix | cartao_debito | cartao_credito")
+    numero_parcelas: int = Field(1, ge=1, le=12)
+
+
+
 def ensure_rotas_entrega_schema(db: Session) -> None:
     """Compatibilidade de schema para rotas/paradas em ambientes legados."""
     global _rotas_schema_checked
@@ -36,6 +43,9 @@ def ensure_rotas_entrega_schema(db: Session) -> None:
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"))
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"))
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS token_rastreio VARCHAR(64)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lat_atual NUMERIC(10,6)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lon_atual NUMERIC(10,6)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS localizacao_atualizada_em TIMESTAMP"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"))
@@ -140,6 +150,73 @@ def listar_vendas_pendentes_entrega(
         "entregador_id": v.entregador_id,
         "entregador_nome": v.entregador.nome if v.entregador else None,
     } for v in vendas]
+
+
+@router.post("/{rota_id}/paradas/{parada_id}/registrar-recebimento")
+def registrar_recebimento_entregador(
+    rota_id: int,
+    parada_id: int,
+    payload: RegistrarRecebimentoPayload,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Pré-integração de recebimento no app do entregador.
+
+    IMPORTANTE:
+    - NÃO baixa financeiro ainda.
+    - Apenas registra intenção de cobrança para ficar pronto para integração Stone/operadora.
+    """
+    _, tenant_id = user_and_tenant
+
+    forma = (payload.forma_pagamento or "").strip().lower()
+    formas_validas = {"pix", "cartao_debito", "cartao_credito"}
+    if forma not in formas_validas:
+        raise HTTPException(status_code=400, detail="Forma de pagamento inválida")
+
+    if forma != "cartao_credito" and payload.numero_parcelas != 1:
+        raise HTTPException(status_code=400, detail="Parcelas só são permitidas para cartão de crédito")
+
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not parada:
+        raise HTTPException(status_code=404, detail="Parada não encontrada")
+
+    venda = db.query(Venda).filter(Venda.id == parada.venda_id, Venda.tenant_id == tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+    parcelas_txt = f"{payload.numero_parcelas}x" if forma == "cartao_credito" else "1x"
+    registro = (
+        f"[RECEBIMENTO_APP] provider=stone status=pendente_integracao "
+        f"forma={forma} parcelas={parcelas_txt} valor={float(venda.total or 0):.2f} "
+        f"em={datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+
+    obs_atual = (parada.observacoes or "").strip()
+    parada.observacoes = f"{obs_atual}\n{registro}".strip()
+
+    venda_obs_atual = (venda.observacoes_entrega or "").strip()
+    venda.observacoes_entrega = f"{venda_obs_atual}\n{registro}".strip()
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "message": "Recebimento registrado no app e aguardando integração com a operadora",
+        "integracao_status": "pendente_integracao",
+        "provider": "stone",
+        "forma_pagamento": forma,
+        "numero_parcelas": payload.numero_parcelas,
+        "valor": float(venda.total or 0),
+    }
 
 
 @router.post("/vendas-pendentes/otimizar")
@@ -812,6 +889,54 @@ def reverter_inicio_rota(
     logger.info(f"Rota #{rota_id} revertida para pendente")
 
     return rota
+
+
+@router.post("/{rota_id}/atualizar-localizacao")
+def atualizar_localizacao_rota(
+    rota_id: int,
+    lat: float,
+    lon: float,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Atualiza a localização atual do entregador para rastreio ao vivo.
+    """
+    _, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
+
+    rota = db.query(RotaEntrega).filter(
+        RotaEntrega.id == rota_id,
+        RotaEntrega.tenant_id == tenant_id,
+    ).first()
+
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota não encontrada")
+
+    if rota.status not in ("em_rota", "em_andamento"):
+        raise HTTPException(status_code=400, detail="Rota não está em andamento")
+
+    db.execute(
+        text(
+            """
+            UPDATE rotas_entrega
+            SET lat_atual = :lat,
+                lon_atual = :lon,
+                localizacao_atualizada_em = :agora
+            WHERE id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {
+            "lat": lat,
+            "lon": lon,
+            "agora": datetime.now(),
+            "rid": rota_id,
+            "tenant": tenant_id,
+        },
+    )
+    db.commit()
+
+    return {"ok": True}
 
 
 @router.post("/{rota_id}/paradas/{parada_id}/marcar-entregue")

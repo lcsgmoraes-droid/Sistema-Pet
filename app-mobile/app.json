@@ -5,7 +5,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "updates": {
-      "enabled": false
+      "enabled": false,
+      "url": "https://u.expo.dev/158693e8-177c-4be6-8e2f-143d0d8260dd"
     },
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,6 +21,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Usado para escanear código de barras dos produtos.",
         "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet."
+      },
+      "runtimeVersion": {
+        "policy": "appVersion"
       }
     },
     "android": {
@@ -35,8 +39,16 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "runtimeVersion": "1.0.0"
     },
     "web": {
       "favicon": "./assets/favicon.png"

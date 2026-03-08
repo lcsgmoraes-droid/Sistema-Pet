@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, hash_password, verify_password
@@ -712,7 +713,7 @@ def meus_beneficios(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            sqlfunc.or_(
+            or_(
                 CashbackTransaction.expires_at.is_(None),
                 CashbackTransaction.expires_at > now,
                 CashbackTransaction.tx_type != "credit",
@@ -863,7 +864,7 @@ def meu_extrato_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            sqlfunc.or_(
+            or_(
                 CashbackTransaction.expires_at.is_(None),
                 CashbackTransaction.expires_at > now,
                 CashbackTransaction.tx_type != "credit",

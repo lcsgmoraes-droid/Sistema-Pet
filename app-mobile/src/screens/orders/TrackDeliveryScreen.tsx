@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import MapView, { Marker } from "react-native-maps";
 import api from "../../services/api";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 
@@ -79,6 +80,7 @@ export default function TrackDeliveryScreen() {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
+  const [intervaloMs, setIntervaloMs] = useState(10_000);
 
   const carregar = useCallback(async () => {
     try {
@@ -94,15 +96,20 @@ export default function TrackDeliveryScreen() {
   }, [pedidoId]);
 
   useEffect(() => {
+    const paradasAntes = dados?.rota?.paradas_antes ?? 99;
+    setIntervaloMs(paradasAntes <= 1 ? 5_000 : 10_000);
+  }, [dados?.rota?.paradas_antes]);
+
+  useEffect(() => {
     carregar();
-    // Polling a cada 30 segundos enquanto em rota
+    // Polling adaptativo: 10s quando longe, 5s quando perto.
     const interval = setInterval(() => {
       if (dados?.rota?.status_parada !== "entregue") {
         carregar();
       }
-    }, 30_000);
+    }, intervaloMs);
     return () => clearInterval(interval);
-  }, [carregar, dados?.rota?.status_parada]);
+  }, [carregar, dados?.rota?.status_parada, intervaloMs]);
 
   function abrirGoogleMaps() {
     const gps = dados?.rota?.ultima_posicao_gps;
@@ -243,6 +250,8 @@ export default function TrackDeliveryScreen() {
     STATUS_PARADA[rota.status_parada] ?? STATUS_PARADA.pendente;
   const progresso =
     rota.total_paradas > 0 ? rota.entregues / rota.total_paradas : 0;
+  const podeAbrirMapa =
+    rota.ultima_posicao_gps !== undefined || Boolean(rota.endereco_entrega);
 
   return (
     <ScrollView
@@ -328,12 +337,42 @@ export default function TrackDeliveryScreen() {
             <Text style={styles.enderecoLabel}>Entregar em</Text>
             <Text style={styles.enderecoTexto}>{rota.endereco_entrega}</Text>
           </View>
-          {(rota.ultima_posicao_gps || rota.endereco_entrega) && (
+          {podeAbrirMapa ? (
             <TouchableOpacity onPress={abrirGoogleMaps} style={styles.btnMaps}>
               <Ionicons name="map" size={16} color={CORES.primario} />
               <Text style={styles.btnMapsTexto}>Maps</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
+        </View>
+      )}
+
+      {!!rota.ultima_posicao_gps && (
+        <View style={styles.mapaCard}>
+          <Text style={styles.mapaTitulo}>Posição atual do entregador</Text>
+          <MapView
+            style={styles.mapa}
+            initialRegion={{
+              latitude: rota.ultima_posicao_gps.lat,
+              longitude: rota.ultima_posicao_gps.lon,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+            region={{
+              latitude: rota.ultima_posicao_gps.lat,
+              longitude: rota.ultima_posicao_gps.lon,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }}
+          >
+            <Marker
+              coordinate={{
+                latitude: rota.ultima_posicao_gps.lat,
+                longitude: rota.ultima_posicao_gps.lon,
+              }}
+              title="Entregador"
+              description="Posição atual"
+            />
+          </MapView>
         </View>
       )}
 
@@ -368,7 +407,7 @@ export default function TrackDeliveryScreen() {
 
       {rota.status_parada !== "entregue" && (
         <Text style={styles.autoAtualizaAviso}>
-          Atualizado automaticamente a cada 30 segundos
+          Atualizado automaticamente a cada {intervaloMs / 1000} segundos
         </Text>
       )}
     </ScrollView>
@@ -488,6 +527,24 @@ const styles = StyleSheet.create({
     fontSize: FONTE.pequena,
     color: CORES.primario,
     fontWeight: "600",
+  },
+
+  mapaCard: {
+    backgroundColor: CORES.superficie,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    gap: 8,
+    ...SOMBRA,
+  },
+  mapaTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: "600",
+    color: CORES.texto,
+  },
+  mapa: {
+    width: "100%",
+    height: 220,
+    borderRadius: RAIO.md,
   },
 
   palavraChaveCard: {
