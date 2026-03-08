@@ -186,7 +186,7 @@ const ItemFAQ = ({ pergunta, resposta }) => {
    Página principal
 -------------------------------------------------------- */
 const Ajuda = () => {
-  const [aba, setAba] = useState("central");
+  const [aba, setAba] = useState("planos");
   const msgGeral = encodeURIComponent(
     "Olá! Tenho dúvidas sobre os planos do Sistema Pet.",
   );
@@ -200,7 +200,9 @@ const Ajuda = () => {
             Ajuda e Planos
           </p>
           <h1 className="text-3xl font-bold mb-3">
-            {aba === "central" ? "Como usar o Sistema Pet" : "Módulos extras do Sistema Pet"}
+            {aba === "central"
+              ? "Como usar o Sistema Pet"
+              : "Módulos extras do Sistema Pet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
             {aba === "central"
@@ -232,17 +234,6 @@ const Ajuda = () => {
         <div className="max-w-5xl mx-auto px-4">
           <nav className="flex gap-1 overflow-x-auto">
             <button
-              onClick={() => setAba("central")}
-              className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                aba === "central"
-                  ? "border-indigo-600 text-indigo-700"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              <FiBookOpen className="w-4 h-4" />
-              Central de Ajuda
-            </button>
-            <button
               onClick={() => setAba("planos")}
               className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 aba === "planos"
@@ -253,6 +244,17 @@ const Ajuda = () => {
               <FiStar className="w-4 h-4" />
               Módulos Premium
             </button>
+            <button
+              onClick={() => setAba("central")}
+              className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                aba === "central"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FiBookOpen className="w-4 h-4" />
+              Central de Ajuda
+            </button>
           </nav>
         </div>
       </div>
@@ -262,130 +264,130 @@ const Ajuda = () => {
 
       {/* Conteúdo da aba Módulos Premium */}
       {aba === "planos" && (
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        {/* Seção: módulos base (inclusos sem custo) */}
-        <div className="mb-10">
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-start">
-            <FiCheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-bold text-green-800 text-base">
-                Já inclusos no seu plano — sem custo extra
-              </p>
-              <p className="text-sm text-green-700 mt-1">
-                PDV (vendas), Clientes, Pets, Produtos, Financeiro, Lembretes,
-                Comissões, Compras, RH, Inteligência Artificial (Chat) e
-                Configurações já estão liberados para você usar hoje.
-              </p>
+        <div className="max-w-5xl mx-auto px-4 py-10">
+          {/* Seção: módulos base (inclusos sem custo) */}
+          <div className="mb-10">
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-5 flex flex-col sm:flex-row gap-4 items-start">
+              <FiCheckCircle className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-green-800 text-base">
+                  Já inclusos no seu plano — sem custo extra
+                </p>
+                <p className="text-sm text-green-700 mt-1">
+                  PDV (vendas), Clientes, Pets, Produtos, Financeiro, Lembretes,
+                  Comissões, Compras, RH, Inteligência Artificial (Chat) e
+                  Configurações já estão liberados para você usar hoje.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Seção: módulos premium */}
-        <div className="mb-12">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            Módulos premium disponíveis
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Cada módulo é independente — contrate só o que fizer sentido para o
-            seu negócio. Cancele a qualquer hora, sem multa.
-          </p>
+          {/* Seção: módulos premium */}
+          <div className="mb-12">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              Módulos premium disponíveis
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Cada módulo é independente — contrate só o que fizer sentido para
+              o seu negócio. Cancele a qualquer hora, sem multa.
+            </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {ORDEM_MODULOS.map((key) => (
-              <CardModulo key={key} moduloKey={key} />
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {ORDEM_MODULOS.map((key) => (
+                <CardModulo key={key} moduloKey={key} />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Seção: como contratar */}
-        <div className="mb-12">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            Como contratar
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Simples e rápido — tudo pelo WhatsApp.
-          </p>
+          {/* Seção: como contratar */}
+          <div className="mb-12">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              Como contratar
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Simples e rápido — tudo pelo WhatsApp.
+            </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              {
-                passo: "1",
-                titulo: "Escolha o módulo",
-                descricao:
-                  "Veja os módulos acima, entenda o que cada um faz e escolha o que resolve seu problema.",
-              },
-              {
-                passo: "2",
-                titulo: "Fale com o suporte",
-                descricao:
-                  'Clique em "Contratar" ou "Tirar dúvidas". A gente explica tudo e confirma o acesso.',
-              },
-              {
-                passo: "3",
-                titulo: "Pronto, acesso liberado",
-                descricao:
-                  "Em até 5 minutos após o pagamento o módulo aparece desbloqueado no sistema.",
-              },
-            ].map((etapa) => (
-              <div
-                key={etapa.passo}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"
-              >
-                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
-                  <span className="text-sm font-bold text-indigo-700">
-                    {etapa.passo}
-                  </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                {
+                  passo: "1",
+                  titulo: "Escolha o módulo",
+                  descricao:
+                    "Veja os módulos acima, entenda o que cada um faz e escolha o que resolve seu problema.",
+                },
+                {
+                  passo: "2",
+                  titulo: "Fale com o suporte",
+                  descricao:
+                    'Clique em "Contratar" ou "Tirar dúvidas". A gente explica tudo e confirma o acesso.',
+                },
+                {
+                  passo: "3",
+                  titulo: "Pronto, acesso liberado",
+                  descricao:
+                    "Em até 5 minutos após o pagamento o módulo aparece desbloqueado no sistema.",
+                },
+              ].map((etapa) => (
+                <div
+                  key={etapa.passo}
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"
+                >
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                    <span className="text-sm font-bold text-indigo-700">
+                      {etapa.passo}
+                    </span>
+                  </div>
+                  <p className="font-bold text-gray-900 text-sm mb-1">
+                    {etapa.titulo}
+                  </p>
+                  <p className="text-sm text-gray-500">{etapa.descricao}</p>
                 </div>
-                <p className="font-bold text-gray-900 text-sm mb-1">
-                  {etapa.titulo}
-                </p>
-                <p className="text-sm text-gray-500">{etapa.descricao}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* Seção: dúvidas comuns */}
+          <div className="mb-12">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">
+              Dúvidas comuns
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Perguntas que a maioria dos usuários faz antes de contratar.
+            </p>
+
+            <div className="space-y-2">
+              {FAQS.map((faq) => (
+                <ItemFAQ
+                  key={faq.pergunta}
+                  pergunta={faq.pergunta}
+                  resposta={faq.resposta}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* CTA final */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white text-center">
+            <h3 className="text-xl font-bold mb-2">
+              Ainda tem dúvidas? Fala comigo!
+            </h3>
+            <p className="text-indigo-100 text-sm mb-5">
+              Nossa equipe responde em minutos pelo WhatsApp. Nenhuma pergunta é
+              boba — é melhor perguntar antes de contratar do que contratar sem
+              saber.
+            </p>
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgGeral}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-8 py-3 rounded-xl hover:bg-indigo-50 transition-colors"
+            >
+              <FiMessageCircle className="w-5 h-5" />
+              Falar com o suporte agora
+            </a>
           </div>
         </div>
-
-        {/* Seção: dúvidas comuns */}
-        <div className="mb-12">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">
-            Dúvidas comuns
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Perguntas que a maioria dos usuários faz antes de contratar.
-          </p>
-
-          <div className="space-y-2">
-            {FAQS.map((faq) => (
-              <ItemFAQ
-                key={faq.pergunta}
-                pergunta={faq.pergunta}
-                resposta={faq.resposta}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* CTA final */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white text-center">
-          <h3 className="text-xl font-bold mb-2">
-            Ainda tem dúvidas? Fala comigo!
-          </h3>
-          <p className="text-indigo-100 text-sm mb-5">
-            Nossa equipe responde em minutos pelo WhatsApp. Nenhuma pergunta é
-            boba — é melhor perguntar antes de contratar do que contratar sem
-            saber.
-          </p>
-          <a
-            href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgGeral}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 bg-white text-indigo-700 font-bold px-8 py-3 rounded-xl hover:bg-indigo-50 transition-colors"
-          >
-            <FiMessageCircle className="w-5 h-5" />
-            Falar com o suporte agora
-          </a>
-        </div>
-      </div>
       )}
     </div>
   );
