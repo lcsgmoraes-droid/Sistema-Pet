@@ -75,6 +75,37 @@ def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
         return None
 
 
+def _align_reference_datetime(target_dt: datetime, reference_dt: datetime) -> datetime:
+    """
+    Alinha o datetime de referência ao mesmo padrão (com/sem tz) do alvo.
+    Evita TypeError quando o banco retorna datetime sem timezone.
+    """
+    if target_dt.tzinfo is None and reference_dt.tzinfo is not None:
+        return reference_dt.replace(tzinfo=None)
+    if target_dt.tzinfo is not None and reference_dt.tzinfo is None:
+        return reference_dt.replace(tzinfo=timezone.utc)
+    return reference_dt
+
+
+def _is_expired(dt: datetime | None, now_ref: datetime) -> bool:
+    if not dt:
+        return False
+    aligned_now = _align_reference_datetime(dt, now_ref)
+    return dt < aligned_now
+
+
+def _is_expired_or_equal(dt: datetime | None, now_ref: datetime) -> bool:
+    if not dt:
+        return False
+    aligned_now = _align_reference_datetime(dt, now_ref)
+    return dt <= aligned_now
+
+
+def _remaining_days_until(dt: datetime, now_ref: datetime) -> int:
+    aligned_now = _align_reference_datetime(dt, now_ref)
+    return max(0, (dt - aligned_now).days)
+
+
 def _extract_tenant_id_from_request(request: Request) -> UUID:
     tenant_id = _normalize_tenant_uuid(request.headers.get("X-Tenant-ID"))
     if not tenant_id:
@@ -628,7 +659,7 @@ def meus_cupons(
     now = datetime.now(timezone.utc)
     resultado = []
     for c in cupons:
-        expirado = c.valid_until and c.valid_until < now
+        expirado = _is_expired(c.valid_until, now)
         resultado.append({
             "id": c.id,
             "code": c.code,
@@ -756,7 +787,7 @@ def meus_beneficios(
     )
     cupons_lista = []
     for c in cupons:
-        expirado = bool(c.valid_until and c.valid_until < now)
+        expirado = _is_expired(c.valid_until, now)
         cupons_lista.append({
             "id": c.id,
             "code": c.code,
@@ -839,7 +870,7 @@ def meu_extrato_cashback(
         is_expired_credit = (
             getattr(t, "tx_type", "credit") == "credit"
             and t.expires_at is not None
-            and t.expires_at <= now
+            and _is_expired_or_equal(t.expires_at, now)
         )
         items.append({
             "id": t.id,
@@ -929,7 +960,7 @@ def minha_sugestao_cashback(
         "proximo_expirando": {
             "amount": float(proximo_expirando.amount),
             "expires_at": proximo_expirando.expires_at.isoformat(),
-            "dias_restantes": max(0, (proximo_expirando.expires_at - now).days),
+            "dias_restantes": _remaining_days_until(proximo_expirando.expires_at, now),
         } if proximo_expirando else None,
     }
 
