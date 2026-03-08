@@ -4,19 +4,22 @@
  */
 import { useState } from "react";
 import {
+  FiBookOpen,
   FiCheckCircle,
   FiChevronDown,
   FiChevronUp,
   FiCreditCard,
-  FiGlobe,
   FiGift,
+  FiGlobe,
   FiMessageCircle,
   FiSmartphone,
+  FiStar,
   FiTruck,
   FiZap,
 } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO } from "../contexts/ModulosContext";
+import CentralAjuda from "./CentralAjuda";
 
 const WHATSAPP_NUMERO = "5518997401641";
 
@@ -183,6 +186,7 @@ const ItemFAQ = ({ pergunta, resposta }) => {
    Página principal
 -------------------------------------------------------- */
 const Ajuda = () => {
+  const [aba, setAba] = useState("central");
   const msgGeral = encodeURIComponent(
     "Olá! Tenho dúvidas sobre os planos do Sistema Pet.",
   );
@@ -193,15 +197,15 @@ const Ajuda = () => {
       <div className="bg-gradient-to-br from-indigo-600 to-purple-700 text-white py-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <p className="text-indigo-200 text-sm font-medium mb-2">
-            Central de Ajuda
+            Ajuda e Planos
           </p>
           <h1 className="text-3xl font-bold mb-3">
-            Módulos extras do Sistema Pet
+            {aba === "central" ? "Como usar o Sistema Pet" : "Módulos extras do Sistema Pet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
-            O sistema base já está funcionando para você. Quer vender mais,
-            entregar mais rápido ou atender sem parar? Veja o que cada módulo
-            faz e quanto custa.
+            {aba === "central"
+              ? "Aprenda a usar cada funcionalidade do sistema. Pesquise por dúvidas, navegue por módulo ou leia o passo a passo."
+              : "O sistema base já está funcionando para você. Quer vender mais, entregar mais rápido ou atender sem parar? Veja o que cada módulo faz e quanto custa."}
           </p>
           <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
             <a
@@ -223,6 +227,41 @@ const Ajuda = () => {
         </div>
       </div>
 
+      {/* Abas de navegação */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4">
+          <nav className="flex gap-1 overflow-x-auto">
+            <button
+              onClick={() => setAba("central")}
+              className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                aba === "central"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FiBookOpen className="w-4 h-4" />
+              Central de Ajuda
+            </button>
+            <button
+              onClick={() => setAba("planos")}
+              className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                aba === "planos"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FiStar className="w-4 h-4" />
+              Módulos Premium
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* Conteúdo da aba Central de Ajuda */}
+      {aba === "central" && <CentralAjuda />}
+
+      {/* Conteúdo da aba Módulos Premium */}
+      {aba === "planos" && (
       <div className="max-w-5xl mx-auto px-4 py-10">
         {/* Seção: módulos base (inclusos sem custo) */}
         <div className="mb-10">
@@ -347,6 +386,7 @@ const Ajuda = () => {
           </a>
         </div>
       </div>
+      )}
     </div>
   );
 };

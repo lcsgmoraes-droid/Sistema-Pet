@@ -9,22 +9,41 @@ import { useCallback, useEffect, useRef } from "react";
  * - O usuário pode reiniciar o tour chamando `iniciarTour()`.
  * - O status "já visto" é salvo no localStorage.
  *
- * @param {string} tourKey - Chave única da página (ex: "dashboard", "pdv", "pessoas")
- * @param {Array}  steps   - Array de passos do driver.js
- * @param {Object} [opcoes]
- * @param {number} [opcoes.delay=800] - Delay em ms antes de iniciar (para a DOM renderizar)
- * @returns {{ iniciarTour: Function, resetarTour: Function }}
+ * Usa refs para acessar valores atuais sem colocá-los nas deps do useEffect,
+ * evitando problemas com o React.StrictMode (que roda efeitos duas vezes em dev).
  */
-export function useTour(tourKey, steps, { delay = 800 } = {}) {
+export function useTour(tourKey, steps, { delay = 600 } = {}) {
   const driverRef = useRef(null);
+  // Refs para acessar valores atuais sem trigger de re-render
+  const stepsRef = useRef(steps);
+  const tourKeyRef = useRef(tourKey);
+  stepsRef.current = steps;
+  tourKeyRef.current = tourKey;
 
   const iniciarTour = useCallback(() => {
-    if (!steps || steps.length === 0) return;
+    const currentSteps = stepsRef.current;
+    const currentKey = tourKeyRef.current;
 
-    // Destrói instância anterior se existir
+    if (!currentSteps || currentSteps.length === 0) return;
+
     if (driverRef.current) {
-      driverRef.current.destroy();
+      try {
+        driverRef.current.destroy();
+      } catch (_) {}
     }
+
+    // Filtra passos cujo elemento não existe no DOM (evita travar o tour)
+    const stepsValidos = currentSteps.filter((step) => {
+      if (!step.element) return true; // passos de intro (sem elemento) sempre ok
+      const found = !!document.querySelector(step.element);
+      if (!found)
+        console.warn(
+          `[Tour:${currentKey}] elemento não encontrado: ${step.element}`,
+        );
+      return found;
+    });
+
+    if (stepsValidos.length === 0) return;
 
     driverRef.current = driver({
       showProgress: true,
@@ -32,40 +51,48 @@ export function useTour(tourKey, steps, { delay = 800 } = {}) {
       nextBtnText: "Próximo →",
       prevBtnText: "← Anterior",
       doneBtnText: "Concluir ✓",
-      overlayClickBtnText: "Próximo →",
       allowClose: true,
       smoothScroll: true,
       stagePadding: 8,
       stageRadius: 8,
       popoverClass: "tour-petshop",
       onDestroyed: () => {
-        localStorage.setItem(`tour_visto_${tourKey}`, "1");
+        localStorage.setItem(`tour_visto_${currentKey}`, "1");
       },
-      steps,
+      steps: stepsValidos,
     });
 
     driverRef.current.drive();
-  }, [tourKey, steps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // deps vazio: usa refs para acessar valores atuais
 
-  // Inicia automaticamente na primeira visita
+  // Auto-start: roda UMA vez após montagem real.
   useEffect(() => {
-    const jaVisto = localStorage.getItem(`tour_visto_${tourKey}`);
+    const key = tourKeyRef.current;
+    const jaVisto = localStorage.getItem(`tour_visto_${key}`);
     if (jaVisto) return;
 
     const timer = setTimeout(() => {
-      iniciarTour();
+      try {
+        iniciarTour();
+      } catch (err) {
+        console.error(`[Tour:${key}] ERRO em iniciarTour:`, err);
+      }
     }, delay);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [tourKey, delay, iniciarTour]);
+  }, []); // deps vazio intencional
 
-  // Destrói ao desmontar o componente
+  // Destrói ao desmontar
   useEffect(() => {
     return () => {
       if (driverRef.current) {
-        driverRef.current.destroy();
+        try {
+          driverRef.current.destroy();
+        } catch (_) {}
+        driverRef.current = null;
       }
     };
   }, []);

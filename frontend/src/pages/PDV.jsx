@@ -53,16 +53,16 @@ import QuantidadeInput from "../components/QuantidadeInput";
 import SubtotalInput from "../components/SubtotalInput";
 import { useAuth } from "../contexts/AuthContext";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
-import { formatBRL, formatMoneyBRL } from "../utils/formatters";
-import { formatarVariacao } from "../utils/variacoes";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
+import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import { formatarVariacao } from "../utils/variacoes";
 
 export default function PDV() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
-  const { iniciarTour } = useTour('pdv', tourPDV, { delay: 1200 });
+  const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
 
   // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
   const podeVerMargem = user?.is_admin === true;
@@ -2023,8 +2023,18 @@ export default function PDV() {
                   title="Ver tour guiado do PDV"
                   className="flex items-center gap-1 px-2 py-1 text-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <span className="hidden sm:inline text-xs">Tour</span>
                 </button>
@@ -2303,7 +2313,10 @@ export default function PDV() {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-5xl mx-auto space-y-4">
               {/* Card Cliente */}
-              <div id="tour-pdv-cliente" className="bg-white rounded-lg shadow-sm border p-6">
+              <div
+                id="tour-pdv-cliente"
+                className="bg-white rounded-lg shadow-sm border p-6"
+              >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                     <User className="w-5 h-5 mr-2 text-blue-600" />
@@ -2598,7 +2611,10 @@ export default function PDV() {
               </div>
 
               {/* Card Produtos */}
-              <div id="tour-pdv-carrinho" className="bg-white rounded-lg shadow-sm border p-4">
+              <div
+                id="tour-pdv-carrinho"
+                className="bg-white rounded-lg shadow-sm border p-4"
+              >
                 <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
                   <Package className="w-5 h-5 mr-2 text-blue-600" />
                   Produtos e Serviços
@@ -3781,7 +3797,10 @@ export default function PDV() {
 
             {/* Botões de Ação - Duplicados no final para facilitar acesso */}
             {vendaAtual.itens.length > 0 && (
-              <div id="tour-pdv-resumo" className="bg-white rounded-lg shadow-sm border p-6">
+              <div
+                id="tour-pdv-resumo"
+                className="bg-white rounded-lg shadow-sm border p-6"
+              >
                 {!temCaixaAberto && (
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
                     <div className="flex items-center space-x-2 text-red-700">

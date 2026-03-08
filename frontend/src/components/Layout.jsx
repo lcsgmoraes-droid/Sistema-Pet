@@ -875,11 +875,17 @@ const Layout = () => {
                         </div>
                         {sidebarOpen &&
                           (item.modulo && devControlesAtivos ? (
-                            <button
+                            <span
+                              role="button"
+                              tabIndex={0}
                               onClick={(event) =>
                                 onToggleModuloDev(event, item.modulo)
                               }
-                              className="p-1 rounded hover:bg-white/70"
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ")
+                                  onToggleModuloDev(event, item.modulo);
+                              }}
+                              className="p-1 rounded hover:bg-white/70 cursor-pointer"
                               title="DEV: clicar para travar/destravar modulo"
                             >
                               {moduloAtivo(item.modulo) ? (
@@ -887,9 +893,12 @@ const Layout = () => {
                               ) : (
                                 <FiLock className="text-xs md:text-sm text-amber-400 flex-shrink-0" />
                               )}
-                            </button>
+                            </span>
                           ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <TooltipPremium modulo={item.modulo} placement="right">
+                            <TooltipPremium
+                              modulo={item.modulo}
+                              placement="right"
+                            >
                               <FiLock
                                 className="text-xs md:text-sm text-amber-400 flex-shrink-0"
                                 aria-label="Módulo premium"
@@ -924,11 +933,23 @@ const Layout = () => {
                                 {subitem.modulo &&
                                   sidebarOpen &&
                                   (devControlesAtivos ? (
-                                    <button
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
                                       onClick={(event) =>
                                         onToggleModuloDev(event, subitem.modulo)
                                       }
-                                      className="p-1 rounded hover:bg-white/80 ml-auto"
+                                      onKeyDown={(event) => {
+                                        if (
+                                          event.key === "Enter" ||
+                                          event.key === " "
+                                        )
+                                          onToggleModuloDev(
+                                            event,
+                                            subitem.modulo,
+                                          );
+                                      }}
+                                      className="p-1 rounded hover:bg-white/80 ml-auto cursor-pointer"
                                       title="DEV: clicar para travar/destravar modulo"
                                     >
                                       {moduloAtivo(subitem.modulo) ? (
@@ -936,10 +957,13 @@ const Layout = () => {
                                       ) : (
                                         <FiLock className="w-3 h-3 text-amber-400 flex-shrink-0" />
                                       )}
-                                    </button>
+                                    </span>
                                   ) : (
                                     !moduloAtivo(subitem.modulo) && (
-                                      <TooltipPremium modulo={subitem.modulo} placement="right">
+                                      <TooltipPremium
+                                        modulo={subitem.modulo}
+                                        placement="right"
+                                      >
                                         <FiLock
                                           className="w-3 h-3 text-amber-400 flex-shrink-0 ml-auto"
                                           aria-label="Módulo premium"
@@ -970,11 +994,17 @@ const Layout = () => {
                             {item.label}
                           </span>
                           {item.modulo && devControlesAtivos ? (
-                            <button
+                            <span
+                              role="button"
+                              tabIndex={0}
                               onClick={(event) =>
                                 onToggleModuloDev(event, item.modulo)
                               }
-                              className="p-1 rounded hover:bg-white/80"
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ")
+                                  onToggleModuloDev(event, item.modulo);
+                              }}
+                              className="p-1 rounded hover:bg-white/80 cursor-pointer"
                               title="DEV: clicar para travar/destravar modulo"
                             >
                               {moduloAtivo(item.modulo) ? (
@@ -988,9 +1018,12 @@ const Layout = () => {
                                   title="Modulo bloqueado"
                                 />
                               )}
-                            </button>
+                            </span>
                           ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <TooltipPremium modulo={item.modulo} placement="right">
+                            <TooltipPremium
+                              modulo={item.modulo}
+                              placement="right"
+                            >
                               <FiLock
                                 className="w-3 h-3 text-amber-400 flex-shrink-0"
                                 aria-label="Módulo premium"
