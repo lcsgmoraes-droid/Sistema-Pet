@@ -166,15 +166,22 @@ def _find_cliente_match(
     if exclude_cliente_id is not None:
         base_query = base_query.filter(Cliente.id != exclude_cliente_id)
 
-    cpf = (cpf or "").strip()
-    if cpf:
-        linked_by_cpf = linked_query.filter(Cliente.cpf == cpf).first()
+    cpf_digits = _digits_only(cpf)
+    if cpf_digits:
+        # Busca exata pelo CPF já normalizado (como salvo no banco)
+        linked_by_cpf = linked_query.filter(Cliente.cpf == cpf_digits).first()
         if linked_by_cpf:
             return linked_by_cpf
 
-        matched_by_cpf = base_query.filter(Cliente.cpf == cpf).first()
+        matched_by_cpf = base_query.filter(Cliente.cpf == cpf_digits).first()
         if matched_by_cpf:
             return matched_by_cpf
+
+        # Fallback: busca normalizada por dígitos (para registros com CPF formatado no banco)
+        cpf_candidates = base_query.filter(Cliente.cpf.isnot(None)).all()
+        for candidate in cpf_candidates:
+            if _digits_only(candidate.cpf) == cpf_digits:
+                return candidate
 
     email = (email or "").strip().lower()
     if email:
@@ -331,6 +338,9 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado")
 
+    # Normaliza CPF para apenas dígitos antes de salvar e de buscar o Cliente
+    cpf_normalizado = re.sub(r"\D+", "", str(payload.cpf or "")).strip() or None
+
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
@@ -339,6 +349,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         is_admin=False,
         consent_date=datetime.now(timezone.utc),
         tenant_id=tenant_id,
+        cpf_cnpj=cpf_normalizado,  # Salva o CPF antes para que _get_or_create_cliente_for_user possa encontrar o Cliente por CPF
     )
     db.add(user)
     db.commit()
@@ -347,11 +358,8 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     cliente = _get_or_create_cliente_for_user(db, user)
     if payload.nome:
         cliente.nome = payload.nome
-    if payload.cpf:
-        cpf_clean = payload.cpf.strip()
-        if cpf_clean:
-            user.cpf_cnpj = cpf_clean
-            cliente.cpf = cpf_clean
+    if cpf_normalizado and not cliente.cpf:
+        cliente.cpf = cpf_normalizado
     db.commit()
     db.refresh(cliente)
 
