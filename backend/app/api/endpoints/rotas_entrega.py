@@ -90,6 +90,22 @@ def listar_rotas(
     # Se a rota tem paradas, ordenar internamente pelas paradas.ordem
     # E incluir dados do cliente para exibição
     for rota in rotas:
+        # Carregar localização atual sem depender de mapeamento ORM de colunas legadas.
+        loc = db.execute(
+            text(
+                """
+                SELECT lat_atual, lon_atual, localizacao_atualizada_em
+                FROM rotas_entrega
+                WHERE id = :rid AND tenant_id = :tenant
+                """
+            ),
+            {"rid": rota.id, "tenant": tenant_id},
+        ).fetchone()
+        if loc:
+            rota.lat_atual = loc[0]
+            rota.lon_atual = loc[1]
+            rota.localizacao_atualizada_em = loc[2]
+
         if rota.paradas:
             rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
             # Adicionar informações do cliente em cada parada

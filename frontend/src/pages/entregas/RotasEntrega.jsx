@@ -14,8 +14,9 @@ export default function RotasEntrega() {
   useEffect(() => {
     carregarRotas();
     // Carregar config de entrega para saber o método configurado
-    apiServices.get("/configuracoes/entregas")
-      .then(r => setMetodoKm(r.data?.metodo_km_entrega || "auto_rota"))
+    apiServices
+      .get("/configuracoes/entregas")
+      .then((r) => setMetodoKm(r.data?.metodo_km_entrega || "auto_rota"))
       .catch(() => {}); // silencioso — usa default se falhar
   }, [filtroStatus]);
 
@@ -49,16 +50,24 @@ export default function RotasEntrega() {
     try {
       // API call para atualizar ordem das paradas
       // Backend espera lista de IDs na nova ordem
-      const novaOrdem = paradasOrdenadas.map(p => p.id);
+      const novaOrdem = paradasOrdenadas.map((p) => p.id);
 
       await api.put(`/rotas-entrega/${rotaId}/paradas/reordenar`, novaOrdem);
 
       // Atualizar localmente
-      setRotas(prev => prev.map(r =>
-        r.id === rotaId
-          ? { ...r, paradas: paradasOrdenadas.map((p, idx) => ({ ...p, ordem: idx + 1 })) }
-          : r
-      ));
+      setRotas((prev) =>
+        prev.map((r) =>
+          r.id === rotaId
+            ? {
+                ...r,
+                paradas: paradasOrdenadas.map((p, idx) => ({
+                  ...p,
+                  ordem: idx + 1,
+                })),
+              }
+            : r,
+        ),
+      );
 
       alert("Ordem das paradas atualizada!");
     } catch (err) {
@@ -68,7 +77,11 @@ export default function RotasEntrega() {
   }
 
   async function iniciarRota(rotaId) {
-    if (!confirm("Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.")) {
+    if (
+      !confirm(
+        "Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.",
+      )
+    ) {
       return;
     }
 
@@ -86,14 +99,20 @@ export default function RotasEntrega() {
   }
 
   async function excluirRota(rotaId) {
-    if (!confirm("⚠️ Tem certeza que deseja excluir esta rota?\n\nAs vendas voltarão para a listagem de entregas pendentes.")) {
+    if (
+      !confirm(
+        "⚠️ Tem certeza que deseja excluir esta rota?\n\nAs vendas voltarão para a listagem de entregas pendentes.",
+      )
+    ) {
       return;
     }
 
     try {
       const response = await api.delete(`/rotas-entrega/${rotaId}`);
       const { total_vendas } = response.data;
-      alert(`✅ Rota excluída com sucesso!\n${total_vendas} venda(s) voltaram para entregas pendentes.`);
+      alert(
+        `✅ Rota excluída com sucesso!\n${total_vendas} venda(s) voltaram para entregas pendentes.`,
+      );
       carregarRotas(); // Recarregar lista
     } catch (err) {
       console.error("Erro ao excluir rota:", err);
@@ -103,17 +122,24 @@ export default function RotasEntrega() {
   }
 
   async function reverterInicioRota(rotaId) {
-    if (!confirm("↩️ Reverter início desta rota?\n\nA rota voltará para status pendente e você poderá adicionar mais entregas.")) {
+    if (
+      !confirm(
+        "↩️ Reverter início desta rota?\n\nA rota voltará para status pendente e você poderá adicionar mais entregas.",
+      )
+    ) {
       return;
     }
 
     try {
       await api.post(`/rotas-entrega/${rotaId}/reverter-inicio`);
-      alert("✅ Rota revertida para pendente! Agora você pode adicionar mais entregas.");
+      alert(
+        "✅ Rota revertida para pendente! Agora você pode adicionar mais entregas.",
+      );
       carregarRotas(); // Recarregar lista
     } catch (err) {
       console.error("Erro ao reverter rota:", err);
-      const mensagem = err.response?.data?.detail || "Erro ao reverter início da rota";
+      const mensagem =
+        err.response?.data?.detail || "Erro ao reverter início da rota";
       alert(`❌ ${mensagem}`);
     }
   }
@@ -145,25 +171,103 @@ export default function RotasEntrega() {
 
   function getStatusColor(status) {
     switch (status) {
-      case "pendente": return "#FFA500";
-      case "em_andamento": return "#007BFF";
-      case "em_rota": return "#007BFF";
-      case "concluida": return "#28A745";
-      case "cancelada": return "#DC3545";
-      default: return "#6C757D";
+      case "pendente":
+        return "#FFA500";
+      case "em_andamento":
+        return "#007BFF";
+      case "em_rota":
+        return "#007BFF";
+      case "concluida":
+        return "#28A745";
+      case "cancelada":
+        return "#DC3545";
+      default:
+        return "#6C757D";
     }
   }
 
   function getStatusLabel(status) {
     switch (status) {
-      case "pendente": return "🟠 Pendente";
-      case "em_andamento": return "🔵 Em Andamento";
-      case "em_rota": return "🔵 Em Rota";
-      case "concluida": return "✅ Concluída";
-      case "cancelada": return "❌ Cancelada";
-      default: return status;
+      case "pendente":
+        return "🟠 Pendente";
+      case "em_andamento":
+        return "🔵 Em Andamento";
+      case "em_rota":
+        return "🔵 Em Rota";
+      case "concluida":
+        return "✅ Concluída";
+      case "cancelada":
+        return "❌ Cancelada";
+      default:
+        return status;
     }
   }
+
+  function formatarHorarioLocalizacao(dataIso) {
+    if (!dataIso) return "Sem atualização";
+    const data = new Date(dataIso);
+    if (Number.isNaN(data.getTime())) return "Sem atualização";
+    return data.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function getUltimaParadaPendente(rota) {
+    if (!Array.isArray(rota?.paradas)) return null;
+    return (
+      rota.paradas.find((parada) => parada.status !== "entregue") ||
+      rota.paradas[rota.paradas.length - 1] ||
+      null
+    );
+  }
+
+  function abrirMapaRota(rota) {
+    const lat = rota?.lat_atual;
+    const lon = rota?.lon_atual;
+    if (lat && lon) {
+      window.open(
+        `https://www.google.com/maps?q=${lat},${lon}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+
+    const ultimaParada = getUltimaParadaPendente(rota);
+    const endereco = ultimaParada?.endereco || rota?.endereco_destino;
+    if (endereco) {
+      window.open(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+
+    alert(
+      "Esta rota ainda não tem localização ou endereço para abrir no mapa.",
+    );
+  }
+
+  const rotasEmAndamento = Array.isArray(rotas)
+    ? rotas.filter(
+        (rota) => rota.status === "em_rota" || rota.status === "em_andamento",
+      )
+    : [];
+
+  const monitoramentoEntregadores = rotasEmAndamento.reduce((acc, rota) => {
+    const chave = rota?.entregador?.id || `sem-id-${rota.id}`;
+    if (!acc[chave]) {
+      acc[chave] = {
+        entregadorNome: rota?.entregador?.nome || "Entregador não informado",
+        rotas: [],
+      };
+    }
+    acc[chave].rotas.push(rota);
+    return acc;
+  }, {});
 
   if (loading) {
     return (
@@ -181,7 +285,14 @@ export default function RotasEntrega() {
         Rotas criadas e em andamento
       </p>
 
-      <div style={{ marginBottom: 20, display: "flex", gap: 10, alignItems: "center" }}>
+      <div
+        style={{
+          marginBottom: 20,
+          display: "flex",
+          gap: 10,
+          alignItems: "center",
+        }}
+      >
         <label>
           Filtrar por status:
           <select
@@ -191,6 +302,7 @@ export default function RotasEntrega() {
           >
             <option value="">Todos</option>
             <option value="pendente">Pendente</option>
+            <option value="em_rota">Em Rota</option>
             <option value="em_andamento">Em Andamento</option>
             <option value="concluida">Concluída</option>
             <option value="cancelada">Cancelada</option>
@@ -205,6 +317,111 @@ export default function RotasEntrega() {
           🔄 Atualizar
         </button>
       </div>
+
+      {rotasEmAndamento.length > 0 && (
+        <div
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            borderRadius: 10,
+            border: "1px solid #cde7d8",
+            backgroundColor: "#f3fbf6",
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: 12 }}>
+            📡 Entregas em andamento por entregador
+          </h3>
+          <p style={{ marginTop: 0, marginBottom: 14, color: "#4d5b52" }}>
+            Acompanhe quem está na rua agora e abra o mapa com 1 clique.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {Object.values(monitoramentoEntregadores).map((grupo) => (
+              <div
+                key={grupo.entregadorNome}
+                style={{
+                  border: "1px solid #d7e6dc",
+                  borderRadius: 8,
+                  backgroundColor: "#fff",
+                  padding: 12,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                  🧑‍🛵 {grupo.entregadorNome}
+                </div>
+
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
+                  {grupo.rotas.map((rota) => {
+                    const ultimaParada = getUltimaParadaPendente(rota);
+                    const temPosicaoAtual = rota?.lat_atual && rota?.lon_atual;
+
+                    return (
+                      <div
+                        key={rota.id}
+                        style={{
+                          padding: 10,
+                          border: "1px solid #eef2ef",
+                          borderRadius: 6,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600 }}>
+                            🚚 {rota.numero || `Rota #${rota.id}`} •{" "}
+                            {rota.paradas?.length || 0} parada(s)
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: "#59665e",
+                              marginTop: 4,
+                            }}
+                          >
+                            {temPosicaoAtual
+                              ? `📍 Localização ao vivo atualizada às ${formatarHorarioLocalizacao(rota.localizacao_atualizada_em)}`
+                              : "📍 Sem localização ao vivo no momento"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              color: "#59665e",
+                              marginTop: 2,
+                            }}
+                          >
+                            Próxima entrega:{" "}
+                            {ultimaParada?.endereco || "Não informado"}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => abrirMapaRota(rota)}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 6,
+                            border: "none",
+                            backgroundColor: "#1f7a4d",
+                            color: "#fff",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🗺️ Ver rota
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!Array.isArray(rotas) || rotas.length === 0 ? (
         <div className="empty-state">
@@ -255,7 +472,7 @@ function RotaCard({
   getStatusLabel,
   calcularTempoEstimado,
   formatarTempo,
-  metodoKm
+  metodoKm,
 }) {
   const [paradasOrdenadas, setParadasOrdenadas] = useState(rota.paradas || []);
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -273,7 +490,9 @@ function RotaCard({
   const tempoEstimado = calcularTempoEstimado(rota);
 
   // Calcular paradas pendentes
-  const paradasPendentes = paradasOrdenadas.filter(p => p.status !== "entregue").length;
+  const paradasPendentes = paradasOrdenadas.filter(
+    (p) => p.status !== "entregue",
+  ).length;
   const todasEntregue = paradasOrdenadas.length > 0 && paradasPendentes === 0;
 
   async function carregarDetalhesVenda(paradaId, vendaId) {
@@ -281,11 +500,11 @@ function RotaCard({
       setLoadingDetalhes(true);
       setParadaDetalhesAberta(paradaId);
       const response = await api.get(`/vendas/${vendaId}`);
-      console.log('📦 Detalhes da venda carregados:', response.data);
-      console.log('📞 Telefones do cliente:', {
+      console.log("📦 Detalhes da venda carregados:", response.data);
+      console.log("📞 Telefones do cliente:", {
         telefone: response.data.cliente?.telefone,
         celular: response.data.cliente?.celular,
-        email: response.data.cliente?.email
+        email: response.data.cliente?.email,
       });
       setVendaDetalhes(response.data);
     } catch (err) {
@@ -303,7 +522,11 @@ function RotaCard({
   }
 
   async function marcarComoEntregue(paradaId, rotaId) {
-    if (!confirm("✅ Confirmar entrega realizada?\n\nUma mensagem será enviada automaticamente para o próximo cliente da rota.")) {
+    if (
+      !confirm(
+        "✅ Confirmar entrega realizada?\n\nUma mensagem será enviada automaticamente para o próximo cliente da rota.",
+      )
+    ) {
       return;
     }
 
@@ -315,15 +538,19 @@ function RotaCard({
 
       if (metodo === "manual") {
         // Entregador digita o km do odômetro manualmente
-        const kmDigitado = prompt("🏁 Digite o KM atual do odômetro (opcional):\n\nDeixe em branco para pular.");
+        const kmDigitado = prompt(
+          "🏁 Digite o KM atual do odômetro (opcional):\n\nDeixe em branco para pular.",
+        );
         if (kmDigitado && !isNaN(kmDigitado) && parseFloat(kmDigitado) > 0) {
           params.km_entrega = parseFloat(kmDigitado);
         }
       } else if (metodo === "auto_rota") {
         // Auto-calcular a partir da distância da rota otimizada
-        const parada = paradasOrdenadas.find(p => p.id === paradaId);
+        const parada = paradasOrdenadas.find((p) => p.id === paradaId);
         if (parada?.distancia_acumulada && rota.km_inicial) {
-          const kmAuto = parseFloat(rota.km_inicial) + parseFloat(parada.distancia_acumulada);
+          const kmAuto =
+            parseFloat(rota.km_inicial) +
+            parseFloat(parada.distancia_acumulada);
           params.km_entrega = parseFloat(kmAuto.toFixed(2));
         }
       }
@@ -332,11 +559,15 @@ function RotaCard({
       // GPS: capturar localização silenciosamente em qualquer método (para rastreamento)
       try {
         const gps = await new Promise((resolve) => {
-          if (!navigator.geolocation) { resolve(null); return; }
+          if (!navigator.geolocation) {
+            resolve(null);
+            return;
+          }
           navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            (pos) =>
+              resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
             () => resolve(null),
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
           );
         });
         if (gps) {
@@ -347,21 +578,33 @@ function RotaCard({
         // GPS não disponível — continua sem coordenadas
       }
 
-      const response = await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/marcar-entregue`, null, { params });
+      const response = await api.post(
+        `/rotas-entrega/${rotaId}/paradas/${paradaId}/marcar-entregue`,
+        null,
+        { params },
+      );
       alert("✅ " + response.data.message);
 
       // Atualizar estado local da parada
-      setParadasOrdenadas(prev => prev.map(p =>
-        p.id === paradaId
-          ? { ...p, status: "entregue", data_entrega: new Date().toISOString(), km_entrega: params.km_entrega || null }
-          : p
-      ));
+      setParadasOrdenadas((prev) =>
+        prev.map((p) =>
+          p.id === paradaId
+            ? {
+                ...p,
+                status: "entregue",
+                data_entrega: new Date().toISOString(),
+                km_entrega: params.km_entrega || null,
+              }
+            : p,
+        ),
+      );
 
       // Recarregar a rota completa para garantir sincronização
       window.location.reload();
     } catch (err) {
       console.error("Erro ao marcar entrega:", err);
-      const mensagem = err.response?.data?.detail || "Erro ao marcar entrega como concluída";
+      const mensagem =
+        err.response?.data?.detail || "Erro ao marcar entrega como concluída";
       alert("❌ " + mensagem);
     } finally {
       setProcessandoEntrega(null);
@@ -369,25 +612,31 @@ function RotaCard({
   }
 
   async function adicionarObservacao(paradaId, rotaId) {
-    const observacao = prompt("📋 Digite a observação sobre esta entrega:\n\n(Ex: 'Sempre entregar no vizinho', 'Chamar na casa da frente')");
+    const observacao = prompt(
+      "📋 Digite a observação sobre esta entrega:\n\n(Ex: 'Sempre entregar no vizinho', 'Chamar na casa da frente')",
+    );
 
     if (!observacao || observacao.trim() === "") {
       return;
     }
 
     try {
-      await api.put(`/rotas-entrega/${rotaId}/paradas/${paradaId}/observacao`, null, {
-        params: { observacao: observacao.trim() }
-      });
+      await api.put(
+        `/rotas-entrega/${rotaId}/paradas/${paradaId}/observacao`,
+        null,
+        {
+          params: { observacao: observacao.trim() },
+        },
+      );
 
       alert("✅ Observação salva com sucesso!");
 
       // Atualizar localmente
-      setParadasOrdenadas(prev => prev.map(p =>
-        p.id === paradaId
-          ? { ...p, observacoes: observacao.trim() }
-          : p
-      ));
+      setParadasOrdenadas((prev) =>
+        prev.map((p) =>
+          p.id === paradaId ? { ...p, observacoes: observacao.trim() } : p,
+        ),
+      );
     } catch (err) {
       console.error("Erro ao salvar observação:", err);
       alert("❌ Erro ao salvar observação");
@@ -395,23 +644,37 @@ function RotaCard({
   }
 
   async function marcarNaoEntregue(paradaId, rotaId, vendaId) {
-    const motivo = prompt("⚠️ Por que a entrega não foi realizada?\n\n(Ex: 'Cliente ausente', 'Cartão recusado', 'Endereço não encontrado')");
+    const motivo = prompt(
+      "⚠️ Por que a entrega não foi realizada?\n\n(Ex: 'Cliente ausente', 'Cartão recusado', 'Endereço não encontrado')",
+    );
 
     if (!motivo || motivo.trim() === "") {
       return;
     }
 
-    if (!confirm("⚠️ Confirmar que a entrega NÃO foi realizada?\n\nA venda voltará para entregas em aberto.")) {
+    if (
+      !confirm(
+        "⚠️ Confirmar que a entrega NÃO foi realizada?\n\nA venda voltará para entregas em aberto.",
+      )
+    ) {
       return;
     }
 
     try {
       setProcessandoNaoEntregue(paradaId);
-      await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`, null, {
-        params: { motivo: motivo.trim() }
-      });
+      await api.post(
+        `/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`,
+        null,
+        {
+          params: { motivo: motivo.trim() },
+        },
+      );
 
-      alert("✅ Entrega marcada como não realizada. Venda #" + vendaId + " voltou para entregas em aberto.");
+      alert(
+        "✅ Entrega marcada como não realizada. Venda #" +
+          vendaId +
+          " voltou para entregas em aberto.",
+      );
       window.location.reload();
     } catch (err) {
       console.error("Erro ao marcar como não entregue:", err);
@@ -427,13 +690,14 @@ function RotaCard({
     // Distância total da rota otimizada (última parada com distancia_acumulada)
     const ultimaParadaComDistancia = [...paradasOrdenadas]
       .reverse()
-      .find(p => p.distancia_acumulada);
+      .find((p) => p.distancia_acumulada);
     const distanciaRouteTotal = ultimaParadaComDistancia
       ? parseFloat(ultimaParadaComDistancia.distancia_acumulada)
       : null;
 
     // Montar mensagem de confirmação com distância se disponível
-    let msgConfirm = "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
+    let msgConfirm =
+      "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
     if (metodo === "auto_rota" && distanciaRouteTotal) {
       msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância percorrida estimada: ${distanciaRouteTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     }
@@ -449,11 +713,18 @@ function RotaCard({
 
       if (metodo === "manual") {
         // Entregador digita km final do odômetro
-        const kmFinalDigitado = prompt("🏁 Digite o KM final do odômetro (opcional):\n\nDeixe em branco para pular.");
-        if (kmFinalDigitado && !isNaN(kmFinalDigitado) && parseFloat(kmFinalDigitado) > 0) {
+        const kmFinalDigitado = prompt(
+          "🏁 Digite o KM final do odômetro (opcional):\n\nDeixe em branco para pular.",
+        );
+        if (
+          kmFinalDigitado &&
+          !isNaN(kmFinalDigitado) &&
+          parseFloat(kmFinalDigitado) > 0
+        ) {
           payload.km_final = parseFloat(kmFinalDigitado);
           if (kmInicial) {
-            payload.distancia_real = parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
+            payload.distancia_real =
+              parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
           }
         }
       } else if (metodo === "auto_rota") {
@@ -522,16 +793,30 @@ function RotaCard({
         }}
         onClick={onToggleExpand}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+          }}
+        >
           <div style={{ flex: 1 }}>
             <h3 style={{ margin: 0, marginBottom: 10 }}>
               🚚 {rota.numero || `Rota #${rota.id}`}
               {expandida ? " 🔽" : " ▶️"}
             </h3>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, color: "#555" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                color: "#555",
+              }}
+            >
               <div>
-                <strong>Entregador:</strong> {rota.entregador?.nome || "Não informado"}
+                <strong>Entregador:</strong>{" "}
+                {rota.entregador?.nome || "Não informado"}
               </div>
 
               <div>
@@ -540,52 +825,69 @@ function RotaCard({
 
               {rota.distancia_prevista && (
                 <div>
-                  <strong>Distância Prevista:</strong> {rota.distancia_prevista} km
+                  <strong>Distância Prevista:</strong> {rota.distancia_prevista}{" "}
+                  km
                 </div>
               )}
 
               {tempoEstimado && (
                 <div>
-                  <strong>Tempo Estimado:</strong> {formatarTempo(tempoEstimado)}
+                  <strong>Tempo Estimado:</strong>{" "}
+                  {formatarTempo(tempoEstimado)}
                 </div>
               )}
 
               {/* KM Inicial - Mostra quando a rota foi iniciada */}
               {rota.km_inicial && (
                 <div>
-                  <strong>🏁 KM Inicial:</strong> {parseFloat(rota.km_inicial).toFixed(1)} km
+                  <strong>🏁 KM Inicial:</strong>{" "}
+                  {parseFloat(rota.km_inicial).toFixed(1)} km
                 </div>
               )}
 
               {/* KM Final - Mostra quando a rota foi finalizada */}
               {rota.km_final && (
                 <div>
-                  <strong>🏁 KM Final:</strong> {parseFloat(rota.km_final).toFixed(1)} km
+                  <strong>🏁 KM Final:</strong>{" "}
+                  {parseFloat(rota.km_final).toFixed(1)} km
                 </div>
               )}
 
               {/* Total de KM Rodados - Calcula se tiver inicial e final */}
               {rota.km_inicial && rota.km_final && (
                 <div style={{ color: "#007BFF", fontWeight: "600" }}>
-                  <strong>📏 Total Rodado:</strong> {(parseFloat(rota.km_final) - parseFloat(rota.km_inicial)).toFixed(1)} km
-
+                  <strong>📏 Total Rodado:</strong>{" "}
+                  {(
+                    parseFloat(rota.km_final) - parseFloat(rota.km_inicial)
+                  ).toFixed(1)}{" "}
+                  km
                   {/* Comparação com Projetado - Se existir distância prevista */}
-                  {rota.distancia_prevista && (() => {
-                    const realizado = parseFloat(rota.km_final) - parseFloat(rota.km_inicial);
-                    const projetado = parseFloat(rota.distancia_prevista);
-                    const diferenca = realizado - projetado;
-                    const percentual = ((diferenca / projetado) * 100).toFixed(1);
+                  {rota.distancia_prevista &&
+                    (() => {
+                      const realizado =
+                        parseFloat(rota.km_final) - parseFloat(rota.km_inicial);
+                      const projetado = parseFloat(rota.distancia_prevista);
+                      const diferenca = realizado - projetado;
+                      const percentual = (
+                        (diferenca / projetado) *
+                        100
+                      ).toFixed(1);
 
-                    return (
-                      <span style={{
-                        marginLeft: 10,
-                        color: diferenca > 0 ? "#DC3545" : "#28A745",
-                        fontSize: 13
-                      }}>
-                        ({diferenca > 0 ? "+" : ""}{diferenca.toFixed(1)} km / {percentual > 0 ? "+" : ""}{percentual}% vs projetado)
-                      </span>
-                    );
-                  })()}
+                      return (
+                        <span
+                          style={{
+                            marginLeft: 10,
+                            color: diferenca > 0 ? "#DC3545" : "#28A745",
+                            fontSize: 13,
+                          }}
+                        >
+                          ({diferenca > 0 ? "+" : ""}
+                          {diferenca.toFixed(1)} km /{" "}
+                          {percentual > 0 ? "+" : ""}
+                          {percentual}% vs projetado)
+                        </span>
+                      );
+                    })()}
                 </div>
               )}
 
@@ -622,7 +924,7 @@ function RotaCard({
                   fontSize: 14,
                   display: "flex",
                   alignItems: "center",
-                  gap: 5
+                  gap: 5,
                 }}
               >
                 🚀 Iniciar Rota
@@ -630,58 +932,66 @@ function RotaCard({
             )}
 
             {/* Botão Finalizar Rota - visível quando rota em_rota e todas entregas concluídas */}
-            {(rota.status === "em_rota" || rota.status === "em_andamento") && todasEntregue && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  finalizarRota(rota.id, rota.km_inicial);
-                }}
-                disabled={processandoFinalizacao}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: processandoFinalizacao ? "#ccc" : "#007BFF",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: processandoFinalizacao ? "not-allowed" : "pointer",
-                  fontWeight: "bold",
-                  fontSize: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5
-                }}
-              >
-                {processandoFinalizacao ? "⏳ Processando..." : "✅ Finalizar Rota"}
-              </button>
-            )}
+            {(rota.status === "em_rota" || rota.status === "em_andamento") &&
+              todasEntregue && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    finalizarRota(rota.id, rota.km_inicial);
+                  }}
+                  disabled={processandoFinalizacao}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: processandoFinalizacao
+                      ? "#ccc"
+                      : "#007BFF",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: processandoFinalizacao ? "not-allowed" : "pointer",
+                    fontWeight: "bold",
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  {processandoFinalizacao
+                    ? "⏳ Processando..."
+                    : "✅ Finalizar Rota"}
+                </button>
+              )}
 
             {/* Botão Reverter Início - visível quando rota em_rota mas nenhuma entrega foi feita */}
-            {(rota.status === "em_rota" || rota.status === "em_andamento") && paradasPendentes === paradasOrdenadas.length && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReverterInicio(rota.id);
-                }}
-                style={{
-                  padding: "8px 16px",
-                  backgroundColor: "#FFC107",
-                  color: "#000",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontWeight: "bold",
-                  fontSize: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5
-                }}
-              >
-                ↩️ Reverter Início
-              </button>
-            )}
+            {(rota.status === "em_rota" || rota.status === "em_andamento") &&
+              paradasPendentes === paradasOrdenadas.length && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onReverterInicio(rota.id);
+                  }}
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: "#FFC107",
+                    color: "#000",
+                    border: "none",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  ↩️ Reverter Início
+                </button>
+              )}
 
             {/* Botão Excluir Rota - visível para rotas pendentes ou em_rota */}
-            {(rota.status === "pendente" || rota.status === "em_rota" || rota.status === "em_andamento") && (
+            {(rota.status === "pendente" ||
+              rota.status === "em_rota" ||
+              rota.status === "em_andamento") && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -698,7 +1008,7 @@ function RotaCard({
                   fontSize: 14,
                   display: "flex",
                   alignItems: "center",
-                  gap: 5
+                  gap: 5,
                 }}
               >
                 🗑️ Excluir
@@ -739,8 +1049,12 @@ function RotaCard({
 
       {/* Paradas Expandidas */}
       {expandida && paradasOrdenadas.length > 0 && (
-        <div style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}>
-          <h4 style={{ marginBottom: 15 }}>📍 Paradas da Rota (arraste para reordenar)</h4>
+        <div
+          style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}
+        >
+          <h4 style={{ marginBottom: 15 }}>
+            📍 Paradas da Rota (arraste para reordenar)
+          </h4>
 
           {paradasOrdenadas.map((parada, index) => (
             <div key={parada.id}>
@@ -754,7 +1068,8 @@ function RotaCard({
                   marginBottom: 10,
                   border: "1px solid #ddd",
                   borderRadius: 6,
-                  backgroundColor: draggedIndex === index ? "#f0f8ff" : "#fafafa",
+                  backgroundColor:
+                    draggedIndex === index ? "#f0f8ff" : "#fafafa",
                   cursor: "move",
                   display: "flex",
                   justifyContent: "space-between",
@@ -762,33 +1077,52 @@ function RotaCard({
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", marginBottom: 5 }}>
-                    <span style={{
-                      fontWeight: "bold",
-                      marginRight: 10,
-                      fontSize: 18,
-                      color: "#007BFF"
-                    }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      marginBottom: 5,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: "bold",
+                        marginRight: 10,
+                        fontSize: 18,
+                        color: "#007BFF",
+                      }}
+                    >
                       {parada.ordem}º
                     </span>
                     <span style={{ color: "#666", fontSize: 14 }}>
                       Venda #{parada.venda_id}
                     </span>
                     {parada.status && (
-                      <span style={{
-                        marginLeft: 10,
-                        padding: "2px 8px",
-                        borderRadius: 12,
-                        fontSize: 12,
-                        backgroundColor:
-                          parada.status === "entregue" ? "#d4edda" :
-                          parada.status === "tentativa" ? "#fff3cd" : "#e2e3e5",
-                        color:
-                          parada.status === "entregue" ? "#155724" :
-                          parada.status === "tentativa" ? "#856404" : "#383d41",
-                      }}>
-                        {parada.status === "entregue" ? "✓ Entregue" :
-                         parada.status === "tentativa" ? "⚠ Tentativa" : "Pendente"}
+                      <span
+                        style={{
+                          marginLeft: 10,
+                          padding: "2px 8px",
+                          borderRadius: 12,
+                          fontSize: 12,
+                          backgroundColor:
+                            parada.status === "entregue"
+                              ? "#d4edda"
+                              : parada.status === "tentativa"
+                                ? "#fff3cd"
+                                : "#e2e3e5",
+                          color:
+                            parada.status === "entregue"
+                              ? "#155724"
+                              : parada.status === "tentativa"
+                                ? "#856404"
+                                : "#383d41",
+                        }}
+                      >
+                        {parada.status === "entregue"
+                          ? "✓ Entregue"
+                          : parada.status === "tentativa"
+                            ? "⚠ Tentativa"
+                            : "Pendente"}
                       </span>
                     )}
                   </div>
@@ -798,7 +1132,9 @@ function RotaCard({
                     {/* Nome e Telefones */}
                     {parada.cliente_nome && (
                       <div style={{ marginBottom: 4 }}>
-                        <strong style={{ color: "#1565C0" }}>👤 {parada.cliente_nome}</strong>
+                        <strong style={{ color: "#1565C0" }}>
+                          👤 {parada.cliente_nome}
+                        </strong>
                         {parada.cliente_telefone && (
                           <span style={{ marginLeft: 12, color: "#555" }}>
                             📞 {parada.cliente_telefone}
@@ -829,80 +1165,115 @@ function RotaCard({
                   </div>
 
                   {parada.data_entrega && (
-                    <div style={{ color: "#28a745", fontSize: 12, marginTop: 3 }}>
-                      ✓ Entregue em: {new Date(parada.data_entrega).toLocaleString("pt-BR")}
+                    <div
+                      style={{ color: "#28a745", fontSize: 12, marginTop: 3 }}
+                    >
+                      ✓ Entregue em:{" "}
+                      {new Date(parada.data_entrega).toLocaleString("pt-BR")}
                     </div>
                   )}
 
                   {/* Observações da parada */}
                   {parada.observacoes && (
-                    <div style={{
-                      marginTop: 6,
-                      padding: 6,
-                      backgroundColor: "#fff3cd",
-                      borderRadius: 4,
-                      fontSize: 12,
-                      color: "#856404",
-                      border: "1px solid #ffc107"
-                    }}>
+                    <div
+                      style={{
+                        marginTop: 6,
+                        padding: 6,
+                        backgroundColor: "#fff3cd",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        color: "#856404",
+                        border: "1px solid #ffc107",
+                      }}
+                    >
                       📋 {parada.observacoes}
                     </div>
                   )}
                 </div>
 
                 {/* Botões de Ação */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    alignItems: "flex-end",
+                  }}
+                >
                   {/* Botão Entregue - só aparece se status != entregue */}
-                  {parada.status !== "entregue" && rota.status === "em_rota" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        marcarComoEntregue(parada.id, rota.id);
-                      }}
-                      disabled={processandoEntrega === parada.id}
-                      style={{
-                        padding: "8px 12px",
-                        backgroundColor: processandoEntrega === parada.id ? "#ccc" : "#28A745",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: processandoEntrega === parada.id ? "not-allowed" : "pointer",
-                        fontWeight: "600",
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        width: "130px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {processandoEntrega === parada.id ? "⏳..." : "✅ Entregue"}
-                    </button>
-                  )}
+                  {parada.status !== "entregue" &&
+                    rota.status === "em_rota" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          marcarComoEntregue(parada.id, rota.id);
+                        }}
+                        disabled={processandoEntrega === parada.id}
+                        style={{
+                          padding: "8px 12px",
+                          backgroundColor:
+                            processandoEntrega === parada.id
+                              ? "#ccc"
+                              : "#28A745",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor:
+                            processandoEntrega === parada.id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: "600",
+                          fontSize: 12,
+                          whiteSpace: "nowrap",
+                          width: "130px",
+                          textAlign: "center",
+                        }}
+                      >
+                        {processandoEntrega === parada.id
+                          ? "⏳..."
+                          : "✅ Entregue"}
+                      </button>
+                    )}
 
                   {/* Botão Não Entregue - só aparece para rotas em andamento */}
-                  {parada.status !== "entregue" && (rota.status === "em_rota" || rota.status === "em_andamento") && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        marcarNaoEntregue(parada.id, rota.id, parada.venda_id);
-                      }}
-                      disabled={processandoNaoEntregue === parada.id}
-                      style={{
-                        padding: "8px 12px",
-                        backgroundColor: processandoNaoEntregue === parada.id ? "#ccc" : "#FFC107",
-                        color: "#000",
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: processandoNaoEntregue === parada.id ? "not-allowed" : "pointer",
-                        fontWeight: "600",
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        width: "130px",
-                        textAlign: "center",
-                      }}
-                    >
-                      {processandoNaoEntregue === parada.id ? "⏳..." : "⚠️ Falta Entregar"}
-                    </button>
-                  )}
+                  {parada.status !== "entregue" &&
+                    (rota.status === "em_rota" ||
+                      rota.status === "em_andamento") && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          marcarNaoEntregue(
+                            parada.id,
+                            rota.id,
+                            parada.venda_id,
+                          );
+                        }}
+                        disabled={processandoNaoEntregue === parada.id}
+                        style={{
+                          padding: "8px 12px",
+                          backgroundColor:
+                            processandoNaoEntregue === parada.id
+                              ? "#ccc"
+                              : "#FFC107",
+                          color: "#000",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor:
+                            processandoNaoEntregue === parada.id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: "600",
+                          fontSize: 12,
+                          whiteSpace: "nowrap",
+                          width: "130px",
+                          textAlign: "center",
+                        }}
+                      >
+                        {processandoNaoEntregue === parada.id
+                          ? "⏳..."
+                          : "⚠️ Falta Entregar"}
+                      </button>
+                    )}
 
                   {/* Botão Observação */}
                   <button
@@ -958,22 +1329,39 @@ function RotaCard({
 
               {/* Modal de Detalhes da Venda - Logo abaixo da parada */}
               {paradaDetalhesAberta === parada.id && (
-                <div style={{
-                  marginTop: 0,
-                  marginBottom: 15,
-                  padding: 15,
-                  backgroundColor: "#f8f9fa",
-                  borderRadius: 8,
-                  border: "2px solid #007BFF",
-                  boxShadow: "0 2px 8px rgba(0,123,255,0.2)"
-                }}>
+                <div
+                  style={{
+                    marginTop: 0,
+                    marginBottom: 15,
+                    padding: 15,
+                    backgroundColor: "#f8f9fa",
+                    borderRadius: 8,
+                    border: "2px solid #007BFF",
+                    boxShadow: "0 2px 8px rgba(0,123,255,0.2)",
+                  }}
+                >
                   {loadingDetalhes ? (
-                    <div style={{ textAlign: "center", color: "#666", padding: 20 }}>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        color: "#666",
+                        padding: 20,
+                      }}
+                    >
                       Carregando detalhes da venda...
                     </div>
                   ) : vendaDetalhes ? (
                     <>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15, borderBottom: "2px solid #007BFF", paddingBottom: 10 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 15,
+                          borderBottom: "2px solid #007BFF",
+                          paddingBottom: 10,
+                        }}
+                      >
                         <h4 style={{ margin: 0, color: "#007BFF" }}>
                           🧾 Detalhes da Venda #{vendaDetalhes.id}
                         </h4>
@@ -990,7 +1378,7 @@ function RotaCard({
                             padding: "6px 12px",
                             cursor: "pointer",
                             fontWeight: "bold",
-                            fontSize: 13
+                            fontSize: 13,
                           }}
                         >
                           ✕ Fechar
@@ -998,61 +1386,139 @@ function RotaCard({
                       </div>
 
                       {/* Informações do Cliente */}
-                      <div style={{
-                        backgroundColor: "#e7f3ff",
-                        padding: 12,
-                        borderRadius: 6,
-                        marginBottom: 15,
-                        border: "1px solid #007BFF"
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 14 }}>
+                      <div
+                        style={{
+                          backgroundColor: "#e7f3ff",
+                          padding: 12,
+                          borderRadius: 6,
+                          marginBottom: 15,
+                          border: "1px solid #007BFF",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: 10,
+                            fontSize: 14,
+                          }}
+                        >
                           <div>
-                            <strong>👤 Cliente:</strong> {vendaDetalhes.cliente?.nome || vendaDetalhes.nome_cliente || "N/A"}
+                            <strong>👤 Cliente:</strong>{" "}
+                            {vendaDetalhes.cliente?.nome ||
+                              vendaDetalhes.nome_cliente ||
+                              "N/A"}
                           </div>
                           <div>
-                            <strong>📅 Data:</strong> {vendaDetalhes.data_venda ? new Date(vendaDetalhes.data_venda).toLocaleString("pt-BR") : "N/A"}
+                            <strong>📅 Data:</strong>{" "}
+                            {vendaDetalhes.data_venda
+                              ? new Date(
+                                  vendaDetalhes.data_venda,
+                                ).toLocaleString("pt-BR")
+                              : "N/A"}
                           </div>
 
                           {vendaDetalhes.cliente?.telefone && (
                             <div>
-                              <strong>📞 Telefone:</strong> {vendaDetalhes.cliente.telefone}
+                              <strong>📞 Telefone:</strong>{" "}
+                              {vendaDetalhes.cliente.telefone}
                             </div>
                           )}
                           {vendaDetalhes.cliente?.celular && (
                             <div>
-                              <strong>📱 Celular:</strong> {vendaDetalhes.cliente.celular}
+                              <strong>📱 Celular:</strong>{" "}
+                              {vendaDetalhes.cliente.celular}
                             </div>
                           )}
                           {vendaDetalhes.cliente?.email && (
                             <div style={{ gridColumn: "1 / -1" }}>
-                              <strong>📧 Email:</strong> {vendaDetalhes.cliente.email}
+                              <strong>📧 Email:</strong>{" "}
+                              {vendaDetalhes.cliente.email}
                             </div>
                           )}
                         </div>
                       </div>
 
                       {/* Informações Financeiras */}
-                      <div style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr 1fr",
-                        gap: 10,
-                        fontSize: 14,
-                        marginBottom: 15
-                      }}>
-                        <div style={{ padding: 10, backgroundColor: "#d4edda", borderRadius: 4, border: "1px solid #28a745" }}>
-                          <div style={{ fontSize: 11, color: "#155724", marginBottom: 3 }}>VALOR TOTAL</div>
-                          <div style={{ fontWeight: "bold", fontSize: 16, color: "#155724" }}>
-                            R$ {parseFloat(vendaDetalhes.valor_total || vendaDetalhes.total || 0).toFixed(2)}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 1fr",
+                          gap: 10,
+                          fontSize: 14,
+                          marginBottom: 15,
+                        }}
+                      >
+                        <div
+                          style={{
+                            padding: 10,
+                            backgroundColor: "#d4edda",
+                            borderRadius: 4,
+                            border: "1px solid #28a745",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#155724",
+                              marginBottom: 3,
+                            }}
+                          >
+                            VALOR TOTAL
+                          </div>
+                          <div
+                            style={{
+                              fontWeight: "bold",
+                              fontSize: 16,
+                              color: "#155724",
+                            }}
+                          >
+                            R${" "}
+                            {parseFloat(
+                              vendaDetalhes.valor_total ||
+                                vendaDetalhes.total ||
+                                0,
+                            ).toFixed(2)}
                           </div>
                         </div>
-                        <div style={{ padding: 10, backgroundColor: "#fff", borderRadius: 4, border: "1px solid #ddd" }}>
-                          <div style={{ fontSize: 11, color: "#666", marginBottom: 3 }}>PAGAMENTO</div>
+                        <div
+                          style={{
+                            padding: 10,
+                            backgroundColor: "#fff",
+                            borderRadius: 4,
+                            border: "1px solid #ddd",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#666",
+                              marginBottom: 3,
+                            }}
+                          >
+                            PAGAMENTO
+                          </div>
                           <div style={{ fontWeight: "bold", fontSize: 14 }}>
                             {vendaDetalhes.forma_pagamento || "N/A"}
                           </div>
                         </div>
-                        <div style={{ padding: 10, backgroundColor: "#fff", borderRadius: 4, border: "1px solid #ddd" }}>
-                          <div style={{ fontSize: 11, color: "#666", marginBottom: 3 }}>STATUS</div>
+                        <div
+                          style={{
+                            padding: 10,
+                            backgroundColor: "#fff",
+                            borderRadius: 4,
+                            border: "1px solid #ddd",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "#666",
+                              marginBottom: 3,
+                            }}
+                          >
+                            STATUS
+                          </div>
                           <div style={{ fontWeight: "bold", fontSize: 14 }}>
                             {vendaDetalhes.status_pagamento || "N/A"}
                           </div>
@@ -1060,14 +1526,22 @@ function RotaCard({
                       </div>
 
                       {vendaDetalhes.endereco_entrega && (
-                        <div style={{
-                          padding: 12,
-                          backgroundColor: "#e3f2fd",
-                          borderRadius: 6,
-                          marginBottom: 15,
-                          border: "1px solid #2196F3"
-                        }}>
-                          <div style={{ fontWeight: "bold", marginBottom: 5, color: "#1976D2" }}>
+                        <div
+                          style={{
+                            padding: 12,
+                            backgroundColor: "#e3f2fd",
+                            borderRadius: 6,
+                            marginBottom: 15,
+                            border: "1px solid #2196F3",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: "bold",
+                              marginBottom: 5,
+                              color: "#1976D2",
+                            }}
+                          >
                             📍 Endereço de Entrega
                           </div>
                           <div style={{ color: "#424242", fontSize: 14 }}>
@@ -1077,14 +1551,22 @@ function RotaCard({
                       )}
 
                       {vendaDetalhes.observacoes && (
-                        <div style={{
-                          padding: 12,
-                          backgroundColor: "#fff3cd",
-                          borderRadius: 6,
-                          marginBottom: 15,
-                          border: "1px solid #ffc107"
-                        }}>
-                          <div style={{ fontWeight: "bold", marginBottom: 5, color: "#f57c00" }}>
+                        <div
+                          style={{
+                            padding: 12,
+                            backgroundColor: "#fff3cd",
+                            borderRadius: 6,
+                            marginBottom: 15,
+                            border: "1px solid #ffc107",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: "bold",
+                              marginBottom: 5,
+                              color: "#f57c00",
+                            }}
+                          >
                             💬 Observações
                           </div>
                           <div style={{ color: "#424242", fontSize: 14 }}>
@@ -1093,73 +1575,138 @@ function RotaCard({
                         </div>
                       )}
 
-                      {vendaDetalhes.itens && vendaDetalhes.itens.length > 0 && (
-                        <div>
-                          <div style={{
-                            fontWeight: "bold",
-                            fontSize: 15,
-                            marginBottom: 10,
-                            color: "#424242"
-                          }}>
-                            🛒 Itens da Venda ({vendaDetalhes.itens.length})
-                          </div>
-                          <div style={{
-                            backgroundColor: "#fff",
-                            borderRadius: 6,
-                            border: "1px solid #ddd",
-                            overflow: "hidden",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
-                          }}>
-                            {vendaDetalhes.itens.map((item, idx) => (
+                      {vendaDetalhes.itens &&
+                        vendaDetalhes.itens.length > 0 && (
+                          <div>
+                            <div
+                              style={{
+                                fontWeight: "bold",
+                                fontSize: 15,
+                                marginBottom: 10,
+                                color: "#424242",
+                              }}
+                            >
+                              🛒 Itens da Venda ({vendaDetalhes.itens.length})
+                            </div>
+                            <div
+                              style={{
+                                backgroundColor: "#fff",
+                                borderRadius: 6,
+                                border: "1px solid #ddd",
+                                overflow: "hidden",
+                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                              }}
+                            >
+                              {vendaDetalhes.itens.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    padding: 12,
+                                    borderBottom:
+                                      idx < vendaDetalhes.itens.length - 1
+                                        ? "1px solid #eee"
+                                        : "none",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    backgroundColor:
+                                      idx % 2 === 0 ? "#fafafa" : "#fff",
+                                  }}
+                                >
+                                  <div style={{ flex: 1 }}>
+                                    <div
+                                      style={{
+                                        fontWeight: "600",
+                                        marginBottom: 3,
+                                        color: "#333",
+                                      }}
+                                    >
+                                      {item.produto?.nome ||
+                                        item.servico?.nome ||
+                                        item.produto_nome ||
+                                        item.servico_descricao ||
+                                        "Item"}
+                                    </div>
+                                    {(item.produto?.codigo ||
+                                      item.produto_codigo) && (
+                                      <div
+                                        style={{ fontSize: 12, color: "#999" }}
+                                      >
+                                        Cód:{" "}
+                                        {item.produto?.codigo ||
+                                          item.produto_codigo}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div
+                                    style={{
+                                      textAlign: "right",
+                                      minWidth: 120,
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        color: "#666",
+                                        fontSize: 13,
+                                        marginBottom: 2,
+                                      }}
+                                    >
+                                      {item.quantidade} × R${" "}
+                                      {parseFloat(
+                                        item.valor_unitario ||
+                                          item.preco_unitario ||
+                                          0,
+                                      ).toFixed(2)}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: 15,
+                                        color: "#28a745",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      R${" "}
+                                      {parseFloat(
+                                        (item.quantidade || 0) *
+                                          (item.valor_unitario ||
+                                            item.preco_unitario ||
+                                            0),
+                                      ).toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {/* Total geral */}
                               <div
-                                key={idx}
                                 style={{
-                                  padding: 12,
-                                  borderBottom: idx < vendaDetalhes.itens.length - 1 ? "1px solid #eee" : "none",
+                                  padding: 14,
+                                  backgroundColor: "#1976D2",
                                   display: "flex",
                                   justifyContent: "space-between",
                                   alignItems: "center",
-                                  backgroundColor: idx % 2 === 0 ? "#fafafa" : "#fff"
+                                  color: "#fff",
                                 }}
                               >
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontWeight: "600", marginBottom: 3, color: "#333" }}>
-                                    {item.produto?.nome || item.servico?.nome || item.produto_nome || item.servico_descricao || "Item"}
-                                  </div>
-                                  {(item.produto?.codigo || item.produto_codigo) && (
-                                    <div style={{ fontSize: 12, color: "#999" }}>
-                                      Cód: {item.produto?.codigo || item.produto_codigo}
-                                    </div>
-                                  )}
-                                </div>
-                                <div style={{ textAlign: "right", minWidth: 120 }}>
-                                  <div style={{ color: "#666", fontSize: 13, marginBottom: 2 }}>
-                                    {item.quantidade} × R$ {parseFloat(item.valor_unitario || item.preco_unitario || 0).toFixed(2)}
-                                  </div>
-                                  <div style={{ fontSize: 15, color: "#28a745", fontWeight: "bold" }}>
-                                    R$ {parseFloat((item.quantidade || 0) * (item.valor_unitario || item.preco_unitario || 0)).toFixed(2)}
-                                  </div>
-                                </div>
+                                <span
+                                  style={{ fontWeight: "bold", fontSize: 16 }}
+                                >
+                                  TOTAL DA VENDA
+                                </span>
+                                <span
+                                  style={{ fontWeight: "bold", fontSize: 18 }}
+                                >
+                                  R${" "}
+                                  {parseFloat(
+                                    vendaDetalhes.valor_total ||
+                                      vendaDetalhes.total ||
+                                      0,
+                                  ).toFixed(2)}
+                                </span>
                               </div>
-                            ))}
-
-                            {/* Total geral */}
-                            <div style={{
-                              padding: 14,
-                              backgroundColor: "#1976D2",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              color: "#fff"
-                            }}>
-                              <span style={{ fontWeight: "bold", fontSize: 16 }}>TOTAL DA VENDA</span>
-                              <span style={{ fontWeight: "bold", fontSize: 18 }}>
-                                R$ {parseFloat(vendaDetalhes.valor_total || vendaDetalhes.total || 0).toFixed(2)}
-                              </span>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
                     </>
                   ) : null}
                 </div>

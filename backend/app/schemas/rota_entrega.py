@@ -13,7 +13,7 @@ class ClienteEntregadorResponse(BaseModel):
     nome: str
     telefone: Optional[str] = None
     celular: Optional[str] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -22,19 +22,19 @@ class RotaEntregaBase(BaseModel):
     venda_id: Optional[int] = None
     entregador_id: int
     endereco_destino: Optional[str] = None
-    
+
     # ETAPA 9.4+: Pontos inicial e final
     ponto_inicial_rota: Optional[str] = None
     ponto_final_rota: Optional[str] = None
     retorna_origem: Optional[bool] = True  # Por padrão volta para origem
-    
+
     distancia_prevista: Optional[Decimal] = None
     custo_previsto: Optional[Decimal] = None
-    
+
     # Repasse da taxa (ETAPA 7.1)
     taxa_entrega_cliente: Optional[Decimal] = None
     valor_repasse_entregador: Optional[Decimal] = None
-    
+
     moto_da_loja: Optional[bool] = False
     observacoes: Optional[str] = None
 
@@ -69,12 +69,12 @@ class RotaEntregaParadaResponse(BaseModel):
     observacoes: Optional[str] = None  # Observações sobre a entrega
     km_entrega: Optional[Decimal] = None  # KM da moto ao entregar
     created_at: datetime
-    
+
     # Informações do cliente para facilitar visualização
     cliente_nome: Optional[str] = None
     cliente_telefone: Optional[str] = None
     cliente_celular: Optional[str] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -83,25 +83,30 @@ class RotaEntregaResponse(RotaEntregaBase):
     id: int
     numero: str
     status: str
-    
+
     distancia_real: Optional[Decimal] = None
     custo_real: Optional[Decimal] = None
     tentativas: int
-    
+
     # Controle de KM da moto (opcional)
     km_inicial: Optional[Decimal] = None
     km_final: Optional[Decimal] = None
-    
+
     taxa_entrega_cliente: Optional[Decimal] = None
     valor_repasse_entregador: Optional[Decimal] = None
-    
+
     created_at: datetime
     data_inicio: Optional[datetime] = None  # ETAPA 9.4: Quando iniciou
     data_conclusao: Optional[datetime] = None
-    
+
+    # Localização atual da rota para monitoramento em tempo real
+    lat_atual: Optional[Decimal] = None
+    lon_atual: Optional[Decimal] = None
+    localizacao_atualizada_em: Optional[datetime] = None
+
     # ETAPA 9.3: Incluir paradas ordenadas
     paradas: Optional[List[RotaEntregaParadaResponse]] = []
-    
+
     # Incluir dados do entregador
     entregador: Optional[ClienteEntregadorResponse] = None
 
