@@ -62,6 +62,7 @@ class CheckoutFinalizarRequest(BaseModel):
     endereco_entrega: str | None = None
     cupom: str | None = None
     tipo_retirada: str | None = None  # proprio, terceiro (usado quando delivery_mode=retirada)
+    is_drive: bool = False  # Cliente quer usar drive (avisa quando chega no estacionamento)
     forma_pagamento_nome: str | None = None  # Nome da forma de pagamento selecionada pelo cliente
     origem: str | None = None  # 'app' | 'web' — canal de origem do pedido
 
@@ -375,8 +376,12 @@ def finalizar_checkout(
     if tipo_retirada in ("terceiro", "app_loja"):
         # app_loja: cliente comprou pelo app, vai à loja e fala a palavra no caixa
         palavra_chave = _gerar_palavra_chave_retirada()
+    elif tipo_retirada == "proprio" and payload.is_drive:
+        # Drive: cliente próprio, mas quer drive — usamos palavra-chave como token de chegada
+        palavra_chave = _gerar_palavra_chave_retirada()
     carrinho.tipo_retirada = tipo_retirada
     carrinho.palavra_chave_retirada = palavra_chave
+    carrinho.is_drive = payload.is_drive
 
     response = {
         "status": "pedido_finalizado",
@@ -392,6 +397,7 @@ def finalizar_checkout(
         "total": total,
         "endereco_entrega": payload.endereco_entrega,
         "tipo_retirada": tipo_retirada,
+        "is_drive": payload.is_drive,
         "palavra_chave_retirada": palavra_chave,
     }
 
@@ -485,6 +491,11 @@ def consultar_status_pedido(
         "pedido_id": pedido.pedido_id,
         "status": pedido.status,
         "total": float(pedido.total or 0.0),
+        "tipo_retirada": pedido.tipo_retirada,
+        "is_drive": pedido.is_drive,
+        "drive_chegou_at": pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None,
+        "drive_entregue_at": pedido.drive_entregue_at.isoformat() if pedido.drive_entregue_at else None,
+        "palavra_chave_retirada": pedido.palavra_chave_retirada,
         "created_at": pedido.created_at,
     }
 
@@ -519,4 +530,40 @@ def cancelar_pedido(
         "pedido_id": pedido.pedido_id,
         "status": pedido.status,
         "message": "Pedido cancelado com sucesso",
+    }
+
+
+@router.post("/pedido/{pedido_id}/drive-cheguei")
+def drive_cheguei(
+    pedido_id: str,
+    identity: EcommerceIdentity = Depends(_current_identity),
+    db: Session = Depends(get_session),
+):
+    """Cliente pressiona 'Cheguei' — grava timestamp de chegada no drive."""
+    pedido = (
+        db.query(Pedido)
+        .filter(
+            Pedido.pedido_id == pedido_id,
+            Pedido.cliente_id == identity.user_id,
+            Pedido.tenant_id == identity.tenant_id,
+        )
+        .first()
+    )
+    if not pedido:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
+
+    if not pedido.is_drive:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este pedido não é drive")
+
+    if pedido.drive_chegou_at:
+        return {"pedido_id": pedido.pedido_id, "drive_chegou_at": pedido.drive_chegou_at.isoformat(), "message": "Chegada já registrada"}
+
+    pedido.drive_chegou_at = now_brasilia()
+    db.commit()
+
+    logger.info(f"🚗 Drive chegou: pedido #{pedido_id} (cliente {identity.user_id})")
+    return {
+        "pedido_id": pedido.pedido_id,
+        "drive_chegou_at": pedido.drive_chegou_at.isoformat(),
+        "message": "Chegada registrada! Aguarde, estamos preparando seu pedido.",
     }

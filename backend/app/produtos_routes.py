@@ -276,10 +276,19 @@ class ProdutoBase(BaseModel):
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = 0
-    preco_venda: Optional[float] = None  # Opcional porque produto PAI nÃ£o tem preÃ§o
+    preco_venda: Optional[float] = None  # Opcional porque produto PAI não tem preço
     preco_promocional: Optional[float] = None
     promocao_inicio: Optional[datetime] = None
     promocao_fim: Optional[datetime] = None
+    # Preços por canal — None = usar preco_venda padrão
+    preco_ecommerce: Optional[float] = None
+    preco_ecommerce_promo: Optional[float] = None
+    preco_ecommerce_promo_inicio: Optional[datetime] = None
+    preco_ecommerce_promo_fim: Optional[datetime] = None
+    preco_whatsapp: Optional[float] = None
+    preco_whatsapp_promo: Optional[float] = None
+    preco_whatsapp_promo_inicio: Optional[datetime] = None
+    preco_whatsapp_promo_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = False
     estoque_minimo: Optional[float] = 0
     estoque_maximo: Optional[float] = None
@@ -353,6 +362,15 @@ class ProdutoUpdate(BaseModel):
     preco_promocional: Optional[float] = None
     promocao_inicio: Optional[datetime] = None
     promocao_fim: Optional[datetime] = None
+    # Preços por canal
+    preco_ecommerce: Optional[float] = None
+    preco_ecommerce_promo: Optional[float] = None
+    preco_ecommerce_promo_inicio: Optional[datetime] = None
+    preco_ecommerce_promo_fim: Optional[datetime] = None
+    preco_whatsapp: Optional[float] = None
+    preco_whatsapp_promo: Optional[float] = None
+    preco_whatsapp_promo_inicio: Optional[datetime] = None
+    preco_whatsapp_promo_fim: Optional[datetime] = None
     controle_lote: Optional[bool] = None
     estoque_minimo: Optional[float] = None
     estoque_maximo: Optional[float] = None

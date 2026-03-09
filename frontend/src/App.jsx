@@ -29,6 +29,7 @@ const ProdutosNovo = lazy(() => import("./pages/ProdutosNovo"));
 const ProdutosRelatorio = lazy(() => import("./pages/ProdutosRelatorio"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
 const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
+const SEFAZImportacao = lazy(() => import("./pages/SEFAZImportacao"));
 const preloadLembretes = () => import("./pages/Lembretes");
 const Lembretes = lazy(preloadLembretes);
 const CalculadoraRacao = lazy(() => import("./pages/CalculadoraRacao"));
@@ -366,6 +367,14 @@ function App() {
                     element={
                       <ProtectedRoute permission="produtos.editar">
                         <EstoqueFullNF />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="fiscal/sefaz"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <SEFAZImportacao />
                       </ProtectedRoute>
                     }
                   />

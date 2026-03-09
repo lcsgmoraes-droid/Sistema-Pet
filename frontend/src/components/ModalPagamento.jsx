@@ -67,6 +67,9 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
   // 🆕 Estados para status de margem operacional
   const [statusMargem, setStatusMargem] = useState(null);
   const [loadingStatusMargem, setLoadingStatusMargem] = useState(false);
+
+  // 💡 Sugestão PIX — desconto que pode ser oferecido ao cliente se pagar no PIX
+  const [sugestaoPix, setSugestaoPix] = useState(null);
   
   // 🆕 Estados para justificativa inline (ÚNICO campo)
   const [justificativaTexto, setJustificativaTexto] = useState('');
@@ -268,6 +271,23 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
 
     return () => clearTimeout(timer);
   }, [pagamentos, numeroParcelas]);
+
+  // 💡 Calcular sugestão PIX quando a forma de pagamento selecionada NÃO É PIX
+  useEffect(() => {
+    const ehPix = (formaPagamentoSelecionada?.nome || '').toLowerCase().includes('pix');
+    if (ehPix || !formaPagamentoSelecionada) {
+      setSugestaoPix(null);
+      return;
+    }
+    const custoTotal = (venda.itens || []).reduce((sum, item) => sum + ((item.custo || 0) * (item.quantidade || 1)), 0);
+    if (!custoTotal) { setSugestaoPix(null); return; }
+    api.post('/pdv/indicadores/sugestao-pix', {
+      total_venda: venda.total || 0,
+      custo_total: custoTotal,
+      desconto_atual: venda.desconto_valor || 0,
+    }).then(res => setSugestaoPix(res.data?.tem_sugestao ? res.data : null))
+      .catch(() => setSugestaoPix(null));
+  }, [formaPagamentoSelecionada?.id]);
 
   // 🆕 PASSO 1️⃣ - Calcular status IMEDIATAMENTE ao abrir o modal
   useEffect(() => {
@@ -1499,6 +1519,31 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                   status={statusMargem} 
                   loading={loadingStatusMargem}
                 />
+              )}
+
+              {/* 💡 Sugestão PIX — aparece quando forma atual NÃO é PIX e há margem para oferecer desconto */}
+              {sugestaoPix && (
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">💡</span>
+                    <div className="flex-1">
+                      <div className="font-bold text-emerald-900 text-sm mb-1">Ofereça desconto no PIX</div>
+                      <div className="text-sm text-emerald-800">
+                        Você pode oferecer{' '}
+                        <span className="font-bold text-emerald-700 text-base">
+                          {sugestaoPix.percentual_sugerido}% de desconto
+                        </span>{' '}
+                        se o cliente pagar no PIX.
+                      </div>
+                      <div className="text-xs text-emerald-700 mt-1">
+                        Cliente pagaria{' '}
+                        <strong>R$ {sugestaoPix.total_com_desconto?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        {' '}· sua margem ficaria em <strong>~{sugestaoPix.margem_final_estimada}%</strong>
+                        {' '}(mínimo: {sugestaoPix.margem_minima}%)
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* 🆕 PASSO 3️⃣ - Exibir faixas de parcelamento recomendadas */}

@@ -1,7 +1,5 @@
 """
-Rotas para análise
-
- de indicadores no PDV
+Rotas para análise de indicadores no PDV
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +9,7 @@ from typing import Optional, List
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
-from app.utils.pdv_indicadores import calcular_indicadores_venda, calcular_indicadores_item
+from app.utils.pdv_indicadores import calcular_indicadores_venda, calcular_indicadores_item, calcular_sugestao_pix
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/pdv/indicadores", tags=["PDV - Indicadores"])
@@ -167,3 +165,36 @@ def get_referencias_margem(
                 'critica': '🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!'
             }
         }
+
+class SugestaoPIXRequest(BaseModel):
+    total_venda: float
+    custo_total: float
+    desconto_atual: float = 0
+    aliquota_imposto: float = 7.0
+
+
+@router.post("/sugestao-pix")
+def sugestao_pix(
+    request: SugestaoPIXRequest,
+    user_tenant: tuple = Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """
+    Calcula desconto máximo viável para oferecer ao cliente se ele pagar no PIX.
+    A loja usa a economia da taxa zero do PIX para gerar atrativo ao cliente
+    sem comprometer a margem mínima configurada.
+    """
+    user, tenant_id = user_tenant
+    try:
+        resultado = calcular_sugestao_pix(
+            db=db,
+            tenant_id=str(tenant_id),
+            total_venda=request.total_venda,
+            custo_total=request.custo_total,
+            desconto_atual=request.desconto_atual,
+            aliquota_imposto=request.aliquota_imposto,
+        )
+        return resultado
+    except Exception as e:
+        logger.error(f"Erro ao calcular sugestão PIX: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

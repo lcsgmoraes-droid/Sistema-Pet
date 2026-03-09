@@ -157,6 +157,8 @@ from app.routes.ecommerce_config_routes import router as ecommerce_config_router
 from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
 from app.routes.ecommerce_entregador import router as ecommerce_entregador_router
+from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
+from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 
@@ -726,6 +728,8 @@ app.include_router(ecommerce_aparencia_router)
 app.include_router(ecommerce_config_router)
 app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router)
+app.include_router(ecommerce_drive_router)     # Drive pickup — PDV + cliente
+app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(campaigns_router)   # Motor de Campanhas
 app.include_router(modulos_router)     # Módulos Premium

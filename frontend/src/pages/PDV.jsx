@@ -192,6 +192,10 @@ export default function PDV() {
   // Estado para controlar expansão de itens KIT no carrinho
   const [itensKitExpandidos, setItensKitExpandidos] = useState({});
 
+  // 🚗 Estados de Drive pickup
+  const [driveAguardando, setDriveAguardando] = useState([]);
+  const [driveAlertVisible, setDriveAlertVisible] = useState(false);
+
   // Estados de controle de painéis laterais (UX - FASE 1)
   const [painelVendasAberto, setPainelVendasAberto] = useState(() => {
     const saved = localStorage.getItem("pdv_painel_vendas_aberto");
@@ -524,6 +528,23 @@ export default function PDV() {
     carregarVendasRecentes();
   }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
 
+  // 🚗 Polling drive — verifica a cada 30s se tem clientes esperando no estacionamento
+  useEffect(() => {
+    const verificarDrive = async () => {
+      try {
+        const res = await api.get("/api/ecommerce-drive/aguardando");
+        const lista = res.data?.pedidos || [];
+        setDriveAguardando(lista);
+        setDriveAlertVisible(lista.length > 0);
+      } catch {
+        // silencioso — não quebrar o PDV se endpoint falhar
+      }
+    };
+    verificarDrive();
+    const intervalo = setInterval(verificarDrive, 30000);
+    return () => clearInterval(intervalo);
+  }, []);
+
   // Carregar venda específica se vier na URL
   useEffect(() => {
     const vendaId = searchParams.get("venda");
@@ -818,6 +839,17 @@ export default function PDV() {
     setCodigoCupom("");
     setErroCupom("");
     removerDescontoTotal();
+  };
+
+  // 🚗 Confirmar entrega no drive
+  const confirmarDriveEntregue = async (pedidoId) => {
+    try {
+      await api.post(`/api/ecommerce-drive/pedido/${pedidoId}/entregue`);
+      setDriveAguardando((prev) => prev.filter((p) => p.pedido_id !== pedidoId));
+      if (driveAguardando.length <= 1) setDriveAlertVisible(false);
+    } catch (err) {
+      console.error("Erro ao confirmar drive entregue:", err);
+    }
   };
 
   const carregarVendasRecentes = async () => {
@@ -2012,7 +2044,47 @@ export default function PDV() {
 
   return (
     <>
-      <div className="flex h-screen bg-gray-50">
+      {/* 🚗 Drive Alert — aparece quando cliente chegou no estacionamento */}
+      {driveAlertVisible && driveAguardando.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <span className="text-2xl animate-bounce">🚗</span>
+              <div>
+                <div className="font-bold text-base">
+                  {driveAguardando.length === 1
+                    ? "1 cliente aguardando no estacionamento (Drive)"
+                    : `${driveAguardando.length} clientes aguardando no estacionamento (Drive)`}
+                </div>
+                <div className="text-xs text-red-100 flex flex-wrap gap-3 mt-0.5">
+                  {driveAguardando.map((p) => (
+                    <span key={p.pedido_id} className="flex items-center gap-1.5">
+                      <span className="font-semibold">#{p.pedido_id.slice(-6)}</span>
+                      {p.palavra_chave_retirada && (
+                        <span className="bg-red-700 px-1 rounded">{p.palavra_chave_retirada}</span>
+                      )}
+                      <button
+                        onClick={() => confirmarDriveEntregue(p.pedido_id)}
+                        className="bg-white text-red-700 font-bold text-xs px-2 py-0.5 rounded hover:bg-red-50 transition-colors"
+                      >
+                        Entreguei
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setDriveAlertVisible(false)}
+              className="text-red-200 hover:text-white p-1 rounded"
+              title="Fechar alerta (não marca como entregue)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="flex h-screen bg-gray-50" style={driveAlertVisible && driveAguardando.length > 0 ? { paddingTop: '52px' } : {}}>
         {/* Área Principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}

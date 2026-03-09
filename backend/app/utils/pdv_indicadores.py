@@ -258,3 +258,85 @@ def calcular_indicadores_item(
         'margem_estimada_percentual': round(margem_estimada_percentual, 2),
         'status': status
     }
+
+
+def calcular_sugestao_pix(
+    db: Session,
+    tenant_id: str,
+    total_venda: float,
+    custo_total: float,
+    desconto_atual: float = 0,
+    aliquota_imposto: float = 7.0,
+) -> Dict:
+    """
+    Calcula o desconto máximo que pode ser oferecido no PIX
+    sem cair abaixo da margem mínima de alerta.
+
+    O PIX tem taxa zero (ou praticamente zero), por isso a loja
+    ganha margem extra quando o cliente paga no PIX, e pode
+    repassar parte dessa economia como desconto ao cliente.
+
+    Returns:
+        dict com sugestão de desconto PIX (ou None se não viável)
+    """
+    if total_venda <= 0 or custo_total <= 0:
+        return {"tem_sugestao": False}
+
+    config = db.query(EmpresaConfigGeral).filter(
+        EmpresaConfigGeral.tenant_id == tenant_id
+    ).first()
+
+    margem_alerta = float(config.margem_alerta_minima) if config else 15.0
+    aliq = aliquota_imposto
+
+    # Valor base após desconto já aplicado
+    valor_base = total_venda - desconto_atual
+
+    # Margem atual sem taxa de pagamento (supondo PIX = 0% taxa)
+    imposto = valor_base * (aliq / 100)
+    lucro_pix_sem_desconto = valor_base - custo_total - imposto
+    margem_pix_sem_desconto = (lucro_pix_sem_desconto / valor_base * 100) if valor_base > 0 else 0
+
+    # Só faz sentido sugerir se a margem PIX for superior à mínima
+    if margem_pix_sem_desconto <= margem_alerta:
+        return {"tem_sugestao": False}
+
+    # Calcula desconto máximo mantendo margem >= margem_alerta
+    # lucro = (base - desc) - custo - (base - desc) * aliq/100 >= margem_alerta/100 * (base - desc)
+    # Simplificando: (base - desc) * (1 - aliq/100 - margem_alerta/100) >= custo
+    # => base - desc >= custo / (1 - aliq/100 - margem_alerta/100)
+    fator = 1 - (aliq / 100) - (margem_alerta / 100)
+    if fator <= 0:
+        return {"tem_sugestao": False}
+
+    receita_minima = custo_total / fator
+    desconto_maximo = valor_base - receita_minima
+
+    if desconto_maximo <= 0:
+        return {"tem_sugestao": False}
+
+    # Arredonda para baixo em múltiplos de 0.5% para sugestão "limpa"
+    percentual_max = (desconto_maximo / valor_base * 100)
+    percentual_sugerido = (int(percentual_max * 2) / 2)  # arredonda para baixo em 0.5%
+    if percentual_sugerido < 1.0:
+        return {"tem_sugestao": False}
+
+    # Limita a 10% para não parecer excessivo
+    percentual_sugerido = min(percentual_sugerido, 10.0)
+
+    desconto_valor = round(valor_base * percentual_sugerido / 100, 2)
+    total_com_desconto = round(valor_base - desconto_valor, 2)
+
+    # Margem resultante com o desconto sugerido
+    imposto_com_desc = total_com_desconto * (aliq / 100)
+    lucro_final = total_com_desconto - custo_total - imposto_com_desc
+    margem_final = round(lucro_final / total_com_desconto * 100, 1) if total_com_desconto > 0 else 0
+
+    return {
+        "tem_sugestao": True,
+        "percentual_sugerido": percentual_sugerido,
+        "desconto_valor": desconto_valor,
+        "total_com_desconto": total_com_desconto,
+        "margem_final_estimada": margem_final,
+        "margem_minima": margem_alerta,
+    }

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
@@ -31,6 +31,11 @@ class Pedido(Base):
     # Retirada na loja
     tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
     palavra_chave_retirada = Column(String(100), nullable=True)
+
+    # Drive-thru pickup (cliente avisa que chegou no carro)
+    is_drive = Column(Boolean, default=False, nullable=False, server_default='0')
+    drive_chegou_at = Column(DateTime(timezone=True), nullable=True)
+    drive_entregue_at = Column(DateTime(timezone=True), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

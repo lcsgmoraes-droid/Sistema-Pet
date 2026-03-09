@@ -371,6 +371,7 @@ export default function EcommerceMVP() {
   const [cidadeDestino, setCidadeDestino] = useState('');
   const [deliveryMode, setDeliveryMode] = useState('entrega');
   const [tipoRetirada, setTipoRetirada] = useState('proprio'); // 'proprio' | 'terceiro'
+  const [isDrive, setIsDrive] = useState(false); // cliente quer drive pickup
   const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
   const [checkoutResumo, setCheckoutResumo] = useState(null);
   const [checkoutResult, setCheckoutResult] = useState(null);
@@ -1084,6 +1085,7 @@ export default function EcommerceMVP() {
           endereco_entrega: enderecoFormatado || null,
           cupom: cupomResult?.codigo || null,
           tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
+          is_drive: deliveryMode === 'retirada' && tipoRetirada === 'proprio' ? isDrive : false,
           forma_pagamento_nome: (() => {
             if (pagamentoTipo === 'dinheiro') return pagamentoTroco ? `Dinheiro (troco p/ R$ ${pagamentoTroco})` : 'Dinheiro';
             if (pagamentoTipo === 'pix') return 'PIX';
@@ -1156,6 +1158,15 @@ export default function EcommerceMVP() {
     if (!customerToken || view !== 'pedidos') return;
     loadOrdersDetailed();
   }, [view, customerToken]);
+
+  async function avisarCheguei(pedidoId) {
+    try {
+      await ecommerceApi.post(`/api/checkout/pedido/${pedidoId}/drive-cheguei`, {}, { headers: authHeaders });
+      await loadOrdersDetailed();
+    } catch (err) {
+      setError(extractApiErrorMessage(err, 'Erro ao avisar chegada'));
+    }
+  }
 
   const cartTotal = Number(cart?.total || 0);
 
@@ -1818,6 +1829,15 @@ export default function EcommerceMVP() {
                           ℹ️ Uma <strong>senha secreta de retirada</strong> será gerada. Compartilhe com quem vai buscar.
                         </div>
                       )}
+                      {tipoRetirada === 'proprio' && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', background: isDrive ? '#fff7ed' : '#f8fafc', border: `1.5px solid ${isDrive ? '#f97316' : '#e5e7eb'}`, borderRadius: 10 }}>
+                          <input type="checkbox" checked={isDrive} onChange={(e) => setIsDrive(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1a2e' }}>🚗 Quero usar o Drive</div>
+                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>Avise pela loja quando chegar no estacionamento — sem sair do carro!</div>
+                          </div>
+                        </label>
+                      )}
                     </div>
                   )}
 
@@ -1984,6 +2004,30 @@ export default function EcommerceMVP() {
                         <div style={{ fontSize: 11, fontWeight: 700, color: '#7c2d12', marginBottom: 2 }}>🔑 SENHA DE RETIRADA</div>
                         <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 3, color: '#ea580c' }}>{order.palavra_chave_retirada}</div>
                         <div style={{ fontSize: 10, color: '#92400e', marginTop: 2 }}>Apresente na loja para retirar</div>
+                      </div>
+                    )}
+
+                    {order.is_drive && order.tipo_retirada === 'proprio' && (
+                      <div style={{ background: order.drive_entregue_at ? '#f0fdf4' : order.drive_chegou_at ? '#fef9c3' : '#f0f9ff', border: `2px solid ${order.drive_entregue_at ? '#22c55e' : order.drive_chegou_at ? '#eab308' : '#3b82f6'}`, borderRadius: 10, padding: 12, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                        {order.drive_entregue_at ? (
+                          <div style={{ color: '#15803d', fontWeight: 700, fontSize: 14 }}>✅ Entregue no Drive!</div>
+                        ) : order.drive_chegou_at ? (
+                          <>
+                            <div style={{ color: '#854d0e', fontWeight: 700, fontSize: 13 }}>🚗 Chegada registrada — aguarde a equipe!</div>
+                            <div style={{ color: '#78716c', fontSize: 11 }}>Registrado às {new Date(order.drive_chegou_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ color: '#1d4ed8', fontWeight: 700, fontSize: 13 }}>🚗 Pedido com Drive</div>
+                            <div style={{ color: '#6b7280', fontSize: 11, textAlign: 'center' }}>Quando chegar no estacionamento, clique no botão abaixo.</div>
+                            <button
+                              onClick={() => avisarCheguei(order.pedido_id)}
+                              style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 2 }}
+                            >
+                              🚗 Cheguei! Estou no estacionamento
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
 

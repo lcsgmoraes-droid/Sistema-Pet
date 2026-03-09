@@ -137,6 +137,16 @@ class Produto(BaseTenantModel):
     promocao_inicio = Column(DateTime, nullable=True)
     promocao_fim = Column(DateTime, nullable=True)
     promocao_ativa = Column(Boolean, default=False)
+
+    # Preços por canal — se NULL usa o preco_venda padrão
+    preco_ecommerce = Column(Float, nullable=True)
+    preco_ecommerce_promo = Column(Float, nullable=True)
+    preco_ecommerce_promo_inicio = Column(DateTime(timezone=True), nullable=True)
+    preco_ecommerce_promo_fim = Column(DateTime(timezone=True), nullable=True)
+    preco_whatsapp = Column(Float, nullable=True)
+    preco_whatsapp_promo = Column(Float, nullable=True)
+    preco_whatsapp_promo_inicio = Column(DateTime(timezone=True), nullable=True)
+    preco_whatsapp_promo_fim = Column(DateTime(timezone=True), nullable=True)
     
     # Estoque
     estoque_atual = Column(Float, default=0)
