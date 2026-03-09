@@ -432,13 +432,20 @@ export default function PDV() {
 
   // Buscar oportunidades do backend (D4 - Backend Integration)
   const buscarOportunidades = async (vendaId) => {
-    if (!vendaId || !vendaAtual.cliente) {
+    const clienteId = vendaAtual.cliente?.id;
+    if (!clienteId) {
       setOpportunities([]);
       return;
     }
 
     try {
-      const response = await api.get(`/internal/pdv/oportunidades/${vendaId}`);
+      // Se há venda salva: usa endpoint por venda (exclui itens já no carrinho)
+      // Se não há venda salva ainda: usa endpoint direto por cliente
+      const url = vendaId
+        ? `/internal/pdv/oportunidades/${vendaId}`
+        : `/internal/pdv/oportunidades-cliente/${clienteId}`;
+
+      const response = await api.get(url);
       const data = response.data;
 
       // Extrair oportunidades da resposta
