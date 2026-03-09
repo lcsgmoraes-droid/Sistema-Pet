@@ -702,7 +702,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             </button>
             <button
               onClick={handleFechar}
-              disabled={salvando || valorContado <= 0}
+              disabled={salvando || valorContado === null || valorContado === undefined || valorContado === ''}
               className="px-8 py-3 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
               {salvando ? (
