@@ -36,6 +36,9 @@ export default function UsuariosPage() {
   }
 
   async function toggleStatus(userId, isActive) {
+    const acao = isActive ? 'desativar acesso' : 'ativar acesso';
+    if (!confirm(`Confirma ${acao} deste usuário?`)) return;
+
     try {
       await api.patch(`/usuarios/${userId}/status`, {
         is_active: !isActive,
@@ -44,6 +47,18 @@ export default function UsuariosPage() {
     } catch (error) {
       console.error('Erro ao alterar status:', error);
       alert('Erro ao alterar status do usuário');
+    }
+  }
+
+  async function forcarLogout(userId) {
+    if (!confirm('Forçar logout deste usuário em todos os dispositivos? A conta continuará ativa.')) return;
+
+    try {
+      const response = await api.post(`/usuarios/${userId}/forcar-logout`);
+      alert(`Logout forçado com sucesso. Sessões encerradas: ${response.data?.sessions_revogadas ?? 0}`);
+    } catch (error) {
+      console.error('Erro ao forçar logout:', error);
+      alert(error.response?.data?.detail || 'Erro ao forçar logout do usuário');
     }
   }
 
@@ -138,16 +153,26 @@ export default function UsuariosPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <button
-                        onClick={() => toggleStatus(u.user_id, u.is_active)}
-                        className={`px-3 py-1 rounded text-white transition-colors ${
-                          u.is_active 
-                            ? 'bg-red-500 hover:bg-red-600' 
-                            : 'bg-green-500 hover:bg-green-600'
-                        }`}
-                      >
-                        {u.is_active ? 'Desativar' : 'Ativar'}
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => forcarLogout(u.user_id)}
+                          className="px-3 py-1 rounded text-white transition-colors bg-amber-500 hover:bg-amber-600"
+                          title="Encerra sessões sem desativar o usuário"
+                        >
+                          Forçar Logout
+                        </button>
+                        <button
+                          onClick={() => toggleStatus(u.user_id, u.is_active)}
+                          className={`px-3 py-1 rounded text-white transition-colors ${
+                            u.is_active
+                              ? 'bg-red-500 hover:bg-red-600'
+                              : 'bg-green-500 hover:bg-green-600'
+                          }`}
+                          title={u.is_active ? 'Desativa o acesso do usuário' : 'Reativa o acesso do usuário'}
+                        >
+                          {u.is_active ? 'Desativar Acesso' : 'Ativar Acesso'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -179,10 +204,11 @@ export default function UsuariosPage() {
 
               <form onSubmit={criarUsuario} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="novo-usuario-email" className="block text-sm font-medium text-gray-700 mb-1">
                     Email *
                   </label>
                   <input
+                    id="novo-usuario-email"
                     type="email"
                     required
                     value={novoUsuario.email}
@@ -194,11 +220,12 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="novo-usuario-senha" className="block text-sm font-medium text-gray-700 mb-1">
                     Senha *
                   </label>
                   <div className="relative">
                     <input
+                      id="novo-usuario-senha"
                       type={showPassword ? "text" : "password"}
                       required
                       value={novoUsuario.password}
@@ -227,12 +254,13 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="novo-usuario-role" className="block text-sm font-medium text-gray-700 mb-1">
                     Role *
                   </label>
                   <select
+                    id="novo-usuario-role"
                     value={novoUsuario.role_id || ''}
-                    onChange={(e) => setNovoUsuario({ ...novoUsuario, role_id: parseInt(e.target.value) })}
+                    onChange={(e) => setNovoUsuario({ ...novoUsuario, role_id: Number.parseInt(e.target.value, 10) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >{roles.length === 0 ? (

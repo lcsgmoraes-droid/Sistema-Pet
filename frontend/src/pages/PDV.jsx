@@ -56,11 +56,20 @@ import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import { getGuiaClassNames } from "../utils/guiaHighlight";
 import { formatarVariacao } from "../utils/variacoes";
 
 export default function PDV() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const guiaAtiva = searchParams.get("guia");
+  const destaqueAbrirCaixa = guiaAtiva === "abrir-caixa";
+  const destaqueVenda =
+    guiaAtiva === "venda-sem-entrega" ||
+    guiaAtiva === "venda-com-entrega" ||
+    guiaAtiva === "venda-com-comissao";
+  const caixaGuiaClasses = getGuiaClassNames(destaqueAbrirCaixa);
+  const vendaGuiaClasses = getGuiaClassNames(destaqueVenda);
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
 
@@ -522,6 +531,12 @@ export default function PDV() {
       carregarVendaEspecifica(parseInt(vendaId));
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (destaqueAbrirCaixa && !temCaixaAberto && !mostrarModalAbrirCaixa) {
+      setMostrarModalAbrirCaixa(true);
+    }
+  }, [destaqueAbrirCaixa, temCaixaAberto, mostrarModalAbrirCaixa]);
 
   // 🆕 DETECTAR REDIRECIONAMENTO DO CONTAS A RECEBER
   useEffect(() => {
@@ -2002,6 +2017,14 @@ export default function PDV() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-white border-b px-6 py-4">
+            {(destaqueAbrirCaixa || destaqueVenda) && (
+              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 text-sm">
+                {destaqueAbrirCaixa
+                  ? "Etapa da introducao guiada: abra o caixa para liberar salvamento e finalizacao de vendas."
+                  : "Etapa da introducao guiada: use esta tela para concluir a venda e validar o fluxo operacional."}
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <ShoppingCart className="w-8 h-8 text-blue-600" />
@@ -2108,10 +2131,14 @@ export default function PDV() {
                 )}
 
                 {/* Menu de Controle de Caixa */}
-                <MenuCaixa
-                  key={caixaKey}
-                  onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}
-                />
+                <div
+                  className={destaqueAbrirCaixa ? `rounded-lg ${caixaGuiaClasses.action}` : ""}
+                >
+                  <MenuCaixa
+                    key={caixaKey}
+                    onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}
+                  />
+                </div>
 
                 {/* Botão Meus Caixas */}
                 <button
@@ -2315,7 +2342,9 @@ export default function PDV() {
               {/* Card Cliente */}
               <div
                 id="tour-pdv-cliente"
-                className="bg-white rounded-lg shadow-sm border p-6"
+                className={`bg-white rounded-lg shadow-sm border p-6 ${
+                  destaqueVenda ? vendaGuiaClasses.box : ""
+                }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center">

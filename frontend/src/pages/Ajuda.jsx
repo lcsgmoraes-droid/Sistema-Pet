@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   FiBookOpen,
   FiCheckCircle,
+  FiCheckSquare,
   FiChevronDown,
   FiChevronUp,
   FiCreditCard,
@@ -20,6 +21,7 @@ import {
 import { Link } from "react-router-dom";
 import { MODULOS_INFO } from "../contexts/ModulosContext";
 import CentralAjuda from "./CentralAjuda";
+import IntroducaoGuiada from "./IntroducaoGuiada";
 
 const WHATSAPP_NUMERO = "5518997401641";
 
@@ -200,12 +202,16 @@ const Ajuda = () => {
             Ajuda e Planos
           </p>
           <h1 className="text-3xl font-bold mb-3">
-            {aba === "central"
+            {aba === "introducao"
+              ? "Preparando seu sistema"
+              : aba === "central"
               ? "Como usar o Sistema Pet"
               : "Módulos extras do Sistema Pet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
-            {aba === "central"
+            {aba === "introducao"
+              ? "Checklist guiado, com sequencia recomendada, para configurar o sistema com seguranca do inicio ao fim."
+              : aba === "central"
               ? "Aprenda a usar cada funcionalidade do sistema. Pesquise por dúvidas, navegue por módulo ou leia o passo a passo."
               : "O sistema base já está funcionando para você. Quer vender mais, entregar mais rápido ou atender sem parar? Veja o que cada módulo faz e quanto custa."}
           </p>
@@ -245,6 +251,17 @@ const Ajuda = () => {
               Módulos Premium
             </button>
             <button
+              onClick={() => setAba("introducao")}
+              className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                aba === "introducao"
+                  ? "border-indigo-600 text-indigo-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <FiCheckSquare className="w-4 h-4" />
+              Introdução Guiada
+            </button>
+            <button
               onClick={() => setAba("central")}
               className={`flex items-center gap-2 px-5 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 aba === "central"
@@ -261,6 +278,9 @@ const Ajuda = () => {
 
       {/* Conteúdo da aba Central de Ajuda */}
       {aba === "central" && <CentralAjuda />}
+
+      {/* Conteudo da aba Introducao Guiada */}
+      {aba === "introducao" && <IntroducaoGuiada />}
 
       {/* Conteúdo da aba Módulos Premium */}
       {aba === "planos" && (

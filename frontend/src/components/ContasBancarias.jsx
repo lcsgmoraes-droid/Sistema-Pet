@@ -4,6 +4,7 @@ import {
   Building2, Wallet, CreditCard, X, Save
 } from 'lucide-react';
 import api from '../api';
+import { getGuiaClassNames } from '../utils/guiaHighlight';
 
 const TIPOS_CONTA = [
   { value: 'banco', label: 'Banco', icon: Building2, cor_padrao: '#dc2626' },
@@ -51,6 +52,9 @@ const normalizeContaIcon = (rawIcon, tipo = 'banco') => {
 };
 
 function ContasBancarias() {
+  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
+  const destacarContasBancarias = guiaAtiva === 'contas-bancarias';
+  const guiaClasses = getGuiaClassNames(destacarContasBancarias);
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -177,6 +181,12 @@ function ContasBancarias() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {destacarContasBancarias && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          Etapa da introducao guiada: use o botao <strong>Nova Conta</strong> para cadastrar banco, caixa ou carteira digital.
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
@@ -186,7 +196,11 @@ function ContasBancarias() {
           </div>
           <button
             onClick={() => abrirModal()}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+              destacarContasBancarias
+                ? `bg-amber-600 text-white hover:bg-amber-700 ${guiaClasses.action}`
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
           >
             <Plus className="w-5 h-5" />
             Nova Conta

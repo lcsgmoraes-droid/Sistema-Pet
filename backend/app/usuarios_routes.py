@@ -8,6 +8,7 @@ from app.auth.core import hash_password
 from app.tenancy.context import get_current_tenant
 from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
+from app.session_manager import revoke_all_sessions
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -44,7 +45,7 @@ def listar_usuarios(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista usuários do tenant com informações de role e status"""
-    current_user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
 
     rows = (
         db.query(
@@ -69,7 +70,7 @@ def criar_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    current_user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
         raise HTTPException(
@@ -129,7 +130,7 @@ def vincular_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    current_user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -174,7 +175,7 @@ def atualizar_status_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    current_user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
 
     vinculo = (
         db.query(UserTenant)
@@ -188,6 +189,60 @@ def atualizar_status_usuario(
         raise HTTPException(status_code=404, detail="Usuário não vinculado a este tenant")
 
     vinculo.is_active = payload.is_active
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        if payload.is_active:
+            user.is_active = True
+        else:
+            tem_algum_vinculo_ativo = (
+                db.query(UserTenant)
+                .filter(
+                    UserTenant.user_id == user_id,
+                    UserTenant.is_active == True,
+                )
+                .count()
+                > 0
+            )
+            user.is_active = tem_algum_vinculo_ativo
+
     db.commit()
 
-    return {"status": "ok", "is_active": vinculo.is_active}
+    return {
+        "status": "ok",
+        "is_active_vinculo": vinculo.is_active,
+        "is_active_usuario": user.is_active if user else None,
+    }
+
+
+@router.post("/{user_id}/forcar-logout")
+@require_permission("usuarios.manage")
+def forcar_logout_usuario(
+    user_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = user_and_tenant
+
+    vinculo = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not vinculo:
+        raise HTTPException(status_code=404, detail="Usuário não vinculado a este tenant")
+
+    revogadas = revoke_all_sessions(
+        db=db,
+        user_id=user_id,
+        reason="admin_forced_logout",
+    )
+
+    return {
+        "status": "ok",
+        "message": "Logout forçado executado com sucesso",
+        "sessions_revogadas": revogadas,
+    }

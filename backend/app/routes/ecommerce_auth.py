@@ -14,7 +14,7 @@ from app.auth import create_access_token, hash_password, verify_password
 from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
-from app.models import Cliente, User
+from app.models import Cliente, User, UserTenant
 
 
 router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
@@ -422,6 +422,22 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa")
+
+    vinculo_ativo = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active == True,
+        )
+        .first()
+    )
+
+    if not vinculo_ativo:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso inativo para esta loja",
+        )
 
     access_token = create_access_token(
         data={

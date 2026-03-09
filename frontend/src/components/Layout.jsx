@@ -363,7 +363,7 @@ const Layout = () => {
     {
       path: "/produtos",
       icon: FiPackage,
-      label: "Produtos",
+      label: "Produtos / Estoque",
       permission: "produtos.visualizar",
       submenu: [
         {
@@ -380,6 +380,11 @@ const Layout = () => {
           path: "/estoque/alertas",
           label: "Alertas de Estoque",
           permission: "produtos.visualizar",
+        },
+        {
+          path: "/estoque/full-nf",
+          label: "Movimentacao Full por NF",
+          permission: "produtos.editar",
         },
       ],
     },
@@ -694,6 +699,11 @@ const Layout = () => {
           path: "/configuracoes/fiscal",
           label: "Configuração da Empresa",
           permission: "configuracoes.empresa",
+        },
+        {
+          path: "/configuracoes/geral",
+          label: "Parâmetros Gerais",
+          permission: "configuracoes.editar",
         },
         {
           path: "/configuracoes/entregas",

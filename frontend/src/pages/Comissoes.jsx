@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
+import { getGuiaClassNames } from '../utils/guiaHighlight';
 
 const Comissoes = () => {
+  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
+  const destacarComissoes = guiaAtiva === 'comissao-func' || guiaAtiva === 'comissao-regras';
+  const guiaClasses = getGuiaClassNames(destacarComissoes);
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -95,6 +99,12 @@ const Comissoes = () => {
 
   return (
     <div className="p-6">
+      {destacarComissoes && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          Etapa da introducao guiada: clique em <strong>Nova Comissao</strong> para definir funcionario e regras por categoria, subcategoria ou produto.
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center">
@@ -104,7 +114,11 @@ const Comissoes = () => {
           </div>
           <button
             onClick={() => abrirModal()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            className={`text-white px-4 py-2 rounded-lg flex items-center gap-2 ${
+              destacarComissoes
+                ? `bg-amber-600 hover:bg-amber-700 ${guiaClasses.action}`
+                : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
             <span>+</span>
             Nova Comissão
@@ -120,7 +134,11 @@ const Comissoes = () => {
       )}
 
       {/* Lista de Funcionários */}
-      <div className="bg-white rounded-lg shadow">
+      <div
+        className={`bg-white rounded-lg shadow ${
+          destacarComissoes ? guiaClasses.box : ''
+        }`}
+      >
         {funcionarios.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p className="text-lg mb-2">Nenhuma comissão configurada</p>

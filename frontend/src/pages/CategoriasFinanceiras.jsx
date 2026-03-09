@@ -1,7 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiTag, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiChevronDown, FiChevronRight } from 'react-icons/fi';
 import api from '../api.js';
 import { toast } from 'react-hot-toast';
+
+const ICON_FALLBACK = '•';
+
+const MOJIBAKE_REPLACEMENTS = {
+  'Ã¡': 'á',
+  'Ã¢': 'â',
+  'Ã£': 'ã',
+  'Ãª': 'ê',
+  'Ã©': 'é',
+  'Ã­': 'í',
+  'Ã³': 'ó',
+  'Ã´': 'ô',
+  'Ãµ': 'õ',
+  'Ãº': 'ú',
+  'Ã§': 'ç',
+  'Ã': 'Á',
+  'Ã‰': 'É',
+  'Ã“': 'Ó',
+  'Ãš': 'Ú',
+  'Ã‡': 'Ç',
+  'â€“': '-',
+  'â€”': '-',
+  'â€˜': "'",
+  'â€™': "'",
+  'â€œ': '"',
+  'â€': '"',
+};
+
+const QUESTION_MARK_WORD_FIXES = [
+  [/sal\?+rio/gi, 'salário'],
+  [/r\?+gua/gi, 'régua'],
+  [/\?+gua/gi, 'água'],
+  [/veterin\?+rias/gi, 'veterinárias'],
+  [/consultas\s+veterin\?+rias/gi, 'Consultas Veterinárias'],
+  [/f\?+rias/gi, 'férias'],
+  [/manuten\?+o/gi, 'manutenção'],
+  [/escrit\?+rio/gi, 'escritório'],
+  [/el\?+trica/gi, 'elétrica'],
+  [/servi\?+os/gi, 'serviços'],
+  [/ter\?+o/gi, 'terço'],
+  [/13\?+/gi, '13º'],
+  [/alimenta\?+o/gi, 'alimentação'],
+  [/provis\?+o/gi, 'provisão'],
+  [/descri\?+o/gi, 'descrição'],
+  [/n\?mero/gi, 'número'],
+];
+
+const normalizeDisplayText = (value) => {
+  if (typeof value !== 'string') return value || '';
+
+  let text = value;
+  for (const [broken, fixed] of Object.entries(MOJIBAKE_REPLACEMENTS)) {
+    text = text.split(broken).join(fixed);
+  }
+
+  for (const [pattern, fixed] of QUESTION_MARK_WORD_FIXES) {
+    text = text.replace(pattern, fixed);
+  }
+
+  return text.replace(/�/g, '').replace(/\s{2,}/g, ' ').trim();
+};
+
+const normalizeIcon = (iconValue) => {
+  const icon = normalizeDisplayText(iconValue);
+  if (!icon || /[?�]/.test(icon)) return ICON_FALLBACK;
+  return icon;
+};
 
 const CategoriasFinanceiras = () => {
   const [categorias, setCategorias] = useState([]);
@@ -18,7 +85,7 @@ const CategoriasFinanceiras = () => {
     nome: '',
     tipo: 'despesa',
     cor: '#6366f1',
-    icone: '📋',
+    icone: '•',
     descricao: '',
     ativo: true,
     novasSubcategorias: []
@@ -31,7 +98,7 @@ const CategoriasFinanceiras = () => {
     ativo: true
   });
 
-  const icones = ['💰', '💸', '📋', '🏠', '⚡', '💧', '📡', '👥', '📦', '🔧', '🚗', '🍽️', '📝', '🛡️', '🛒', '✨', '🐕', '🩺', '🏨', '🎓'];
+  const icones = ['•', '$', '#', '@', '+', '*'];
   const cores = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'];
 
   useEffect(() => {
@@ -48,13 +115,11 @@ const CategoriasFinanceiras = () => {
   const carregarCategorias = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/categorias-financeiras/');
-      console.log('📂 Categorias carregadas:', response.data.length);
-      console.log('🔍 Primeira categoria:', response.data[0]);
+      const response = await api.get('/categorias-financeiras');
       setCategorias(response.data);
     } catch (error) {
       console.error('Erro ao carregar categorias:', error);
-      toast.error('Erro ao carregar categorias financeiras');
+      toast.error(error.response?.data?.detail || 'Erro ao carregar categorias financeiras');
     } finally {
       setLoading(false);
     }
@@ -62,18 +127,11 @@ const CategoriasFinanceiras = () => {
 
   const carregarSubcategoriasDRE = async () => {
     try {
-      console.log('🔄 Iniciando carregamento de subcategorias DRE...');
-      // ✅ OFICIAL: Busca todas as subcategorias DRE do tenant (PostgreSQL multi-tenant)
+      // Oficial: Busca todas as subcategorias DRE do tenant (PostgreSQL multi-tenant)
       const response = await api.get('/dre/subcategorias');
-      console.log('✅ Resposta recebida:', response);
-      console.log('📋 Subcategorias DRE carregadas:', response.data.length);
-      console.log('🔍 Primeira subcategoria:', response.data[0]);
-      console.log('📦 Todas as subcategorias:', response.data);
       setSubcategoriasDRE(response.data);
     } catch (error) {
-      console.error('❌ ERRO ao carregar subcategorias DRE:', error);
-      console.error('❌ Erro completo:', error.response?.data || error.message);
-      console.error('❌ Status:', error.response?.status);
+      console.error('Erro ao carregar subcategorias DRE:', error);
       // Retorna array vazio para não quebrar a UI
       setSubcategoriasDRE([]);
     }
@@ -101,14 +159,12 @@ const CategoriasFinanceiras = () => {
     const subPrincipal = subcategoriasDRE.find(s => s.id === categoria.dre_subcategoria_id);
     
     if (!subPrincipal) {
-      console.log(`⚠️ Categoria "${categoria.nome}" tem dre_subcategoria_id=${categoria.dre_subcategoria_id} mas não encontrada`);
       return [];
     }
     
     // Retornar TODAS as subcategorias da mesma categoria DRE
     const todasSubcategorias = subcategoriasDRE.filter(s => s.categoria_id === subPrincipal.categoria_id);
     
-    console.log(`📦 Categoria "${categoria.nome}" → ${todasSubcategorias.length} subcategorias DRE`);
     return todasSubcategorias;
   };
 
@@ -135,7 +191,7 @@ const CategoriasFinanceiras = () => {
         categoriaId = editando;
         toast.success('Categoria atualizada com sucesso!');
       } else {
-        const response = await api.post('/categorias-financeiras/', {
+        const response = await api.post('/categorias-financeiras', {
           nome: formData.nome,
           tipo: formData.tipo,
           cor: formData.cor,
@@ -179,11 +235,8 @@ const CategoriasFinanceiras = () => {
 
   const handleEdit = async (categoria) => {
     // Carregar TODAS as subcategorias DRE vinculadas a esta categoria
-    console.log(`🔧 Editando categoria "${categoria.nome}" (ID: ${categoria.id})`);
-    
     // Buscar todas as subcategorias DRE desta categoria
     const subs = getSubcategoriasDREDaCategoria(categoria);
-    console.log(`📦 Subcategorias DRE encontradas: ${subs.length}`, subs);
     
     const subsExistentes = subs.map(sub => ({
       id: sub.id,
@@ -195,11 +248,11 @@ const CategoriasFinanceiras = () => {
     }));
 
     setFormData({
-      nome: categoria.nome,
+      nome: normalizeDisplayText(categoria.nome),
       tipo: categoria.tipo,
       cor: categoria.cor || '#6366f1',
-      icone: categoria.icone || '📋',
-      descricao: categoria.descricao || '',
+      icone: normalizeIcon(categoria.icone),
+      descricao: normalizeDisplayText(categoria.descricao || ''),
       ativo: categoria.ativo,
       novasSubcategorias: subsExistentes
     });
@@ -225,7 +278,7 @@ const CategoriasFinanceiras = () => {
       nome: '',
       tipo: 'despesa',
       cor: '#6366f1',
-      icone: '📋',
+      icone: '•',
       descricao: '',
       ativo: true,
       novasSubcategorias: []
@@ -340,11 +393,11 @@ const CategoriasFinanceiras = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">🏷️ Categorias Financeiras</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Categorias Financeiras</h2>
           <p className="text-gray-600 mt-1">
             Organize suas receitas e despesas | 
-            <span className="text-red-600 ml-2">💸 {countDespesas} despesas</span>
-            <span className="text-green-600 ml-2">💰 {countReceitas} receitas</span>
+            <span className="text-red-600 ml-2">{countDespesas} despesas</span>
+            <span className="text-green-600 ml-2">{countReceitas} receitas</span>
           </p>
         </div>
         <button
@@ -362,19 +415,19 @@ const CategoriasFinanceiras = () => {
             onClick={() => setFiltroTipo('todos')}
             className={`px-4 py-2 rounded-lg ${filtroTipo === 'todos' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
-            📊 Todas ({categorias.length})
+            Todas ({categorias.length})
           </button>
           <button
             onClick={() => setFiltroTipo('despesa')}
             className={`px-4 py-2 rounded-lg ${filtroTipo === 'despesa' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
-            💸 Despesas ({countDespesas})
+            Despesas ({countDespesas})
           </button>
           <button
             onClick={() => setFiltroTipo('receita')}
             className={`px-4 py-2 rounded-lg ${filtroTipo === 'receita' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
-            💰 Receitas ({countReceitas})
+            Receitas ({countReceitas})
           </button>
         </div>
       </div>
@@ -423,13 +476,10 @@ const CategoriasFinanceiras = () => {
                       
                       {/* Ícone e Nome */}
                       <div className="flex items-center gap-3 flex-1">
-                        <span style={{ backgroundColor: cat.cor }} className="w-10 h-10 rounded-full flex items-center justify-center text-white text-lg">
-                          {cat.icone || '📋'}
-                        </span>
                         <div>
-                          <div className="font-semibold text-gray-800">{cat.nome}</div>
+                          <div className="font-semibold text-gray-800">{normalizeDisplayText(cat.nome)}</div>
                           {cat.descricao && (
-                            <div className="text-sm text-gray-500">{cat.descricao}</div>
+                            <div className="text-sm text-gray-500">{normalizeDisplayText(cat.descricao)}</div>
                           )}
                         </div>
                       </div>
@@ -441,12 +491,12 @@ const CategoriasFinanceiras = () => {
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-red-100 text-red-800'
                         }`}>
-                          {cat.tipo === 'receita' ? '💰 Receita' : '💸 Despesa'}
+                          {cat.tipo === 'receita' ? 'Receita' : 'Despesa'}
                         </span>
                         
                         {temSubcategoria && (
                           <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center gap-1">
-                            <span>📊 DRE</span>
+                            <span>DRE</span>
                             <span className="bg-purple-200 text-purple-900 px-1.5 rounded-full font-bold">
                               {subsDRE.length}
                             </span>
@@ -481,14 +531,14 @@ const CategoriasFinanceiras = () => {
                         <>
                           <div className="px-6 py-2 bg-purple-100/50 border-b border-purple-200">
                             <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
-                              🏗️ Subcategorias DRE ({subsDRE.length})
+                              Subcategorias DRE ({subsDRE.length})
                             </span>
                           </div>
                           {subsDRE.map((sub) => (
                             <div key={sub.id} className="px-6 py-3 flex items-center gap-4 ml-9">
                             <span className="text-purple-400 text-lg">└─</span>
                             <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-700">{sub.nome}</div>
+                              <div className="text-sm font-medium text-gray-700">{normalizeDisplayText(sub.nome)}</div>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
                                   {sub.tipo_custo}
@@ -505,7 +555,7 @@ const CategoriasFinanceiras = () => {
                                 ? 'bg-green-100 text-green-700' 
                                 : 'bg-gray-200 text-gray-600'
                             }`}>
-                              {sub.ativo ? '✓ Ativo' : '✗ Inativo'}
+                              {sub.ativo ? 'Ativo' : 'Inativo'}
                             </span>
                           </div>
                         ))}
@@ -513,7 +563,7 @@ const CategoriasFinanceiras = () => {
                       ) : (
                         <div className="px-6 py-4 ml-9 text-center">
                           <div className="text-gray-400 text-sm">
-                            <div className="mb-2">📭</div>
+                            <div className="mb-2">-</div>
                             <div className="font-medium">Nenhuma subcategoria DRE cadastrada</div>
                             <div className="text-xs mt-1">Configure subcategorias no módulo DRE</div>
                           </div>
@@ -565,8 +615,8 @@ const CategoriasFinanceiras = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   required
                 >
-                  <option value="despesa">💸 Despesa</option>
-                  <option value="receita">💰 Receita</option>
+                  <option value="despesa">Despesa</option>
+                  <option value="receita">Receita</option>
                 </select>
               </div>
 
@@ -715,7 +765,7 @@ const CategoriasFinanceiras = () => {
               <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
                 <span className="text-sm text-gray-600">Categoria: </span>
                 <span className="font-semibold text-gray-800">
-                  {categorias.find(c => c.id === formSubData.categoria_id).nome}
+                  {normalizeDisplayText(categorias.find(c => c.id === formSubData.categoria_id).nome)}
                 </span>
               </div>
             )}

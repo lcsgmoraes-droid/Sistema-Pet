@@ -28,6 +28,7 @@ const Produtos = lazy(preloadProdutos);
 const ProdutosNovo = lazy(() => import("./pages/ProdutosNovo"));
 const ProdutosRelatorio = lazy(() => import("./pages/ProdutosRelatorio"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
+const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
 const preloadLembretes = () => import("./pages/Lembretes");
 const Lembretes = lazy(preloadLembretes);
 const CalculadoraRacao = lazy(() => import("./pages/CalculadoraRacao"));
@@ -127,6 +128,9 @@ const EntregasConfig = lazy(
 const CustosMoto = lazy(() => import("./pages/configuracoes/CustosMoto"));
 const ConfiguracaoEstoque = lazy(
   () => import("./pages/configuracoes/ConfiguracaoEstoque"),
+);
+const ConfiguracaoGeralNegocio = lazy(
+  () => import("./pages/configuracoes/ConfiguracaoGeralNegocio"),
 );
 const StoneIntegracao = lazy(
   () => import("./pages/configuracoes/StoneIntegracao"),
@@ -354,6 +358,14 @@ function App() {
                     element={
                       <ProtectedRoute permission="produtos.visualizar">
                         <AlertasEstoque />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="estoque/full-nf"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <EstoqueFullNF />
                       </ProtectedRoute>
                     }
                   />
@@ -608,6 +620,10 @@ function App() {
                   <Route
                     path="configuracoes/fiscal"
                     element={<ConfiguracaoFiscalEmpresa />}
+                  />
+                  <Route
+                    path="configuracoes/geral"
+                    element={<ConfiguracaoGeralNegocio />}
                   />
                   <Route
                     path="configuracoes/entregas"

@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "../../services/api";
 import toast from "react-hot-toast";
+import { getGuiaClassNames } from "../../utils/guiaHighlight";
 
 export default function ConfiguracaoFiscalEmpresa() {
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [buscandoCNPJ, setBuscandoCNPJ] = useState(false);
+  const [guiaAtiva, setGuiaAtiva] = useState("");
 
   const normalizeCnaesSecundarios = (value) => {
     console.log('🔧 normalizeCnaesSecundarios chamado com:', value, 'tipo:', typeof value);
@@ -134,6 +138,38 @@ export default function ConfiguracaoFiscalEmpresa() {
     }
     carregar();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    setGuiaAtiva(params.get("guia") || "");
+  }, [location.search]);
+
+  const CAMPOS_DESTACADOS = {
+    "empresa-dados": new Set([
+      "cnpj",
+      "razao_social",
+      "nome_fantasia",
+      "email",
+      "telefone",
+      "cep",
+      "endereco",
+      "numero",
+      "bairro",
+      "cidade",
+      "uf",
+    ]),
+    "empresa-fiscal": new Set(["cnae_principal", "regime_tributario"]),
+  };
+
+  const classeCampo = (name) => {
+    const base =
+      "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500";
+    const destacar = Boolean(CAMPOS_DESTACADOS[guiaAtiva]?.has(name));
+    const guiaClasses = getGuiaClassNames(destacar);
+    return destacar
+      ? `${base} ${guiaClasses.input}`
+      : base;
+  };
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -309,6 +345,12 @@ export default function ConfiguracaoFiscalEmpresa() {
       </div>
 
       <div className="space-y-6">
+        {guiaAtiva && (CAMPOS_DESTACADOS[guiaAtiva]?.size ?? 0) > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+            Campos desta etapa foram destacados em amarelo para facilitar o preenchimento.
+          </div>
+        )}
+
         {/* ===== SEÇÃO 1: DADOS CADASTRAIS ===== */}
         <div className="bg-white rounded-lg shadow">
           <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
@@ -333,7 +375,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                     onChange={handleDadosChange}
                     placeholder="00.000.000/0000-00"
                     maxLength="18"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`${classeCampo("cnpj")} flex-1`}
                   />
                   <button
                     type="button"
@@ -365,7 +407,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.razao_social}
                   onChange={handleDadosChange}
                   placeholder="Nome empresarial completo"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("razao_social")}
                 />
               </div>
             </div>
@@ -381,7 +423,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 value={dadosEmpresa.nome_fantasia}
                 onChange={handleDadosChange}
                 placeholder="Nome comercial"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={classeCampo("nome_fantasia")}
               />
             </div>
 
@@ -427,7 +469,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.email}
                   onChange={handleDadosChange}
                   placeholder="contato@empresa.com.br"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("email")}
                 />
               </div>
               <div>
@@ -440,7 +482,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.telefone}
                   onChange={handleDadosChange}
                   placeholder="(00) 0000-0000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("telefone")}
                 />
               </div>
             </div>
@@ -458,7 +500,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   onChange={handleDadosChange}
                   placeholder="00000-000"
                   maxLength="9"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("cep")}
                 />
               </div>
               <div className="md:col-span-3">
@@ -471,7 +513,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.endereco}
                   onChange={handleDadosChange}
                   placeholder="Rua, Avenida, etc"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("endereco")}
                 />
               </div>
             </div>
@@ -488,7 +530,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.numero}
                   onChange={handleDadosChange}
                   placeholder="123"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("numero")}
                 />
               </div>
               <div className="md:col-span-2">
@@ -514,7 +556,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   value={dadosEmpresa.bairro}
                   onChange={handleDadosChange}
                   placeholder="Centro"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("bairro")}
                 />
               </div>
               <div className="md:col-span-1">
@@ -525,7 +567,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                   name="uf"
                   value={dadosEmpresa.uf}
                   onChange={handleDadosChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={classeCampo("uf")}
                 >
                   <option value="">-</option>
                   <option value="SP">SP</option>
@@ -554,7 +596,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 value={dadosEmpresa.cidade}
                 onChange={handleDadosChange}
                 placeholder="Nome da cidade"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={classeCampo("cidade")}
               />
             </div>
           </div>
@@ -577,7 +619,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 value={form.cnae_principal}
                 onChange={handleChange}
                 placeholder="0000-0/00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={classeCampo("cnae_principal")}
               />
               {cnaePrincipalDescricao && (
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
@@ -615,7 +657,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 name="regime_tributario"
                 value={form.regime_tributario}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={classeCampo("regime_tributario")}
               >
                 <option value="">Selecione...</option>
                 <option value="Simples Nacional">Simples Nacional</option>

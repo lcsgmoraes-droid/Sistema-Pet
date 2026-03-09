@@ -34,6 +34,13 @@ export default function Configuracoes() {
       color: "green",
     },
     {
+      title: "Parâmetros Gerais",
+      description: "Margens do PDV, mensagens, metas e alertas",
+      icon: FiSettings,
+      link: "/configuracoes/geral",
+      color: "orange",
+    },
+    {
       title: "Entregas",
       description: "Configurar entregadores e ponto inicial de rotas",
       icon: FiTruck,

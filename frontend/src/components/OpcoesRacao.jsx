@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Settings, ChevronRight } from 'lucide-react';
 import api from '../api';
 import toast from 'react-hot-toast';
+import { getGuiaClassNames } from '../utils/guiaHighlight';
 
 function OpcoesRacao() {
+  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
+  const destacarOpcoesRacao = guiaAtiva === 'racao-opcoes';
+  const guiaClasses = getGuiaClassNames(destacarOpcoesRacao);
   const [abaAtiva, setAbaAtiva] = useState('linhas');
   const [dados, setDados] = useState({});
   const [loading, setLoading] = useState(false);
@@ -105,6 +109,12 @@ function OpcoesRacao() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {destacarOpcoesRacao && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          Etapa da introducao guiada: escolha a aba e use o formulario <strong>Adicionar Novo</strong> para cadastrar as opcoes de classificacao.
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -148,7 +158,11 @@ function OpcoesRacao() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Formulário de Criação/Edição */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow p-6">
+          <div
+            className={`bg-white rounded-lg shadow p-6 ${
+              destacarOpcoesRacao ? guiaClasses.box : ''
+            }`}
+          >
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               {editando ? 'Editar' : 'Adicionar Novo'}
             </h2>

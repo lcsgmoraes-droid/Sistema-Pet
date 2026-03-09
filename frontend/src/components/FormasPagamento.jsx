@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   Receipt
 } from 'lucide-react';
+import { getGuiaClassNames } from '../utils/guiaHighlight';
 
 const getIconeFormaPagamento = (icone, tipo) => {
   const key = (icone || tipo || '').toLowerCase();
@@ -66,6 +67,9 @@ const normalizeFormaIcon = (rawIcon, tipo) => {
 };
 
 const FormasPagamento = () => {
+  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
+  const destacarFormasPagamento = guiaAtiva === 'formas-pagamento';
+  const guiaClasses = getGuiaClassNames(destacarFormasPagamento);
   const [formas, setFormas] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [operadoras, setOperadoras] = useState([]);
@@ -262,10 +266,20 @@ const FormasPagamento = () => {
 
   return (
     <div className="p-6">
+      {destacarFormasPagamento && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+          Etapa da introducao guiada: clique em <strong>+ Nova Forma</strong> e cadastre os meios de pagamento usados no PDV.
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Formas de Pagamento/Recebimento</h2>
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          className={`${
+            destacarFormasPagamento
+              ? `bg-amber-600 hover:bg-amber-700 ${guiaClasses.action}`
+              : 'bg-blue-600 hover:bg-blue-700'
+          } text-white px-4 py-2 rounded`}
           onClick={() => abrirModal()}
         >
           + Nova Forma

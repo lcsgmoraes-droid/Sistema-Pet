@@ -24,7 +24,10 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 import json
+import io
+import re
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 
 from .db import get_session
 from .auth import get_current_user
@@ -36,6 +39,11 @@ from .produtos_models import (
 from .bling_estoque_sync import sincronizar_bling_background
 import logging
 logger = logging.getLogger(__name__)
+
+try:
+    import pdfplumber
+except Exception:
+    pdfplumber = None
 
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
 
@@ -67,6 +75,215 @@ class SaidaEstoqueRequest(BaseModel):
     observacao: Optional[str] = None
     # Para KIT FÍSICO: se True, desmontou o kit e volta os componentes ao estoque
     retornar_componentes: bool = False
+
+
+class SaidaFullNFItemRequest(BaseModel):
+    """Item para baixa de estoque por NF de saida."""
+    produto_id: Optional[int] = None
+    sku: Optional[str] = None
+    quantidade: float = Field(gt=0)
+
+
+class SaidaFullNFRequest(BaseModel):
+    """Baixa em lote de estoque vinculada a uma NF de saida."""
+    numero_nf: str
+    plataforma: Optional[str] = "full"
+    observacao: Optional[str] = None
+    itens: List[SaidaFullNFItemRequest]
+
+
+def _resolver_produto_full_nf(db: Session, tenant_id: int, item: SaidaFullNFItemRequest) -> Optional[Produto]:
+    if item.produto_id:
+        return db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
+
+    if item.sku:
+        filtros_sku = [Produto.codigo == item.sku]
+        # Compatibilidade com modelos legados que ainda possam expor campo "sku".
+        if hasattr(Produto, "sku"):
+            filtros_sku.append(getattr(Produto, "sku") == item.sku)
+
+        return db.query(Produto).filter(
+            Produto.tenant_id == tenant_id,
+            or_(*filtros_sku),
+        ).first()
+
+    return None
+
+
+def _observacao_full_nf(numero_nf: str, plataforma: Optional[str], observacao: Optional[str]) -> str:
+    base = f"Saida FULL por NF {numero_nf} | plataforma: {plataforma or 'full'}"
+    if observacao:
+        return f"{base} | {observacao}"
+    return base
+
+
+def _sku_produto(produto: Produto) -> Optional[str]:
+    return getattr(produto, "sku", None) or getattr(produto, "codigo", None)
+
+
+SKU_EXPLICITO_REGEX = re.compile(r"(?:SKU|C[ÓO]DIGO)\s*[:#-]?\s*([A-Z0-9._/-]+)", re.IGNORECASE)
+QTD_EXPLICITA_REGEX = re.compile(r"(?:QTD|QUANTIDADE)\s*[:#-]?\s*(\d+(?:[\.,]\d+)?)", re.IGNORECASE)
+SKU_QTD_LINHA_REGEX = re.compile(r"^([A-Za-z0-9._\-/]{3,})\s+(\d+(?:[\.,]\d+)?)$")
+
+
+def _to_float_br(value: str) -> float:
+    return float(value.replace(".", "").replace(",", ".")) if "," in value else float(value)
+
+
+def _extrair_itens_full_pdf(texto: str) -> List[dict]:
+    itens_por_sku = defaultdict(float)
+
+    for raw_line in texto.splitlines():
+        linha = (raw_line or "").strip()
+        if not linha:
+            continue
+
+        sku_match = SKU_EXPLICITO_REGEX.search(linha)
+        qtd_match = QTD_EXPLICITA_REGEX.search(linha)
+        if sku_match and qtd_match:
+            sku = sku_match.group(1).strip()
+            qtd = _to_float_br(qtd_match.group(1))
+            if qtd > 0:
+                itens_por_sku[sku] += qtd
+            continue
+
+        linha_match = SKU_QTD_LINHA_REGEX.match(linha)
+        if linha_match:
+            sku = linha_match.group(1).strip()
+            qtd = _to_float_br(linha_match.group(2))
+            if qtd > 0:
+                itens_por_sku[sku] += qtd
+
+    return [
+        {"sku": sku, "quantidade": quantidade}
+        for sku, quantidade in itens_por_sku.items()
+    ]
+
+
+def _xml_find_text(parent, path_ns: str, path_plain: str, ns: dict) -> Optional[str]:
+    elem = parent.find(path_ns, ns)
+    if elem is None:
+        elem = parent.find(path_plain)
+    if elem is None:
+        return None
+    return (elem.text or "").strip()
+
+
+def _parse_saida_full_xml(xml_bytes: bytes) -> dict:
+    root = ET.fromstring(xml_bytes)
+    ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+
+    inf_nfe = root.find('.//nfe:infNFe', ns)
+    if inf_nfe is None:
+        inf_nfe = root.find('.//infNFe')
+    if inf_nfe is None:
+        raise HTTPException(status_code=400, detail="XML invalido: tag infNFe nao encontrada")
+
+    ide = inf_nfe.find('nfe:ide', ns)
+    if ide is None:
+        ide = inf_nfe.find('ide')
+    if ide is None:
+        raise HTTPException(status_code=400, detail="XML invalido: tag ide nao encontrada")
+
+    numero_nf = _xml_find_text(ide, 'nfe:nNF', 'nNF', ns)
+    if not numero_nf:
+        raise HTTPException(status_code=400, detail="Numero da NF nao encontrado no XML")
+
+    itens_por_sku = defaultdict(float)
+    det_list = inf_nfe.findall('.//nfe:det', ns)
+    if not det_list:
+        det_list = inf_nfe.findall('.//det')
+
+    for det in det_list:
+        prod = det.find('nfe:prod', ns)
+        if prod is None:
+            prod = det.find('prod')
+        if prod is None:
+            continue
+
+        sku = _xml_find_text(prod, 'nfe:cProd', 'cProd', ns)
+        qcom = _xml_find_text(prod, 'nfe:qCom', 'qCom', ns)
+        if not sku or not qcom:
+            continue
+
+        try:
+            qtd = float(qcom.replace(',', '.'))
+        except ValueError:
+            continue
+
+        if qtd > 0:
+            itens_por_sku[sku] += qtd
+
+    itens = [
+        {"sku": sku, "quantidade": quantidade}
+        for sku, quantidade in itens_por_sku.items()
+    ]
+
+    if not itens:
+        raise HTTPException(status_code=400, detail="Nenhum item valido (cProd + qCom) foi encontrado no XML")
+
+    return {
+        "numero_nf": numero_nf,
+        "total_itens": len(itens),
+        "itens": itens,
+    }
+
+
+def _processar_item_saida_full_nf(
+    db: Session,
+    tenant_id: int,
+    item: SaidaFullNFItemRequest,
+    numero_nf: str,
+    observacao_movimentacao: str,
+    current_user: User,
+):
+    produto = _resolver_produto_full_nf(db, tenant_id, item)
+    if not produto:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Produto nao encontrado para item (produto_id={item.produto_id}, sku={item.sku})",
+        )
+
+    estoque_anterior = float(produto.estoque_atual or 0)
+    if estoque_anterior < item.quantidade:
+        sku_label = _sku_produto(produto) or 'sem-sku'
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
+                f"Disponivel: {estoque_anterior}, solicitado: {item.quantidade}"
+            ),
+        )
+
+    produto.estoque_atual = estoque_anterior - item.quantidade
+
+    movimentacao = EstoqueMovimentacao(
+        produto_id=produto.id,
+        tipo='saida',
+        motivo='full_nfe_saida',
+        quantidade=item.quantidade,
+        quantidade_anterior=estoque_anterior,
+        quantidade_nova=produto.estoque_atual,
+        custo_unitario=produto.preco_custo,
+        valor_total=item.quantidade * float(produto.preco_custo or 0),
+        documento=numero_nf,
+        observacao=observacao_movimentacao,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    db.add(movimentacao)
+
+    return {
+        "produto_id": produto.id,
+        "sku": _sku_produto(produto),
+        "nome": produto.nome,
+        "quantidade": item.quantidade,
+        "estoque_anterior": estoque_anterior,
+        "estoque_novo": float(produto.estoque_atual or 0),
+    }
 
 class TransferenciaEstoqueRequest(BaseModel):
     """Transferência entre estoques"""
@@ -554,6 +771,159 @@ def saida_estoque(
         logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida): {e_sync}")
     
     return response_data
+
+
+@router.post("/saida-full-nf", status_code=status.HTTP_201_CREATED)
+def saida_full_por_nf(
+    payload: SaidaFullNFRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Baixa estoque em lote por NF de saida (operacao FULL).
+
+    Regras:
+    - Cada item baixa apenas estoque (sem gerar financeiro).
+    - Se qualquer item falhar, toda a transacao e cancelada.
+    """
+    current_user, tenant_id = user_and_tenant
+
+    itens_validos = [item for item in payload.itens if item.quantidade and item.quantidade > 0]
+    if not itens_validos:
+        raise HTTPException(status_code=400, detail="Informe ao menos um item com quantidade maior que zero")
+
+    processados = []
+    observacao_movimentacao = _observacao_full_nf(payload.numero_nf, payload.plataforma, payload.observacao)
+
+    try:
+        for item in itens_validos:
+            processados.append(
+                _processar_item_saida_full_nf(
+                    db=db,
+                    tenant_id=tenant_id,
+                    item=item,
+                    numero_nf=payload.numero_nf,
+                    observacao_movimentacao=observacao_movimentacao,
+                    current_user=current_user,
+                )
+            )
+
+        db.commit()
+
+        for item in processados:
+            try:
+                sincronizar_bling_background(item["produto_id"], item["estoque_novo"], "saida_full_nfe")
+            except Exception as e_sync:
+                logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida-full-nf): {e_sync}")
+
+        return {
+            "success": True,
+            "message": "Baixa de estoque por NF concluida",
+            "numero_nf": payload.numero_nf,
+            "plataforma": payload.plataforma,
+            "total_itens": len(processados),
+            "itens": processados,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Erro na baixa FULL por NF: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar baixa por NF: {str(e)}")
+
+
+@router.post("/saida-full-pdf/parse")
+async def parse_saida_full_pdf(
+    file: UploadFile = File(...),
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Extrai SKU + quantidade de um PDF para preencher a baixa FULL por NF.
+    Nao baixa estoque automaticamente; apenas retorna os itens interpretados.
+    """
+    if pdfplumber is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Leitura de PDF indisponivel no backend (pdfplumber nao instalado)",
+        )
+
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo PDF nao informado")
+
+    nome = file.filename.lower()
+    if not nome.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Envie um arquivo PDF valido")
+
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=400, detail="Arquivo PDF vazio")
+
+    try:
+        texto_paginas = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                texto_paginas.append(page.extract_text() or "")
+
+        texto = "\n".join(texto_paginas).strip()
+        if not texto:
+            raise HTTPException(status_code=400, detail="Nao foi possivel ler texto do PDF")
+
+        itens = _extrair_itens_full_pdf(texto)
+        if not itens:
+            raise HTTPException(
+                status_code=400,
+                detail="Nenhum item SKU+quantidade foi identificado no PDF",
+            )
+
+        return {
+            "success": True,
+            "message": "Itens extraidos do PDF com sucesso",
+            "total_itens": len(itens),
+            "itens": itens,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao interpretar PDF FULL NF: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao interpretar PDF: {str(e)}")
+
+
+@router.post("/saida-full-xml/parse")
+async def parse_saida_full_xml(
+    file: UploadFile = File(...),
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Extrai numero da NF e itens (SKU + quantidade) de XML da NF-e.
+    Nao baixa estoque automaticamente; apenas preenche o formulario.
+    """
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="Arquivo XML nao informado")
+
+    nome = file.filename.lower()
+    if not nome.endswith('.xml'):
+        raise HTTPException(status_code=400, detail="Envie um arquivo XML valido")
+
+    xml_bytes = await file.read()
+    if not xml_bytes:
+        raise HTTPException(status_code=400, detail="Arquivo XML vazio")
+
+    try:
+        dados = _parse_saida_full_xml(xml_bytes)
+        return {
+            "success": True,
+            "message": "XML lido com sucesso",
+            **dados,
+        }
+    except HTTPException:
+        raise
+    except ET.ParseError:
+        raise HTTPException(status_code=400, detail="XML invalido: erro de estrutura")
+    except Exception as e:
+        logger.error(f"Erro ao interpretar XML FULL NF: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao interpretar XML: {str(e)}")
 
 # ============================================================================
 # TRANSFERÊNCIA ENTRE ESTOQUES

@@ -9,7 +9,7 @@ from typing import Optional
 from decimal import Decimal
 
 from app.db import get_session
-from app.auth.dependencies import get_current_user_and_tenant
+from app.auth import get_current_user
 from app.models import User
 from app.empresa_config_geral_models import EmpresaConfigGeral
 from app.utils.logger import logger
@@ -95,14 +95,14 @@ class EmpresaConfigGeralResponse(BaseModel):
 
 @router.get("/", response_model=EmpresaConfigGeralResponse)
 def get_config_empresa(
-    user_tenant: tuple = Depends(get_current_user_and_tenant),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """
     Busca a configuração geral da empresa
     Se não existir, retorna configuração padrão
     """
-    user, tenant_id = user_tenant
+    tenant_id = current_user.tenant_id
     
     config = db.query(EmpresaConfigGeral).filter(
         EmpresaConfigGeral.tenant_id == tenant_id
@@ -129,11 +129,11 @@ def get_config_empresa(
 @router.post("/", response_model=EmpresaConfigGeralResponse)
 def create_config_empresa(
     config_data: EmpresaConfigGeralCreate,
-    user_tenant: tuple = Depends(get_current_user_and_tenant),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """Cria a configuração geral da empresa"""
-    user, tenant_id = user_tenant
+    tenant_id = current_user.tenant_id
     
     # Verifica se já existe
     config_existente = db.query(EmpresaConfigGeral).filter(
@@ -161,11 +161,11 @@ def create_config_empresa(
 @router.put("/", response_model=EmpresaConfigGeralResponse)
 def update_config_empresa(
     config_data: EmpresaConfigGeralUpdate,
-    user_tenant: tuple = Depends(get_current_user_and_tenant),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """Atualiza a configuração geral da empresa"""
-    user, tenant_id = user_tenant
+    tenant_id = current_user.tenant_id
     
     config = db.query(EmpresaConfigGeral).filter(
         EmpresaConfigGeral.tenant_id == tenant_id
@@ -191,11 +191,11 @@ def update_config_empresa(
 
 @router.delete("/")
 def delete_config_empresa(
-    user_tenant: tuple = Depends(get_current_user_and_tenant),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """Remove a configuração da empresa (volta para padrão)"""
-    user, tenant_id = user_tenant
+    tenant_id = current_user.tenant_id
     
     config = db.query(EmpresaConfigGeral).filter(
         EmpresaConfigGeral.tenant_id == tenant_id
