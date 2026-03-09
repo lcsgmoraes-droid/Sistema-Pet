@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { FiBell, FiCheckCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import "../styles/Lembretes.css";
 
@@ -9,10 +10,13 @@ export default function Lembretes() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("pendente"); // pendente, notificado, completado, todos
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
+  const [dresPendentes, setDresPendentes] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     carregarLembretes();
     carregarAlertasCampanhas();
+    carregarDresPendentes();
     // Atualizar a cada 1 minuto
     const interval = setInterval(carregarLembretes, 60000);
     return () => clearInterval(interval);
@@ -24,6 +28,15 @@ export default function Lembretes() {
       setAlertasCampanhas(res.data);
     } catch {
       // silencioso — alertas são informativos, não críticos
+    }
+  };
+
+  const carregarDresPendentes = async () => {
+    try {
+      const res = await api.get("/dre/classificar/pendentes");
+      setDresPendentes(res.data?.total_pendentes || 0);
+    } catch {
+      // silencioso
     }
   };
 
@@ -501,6 +514,82 @@ export default function Lembretes() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Alerta DRE: lançamentos sem classificação ── */}
+      {dresPendentes > 0 && (
+        <div
+          style={{
+            marginBottom: "20px",
+            borderRadius: "12px",
+            border: "1px solid #c4b5fd",
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              background: "#ede9fe",
+              padding: "12px 20px",
+              borderBottom: "1px solid #c4b5fd",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "16px" }}>🏷️</span>
+            <span style={{ fontWeight: "600", color: "#5b21b6", fontSize: "14px" }}>
+              DRE — Lançamentos pendentes de classificação
+            </span>
+          </div>
+          <div
+            style={{
+              padding: "14px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "16px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <p
+                style={{
+                  fontWeight: "700",
+                  color: "#7c3aed",
+                  fontSize: "28px",
+                  margin: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {dresPendentes}
+              </p>
+              <p style={{ color: "#4b5563", fontSize: "13px", margin: 0 }}>
+                lançamento{dresPendentes !== 1 ? "s" : ""} sem categoria DRE.<br />
+                O DRE pode estar incompleto ou incorreto.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/financeiro/dre")}
+              style={{
+                background: "linear-gradient(to right, #7c3aed, #4f46e5)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 18px",
+                fontWeight: "600",
+                fontSize: "13px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🏷️ Ir para o DRE e Classificar
+            </button>
           </div>
         </div>
       )}

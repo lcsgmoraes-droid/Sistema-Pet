@@ -24,7 +24,6 @@ import {
   YAxis,
 } from "recharts";
 import api from "../api";
-import ClassificarLancamentosModal from "../components/ClassificarLancamentosModal";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
 
@@ -33,7 +32,6 @@ const DashboardFinanceiro = () => {
   const { iniciarTour } = useTour("dashboard", tourDashboard);
   const [loading, setLoading] = useState(true);
   const [periodoDias, setPeriodoDias] = useState(30);
-  const [modalClassificarOpen, setModalClassificarOpen] = useState(false);
   const [resumo, setResumo] = useState({
     saldo_atual: 0,
     contas_receber: { total: 0, vencidas: 0 },
@@ -200,15 +198,6 @@ const DashboardFinanceiro = () => {
         </div>
 
         <div className="flex gap-3 items-center">
-          {/* Botão Classificar Lançamentos */}
-          <button
-            onClick={() => setModalClassificarOpen(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            <span className="text-xl">🏷️</span>
-            Classificar DRE
-          </button>
-
           {/* Seletor de período */}
           <div className="flex gap-2">
             {[7, 15, 30, 60, 90].map((dias) => (
@@ -598,11 +587,6 @@ const DashboardFinanceiro = () => {
         </div>
       )}
 
-      {/* Modal de Classificação DRE */}
-      <ClassificarLancamentosModal
-        isOpen={modalClassificarOpen}
-        onClose={() => setModalClassificarOpen(false)}
-      />
     </div>
   );
 };

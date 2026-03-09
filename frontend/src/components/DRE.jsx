@@ -17,6 +17,7 @@ import toast from "react-hot-toast";
 import api from "../api";
 import AnaliseInteligente from "./AnaliseInteligente";
 import ChatIAModal from "./ChatIAModal";
+import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
 
 const DRE = () => {
@@ -25,6 +26,9 @@ const DRE = () => {
 
   // Modal Chat IA
   const [chatIAAberto, setChatIAAberto] = useState(false);
+
+  // Modal Classificar DRE
+  const [modalClassificarOpen, setModalClassificarOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
@@ -214,6 +218,14 @@ const DRE = () => {
         </div>
 
         <div className="flex gap-2">
+          <button
+            onClick={() => setModalClassificarOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+            title="Classificar lançamentos no DRE"
+          >
+            <span className="text-base">🏷️</span>
+            <span className="font-medium">Classificar</span>
+          </button>
           <button
             onClick={() => setChatIAAberto(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
@@ -599,6 +611,12 @@ const DRE = () => {
           valor: dados?.lucro_liquido,
           dados: dados,
         }}
+      />
+
+      {/* Modal Classificar DRE */}
+      <ClassificarLancamentosModal
+        isOpen={modalClassificarOpen}
+        onClose={() => setModalClassificarOpen(false)}
       />
     </div>
   );
