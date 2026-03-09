@@ -449,7 +449,8 @@ export default function PDV() {
       const response = await api.get(
         `/pendencias-estoque/cliente/${vendaAtual.cliente.id}`,
       );
-      const pendenciasAtivas = response.data.filter(
+      const todas = Array.isArray(response.data?.pendencias) ? response.data.pendencias : [];
+      const pendenciasAtivas = todas.filter(
         (p) => p.status === "pendente" || p.status === "notificado",
       );
       setPendenciasCount(pendenciasAtivas.length);
