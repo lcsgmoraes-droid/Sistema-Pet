@@ -28,6 +28,7 @@ def listar_movimentacoes(
     """
     Lista todas as movimentações financeiras (entradas e saídas) no período
     """
+    current_user, tenant_id = user_and_tenant
     try:
         data_ini = datetime.strptime(data_inicio, '%Y-%m-%d').date()
         data_fi = datetime.strptime(data_fim, '%Y-%m-%d').date()
@@ -85,6 +86,7 @@ def obter_saldo_atual(
     """
     Retorna o saldo atual somando todas as contas bancárias
     """
+    current_user, tenant_id = user_and_tenant
     contas = db.query(ContaBancaria).filter(
         ContaBancaria.user_id == current_user.id,
         ContaBancaria.ativa == True
@@ -111,6 +113,7 @@ def listar_contas_pagar(
     """
     Lista contas a pagar com diversos filtros
     """
+    current_user, tenant_id = user_and_tenant
     query = db.query(ContaPagar).filter(ContaPagar.user_id == current_user.id)
 
     # Filtrar por período
@@ -163,6 +166,7 @@ def analisar_gastos(
     """
     Analisa gastos comparando com média histórica
     """
+    current_user, tenant_id = user_and_tenant
     try:
         data_ini = datetime.strptime(data_inicio, '%Y-%m-%d').date()
         data_fi = datetime.strptime(data_fim, '%Y-%m-%d').date()
@@ -212,6 +216,7 @@ def listar_recorrencias_proximas(
     """
     Lista despesas recorrentes que vencerão nos próximos 30 dias
     """
+    current_user, tenant_id = user_and_tenant
     hoje = date.today()
     data_limite = hoje + timedelta(days=30)
 
@@ -243,6 +248,7 @@ def projecao_saldo(
     """
     Projeta quando o saldo pode ficar negativo baseado em tendências
     """
+    current_user, tenant_id = user_and_tenant
     # Buscar saldo atual
     contas = db.query(ContaBancaria).filter(
         ContaBancaria.user_id == current_user.id,
