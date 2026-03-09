@@ -1,7 +1,163 @@
 import { Printer } from 'lucide-react';
+import PropTypes from 'prop-types';
 import { formatMoneyBRL } from '../utils/formatters';
 
-export default function ImprimirCupom({ venda, onClose }) {
+const RECEIPT_WIDTH = 42;
+
+function toAscii(texto) {
+  return String(texto || '')
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .replaceAll(/[^\x20-\x7E]/g, ' ')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+function clip(texto, max = RECEIPT_WIDTH) {
+  const limpo = toAscii(texto);
+  return limpo.length > max ? `${limpo.slice(0, max - 3)}...` : limpo;
+}
+
+function center(texto, width = RECEIPT_WIDTH) {
+  const valor = clip(texto, width);
+  const total = Math.max(0, width - valor.length);
+  const left = Math.floor(total / 2);
+  const right = total - left;
+  return `${' '.repeat(left)}${valor}${' '.repeat(right)}`;
+}
+
+function linePair(label, valor, width = RECEIPT_WIDTH) {
+  const right = clip(valor, Math.max(8, Math.floor(width / 2)));
+  const maxLeft = Math.max(0, width - right.length - 1);
+  const left = clip(label, maxLeft);
+  return `${left}${' '.repeat(Math.max(1, width - left.length - right.length))}${right}`;
+}
+
+function wrap(texto, width = RECEIPT_WIDTH) {
+  const palavras = toAscii(texto).split(' ');
+  const linhas = [];
+  let atual = '';
+
+  for (const palavra of palavras) {
+    if (!palavra) continue;
+    const proposta = atual ? `${atual} ${palavra}` : palavra;
+    if (proposta.length <= width) {
+      atual = proposta;
+      continue;
+    }
+    if (atual) linhas.push(atual);
+    if (palavra.length <= width) {
+      atual = palavra;
+      continue;
+    }
+    for (let i = 0; i < palavra.length; i += width) {
+      linhas.push(palavra.slice(i, i + width));
+    }
+    atual = '';
+  }
+
+  if (atual) linhas.push(atual);
+  return linhas.length ? linhas : [''];
+}
+
+function renderItens(itens = []) {
+  const linhas = [];
+  for (const item of itens) {
+    const nome = item?.produto_nome || item?.descricao || 'Item';
+    linhas.push(...wrap(nome, RECEIPT_WIDTH));
+
+    const qtd = Number(item?.quantidade || 0);
+    const unit = formatMoneyBRL(Number(item?.preco_unitario || 0));
+    const subtotal = formatMoneyBRL(Number(item?.subtotal || 0));
+    linhas.push(linePair(`${qtd} x ${unit}`, subtotal));
+
+    const desconto = Number(item?.desconto_valor || 0);
+    if (desconto > 0) {
+      linhas.push(linePair('Desconto item', `-${formatMoneyBRL(desconto)}`));
+    }
+    linhas.push('');
+  }
+  return linhas;
+}
+
+function montarCupom(venda) {
+  const agora = new Date();
+  const dataVenda = venda?.data_venda ? new Date(venda.data_venda) : agora;
+  const numeroVenda = venda?.numero_venda || venda?.id || '-';
+  const subtotal = Number(venda?.subtotal || 0);
+  const descontoTotal = Number(venda?.desconto_valor || 0);
+  const totalBruto = subtotal + descontoTotal;
+  const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || 0);
+  const total = Number(venda?.total || 0);
+
+  const linhas = [
+    center('PET SHOP PRO'),
+    center('Central de Gestao'),
+    center(dataVenda.toLocaleString('pt-BR')),
+    '-'.repeat(RECEIPT_WIDTH),
+    clip(`VENDA #${numeroVenda}`),
+    clip(`Data: ${dataVenda.toLocaleString('pt-BR')}`),
+  ];
+
+  if (venda?.cliente?.nome || venda?.cliente_nome) {
+    linhas.push(...wrap(`Cliente: ${venda.cliente?.nome || venda.cliente_nome}`, RECEIPT_WIDTH));
+  }
+
+  if (venda?.pet?.nome) {
+    linhas.push(...wrap(`Pet: ${venda.pet.nome}`, RECEIPT_WIDTH));
+  }
+
+  linhas.push(
+    '-'.repeat(RECEIPT_WIDTH),
+    clip('ITENS'),
+    '-'.repeat(RECEIPT_WIDTH),
+    ...renderItens(venda?.itens || []),
+    '-'.repeat(RECEIPT_WIDTH),
+    linePair('Total bruto:', formatMoneyBRL(totalBruto)),
+  );
+
+  if (descontoTotal > 0) {
+    linhas.push(linePair('Desconto:', `-${formatMoneyBRL(descontoTotal)}`));
+  }
+
+  if (venda?.tem_entrega) {
+    linhas.push(linePair('Taxa entrega:', formatMoneyBRL(taxaEntrega)));
+  }
+
+  linhas.push(
+    '-'.repeat(RECEIPT_WIDTH),
+    linePair('TOTAL:', formatMoneyBRL(total)),
+    '-'.repeat(RECEIPT_WIDTH),
+  );
+
+  if (Array.isArray(venda?.pagamentos) && venda.pagamentos.length > 0) {
+    linhas.push('PAGAMENTOS');
+    for (const pag of venda.pagamentos) {
+      const forma = pag?.forma_pagamento || 'Pagamento';
+      const valor = formatMoneyBRL(Number(pag?.valor || 0));
+      linhas.push(linePair(forma, valor));
+    }
+    linhas.push('-'.repeat(RECEIPT_WIDTH));
+  }
+
+  if (venda?.tem_entrega && venda?.entrega?.endereco_completo) {
+    linhas.push('ENTREGA:', ...wrap(venda.entrega.endereco_completo, RECEIPT_WIDTH));
+    if (venda?.entrega?.observacoes_entrega) {
+      linhas.push(...wrap(`Obs: ${venda.entrega.observacoes_entrega}`, RECEIPT_WIDTH));
+    }
+    linhas.push('-'.repeat(RECEIPT_WIDTH));
+  }
+
+  if (venda?.observacoes) {
+    linhas.push('OBSERVACOES:', ...wrap(venda.observacoes, RECEIPT_WIDTH), '-'.repeat(RECEIPT_WIDTH));
+  }
+
+  linhas.push(center('Obrigado pela preferencia!'), center('Volte sempre!'));
+
+  return linhas.join('\n');
+}
+
+export default function ImprimirCupom({ venda }) {
   const imprimir = () => {
     globalThis.print();
   };
@@ -22,7 +178,6 @@ export default function ImprimirCupom({ venda, onClose }) {
       {/* Estilos espec\u00edficos para impress\u00e3o */}
       <style>{`
         @media print {
-          /* Esconder tudo exceto o cupom */
           body * {
             visibility: hidden;
           }
@@ -33,165 +188,79 @@ export default function ImprimirCupom({ venda, onClose }) {
             position: absolute;
             left: 0;
             top: 0;
-            width: 80mm;
+            width: 76mm;
             margin: 0;
-            padding: 0;
+            padding: 0 1mm;
             color: #000 !important;
-            print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
-            text-rendering: geometricPrecision;
+            print-color-adjust: exact;
           }
           .cupom-impressao * {
             color: #000 !important;
           }
-          
-          /* Reset de margens para impress\u00e3o */
+
           @page {
             size: 80mm auto;
-            margin: 4mm;
+            margin: 2mm;
           }
         }
       `}</style>
 
-      {/* Cupom (hidden na tela, vis\u00edvel na impress\u00e3o) */}
-      <div className="cupom-impressao hidden print:block" style={{ width: '80mm', fontFamily: 'monospace', fontWeight: 500, lineHeight: 1.35 }}>
-        <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <div style={{ fontSize: '19px', fontWeight: 'bold' }}>PET SHOP PRO</div>
-          <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Central de Gest\u00e3o</div>
-          <div style={{ fontSize: '11px', marginTop: '5px', fontWeight: 600 }}>
-            {new Date().toLocaleString('pt-BR')}
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px dashed #000', marginBottom: '10px', paddingTop: '10px' }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>
-            VENDA #{venda.numero_venda || venda.id}
-          </div>
-          <div style={{ fontSize: '11px', fontWeight: 600 }}>
-            <div>Data: {venda.data_venda ? new Date(venda.data_venda).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR')}</div>
-            {venda.cliente && (
-              <div>Cliente: {venda.cliente.nome || venda.cliente_nome}</div>
-            )}
-            {venda.pet && (
-              <div>Pet: {venda.pet.nome}</div>
-            )}
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px dashed #000', marginBottom: '10px', paddingTop: '10px' }}>
-          <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #000' }}>
-                <th style={{ textAlign: 'left', paddingBottom: '5px' }}>Item</th>
-                <th style={{ textAlign: 'center', paddingBottom: '5px' }}>Qtd</th>
-                <th style={{ textAlign: 'right', paddingBottom: '5px' }}>Valor</th>
-              </tr>
-            </thead>
-            <tbody>
-              {venda.itens?.map((item, index) => (
-                <tr key={index}>
-                  <td style={{ paddingTop: '5px', paddingBottom: '5px' }}>
-                    {item.produto_nome}
-                    <br />
-                    <span style={{ fontSize: '10px', fontWeight: 600 }}>
-                      {item.quantidade} x {formatMoneyBRL(item.preco_unitario)}
-                      {item.desconto_valor > 0 && (
-                        <span>
-                          {' '}com {formatMoneyBRL(item.desconto_valor)} de desconto
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'center', paddingTop: '5px', paddingBottom: '5px' }}>
-                    {item.quantidade}
-                  </td>
-                  <td style={{ textAlign: 'right', paddingTop: '5px', paddingBottom: '5px' }}>
-                    {formatMoneyBRL(item.subtotal)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-            <span>Total bruto:</span>
-            <span>{formatMoneyBRL(venda.subtotal + venda.desconto_valor)}</span>
-          </div>
-          
-          {venda.desconto_valor > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-              <span>
-                {((venda.desconto_valor / (venda.subtotal + venda.desconto_valor)) * 100).toFixed(2)}% de desconto:
-              </span>
-              <span>{formatMoneyBRL(venda.desconto_valor)}</span>
-            </div>
-          )}
-
-          {venda.tem_entrega && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-              <span>Taxa de Entrega:</span>
-              <span>{formatMoneyBRL(venda.entrega?.taxa_entrega_total || 0)}</span>
-            </div>
-          )}
-
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            marginTop: '10px', 
-            paddingTop: '10px',
-            borderTop: '1px solid #000',
-            fontSize: '14px',
-            fontWeight: 'bold'
-          }}>
-            <span>TOTAL:</span>
-            <span>{formatMoneyBRL(venda.total)}</span>
-          </div>
-        </div>
-
-        {venda.pagamentos && venda.pagamentos.length > 0 && (
-          <div style={{ borderTop: '1px dashed #000', marginTop: '10px', paddingTop: '10px', fontSize: '10px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>PAGAMENTOS:</div>
-            {venda.pagamentos.map((pag, index) => (
-              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                <span>{pag.forma_pagamento}</span>
-                <span>{formatMoneyBRL(pag.valor)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {venda.tem_entrega && venda.entrega && (
-          <div style={{ borderTop: '1px dashed #000', marginTop: '10px', paddingTop: '10px', fontSize: '10px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>ENTREGA:</div>
-            <div>{venda.entrega.endereco_completo}</div>
-            {venda.entrega.observacoes_entrega && (
-              <div style={{ marginTop: '3px', fontStyle: 'italic' }}>
-                Obs: {venda.entrega.observacoes_entrega}
-              </div>
-            )}
-          </div>
-        )}
-
-        {venda.observacoes && (
-          <div style={{ borderTop: '1px dashed #000', marginTop: '10px', paddingTop: '10px', fontSize: '10px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>OBSERVA\u00c7\u00d5ES:</div>
-            <div>{venda.observacoes}</div>
-          </div>
-        )}
-
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '15px', 
-          paddingTop: '10px',
-          borderTop: '1px dashed #000',
-          fontSize: '10px'
-        }}>
-          <div>Obrigado pela preferencia!</div>
-          <div style={{ marginTop: '5px' }}>Volte sempre!</div>
-        </div>
-      </div>
+      <pre
+        className="cupom-impressao hidden print:block"
+        style={{
+          width: '76mm',
+          fontFamily: 'Consolas, "Courier New", monospace',
+          fontSize: '11px',
+          lineHeight: 1.22,
+          letterSpacing: '0.1px',
+          fontWeight: 700,
+          whiteSpace: 'pre',
+          margin: 0,
+          padding: 0,
+          textTransform: 'none',
+          textRendering: 'optimizeSpeed',
+        }}
+      >
+        {montarCupom(venda)}
+      </pre>
     </>
   );
 }
+
+ImprimirCupom.propTypes = {
+  venda: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    numero_venda: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    data_venda: PropTypes.string,
+    subtotal: PropTypes.number,
+    desconto_valor: PropTypes.number,
+    total: PropTypes.number,
+    cliente_nome: PropTypes.string,
+    cliente: PropTypes.shape({ nome: PropTypes.string }),
+    pet: PropTypes.shape({ nome: PropTypes.string }),
+    itens: PropTypes.arrayOf(
+      PropTypes.shape({
+        produto_nome: PropTypes.string,
+        descricao: PropTypes.string,
+        quantidade: PropTypes.number,
+        preco_unitario: PropTypes.number,
+        subtotal: PropTypes.number,
+        desconto_valor: PropTypes.number,
+      }),
+    ),
+    pagamentos: PropTypes.arrayOf(
+      PropTypes.shape({
+        forma_pagamento: PropTypes.string,
+        valor: PropTypes.number,
+      }),
+    ),
+    tem_entrega: PropTypes.bool,
+    entrega: PropTypes.shape({
+      taxa_entrega_total: PropTypes.number,
+      endereco_completo: PropTypes.string,
+      observacoes_entrega: PropTypes.string,
+    }),
+    observacoes: PropTypes.string,
+  }),
+};
