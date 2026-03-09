@@ -8,7 +8,6 @@
 import {
   AlertCircle,
   AlertTriangle,
-  Bell,
   BookmarkPlus,
   CheckCircle,
   ChevronDown,
@@ -2204,9 +2203,16 @@ export default function PDV() {
                     className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-orange-50 border-2 border-orange-400 rounded-lg transition-colors relative"
                     title="Lista de espera - Produtos sem estoque"
                   >
-                    <Bell className="w-5 h-5 text-orange-500" />
+                    <BookmarkPlus className="w-5 h-5 text-orange-500" />
+                    {pendenciasCount > 0 ? (
+                      <span className="text-orange-600 font-semibold text-sm">
+                        Lista de espera ({pendenciasCount})
+                      </span>
+                    ) : (
+                      <span className="text-orange-500 text-sm">Lista de espera</span>
+                    )}
                     {pendenciasCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
+                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                         {pendenciasCount}
                       </span>
                     )}
