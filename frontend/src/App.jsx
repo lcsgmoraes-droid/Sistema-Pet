@@ -45,6 +45,7 @@ const MeusCaixas = lazy(() => import("./pages/MeusCaixas"));
 const NotasFiscais = lazy(() => import("./pages/NotasFiscais"));
 const NFEntrada = lazy(() => import("./pages/NFEntrada"));
 const NFSaida = lazy(() => import("./pages/NFSaida"));
+const CentralNFSaida = lazy(() => import("./pages/CentralNFSaida"));
 
 // Timeline de Cliente
 const ClienteTimelinePage = lazy(() => import("./pages/ClienteTimelinePage"));
@@ -393,10 +394,10 @@ function App() {
                     }
                   />
                   <Route path="meus-caixas" element={<MeusCaixas />} />
-                  <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/vendas" replace />} />
-                  <Route path="notas-fiscais/vendas" element={<NotasFiscais />} />
+                  <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/saida" replace />} />
+                  <Route path="notas-fiscais/vendas" element={<Navigate to="/notas-fiscais/saida" replace />} />
+                  <Route path="notas-fiscais/saida" element={<CentralNFSaida />} />
                   <Route path="notas-fiscais/entrada" element={<NFEntrada />} />
-                  <Route path="notas-fiscais/saida" element={<NFSaida />} />
                   <Route
                     path="campanhas"
                     element={

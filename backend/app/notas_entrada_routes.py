@@ -2625,8 +2625,9 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
 
     Só importa documentos com schema procNFe (XML completo).
     Documentos resNFe (resumo) são ignorados pois não têm itens.
+    Documentos onde o CNPJ emitente == CNPJ do tenant (NF de saída) são descartados.
 
-    Retorna: {"importadas": N, "duplicadas": N, "erros": N}
+    Retorna: {"importadas": N, "duplicadas": N, "erros": N, "saidas_descartadas": N}
     """
     from uuid import UUID
     from app.models import User
@@ -2634,13 +2635,23 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
     importadas = 0
     duplicadas = 0
     erros = 0
+    saidas_descartadas = 0
+
+    # Buscar CNPJ do tenant na config SEFAZ para identificar NF de saída
+    tenant_cnpj = ""
+    try:
+        from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+        cfg_tenant = SefazTenantConfigService.load_config(UUID(tenant_id_str))
+        tenant_cnpj = "".join(ch for ch in str(cfg_tenant.get("cnpj", "")) if ch.isdigit())
+    except Exception as exc_cfg:
+        logger.warning(f"[SEFAZ] Não foi possível carregar CNPJ do tenant {tenant_id_str}: {exc_cfg}")
 
     # Buscar um usuário sistema do tenant para associar as notas
     try:
         tenant_uuid = UUID(tenant_id_str)
     except ValueError:
         logger.warning(f"[SEFAZ] tenant_id inválido: {tenant_id_str}")
-        return {"importadas": 0, "duplicadas": 0, "erros": len(docs)}
+        return {"importadas": 0, "duplicadas": 0, "erros": len(docs), "saidas_descartadas": 0}
 
     user_sistema = db.query(User).filter(
         User.tenant_id == tenant_id_str
@@ -2666,6 +2677,15 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
             logger.warning(f"[SEFAZ] NSU {nsu}: erro no parse do XML — {exc}")
             erros += 1
             continue
+
+        # Descartar NF de saída (emitida pela própria empresa)
+        # emit.CNPJ == tenant CNPJ significa que a empresa emitiu essa NF (saída/venda)
+        if tenant_cnpj:
+            cnpj_emitente = "".join(ch for ch in str(dados_nfe.get("fornecedor_cnpj", "")) if ch.isdigit())
+            if cnpj_emitente and cnpj_emitente == tenant_cnpj:
+                logger.debug(f"[SEFAZ] NSU {nsu}: NF de saída descartada (emitente == tenant)")
+                saidas_descartadas += 1
+                continue
 
         chave = dados_nfe.get("chave_acesso", "")
         if not chave:
@@ -2769,4 +2789,4 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
             logger.warning(f"[SEFAZ] NSU {nsu}: erro ao salvar nota {chave[:10]}... — {exc}")
             erros += 1
 
-    return {"importadas": importadas, "duplicadas": duplicadas, "erros": erros}
+    return {"importadas": importadas, "duplicadas": duplicadas, "erros": erros, "saidas_descartadas": saidas_descartadas}

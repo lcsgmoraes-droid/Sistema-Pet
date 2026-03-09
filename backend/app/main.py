@@ -407,7 +407,7 @@ def _loop_sefaz_sync():
                                 try:
                                     r = importar_docs_sefaz(docs_lista, tenant_id_str, db_import)
                                     if r["importadas"] > 0:
-                                        logger.info(f"[SEFAZ] 📥 {r['importadas']} NF-e(s) salvas. Duplicadas: {r['duplicadas']}. Erros: {r['erros']}")
+                                        logger.info(f"[SEFAZ] 📥 {r['importadas']} NF-e(s) salvas. Duplicadas: {r['duplicadas']}. Erros: {r['erros']}. Saídas descartadas: {r.get('saidas_descartadas', 0)}")
                                 finally:
                                     db_import.close()
                         except Exception as exc_tenant:
