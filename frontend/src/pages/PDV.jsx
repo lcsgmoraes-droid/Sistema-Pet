@@ -9,6 +9,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Bell,
+  BookmarkPlus,
   CheckCircle,
   ChevronDown,
   ChevronLeft,
@@ -409,6 +410,32 @@ export default function PDV() {
       setCustoOperacionalEntrega(0);
     }
   }, [entregadorSelecionado, vendaAtual.tem_entrega]);
+
+  // Adicionar produto à lista de espera direto da busca (estoque zerado)
+  const adicionarNaListaEsperaRapido = async (produto, e) => {
+    e.stopPropagation();
+    if (!vendaAtual.cliente) {
+      toast.error("Selecione um cliente primeiro");
+      return;
+    }
+    try {
+      await api.post("/pendencias-estoque/", {
+        cliente_id: vendaAtual.cliente.id,
+        produto_id: produto.id,
+        quantidade_desejada: 1,
+        prioridade: 1,
+        observacoes: null,
+      });
+      toast.success(`"${produto.nome}" adicionado à lista de espera!`);
+      setBuscarProduto("");
+      setProdutosSugeridos([]);
+      carregarPendencias();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail || "Erro ao adicionar à lista de espera",
+      );
+    }
+  };
 
   // Carregar pendências de estoque do cliente
   const carregarPendencias = async () => {
@@ -2747,7 +2774,16 @@ export default function PDV() {
                   {/* Sugestões de produtos */}
                   {produtosSugeridos.length > 0 && (
                     <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {produtosSugeridos.map((produto) => (
+                      {produtosSugeridos.map((produto) => {
+                        const estoqueZerado =
+                          produto.tipo_produto === "KIT" &&
+                          produto.tipo_kit === "VIRTUAL"
+                            ? produto.estoque_virtual !== undefined &&
+                              Math.floor(produto.estoque_virtual) <= 0
+                            : produto.estoque_atual !== undefined &&
+                              Math.floor(produto.estoque_atual) <= 0;
+
+                        return (
                         <button
                           key={produto.id}
                           onClick={() => adicionarProduto(produto)}
@@ -2756,8 +2792,20 @@ export default function PDV() {
                           <div className="flex items-center justify-between">
                             <div>
                               {/* 🔒 SPRINT 2: Exibir variações formatadas */}
-                              <div className="font-medium text-gray-900">
+                              <div className="flex items-center gap-1.5 font-medium text-gray-900">
                                 {produto.nome}
+                                {estoqueZerado && vendaAtual.cliente && (
+                                  <span
+                                    onClick={(e) =>
+                                      adicionarNaListaEsperaRapido(produto, e)
+                                    }
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 rounded text-xs font-medium transition-colors cursor-pointer"
+                                    title="Sem estoque — clique para adicionar à lista de espera"
+                                  >
+                                    <BookmarkPlus className="w-3 h-3" />
+                                    <span>Lista de espera</span>
+                                  </span>
+                                )}
                               </div>
                               {produto.tipo_produto === "VARIACAO" &&
                                 formatarVariacao(produto) && (
@@ -2781,7 +2829,8 @@ export default function PDV() {
                             </div>
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
