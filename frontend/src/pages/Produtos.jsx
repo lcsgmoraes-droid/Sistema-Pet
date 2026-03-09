@@ -25,6 +25,14 @@ import ModalImportacaoProdutos from "../components/ModalImportacaoProdutos";
 import { useTour } from "../hooks/useTour";
 import { tourProdutos } from "../tours/tourDefinitions";
 
+const normalizeSearchText = (value) => {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replaceAll(/[\u0300-\u036f]/g, "");
+};
+
 // ====================================================
 // DEFINIÇÃO DE COLUNAS DA LISTAGEM
 // ====================================================
@@ -688,13 +696,29 @@ export default function Produtos() {
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosOrganizados];
 
-    // Filtro de busca (nome ou código)
+    // Filtro de busca inteligente (multi-termo + sem acento)
     if (filtros.busca.trim()) {
-      const termo = filtros.busca.toLowerCase();
+      const termos = normalizeSearchText(filtros.busca)
+        .split(/\s+/)
+        .filter(Boolean);
+
       produtosTemp = produtosTemp.filter(
-        (p) =>
-          (p.nome && p.nome.toLowerCase().includes(termo)) ||
-          (p.codigo && p.codigo.toLowerCase().includes(termo)),
+        (p) => {
+          const searchableText = normalizeSearchText(
+            [
+              p.nome,
+              p.codigo,
+              p.codigo_barras,
+              p.sku,
+              p.referencia,
+              p.referencia_sku,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          );
+
+          return termos.every((termo) => searchableText.includes(termo));
+        },
       );
     }
 

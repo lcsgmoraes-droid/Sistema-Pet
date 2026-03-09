@@ -37,6 +37,7 @@ export default function CartScreen() {
   // Modo de recebimento
   const [modo, setModo] = useState<'retirada' | 'entrega'>('retirada');
   const [tipoRetirada, setTipoRetirada] = useState<'proprio' | 'terceiro'>('proprio');
+  const [isDrive, setIsDrive] = useState(false); // Drive-thru: cliente aguarda no carro
 
   // Endereço: salvo (do perfil) ou outro
   const enderecoSalvo = user?.cidade
@@ -115,7 +116,7 @@ export default function CartScreen() {
     const modoLabel = modo === 'retirada'
       ? tipoRetirada === 'terceiro'
         ? 'Retirada por terceiro (senha será gerada)'
-        : 'Retirada na loja por mim'
+        : (isDrive ? 'Drive-thru (aguardar no carro)' : 'Retirada na loja por mim')
       : `Entrega em: ${enderecoFormatado}`;
 
     function buildPagLabel(): string {
@@ -141,6 +142,7 @@ export default function CartScreen() {
                 cidade: user?.cidade || 'loja',
                 modo,
                 tipoRetirada,
+                isDrive: isDrive && modo === 'retirada' && tipoRetirada === 'proprio',
                 endereco: enderecoFormatado,
                 formaPagamentoNome: buildPagLabel() || undefined,
               });
@@ -313,6 +315,17 @@ export default function CartScreen() {
                       🔑 Uma senha secreta será gerada após confirmar. Compartilhe com a pessoa que irá retirar.
                     </Text>
                   </View>
+                )}
+                {/* Drive-thru: apenas quando o próprio cliente vai retirar */}
+                {tipoRetirada === 'proprio' && (
+                  <TouchableOpacity
+                    style={[styles.opcaoBotao, isDrive && styles.opcaoBotaoAtivo]}
+                    onPress={() => setIsDrive(prev => !prev)}
+                  >
+                    <Text style={[styles.opcaoTexto, isDrive && styles.opcaoTextoAtivo]}>
+                      🚗 {isDrive ? '✅ Vou aguardar no carro (Drive-thru)' : 'Vou aguardar no carro (Drive-thru)'}
+                    </Text>
+                  </TouchableOpacity>
                 )}
               </View>
             )}

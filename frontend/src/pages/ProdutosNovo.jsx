@@ -70,6 +70,14 @@ export default function ProdutosNovo() {
     preco_promocional: '',
     data_inicio_promocao: '',
     data_fim_promocao: '',
+    preco_ecommerce: '',
+    preco_ecommerce_promo: '',
+    preco_ecommerce_promo_inicio: '',
+    preco_ecommerce_promo_fim: '',
+    preco_app: '',
+    preco_app_promo: '',
+    preco_app_promo_inicio: '',
+    preco_app_promo_fim: '',
     markup: '',
     
     // Sprint 2: Produtos com variação
@@ -388,6 +396,14 @@ export default function ProdutosNovo() {
         preco_promocional: produto.preco_promocional || '',
         data_inicio_promocao: produto.promocao_inicio || '',
         data_fim_promocao: produto.promocao_fim || '',
+        preco_ecommerce: produto.preco_ecommerce ?? '',
+        preco_ecommerce_promo: produto.preco_ecommerce_promo ?? '',
+        preco_ecommerce_promo_inicio: produto.preco_ecommerce_promo_inicio ?? '',
+        preco_ecommerce_promo_fim: produto.preco_ecommerce_promo_fim ?? '',
+        preco_app: produto.preco_app ?? '',
+        preco_app_promo: produto.preco_app_promo ?? '',
+        preco_app_promo_inicio: produto.preco_app_promo_inicio ?? '',
+        preco_app_promo_fim: produto.preco_app_promo_fim ?? '',
         estoque_minimo: produto.estoque_minimo || '',
         estoque_maximo: produto.estoque_maximo || '',
         controle_lote: produto.controle_lote ?? true,
@@ -1031,6 +1047,14 @@ export default function ProdutosNovo() {
         preco_promocional: formData.preco_promocional ? parseFloat(formData.preco_promocional) : null,
         promocao_inicio: formData.data_inicio_promocao || null,
         promocao_fim: formData.data_fim_promocao || null,
+        preco_ecommerce: formData.preco_ecommerce ? parseFloat(formData.preco_ecommerce) : null,
+        preco_ecommerce_promo: formData.preco_ecommerce_promo ? parseFloat(formData.preco_ecommerce_promo) : null,
+        preco_ecommerce_promo_inicio: formData.preco_ecommerce_promo_inicio || null,
+        preco_ecommerce_promo_fim: formData.preco_ecommerce_promo_fim || null,
+        preco_app: formData.preco_app ? parseFloat(formData.preco_app) : null,
+        preco_app_promo: formData.preco_app_promo ? parseFloat(formData.preco_app_promo) : null,
+        preco_app_promo_inicio: formData.preco_app_promo_inicio || null,
+        preco_app_promo_fim: formData.preco_app_promo_fim || null,
         controle_lote: formData.controle_lote || false,
         estoque_minimo: formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
         estoque_maximo: formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
@@ -1589,12 +1613,12 @@ export default function ProdutosNovo() {
                 </div>
               )}
 
-              {/* Linha 6: Datas da Promoção */}
-              {formData.preco_promocional && formData.tipo_produto !== 'PAI' && (
+              {/* Linha 6: Validade do preço promocional base (ERP) */}
+              {formData.tipo_produto !== 'PAI' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Início da Promoção
+                      Início da Promoção (ERP)
                     </label>
                     <input
                       type="date"
@@ -1606,7 +1630,7 @@ export default function ProdutosNovo() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fim da Promoção
+                      Fim da Promoção (ERP)
                     </label>
                     <input
                       type="date"
@@ -1614,6 +1638,92 @@ export default function ProdutosNovo() {
                       onChange={(e) => handleChange('data_fim_promocao', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Linha 7: Preços por Canal (Ecommerce / App) */}
+              {formData.tipo_produto !== 'PAI' && (
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700">Preços por Canal (Ecommerce / App)</h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Se deixar vazio, o sistema usa o preço de venda padrão.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-purple-700 uppercase">Ecommerce</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.preco_ecommerce}
+                        onChange={(e) => handleChange('preco_ecommerce', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Preço normal"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.preco_ecommerce_promo}
+                        onChange={(e) => handleChange('preco_ecommerce_promo', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="Preço promocional"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input
+                          type="datetime-local"
+                          value={formData.preco_ecommerce_promo_inicio ? formData.preco_ecommerce_promo_inicio.toString().slice(0, 16) : ''}
+                          onChange={(e) => handleChange('preco_ecommerce_promo_inicio', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <input
+                          type="datetime-local"
+                          value={formData.preco_ecommerce_promo_fim ? formData.preco_ecommerce_promo_fim.toString().slice(0, 16) : ''}
+                          onChange={(e) => handleChange('preco_ecommerce_promo_fim', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="text-xs font-bold text-green-700 uppercase">App Móvel</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.preco_app}
+                        onChange={(e) => handleChange('preco_app', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Preço normal"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.preco_app_promo}
+                        onChange={(e) => handleChange('preco_app_promo', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        placeholder="Preço promocional"
+                      />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input
+                          type="datetime-local"
+                          value={formData.preco_app_promo_inicio ? formData.preco_app_promo_inicio.toString().slice(0, 16) : ''}
+                          onChange={(e) => handleChange('preco_app_promo_inicio', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        />
+                        <input
+                          type="datetime-local"
+                          value={formData.preco_app_promo_fim ? formData.preco_app_promo_fim.toString().slice(0, 16) : ''}
+                          onChange={(e) => handleChange('preco_app_promo_fim', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

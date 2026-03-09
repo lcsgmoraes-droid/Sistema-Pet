@@ -166,6 +166,7 @@ from app.pedido_models import Pedido  # Modelo base ecommerce
 # CAMPANHAS — Motor de Campanhas (Fase 1)
 # ============================================================================
 from app.campaigns.routes import router as campaigns_router
+from app.routes.canal_descontos_routes import router as canal_descontos_router
 
 from app.tenancy.middleware import TenancyMiddleware
 import logging
@@ -732,6 +733,7 @@ app.include_router(ecommerce_drive_router)     # Drive pickup — PDV + cliente
 app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(campaigns_router)   # Motor de Campanhas
+app.include_router(canal_descontos_router)  # Descontos Globais por Canal (Ecommerce / App)
 app.include_router(modulos_router)     # Módulos Premium
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])

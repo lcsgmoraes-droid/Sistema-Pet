@@ -143,10 +143,10 @@ class Produto(BaseTenantModel):
     preco_ecommerce_promo = Column(Float, nullable=True)
     preco_ecommerce_promo_inicio = Column(DateTime(timezone=True), nullable=True)
     preco_ecommerce_promo_fim = Column(DateTime(timezone=True), nullable=True)
-    preco_whatsapp = Column(Float, nullable=True)
-    preco_whatsapp_promo = Column(Float, nullable=True)
-    preco_whatsapp_promo_inicio = Column(DateTime(timezone=True), nullable=True)
-    preco_whatsapp_promo_fim = Column(DateTime(timezone=True), nullable=True)
+    preco_app = Column(Float, nullable=True)
+    preco_app_promo = Column(Float, nullable=True)
+    preco_app_promo_inicio = Column(DateTime(timezone=True), nullable=True)
+    preco_app_promo_fim = Column(DateTime(timezone=True), nullable=True)
     
     # Estoque
     estoque_atual = Column(Float, default=0)

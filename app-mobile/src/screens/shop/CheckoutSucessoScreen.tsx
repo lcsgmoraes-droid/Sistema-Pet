@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   Share,
@@ -10,6 +10,7 @@ import {
   Vibration,
   View,
 } from "react-native";
+import api from "../../services/api";
 import { useCartStore } from "../../store/cart.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { Pedido } from "../../types";
@@ -25,6 +26,10 @@ export default function CheckoutSucessoScreen() {
   const { pedido } = route.params;
   const navigation = useNavigation<any>();
   const { limpar } = useCartStore();
+  const [avisando, setAvisando] = useState(false);
+  const [avisou, setAvisou] = useState(false);
+
+  const isDrive = Boolean(pedido.is_drive);
 
   useEffect(() => {
     // Vibrar para feedback positivo
@@ -35,6 +40,18 @@ export default function CheckoutSucessoScreen() {
 
   const isEntrega = pedido.tipo_retirada === "entrega";
   const isTerceiro = pedido.tipo_retirada === "terceiro";
+
+  async function avisarCheguei() {
+    setAvisando(true);
+    try {
+      await api.post(`/checkout/pedido/${pedido.pedido_id}/drive-cheguei`);
+      setAvisou(true);
+    } catch {
+      // ignora erro silenciosamente — loja vai ver pelo painel
+    } finally {
+      setAvisando(false);
+    }
+  }
 
   async function compartilhar() {
     const msg = isEntrega
@@ -171,6 +188,23 @@ export default function CheckoutSucessoScreen() {
       </View>
 
       {/* Ações */}
+      {/* Botão Drive-thru: aparecer apenas quando isDrive=true */}
+      {isDrive && (
+        <TouchableOpacity
+          style={[
+            styles.botaoDrive,
+            avisou && styles.botaoDriveAvisado,
+          ]}
+          onPress={avisarCheguei}
+          disabled={avisando || avisou}
+        >
+          <Ionicons name="car" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.botaoDriveTexto}>
+            {avisou ? '✅ Loja avisada! Aguarde...' : (avisando ? 'Avisando...' : '🚗 Avisar que cheguei')}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity style={styles.botaoCompartilhar} onPress={compartilhar}>
         <Ionicons name="share-outline" size={18} color={CORES.primario} />
         <Text style={styles.botaoCompartilharTexto}>
@@ -356,6 +390,24 @@ const styles = StyleSheet.create({
     color: CORES.primario,
     fontWeight: "600",
     fontSize: FONTE.normal,
+  },
+  botaoDrive: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f59e0b",
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.md,
+    width: "100%",
+    marginBottom: ESPACO.sm,
+  },
+  botaoDriveAvisado: {
+    backgroundColor: CORES.sucesso,
+  },
+  botaoDriveTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: FONTE.media,
   },
   botaoInicio: {
     backgroundColor: CORES.primario,

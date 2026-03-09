@@ -164,6 +164,7 @@ export interface CheckoutOptions {
   cidade: string;
   modo: 'retirada' | 'entrega'; // retirada na loja ou entrega
   tipoRetirada?: 'proprio' | 'terceiro'; // quem vai retirar
+  isDrive?: boolean; // cliente aguarda no carro (drive-thru)
   endereco?: string; // usado quando modo === 'entrega'
   formaPagamentoNome?: string; // forma de pagamento selecionada pelo cliente
 }
@@ -173,6 +174,7 @@ export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string)
   const cidade = typeof opcoes === 'string' ? opcoes : opcoes.cidade;
   const modo = typeof opcoes === 'object' ? opcoes.modo : 'retirada';
   const tipoRetirada = typeof opcoes === 'object' ? (opcoes.tipoRetirada ?? 'proprio') : 'proprio';
+  const isDrive = typeof opcoes === 'object' ? (opcoes.isDrive ?? false) : false;
   const endereco = typeof opcoes === 'object' && opcoes.modo === 'entrega' ? opcoes.endereco : undefined;
 
   const idempotencyKey = `app-loja-${Date.now()}`;
@@ -183,6 +185,7 @@ export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string)
     {
       cidade_destino: cidade,
       tipo_retirada: modo === 'entrega' ? 'entrega' : (tipoRetirada === 'terceiro' ? 'terceiro' : 'app_loja'),
+      is_drive: isDrive,
       endereco_entrega: modo === 'entrega' ? (endereco || 'A INFORMAR') : (modo === 'retirada' ? 'RETIRADA NA LOJA' : null),
       forma_pagamento_nome: formaPagamentoNome || null,
       origem: 'app',

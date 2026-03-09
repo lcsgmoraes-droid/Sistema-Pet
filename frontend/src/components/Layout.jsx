@@ -448,6 +448,11 @@ const Layout = () => {
       icon: FiFileText,
       label: "Notas Fiscais",
       permission: "vendas.visualizar",
+      submenu: [
+        { path: "/notas-fiscais/vendas", label: "🧾 NF de Vendas", permission: "vendas.visualizar" },
+        { path: "/notas-fiscais/entrada", label: "📥 NF Entrada (SEFAZ)", permission: "vendas.visualizar" },
+        { path: "/notas-fiscais/saida", label: "📤 NF Saída (SEFAZ)", permission: "vendas.visualizar" },
+      ],
     }, // Vinculado a vendas
     {
       path: "/vendas/bling-pedidos",

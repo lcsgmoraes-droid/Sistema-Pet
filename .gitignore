@@ -132,5 +132,9 @@ Comparação*.csv
 # Certificados locais gerados automaticamente (NUNCA versionar)
 nginx/ssl/*.pem
 
+# Certificados e configuracoes locais de integracao fiscal (NUNCA versionar)
+backend/secrets/
+secrets/
+
 # Vite temp files
 frontend/vite.config.js.timestamp-*.mjs

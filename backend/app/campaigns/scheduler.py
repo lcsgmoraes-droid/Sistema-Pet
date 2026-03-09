@@ -275,7 +275,7 @@ class CampaignScheduler:
 
         db = SessionLocal()
         try:
-            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+            tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             now = datetime.now(_tz.utc)
             first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month = (first_day_this_month - timedelta(days=1))
@@ -408,7 +408,7 @@ class CampaignScheduler:
         db = SessionLocal()
         try:
             from app.models import Tenant
-            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+            tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             seeded = 0
             for tenant in tenants:
                 try:
@@ -437,7 +437,7 @@ class CampaignScheduler:
         try:
             from app.models import Tenant  # Import local para evitar circular
 
-            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+            tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             for tenant in tenants:
                 event = CampaignEventQueue(
                     tenant_id=tenant.id,
@@ -488,7 +488,7 @@ class CampaignScheduler:
             today_start = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
             today_end = today_start + timedelta(days=1)
 
-            tenants = db.query(Tenant).filter(Tenant.ativo == True).all()
+            tenants = db.query(Tenant).filter(Tenant.status == "active").all()
 
             for tenant in tenants:
                 try:

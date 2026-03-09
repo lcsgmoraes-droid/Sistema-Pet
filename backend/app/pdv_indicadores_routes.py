@@ -171,6 +171,7 @@ class SugestaoPIXRequest(BaseModel):
     custo_total: float
     desconto_atual: float = 0
     aliquota_imposto: float = 7.0
+    taxa_cartao_pct: float = 0.0  # taxa da forma de pagamento selecionada (ex: 3.5 para 3.5%)
 
 
 @router.post("/sugestao-pix")
@@ -193,6 +194,7 @@ def sugestao_pix(
             custo_total=request.custo_total,
             desconto_atual=request.desconto_atual,
             aliquota_imposto=request.aliquota_imposto,
+            taxa_cartao_pct=request.taxa_cartao_pct,
         )
         return resultado
     except Exception as e:

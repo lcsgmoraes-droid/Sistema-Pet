@@ -285,6 +285,7 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       total_venda: venda.total || 0,
       custo_total: custoTotal,
       desconto_atual: venda.desconto_valor || 0,
+      taxa_cartao_pct: formaPagamentoSelecionada?.taxa_percentual || 0,
     }).then(res => setSugestaoPix(res.data?.tem_sugestao ? res.data : null))
       .catch(() => setSugestaoPix(null));
   }, [formaPagamentoSelecionada?.id]);
@@ -1535,12 +1536,24 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
                         </span>{' '}
                         se o cliente pagar no PIX.
                       </div>
-                      <div className="text-xs text-emerald-700 mt-1">
-                        Cliente pagaria{' '}
-                        <strong>R$ {sugestaoPix.total_com_desconto?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                        {' '}· sua margem ficaria em <strong>~{sugestaoPix.margem_final_estimada}%</strong>
-                        {' '}(mínimo: {sugestaoPix.margem_minima}%)
-                      </div>
+                      {sugestaoPix.modo === 'comparativo_cartao' ? (
+                        <div className="text-xs text-emerald-700 mt-1">
+                          Cliente pagaria{' '}
+                          <strong>R$ {sugestaoPix.total_com_desconto?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                          {sugestaoPix.economia_cliente > 0 && (
+                            <> · cliente economiza <strong>R$ {sugestaoPix.economia_cliente?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                          )}
+                          {' '}· você recebe mais do que pelo cartão (
+                          <strong>R$ {sugestaoPix.liquido_cartao?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>)
+                        </div>
+                      ) : (
+                        <div className="text-xs text-emerald-700 mt-1">
+                          Cliente pagaria{' '}
+                          <strong>R$ {sugestaoPix.total_com_desconto?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                          {' '}· sua margem ficaria em <strong>~{sugestaoPix.margem_final_estimada}%</strong>
+                          {' '}(mínimo: {sugestaoPix.margem_minima}%)
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

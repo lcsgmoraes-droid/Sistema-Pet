@@ -65,11 +65,10 @@ export default function ProdutosForm() {
     preco_ecommerce_promo: null,
     preco_ecommerce_promo_inicio: null,
     preco_ecommerce_promo_fim: null,
-    preco_whatsapp: null,
-    preco_whatsapp_promo: null,
-    preco_whatsapp_promo_inicio: null,
-    preco_whatsapp_promo_fim: null,
-    _mostrarCanais: false
+    preco_app: null,
+    preco_app_promo: null,
+    preco_app_promo_inicio: null,
+    preco_app_promo_fim: null
   });
   
   // Imagens
@@ -225,11 +224,10 @@ export default function ProdutosForm() {
         preco_ecommerce_promo: prod.preco_ecommerce_promo ?? null,
         preco_ecommerce_promo_inicio: prod.preco_ecommerce_promo_inicio ?? null,
         preco_ecommerce_promo_fim: prod.preco_ecommerce_promo_fim ?? null,
-        preco_whatsapp: prod.preco_whatsapp ?? null,
-        preco_whatsapp_promo: prod.preco_whatsapp_promo ?? null,
-        preco_whatsapp_promo_inicio: prod.preco_whatsapp_promo_inicio ?? null,
-        preco_whatsapp_promo_fim: prod.preco_whatsapp_promo_fim ?? null,
-        _mostrarCanais: false
+        preco_app: prod.preco_app ?? null,
+        preco_app_promo: prod.preco_app_promo ?? null,
+        preco_app_promo_inicio: prod.preco_app_promo_inicio ?? null,
+        preco_app_promo_fim: prod.preco_app_promo_fim ?? null
       });
       
       // Carregar imagens
@@ -350,8 +348,9 @@ export default function ProdutosForm() {
     try {
       setSalvando(true);
       
+      const { _mostrarCanais, ...restoProduto } = produto;
       const dados = {
-        ...produto,
+        ...restoProduto,
         preco_custo: parseFloat(produto.preco_custo) || 0,
         preco_venda: parseFloat(produto.preco_venda) || 0,
         margem_lucro: parseFloat(produto.margem_lucro) || 0,
@@ -780,18 +779,11 @@ export default function ProdutosForm() {
           </div>
 
           {/* 💰 Preços por Canal */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setProduto(prev => ({ ...prev, _mostrarCanais: !prev._mostrarCanais }))}
-              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-            >
-              <span className="text-sm font-semibold text-gray-700">💰 Preços por Canal (Ecommerce / WhatsApp)</span>
-              <span className="text-gray-400 text-xs">{produto._mostrarCanais ? '▲ Ocultar' : '▼ Expandir'}</span>
-            </button>
-            {produto._mostrarCanais && (
-              <div className="p-4 grid grid-cols-1 gap-6">
-                <p className="text-xs text-gray-500">Se vazio, o sistema usa o <strong>Preço de Venda padrão</strong>. Preencha apenas se quiser um preço diferente por canal.</p>
+          <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700">💰 Preços por Canal (Ecommerce / App Móvel)</h3>
+              <p className="text-xs text-gray-500 mt-1">Se vazio, o sistema usa o <strong>Preço de Venda padrão</strong>. Preencha apenas se quiser um preço diferente por canal.</p>
+            </div>
 
                 {/* Ecommerce */}
                 <div>
@@ -832,46 +824,44 @@ export default function ProdutosForm() {
                   </div>
                 </div>
 
-                {/* WhatsApp */}
+                {/* App Móvel (Aplicativo) */}
                 <div>
-                  <div className="text-xs font-bold text-green-700 uppercase mb-2">📱 WhatsApp</div>
+                  <div className="text-xs font-bold text-green-700 uppercase mb-2">📱 App Móvel (Aplicativo)</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
                       <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_whatsapp || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_whatsapp: e.target.value || null }))}
+                        value={produto.preco_app || ''}
+                        onChange={e => setProduto(prev => ({ ...prev, preco_app: e.target.value || null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Preço promocional</label>
                       <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_whatsapp_promo || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_whatsapp_promo: e.target.value || null }))}
+                        value={produto.preco_app_promo || ''}
+                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo: e.target.value || null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Promoção início</label>
                       <input type="datetime-local"
-                        value={produto.preco_whatsapp_promo_inicio ? produto.preco_whatsapp_promo_inicio.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_whatsapp_promo_inicio: e.target.value || null }))}
+                        value={produto.preco_app_promo_inicio ? produto.preco_app_promo_inicio.toString().slice(0, 16) : ''}
+                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo_inicio: e.target.value || null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
                       />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Promoção fim</label>
                       <input type="datetime-local"
-                        value={produto.preco_whatsapp_promo_fim ? produto.preco_whatsapp_promo_fim.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_whatsapp_promo_fim: e.target.value || null }))}
+                        value={produto.preco_app_promo_fim ? produto.preco_app_promo_fim.toString().slice(0, 16) : ''}
+                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo_fim: e.target.value || null }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
                       />
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>

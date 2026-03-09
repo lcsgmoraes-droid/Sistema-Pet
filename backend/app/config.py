@@ -17,6 +17,19 @@ class Settings(BaseSettings):
     # Integracoes externas
     GOOGLE_MAPS_API_KEY: str = ""
 
+    # SEFAZ (NF-e)
+    SEFAZ_ENABLED: bool = False
+    SEFAZ_MODO: str = "mock"  # mock | real
+    SEFAZ_AMBIENTE: str = "homologacao"  # homologacao | producao
+    SEFAZ_UF: str = ""
+    SEFAZ_CNPJ: str = ""
+    SEFAZ_CERT_PATH: str = ""
+    SEFAZ_CERT_PASSWORD: str = ""
+    SEFAZ_TIMEOUT_SECONDS: int = 30
+    SEFAZ_IMPORTACAO_AUTOMATICA: bool = False
+    SEFAZ_IMPORTACAO_INTERVALO_MIN: int = 15
+    SEFAZ_ULTIMO_NSU: str = "000000000000000"
+
     # Auditoria SQL (Pré-Prod Block 1)
     SQL_AUDIT_ENFORCE: bool = True
     SQL_AUDIT_ENFORCE_LEVEL: str = "error"  # warn, error, strict
@@ -56,6 +69,17 @@ ENV = settings.ENV  # Alias
 DEBUG = settings.DEBUG
 JWT_SECRET_KEY = settings.JWT_SECRET_KEY
 GOOGLE_MAPS_API_KEY = settings.GOOGLE_MAPS_API_KEY
+SEFAZ_ENABLED = settings.SEFAZ_ENABLED
+SEFAZ_MODO = settings.SEFAZ_MODO
+SEFAZ_AMBIENTE = settings.SEFAZ_AMBIENTE
+SEFAZ_UF = settings.SEFAZ_UF
+SEFAZ_CNPJ = settings.SEFAZ_CNPJ
+SEFAZ_CERT_PATH = settings.SEFAZ_CERT_PATH
+SEFAZ_CERT_PASSWORD = settings.SEFAZ_CERT_PASSWORD
+SEFAZ_TIMEOUT_SECONDS = settings.SEFAZ_TIMEOUT_SECONDS
+SEFAZ_IMPORTACAO_AUTOMATICA = settings.SEFAZ_IMPORTACAO_AUTOMATICA
+SEFAZ_IMPORTACAO_INTERVALO_MIN = settings.SEFAZ_IMPORTACAO_INTERVALO_MIN
+SEFAZ_ULTIMO_NSU = settings.SEFAZ_ULTIMO_NSU
 SQL_AUDIT_ENFORCE = settings.SQL_AUDIT_ENFORCE
 SQL_AUDIT_ENFORCE_LEVEL = settings.SQL_AUDIT_ENFORCE_LEVEL
 ENABLE_GUARDRAILS = settings.ENABLE_GUARDRAILS

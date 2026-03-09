@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import api from "../api";
+import CanalDescontos from "./CanalDescontos";
 import { formatBRL } from "../utils/formatters";
 
 const TIPO_LABELS = {
@@ -308,6 +309,7 @@ function RetencaoForm({ inicial, salvando, onSalvar, onCancelar }) {
 }
 
 export default function Campanhas() {
+
   const [aba, setAba] = useState("dashboard");
 
   // Campanhas
@@ -2037,6 +2039,7 @@ export default function Campanhas() {
             Gerencie campanhas automáticas, ranking de clientes e cupons.
           </p>
         </div>
+
       </div>
 
       {/* Tabs */}
@@ -2053,6 +2056,7 @@ export default function Campanhas() {
           { id: "relatorios", label: "📈 Relatórios" },
           { id: "gestor", label: "🛠️ Gestor" },
           { id: "config", label: "⚙️ Configurações" },
+          { id: "canais", label: "🏷️ Descontos por Canal" },
         ].map((t) => (
           <button
             key={t.id}
@@ -6164,6 +6168,9 @@ export default function Campanhas() {
           )}
         </div>
       )}
+
+      {/* ── ABA: DESCONTOS POR CANAL ── */}
+      {aba === "canais" && <CanalDescontos />}
     </div>
   );
 }

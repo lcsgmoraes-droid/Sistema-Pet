@@ -43,6 +43,8 @@ const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
 const MeusCaixas = lazy(() => import("./pages/MeusCaixas"));
 const NotasFiscais = lazy(() => import("./pages/NotasFiscais"));
+const NFEntrada = lazy(() => import("./pages/NFEntrada"));
+const NFSaida = lazy(() => import("./pages/NFSaida"));
 
 // Timeline de Cliente
 const ClienteTimelinePage = lazy(() => import("./pages/ClienteTimelinePage"));
@@ -160,6 +162,7 @@ const EcommerceAnalytics = lazy(
   () => import("./pages/ecommerce/EcommerceAnalytics"),
 );
 const Campanhas = lazy(() => import("./pages/Campanhas"));
+const CanalDescontos = lazy(() => import("./pages/CanalDescontos"));
 const Ajuda = lazy(() => import("./pages/Ajuda"));
 
 function AppRoutePreloader() {
@@ -394,12 +397,23 @@ function App() {
                     }
                   />
                   <Route path="meus-caixas" element={<MeusCaixas />} />
-                  <Route path="notas-fiscais" element={<NotasFiscais />} />
+                  <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/vendas" replace />} />
+                  <Route path="notas-fiscais/vendas" element={<NotasFiscais />} />
+                  <Route path="notas-fiscais/entrada" element={<NFEntrada />} />
+                  <Route path="notas-fiscais/saida" element={<NFSaida />} />
                   <Route
                     path="campanhas"
                     element={
                       <ModuloBloqueado modulo="campanhas">
                         <Campanhas />
+                      </ModuloBloqueado>
+                    }
+                  />
+                  <Route
+                    path="campanhas/canais"
+                    element={
+                      <ModuloBloqueado modulo="campanhas">
+                        <CanalDescontos />
                       </ModuloBloqueado>
                     }
                   />

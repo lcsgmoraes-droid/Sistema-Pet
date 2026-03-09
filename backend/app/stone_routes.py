@@ -206,10 +206,23 @@ def obter_config_stone(
     ).first()
 
     if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Configuração Stone não encontrada"
-        )
+        # Retorna dados padrao para evitar erro 404 no frontend
+        return {
+            "client_id": "",
+            "merchant_id": None,
+            "sandbox": False,
+            "enable_pix": True,
+            "enable_credit_card": True,
+            "enable_debit_card": True,
+            "max_installments": 12,
+            "webhook_url": None,
+            "webhook_enabled": True,
+            "active": False,
+            "affiliation_code": "",
+            "documento": "",
+            "conciliacao_username": None,
+            "conciliacao_configurado": False,
+        }
 
     return config.to_dict()
 

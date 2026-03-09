@@ -267,21 +267,52 @@ def calcular_sugestao_pix(
     custo_total: float,
     desconto_atual: float = 0,
     aliquota_imposto: float = 7.0,
+    taxa_cartao_pct: float = 0.0,
 ) -> Dict:
     """
-    Calcula o desconto máximo que pode ser oferecido no PIX
-    sem cair abaixo da margem mínima de alerta.
+    Calcula o desconto máximo que pode ser oferecido no PIX.
 
-    O PIX tem taxa zero (ou praticamente zero), por isso a loja
-    ganha margem extra quando o cliente paga no PIX, e pode
-    repassar parte dessa economia como desconto ao cliente.
+    Quando taxa_cartao_pct > 0: o desconto sugerido é calculado como
+    (taxa_cartao - 0.5%) arredondando para baixo em 0.5% — assim o
+    lojista ganha mais no PIX do que no cartão mesmo oferecendo desconto.
+
+    Quando taxa_cartao_pct == 0: usa a margem mínima configurada para
+    calcular o desconto máximo viável.
 
     Returns:
-        dict com sugestão de desconto PIX (ou None se não viável)
+        dict com sugestão de desconto PIX (ou sem_sugestao se não viável)
     """
     if total_venda <= 0 or custo_total <= 0:
         return {"tem_sugestao": False}
 
+    # — Caminho 1: sugestão baseada na taxa do cartão —
+    if taxa_cartao_pct > 0:
+        valor_base = total_venda - desconto_atual
+        # Desconto máximo = taxa - 0.5%, arredondado para baixo em 0.5%
+        percentual_max = taxa_cartao_pct - 0.5
+        percentual_sugerido = max(int(percentual_max * 2) / 2, 0.5)
+        if percentual_sugerido < 0.5:
+            return {"tem_sugestao": False}
+        percentual_sugerido = min(percentual_sugerido, taxa_cartao_pct - 0.5)  # nunca igual ou maior que taxa
+        desconto_valor = round(valor_base * percentual_sugerido / 100, 2)
+        total_com_desconto = round(valor_base - desconto_valor, 2)
+        # Valor que lojista recebe no cartão (após taxa)
+        liquido_cartao = round(valor_base * (1 - taxa_cartao_pct / 100), 2)
+        economia_cliente = round(valor_base - total_com_desconto, 2)
+        return {
+            "tem_sugestao": True,
+            "modo": "comparativo_cartao",
+            "percentual_sugerido": percentual_sugerido,
+            "desconto_valor": desconto_valor,
+            "total_com_desconto": total_com_desconto,
+            "liquido_cartao": liquido_cartao,
+            "economia_cliente": economia_cliente,
+            "taxa_cartao_pct": taxa_cartao_pct,
+            "margem_final_estimada": None,
+            "margem_minima": None,
+        }
+
+    # — Caminho 2: sugestão baseada na margem mínima —
     config = db.query(EmpresaConfigGeral).filter(
         EmpresaConfigGeral.tenant_id == tenant_id
     ).first()

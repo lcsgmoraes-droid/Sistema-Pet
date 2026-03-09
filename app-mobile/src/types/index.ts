@@ -106,6 +106,7 @@ export interface Pedido {
   status: string;
   total: number;
   tipo_retirada?: string | null;
+  is_drive?: boolean | null;
   palavra_chave_retirada?: string | null;
   endereco_entrega?: string | null;
   created_at?: string | null;

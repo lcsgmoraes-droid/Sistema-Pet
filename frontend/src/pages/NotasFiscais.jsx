@@ -181,7 +181,7 @@ export default function NotasFiscais() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
           <FileText className="w-8 h-8 text-blue-600" />
-          Notas Fiscais de Saída
+          NF de Vendas
         </h1>
         <p className="text-gray-600 mt-1">Gerencie suas NF-e e NFC-e emitidas</p>
       </div>

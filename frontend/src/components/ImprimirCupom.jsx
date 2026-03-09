@@ -1,8 +1,9 @@
 import { Printer } from 'lucide-react';
+import { formatMoneyBRL } from '../utils/formatters';
 
 export default function ImprimirCupom({ venda, onClose }) {
   const imprimir = () => {
-    window.print();
+    globalThis.print();
   };
 
   if (!venda) return null;
@@ -35,22 +36,29 @@ export default function ImprimirCupom({ venda, onClose }) {
             width: 80mm;
             margin: 0;
             padding: 0;
+            color: #000 !important;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+            text-rendering: geometricPrecision;
+          }
+          .cupom-impressao * {
+            color: #000 !important;
           }
           
           /* Reset de margens para impress\u00e3o */
           @page {
             size: 80mm auto;
-            margin: 5mm;
+            margin: 4mm;
           }
         }
       `}</style>
 
       {/* Cupom (hidden na tela, vis\u00edvel na impress\u00e3o) */}
-      <div className="cupom-impressao hidden print:block" style={{ width: '80mm', fontFamily: 'monospace' }}>
+      <div className="cupom-impressao hidden print:block" style={{ width: '80mm', fontFamily: 'monospace', fontWeight: 500, lineHeight: 1.35 }}>
         <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-          <div style={{ fontSize: '18px', fontWeight: 'bold' }}>PET SHOP PRO</div>
-          <div style={{ fontSize: '12px' }}>Central de Gest\u00e3o</div>
-          <div style={{ fontSize: '10px', marginTop: '5px' }}>
+          <div style={{ fontSize: '19px', fontWeight: 'bold' }}>PET SHOP PRO</div>
+          <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Central de Gest\u00e3o</div>
+          <div style={{ fontSize: '11px', marginTop: '5px', fontWeight: 600 }}>
             {new Date().toLocaleString('pt-BR')}
           </div>
         </div>
@@ -59,7 +67,7 @@ export default function ImprimirCupom({ venda, onClose }) {
           <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '5px' }}>
             VENDA #{venda.numero_venda || venda.id}
           </div>
-          <div style={{ fontSize: '11px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 600 }}>
             <div>Data: {venda.data_venda ? new Date(venda.data_venda).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR')}</div>
             {venda.cliente && (
               <div>Cliente: {venda.cliente.nome || venda.cliente_nome}</div>
@@ -71,7 +79,7 @@ export default function ImprimirCupom({ venda, onClose }) {
         </div>
 
         <div style={{ borderTop: '1px dashed #000', marginBottom: '10px', paddingTop: '10px' }}>
-          <table style={{ width: '100%', fontSize: '10px', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #000' }}>
                 <th style={{ textAlign: 'left', paddingBottom: '5px' }}>Item</th>
@@ -85,11 +93,11 @@ export default function ImprimirCupom({ venda, onClose }) {
                   <td style={{ paddingTop: '5px', paddingBottom: '5px' }}>
                     {item.produto_nome}
                     <br />
-                    <span style={{ fontSize: '9px', color: '#666' }}>
-                      {item.quantidade} x R$ {item.preco_unitario.toFixed(2)}
+                    <span style={{ fontSize: '10px', fontWeight: 600 }}>
+                      {item.quantidade} x {formatMoneyBRL(item.preco_unitario)}
                       {item.desconto_valor > 0 && (
-                        <span style={{ color: '#ff8c00' }}>
-                          {' '}com R$ {item.desconto_valor.toFixed(2)} de desconto
+                        <span>
+                          {' '}com {formatMoneyBRL(item.desconto_valor)} de desconto
                         </span>
                       )}
                     </span>
@@ -98,7 +106,7 @@ export default function ImprimirCupom({ venda, onClose }) {
                     {item.quantidade}
                   </td>
                   <td style={{ textAlign: 'right', paddingTop: '5px', paddingBottom: '5px' }}>
-                    R$ {item.subtotal.toFixed(2)}
+                    {formatMoneyBRL(item.subtotal)}
                   </td>
                 </tr>
               ))}
@@ -109,22 +117,22 @@ export default function ImprimirCupom({ venda, onClose }) {
         <div style={{ borderTop: '1px dashed #000', paddingTop: '10px', fontSize: '11px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
             <span>Total bruto:</span>
-            <span>R$ {(venda.subtotal + venda.desconto_valor).toFixed(2)}</span>
+            <span>{formatMoneyBRL(venda.subtotal + venda.desconto_valor)}</span>
           </div>
           
           {venda.desconto_valor > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', color: '#ff8c00' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
               <span>
                 {((venda.desconto_valor / (venda.subtotal + venda.desconto_valor)) * 100).toFixed(2)}% de desconto:
               </span>
-              <span>R$ {venda.desconto_valor.toFixed(2)}</span>
+              <span>{formatMoneyBRL(venda.desconto_valor)}</span>
             </div>
           )}
 
           {venda.tem_entrega && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
               <span>Taxa de Entrega:</span>
-              <span>R$ {(venda.entrega?.taxa_entrega_total || 0).toFixed(2)}</span>
+              <span>{formatMoneyBRL(venda.entrega?.taxa_entrega_total || 0)}</span>
             </div>
           )}
 
@@ -138,7 +146,7 @@ export default function ImprimirCupom({ venda, onClose }) {
             fontWeight: 'bold'
           }}>
             <span>TOTAL:</span>
-            <span>R$ {venda.total.toFixed(2)}</span>
+            <span>{formatMoneyBRL(venda.total)}</span>
           </div>
         </div>
 
@@ -148,7 +156,7 @@ export default function ImprimirCupom({ venda, onClose }) {
             {venda.pagamentos.map((pag, index) => (
               <div key={index} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
                 <span>{pag.forma_pagamento}</span>
-                <span>R$ {pag.valor.toFixed(2)}</span>
+                <span>{formatMoneyBRL(pag.valor)}</span>
               </div>
             ))}
           </div>

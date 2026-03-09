@@ -7,12 +7,16 @@ import {
   FiCreditCard,
   FiEye,
   FiEyeOff,
+  FiFileText,
+  FiGrid,
   FiMail,
   FiRefreshCw,
   FiSave,
+  FiX,
   FiXCircle,
 } from "react-icons/fi";
 import { api } from "../../services/api";
+import SefazIntegracaoCard from "./SefazIntegracaoCard";
 
 /**
  * Página de configuração e ativação da integração Stone.
@@ -32,7 +36,13 @@ export default function StoneIntegracao() {
   const [saving, setSaving] = useState(false);
   const [solicitando, setSolicitando] = useState(false);
   const [mostrarChave, setMostrarChave] = useState(false);
+  const [modalAtivo, setModalAtivo] = useState(null);
   const [msg, setMsg] = useState(null); // { tipo: 'sucesso'|'erro', texto: '' }
+  const [sefazStatus, setSefazStatus] = useState({
+    enabled: false,
+    cert_ok: false,
+    mensagem: "",
+  });
 
   const [config, setConfig] = useState({
     // Connect (Pagar.me)
@@ -59,12 +69,25 @@ export default function StoneIntegracao() {
 
   async function carregarConfig() {
     try {
-      const { data } = await api.get("/stone/config");
+      const [stoneResp, sefazResp] = await Promise.all([
+        api.get("/stone/config"),
+        api.get("/sefaz/config").catch(() => null),
+      ]);
+
+      const { data } = stoneResp;
       setConfig((prev) => ({
         ...prev,
         ...data,
         webhook_url: data.webhook_url || webhookUrlPadrao,
       }));
+
+      if (sefazResp?.data) {
+        setSefazStatus({
+          enabled: Boolean(sefazResp.data.enabled),
+          cert_ok: Boolean(sefazResp.data.cert_ok),
+          mensagem: sefazResp.data.mensagem || "",
+        });
+      }
     } catch (e) {
       if (e.response?.status !== 404) {
         mostrarMensagem("erro", "Erro ao carregar configuração.");
@@ -178,63 +201,50 @@ export default function StoneIntegracao() {
 
   const conectadoConnect = config.active && config.client_id?.startsWith("sk_");
   const conectadoConciliacao = config.conciliacao_configurado;
+  const conectadoSefaz = sefazStatus.enabled && sefazStatus.cert_ok;
+  let textoBotaoConnect = "Ativar Connect";
+  if (saving) textoBotaoConnect = "Salvando...";
+  if (!saving && conectadoConnect) textoBotaoConnect = "Atualizar Chave";
 
-  return (
-    <div className="max-w-2xl mx-auto p-6 space-y-8">
-      {/* Cabeçalho */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <FiCreditCard className="text-green-600" />
-          Integrações
-        </h1>
-        <p className="text-gray-500 mt-1">
-          Configure as integrações do sistema com serviços externos.
-        </p>
-      </div>
+  let detalheConciliacao = "CNPJ e Stone Code pendentes";
+  if (config.affiliation_code) detalheConciliacao = "Aguardando aprovação no e-mail";
+  if (conectadoConciliacao) {
+    detalheConciliacao = `Usuário: ${config.conciliacao_username || "vinculado"}`;
+  }
 
-      {/* Mensagem de retorno */}
-      {msg && (
-        <div
-          className={`flex items-start gap-3 p-4 rounded-lg border ${
-            msg.tipo === "sucesso"
-              ? "bg-green-50 border-green-200 text-green-800"
-              : "bg-red-50 border-red-200 text-red-800"
-          }`}
-        >
-          {msg.tipo === "sucesso" ? (
-            <FiCheckCircle className="mt-0.5 shrink-0" />
-          ) : (
-            <FiXCircle className="mt-0.5 shrink-0" />
-          )}
-          <span>{msg.texto}</span>
-        </div>
-      )}
+  let statusConciliacao = "desconectado";
+  if (config.affiliation_code) statusConciliacao = "pendente";
+  if (conectadoConciliacao) statusConciliacao = "conectado";
 
-      {/* ── MÓDULO 1: Stone Connect ─────────────────── */}
-      <section className="border rounded-xl overflow-hidden">
-        <div className="bg-gray-50 border-b px-5 py-4 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-gray-800">
-              Stone Connect — Maquininha
-            </h2>
-            <p className="text-sm text-gray-500">
-              Permite cobrar diretamente na maquininha a partir do sistema.
-            </p>
-          </div>
-          <StatusBadge ativo={conectadoConnect} />
-        </div>
+  function abrirModal(modulo) {
+    setModalAtivo(modulo);
+  }
 
-        <form onSubmit={salvarConfiguracaoConnect} className="p-5 space-y-4">
-          {/* Instrução de como obter a chave */}
+  function fecharModal() {
+    setModalAtivo(null);
+  }
+
+  function renderModalConteudo() {
+    if (modalAtivo === "stone-connect") {
+      return (
+        <form onSubmit={salvarConfiguracaoConnect} className="space-y-4">
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            value="stone"
+            readOnly
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+
           {!conectadoConnect && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 flex gap-2">
               <FiAlertCircle className="shrink-0 mt-0.5" />
               <span>
-                Para obter sua chave, acesse{" "}
-                <strong>id.pagar.me → Empresas → sua empresa → API Keys</strong>{" "}
-                e copie a chave que começa com <strong>sk_</strong>. Caso sua
-                empresa não apareça, entre em contato com a Stone pelo chat e
-                peça acesso ao Pagar.me Connect.
+                Para obter sua chave, acesse <strong>id.pagar.me</strong> e
+                copie a chave que começa com <strong>sk_</strong>.
               </span>
             </div>
           )}
@@ -250,7 +260,7 @@ export default function StoneIntegracao() {
               <input
                 id="stone-client-id"
                 type={mostrarChave ? "text" : "password"}
-                autoComplete="new-password"
+                autoComplete="current-password"
                 className="w-full border rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                 placeholder="sk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                 value={config.client_id}
@@ -267,9 +277,6 @@ export default function StoneIntegracao() {
                 {mostrarChave ? <FiEyeOff size={16} /> : <FiEye size={16} />}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Nunca compartilhe esta chave. Ela dá acesso à sua conta Pagar.me.
-            </p>
           </div>
 
           <div className="flex flex-wrap gap-4">
@@ -280,8 +287,8 @@ export default function StoneIntegracao() {
                 onChange={(e) =>
                   setConfig({ ...config, enable_pix: e.target.checked })
                 }
-              />{" "}
-              Aceitar PIX
+              />
+              <span>Aceitar PIX</span>
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -290,8 +297,8 @@ export default function StoneIntegracao() {
                 onChange={(e) =>
                   setConfig({ ...config, enable_credit_card: e.target.checked })
                 }
-              />{" "}
-              Aceitar Crédito
+              />
+              <span>Aceitar Crédito</span>
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
@@ -300,8 +307,8 @@ export default function StoneIntegracao() {
                 onChange={(e) =>
                   setConfig({ ...config, enable_debit_card: e.target.checked })
                 }
-              />{" "}
-              Aceitar Débito
+              />
+              <span>Aceitar Débito</span>
             </label>
           </div>
 
@@ -311,42 +318,22 @@ export default function StoneIntegracao() {
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-5 py-2 rounded-lg text-sm font-medium transition"
           >
             {saving ? <FiRefreshCw className="animate-spin" /> : <FiSave />}
-            {(() => {
-              if (saving) return "Salvando...";
-              return conectadoConnect ? "Atualizar Chave" : "Ativar Connect";
-            })()}
+            {textoBotaoConnect}
           </button>
         </form>
-      </section>
+      );
+    }
 
-      {/* ── MÓDULO 2: Stone Conciliação ─────────────── */}
-      <section className="border rounded-xl overflow-hidden">
-        <div className="bg-gray-50 border-b px-5 py-4 flex items-center justify-between">
-          <div>
-            <h2 className="font-semibold text-gray-800">
-              Stone Conciliação — Relatório Automático
-            </h2>
-            <p className="text-sm text-gray-500">
-              Baixa automaticamente o relatório financeiro da Stone todos os
-              dias.
-            </p>
-          </div>
-          <StatusBadge
-            ativo={conectadoConciliacao}
-            pendente={!conectadoConciliacao && !!config.affiliation_code}
-          />
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Status da conciliação */}
+    if (modalAtivo === "stone-conciliacao") {
+      return (
+        <div className="space-y-4">
           {conectadoConciliacao ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800 flex gap-2">
               <FiCheckCircle className="shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium">Conciliação ativa!</p>
                 <p className="text-green-700 mt-0.5">
-                  Usuário vinculado:{" "}
-                  <strong>{config.conciliacao_username}</strong>
+                  Usuário vinculado: <strong>{config.conciliacao_username}</strong>
                 </p>
               </div>
             </div>
@@ -354,11 +341,7 @@ export default function StoneIntegracao() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800 flex gap-2">
               <FiMail className="shrink-0 mt-0.5" />
               <span>
-                Preencha o <strong>CNPJ</strong> e o <strong>Stone Code</strong>{" "}
-                e clique em <strong>Solicitar Acesso</strong>. A Stone enviará
-                um e-mail para o responsável pelo CNPJ.{" "}
-                <strong>Após aprovar no e-mail</strong>, a integração ativa
-                automaticamente aqui.
+                Preencha CNPJ e Stone Code para solicitar aprovação por e-mail.
               </span>
             </div>
           )}
@@ -388,7 +371,7 @@ export default function StoneIntegracao() {
                 htmlFor="stone-affiliation"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Stone Code (código de afiliação)
+                Stone Code (afiliação)
               </label>
               <input
                 id="stone-affiliation"
@@ -401,28 +384,13 @@ export default function StoneIntegracao() {
                 }
                 disabled={conectadoConciliacao}
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Encontrado no portal Stone → Meu negócio → Dados da empresa
-              </p>
             </div>
           </div>
-
-          {/* URL do webhook (oculta por padrão, só para referência) */}
-          <details className="text-xs text-gray-400">
-            <summary className="cursor-pointer hover:text-gray-600">
-              Ver URL do webhook (avançado)
-            </summary>
-            <p className="mt-2 break-all font-mono bg-gray-100 p-2 rounded">
-              {config.webhook_url || webhookUrlPadrao}
-            </p>
-          </details>
 
           {!conectadoConciliacao && (
             <button
               type="button"
-              disabled={
-                solicitando || !config.affiliation_code || !config.documento
-              }
+              disabled={solicitando || !config.affiliation_code || !config.documento}
               onClick={solicitarConsentimentoConciliacao}
               className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white px-5 py-2 rounded-lg text-sm font-medium transition"
             >
@@ -437,30 +405,196 @@ export default function StoneIntegracao() {
               )}
             </button>
           )}
-
-          {/* Instrução pós-solicitação */}
-          {!conectadoConciliacao && config.affiliation_code && (
-            <div className="flex items-start gap-2 text-sm text-gray-500">
-              <FiClock className="shrink-0 mt-0.5" />
-              <span>
-                Após solicitar, o responsável pelo CNPJ receberá um e-mail da
-                Stone para aprovar. Assim que aprovado, o sistema ativa
-                automaticamente — sem precisar fazer nada aqui.
-              </span>
-            </div>
-          )}
         </div>
-      </section>
+      );
+    }
+
+    if (modalAtivo === "sefaz") {
+      return <SefazIntegracaoCard modoModal onStatusChange={setSefazStatus} />;
+    }
+
+    return null;
+  }
+
+  function tituloModal() {
+    if (modalAtivo === "stone-connect") return "Configurar Stone Connect";
+    if (modalAtivo === "stone-conciliacao") return "Configurar Stone Conciliação";
+    if (modalAtivo === "sefaz") return "Configurar SEFAZ";
+    return "Configurar Integração";
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto p-6 space-y-6 relative">
+      <div className="absolute -z-10 inset-x-0 top-0 h-40 bg-gradient-to-r from-indigo-50 via-cyan-50 to-emerald-50 rounded-2xl" />
+
+      <div className="bg-white/85 backdrop-blur-sm border border-indigo-100 rounded-2xl px-5 py-4">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <FiGrid className="text-indigo-600" />
+          Integrações
+        </h1>
+        <p className="text-gray-500 mt-1">
+          Visualize status rápido e clique para abrir cada configuração em modal.
+        </p>
+      </div>
+
+      {msg && (
+        <div
+          className={`flex items-start gap-3 p-4 rounded-lg border ${
+            msg.tipo === "sucesso"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}
+        >
+          {msg.tipo === "sucesso" ? (
+            <FiCheckCircle className="mt-0.5 shrink-0" />
+          ) : (
+            <FiXCircle className="mt-0.5 shrink-0" />
+          )}
+          <span>{msg.texto}</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <IntegracaoCard
+          icon={FiCreditCard}
+          titulo="Stone Connect"
+          descricao="Cobrança na maquininha direto no sistema."
+          detalhe={conectadoConnect ? "Conta conectada" : "Aguardando chave sk_*"}
+          status={conectadoConnect ? "conectado" : "desconectado"}
+          acaoTexto={conectadoConnect ? "Editar" : "Configurar"}
+          onAcao={() => abrirModal("stone-connect")}
+          tema="emerald"
+        />
+
+        <IntegracaoCard
+          icon={FiMail}
+          titulo="Stone Conciliação"
+          descricao="Relatórios financeiros automáticos da Stone."
+          detalhe={detalheConciliacao}
+          status={statusConciliacao}
+          acaoTexto={conectadoConciliacao ? "Ver detalhes" : "Configurar"}
+          onAcao={() => abrirModal("stone-conciliacao")}
+          tema="sky"
+        />
+
+        <IntegracaoCard
+          icon={FiFileText}
+          titulo="SEFAZ NF-e"
+          descricao="Certificado A1 e parâmetros de consulta fiscal."
+          detalhe={conectadoSefaz ? "Configuração validada" : sefazStatus.mensagem || "Configuração pendente"}
+          status={conectadoSefaz ? "conectado" : "desconectado"}
+          acaoTexto="Configurar"
+          onAcao={() => abrirModal("sefaz")}
+          tema="violet"
+        />
+      </div>
+
+      {modalAtivo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Fechar modal"
+            className="absolute inset-0 bg-black/40"
+            onClick={fecharModal}
+          />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-auto border border-gray-200">
+            <div className="sticky top-0 bg-gradient-to-r from-indigo-50 to-cyan-50 border-b px-5 py-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-800">{tituloModal()}</h2>
+              <button
+                type="button"
+                onClick={fecharModal}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Fechar modal"
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            <div className="p-5">{renderModalConteudo()}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+IntegracaoCard.propTypes = {
+  icon: PropTypes.elementType.isRequired,
+  titulo: PropTypes.string.isRequired,
+  descricao: PropTypes.string.isRequired,
+  detalhe: PropTypes.string,
+  status: PropTypes.oneOf(["conectado", "pendente", "desconectado"]).isRequired,
+  acaoTexto: PropTypes.string.isRequired,
+  onAcao: PropTypes.func.isRequired,
+  tema: PropTypes.oneOf(["emerald", "sky", "violet"]),
+};
+
+function IntegracaoCard({
+  icon: Icon,
+  titulo,
+  descricao,
+  detalhe = "",
+  status,
+  acaoTexto,
+  onAcao,
+  tema = "sky",
+}) {
+  const temaStyles = {
+    emerald: {
+      card: "hover:border-emerald-300",
+      icon: "bg-emerald-50 text-emerald-600",
+      botao: "text-emerald-700 bg-emerald-50 hover:bg-emerald-100",
+    },
+    sky: {
+      card: "hover:border-sky-300",
+      icon: "bg-sky-50 text-sky-600",
+      botao: "text-sky-700 bg-sky-50 hover:bg-sky-100",
+    },
+    violet: {
+      card: "hover:border-violet-300",
+      icon: "bg-violet-50 text-violet-600",
+      botao: "text-violet-700 bg-violet-50 hover:bg-violet-100",
+    },
+  };
+
+  const estilo = temaStyles[tema] || temaStyles.sky;
+
+  return (
+    <div className={`h-full border rounded-xl p-4 bg-white flex flex-col gap-4 transition ${estilo.card}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className={`p-2 rounded-lg ${estilo.icon}`}>
+            <Icon size={18} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-800 leading-tight">{titulo}</h3>
+            <p className="text-xs text-gray-500 mt-1">{descricao}</p>
+          </div>
+        </div>
+        <StatusBadge
+          ativo={status === "conectado"}
+          pendente={status === "pendente"}
+        />
+      </div>
+
+      <p className="text-xs text-gray-500 min-h-10">{detalhe}</p>
+
+      <button
+        type="button"
+        onClick={onAcao}
+        className={`self-start mt-auto text-sm font-medium px-3 py-1.5 rounded-lg transition ${estilo.botao}`}
+      >
+        {acaoTexto}
+      </button>
     </div>
   );
 }
 
 StatusBadge.propTypes = {
   ativo: PropTypes.bool.isRequired,
-  pendente: PropTypes.bool.isRequired,
+  pendente: PropTypes.bool,
 };
 
-function StatusBadge({ ativo, pendente }) {
+function StatusBadge({ ativo, pendente = false }) {
   if (ativo) {
     return (
       <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
