@@ -70,6 +70,7 @@ services:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
       - ./backend/data:/app/data
+      - ./backend/secrets:/app/secrets
       - /opt/petshop/.env:/opt/petshop/.env:rw
     depends_on:
       postgres:
