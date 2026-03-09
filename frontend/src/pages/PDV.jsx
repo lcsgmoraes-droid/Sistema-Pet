@@ -2892,12 +2892,25 @@ export default function PDV() {
                                   <div className="font-medium text-gray-900">
                                     {item.produto_nome}
                                   </div>
-                                  {/* Badge Lista de Espera */}
-                                  {pendenciasProdutoIds.includes(item.produto_id) && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-600" title="Na lista de espera">
+                                  {/* Botão lista de espera — sempre visível se houver cliente */}
+                                  {vendaAtual.cliente && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!pendenciasProdutoIds.includes(item.produto_id)) {
+                                          adicionarNaListaEsperaRapido({ id: item.produto_id, nome: item.produto_nome }, e);
+                                        }
+                                      }}
+                                      title={pendenciasProdutoIds.includes(item.produto_id) ? "Já na lista de espera" : "Adicionar à lista de espera"}
+                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                                        pendenciasProdutoIds.includes(item.produto_id)
+                                          ? "bg-orange-100 text-orange-600 cursor-default"
+                                          : "bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-500 cursor-pointer"
+                                      }`}
+                                    >
                                       <BookmarkPlus className="w-3 h-3" />
-                                      Espera
-                                    </span>
+                                      {pendenciasProdutoIds.includes(item.produto_id) ? "Espera" : "Espera"}
+                                    </button>
                                   )}
                                   {/* Badge KIT */}
                                   {isKit && (
