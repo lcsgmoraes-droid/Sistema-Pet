@@ -1327,6 +1327,8 @@ export default function PDV() {
           // 🎯 CAMPO PRINCIPAL para identificação de ração (usado pela calculadora antiga)
           peso_embalagem: produto.peso_embalagem,
           classificacao_racao: produto.classificacao_racao,
+          estoque_atual: produto.estoque_atual,
+          estoque_virtual: produto.estoque_virtual,
         },
       ];
     }
@@ -2892,8 +2894,12 @@ export default function PDV() {
                                   <div className="font-medium text-gray-900">
                                     {item.produto_nome}
                                   </div>
-                                  {/* Botão lista de espera — sempre visível se houver cliente */}
+                                  {/* Botão lista de espera — visível quando estoque zerado */}
                                   {vendaAtual.cliente && (
+                                    (item.tipo_produto === 'KIT VIRTUAL'
+                                      ? (item.estoque_virtual !== undefined && Math.floor(item.estoque_virtual) <= 0)
+                                      : (item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0)
+                                    )) && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
