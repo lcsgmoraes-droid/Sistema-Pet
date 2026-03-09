@@ -532,7 +532,7 @@ export default function PDV() {
   useEffect(() => {
     const verificarDrive = async () => {
       try {
-        const res = await api.get("/api/ecommerce-drive/aguardando");
+        const res = await api.get("/ecommerce-drive/aguardando");
         const lista = res.data?.pedidos || [];
         setDriveAguardando(lista);
         setDriveAlertVisible(lista.length > 0);
@@ -844,7 +844,7 @@ export default function PDV() {
   // 🚗 Confirmar entrega no drive
   const confirmarDriveEntregue = async (pedidoId) => {
     try {
-      await api.post(`/api/ecommerce-drive/pedido/${pedidoId}/entregue`);
+      await api.post(`/ecommerce-drive/pedido/${pedidoId}/entregue`);
       setDriveAguardando((prev) => prev.filter((p) => p.pedido_id !== pedidoId));
       if (driveAguardando.length <= 1) setDriveAlertVisible(false);
     } catch (err) {
