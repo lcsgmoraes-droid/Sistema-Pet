@@ -216,6 +216,10 @@ _expirar_reservas_stop_event = threading.Event()
 _expirar_reservas_thread: Optional[threading.Thread] = None
 EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS = 30 * 60  # 30 minutos
 
+# SEFAZ — sincronização automática de NF-e por NSU
+_sefaz_sync_stop_event = threading.Event()
+_sefaz_sync_thread: Optional[threading.Thread] = None
+
 # Campaign Engine — scheduler APScheduler
 _campaign_scheduler = None
 
@@ -303,6 +307,87 @@ def _loop_renovacao_token_bling():
         _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
 
     logger.info(f"[BLING] Job de renovação automática finalizado (PID {worker_pid})")
+
+
+def _loop_sefaz_sync():
+    """
+    Job em background para sincronizar NF-e automaticamente via SEFAZ.
+    Roda a cada minuto e verifica quais tenants tem importacao_automatica=true.
+    Para cada um, verifica se o intervalo configurado ja passou e dispara o sync.
+    """
+    import os as _os
+    from datetime import datetime as _dt, timezone as _tz
+    from pathlib import Path as _Path
+
+    worker_pid = _os.getpid()
+    logger.info(f"[SEFAZ] Job de sincronizacao automatica iniciado (PID {worker_pid})")
+
+    # Aguarda 90 segundos no startup para o backend estar totalmente pronto
+    _sefaz_sync_stop_event.wait(90)
+
+    while not _sefaz_sync_stop_event.is_set():
+        try:
+            from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+            from app.services.sefaz_service import SefazService
+
+            base_dir = SefazTenantConfigService.BASE_DIR
+            if base_dir.exists():
+                for tenant_dir in base_dir.iterdir():
+                    if not tenant_dir.is_dir():
+                        continue
+                    config_path = tenant_dir / SefazTenantConfigService.CONFIG_FILE
+                    if not config_path.exists():
+                        continue
+                    try:
+                        import json as _json
+                        cfg = _json.loads(config_path.read_text(encoding="utf-8"))
+
+                        if not cfg.get("importacao_automatica"):
+                            continue
+                        if not cfg.get("enabled"):
+                            continue
+                        if cfg.get("modo") != "real":
+                            continue
+                        if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
+                            continue
+
+                        intervalo_min = int(cfg.get("importacao_intervalo_min", 15))
+                        ultimo_sync = cfg.get("ultimo_sync_at")
+                        if ultimo_sync:
+                            ultima_dt = _dt.fromisoformat(ultimo_sync)
+                            agora = _dt.now(_tz.utc)
+                            if ultima_dt.tzinfo is None:
+                                ultima_dt = ultima_dt.replace(tzinfo=_tz.utc)
+                            minutos_desde_ultimo = (agora - ultima_dt).total_seconds() / 60
+                            if minutos_desde_ultimo < intervalo_min:
+                                continue
+
+                        tenant_id_str = tenant_dir.name
+                        logger.info(f"[SEFAZ] Sincronizando tenant {tenant_id_str}...")
+
+                        resultado = SefazService.sincronizar_nsu(
+                            config=cfg,
+                            ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"),
+                        )
+                        now_iso = _dt.now(_tz.utc).isoformat()
+                        cfg["ultimo_sync_at"] = now_iso
+                        cfg["ultimo_sync_status"] = "ok"
+                        cfg["ultimo_sync_mensagem"] = resultado["mensagem"]
+                        cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
+                        cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu"))
+                        config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+                        docs = cfg["ultimo_sync_documentos"]
+                        logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {docs} documento(s) novos. NSU: {cfg['ultimo_nsu']}")
+
+                    except Exception as exc_tenant:
+                        logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
+
+        except Exception as exc:
+            logger.warning(f"[SEFAZ] ⚠️ Erro no loop de sincronizacao: {exc}")
+
+        _sefaz_sync_stop_event.wait(60)  # verifica a cada 1 minuto
+
+    logger.info(f"[SEFAZ] Job de sincronizacao automatica finalizado (PID {worker_pid})")
 
 
 def _loop_expirar_reservas():
@@ -870,6 +955,16 @@ def on_startup():
     )
     _expirar_reservas_thread.start()
 
+    # Iniciar job de sincronização automática SEFAZ (a cada 1min, verifica tenants)
+    global _sefaz_sync_thread
+    _sefaz_sync_stop_event.clear()
+    _sefaz_sync_thread = threading.Thread(
+        target=_loop_sefaz_sync,
+        name="sefaz-sync-automatico",
+        daemon=True,
+    )
+    _sefaz_sync_thread.start()
+
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
     logger.info("[DOCS] Documentacao em: http://127.0.0.1:8000/docs")
@@ -895,6 +990,9 @@ def on_shutdown():
             logger.info("[STOP] Campaign Scheduler parado!")
     except Exception as e:
         logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
+
+    global _sefaz_sync_thread
+    _sefaz_sync_stop_event.set()
 
     global _bling_token_thread
     _bling_token_stop_event.set()
