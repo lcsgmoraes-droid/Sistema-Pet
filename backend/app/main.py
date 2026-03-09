@@ -229,6 +229,9 @@ _BLING_LAST_RENEWAL_FILE = "/tmp/bling_token_last_renewal.txt"
 # Janela de segurança: se outro worker renovou há menos de 60s, apenas recarrega do .env
 _BLING_RENEWAL_COOLDOWN = 60
 
+# File lock para coordenar sincronização SEFAZ entre workers uvicorn
+_SEFAZ_LOCK_FILE = "/tmp/sefaz_sync.lock"
+
 
 def _bling_recarregar_tokens_do_env():
     """Relê o access_token e refresh_token do .env e atualiza os.environ."""
@@ -327,61 +330,85 @@ def _loop_sefaz_sync():
 
     while not _sefaz_sync_stop_event.is_set():
         try:
-            from app.services.sefaz_tenant_config_service import SefazTenantConfigService
-            from app.services.sefaz_service import SefazService
+            # Garante que apenas 1 dos 4 workers uvicorn execute o sync por vez
+            try:
+                import fcntl as _fcntl
+                _lock_f = open(_SEFAZ_LOCK_FILE, "w")
+                try:
+                    _fcntl.flock(_lock_f, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                    _lock_acquired = True
+                except OSError:
+                    _lock_f.close()
+                    _sefaz_sync_stop_event.wait(60)
+                    continue
+            except ImportError:
+                _lock_f = None
+                _lock_acquired = True
 
-            base_dir = SefazTenantConfigService.BASE_DIR
-            if base_dir.exists():
-                for tenant_dir in base_dir.iterdir():
-                    if not tenant_dir.is_dir():
-                        continue
-                    config_path = tenant_dir / SefazTenantConfigService.CONFIG_FILE
-                    if not config_path.exists():
-                        continue
-                    try:
-                        import json as _json
-                        cfg = _json.loads(config_path.read_text(encoding="utf-8"))
+            try:
+                from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+                from app.services.sefaz_service import SefazService
 
-                        if not cfg.get("importacao_automatica"):
+                base_dir = SefazTenantConfigService.BASE_DIR
+                if base_dir.exists():
+                    for tenant_dir in base_dir.iterdir():
+                        if not tenant_dir.is_dir():
                             continue
-                        if not cfg.get("enabled"):
+                        config_path = tenant_dir / SefazTenantConfigService.CONFIG_FILE
+                        if not config_path.exists():
                             continue
-                        if cfg.get("modo") != "real":
-                            continue
-                        if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
-                            continue
+                        try:
+                            import json as _json
+                            cfg = _json.loads(config_path.read_text(encoding="utf-8"))
 
-                        intervalo_min = int(cfg.get("importacao_intervalo_min", 15))
-                        ultimo_sync = cfg.get("ultimo_sync_at")
-                        if ultimo_sync:
-                            ultima_dt = _dt.fromisoformat(ultimo_sync)
-                            agora = _dt.now(_tz.utc)
-                            if ultima_dt.tzinfo is None:
-                                ultima_dt = ultima_dt.replace(tzinfo=_tz.utc)
-                            minutos_desde_ultimo = (agora - ultima_dt).total_seconds() / 60
-                            if minutos_desde_ultimo < intervalo_min:
+                            if not cfg.get("importacao_automatica"):
+                                continue
+                            if not cfg.get("enabled"):
+                                continue
+                            if cfg.get("modo") != "real":
+                                continue
+                            if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
                                 continue
 
-                        tenant_id_str = tenant_dir.name
-                        logger.info(f"[SEFAZ] Sincronizando tenant {tenant_id_str}...")
+                            intervalo_min = int(cfg.get("importacao_intervalo_min", 15))
+                            ultimo_sync = cfg.get("ultimo_sync_at")
+                            if ultimo_sync:
+                                ultima_dt = _dt.fromisoformat(ultimo_sync)
+                                agora = _dt.now(_tz.utc)
+                                if ultima_dt.tzinfo is None:
+                                    ultima_dt = ultima_dt.replace(tzinfo=_tz.utc)
+                                minutos_desde_ultimo = (agora - ultima_dt).total_seconds() / 60
+                                if minutos_desde_ultimo < intervalo_min:
+                                    continue
 
-                        resultado = SefazService.sincronizar_nsu(
-                            config=cfg,
-                            ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"),
-                        )
-                        now_iso = _dt.now(_tz.utc).isoformat()
-                        cfg["ultimo_sync_at"] = now_iso
-                        cfg["ultimo_sync_status"] = "ok"
-                        cfg["ultimo_sync_mensagem"] = resultado["mensagem"]
-                        cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
-                        cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu"))
-                        config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-                        docs = cfg["ultimo_sync_documentos"]
-                        logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {docs} documento(s) novos. NSU: {cfg['ultimo_nsu']}")
+                            tenant_id_str = tenant_dir.name
+                            logger.info(f"[SEFAZ] Sincronizando tenant {tenant_id_str}...")
 
-                    except Exception as exc_tenant:
-                        logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
+                            resultado = SefazService.sincronizar_nsu(
+                                config=cfg,
+                                ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"),
+                            )
+                            now_iso = _dt.now(_tz.utc).isoformat()
+                            cfg["ultimo_sync_at"] = now_iso
+                            cfg["ultimo_sync_status"] = "ok"
+                            cfg["ultimo_sync_mensagem"] = resultado["mensagem"]
+                            cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
+                            cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu"))
+                            config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+                            docs = cfg["ultimo_sync_documentos"]
+                            logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {docs} documento(s) novos. NSU: {cfg['ultimo_nsu']}")
 
+                        except Exception as exc_tenant:
+                            logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
+
+            finally:
+                if _lock_f is not None:
+                    try:
+                        import fcntl as _fcntl
+                        _fcntl.flock(_lock_f, _fcntl.LOCK_UN)
+                    except Exception:
+                        pass
+                    _lock_f.close()
         except Exception as exc:
             logger.warning(f"[SEFAZ] ⚠️ Erro no loop de sincronizacao: {exc}")
 
