@@ -181,7 +181,7 @@ const DashboardFinanceiro = () => {
         <div className="flex items-center gap-3">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">
-              Dashboard Gerencial
+              Dashboard Financeiro
             </h1>
             <p className="text-gray-600 mt-1">
               Visão consolidada do seu negócio
