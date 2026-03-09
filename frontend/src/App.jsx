@@ -375,11 +375,7 @@ function App() {
                   />
                   <Route
                     path="fiscal/sefaz"
-                    element={
-                      <ProtectedRoute permission="produtos.editar">
-                        <SEFAZImportacao />
-                      </ProtectedRoute>
-                    }
+                    element={<Navigate to="/compras/entrada-xml" replace />}
                   />
                   <Route path="lembretes" element={<Lembretes />} />
                   <Route

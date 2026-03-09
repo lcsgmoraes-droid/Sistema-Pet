@@ -1,10 +1,24 @@
-﻿import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
+import { formatMoneyBRL } from '../utils/formatters';
+
+function formatarChaveAcesso(valor) {
+  return String(valor).replaceAll(/\D/g, '').slice(0, 44);
+}
+
+function montarNomeXml(dados) {
+  const numero = String(dados?.numero_nf || '0').replaceAll(/\D/g, '');
+  const serie = String(dados?.serie || '1').replaceAll(/\D/g, '');
+  const chave = String(dados?.chave_acesso || '').replaceAll(/\D/g, '').slice(-8);
+  return `nfe_${numero || '0'}_${serie || '1'}_${chave || 'xml'}.xml`;
+}
 
 const EntradaXML = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoOpenNotaIdRef = useRef(null);
   const [notasEntrada, setNotasEntrada] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,19 +32,19 @@ const EntradaXML = () => {
   const [mostrarModalLote, setMostrarModalLote] = useState(false);
   const [resultadoLote, setResultadoLote] = useState(null);
   
-  // Estados para histÃ³rico de preÃ§os
+  // Estados para historico de precos
   const [mostrarHistoricoPrecos, setMostrarHistoricoPrecos] = useState(false);
   const [historicoPrecos, setHistoricoPrecos] = useState([]);
   const [produtoHistorico, setProdutoHistorico] = useState(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   
-  // Estados para revisÃ£o de preÃ§os
+  // Estados para revisao de precos
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
   const [precosAjustados, setPrecosAjustados] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
   
-  // Estados para rateio (APENAS informativo - estoque Ã© UNIFICADO)
+  // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
   const [quantidadesOnline, setQuantidadesOnline] = useState({}); // {item_id: quantidade_online}
   
@@ -53,19 +67,59 @@ const EntradaXML = () => {
   // Estado para filtro de pesquisa de produtos (por item)
   const [filtroProduto, setFiltroProduto] = useState({});
 
+  // Filtro de status da tabela
+  const [filtroStatus, setFiltroStatus] = useState('todos');
+
+  // Painel de busca SEFAZ embutido
+  const [mostrarPainelSefaz, setMostrarPainelSefaz] = useState(false);
+  const [mostrarConfigSefaz, setMostrarConfigSefaz] = useState(false);
+  const [chaveSefaz, setChaveSefaz] = useState('');
+  const [consultasSefaz, setConsultasSefaz] = useState([]);
+  const [consultaExpandidaId, setConsultaExpandidaId] = useState(null);
+  const [importandoConsultaId, setImportandoConsultaId] = useState(null);
+  const [erroSefaz, setErroSefaz] = useState('');
+  const [avisoConectorSefaz, setAvisoConectorSefaz] = useState('');
+  const [loadingSefaz, setLoadingSefaz] = useState(false);
+  const [configSefazLoading, setConfigSefazLoading] = useState(false);
+  const [salvandoRotina, setSalvandoRotina] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [mensagemRotina, setMensagemRotina] = useState('');
+  const [cfgSefaz, setCfgSefaz] = useState({
+    enabled: false, modo: 'mock', ambiente: 'homologacao', uf: 'SP', cnpj: '',
+    importacao_automatica: false, importacao_intervalo_min: 15, cert_ok: false,
+    ultimo_sync_status: 'nunca', ultimo_sync_mensagem: 'Ainda nao sincronizado.',
+    ultimo_sync_at: null, ultimo_sync_documentos: 0,
+  });
+
   useEffect(() => {
     console.log('ðŸ”„ [EntradaXML] Componente montado, iniciando carregamento...');
     carregarDados();
   }, []);
 
+  useEffect(() => {
+    const notaIdParam = searchParams.get('nota_id');
+    if (!notaIdParam) return;
+    if (autoOpenNotaIdRef.current === notaIdParam) return;
+
+    const notaId = Number(notaIdParam);
+    if (Number.isNaN(notaId)) return;
+
+    autoOpenNotaIdRef.current = notaIdParam;
+    abrirDetalhes(notaId).finally(() => {
+      const params = new URLSearchParams(searchParams);
+      params.delete('nota_id');
+      setSearchParams(params, { replace: true });
+    });
+  }, [searchParams, setSearchParams]);
+
   const carregarDados = async () => {
     console.log('ðŸ“Š [EntradaXML] Carregando dados...');
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-      console.log('ðŸ”‘ [EntradaXML] Token obtido:', token ? 'SIM' : 'NÃƒO');
+      console.log('ðŸ”‘ [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log('ðŸŒ [EntradaXML] Fazendo requisiÃ§Ãµes para:', {
+      console.log('ðŸŒ [EntradaXML] Fazendo requisicoes para:', {
         notasEntrada: `/notas-entrada/`,
         produtos: `/produtos/` // Sem filtro de ativo para trazer todos os produtos
       });
@@ -117,7 +171,7 @@ const EntradaXML = () => {
     }
 
     if (!file.name.toLowerCase().endsWith('.xml')) {
-      console.error('âŒ [EntradaXML] Arquivo nÃ£o Ã© XML:', file.name);
+      console.error('âŒ [EntradaXML] Arquivo nao Ã© XML:', file.name);
       toast.error('âŒ Por favor, selecione um arquivo XML');
       return;
     }
@@ -176,7 +230,7 @@ const EntradaXML = () => {
       console.error('  - Stack completo:', error.stack);
       
       const errorMsg = error.response?.data?.detail || error.message || 'Erro ao processar XML da NF-e';
-      console.error('  - Mensagem para usuÃ¡rio:', errorMsg);
+      console.error('  - Mensagem para usuario:', errorMsg);
       
       toast.error(`âŒ ${errorMsg}`);
     } finally {
@@ -197,7 +251,7 @@ const EntradaXML = () => {
     // Validar se todos sÃ£o XML
     const invalidFiles = files.filter(f => !f.name.toLowerCase().endsWith('.xml'));
     if (invalidFiles.length > 0) {
-      toast.error(`âŒ ${invalidFiles.length} arquivo(s) nÃ£o sÃ£o XML: ${invalidFiles.map(f => f.name).join(', ')}`);
+      toast.error(`âŒ ${invalidFiles.length} arquivo(s) nao sÃ£o XML: ${invalidFiles.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -275,7 +329,7 @@ const EntradaXML = () => {
   const vincularProduto = async (notaId, itemId, produtoId) => {
     try {
       await api.post(
-        `/notas-entrada/${notaId}/itens/${itemId}/vincular?produto_id=${parseInt(produtoId)}`
+        `/notas-entrada/${notaId}/itens/${itemId}/vincular?produto_id=${Number.parseInt(produtoId)}`
       );
       
       toast.success('âœ… Produto vinculado com sucesso!');
@@ -293,37 +347,22 @@ const EntradaXML = () => {
     }
   };
 
-  const salvarRateioItem = async (notaId, itemId, percentualOnline, percentualLoja) => {
-    try {
-      await api.post(`/notas-entrada/${notaId}/itens/${itemId}/rateio`, {
-        percentual_online: parseFloat(percentualOnline),
-        percentual_loja: parseFloat(percentualLoja)
-      });
-      
-      toast.success('ðŸ“Š Rateio configurado com sucesso!');
-      
-      // Recarregar detalhes
-      const response = await api.get(`/notas-entrada/${notaId}`);
-      setNotaSelecionada(response.data);
-    } catch (error) {
-      console.error('âŒ Erro ao salvar rateio:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar rateio');
-    }
-  };
-
   const salvarTipoRateio = async (notaId, tipo) => {
     try {
       await api.post(`/notas-entrada/${notaId}/rateio`, {
         tipo_rateio: tipo
       });
-      
-      toast.success(`âœ… Nota configurada: ${tipo === 'online' ? '100% Online' : tipo === 'loja' ? '100% Loja FÃ­sica' : 'Rateio Parcial'}`);
+
+      let descricaoTipo = 'Rateio Parcial';
+      if (tipo === 'online') descricaoTipo = '100% Online';
+      if (tipo === 'loja') descricaoTipo = '100% Loja Fisica';
+      toast.success(`Nota configurada: ${descricaoTipo}`);
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
       setNotaSelecionada(response.data);
       
-      // Atualizar estado local para seleÃ§Ã£o visual
+      // Atualizar estado local para selecao visual
       setTipoRateio(tipo);
     } catch (error) {
       console.error('âŒ Erro ao salvar tipo de rateio:', error);
@@ -334,7 +373,7 @@ const EntradaXML = () => {
   const salvarQuantidadeOnlineItem = async (notaId, itemId, quantidadeOnline) => {
     try {
       const response = await api.post(`/notas-entrada/${notaId}/itens/${itemId}/rateio`, {
-        quantidade_online: parseFloat(quantidadeOnline) || 0  // Permitir 0
+        quantidade_online: Number.parseFloat(quantidadeOnline) || 0  // Permitir 0
       });
       
       toast.success('ðŸ“Š Quantidade online configurada!');
@@ -346,7 +385,7 @@ const EntradaXML = () => {
         `${totais.percentual_loja.toFixed(1)}% Loja (R$ ${totais.valor_loja.toFixed(2)})`
       );
       
-      // Atualizar apenas o item especÃ­fico e os totais da nota, sem recarregar tudo
+      // Atualizar apenas o item especifico e os totais da nota, sem recarregar tudo
       setNotaSelecionada(prev => ({
         ...prev,
         percentual_online: totais.percentual_online,
@@ -355,7 +394,7 @@ const EntradaXML = () => {
         valor_loja: totais.valor_loja,
         itens: prev.itens.map(i => 
           i.id === itemId 
-            ? { ...i, quantidade_online: parseFloat(quantidadeOnline) || 0 }
+            ? { ...i, quantidade_online: Number.parseFloat(quantidadeOnline) || 0 }
             : i
         )
       }));
@@ -363,7 +402,7 @@ const EntradaXML = () => {
       // Sincronizar estado local com valor salvo
       setQuantidadesOnline(prev => ({
         ...prev,
-        [itemId]: parseFloat(quantidadeOnline) || 0
+        [itemId]: Number.parseFloat(quantidadeOnline) || 0
       }));
     } catch (error) {
       console.error('âŒ Erro ao salvar quantidade online:', error);
@@ -384,7 +423,7 @@ const EntradaXML = () => {
       // FECHAR o modal de detalhes quando abrir o de revisÃ£o
       setMostrarDetalhes(false);
       
-      // Inicializar preÃ§os ajustados com valores atuais (adaptar para nova estrutura)
+      // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
       const precosIniciais = {};
       response.data.itens.forEach(item => {
         if (item.produto_vinculado) {
@@ -407,7 +446,7 @@ const EntradaXML = () => {
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
-      // Atualizar preÃ§os se houver alteraÃ§Ãµes (adaptar para nova estrutura)
+      // Atualizar precos se houver alteraÃ§Ãµes (adaptar para nova estrutura)
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
         const itemOriginal = previewProcessamento.itens.find(i => 
@@ -416,7 +455,7 @@ const EntradaXML = () => {
         if (itemOriginal && itemOriginal.produto_vinculado && 
             dados.preco_venda !== itemOriginal.produto_vinculado.preco_venda_atual) {
           precosParaAtualizar.push({
-            produto_id: parseInt(produtoId),
+            produto_id: Number.parseInt(produtoId),
             preco_venda: dados.preco_venda
           });
         }
@@ -523,7 +562,7 @@ const EntradaXML = () => {
       
       setHistoricoPrecos(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar histÃ³rico de preÃ§os');
+      toast.error('Erro ao carregar historico de precos');
       setMostrarHistoricoPrecos(false);
     } finally {
       setCarregandoHistorico(false);
@@ -531,7 +570,7 @@ const EntradaXML = () => {
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (!confirm(`âš ï¸ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso irÃ¡:\nâ€¢ Remover as quantidades do estoque\nâ€¢ Excluir os lotes criados\nâ€¢ Estornar as contas a pagar lanÃ§adas\nâ€¢ Restaurar o status da nota para pendente`)) {
+    if (!confirm(`âš ï¸ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\nâ€¢ Remover as quantidades do estoque\nâ€¢ Excluir os lotes criados\nâ€¢ Estornar as contas a pagar lanÃ§adas\nâ€¢ Restaurar o status da nota para pendente`)) {
       return;
     }
 
@@ -576,11 +615,6 @@ const EntradaXML = () => {
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao desvincular produto');
     }
-  };
-
-  const abrirModalVincularProduto = (item) => {
-    setItemSelecionado(item);
-    setMostrarModalVincular(true);
   };
 
   // Detectar divergÃªncias entre NF e produto vinculado
@@ -648,7 +682,7 @@ const EntradaXML = () => {
     setMostrarModalCriarProduto(true);
     setCarregandoSugestao(true);
     
-    // Resetar formulÃ¡rio
+    // Resetar formulario
     setFormProduto({
       sku: '',
       nome: '',
@@ -670,13 +704,13 @@ const EntradaXML = () => {
       // Determinar qual SKU usar
       let skuParaUsar = response.data.sku_proposto || item.codigo_produto || 'PROD-' + item.id;
       
-      // Se o SKU jÃ¡ existe, usar a primeira sugestÃ£o alternativa (a recomendada com â­)
+      // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com â­)
       if (response.data.ja_existe && response.data.sugestoes && response.data.sugestoes.length > 0) {
         const sugestaoRecomendada = response.data.sugestoes.find(s => s.padrao) || response.data.sugestoes[0];
         skuParaUsar = sugestaoRecomendada.sku;
       }
       
-      // Preencher formulÃ¡rio com dados do item
+      // Preencher formulario com dados do item
       setFormProduto({
         sku: skuParaUsar,
         nome: item.descricao || item.descricao_produto || 'Produto sem nome',
@@ -720,11 +754,11 @@ const EntradaXML = () => {
             // Preparar dados convertendo strings para nÃºmeros
       const dadosProduto = {
         ...formProduto,
-        preco_custo: parseFloat(formProduto.preco_custo) || 0,
-        preco_venda: parseFloat(formProduto.preco_venda) || 0,
-        margem_lucro: parseFloat(formProduto.margem_lucro) || 0,
-        estoque_minimo: parseInt(formProduto.estoque_minimo) || 10,
-        estoque_maximo: parseInt(formProduto.estoque_maximo) || 100
+        preco_custo: Number.parseFloat(formProduto.preco_custo) || 0,
+        preco_venda: Number.parseFloat(formProduto.preco_venda) || 0,
+        margem_lucro: Number.parseFloat(formProduto.margem_lucro) || 0,
+        estoque_minimo: Number.parseInt(formProduto.estoque_minimo) || 10,
+        estoque_maximo: Number.parseInt(formProduto.estoque_maximo) || 100
       };
       
       const response = await api.post(
@@ -760,11 +794,11 @@ const EntradaXML = () => {
     const itensNaoVinculados = notaSelecionada.itens.filter(item => !item.produto_id);
     
     if (itensNaoVinculados.length === 0) {
-      toast.success('Todos os produtos jÃ¡ estÃ£o vinculados!');
+      toast.success('Todos os produtos ja estÃ£o vinculados!');
       return;
     }
     
-    const confirmacao = window.confirm(
+    const confirmacao = globalThis.confirm(
       `Criar ${itensNaoVinculados.length} produto(s) automaticamente?\n\n` +
       `PadrÃµes aplicados:\n` +
       `â€¢ Estoque mÃ­nimo: 10\n` +
@@ -791,7 +825,7 @@ const EntradaXML = () => {
           
           let skuParaUsar = skuResponse.data.sku_proposto || item.codigo_produto || `PROD-${item.id}`;
           
-          // Se jÃ¡ existe, usar primeira sugestÃ£o alternativa
+          // Se ja existe, usar primeira sugestao alternativa
           if (skuResponse.data.ja_existe && skuResponse.data.sugestoes?.length > 0) {
             const sugestaoRecomendada = skuResponse.data.sugestoes.find(s => s.padrao) || skuResponse.data.sugestoes[0];
             skuParaUsar = sugestaoRecomendada.sku;
@@ -802,8 +836,8 @@ const EntradaXML = () => {
             sku: skuParaUsar,
             nome: item.descricao || 'Produto sem nome',
             descricao: item.descricao || '',
-            preco_custo: parseFloat(item.valor_unitario) || 0,
-            preco_venda: parseFloat((item.valor_unitario * 1.5).toFixed(2)),
+            preco_custo: Number.parseFloat(item.valor_unitario) || 0,
+            preco_venda: Number.parseFloat((item.valor_unitario * 1.5).toFixed(2)),
             margem_lucro: 50,
             estoque_minimo: 10,
             estoque_maximo: 100
@@ -851,27 +885,127 @@ const EntradaXML = () => {
     return ((venda - custo) / custo * 100).toFixed(2);
   };
 
-  // FunÃ§Ãµes para determinar cores baseadas em comparaÃ§Ãµes
-  const getCorComparacao = (valorNovo, valorAntigo, tipo) => {
-    // ValidaÃ§Ãµes de seguranÃ§a
-    const novo = parseFloat(valorNovo) || 0;
-    const antigo = parseFloat(valorAntigo) || 0;
-    
-    if (novo === antigo) {
-      return { cor: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-300', label: '=' };
+  const carregarConfigSefaz = async () => {
+    try {
+      setConfigSefazLoading(true);
+      const { data } = await api.get('/sefaz/config');
+      setCfgSefaz(prev => ({
+        ...prev,
+        enabled: Boolean(data.enabled),
+        modo: data.modo || 'mock',
+        ambiente: data.ambiente || 'homologacao',
+        uf: data.uf || 'SP',
+        cnpj: data.cnpj || '',
+        importacao_automatica: Boolean(data.importacao_automatica),
+        importacao_intervalo_min: Number(data.importacao_intervalo_min || 15),
+        cert_ok: Boolean(data.cert_ok),
+        ultimo_sync_status: data.ultimo_sync_status || 'nunca',
+        ultimo_sync_mensagem: data.ultimo_sync_mensagem || 'Ainda nao sincronizado.',
+        ultimo_sync_at: data.ultimo_sync_at || null,
+        ultimo_sync_documentos: Number(data.ultimo_sync_documentos || 0),
+      }));
+    } catch {
+      setMensagemRotina('Nao foi possivel carregar a configuracao da SEFAZ.');
+    } finally {
+      setConfigSefazLoading(false);
     }
-    
-    // Para custo: menor Ã© melhor (verde), maior Ã© pior (vermelho)
-    if (tipo === 'custo') {
-      return novo < antigo 
-        ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'â†“' }
-        : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: 'â†‘' };
+  };
+
+  const salvarRotinaSefaz = async () => {
+    setMensagemRotina('');
+    try {
+      setSalvandoRotina(true);
+      await api.post('/sefaz/config', {
+        enabled: cfgSefaz.enabled,
+        modo: cfgSefaz.modo,
+        ambiente: cfgSefaz.ambiente,
+        uf: cfgSefaz.uf,
+        cnpj: cfgSefaz.cnpj,
+        importacao_automatica: cfgSefaz.importacao_automatica,
+        importacao_intervalo_min: Number(cfgSefaz.importacao_intervalo_min || 15),
+      });
+      setMensagemRotina('Rotina automatica salva com sucesso.');
+      await carregarConfigSefaz();
+    } catch (err) {
+      setMensagemRotina(err?.response?.data?.detail || 'Erro ao salvar rotina automatica.');
+    } finally {
+      setSalvandoRotina(false);
     }
-    
-    // Para preÃ§o e margem: maior Ã© melhor (verde), menor Ã© pior (vermelho)
-    return novo > antigo
-      ? { cor: 'text-green-600', bg: 'bg-green-50', border: 'border-green-300', label: 'â†‘' }
-      : { cor: 'text-red-600', bg: 'bg-red-50', border: 'border-red-300', label: 'â†“' };
+  };
+
+  const sincronizarAgoraSefaz = async () => {
+    setMensagemRotina('');
+    try {
+      setSincronizando(true);
+      const { data } = await api.post('/sefaz/sync-now');
+      setMensagemRotina(data?.mensagem || 'Sincronizacao solicitada.');
+      await carregarConfigSefaz();
+    } catch (err) {
+      setMensagemRotina(err?.response?.data?.detail || 'Erro ao sincronizar agora.');
+    } finally {
+      setSincronizando(false);
+    }
+  };
+
+  const consultarSefaz = async (e) => {
+    e.preventDefault();
+    setErroSefaz('');
+    setAvisoConectorSefaz('');
+    if (chaveSefaz.length !== 44) {
+      setErroSefaz('A chave de acesso deve ter exatamente 44 digitos.');
+      return;
+    }
+    try {
+      setLoadingSefaz(true);
+      const resp = await api.post('/sefaz/consultar', { chave_acesso: chaveSefaz });
+      const novaConsulta = {
+        id: `${Date.now()}-${resp.data.chave_acesso}`,
+        criadoEm: new Date().toISOString(),
+        dados: resp.data,
+      };
+      setConsultasSefaz(prev => [novaConsulta, ...prev]);
+      setConsultaExpandidaId(null);
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Erro ao consultar a SEFAZ.';
+      const httpStatus = Number(err?.response?.status || 0);
+      if (httpStatus === 501 && msg.toLowerCase().includes('conector')) {
+        setAvisoConectorSefaz(msg);
+      } else {
+        setErroSefaz(msg);
+      }
+    } finally {
+      setLoadingSefaz(false);
+    }
+  };
+
+  const usarNaEntrada = async (consulta) => {
+    const xmlNfe = consulta?.dados?.xml_nfe;
+    if (!xmlNfe) {
+      toast.error('Esta consulta nao trouxe XML completo. Tente outra chave ou rode sincronizacao real.');
+      return;
+    }
+    try {
+      setImportandoConsultaId(consulta.id);
+      const fileName = montarNomeXml(consulta.dados);
+      const blob = new Blob([xmlNfe], { type: 'application/xml;charset=utf-8' });
+      const file = new File([blob], fileName, { type: 'text/xml' });
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post('/notas-entrada/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('NF-e importada com sucesso!');
+      await carregarDados();
+      const notaIdCriada = data?.nota_id;
+      if (notaIdCriada) {
+        await abrirDetalhes(notaIdCriada);
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Falha ao importar NF-e.';
+      toast.error(msg);
+    } finally {
+      setImportandoConsultaId(null);
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -881,135 +1015,284 @@ const EntradaXML = () => {
       cancelada: 'bg-red-200 text-red-800',
       erro: 'bg-red-300 text-red-900'
     };
+    const labels = {
+      pendente: 'Pendente',
+      processada: 'Conciliada',
+      cancelada: 'Cancelada',
+      erro: 'Erro',
+    };
     return (
       <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || 'bg-gray-200'}`}>
-        {status.toUpperCase()}
+        {labels[status] || status.toUpperCase()}
       </span>
     );
   };
 
   const getConfiancaBadge = (confianca) => {
-    if (!confianca) return <span className="text-gray-400 text-sm">NÃ£o vinculado</span>;
-    
-    const nivel = confianca >= 90 ? 'alta' : confianca >= 70 ? 'media' : 'baixa';
+    if (!confianca) return <span className="text-gray-400 text-sm">Nao vinculado</span>;
+
+    let nivel = 'baixa';
+    if (confianca >= 90) nivel = 'alta';
+    else if (confianca >= 70) nivel = 'media';
+
     const styles = {
       alta: 'bg-green-100 text-green-800',
       media: 'bg-yellow-100 text-yellow-800',
       baixa: 'bg-orange-100 text-orange-800'
     };
+
+    let selo = 'BAIXA';
+    if (nivel === 'alta') selo = 'OK';
+    else if (nivel === 'media') selo = 'ATENCAO';
     
     return (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[nivel]}`}>
-        {confianca.toFixed(1)}% {nivel === 'alta' ? 'âœ…' : nivel === 'media' ? 'âš ï¸' : 'âš¡'}
+        {confianca.toFixed(1)}% {selo}
       </span>
     );
   };
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">ðŸ“„ Entrada por NF-e (XML)</h1>
-        <p className="text-gray-600">Importe notas fiscais eletrÃ´nicas e vincule produtos automaticamente</p>
-      </div>
-
-      {/* Ãrea de Upload */}
-      <div className="bg-white rounded-lg shadow-md p-8 mb-6">
-        <div className="text-center">
-          <div className="mb-4">
-            <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold mb-2">
-            {uploadingFile ? 'â³ Processando XML...' : 'Selecione o arquivo XML da NF-e'}
-          </h3>
-          <p className="text-sm text-gray-500 mb-4">
-            O sistema irÃ¡ processar automaticamente os dados da nota fiscal
-          </p>
-          
-          {/* BotÃµes de Upload */}
-          <div className="flex gap-3 justify-center">
-            {/* Upload Ãšnico */}
-            <label className="inline-block">
-              <input
-                type="file"
-                accept=".xml"
-                onChange={handleFileUpload}
-                disabled={uploadingFile || uploadingLote}
-                className="hidden"
-              />
-              <span className={`
-                px-6 py-3 rounded-lg font-semibold cursor-pointer inline-block
-                ${(uploadingFile || uploadingLote)
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'}
-              `}>
-                {uploadingFile ? 'â³ Processando...' : 'ðŸ“ Upload Ãšnico'}
-              </span>
-            </label>
-            
-            {/* Upload MÃºltiplo */}
-            <label className="inline-block">
-              <input
-                type="file"
-                accept=".xml"
-                multiple
-                onChange={handleMultipleFilesUpload}
-                disabled={uploadingFile || uploadingLote}
-                className="hidden"
-              />
-              <span className={`
-                px-6 py-3 rounded-lg font-semibold cursor-pointer inline-block
-                ${(uploadingFile || uploadingLote)
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-green-600 hover:bg-green-700 text-white'}
-              `}>
-                {uploadingLote ? 'â³ Processando Lote...' : 'ðŸ“¦ Upload MÃºltiplo'}
-              </span>
-            </label>
-          </div>
-          
-          <p className="text-xs text-gray-500 mt-3">
-            Formatos aceitos: XML de NF-e (padrÃ£o SEFAZ)
-          </p>
+      {/* Cabecalho + Acoes */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Central NF-e Entradas</h1>
+          <p className="text-gray-600 text-sm mt-1">Gerencie todas as notas fiscais de entrada — via upload ou direto da SEFAZ</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-block">
+            <input type="file" accept=".xml" onChange={handleFileUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
+            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+              {uploadingFile ? 'Processando...' : 'Importar XML'}
+            </span>
+          </label>
+          <label className="inline-block">
+            <input type="file" accept=".xml" multiple onChange={handleMultipleFilesUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
+            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
+              {uploadingLote ? 'Processando lote...' : 'Importar Varios XML'}
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={() => { setMostrarPainelSefaz(v => !v); setMostrarConfigSefaz(false); }}
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarPainelSefaz ? 'bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
+          >
+            Buscar pela SEFAZ
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMostrarConfigSefaz(v => !v); if (!mostrarConfigSefaz) { carregarConfigSefaz(); } setMostrarPainelSefaz(false); }}
+            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarConfigSefaz ? 'bg-gray-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}`}
+          >
+            Configurar SEFAZ
+          </button>
         </div>
       </div>
 
-      {/* EstatÃ­sticas */}
+      {/* Painel: Buscar pela SEFAZ */}
+      {mostrarPainelSefaz && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-emerald-500">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">Buscar NF-e pela SEFAZ</h2>
+          <form onSubmit={consultarSefaz} className="flex gap-3 mb-2">
+            <input
+              type="text"
+              value={chaveSefaz}
+              onChange={e => setChaveSefaz(formatarChaveAcesso(e.target.value))}
+              onPaste={e => { e.preventDefault(); setChaveSefaz(formatarChaveAcesso(e.clipboardData?.getData('text') || '')); }}
+              placeholder="Chave de acesso (44 digitos)"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              maxLength={80}
+            />
+            <button
+              type="submit"
+              disabled={loadingSefaz || chaveSefaz.length !== 44}
+              className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
+            >
+              {loadingSefaz ? 'Consultando...' : 'Consultar'}
+            </button>
+          </form>
+          <p className="text-xs text-gray-400 mb-3">{chaveSefaz.length}/44 digitos</p>
+          {erroSefaz && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{erroSefaz}</div>}
+          {avisoConectorSefaz && (
+            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+              <strong>Integracao validada, etapa final pendente:</strong> {avisoConectorSefaz}
+            </div>
+          )}
+          {consultasSefaz.length > 0 && (
+            <div className="space-y-3 mt-4">
+              <p className="text-sm font-semibold text-gray-700">Consultas desta sessao ({consultasSefaz.length}):</p>
+              {consultasSefaz.map(consulta => {
+                const exp = consultaExpandidaId === consulta.id;
+                const d = consulta.dados;
+                return (
+                  <div key={consulta.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setConsultaExpandidaId(exp ? null : consulta.id)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-gray-800">NF {d.numero_nf}/{d.serie} — {d.emitente_nome}</span>
+                        <span className="text-xs text-gray-500">{d.itens?.length || 0} itens · {formatMoneyBRL(d.valor_total_nf)}</span>
+                      </div>
+                    </button>
+                    <div className="px-4 pb-3 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-2 items-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => usarNaEntrada(consulta)}
+                        disabled={importandoConsultaId === consulta.id}
+                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        {importandoConsultaId === consulta.id ? 'Importando...' : 'Usar esta NF na Entrada'}
+                      </button>
+                    </div>
+                    {exp && d.itens?.length > 0 && (
+                      <div className="p-4 border-t border-gray-100 overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-600 uppercase">
+                              <th className="text-left px-2 py-1">Cod.</th>
+                              <th className="text-left px-2 py-1">Descricao</th>
+                              <th className="text-right px-2 py-1">Qtd</th>
+                              <th className="text-right px-2 py-1">Unit.</th>
+                              <th className="text-right px-2 py-1">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {d.itens.map(item => (
+                              <tr key={item.numero_item} className="hover:bg-gray-50">
+                                <td className="px-2 py-1 font-mono">{item.codigo_produto}</td>
+                                <td className="px-2 py-1">{item.descricao}</td>
+                                <td className="px-2 py-1 text-right">{item.quantidade}</td>
+                                <td className="px-2 py-1 text-right">{formatMoneyBRL(item.valor_unitario)}</td>
+                                <td className="px-2 py-1 text-right font-semibold">{formatMoneyBRL(item.valor_total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Painel: Configurar SEFAZ */}
+      {mostrarConfigSefaz && (
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-gray-500">
+          <h2 className="text-lg font-bold text-gray-800 mb-1">Configurar SEFAZ</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Certificado digital e parametros ficam em{' '}
+            <Link to="/configuracoes/integracoes" className="text-indigo-600 font-semibold">Configuracoes &gt; Integracoes</Link>.
+            Aqui configure apenas a rotina automatica.
+          </p>
+          {configSefazLoading ? (
+            <p className="text-sm text-gray-500">Carregando configuracao...</p>
+          ) : (
+            <>
+              {(!cfgSefaz.enabled || !cfgSefaz.cert_ok) && (
+                <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm mb-4">
+                  Integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes &gt; Integracoes.
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={cfgSefaz.importacao_automatica}
+                    onChange={e => setCfgSefaz(prev => ({ ...prev, importacao_automatica: e.target.checked }))}
+                  />
+                  <span>Ativar importacao automatica</span>
+                </label>
+                <div>
+                  <label htmlFor="sefaz-intervalo" className="block text-sm font-medium text-gray-700 mb-1">Intervalo (minutos)</label>
+                  <input
+                    id="sefaz-intervalo"
+                    type="number"
+                    min={5}
+                    step={1}
+                    value={cfgSefaz.importacao_intervalo_min}
+                    onChange={e => setCfgSefaz(prev => ({ ...prev, importacao_intervalo_min: Number(e.target.value || 15) }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+                <div>Ultima sincronizacao: <strong>{cfgSefaz.ultimo_sync_at ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR') : '-'}</strong></div>
+                <div>Status: <strong>{cfgSefaz.ultimo_sync_status}</strong></div>
+                <div>Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong></div>
+                <div>Modo atual: <strong>{cfgSefaz.modo}</strong></div>
+                <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
+              </div>
+              {mensagemRotina && (
+                <div className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 mb-4">{mensagemRotina}</div>
+              )}
+              <div className="flex flex-wrap gap-3">
+                <button type="button" onClick={salvarRotinaSefaz} disabled={salvandoRotina} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
+                  {salvandoRotina ? 'Salvando...' : 'Salvar rotina'}
+                </button>
+                <button type="button" onClick={sincronizarAgoraSefaz} disabled={sincronizando} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60">
+                  {sincronizando ? 'Sincronizando...' : 'Sincronizar agora'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Estatisticas */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('todos')}>
           <div className="text-2xl font-bold text-blue-600">
             {notasEntrada.length}
           </div>
           <div className="text-sm text-gray-600">Total de Notas</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('pendente')}>
           <div className="text-2xl font-bold text-yellow-600">
             {notasEntrada.filter(n => n.status === 'pendente').length}
           </div>
           <div className="text-sm text-gray-600">Pendentes</div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
+        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('processada')}>
           <div className="text-2xl font-bold text-green-600">
             {notasEntrada.filter(n => n.status === 'processada').length}
           </div>
-          <div className="text-sm text-gray-600">Processadas</div>
+          <div className="text-sm text-gray-600">Conciliadas</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-purple-600">
-            R$ {notasEntrada
-              .filter(n => n.status === 'processada')
-              .reduce((sum, n) => sum + (n.valor_total || 0), 0)
-              .toFixed(2)}
+            {formatMoneyBRL(notasEntrada.filter(n => n.status === 'processada').reduce((sum, n) => sum + (n.valor_total || 0), 0))}
           </div>
-          <div className="text-sm text-gray-600">Valor Processado</div>
+          <div className="text-sm text-gray-600">Valor Conciliado</div>
         </div>
       </div>
 
       {/* Lista de Notas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50">
-          <h2 className="text-lg font-semibold">Notas Fiscais Importadas</h2>
+        <div className="px-6 py-4 border-b bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Notas Fiscais de Entrada</h2>
+          <div className="flex flex-wrap gap-1">
+            {[
+              { v: 'todos', label: 'Todas' },
+              { v: 'pendente', label: 'Pendentes' },
+              { v: 'processada', label: 'Conciliadas' },
+              { v: 'erro', label: 'Com Erro' },
+            ].map(({ v, label }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setFiltroStatus(v)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${filtroStatus === v ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -1017,24 +1300,30 @@ const EntradaXML = () => {
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Chave NF-e</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Data EmissÃ£o</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Data Emissao</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Itens</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">AÃ§Ãµes</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold">Acoes</th>
               </tr>
             </thead>
             <tbody>
-              {notasEntrada.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                    Nenhuma nota fiscal importada ainda. FaÃ§a o upload de um XML acima.
-                  </td>
-                </tr>
-              ) : (
-                notasEntrada.map(nota => (
-                  <tr 
-                    key={nota.id} 
+              {(() => {
+                const notas = filtroStatus === 'todos' ? notasEntrada : notasEntrada.filter(n => n.status === filtroStatus);
+                if (notas.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                        {notasEntrada.length === 0
+                          ? 'Nenhuma nota fiscal importada. Importe um XML ou busque pela SEFAZ.'
+                          : `Nenhuma nota com status "${filtroStatus}".`}
+                      </td>
+                    </tr>
+                  );
+                }
+                return notas.map(nota => (
+                  <tr
+                    key={nota.id}
                     onClick={() => abrirVisualizacao(nota.id)}
                     className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
                   >
@@ -1046,7 +1335,7 @@ const EntradaXML = () => {
                       <div className="text-xs text-gray-500">{nota.fornecedor_cnpj}</div>
                     </td>
                     <td className="px-4 py-3">{new Date(nota.data_emissao).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold">R$ {(nota.valor_total || 0).toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{formatMoneyBRL(nota.valor_total || 0)}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
                         {nota.produtos_vinculados + nota.produtos_nao_vinculados} itens
@@ -1061,7 +1350,7 @@ const EntradaXML = () => {
                             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
                             title="Vincular produtos"
                           >
-                            ðŸ”— Vincular
+                            Vincular
                           </button>
                         )}
                         {nota.entrada_estoque_realizada ? (
@@ -1070,7 +1359,7 @@ const EntradaXML = () => {
                             className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
                             title="Reverter entrada no estoque"
                           >
-                            â†©ï¸ Reverter
+                            Reverter
                           </button>
                         ) : (
                           <button
@@ -1078,14 +1367,14 @@ const EntradaXML = () => {
                             className="text-red-600 hover:text-red-800 font-semibold text-sm"
                             title="Excluir nota"
                           >
-                            ðŸ—‘ï¸ Excluir
+                            Excluir
                           </button>
                         )}
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -1095,10 +1384,10 @@ const EntradaXML = () => {
       {mostrarDetalhes && notaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            {/* CabeÃ§alho */}
+            {/* Cabecalho */}
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">ðŸ“„ Detalhes da NF-e</h2>
+                <h2 className="text-xl font-bold">Detalhes da NF-e</h2>
                 <p className="text-sm text-gray-600">Chave: {notaSelecionada.chave_acesso}</p>
               </div>
               <button
@@ -1108,11 +1397,11 @@ const EntradaXML = () => {
                 }}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
-                Ã—
+                X
               </button>
             </div>
 
-            {/* InformaÃ§Ãµes da Nota */}
+            {/* Informacoes da Nota */}
             <div className="px-6 py-4 border-b bg-gray-50">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
@@ -1120,11 +1409,11 @@ const EntradaXML = () => {
                   <div className="font-semibold">{notaSelecionada.fornecedor_nome}</div>
                   <div className="text-xs text-gray-500">{notaSelecionada.fornecedor_cnpj}</div>
                   {notaSelecionada.fornecedor_id && (
-                    <div className="text-xs text-green-600 mt-1">âœ… Cadastrado</div>
+                    <div className="text-xs text-green-600 mt-1">Cadastrado</div>
                   )}
                 </div>
                 <div>
-                  <span className="text-gray-600">Data EmissÃ£o:</span>
+                  <span className="text-gray-600">Data Emissao:</span>
                   <div className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString()}</div>
                 </div>
                 <div>
@@ -1134,7 +1423,7 @@ const EntradaXML = () => {
               </div>
             </div>
 
-            {/* Alerta de Fornecedor Novo - VersÃ£o Compacta */}
+            {/* Alerta de Fornecedor Novo - Versao Compacta */}
             {notaSelecionada.fornecedor_id && notaSelecionada.fornecedor_criado_automaticamente && (
               <div className="px-6 py-2 bg-blue-50 border-b border-blue-200">
                 <div className="flex items-center justify-between">
@@ -1145,7 +1434,7 @@ const EntradaXML = () => {
                     onClick={() => navigate(`/clientes/${notaSelecionada.fornecedor_id}`)}
                     className="px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 text-xs"
                   >
-                    ðŸ“ Completar Cadastro
+                    Completar Cadastro
                   </button>
                 </div>
               </div>
@@ -1155,7 +1444,7 @@ const EntradaXML = () => {
             <div className="px-6 py-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-xl text-gray-800">
-                  ðŸ“¦ Produtos da Nota ({notaSelecionada.itens.length})
+                  Produtos da Nota ({notaSelecionada.itens.length})
                 </h3>
                 
                 {notaSelecionada.status === 'pendente' && 
@@ -1164,9 +1453,9 @@ const EntradaXML = () => {
                     onClick={criarTodosProdutosNaoVinculados}
                     disabled={loading}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-                    title="Cria automaticamente todos os produtos nÃ£o vinculados com os padrÃµes: Estoque mÃ­n: 10, mÃ¡x: 100, Margem: 50%"
+                    title="Cria automaticamente todos os produtos nao vinculados com os padrÃµes: Estoque mÃ­n: 10, mÃ¡x: 100, Margem: 50%"
                   >
-                    <span>âœ¨ Criar Todos NÃ£o Vinculados</span>
+                    <span>Criar Todos Nao Vinculados</span>
                     <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
                       {notaSelecionada.itens.filter(i => !i.produto_id).length}
                     </span>
@@ -1194,7 +1483,7 @@ const EntradaXML = () => {
                           
                           <div className="space-y-1.5 text-sm">
                             <div className="flex justify-between">
-                              <span className="text-gray-600">CÃ³digo:</span>
+                              <span className="text-gray-600">Codigo:</span>
                               <span className="font-mono font-semibold">{item.codigo_produto}</span>
                             </div>
                             {item.ean && item.ean !== 'SEM GTIN' && (
@@ -1230,13 +1519,13 @@ const EntradaXML = () => {
                             <div className="mt-3 pt-3 border-t space-y-2">
                               {item.lote && (
                                 <div className="text-xs">
-                                  <span className="text-gray-600">ðŸ“¦ Lote:</span>
+                                  <span className="text-gray-600">Lote:</span>
                                   <div className="font-semibold text-purple-800">{item.lote}</div>
                                 </div>
                               )}
                               {item.data_validade && (
                                 <div className="text-xs">
-                                  <span className="text-gray-600">ðŸ“… Validade:</span>
+                                  <span className="text-gray-600">Validade:</span>
                                   <div className="font-semibold text-orange-800">
                                     {new Date(item.data_validade).toLocaleDateString('pt-BR')}
                                   </div>
@@ -1253,9 +1542,9 @@ const EntradaXML = () => {
                               <button
                                 onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
                                 className="text-3xl text-green-600 hover:text-red-600 transition-colors mb-2"
-                                title="âœ… Vinculado - Clique para desvincular"
+                                title="Vinculado - Clique para desvincular"
                               >
-                                âœ“
+                                V
                               </button>
                               {temDivergencia && (
                                 <div className="bg-red-100 border-2 border-red-500 rounded-lg p-2 max-w-[200px]">
@@ -1265,8 +1554,8 @@ const EntradaXML = () => {
                                       DIVERGÃŠNCIA!
                                     </div>
                                     <div className="text-[10px] text-red-600 space-y-0.5">
-                                      {divergencias.map((div, idx) => (
-                                        <div key={idx}>â€¢ {div}</div>
+                                      {divergencias.map((div) => (
+                                        <div key={`${item.id}-${div}`}>â€¢ {div}</div>
                                       ))}
                                     </div>
                                   </div>
@@ -1275,7 +1564,7 @@ const EntradaXML = () => {
                             </>
                           ) : (
                             <div className="text-3xl text-gray-400" title="âŒ NÃ£o vinculado">
-                              âœ•
+                              X
                             </div>
                           )}
                         </div>
@@ -1291,7 +1580,7 @@ const EntradaXML = () => {
                                 <>
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      âœ… PRODUTO SISTEMA
+                                      PRODUTO SISTEMA
                                     </div>
                                   </div>
                                   
@@ -1300,7 +1589,7 @@ const EntradaXML = () => {
                                   </div>
 
                                   <div className="text-xs text-green-700 mb-3 italic">
-                                    ðŸ’¡ Para alterar o vÃ­nculo, selecione outro produto ou clique no âœ“ para desvincular
+                                    Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
                                   </div>
 
                                   {/* Select para trocar produto */}
@@ -1327,16 +1616,16 @@ const EntradaXML = () => {
                                 <>
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      âš ï¸ NÃƒO VINCULADO
+                                      âš ï¸ NAO VINCULADO
                                     </div>
                                   </div>
                                   
                                   <div className="space-y-3">
                                     {/* Campo de pesquisa */}
                                     <div>
-                                      <label className="block text-xs font-semibold text-gray-700 mb-1">
-                                        ðŸ” Pesquisar produto existente:
-                                      </label>
+                                      <div className="block text-xs font-semibold text-gray-700 mb-1">
+                                        Pesquisar produto existente:
+                                      </div>
                                       <input
                                         type="text"
                                         placeholder="Digite nome ou SKU..."
@@ -1373,7 +1662,7 @@ const EntradaXML = () => {
                                               }}
                                               className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
                                             >
-                                              {!p.ativo && 'ðŸ”´ '}{p.codigo} - {p.nome}
+                                              {!p.ativo && '[INATIVO] '}{p.codigo} - {p.nome}
                                               {!p.ativo && ' [INATIVO]'} 
                                               <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
                                             </button>
@@ -1410,12 +1699,12 @@ const EntradaXML = () => {
                               )}
                             </>
                           ) : (
-                            // Nota jÃ¡ processada - apenas visualizaÃ§Ã£o
+                            // Nota ja processada - apenas visualizacao
                             <div>
                               {item.produto_id ? (
                                 <>
                                   <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
-                                    âœ… VINCULADO
+                                    VINCULADO
                                   </div>
                                   <div className="font-semibold text-base text-green-900">
                                     {item.produto_nome}
@@ -1423,7 +1712,7 @@ const EntradaXML = () => {
                                 </>
                               ) : (
                                 <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
-                                  âš ï¸ NÃƒO VINCULADO
+                                  âš ï¸ NAO VINCULADO
                                 </div>
                               )}
                             </div>
@@ -1437,14 +1726,12 @@ const EntradaXML = () => {
                        item.produto_id && (
                         <div className="col-span-3 p-4 border-t-2 border-gray-300 bg-gradient-to-r from-blue-50 via-gray-50 to-green-50">
                           <h4 className="font-medium text-gray-700 mb-3 flex items-center text-sm">
-                            ðŸ“¦ Quantidade destinada ao estoque online
+                            Quantidade destinada ao estoque online
                           </h4>
                           
                           <div className="grid grid-cols-3 gap-4">
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                ðŸ“‹ Total NF
-                              </label>
+                              <div className="block text-xs font-medium text-gray-600 mb-1">Total NF</div>
                               <input
                                 type="number"
                                 value={item.quantidade}
@@ -1454,9 +1741,7 @@ const EntradaXML = () => {
                             </div>
                             
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                ðŸŒ Online
-                              </label>
+                              <div className="block text-xs font-medium text-gray-700 mb-1">Online</div>
                               <input
                                 type="number"
                                 min="0"
@@ -1464,7 +1749,7 @@ const EntradaXML = () => {
                                 step="0.01"
                                 value={quantidadesOnline[item.id] ?? item.quantidade_online ?? 0}
                                 onChange={(e) => {
-                                  const valor = parseFloat(e.target.value) || 0;
+                                  const valor = Number.parseFloat(e.target.value) || 0;
                                   setQuantidadesOnline({
                                     ...quantidadesOnline,
                                     [item.id]: Math.min(valor, item.quantidade)
@@ -1476,9 +1761,7 @@ const EntradaXML = () => {
                             </div>
                             
                             <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">
-                                ðŸª Loja
-                              </label>
+                              <div className="block text-xs font-medium text-gray-600 mb-1">Loja</div>
                               <input
                                 type="number"
                                 value={(item.quantidade - (quantidadesOnline[item.id] ?? item.quantidade_online ?? 0)).toFixed(2)}
@@ -1489,7 +1772,7 @@ const EntradaXML = () => {
                           </div>
                           
                           <div className="mt-3 text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-300 font-medium">
-                            ðŸ’µ Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
+                            Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
                           </div>
                           
                           {(quantidadesOnline[item.id] !== undefined && 
@@ -1502,12 +1785,12 @@ const EntradaXML = () => {
                               )}
                               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 mt-3 text-sm"
                             >
-                              ðŸ’¾ Salvar DistribuiÃ§Ã£o
+                              Salvar Distribuicao
                             </button>
                           ) : (
                             item.quantidade_online !== null && item.quantidade_online !== undefined && (
                               <div className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3 border border-green-200 flex items-center justify-center font-medium">
-                                âœ… Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
+                                Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
                               </div>
                             )
                           )}
@@ -1517,7 +1800,7 @@ const EntradaXML = () => {
 
                     {notaSelecionada.status === 'processada' && item.produto_id && (
                       <div className="mt-3 pt-3 border-t bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <span className="text-blue-800 font-semibold">âœ… LanÃ§ado no estoque:</span>
+                        <span className="text-blue-800 font-semibold">Lancado no estoque:</span>
                         <span className="ml-2">{item.produto_nome}</span>
                       </div>
                     )}
@@ -1527,17 +1810,17 @@ const EntradaXML = () => {
               </div>
             </div>
 
-            {/* RodapÃ© com AÃ§Ãµes */}
+            {/* Rodape com Acoes */}
             {notaSelecionada.status === 'pendente' && (
               <div className="sticky bottom-0 bg-white border-t px-6 py-4 space-y-3">
-                {/* SeÃ§Ã£o de Rateio - ANTES de processar */}
+                {/* Secao de Rateio - ANTES de processar */}
                 <div className="bg-gray-50 border border-gray-200 rounded p-3">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-700">
-                      ðŸ“Š DistribuiÃ§Ã£o (informativo para relatÃ³rios)
+                      Distribuicao (informativo para relatorios)
                     </h4>
                     <div className="text-xs text-gray-500">
-                      Estoque unificado â€¢ ClassificaÃ§Ã£o apenas para anÃ¡lises
+                      Estoque unificado - Classificacao apenas para analises
                     </div>
                   </div>
                   
@@ -1551,7 +1834,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      ðŸª Loja
+                      Loja
                     </button>
                     <button
                       onClick={() => salvarTipoRateio(notaSelecionada.id, 'online')}
@@ -1562,7 +1845,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      ðŸŒ Online
+                      Online
                     </button>
                     <button
                       onClick={() => salvarTipoRateio(notaSelecionada.id, 'parcial')}
@@ -1573,7 +1856,7 @@ const EntradaXML = () => {
                           : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
                       } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                      ðŸ“Š Parcial
+                      Parcial
                     </button>
                     
                     {(notaSelecionada.percentual_online > 0 || notaSelecionada.tipo_rateio) && (
@@ -1586,12 +1869,12 @@ const EntradaXML = () => {
 
                   {tipoRateio === 'parcial' && (
                     <div className="mt-2 text-xs text-gray-600 bg-gray-100 rounded p-2">
-                      ðŸ’¡ Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
+                      Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
                     </div>
                   )}
                 </div>
 
-                {/* Barra de Status e BotÃµes de AÃ§Ã£o */}
+                {/* Barra de Status e Botoes de Acao */}
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">
                     {notaSelecionada.itens.filter(i => i.produto_id).length} de {notaSelecionada.itens.length} produtos vinculados
@@ -1603,7 +1886,7 @@ const EntradaXML = () => {
                         disabled={loading}
                         className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:bg-gray-400"
                       >
-                        {loading ? 'â³ Revertendo...' : 'â†©ï¸ Reverter Entrada'}
+                        {loading ? 'Revertendo...' : 'Reverter Entrada'}
                       </button>
                     ) : (
                       <>
@@ -1613,7 +1896,7 @@ const EntradaXML = () => {
                             disabled={loading}
                             className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-400"
                           >
-                            ðŸ—‘ï¸ Excluir Nota
+                            Excluir Nota
                           </button>
                         )}
                         {notaSelecionada.itens.some(i => i.produto_id) && (
@@ -1623,14 +1906,14 @@ const EntradaXML = () => {
                               disabled={loading}
                               className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                             >
-                              ðŸ’° Revisar PreÃ§os
+                              Revisar Precos
                             </button>
                             <button
                               onClick={() => processarNota(notaSelecionada.id)}
                               disabled={loading}
                               className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
                             >
-                              {loading ? 'â³ Processando...' : 'âœ… Processar Nota'}
+                              {loading ? 'Processando...' : 'Processar Nota'}
                             </button>
                           </>
                         )}
@@ -1659,7 +1942,7 @@ const EntradaXML = () => {
           <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">âž• Criar Novo Produto</h2>
+                <h2 className="text-xl font-bold">Criar Novo Produto</h2>
                 <p className="text-sm text-gray-600">A partir do item da NF-e</p>
               </div>
               <button
@@ -1670,7 +1953,7 @@ const EntradaXML = () => {
                 }}
                 className="text-gray-500 hover:text-gray-700 text-2xl"
               >
-                Ã—
+                X
               </button>
             </div>
 
@@ -1678,21 +1961,21 @@ const EntradaXML = () => {
               {carregandoSugestao ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Gerando sugestÃµes de SKU...</p>
+                  <p className="text-gray-600">Gerando sugestoes de SKU...</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {/* InformaÃ§Ãµes do Item da NF-e */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="font-semibold text-blue-900 mb-2">ðŸ“„ Dados da NF-e:</div>
+                    <div className="font-semibold text-blue-900 mb-2">Dados da NF-e:</div>
                     <div className="text-sm space-y-1 text-blue-800">
-                      <div><strong>DescriÃ§Ã£o:</strong> {itemSelecionadoParaCriar.descricao}</div>
-                      <div><strong>CÃ³digo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
+                      <div><strong>Descricao:</strong> {itemSelecionadoParaCriar.descricao}</div>
+                      <div><strong>Codigo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
                       <div><strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}</div>
                       {itemSelecionadoParaCriar.ean && (
                         <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
                       )}
-                      <div><strong>Valor UnitÃ¡rio:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
+                      <div><strong>Valor Unitario:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
                     </div>
                   </div>
 
@@ -1703,14 +1986,14 @@ const EntradaXML = () => {
                         <span className="text-2xl">âš ï¸</span>
                         <div className="flex-1">
                           <div className="font-semibold text-yellow-900 mb-2">
-                            CÃ³digo do fornecedor "{sugestaoSku.sku_proposto}" jÃ¡ estÃ¡ em uso!
+                            Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja estÃ¡ em uso!
                           </div>
                           <div className="text-sm text-yellow-800 mb-3">
                             Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br/>
                             <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. VocÃª pode alterar se preferir.</span>
                           </div>
                           <div className="text-sm text-yellow-800 mb-2 font-semibold">
-                            Outras opÃ§Ãµes de SKU disponÃ­veis:
+                            Outras opcoes de SKU disponÃ­veis:
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {sugestaoSku.sugestoes.map(sug => (
@@ -1732,42 +2015,44 @@ const EntradaXML = () => {
                     </div>
                   )}
 
-                  {/* Sucesso - SKU disponÃ­vel */}
+                  {/* Sucesso - SKU disponivel */}
                   {sugestaoSku && !sugestaoSku.ja_existe && (
                     <div className="bg-green-50 border border-green-300 rounded-lg p-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-xl">âœ…</span>
+                        <span className="text-xl">OK</span>
                         <div className="text-sm text-green-800">
-                          <strong>SKU disponÃ­vel!</strong> O cÃ³digo do fornecedor pode ser usado diretamente.
+                          <strong>SKU disponivel!</strong> O codigo do fornecedor pode ser usado diretamente.
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* FormulÃ¡rio */}
+                  {/* Formulario */}
                   <div className="space-y-4">
                     {/* SKU */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        SKU / CÃ³digo do Produto *
-                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no cÃ³digo do fornecedor)</span>
+                      <label htmlFor="novo-produto-sku" className="block text-sm font-semibold text-gray-700 mb-1">
+                        SKU / Codigo do Produto *
+                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no codigo do fornecedor)</span>
                       </label>
                       <input
+                        id="novo-produto-sku"
                         type="text"
                         value={formProduto.sku}
                         onChange={(e) => setFormProduto({ ...formProduto, sku: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
                         placeholder="Ex: MGZ-12345"
                       />
-                      <p className="text-xs text-gray-500 mt-1">ðŸ’¡ VocÃª pode editar o SKU se preferir</p>
+                      <p className="text-xs text-gray-500 mt-1">Voce pode editar o SKU se preferir</p>
                     </div>
 
                     {/* Nome */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      <label htmlFor="novo-produto-nome" className="block text-sm font-semibold text-gray-700 mb-1">
                         Nome do Produto *
                       </label>
                       <input
+                        id="novo-produto-nome"
                         type="text"
                         value={formProduto.nome}
                         onChange={(e) => setFormProduto({ ...formProduto, nome: e.target.value })}
@@ -1776,77 +2061,81 @@ const EntradaXML = () => {
                       />
                     </div>
 
-                    {/* DescriÃ§Ã£o */}
+                    {/* Descricao */}
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1">
-                        DescriÃ§Ã£o
+                      <label htmlFor="novo-produto-descricao" className="block text-sm font-semibold text-gray-700 mb-1">
+                        Descricao
                       </label>
                       <textarea
+                        id="novo-produto-descricao"
                         value={formProduto.descricao}
                         onChange={(e) => setFormProduto({ ...formProduto, descricao: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         rows="2"
-                        placeholder="DescriÃ§Ã£o detalhada (opcional)"
+                        placeholder="Descricao detalhada (opcional)"
                       />
                     </div>
 
-                    {/* PreÃ§os */}
+                    {/* Precos */}
                     <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          PreÃ§o de Custo *
+                        <label htmlFor="novo-produto-preco-custo" className="block text-sm font-semibold text-gray-700 mb-1">
+                          Preco de Custo *
                         </label>
                         <input
+                          id="novo-produto-preco-custo"
                           type="number"
                           step="0.01"
                           value={formProduto.preco_custo}
                           onChange={(e) => {
                             const custo = e.target.value;
-                            const margem = parseFloat(formProduto.margem_lucro) || 0;
+                            const margem = Number.parseFloat(formProduto.margem_lucro) || 0;
                             setFormProduto({ 
                               ...formProduto, 
                               preco_custo: custo,
-                              preco_venda: custo ? calcularPrecoVenda(parseFloat(custo), margem) : ''
+                              preco_venda: custo ? calcularPrecoVenda(Number.parseFloat(custo), margem) : ''
                             });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                        <label htmlFor="novo-produto-margem" className="block text-sm font-semibold text-gray-700 mb-1">
                           Margem (%) *
                         </label>
                         <input
+                          id="novo-produto-margem"
                           type="number"
                           step="0.01"
                           value={formProduto.margem_lucro}
                           onChange={(e) => {
                             const margem = e.target.value;
-                            const custo = parseFloat(formProduto.preco_custo) || 0;
+                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
                             setFormProduto({ 
                               ...formProduto, 
                               margem_lucro: margem,
-                              preco_venda: custo && margem ? calcularPrecoVenda(custo, parseFloat(margem)) : ''
+                              preco_venda: custo && margem ? calcularPrecoVenda(custo, Number.parseFloat(margem)) : ''
                             });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          PreÃ§o de Venda *
+                        <label htmlFor="novo-produto-preco-venda" className="block text-sm font-semibold text-gray-700 mb-1">
+                          Preco de Venda *
                         </label>
                         <input
+                          id="novo-produto-preco-venda"
                           type="number"
                           step="0.01"
                           value={formProduto.preco_venda}
                           onChange={(e) => {
                             const venda = e.target.value;
-                            const custo = parseFloat(formProduto.preco_custo) || 0;
+                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
                             setFormProduto({ 
                               ...formProduto, 
                               preco_venda: venda,
-                              margem_lucro: custo && venda ? calcularMargemLucro(custo, parseFloat(venda)) : ''
+                              margem_lucro: custo && venda ? calcularMargemLucro(custo, Number.parseFloat(venda)) : ''
                             });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -1857,24 +2146,26 @@ const EntradaXML = () => {
                     {/* Estoque */}
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque MÃ­nimo
+                        <label htmlFor="novo-produto-estoque-minimo" className="block text-sm font-semibold text-gray-700 mb-1">
+                          Estoque Minimo
                         </label>
                         <input
+                          id="novo-produto-estoque-minimo"
                           type="number"
                           value={formProduto.estoque_minimo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_minimo: parseInt(e.target.value) })}
+                          onChange={(e) => setFormProduto({ ...formProduto, estoque_minimo: Number.parseInt(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque MÃ¡ximo
+                        <label htmlFor="novo-produto-estoque-maximo" className="block text-sm font-semibold text-gray-700 mb-1">
+                          Estoque Maximo
                         </label>
                         <input
+                          id="novo-produto-estoque-maximo"
                           type="number"
                           value={formProduto.estoque_maximo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_maximo: parseInt(e.target.value) })}
+                          onChange={(e) => setFormProduto({ ...formProduto, estoque_maximo: Number.parseInt(e.target.value) })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
@@ -1903,13 +2194,13 @@ const EntradaXML = () => {
                   !formProduto.sku || 
                   !formProduto.nome || 
                   !formProduto.preco_custo || 
-                  parseFloat(formProduto.preco_custo) <= 0 || 
+                  Number.parseFloat(formProduto.preco_custo) <= 0 || 
                   !formProduto.preco_venda || 
-                  parseFloat(formProduto.preco_venda) <= 0
+                  Number.parseFloat(formProduto.preco_venda) <= 0
                 }
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'â³ Criando...' : 'âœ… Criar e Vincular Produto'}
+                {loading ? 'Criando...' : 'Criar e Vincular Produto'}
               </button>
             </div>
           </div>
@@ -1924,8 +2215,8 @@ const EntradaXML = () => {
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-2xl font-bold">ðŸ“„ NF-e {notaSelecionada.numero_nota}</h2>
-                  <p className="text-blue-100 mt-1">SÃ©rie: {notaSelecionada.serie}</p>
+                  <h2 className="text-2xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
+                  <p className="text-blue-100 mt-1">Serie: {notaSelecionada.serie}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -1934,7 +2225,7 @@ const EntradaXML = () => {
                   }}
                   className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
                 >
-                  âœ•
+                  X
                 </button>
               </div>
             </div>
@@ -1944,10 +2235,10 @@ const EntradaXML = () => {
               {/* InformaÃ§Ãµes da Nota */}
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">ðŸ“‹ Dados da Nota</h3>
+                  <h3 className="font-semibold text-gray-700 mb-3">Dados da Nota</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Data EmissÃ£o:</span>
+                      <span className="text-gray-600">Data Emissao:</span>
                       <span className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString('pt-BR')}</span>
                     </div>
                     <div className="flex justify-between">
@@ -1962,7 +2253,7 @@ const EntradaXML = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">ðŸ¢ Fornecedor</h3>
+                  <h3 className="font-semibold text-gray-700 mb-3">Fornecedor</h3>
                   <div className="space-y-2 text-sm">
                     <div>
                       <span className="text-gray-600">Nome:</span>
@@ -1978,7 +2269,7 @@ const EntradaXML = () => {
 
               {/* Chave de Acesso */}
               <div className="mb-6 p-3 bg-gray-50 rounded">
-                <div className="text-xs text-gray-600 mb-1">ðŸ”‘ Chave de Acesso</div>
+                <div className="text-xs text-gray-600 mb-1">Chave de Acesso</div>
                 <div className="font-mono text-xs break-all">{notaSelecionada.chave_acesso}</div>
               </div>
 
@@ -1994,13 +2285,13 @@ const EntradaXML = () => {
                 </div>
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-orange-600">{notaSelecionada.produtos_nao_vinculados}</div>
-                  <div className="text-sm text-gray-600">NÃ£o Vinculados</div>
+                  <div className="text-sm text-gray-600">Nao Vinculados</div>
                 </div>
               </div>
 
               {/* Itens da Nota */}
               <div>
-                <h3 className="font-semibold text-gray-700 mb-3">ðŸ“¦ Itens da Nota</h3>
+                <h3 className="font-semibold text-gray-700 mb-3">Itens da Nota</h3>
                 <div className="space-y-3">
                   {notaSelecionada.itens?.map((item, index) => (
                     <div key={item.id} className="border border-gray-200 rounded-lg p-4">
@@ -2008,12 +2299,12 @@ const EntradaXML = () => {
                         <div className="flex-1">
                           <div className="font-semibold text-gray-800">{item.descricao}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            CÃ³digo: {item.codigo_produto} | NCM: {item.ncm}
+                            Codigo: {item.codigo_produto} | NCM: {item.ncm}
                           </div>
                         </div>
                         {item.vinculado ? (
                           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-semibold rounded">
-                            âœ“ Vinculado
+                            Vinculado
                           </span>
                         ) : (
                           <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">
@@ -2046,7 +2337,7 @@ const EntradaXML = () => {
                         <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
                           {item.lote && (
                             <div className="bg-purple-50 border border-purple-200 rounded p-2">
-                              <span className="text-gray-600">ðŸ“¦ Lote:</span>
+                              <span className="text-gray-600">Lote:</span>
                               <div className="font-semibold text-purple-800">{item.lote}</div>
                             </div>
                           )}
@@ -2079,7 +2370,7 @@ const EntradaXML = () => {
                 {notaSelecionada.entrada_estoque_realizada ? (
                   <span className="text-green-600 font-semibold">âœ… Entrada realizada no estoque</span>
                 ) : (
-                  <span className="text-orange-600 font-semibold">âš ï¸ Entrada ainda nÃ£o processada</span>
+                  <span className="text-orange-600 font-semibold">âš ï¸ Entrada ainda nao processada</span>
                 )}
               </div>
               <div className="flex gap-3">
@@ -2092,7 +2383,7 @@ const EntradaXML = () => {
                       }}
                       className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                     >
-                      ðŸ’° Revisar PreÃ§os e Processar
+                      ðŸ’° Revisar Precos e Processar
                     </button>
                   </>
                 )}
@@ -2324,7 +2615,7 @@ const EntradaXML = () => {
                                 value={precosAtuais.preco_venda}
                                 onChange={(e) => atualizarPrecoVenda(
                                   produtoVinc.produto_id,
-                                  parseFloat(e.target.value) || 0,
+                                  Number.parseFloat(e.target.value) || 0,
                                   produtoVinc.custo_novo
                                 )}
                                 className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2346,7 +2637,7 @@ const EntradaXML = () => {
                                 value={precosAtuais.margem}
                                 onChange={(e) => atualizarMargem(
                                   produtoVinc.produto_id,
-                                  parseFloat(e.target.value) || 0,
+                                  Number.parseFloat(e.target.value) || 0,
                                   produtoVinc.custo_novo
                                 )}
                                 className="w-full pr-10 pl-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -2437,7 +2728,7 @@ const EntradaXML = () => {
                 </div>
               ) : historicoPrecos.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">Nenhuma alteraÃ§Ã£o de preÃ§o registrada</p>
+                  <p className="text-gray-500 text-lg">Nenhuma alteraÃ§Ã£o de preco registrada</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2651,7 +2942,7 @@ const EntradaXML = () => {
                                   <strong>Valor:</strong> R$ {resultado.valor_total?.toFixed(2)}
                                 </p>
                                 <p className="text-gray-700">
-                                  <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados, {resultado.produtos_nao_vinculados} nÃ£o vinculados
+                                  <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados, {resultado.produtos_nao_vinculados} nao vinculados
                                 </p>
                               </div>
                             ) : (
@@ -2688,4 +2979,6 @@ const EntradaXML = () => {
 };
 
 export default EntradaXML;
+
+
 

@@ -1,9 +1,5 @@
 """
 Rotas SEFAZ — Consulta de NF-e por chave de acesso.
-
-ATENÇÃO: Este módulo é um scaffolding. A integração real com a SEFAZ
-exige certificado digital A1/A3, credenciais IBPT e ambiente de produção.
-Por enquanto retorna dados simulados para desenvolvimento e layout da tela.
 """
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -48,6 +44,7 @@ class ConsultaNFeResponse(BaseModel):
     valor_total_nf: float
     itens: List[ItemNFe]
     aviso: str
+    xml_nfe: Optional[str] = None
 
 
 class SefazConfigUpdateRequest(BaseModel):
@@ -69,12 +66,6 @@ async def consultar_nfe(
 ):
     """
     Consulta uma NF-e na SEFAZ pela chave de acesso (44 dígitos).
-
-    MODO ATUAL: simulação para desenvolvimento.
-    Para produção real é necessário:
-    - Certificado digital A1 (.pfx) do estabelecimento
-    - Credenciais de acesso ao webservice SEFAZ do estado
-    - Biblioteca nfeio ou zeep configurada com o certificado
     """
     chave = payload.chave_acesso.replace(" ", "").replace(".", "")
 
@@ -243,9 +234,6 @@ def sync_now(
 ):
     """
     Dispara sincronizacao manual.
-
-    Observacao: o conector de distribuicao DF-e por NSU ainda sera habilitado na proxima etapa.
-    Este endpoint ja registra status operacional e valida se a configuracao esta pronta.
     """
     from datetime import datetime, timezone
 
@@ -285,17 +273,28 @@ def sync_now(
         SefazTenantConfigService.save_config(tenant_id, cfg)
         raise HTTPException(status_code=422, detail=cfg["ultimo_sync_mensagem"])
 
-    cfg["ultimo_sync_at"] = now_iso
-    cfg["ultimo_sync_status"] = "pendente"
-    cfg["ultimo_sync_mensagem"] = (
-        "Configuracao validada. Conector automatico DF-e por NSU sera ativado na proxima etapa para iniciar importacoes reais."
-    )
-    cfg["ultimo_sync_documentos"] = 0
-    SefazTenantConfigService.save_config(tenant_id, cfg)
-
-    return {
-        "ok": True,
-        "status": cfg["ultimo_sync_status"],
-        "mensagem": cfg["ultimo_sync_mensagem"],
-        "documentos": 0,
-    }
+    try:
+        resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"))
+        cfg["ultimo_sync_at"] = now_iso
+        cfg["ultimo_sync_status"] = "ok"
+        cfg["ultimo_sync_mensagem"] = resultado["mensagem"]
+        cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
+        cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000"))
+        SefazTenantConfigService.save_config(tenant_id, cfg)
+        return {
+            "ok": True,
+            "status": cfg["ultimo_sync_status"],
+            "mensagem": cfg["ultimo_sync_mensagem"],
+            "documentos": cfg["ultimo_sync_documentos"],
+            "ultimo_nsu": cfg["ultimo_nsu"],
+            "max_nsu": resultado.get("max_nsu", cfg["ultimo_nsu"]),
+            "c_stat": resultado.get("c_stat"),
+            "x_motivo": resultado.get("x_motivo"),
+        }
+    except HTTPException as exc:
+        cfg["ultimo_sync_at"] = now_iso
+        cfg["ultimo_sync_status"] = "erro"
+        cfg["ultimo_sync_mensagem"] = str(exc.detail)
+        cfg["ultimo_sync_documentos"] = 0
+        SefazTenantConfigService.save_config(tenant_id, cfg)
+        raise

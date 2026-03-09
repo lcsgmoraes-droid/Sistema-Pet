@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
 import { formatMoneyBRL } from "../utils/formatters";
 
@@ -25,15 +25,32 @@ function formatarDataHora(valor) {
   return data.toLocaleString("pt-BR");
 }
 
+function montarNomeArquivoXml(dados) {
+  const numero = String(dados?.numero_nf || "sem-numero").replaceAll(/\D/g, "");
+  const serie = String(dados?.serie || "1").replaceAll(/\D/g, "");
+  const chaveAcesso = String(dados?.chave_acesso || "").replaceAll(/\D/g, "").slice(-8);
+  return `nfe_${numero || "0"}_${serie || "1"}_${chaveAcesso || "xml"}.xml`;
+}
+
+function somenteDigitos(valor) {
+  return String(valor || "").replaceAll(/\D/g, "");
+}
+
 export default function SEFAZImportacao() {
+  const navigate = useNavigate();
   const [chave, setChave] = useState("");
-  const [resultado, setResultado] = useState(null);
+  const [importacoes, setImportacoes] = useState([]);
+  const [importacaoExpandidaId, setImportacaoExpandidaId] = useState(null);
+  const [importandoEntradaId, setImportandoEntradaId] = useState(null);
+  const [resultadoEntradaPorId, setResultadoEntradaPorId] = useState({});
   const [erro, setErro] = useState("");
+  const [avisoConector, setAvisoConector] = useState("");
   const [loading, setLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
   const [salvandoRotina, setSalvandoRotina] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const [mensagemRotina, setMensagemRotina] = useState("");
+  const listaImportacoesRef = useRef(null);
   const [cfg, setCfg] = useState({
     enabled: false,
     modo: "mock",
@@ -52,6 +69,11 @@ export default function SEFAZImportacao() {
   useEffect(() => {
     carregarConfigOperacional();
   }, []);
+
+  useEffect(() => {
+    if (!importacoes.length || !listaImportacoesRef.current) return;
+    listaImportacoesRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [importacoes.length]);
 
   async function carregarConfigOperacional() {
     try {
@@ -119,10 +141,74 @@ export default function SEFAZImportacao() {
     setCfg((prev) => ({ ...prev, [campo]: valor }));
   }
 
+  function abrirEntradaXmlNovaGuia(notaId) {
+    const alvo = notaId ? `/compras/entrada-xml?nota_id=${notaId}` : "/compras/entrada-xml";
+    const novaGuia = globalThis.open(alvo, "_blank", "noopener,noreferrer");
+    if (!novaGuia) {
+      navigate(alvo);
+    }
+  }
+
+  async function importarNaEntradaXML(importacao) {
+    const xmlNfe = importacao?.dados?.xml_nfe;
+    if (!xmlNfe) {
+      setResultadoEntradaPorId((prev) => ({
+        ...prev,
+        [importacao.id]: {
+          tipo: "erro",
+          mensagem: "Esta consulta nao trouxe XML completo da NF-e. Tente outra chave ou rode sincronizacao real.",
+        },
+      }));
+      return;
+    }
+
+    try {
+      setImportandoEntradaId(importacao.id);
+      setResultadoEntradaPorId((prev) => ({ ...prev, [importacao.id]: null }));
+
+      const fileName = montarNomeArquivoXml(importacao.dados);
+      const blob = new Blob([xmlNfe], { type: "application/xml;charset=utf-8" });
+      const file = new File([blob], fileName, { type: "text/xml" });
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const { data } = await api.post("/notas-entrada/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const notaIdCriada = data?.nota_id;
+      if (notaIdCriada) {
+        abrirEntradaXmlNovaGuia(notaIdCriada);
+        return;
+      }
+
+      setResultadoEntradaPorId((prev) => ({
+        ...prev,
+        [importacao.id]: {
+          tipo: "ok",
+          mensagem: `Entrada criada com sucesso (Nota ID ${data?.nota_id || "-"}).`,
+        },
+      }));
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Falha ao enviar XML para Entrada por XML.";
+      setResultadoEntradaPorId((prev) => ({
+        ...prev,
+        [importacao.id]: {
+          tipo: "erro",
+          mensagem: msg,
+        },
+      }));
+    } finally {
+      setImportandoEntradaId(null);
+    }
+  }
+
   async function consultar(e) {
     e.preventDefault();
     setErro("");
-    setResultado(null);
+    setAvisoConector("");
 
     if (chave.length !== 44) {
       setErro("A chave de acesso deve ter exatamente 44 digitos.");
@@ -132,10 +218,42 @@ export default function SEFAZImportacao() {
     try {
       setLoading(true);
       const resp = await api.post("/sefaz/consultar", { chave_acesso: chave });
-      setResultado(resp.data);
+
+      const caminhoAtual = globalThis.location?.pathname || "";
+      const telaEntrada = caminhoAtual.includes("/notas-fiscais/entrada");
+      const telaSaida = caminhoAtual.includes("/notas-fiscais/saida");
+
+      const cnpjEmpresa = somenteDigitos(cfg.cnpj);
+      const cnpjEmitente = somenteDigitos(resp.data.emitente_cnpj);
+      const cnpjDestinatario = somenteDigitos(resp.data.destinatario_cnpj);
+
+      if (cnpjEmpresa && telaEntrada && cnpjEmitente && cnpjEmitente === cnpjEmpresa) {
+        setErro("Esta chave parece ser NF de saida da propria empresa. Use a tela NF de Saida.");
+        return;
+      }
+
+      if (cnpjEmpresa && telaSaida && cnpjDestinatario && cnpjDestinatario === cnpjEmpresa) {
+        setErro("Esta chave parece ser NF de entrada para a propria empresa. Use a tela NF de Entrada.");
+        return;
+      }
+
+      const novaImportacao = {
+        id: `${Date.now()}-${resp.data.chave_acesso}`,
+        criadoEm: new Date().toISOString(),
+        dados: resp.data,
+      };
+      setImportacoes((prev) => [novaImportacao, ...prev]);
+      setImportacaoExpandidaId(null);
     } catch (err) {
       const msg = err?.response?.data?.detail || "Erro ao consultar a SEFAZ.";
-      setErro(msg);
+      const status = Number(err?.response?.status || 0);
+      const ehEtapaConector = status === 501 && msg.toLowerCase().includes("conector");
+
+      if (ehEtapaConector) {
+        setAvisoConector(msg);
+      } else {
+        setErro(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -179,6 +297,12 @@ export default function SEFAZImportacao() {
         {erro && (
           <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {erro}
+          </div>
+        )}
+
+        {avisoConector && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+            <strong>Integracao validada, etapa final pendente:</strong> {avisoConector}
           </div>
         )}
       </form>
@@ -274,83 +398,151 @@ export default function SEFAZImportacao() {
         )}
       </div>
 
-      {resultado && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {resultado.aviso && (
-            <div className="bg-yellow-50 px-6 py-3 text-xs text-yellow-700 border-b border-yellow-200">
-              {resultado.aviso}
-            </div>
-          )}
+      {importacoes.length > 0 && (
+        <div ref={listaImportacoesRef} className="space-y-3">
+          <h2 className="text-base font-bold text-gray-800">Importacoes da sessao ({importacoes.length})</h2>
 
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Dados da Nota Fiscal</h2>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-500">Numero / Serie:</span>
-                <span className="ml-2 font-semibold">{resultado.numero_nf} / {resultado.serie}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Emissao:</span>
-                <span className="ml-2 font-semibold">{resultado.data_emissao}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Emitente:</span>
-                <span className="ml-2 font-semibold">{resultado.emitente_nome}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">CNPJ Emitente:</span>
-                <span className="ml-2 font-semibold">{resultado.emitente_cnpj}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Destinatario:</span>
-                <span className="ml-2 font-semibold">{resultado.destinatario_nome || "-"}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Valor Total:</span>
-                <span className="ml-2 font-bold text-green-700 text-base">{formatarMoeda(resultado.valor_total_nf)}</span>
-              </div>
-            </div>
-          </div>
+          {importacoes.map((imp) => {
+            const expandida = importacaoExpandidaId === imp.id;
+            const dados = imp.dados;
 
-          <div className="p-6">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">Itens da Nota ({resultado.itens?.length})</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
-                    <th className="text-left px-3 py-2">#</th>
-                    <th className="text-left px-3 py-2">Codigo</th>
-                    <th className="text-left px-3 py-2">Descricao</th>
-                    <th className="text-left px-3 py-2">NCM</th>
-                    <th className="text-right px-3 py-2">Qtd</th>
-                    <th className="text-left px-3 py-2">UN</th>
-                    <th className="text-right px-3 py-2">Unit.</th>
-                    <th className="text-right px-3 py-2">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {resultado.itens?.map((item) => (
-                    <tr key={item.numero_item} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 text-gray-500">{item.numero_item}</td>
-                      <td className="px-3 py-2 font-mono text-xs">{item.codigo_produto}</td>
-                      <td className="px-3 py-2">{item.descricao}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-gray-500">{item.ncm || "-"}</td>
-                      <td className="px-3 py-2 text-right">{item.quantidade}</td>
-                      <td className="px-3 py-2 text-gray-500">{item.unidade}</td>
-                      <td className="px-3 py-2 text-right">{formatarMoeda(item.valor_unitario)}</td>
-                      <td className="px-3 py-2 text-right font-semibold">{formatarMoeda(item.valor_total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-gray-300 bg-gray-50">
-                    <td colSpan={7} className="px-3 py-2 text-right font-bold text-gray-700">Total da NF-e</td>
-                    <td className="px-3 py-2 text-right font-bold text-green-700">{formatarMoeda(resultado.valor_total_nf)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
+            return (
+              <div key={imp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setImportacaoExpandidaId(expandida ? null : imp.id)}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-gray-800">
+                      NF {dados.numero_nf}/{dados.serie} - {dados.emitente_nome}
+                    </div>
+                    <div className="text-xs text-gray-500">{formatarDataHora(imp.criadoEm)}</div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="text-gray-600">Chave: <span className="font-mono">{dados.chave_acesso}</span></div>
+                    <div className="text-gray-600">Itens: <strong>{dados.itens?.length || 0}</strong></div>
+                    <div className="text-gray-600">Total: <strong className="text-green-700">{formatarMoeda(dados.valor_total_nf)}</strong></div>
+                    <div className="text-indigo-700 font-semibold">{expandida ? "Fechar" : "Expandir"}</div>
+                  </div>
+                </button>
+
+                <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => importarNaEntradaXML(imp)}
+                      disabled={importandoEntradaId === imp.id}
+                      className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {importandoEntradaId === imp.id ? "Enviando para Entrada por XML..." : "Usar esta NF na Entrada por XML"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => abrirEntradaXmlNovaGuia()}
+                      className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700"
+                    >
+                      Abrir Entrada por XML em nova guia
+                    </button>
+                  </div>
+
+                  {resultadoEntradaPorId[imp.id]?.mensagem && (
+                    <div
+                      className={`mt-2 text-xs rounded-lg px-3 py-2 ${
+                        resultadoEntradaPorId[imp.id]?.tipo === "ok"
+                          ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                          : "bg-red-50 border border-red-200 text-red-700"
+                      }`}
+                    >
+                      {resultadoEntradaPorId[imp.id]?.mensagem}
+                    </div>
+                  )}
+                </div>
+
+                {expandida && (
+                  <>
+                    {dados.aviso && (
+                      <div className="bg-yellow-50 px-6 py-3 text-xs text-yellow-700 border-t border-b border-yellow-200">
+                        {dados.aviso}
+                      </div>
+                    )}
+
+                    <div className="p-6 border-b border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-800 mb-4">Dados da Nota Fiscal</h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Numero / Serie:</span>
+                          <span className="ml-2 font-semibold">{dados.numero_nf} / {dados.serie}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Emissao:</span>
+                          <span className="ml-2 font-semibold">{dados.data_emissao}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Emitente:</span>
+                          <span className="ml-2 font-semibold">{dados.emitente_nome}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">CNPJ Emitente:</span>
+                          <span className="ml-2 font-semibold">{dados.emitente_cnpj}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Destinatario:</span>
+                          <span className="ml-2 font-semibold">{dados.destinatario_nome || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Valor Total:</span>
+                          <span className="ml-2 font-bold text-green-700 text-base">{formatarMoeda(dados.valor_total_nf)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-6">
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">Itens da Nota ({dados.itens?.length || 0})</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
+                              <th className="text-left px-3 py-2">#</th>
+                              <th className="text-left px-3 py-2">Codigo</th>
+                              <th className="text-left px-3 py-2">Descricao</th>
+                              <th className="text-left px-3 py-2">NCM</th>
+                              <th className="text-right px-3 py-2">Qtd</th>
+                              <th className="text-left px-3 py-2">UN</th>
+                              <th className="text-right px-3 py-2">Unit.</th>
+                              <th className="text-right px-3 py-2">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {dados.itens?.map((item) => (
+                              <tr key={`${imp.id}-${item.numero_item}`} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-gray-500">{item.numero_item}</td>
+                                <td className="px-3 py-2 font-mono text-xs">{item.codigo_produto}</td>
+                                <td className="px-3 py-2">{item.descricao}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-gray-500">{item.ncm || "-"}</td>
+                                <td className="px-3 py-2 text-right">{item.quantidade}</td>
+                                <td className="px-3 py-2 text-gray-500">{item.unidade}</td>
+                                <td className="px-3 py-2 text-right">{formatarMoeda(item.valor_unitario)}</td>
+                                <td className="px-3 py-2 text-right font-semibold">{formatarMoeda(item.valor_total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-gray-300 bg-gray-50">
+                              <td colSpan={7} className="px-3 py-2 text-right font-bold text-gray-700">Total da NF-e</td>
+                              <td className="px-3 py-2 text-right font-bold text-green-700">{formatarMoeda(dados.valor_total_nf)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
