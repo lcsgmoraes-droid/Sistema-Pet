@@ -446,6 +446,132 @@ async def obter_contas_vencidas(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/dashboard/gerencial")
+async def obter_metricas_gerencial(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Retorna métricas consolidadas para o Dashboard Gerencial.
+    Calcula diretamente do banco, sem depender de client-side logic.
+    """
+    current_user, tenant_id = user_and_tenant
+    try:
+        from sqlalchemy import text
+
+        # 1. VIPs inativos — segmento VIP com mais de 20 dias sem compra
+        vips_result = db.execute(text("""
+            SELECT
+                COUNT(*) AS qtd,
+                COALESCE(SUM(CAST(cs.metricas->>'total_compras_90d' AS FLOAT)), 0) AS impacto
+            FROM cliente_segmentos cs
+            JOIN clientes c ON c.id = cs.cliente_id
+            WHERE cs.tenant_id = :tenant_id
+              AND cs.segmento = 'VIP'
+              AND CAST(cs.metricas->>'ultima_compra_dias' AS INTEGER) > 20
+              AND c.ativo = true
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        # 2. Clientes inativos — sem compra há mais de 90 dias
+        inativos_result = db.execute(text("""
+            SELECT COUNT(DISTINCT c.id) AS qtd
+            FROM clientes c
+            LEFT JOIN (
+                SELECT cliente_id, MAX(data_venda) AS ultima_venda
+                FROM vendas
+                WHERE tenant_id = :tenant_id AND status = 'finalizada'
+                GROUP BY cliente_id
+            ) v ON v.cliente_id = c.id
+            WHERE c.tenant_id = :tenant_id
+              AND c.tipo_cadastro = 'cliente'
+              AND c.ativo = true
+              AND (v.ultima_venda IS NULL OR v.ultima_venda < NOW() - INTERVAL '90 days')
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        # 3. Clientes endividados — contas a receber em aberto com saldo > 0
+        endividados_result = db.execute(text("""
+            SELECT
+                COUNT(DISTINCT cr.cliente_id) AS qtd,
+                COALESCE(SUM(cr.valor_final - COALESCE(cr.valor_recebido, 0)), 0) AS total_dividas
+            FROM contas_receber cr
+            WHERE cr.tenant_id = :tenant_id
+              AND cr.status IN ('pendente', 'vencido', 'parcial')
+              AND cr.cliente_id IS NOT NULL
+              AND (cr.valor_final - COALESCE(cr.valor_recebido, 0)) > 0
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        # 4. Novos promissores — segmento Novo com ticket médio > R$ 200
+        novos_result = db.execute(text("""
+            SELECT
+                COUNT(*) AS qtd,
+                COALESCE(SUM(CAST(cs.metricas->>'ticket_medio' AS FLOAT)), 0) AS potencial
+            FROM cliente_segmentos cs
+            JOIN clientes c ON c.id = cs.cliente_id
+            WHERE cs.tenant_id = :tenant_id
+              AND cs.segmento = 'Novo'
+              AND CAST(cs.metricas->>'ticket_medio' AS FLOAT) > 200
+              AND c.ativo = true
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        # 5. WhatsApp faltando — clientes sem celular cadastrado
+        sem_whatsapp_result = db.execute(text("""
+            SELECT COUNT(*) AS qtd
+            FROM clientes
+            WHERE tenant_id = :tenant_id
+              AND tipo_cadastro = 'cliente'
+              AND ativo = true
+              AND (celular IS NULL OR TRIM(celular) = '')
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        # 6. Total de clientes ativos (tipo cliente)
+        total_result = db.execute(text("""
+            SELECT COUNT(*) AS qtd
+            FROM clientes
+            WHERE tenant_id = :tenant_id
+              AND tipo_cadastro = 'cliente'
+              AND ativo = true
+        """), {'tenant_id': str(tenant_id)}).fetchone()
+
+        def fmt_brl(value: float) -> str:
+            return f"R$ {value:_.2f}".replace('.', ',').replace('_', '.')
+
+        total_dividas = float(endividados_result.total_dividas or 0)
+        potencial_novos = float(novos_result.potencial or 0)
+        impacto_vips = float(vips_result.impacto or 0)
+
+        return {
+            'vips_inativos': {
+                'quantidade': int(vips_result.qtd or 0),
+                'impacto': fmt_brl(impacto_vips)
+            },
+            'clientes_inativos': {
+                'quantidade': int(inativos_result.qtd or 0),
+                'impacto': 'Reativação pendente'
+            },
+            'clientes_endividados': {
+                'quantidade': int(endividados_result.qtd or 0),
+                'impacto': fmt_brl(total_dividas)
+            },
+            'oportunidades_novos': {
+                'quantidade': int(novos_result.qtd or 0),
+                'impacto': f"~R$ {potencial_novos:_.0f}/mês".replace('_', '.')
+            },
+            'pets_sem_eventos': {
+                'quantidade': 0,
+                'impacto': 'Em breve'
+            },
+            'whatsapp_inativo': {
+                'quantidade': int(sem_whatsapp_result.qtd or 0),
+                'impacto': 'Canal perdido'
+            },
+            'total_clientes': int(total_result.qtd or 0)
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao obter métricas gerenciais: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/dashboard/top-produtos")
 async def obter_top_produtos(
     periodo_dias: int = 30,

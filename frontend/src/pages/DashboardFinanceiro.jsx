@@ -1,29 +1,27 @@
 import {
   AlertCircle,
+  BarChart2,
   DollarSign,
   FileText,
-  Package,
-  ShoppingCart,
-  Sparkles,
-  Store,
+  ShoppingBag,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { toast } from "react-hot-toast";
 import { FiHelpCircle } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import api from "../api";
+import AlertasIA from "../components/AlertasIA";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
 
@@ -113,471 +111,287 @@ const DashboardFinanceiro = () => {
     );
   }
 
-  // Dados mockados para canais de venda
-  const canaisVenda = [
-    {
-      nome: "Loja Física",
-      valor: resumo.vendas_periodo.valor_total || 0,
-      margem: 35.5,
-      lucro: (resumo.vendas_periodo.valor_total || 0) * 0.355,
-      icon: Store,
-      color: "blue",
-      isMock: false,
-      onClick: () => navigate("/financeiro/relatorio-vendas"),
-    },
-    {
-      nome: "Mercado Livre",
-      valor: 8450.0,
-      margem: 18.2,
-      lucro: 1537.9,
-      icon: Package,
-      color: "yellow",
-      isMock: true,
-      onClick: () =>
-        toast("Integração com Mercado Livre em breve", { icon: "📦" }),
-    },
-    {
-      nome: "Shopee",
-      valor: 5230.0,
-      margem: 22.5,
-      lucro: 1176.75,
-      icon: ShoppingCart,
-      color: "orange",
-      isMock: true,
-      onClick: () => toast("Integração com Shopee em breve", { icon: "🛒" }),
-    },
-    {
-      nome: "Amazon",
-      valor: 12890.0,
-      margem: 15.8,
-      lucro: 2036.62,
-      icon: Package,
-      color: "purple",
-      isMock: true,
-      onClick: () => toast("Integração com Amazon em breve", { icon: "📦" }),
-    },
-  ];
-
-  const getColorClasses = (color) => {
-    const colors = {
-      blue: "from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700",
-      green:
-        "from-green-500 to-green-600 hover:from-green-600 hover:to-green-700",
-      red: "from-red-500 to-red-600 hover:from-red-600 hover:to-red-700",
-      purple:
-        "from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700",
-      yellow:
-        "from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700",
-      orange:
-        "from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700",
-    };
-    return colors[color] || colors.blue;
-  };
-
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-4 bg-gray-50 min-h-screen">
       {/* Cabeçalho */}
-      <div className="mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-3">
+      <div className="mb-4 flex flex-wrap justify-between items-center gap-2">
+        <div className="flex items-center gap-2">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">
-              Dashboard Financeiro
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Visão consolidada do seu negócio
-            </p>
+            <h1 className="text-xl font-bold text-gray-800">Dashboard Financeiro</h1>
+            <p className="text-xs text-gray-500">Visão consolidada do seu negócio</p>
           </div>
           <button
             onClick={iniciarTour}
             title="Ver tour guiado desta página"
-            className="flex items-center gap-1 px-2 py-1 text-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors mt-1"
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
           >
-            <FiHelpCircle className="text-base" />
-            <span className="hidden sm:inline text-xs">Tour</span>
+            <FiHelpCircle className="text-sm" />
           </button>
         </div>
-
-        <div className="flex gap-3 items-center">
-          {/* Seletor de período */}
-          <div className="flex gap-2">
-            {[7, 15, 30, 60, 90].map((dias) => (
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex gap-1">
+            {[{ v: 1, label: "Hoje" }, { v: 7, label: "7d" }, { v: 15, label: "15d" }, { v: 30, label: "30d" }, { v: 60, label: "60d" }, { v: 90, label: "90d" }].map(({ v, label }) => (
               <button
-                key={dias}
-                onClick={() => setPeriodoDias(dias)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  periodoDias === dias
+                key={v}
+                onClick={() => setPeriodoDias(v)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  periodoDias === v
                     ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-100"
+                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
                 }`}
               >
-                {dias} dias
+                {label}
               </button>
             ))}
           </div>
+          <p className="text-xs text-gray-400">Período afeta: Lucro · Vendas · Fluxo · Ticket Médio</p>
         </div>
       </div>
 
-      {/* BLOCO 1: STATUS FINANCEIRO (4 cards clicáveis) */}
-      <div
-        id="tour-stats"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6"
-      >
-        {/* Saldo Atual */}
+      {/* KPIs — linha 1: valores fixos (não afetados pelo período) */}
+      <div className="mb-1">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">📌 Posição atual — não muda com o período</p>
+        <div id="tour-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Saldo */}
         <div
           onClick={() => navigate("/financeiro/fluxo-caixa")}
-          className={`bg-gradient-to-br ${getColorClasses("blue")} rounded-xl p-6 text-white shadow-lg cursor-pointer transition-all transform hover:scale-105`}
+          className="bg-blue-600 rounded-xl p-3 text-white cursor-pointer hover:bg-blue-700 transition-colors"
         >
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/20 p-3 rounded-lg">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium bg-white/20 px-2 py-1 rounded">
-              Atual
-            </span>
+          <div className="flex justify-between items-start mb-2">
+            <DollarSign className="w-4 h-4 opacity-80" />
+            <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Hoje</span>
           </div>
-          <p className="text-sm opacity-90 mb-1">Saldo Atual</p>
-          <p className="text-2xl font-bold">
-            {formatarMoeda(resumo.saldo_atual)}
-          </p>
-          <p className="text-xs mt-2 opacity-75">
-            Clique para ver fluxo de caixa
-          </p>
+          <p className="text-xs opacity-75 mb-0.5">Saldo Estimado</p>
+          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.saldo_atual)}</p>
         </div>
 
-        {/* Contas a Receber */}
+        {/* A Receber */}
         <div
           onClick={() => navigate("/financeiro/contas-receber")}
-          className={`bg-gradient-to-br ${getColorClasses("green")} rounded-xl p-6 text-white shadow-lg cursor-pointer transition-all transform hover:scale-105`}
+          className="bg-emerald-600 rounded-xl p-3 text-white cursor-pointer hover:bg-emerald-700 transition-colors"
         >
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/20 p-3 rounded-lg">
-              <TrendingUp className="w-6 h-6" />
-            </div>
+          <div className="flex justify-between items-start mb-2">
+            <TrendingUp className="w-4 h-4 opacity-80" />
             {resumo.contas_receber.vencidas > 0 && (
-              <AlertCircle className="w-5 h-5 text-yellow-300" />
+              <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
             )}
           </div>
-          <p className="text-sm opacity-90 mb-1">A Receber</p>
-          <p className="text-2xl font-bold">
-            {formatarMoeda(resumo.contas_receber.total)}
-          </p>
-          {resumo.contas_receber.vencidas > 0 ? (
-            <p className="text-xs mt-2 opacity-90">
-              ⚠️ Vencidas: {formatarMoeda(resumo.contas_receber.vencidas)}
-            </p>
-          ) : (
-            <p className="text-xs mt-2 opacity-75">Clique para gerenciar</p>
+          <p className="text-xs opacity-75 mb-0.5">A Receber</p>
+          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.contas_receber.total)}</p>
+          {resumo.contas_receber.vencidas > 0 && (
+            <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_receber.vencidas)} venc.</p>
           )}
         </div>
 
-        {/* Contas a Pagar */}
+        {/* A Pagar */}
         <div
           onClick={() => navigate("/financeiro/contas-pagar")}
-          className={`bg-gradient-to-br ${getColorClasses("red")} rounded-xl p-6 text-white shadow-lg cursor-pointer transition-all transform hover:scale-105`}
+          className="bg-red-500 rounded-xl p-3 text-white cursor-pointer hover:bg-red-600 transition-colors"
         >
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/20 p-3 rounded-lg">
-              <TrendingDown className="w-6 h-6" />
-            </div>
+          <div className="flex justify-between items-start mb-2">
+            <TrendingDown className="w-4 h-4 opacity-80" />
             {resumo.contas_pagar.vencidas > 0 && (
-              <AlertCircle className="w-5 h-5 text-yellow-300" />
+              <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
             )}
           </div>
-          <p className="text-sm opacity-90 mb-1">A Pagar</p>
-          <p className="text-2xl font-bold">
-            {formatarMoeda(resumo.contas_pagar.total)}
-          </p>
-          {resumo.contas_pagar.vencidas > 0 ? (
-            <p className="text-xs mt-2 opacity-90">
-              ⚠️ Vencidas: {formatarMoeda(resumo.contas_pagar.vencidas)}
-            </p>
-          ) : (
-            <p className="text-xs mt-2 opacity-75">Clique para gerenciar</p>
+          <p className="text-xs opacity-75 mb-0.5">A Pagar</p>
+          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.contas_pagar.total)}</p>
+          {resumo.contas_pagar.vencidas > 0 && (
+            <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_pagar.vencidas)} venc.</p>
           )}
         </div>
-
-        {/* Resultado do Período */}
-        <div
-          onClick={() => navigate("/financeiro/dre")}
-          className={`bg-gradient-to-br ${
-            resumo.fluxo_periodo.lucro >= 0
-              ? getColorClasses("purple")
-              : getColorClasses("orange")
-          } rounded-xl p-6 text-white shadow-lg cursor-pointer transition-all transform hover:scale-105`}
-        >
-          <div className="flex justify-between items-start mb-4">
-            <div className="bg-white/20 p-3 rounded-lg">
-              <FileText className="w-6 h-6" />
-            </div>
-            <span className="text-xs font-medium bg-white/20 px-2 py-1 rounded">
-              {periodoDias} dias
-            </span>
-          </div>
-          <p className="text-sm opacity-90 mb-1">
-            {resumo.fluxo_periodo.lucro >= 0 ? "Lucro" : "Prejuízo"}
-          </p>
-          <p className="text-2xl font-bold">
-            {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
-          </p>
-          <p className="text-xs mt-2 opacity-75">
-            Clique para ver DRE completo
-          </p>
         </div>
       </div>
 
-      {/* BLOCO 2: VENDAS POR CANAL */}
-      <div
-        id="tour-financeiro"
-        className="bg-white rounded-xl shadow-lg p-6 mb-6"
-      >
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Vendas por Canal
-            </h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Performance de cada canal de vendas
+      {/* KPIs — linha 2: valores do período selecionado */}
+      <div className="mb-4">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}</p>
+        <div className="grid grid-cols-3 gap-3">
+          {/* Lucro do período */}
+          <div
+            onClick={() => navigate("/financeiro/dre")}
+            className={`rounded-xl p-3 text-white cursor-pointer transition-colors ${
+              resumo.fluxo_periodo.lucro >= 0
+                ? "bg-purple-600 hover:bg-purple-700"
+                : "bg-orange-500 hover:bg-orange-600"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <FileText className="w-4 h-4 opacity-80" />
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+            </div>
+            <p className="text-xs opacity-75 mb-0.5">
+              {resumo.fluxo_periodo.lucro >= 0 ? "Lucro" : "Prejuízo"}
+            </p>
+            <p className="text-base font-bold leading-tight">
+              {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
             </p>
           </div>
-          <span className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full font-medium">
-            Marketplaces em preparação
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {canaisVenda.map((canal, index) => (
-            <div
-              key={index}
-              onClick={canal.onClick}
-              className="bg-gray-50 rounded-lg p-5 border border-gray-200 hover:shadow-md transition-all cursor-pointer transform hover:scale-105 relative"
-            >
-              {canal.isMock && (
-                <div className="absolute top-2 right-2">
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">
-                    Mock
-                  </span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3 mb-4">
-                <div
-                  className={`bg-gradient-to-br ${getColorClasses(canal.color)} p-3 rounded-lg`}
-                >
-                  <canal.icon className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="font-semibold text-gray-800">{canal.nome}</h3>
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <p className="text-xs text-gray-600">Valor Vendido</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {formatarMoeda(canal.valor)}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                  <div>
-                    <p className="text-xs text-gray-600">Margem</p>
-                    <p className="text-sm font-semibold text-gray-800">
-                      {canal.margem}%
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">Lucro Est.</p>
-                    <p className="text-sm font-semibold text-green-600">
-                      {formatarMoeda(canal.lucro)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          {/* Vendas (qtd) */}
+          <div
+            onClick={() => navigate("/financeiro/relatorio-vendas")}
+            className="bg-cyan-600 rounded-xl p-3 text-white cursor-pointer hover:bg-cyan-700 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <ShoppingBag className="w-4 h-4 opacity-80" />
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
             </div>
-          ))}
-        </div>
-
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
-            <strong>Total consolidado:</strong>{" "}
-            {formatarMoeda(canaisVenda.reduce((acc, c) => acc + c.valor, 0))} |{" "}
-            <strong>Lucro total:</strong>{" "}
-            {formatarMoeda(canaisVenda.reduce((acc, c) => acc + c.lucro, 0))}
-          </p>
-        </div>
-      </div>
-
-      {/* BLOCO 3: ALERTAS & AÇÕES IA (Placeholder) */}
-      <div
-        id="tour-composicao"
-        className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 mb-6 text-white"
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="bg-white/20 p-3 rounded-lg">
-            <Sparkles className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Insights Inteligentes</h2>
-            <p className="text-sm opacity-90">
-              Alertas e sugestões automáticas
+            <p className="text-xs opacity-75 mb-0.5">Vendas</p>
+            <p className="text-base font-bold leading-tight">
+              {resumo.vendas_periodo.quantidade || 0}
+            </p>
+            <p className="text-xs opacity-75 mt-0.5">
+              {formatarMoeda(resumo.vendas_periodo.valor_total)}
             </p>
           </div>
-        </div>
 
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-center">
-          <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-75" />
-          <p className="text-lg font-medium mb-2">
-            Em breve a IA mostrará aqui:
-          </p>
-          <div className="mt-3 space-y-2 text-sm opacity-90">
-            <p>• Problemas urgentes detectados</p>
-            <p>• Oportunidades de lucro identificadas</p>
-            <p>• Ações recomendadas para hoje</p>
+          {/* Ticket Médio */}
+          <div
+            onClick={() => navigate("/financeiro/relatorio-vendas")}
+            className="bg-indigo-500 rounded-xl p-3 text-white cursor-pointer hover:bg-indigo-600 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <BarChart2 className="w-4 h-4 opacity-80" />
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+            </div>
+            <p className="text-xs opacity-75 mb-0.5">Ticket Médio</p>
+            <p className="text-base font-bold leading-tight">
+              {formatarMoeda(resumo.vendas_periodo.ticket_medio || 0)}
+            </p>
+            <p className="text-xs opacity-75 mt-0.5">por venda</p>
           </div>
-          <p className="text-xs mt-4 opacity-75">
-            Sem mágica. Apenas análise inteligente dos seus dados reais.
-          </p>
+        </div>
+
+        {/* Sub-row: Entradas, Saídas, Margem, Finalizadas */}
+        <div id="tour-financeiro" className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">Entradas</p>
+            <p className="text-lg font-bold text-emerald-600">{formatarMoeda(resumo.fluxo_periodo.entradas)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">Saídas</p>
+            <p className="text-lg font-bold text-red-500">{formatarMoeda(resumo.fluxo_periodo.saidas)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">Margem</p>
+            <p className="text-lg font-bold text-gray-800">
+              {resumo.fluxo_periodo.entradas > 0
+                ? ((resumo.fluxo_periodo.lucro / resumo.fluxo_periodo.entradas) * 100).toFixed(1) + "%"
+                : "—"}
+            </p>
+          </div>
+          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+            <p className="text-xs text-gray-500 mb-1">Finalizadas</p>
+            <p className="text-lg font-bold text-gray-800">{resumo.vendas_periodo.finalizadas || 0}</p>
+            <p className="text-xs text-gray-400">de {resumo.vendas_periodo.quantidade || 0} vendas</p>
+          </div>
         </div>
       </div>
 
-      {/* BLOCO 4: AÇÕES RÁPIDAS */}
-      <div
-        id="tour-acoes-rapidas"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
-      >
-        <button
-          onClick={() => navigate("/pdv")}
-          className="bg-gradient-to-br from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-3"
-        >
-          <ShoppingCart className="w-5 h-5" />
-          Nova Venda
-        </button>
-
-        <button
-          onClick={() => navigate("/financeiro/contas-receber")}
-          className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-3"
-        >
-          <TrendingUp className="w-5 h-5" />
-          Registrar Recebimento
-        </button>
-
-        <button
-          onClick={() => navigate("/financeiro/contas-pagar")}
-          className="bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-3"
-        >
-          <TrendingDown className="w-5 h-5" />
-          Registrar Despesa
-        </button>
-
-        <button
-          onClick={() => navigate("/ia/fluxo-caixa")}
-          className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold py-4 px-6 rounded-xl shadow-lg transition-all transform hover:scale-105 flex items-center justify-center gap-3"
-        >
-          <Sparkles className="w-5 h-5" />
-          Revisões IA
-        </button>
-      </div>
-
-      {/* Gráfico de Fluxo (mantido por ora - candidato futuro a substituição por "Previsão 7 dias" ou "Dia crítico de caixa") */}
-      <div className="bg-white rounded-xl p-6 shadow-lg mb-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">
-          Fluxo Financeiro ({periodoDias} dias)
-        </h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={entradasSaidas}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="data"
-              tickFormatter={formatarData}
-              style={{ fontSize: "12px" }}
-            />
-            <YAxis
-              tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-              style={{ fontSize: "12px" }}
-            />
-            <Tooltip
-              formatter={(value) => formatarMoeda(value)}
-              labelFormatter={formatarData}
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="entradas"
-              stroke="#10B981"
-              strokeWidth={2}
-              name="Entradas"
-            />
-            <Line
-              type="monotone"
-              dataKey="saidas"
-              stroke="#EF4444"
-              strokeWidth={2}
-              name="Saídas"
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Contas Vencidas (mantido, compactado) */}
-      {(contasVencidas.contas_receber.length > 0 ||
-        contasVencidas.contas_pagar.length > 0) && (
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            Atenção: Contas Vencidas
+      {/* Gráfico + Alertas IA lado a lado */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
+        {/* Gráfico de fluxo */}
+        <div id="tour-composicao" className="lg:col-span-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">
+            📈 Fluxo Financeiro — últimos {periodoDias} dias
           </h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={entradasSaidas} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gradEntradas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradSaidas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis
+                dataKey="data"
+                tickFormatter={formatarData}
+                style={{ fontSize: "10px" }}
+                tick={{ fill: "#9ca3af" }}
+              />
+              <YAxis
+                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                style={{ fontSize: "10px" }}
+                tick={{ fill: "#9ca3af" }}
+                width={36}
+              />
+              <Tooltip
+                formatter={(value) => formatarMoeda(value)}
+                labelFormatter={formatarData}
+                contentStyle={{ fontSize: "12px" }}
+              />
+              <Legend wrapperStyle={{ fontSize: "11px" }} />
+              <Area
+                type="monotone"
+                dataKey="entradas"
+                stroke="#10B981"
+                strokeWidth={2}
+                fill="url(#gradEntradas)"
+                name="Entradas"
+              />
+              <Area
+                type="monotone"
+                dataKey="saidas"
+                stroke="#EF4444"
+                strokeWidth={2}
+                fill="url(#gradSaidas)"
+                name="Saídas"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Contas a Receber Vencidas */}
+        {/* Alertas IA */}
+        <div id="tour-acoes-rapidas" className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <AlertasIA compacto />
+        </div>
+      </div>
+
+      {/* Contas Vencidas */}
+      {(contasVencidas.contas_receber.length > 0 || contasVencidas.contas_pagar.length > 0) && (
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-red-100">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-500" />
+            Contas Vencidas com Atenção
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             {contasVencidas.contas_receber.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                <p className="text-xs font-semibold text-gray-500 mb-2">
                   A Receber ({contasVencidas.contas_receber.length})
-                </h3>
-                <div className="space-y-2">
+                </p>
+                <div className="space-y-1.5">
                   {contasVencidas.contas_receber.slice(0, 3).map((conta) => (
-                    <div
-                      key={conta.id}
-                      className="p-3 bg-red-50 border border-red-200 rounded-lg"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-medium text-gray-800 text-sm">
-                          {conta.cliente || "Sem cliente"}
-                        </p>
-                        <p className="font-bold text-red-600 text-sm">
-                          {formatarMoeda(conta.saldo)}
-                        </p>
+                    <div key={conta.id} className="flex justify-between items-center p-2 bg-red-50 border border-red-100 rounded-lg">
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">{conta.cliente || "Sem cliente"}</p>
+                        <p className="text-xs text-red-500">Venceu há {conta.dias_vencido} dias</p>
                       </div>
-                      <p className="text-xs text-red-600">
-                        Venceu há {conta.dias_vencido} dias
-                      </p>
+                      <p className="text-sm font-bold text-red-600">{formatarMoeda(conta.saldo)}</p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-
-            {/* Contas a Pagar Vencidas */}
             {contasVencidas.contas_pagar.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                <p className="text-xs font-semibold text-gray-500 mb-2">
                   A Pagar ({contasVencidas.contas_pagar.length})
-                </h3>
-                <div className="space-y-2">
+                </p>
+                <div className="space-y-1.5">
                   {contasVencidas.contas_pagar.slice(0, 3).map((conta) => (
-                    <div
-                      key={conta.id}
-                      className="p-3 bg-orange-50 border border-orange-200 rounded-lg"
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-medium text-gray-800 text-sm">
-                          {conta.fornecedor || "Sem fornecedor"}
-                        </p>
-                        <p className="font-bold text-orange-600 text-sm">
-                          {formatarMoeda(conta.saldo)}
-                        </p>
+                    <div key={conta.id} className="flex justify-between items-center p-2 bg-orange-50 border border-orange-100 rounded-lg">
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">{conta.fornecedor || "Sem fornecedor"}</p>
+                        <p className="text-xs text-orange-500">Venceu há {conta.dias_vencido} dias</p>
                       </div>
-                      <p className="text-xs text-orange-600">
-                        Venceu há {conta.dias_vencido} dias
-                      </p>
+                      <p className="text-sm font-bold text-orange-600">{formatarMoeda(conta.saldo)}</p>
                     </div>
                   ))}
                 </div>
@@ -586,7 +400,6 @@ const DashboardFinanceiro = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

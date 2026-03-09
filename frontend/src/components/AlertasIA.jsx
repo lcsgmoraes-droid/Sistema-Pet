@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 
-const AlertasIA = () => {
+const AlertasIA = ({ compacto = false }) => {
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [filtroSeveridade, setFiltroSeveridade] = useState('todos'); // todos, crítico, atenção, info
@@ -284,15 +284,76 @@ const AlertasIA = () => {
 
   if (carregando) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex items-center space-x-3">
-          <Sparkles className="w-6 h-6 text-purple-600 animate-spin" />
-          <span className="text-gray-600">Analisando alertas...</span>
+      <div className="flex items-center justify-center py-8">
+        <div className="flex items-center space-x-2">
+          <Sparkles className="w-5 h-5 text-purple-600 animate-spin" />
+          <span className="text-sm text-gray-600">Analisando alertas...</span>
         </div>
       </div>
     );
   }
 
+  // Modo compacto: usado no dashboard na coluna lateral
+  if (compacto) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 px-4 py-3 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" />
+            <span className="text-sm font-semibold">Alertas IA</span>
+          </div>
+          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+            {alertas.length} alerta{alertas.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {alertasFiltrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CheckCircle className="w-8 h-8 text-green-500 mb-2" />
+              <p className="text-sm font-medium text-green-700">Tudo em ordem!</p>
+              <p className="text-xs text-gray-500 mt-1">Nenhum alerta no momento.</p>
+            </div>
+          ) : (
+            alertasFiltrados.map((alerta) => {
+              const cores = getCorSeveridade(alerta.severidade);
+              const Icone = alerta.icone;
+              return (
+                <div
+                  key={alerta.id}
+                  className={`${cores.bg} border ${cores.border} rounded-lg p-2.5`}
+                >
+                  <div className="flex items-start gap-2">
+                    <Icone className={`w-4 h-4 mt-0.5 flex-shrink-0 ${cores.text}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <p className={`text-xs font-semibold ${cores.text} truncate`}>
+                          {alerta.titulo}
+                        </p>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${cores.badge}`}>
+                          {alerta.severidade}
+                        </span>
+                      </div>
+                      <p className={`text-xs ${cores.text} opacity-90 line-clamp-2`}>
+                        {alerta.mensagem}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => marcarComoResolvido(alerta.id)}
+                      className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Modo completo (página dedicada)
   return (
     <div className="space-y-6">
       {/* Cabeçalho */}

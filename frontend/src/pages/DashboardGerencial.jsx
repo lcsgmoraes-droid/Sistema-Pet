@@ -148,44 +148,28 @@ export default function DashboardGerencial() {
   const carregarDashboard = async () => {
     try {
       setLoading(true);
-      
-      // 1. Buscar todos os clientes com segmentação
-      const [clientesRes, segmentosRes] = await Promise.all([
-        api.get('/clientes/'),
-        api.get('/segmentacao/estatisticas')
-      ]);
-      
-      // ✅ VALIDAÇÃO: Garantir que sempre teremos arrays, mesmo se API retornar null/undefined/objeto
-      const clientesData = clientesRes?.data;
-      const clientes = Array.isArray(clientesData) 
-        ? clientesData 
-        : Array.isArray(clientesData?.data)
-          ? clientesData.data
-          : [];
-      
-      const estatisticasData = segmentosRes?.data;  
-      const estatisticas = estatisticasData || {};
-      
-      console.log('📊 [Dashboard] Clientes carregados:', clientes.length);
-      
-      // 2. Calcular métricas agregadas no frontend (MVP)
-      const metricas = calcularMetricas(clientes, estatisticas);
-      
-      setMetricas(metricas);
+
+      const res = await api.get('/dashboard/gerencial');
+      const data = res?.data;
+
+      if (!data) throw new Error('Resposta vazia do servidor');
+
+      setMetricas(data);
       setUltimaAtualizacao(new Date());
-      
+
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
-      
-      // Definir métricas vazias para evitar erro de renderização
+
       setMetricas({
-        vips_inativos: { quantidade: 0, clientes: [], impacto: 'R$ 0' },
-        clientes_inativos: { quantidade: 0, clientes: [], diasMedia: 0 },
-        clientes_novos: { quantidade: 0, clientes: [] },
-        oportunidades_upsell: { quantidade: 0, clientes: [], potencial: 'R$ 0' },
-        clientes_risco_churn: { quantidade: 0, clientes: [], diasMedia: 0 }
+        vips_inativos: { quantidade: 0, impacto: 'R$ 0,00' },
+        clientes_inativos: { quantidade: 0, impacto: 'Reativação pendente' },
+        clientes_endividados: { quantidade: 0, impacto: 'R$ 0,00' },
+        oportunidades_novos: { quantidade: 0, impacto: '~R$ 0/mês' },
+        pets_sem_eventos: { quantidade: 0, impacto: 'Em breve' },
+        whatsapp_inativo: { quantidade: 0, impacto: 'Canal perdido' },
+        total_clientes: 0
       });
-      
+
       if (err.response?.status === 403) {
         alert('Você não tem permissão para acessar o dashboard gerencial');
       } else {
@@ -194,115 +178,6 @@ export default function DashboardGerencial() {
     } finally {
       setLoading(false);
     }
-  };
-
-  /**
-   * Calcula métricas agregadas baseado em regras
-   */
-  const calcularMetricas = (clientes, estatisticas) => {
-    const hoje = new Date();
-    
-    // ✅ VALIDAÇÃO: Garantir que clientes é um array
-    const clientesSafe = Array.isArray(clientes) ? clientes : [];
-    
-    // Filtros por tipo de cliente
-    const clientesAtivos = clientesSafe.filter(c => c?.tipo_cadastro === 'cliente');
-    
-    // 1. VIPs inativos (>20 dias sem compra)
-    const vipsInativos = clientesAtivos.filter(cliente => {
-      // Buscar segmento nas estatísticas ou assumir que está no cliente
-      const segmento = cliente?.segmento || 'Regular';
-      const diasSemCompra = cliente?.dias_desde_ultima_compra ?? 999;
-      return segmento === 'VIP' && diasSemCompra > 20;
-    });
-    
-    const impactoVips = vipsInativos.reduce((acc, c) => acc + (c?.total_90d ?? 0), 0);
-    
-    // 2. Clientes inativos (>90 dias)
-    const clientesInativos = clientesAtivos.filter(cliente => {
-      const diasSemCompra = cliente?.dias_desde_ultima_compra ?? 0;
-      return diasSemCompra > 90;
-    });
-    
-    const impactoInativos = clientesInativos.reduce((acc, c) => acc + (c?.total_historico ?? 0), 0);
-    
-    // 3. Clientes endividados
-    const clientesEndividados = clientesAtivos.filter(cliente => {
-      return (cliente?.saldo_devedor ?? 0) > 0;
-    });
-    
-    const totalDividas = clientesEndividados.reduce((acc, c) => acc + (c?.saldo_devedor ?? 0), 0);
-    
-    // 4. Novos promissores (Segmento Novo + ticket alto)
-    const novosPromissores = clientesAtivos.filter(cliente => {
-      const segmento = cliente?.segmento || 'Regular';
-      const ticketMedio = cliente?.ticket_medio ?? 0;
-      return segmento === 'Novo' && ticketMedio > 200;
-    });
-    
-    const potencialNovos = novosPromissores.reduce((acc, c) => acc + (c?.ticket_medio ?? 0), 0);
-    
-    // 5. Pets sem eventos (calculado aproximadamente - requer mais dados)
-    const clientesComPets = clientesAtivos.filter(c => Array.isArray(c?.pets) && c.pets.length > 0);
-    let petsInativos = 0;
-    let clientesComPetsInativos = [];
-    
-    clientesComPets.forEach(cliente => {
-      const pets = Array.isArray(cliente?.pets) ? cliente.pets : [];
-      if (pets.length > 0) {
-        const petsSemEvento = pets.filter(pet => {
-          if (!pet?.ultima_consulta) return true;
-          const ultimaConsulta = new Date(pet.ultima_consulta);
-          const diasSem = Math.floor((hoje - ultimaConsulta) / (1000 * 60 * 60 * 24));
-          return diasSem > 60;
-        });
-        
-        if (petsSemEvento.length > 0) {
-          petsInativos += petsSemEvento.length;
-          clientesComPetsInativos.push(cliente);
-        }
-      }
-    });
-    
-    // 6. WhatsApp faltando
-    const semWhatsApp = clientesAtivos.filter(c => !c?.celular || c.celular.trim() === '');
-    
-    return {
-      vips_inativos: {
-        quantidade: vipsInativos?.length ?? 0,
-        impacto: `R$ ${(impactoVips ?? 0).toFixed(2)}`,
-        clientes: vipsInativos
-      },
-      clientes_inativos: {
-        quantidade: clientesInativos?.length ?? 0,
-        impacto: `R$ ${((impactoInativos ?? 0) / 12).toFixed(2)}/mês`,
-        clientes: clientesInativos
-      },
-      clientes_endividados: {
-        quantidade: clientesEndividados?.length ?? 0,
-        impacto: `R$ ${(totalDividas ?? 0).toFixed(2)}`,
-        clientes: clientesEndividados
-      },
-      oportunidades_novos: {
-        quantidade: novosPromissores?.length ?? 0,
-        impacto: `~R$ ${(potencialNovos ?? 0).toFixed(0)}/mês`,
-        clientes: novosPromissores
-      },
-      pets_sem_eventos: {
-        quantidade: petsInativos ?? 0,
-        impacto: `${clientesComPetsInativos?.length ?? 0} donos`,
-        clientes: clientesComPetsInativos
-      },
-      whatsapp_inativo: {
-        quantidade: semWhatsApp?.length ?? 0,
-        impacto: 'Canal perdido',
-        clientes: semWhatsApp
-      },
-      
-      // Dados gerais
-      total_clientes: clientesAtivos?.length ?? 0,
-      estatisticas: estatisticas ?? {}
-    };
   };
 
   const handleCardClick = (tipo) => {
