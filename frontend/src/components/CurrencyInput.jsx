@@ -24,9 +24,7 @@ export default function CurrencyInput({ value, onChange, maxValue, className = '
   const maxCents = maxValue !== undefined ? Math.round(maxValue * 100) : 999999999;
 
   // Exibição com separador de milhar: 17.555,25
-  const display = cents > 0
-    ? (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : '';
+  const display = (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const handleKeyDown = (e) => {
     // Detectar se o campo está totalmente selecionado (Ctrl+A ou clique e arraste)

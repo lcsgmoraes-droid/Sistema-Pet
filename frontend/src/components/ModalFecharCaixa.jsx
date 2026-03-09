@@ -516,7 +516,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
               </button>
             )}
 
-            {!!valorContado && Math.abs(diferenca) <= 0.01 && (
+            {valorContado !== null && valorContado !== undefined && Math.abs(diferenca) <= 0.01 && (
               <div className="mt-3 p-4 rounded-lg border-2 bg-green-50 border-green-300">
                 <div className="flex items-center justify-center space-x-2 text-green-700 font-semibold">
                   <span className="text-2xl">✓</span>
