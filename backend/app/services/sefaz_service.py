@@ -445,6 +445,7 @@ class SefazService:
             "max_nsu": parsed["max_nsu"],
             "c_stat": c_stat,
             "x_motivo": parsed["x_motivo"],
+            "docs_list": docs,
         }
 
     @classmethod

@@ -395,20 +395,29 @@ def _loop_sefaz_sync():
                             cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
                             cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu"))
                             config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-                            docs = cfg["ultimo_sync_documentos"]
-                            logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {docs} documento(s) novos. NSU: {cfg['ultimo_nsu']}")
+                            docs_count = cfg["ultimo_sync_documentos"]
+                            logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {docs_count} documento(s) novos. NSU: {cfg['ultimo_nsu']}")
 
+                            # Importar documentos com XML completo para notas_entrada
+                            docs_lista = resultado.get("docs_list", [])
+                            if docs_lista:
+                                from app.db import SessionLocal as _SessionLocal
+                                from app.notas_entrada_routes import importar_docs_sefaz
+                                db_import = _SessionLocal()
+                                try:
+                                    r = importar_docs_sefaz(docs_lista, tenant_id_str, db_import)
+                                    if r["importadas"] > 0:
+                                        logger.info(f"[SEFAZ] 📥 {r['importadas']} NF-e(s) salvas. Duplicadas: {r['duplicadas']}. Erros: {r['erros']}")
+                                finally:
+                                    db_import.close()
                         except Exception as exc_tenant:
                             logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
-
             finally:
-                if _lock_f is not None:
+                if _lock_f:
                     try:
-                        import fcntl as _fcntl
-                        _fcntl.flock(_lock_f, _fcntl.LOCK_UN)
+                        _lock_f.close()
                     except Exception:
                         pass
-                    _lock_f.close()
         except Exception as exc:
             logger.warning(f"[SEFAZ] ⚠️ Erro no loop de sincronizacao: {exc}")
 
