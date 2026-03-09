@@ -215,6 +215,8 @@ export default function MeusCaixas() {
               <div key={caixa.id} className={`bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow ${
                 caixa.status === 'fechado' && caixa.diferenca !== null && Math.abs(caixa.diferenca ?? 0) > 0.01
                   ? 'border-l-4 border-l-amber-400'
+                  : caixa.status === 'fechado' && caixa.diferenca !== null && Math.abs(caixa.diferenca ?? 0) <= 0.01
+                  ? 'border-l-4 border-l-green-400'
                   : ''
               }`}>
                 <div className="p-6">
@@ -274,17 +276,17 @@ export default function MeusCaixas() {
                         </div>
 
                         <div className={`rounded-lg p-3 ${
-                          diferenca.tipo === 'ok' ? 'bg-gray-50' :
-                          diferenca.tipo === 'sobra' ? 'bg-green-50' : 'bg-red-50'
+                          diferenca.tipo === 'ok' ? 'bg-green-50' :
+                          diferenca.tipo === 'sobra' ? 'bg-blue-50' : 'bg-red-50'
                         }`}>
-                          <div className="text-xs text-gray-600 mb-1">DiferenÃ§a</div>
+                          <div className="text-xs text-gray-600 mb-1">Diferença</div>
                           <div className={`text-lg font-semibold ${
-                            diferenca.tipo === 'ok' ? 'text-gray-900' :
-                            diferenca.tipo === 'sobra' ? 'text-green-900' : 'text-red-900'
+                            diferenca.tipo === 'ok' ? 'text-green-700' :
+                            diferenca.tipo === 'sobra' ? 'text-blue-900' : 'text-red-900'
                           }`}>
-                            {diferenca.tipo === 'sobra' && '+'}
-                            {diferenca.tipo === 'falta' && '-'}
-                            R$ {diferenca.valor.toFixed(2)}
+                            {diferenca.tipo === 'ok' && '✓ Caixa Batido'}
+                            {diferenca.tipo === 'sobra' && `+ R$ ${diferenca.valor.toFixed(2)}`}
+                            {diferenca.tipo === 'falta' && `- R$ ${diferenca.valor.toFixed(2)}`}
                           </div>
                         </div>
                       </>

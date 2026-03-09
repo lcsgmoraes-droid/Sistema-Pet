@@ -46,7 +46,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   };
 
   const calcularDiferenca = () => {
-    if (!resumo || !valorContado) return 0;
+    if (!resumo || valorContado === null || valorContado === undefined) return 0;
     return valorContado - resumo.totais.saldo_atual;
   };
 
@@ -100,8 +100,8 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   };
 
   const handleFechar = async () => {
-    if (!(valorContado > 0)) {
-      setErro('Informe o valor contado no caixa');
+    if (valorContado === null || valorContado === undefined || valorContado === '') {
+      setErro('Informe o valor contado no caixa (pode ser R$ 0,00 se tiver zerado após sangrias)');
       return;
     }
 
@@ -485,7 +485,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
             </div>
 
             {/* Diferença */}
-            {!!valorContado && Math.abs(diferenca) > 0.01 && (
+            {valorContado !== null && valorContado !== undefined && Math.abs(diferenca) > 0.01 && (
               <button
                 type="button"
                 onClick={() => setMostrarDicasDiferenca(true)}
