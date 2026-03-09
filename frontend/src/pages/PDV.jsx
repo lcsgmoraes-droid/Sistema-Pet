@@ -8,6 +8,7 @@
 import {
   AlertCircle,
   AlertTriangle,
+  Bell,
   BookmarkPlus,
   CheckCircle,
   ChevronDown,
@@ -115,6 +116,7 @@ export default function PDV() {
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
     useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
+  const [pendenciasProdutoIds, setPendenciasProdutoIds] = useState([]);
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [vendasRecentes, setVendasRecentes] = useState([]);
   const [filtroVendas, setFiltroVendas] = useState("24h");
@@ -451,8 +453,10 @@ export default function PDV() {
         (p) => p.status === "pendente" || p.status === "notificado",
       );
       setPendenciasCount(pendenciasAtivas.length);
+      setPendenciasProdutoIds(pendenciasAtivas.map((p) => p.produto_id));
     } catch (error) {
       setPendenciasCount(0);
+      setPendenciasProdutoIds([]);
     }
   };
 
@@ -2203,14 +2207,7 @@ export default function PDV() {
                     className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-orange-50 border-2 border-orange-400 rounded-lg transition-colors relative"
                     title="Lista de espera - Produtos sem estoque"
                   >
-                    <BookmarkPlus className="w-5 h-5 text-orange-500" />
-                    {pendenciasCount > 0 ? (
-                      <span className="text-orange-600 font-semibold text-sm">
-                        Lista de espera ({pendenciasCount})
-                      </span>
-                    ) : (
-                      <span className="text-orange-500 text-sm">Lista de espera</span>
-                    )}
+                    <Bell className="w-5 h-5 text-orange-500" />
                     {pendenciasCount > 0 && (
                       <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                         {pendenciasCount}
@@ -2894,6 +2891,13 @@ export default function PDV() {
                                   <div className="font-medium text-gray-900">
                                     {item.produto_nome}
                                   </div>
+                                  {/* Badge Lista de Espera */}
+                                  {pendenciasProdutoIds.includes(item.produto_id) && (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-600" title="Na lista de espera">
+                                      <BookmarkPlus className="w-3 h-3" />
+                                      Espera
+                                    </span>
+                                  )}
                                   {/* Badge KIT */}
                                   {isKit && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
