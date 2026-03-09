@@ -46,7 +46,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func as sqlfunc
+from sqlalchemy import func as sqlfunc, or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -672,7 +672,7 @@ def saldo_cliente(
             CashbackTransaction.customer_id == customer_id,
             # Inclui lançamentos sem prazo OU com prazo ainda no futuro
             # OU lançamentos negativos (debit/expired/reversal) — sempre contam
-            sqlfunc.or_(
+            sql_or_(
                 CashbackTransaction.expires_at.is_(None),
                 CashbackTransaction.expires_at > now_utc,
                 CashbackTransaction.tx_type != "credit",
@@ -774,7 +774,7 @@ def extrato_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
-            sqlfunc.or_(
+            sql_or_(
                 CashbackTransaction.expires_at.is_(None),
                 CashbackTransaction.expires_at > now_utc,
                 CashbackTransaction.tx_type != "credit",
@@ -833,7 +833,7 @@ def sugestao_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == customer_id,
-            sqlfunc.or_(
+            sql_or_(
                 CashbackTransaction.expires_at.is_(None),
                 CashbackTransaction.expires_at > now_utc,
                 CashbackTransaction.tx_type != "credit",
