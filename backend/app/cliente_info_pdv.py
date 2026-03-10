@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import Counter, defaultdict
 from pydantic import BaseModel
 import os
+import json
 
 from app.db import get_session
 from app.models import User, Cliente, Pet
@@ -18,9 +19,108 @@ from app.auth import get_current_user, get_current_user_and_tenant
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
-# Schema para chat IA
+
+class ItemCarrinhoIA(BaseModel):
+    produto_id: Optional[int] = None
+    produto_nome: str
+    quantidade: float
+    preco_unitario: float
+
+
+class AlertasCarrinhoRequest(BaseModel):
+    itens: List[ItemCarrinhoIA]
+
+
 class ChatPDVRequest(BaseModel):
     mensagem: str
+    carrinho: Optional[List[ItemCarrinhoIA]] = None
+
+
+@router.post("/{cliente_id}/alertas-carrinho")
+def alertas_carrinho_pdv(
+    cliente_id: int,
+    request: AlertasCarrinhoRequest,
+    user_and_tenant = Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session)
+):
+    """
+    Analisa o carrinho atual em tempo real e retorna alertas proativos:
+    - Ração errada para a fase de vida do pet
+    - Proteína com alergia registrada
+    - Duração estimada por pet
+    """
+    _, tenant_id = user_and_tenant
+
+    pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo == True).all()
+    alertas = []
+    infos = []
+
+    for item in request.itens:
+        if not item.produto_id:
+            continue
+        produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
+        if not produto or not produto.peso_embalagem:
+            continue  # só analisa rações
+
+        for pet in pets:
+            pet_nome = pet.nome
+            idade_anos = None
+            if pet.data_nascimento:
+                data_nasc = pet.data_nascimento.date() if isinstance(pet.data_nascimento, datetime) else pet.data_nascimento
+                idade_anos = (datetime.now().date() - data_nasc).days // 365
+            fase_pet = "filhote" if (idade_anos is not None and idade_anos < 1) else \
+                       "idoso" if (idade_anos is not None and idade_anos >= 7) else "adulto"
+
+            # Alerta: fase de vida errada
+            if produto.categoria_racao:
+                fase_racao = produto.categoria_racao.lower()
+                if fase_pet == "idoso" and "senior" not in fase_racao and "idoso" not in fase_racao and "sênior" not in fase_racao:
+                    alertas.append({
+                        "tipo": "fase_vida",
+                        "nivel": "aviso",
+                        "mensagem": f"{pet_nome} é idoso ({idade_anos} anos) — ração '{produto.nome}' é para '{produto.categoria_racao}'. Recomendar versão sênior."
+                    })
+                elif fase_pet == "filhote" and "filhote" not in fase_racao:
+                    alertas.append({
+                        "tipo": "fase_vida",
+                        "nivel": "aviso",
+                        "mensagem": f"{pet_nome} é filhote — ração '{produto.nome}' é para '{produto.categoria_racao}'."
+                    })
+
+            # Alerta: alergia
+            if produto.sabor_proteina and pet.alergias:
+                if produto.sabor_proteina.lower() in pet.alergias.lower():
+                    alertas.append({
+                        "tipo": "alergia",
+                        "nivel": "critico",
+                        "mensagem": f"🚨 {pet_nome} tem alergia a '{produto.sabor_proteina}' registrada! A ração '{produto.nome}' contém essa proteína."
+                    })
+
+            # Info: duração estimada
+            if pet.peso and float(pet.peso) > 0:
+                try:
+                    from app.calculadora_racao import calcular_quantidade_diaria
+                    peso_pet = float(pet.peso)
+                    qtd_diaria_g = calcular_quantidade_diaria(
+                        peso_pet_kg=peso_pet,
+                        idade_meses=int(idade_anos * 12) if idade_anos is not None else None,
+                        nivel_atividade="normal",
+                        tabela_consumo_json=None
+                    )
+                    total_g = produto.peso_embalagem * 1000 * item.quantidade
+                    duracao_dias = int(total_g / qtd_diaria_g) if qtd_diaria_g > 0 else None
+                    if duracao_dias:
+                        custo_total = item.preco_unitario * item.quantidade
+                        infos.append({
+                            "tipo": "duracao",
+                            "mensagem": f"'{produto.nome}' para {pet_nome} ({peso_pet}kg): ~{qtd_diaria_g:.0f}g/dia → dura {duracao_dias} dias (R$ {custo_total/duracao_dias:.2f}/dia)"
+                        })
+                except Exception:
+                    pass
+
+    return {"alertas": alertas, "infos": infos}
+
+
 
 
 @router.get("/{cliente_id}/info-pdv")
@@ -375,20 +475,112 @@ async def chat_pdv_cliente(
                     f"    ⚠️ {produto.nome}: compra a cada ~{int(intervalo_medio)}d, última há {dias_desde}d ({int(atraso)}d atrasado)"
                 )
 
-    # ── 5. PETS (detalhes completos) ──────────────────────────────────────
+    # ── 5. PETS (detalhes completos com saúde) ────────────────────────────
     pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo == True).all()
     pets_lines = []
+    pets_data = []  # usado nas análises do carrinho
     for pet in pets:
-        idade_str = ""
+        idade_anos = None
         if pet.data_nascimento:
             data_nasc = pet.data_nascimento.date() if isinstance(pet.data_nascimento, datetime) else pet.data_nascimento
             idade_anos = (datetime.now().date() - data_nasc).days // 365
-            idade_str = f", {idade_anos} anos"
-        peso_str = f", {float(pet.peso):.1f}kg" if pet.peso else ""
+        peso_val = float(pet.peso) if pet.peso else None
         raca_str = f" ({pet.raca})" if pet.raca else ""
-        pets_lines.append(f"    - {pet.nome}: {pet.especie}{raca_str}{idade_str}{peso_str}")
+        fase = "filhote" if (idade_anos is not None and idade_anos < 1) else \
+               "idoso" if (idade_anos is not None and idade_anos >= 7) else "adulto"
+        linha = f"    - {pet.nome}: {pet.especie}{raca_str}"
+        if idade_anos is not None:
+            linha += f", {idade_anos} anos ({fase})"
+        if peso_val:
+            linha += f", {peso_val:.1f}kg"
+        if pet.alergias:
+            linha += f"\n      ⚠️ ALERGIAS: {pet.alergias}"
+        if pet.doencas_cronicas:
+            linha += f"\n      🏥 Doenças crônicas: {pet.doencas_cronicas}"
+        if pet.medicamentos_continuos:
+            linha += f"\n      💊 Medicamentos: {pet.medicamentos_continuos}"
+        if pet.historico_clinico:
+            linha += f"\n      📋 Histórico: {pet.historico_clinico}"
+        pets_lines.append(linha)
+        pets_data.append({"nome": pet.nome, "especie": pet.especie, "raca": pet.raca,
+                          "idade_anos": idade_anos, "peso_kg": peso_val, "fase": fase,
+                          "alergias": pet.alergias or "", "doencas": pet.doencas_cronicas or ""})
 
-    # ── 6. CONTEXTO COMPLETO PARA A IA ───────────────────────────────────
+    # ── 6. CARRINHO ATUAL + ANÁLISE DE RAÇÕES ─────────────────────────────
+    carrinho_lines = []
+    alertas_carrinho = []
+
+    if request.carrinho:
+        for item_c in request.carrinho:
+            linha_c = f"    - {item_c.produto_nome} x{item_c.quantidade:.0f} (R$ {item_c.preco_unitario:.2f}/un)"
+            produto_db = None
+            if item_c.produto_id:
+                produto_db = db.query(Produto).filter(Produto.id == item_c.produto_id).first()
+
+            if produto_db and produto_db.peso_embalagem:
+                # É ração — enriquecer com dados nutricionais
+                nutri = {}
+                if produto_db.tabela_nutricional:
+                    try:
+                        nutri = json.loads(produto_db.tabela_nutricional)
+                    except Exception:
+                        pass
+
+                nutri_str = ""
+                if nutri:
+                    partes = []
+                    for k, v in nutri.items():
+                        partes.append(f"{k}: {v}%")
+                    nutri_str = f" | Nutri: {', '.join(partes)}"
+
+                linha_c += f"\n      🐾 Ração {produto_db.classificacao_racao or ''} | {produto_db.peso_embalagem}kg"
+                if produto_db.categoria_racao:
+                    linha_c += f" | Fase: {produto_db.categoria_racao}"
+                if produto_db.sabor_proteina:
+                    linha_c += f" | Proteína: {produto_db.sabor_proteina}"
+                linha_c += nutri_str
+
+                # Calcular duração por pet
+                for pet in pets_data:
+                    if pet["peso_kg"] and pet["peso_kg"] > 0:
+                        from app.calculadora_racao import calcular_quantidade_diaria
+                        qtd_diaria_g = calcular_quantidade_diaria(
+                            peso_pet_kg=pet["peso_kg"],
+                            idade_meses=int(pet["idade_anos"] * 12) if pet["idade_anos"] is not None else None,
+                            nivel_atividade="normal",
+                            tabela_consumo_json=None
+                        )
+                        total_g = produto_db.peso_embalagem * 1000 * item_c.quantidade
+                        duracao_dias = int(total_g / qtd_diaria_g) if qtd_diaria_g > 0 else None
+                        custo_dia = (item_c.preco_unitario * item_c.quantidade) / duracao_dias if duracao_dias else None
+                        if duracao_dias:
+                            linha_c += f"\n      📅 Para {pet['nome']} ({pet['peso_kg']}kg): ~{qtd_diaria_g:.0f}g/dia → dura {duracao_dias} dias (R$ {custo_dia:.2f}/dia)"
+
+                # Alertas automáticos: fase de vida
+                if produto_db.categoria_racao:
+                    for pet in pets_data:
+                        fase_racao = produto_db.categoria_racao.lower()
+                        fase_pet = pet["fase"]
+                        if fase_pet == "idoso" and "senior" not in fase_racao and "idoso" not in fase_racao and "sênior" not in fase_racao:
+                            alertas_carrinho.append(
+                                f"    ⚠️ {pet['nome']} é IDOSO ({pet['idade_anos']} anos) mas a ração '{produto_db.nome}' é para '{produto_db.categoria_racao}' — considere recomendar ração sênior"
+                            )
+                        elif fase_pet == "filhote" and "filhote" not in fase_racao:
+                            alertas_carrinho.append(
+                                f"    ⚠️ {pet['nome']} é FILHOTE mas a ração '{produto_db.nome}' é para '{produto_db.categoria_racao}'"
+                            )
+
+                # Alertas: proteína x alergia do pet
+                if produto_db.sabor_proteina:
+                    for pet in pets_data:
+                        if pet["alergias"] and produto_db.sabor_proteina.lower() in pet["alergias"].lower():
+                            alertas_carrinho.append(
+                                f"    🚨 {pet['nome']} tem ALERGIA registrada a '{produto_db.sabor_proteina}' e a ração '{produto_db.nome}' contém essa proteína!"
+                            )
+
+            carrinho_lines.append(linha_c)
+
+    # ── 7. CONTEXTO COMPLETO PARA A IA ───────────────────────────────────
     dias_desde_ultima = (datetime.now() - vendas[0].data_venda).days if vendas else None
     contexto = f"""
 === CLIENTE ===
@@ -396,6 +588,12 @@ Nome: {cliente.nome}
 CPF/CNPJ: {cliente.cpf or cliente.cnpj or 'não informado'}
 Telefone: {cliente.telefone or cliente.celular or 'não informado'}
 Cidade: {f"{cliente.cidade}/{cliente.estado}" if cliente.cidade else 'não informada'}
+
+=== CARRINHO ATUAL ===
+{chr(10).join(carrinho_lines) if carrinho_lines else '  (carrinho vazio)'}
+
+=== ALERTAS DO CARRINHO ===
+{chr(10).join(alertas_carrinho) if alertas_carrinho else '  Nenhum alerta detectado.'}
 
 === HISTÓRICO DE COMPRAS ===
 Total de compras: {len(vendas)}
@@ -412,7 +610,7 @@ Detalhes das últimas {min(10, len(vendas))} compras:
 === ALERTAS DE REABASTECIMENTO ===
 {chr(10).join(alertas_reabastecimento) if alertas_reabastecimento else '  Nenhum atrasado no momento.'}
 
-=== PETS ===
+=== PETS (perfil completo) ===
 {chr(10).join(pets_lines) if pets_lines else '  Nenhum pet cadastrado.'}
 """.strip()
 
@@ -420,23 +618,21 @@ Detalhes das últimas {min(10, len(vendas))} compras:
 
 Seu papel é ajudar o OPERADOR DE CAIXA a atender melhor o cliente que está na frente dele AGORA.
 
-Você tem acesso ao histórico completo de compras, produtos favoritos, pets, padrões de reabastecimento e alertas.
+Você tem acesso ao:
+- CARRINHO ATUAL: o que o cliente está comprando neste momento, com tabela nutricional das rações, duração estimada por pet, e alertas já detectados automaticamente
+- HISTÓRICO COMPLETO de compras do cliente
+- PERFIL COMPLETO dos pets: espécie, raça, idade, peso, fase de vida (filhote/adulto/idoso), alergias, doenças crônicas, medicamentos
+- ALERTAS já calculados (ex: ração errada para a fase de vida, alergia detectada)
 
 Regras:
 - Responda SEMPRE em português do Brasil
-- Seja BREVE e DIRETO (máximo 4-5 linhas normalmente)
+- Seja BREVE e DIRETO (máximo 4-5 linhas normalmente, a não ser que pedirem detalhes)
 - Foque no que é útil AGORA para o atendimento
-- Se perceber que um produto favorito está atrasado, mencione proativamente
-- Se os pets do cliente tiverem características relevantes (raça, peso, idade), considere isso nas sugestões
-- Responda perguntas específicas com dados exatos do histórico
+- Se há ALERTAS DO CARRINHO, priorize mencioná-los quando relevante
+- Para perguntas de duração de ração: use os dados já calculados no contexto (duração em dias por pet)
+- Para perguntas sobre alergia ou saúde: seja cuidadoso e sugira consulta veterinária quando necessário
 - Não invente informações — use apenas o que está no contexto
-
-Exemplos de perguntas que você responde bem:
-- "O que ele comprou na última vez?"
-- "Quantas vezes ele comprou ração X?"
-- "Qual o pet dele?"
-- "Tem algum produto que ele compra regularmente que pode estar acabando?"
-- "Qual o ticket médio dele?"
+- Quando sugerir produtos alternativos, seja específico (ex: "ração sênior para cães de porte médio")
 """
 
     try:

@@ -224,6 +224,8 @@ export default function PDV() {
   const [inputAssistente, setInputAssistente] = useState('');
   const [enviandoAssistente, setEnviandoAssistente] = useState(false);
   const chatAssistenteEndRef = useRef(null);
+  const [alertasCarrinho, setAlertasCarrinho] = useState([]);  // alertas proativos
+  const [infosCarrinho, setInfosCarrinho] = useState([]);      // infos de duração
 
   // 🆕 Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
@@ -251,16 +253,31 @@ export default function PDV() {
     }
   }, [vendaAtual.cliente]);
 
-  // Resetar chat do assistente quando cliente mudar
+  // Resetar chat do assistente e alertas quando cliente mudar
   useEffect(() => {
     setMensagensAssistente([]);
     setInputAssistente('');
+    setAlertasCarrinho([]);
+    setInfosCarrinho([]);
   }, [vendaAtual.cliente?.id]);
 
   // Auto-scroll chat para o final
   useEffect(() => {
     chatAssistenteEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mensagensAssistente]);
+
+  // Verificar alertas proativos quando os itens do carrinho mudam
+  useEffect(() => {
+    if (vendaAtual.cliente?.id && vendaAtual.itens?.length > 0) {
+      const timer = setTimeout(() => {
+        verificarAlertasCarrinho(vendaAtual.cliente.id, vendaAtual.itens);
+      }, 800);
+      return () => clearTimeout(timer);
+    } else {
+      setAlertasCarrinho([]);
+      setInfosCarrinho([]);
+    }
+  }, [vendaAtual.itens, vendaAtual.cliente?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Salvar dados do carrinho no sessionStorage para a calculadora universal
   useEffect(() => {
@@ -542,7 +559,31 @@ export default function PDV() {
     }
   };
 
-  // Envia mensagem para o chat IA do cliente
+  // Verifica alertas proativos do carrinho (fase de vida, alergias, duração)
+  const verificarAlertasCarrinho = async (clienteId, itens) => {
+    if (!clienteId || !itens || itens.length === 0) {
+      setAlertasCarrinho([]);
+      setInfosCarrinho([]);
+      return;
+    }
+    try {
+      const payload = {
+        itens: itens.map(i => ({
+          produto_id: i.produto_id || null,
+          produto_nome: i.produto_nome || i.nome || '',
+          quantidade: i.quantidade || 1,
+          preco_unitario: i.preco_unitario || 0,
+        }))
+      };
+      const res = await api.post(`/clientes/${clienteId}/alertas-carrinho`, payload);
+      setAlertasCarrinho(res.data.alertas || []);
+      setInfosCarrinho(res.data.infos || []);
+    } catch {
+      // silencioso
+    }
+  };
+
+  // Envia mensagem para o chat IA do cliente (passa carrinho junto)
   const enviarMensagemAssistente = async () => {
     const msg = inputAssistente.trim();
     if (!msg || !vendaAtual.cliente?.id || enviandoAssistente) return;
@@ -550,7 +591,16 @@ export default function PDV() {
     setInputAssistente('');
     setEnviandoAssistente(true);
     try {
-      const res = await api.post(`/clientes/${vendaAtual.cliente.id}/chat-pdv`, { mensagem: msg });
+      const carrinhoPayload = vendaAtual.itens?.map(i => ({
+        produto_id: i.produto_id || null,
+        produto_nome: i.produto_nome || i.nome || '',
+        quantidade: i.quantidade || 1,
+        preco_unitario: i.preco_unitario || 0,
+      })) || [];
+      const res = await api.post(`/clientes/${vendaAtual.cliente.id}/chat-pdv`, {
+        mensagem: msg,
+        carrinho: carrinhoPayload,
+      });
       setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: res.data.resposta }]);
     } catch {
       setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: 'Erro ao responder. Tente novamente.' }]);
@@ -3707,6 +3757,28 @@ export default function PDV() {
                   </div>
                 )}
               </div>
+
+              {/* Alertas de Pets no Carrinho (fase de vida / alergia) */}
+              {alertasCarrinho.length > 0 && vendaAtual.itens.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">⚠️ Atenção — Carrinho</p>
+                  {alertasCarrinho.map((alerta, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-start gap-2 text-sm rounded px-3 py-2 ${
+                        alerta.nivel === 'critico'
+                          ? 'bg-red-100 text-red-800 border border-red-200'
+                          : 'bg-amber-100 text-amber-900 border border-amber-300'
+                      }`}
+                    >
+                      <span className="mt-0.5 shrink-0">
+                        {alerta.nivel === 'critico' ? '🚨' : '⚠️'}
+                      </span>
+                      <span>{alerta.mensagem}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Resumo dos Totais */}
               {vendaAtual.itens.length > 0 && (
