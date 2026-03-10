@@ -335,6 +335,79 @@ def otimizar_vendas_pendentes(
         raise HTTPException(status_code=500, detail=f"Erro ao otimizar rotas: {str(e)}")
 
 
+class OtimizarSelecionadasRequest(BaseModel):
+    venda_ids: List[int]
+
+
+@router.post("/vendas-pendentes/otimizar-selecionadas")
+def otimizar_vendas_selecionadas(
+    payload: OtimizarSelecionadasRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Otimiza a ordem de entrega apenas das vendas selecionadas (por IDs).
+    """
+    from app.services.google_maps_service import calcular_rota_otimizada
+
+    user, tenant_id = user_and_tenant
+
+    if not payload.venda_ids:
+        raise HTTPException(status_code=400, detail="Nenhuma venda selecionada")
+
+    config = db.query(ConfiguracaoEntrega).filter(
+        ConfiguracaoEntrega.tenant_id == tenant_id
+    ).first()
+
+    if not config or not config.logradouro:
+        raise HTTPException(
+            status_code=400,
+            detail="Configure o endereço da loja em Configurações > Entregas primeiro"
+        )
+
+    origem = ", ".join(filter(None, [
+        config.logradouro, config.numero, config.bairro,
+        config.cidade, config.estado, config.cep
+    ]))
+
+    vendas = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.id.in_(payload.venda_ids),
+        Venda.tem_entrega == True,
+        Venda.endereco_entrega.isnot(None)
+    ).order_by(Venda.created_at.asc()).all()
+
+    if not vendas:
+        raise HTTPException(status_code=404, detail="Nenhuma venda encontrada com os IDs fornecidos")
+
+    if len(vendas) == 1:
+        vendas[0].ordem_entrega_otimizada = 1
+        db.commit()
+        return {"message": "Apenas 1 venda, ordem definida como 1", "total_otimizado": 1}
+
+    try:
+        destinos = [v.endereco_entrega for v in vendas]
+        ordem_indices, legs = calcular_rota_otimizada(origem, destinos)
+
+        for posicao, indice_original in enumerate(ordem_indices, start=1):
+            if indice_original < len(vendas):
+                vendas[indice_original].ordem_entrega_otimizada = posicao
+
+        db.commit()
+
+        ordem_vendas = [vendas[i].numero_venda for i in ordem_indices]
+        return {
+            "message": f"Rotas otimizadas com sucesso! {len(ordem_indices)} entregas reordenadas.",
+            "total_otimizado": len(ordem_indices),
+            "ordem": ordem_vendas
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Erro ao otimizar rotas selecionadas: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao otimizar rotas: {str(e)}")
+
+
 @router.get("/{rota_id}", response_model=RotaEntregaResponse)
 def obter_rota(
     rota_id: int,
