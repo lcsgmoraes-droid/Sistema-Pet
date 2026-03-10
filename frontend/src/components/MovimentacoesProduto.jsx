@@ -308,7 +308,7 @@ export default function MovimentacoesProduto() {
         return { texto: `NF ${mov.documento}`, icone: 'nf-venda', cor: 'text-red-600', link: null };
       }
       // Senão, é apenas pedido
-      return { texto: `Pedido #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600', link: `/pdv?vendaId=${mov.referencia_id}` };
+      return { texto: `Pedido #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600', link: `/pdv?venda=${mov.referencia_id}` };
     }
     // Se for balanço
     if (mov.motivo === 'balanco') {
@@ -324,7 +324,7 @@ export default function MovimentacoesProduto() {
     }
     // Se for entrada manual com documento
     if (mov.tipo === 'entrada' && mov.documento) {
-      return { texto: mov.documento, icone: 'documento', cor: 'text-blue-600', link: `/pdv?vendaId=${mov.documento}` };
+      return { texto: mov.documento, icone: 'documento', cor: 'text-blue-600', link: `/pdv?venda=${mov.documento}` };
     }
     // Entrada manual sem documento - verde
     if (mov.tipo === 'entrada') {

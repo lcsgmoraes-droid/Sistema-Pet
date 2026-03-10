@@ -108,7 +108,7 @@ const PedidosCompra = () => {
       }
       
       if (produtosData.length === 0) {
-        toast.warning('⚠️ Este fornecedor não possui produtos vinculados. Edite os produtos para vincular ao fornecedor.');
+        toast('⚠️ Este fornecedor não possui produtos vinculados. Edite os produtos para vincular ao fornecedor.');
       }
       
       setProdutos(produtosData);
@@ -179,7 +179,7 @@ const PedidosCompra = () => {
 
         toast.success(`✅ Quantidade somada! Total: ${itemExistente.quantidade_pedida + quantidade}`);
       } else {
-        toast.info('Adição cancelada');
+        toast('Adição cancelada');
       }
 
       // Limpar form
@@ -257,7 +257,7 @@ const PedidosCompra = () => {
       setQuantidadesEditadas({});
 
       if (response.data.sugestoes.length === 0) {
-        toast.info('Nenhuma sugestão encontrada com os filtros aplicados');
+        toast('Nenhuma sugestão encontrada com os filtros aplicados');
       } else {
         toast.success(`${response.data.sugestoes.length} produtos analisados`);
       }

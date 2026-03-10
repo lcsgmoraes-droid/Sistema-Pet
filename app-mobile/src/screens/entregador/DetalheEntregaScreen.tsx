@@ -64,6 +64,26 @@ interface VendaDetalhes {
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
 
+function obterMensagemErro(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "response" in error &&
+    error.response &&
+    typeof error.response === "object" &&
+    "data" in error.response
+  ) {
+    const data = error.response.data;
+    if (data && typeof data === "object" && "detail" in data) {
+      const detail = data.detail;
+      if (typeof detail === "string" && detail.trim()) {
+        return detail;
+      }
+    }
+  }
+  return fallback;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function abrirMapa(endereco: string) {
@@ -312,11 +332,16 @@ export default function DetalheEntregaScreen() {
     const confirmarFinalizacao = async () => {
       setProcessandoFinalizacao(true);
       try {
-        await api.post(`/rotas-entrega/${rotaId}/fechar`, {});
+        await api.post(`/rotas-entrega/${rotaId}/fechar`, {
+          tentativas: 1,
+        });
         Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
         await carregar();
-      } catch {
-        Alert.alert('Erro', 'Não foi possível finalizar a rota agora.');
+      } catch (error) {
+        Alert.alert(
+          'Erro',
+          obterMensagemErro(error, 'Não foi possível finalizar a rota agora.'),
+        );
       } finally {
         setProcessandoFinalizacao(false);
       }
@@ -459,7 +484,8 @@ export default function DetalheEntregaScreen() {
             style={styles.btnRecebimento}
             onPress={() => abrirModalRecebimento(parada.id)}
           >
-            <Text style={styles.btnRecebimentoText}>💳 Recebimento</Text>
+            <Text style={styles.btnRecebimentoIcon}>💳</Text>
+            <Text style={styles.btnRecebimentoText}>Receber</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -893,41 +919,47 @@ const styles = StyleSheet.create({
   },
 
   // Botões de ação (mapa + ligar)
-  paradaBotoes: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  paradaBotoes: { flexDirection: "row", gap: 6, marginBottom: 10 },
   btnMapa: {
     flex: 1,
     backgroundColor: "#eff6ff",
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: "center",
   },
-  btnMapaText: { color: "#2563eb", fontWeight: "600", fontSize: 13 },
+  btnMapaText: { color: "#2563eb", fontWeight: "600", fontSize: 12 },
   btnLigar: {
     flex: 1,
     backgroundColor: "#f0fdf4",
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: "center",
   },
-  btnLigarText: { color: "#16a34a", fontWeight: "600", fontSize: 13 },
+  btnLigarText: { color: "#16a34a", fontWeight: "600", fontSize: 12 },
   btnRecebimento: {
     flex: 1,
     backgroundColor: "#f5f3ff",
     borderColor: "#c4b5fd",
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
     alignItems: "center",
+    justifyContent: "center",
   },
-  btnRecebimentoText: { color: "#6d28d9", fontWeight: "600", fontSize: 13 },
+  btnRecebimentoIcon: { fontSize: 14, lineHeight: 16 },
+  btnRecebimentoText: { color: "#6d28d9", fontWeight: "600", fontSize: 12 },
   btnDetalhes: {
     flex: 1,
     backgroundColor: '#e0f2fe',
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: 'center',
   },
-  btnDetalhesText: { color: '#0369a1', fontWeight: '600', fontSize: 13 },
+  btnDetalhesText: { color: '#0369a1', fontWeight: '600', fontSize: 12 },
   btnDrag: {
     paddingHorizontal: 6,
     paddingVertical: 4,

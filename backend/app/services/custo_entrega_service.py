@@ -19,15 +19,18 @@ def calcular_custo_moto(km: Decimal) -> Decimal:
     return Decimal("0.00")
 
 
-def calcular_custo_entrega(entregador: Cliente, km: Decimal, tentativas: int, moto_da_loja: bool) -> Decimal:
+def calcular_custo_entrega(entregador: Cliente | None, km: Decimal, tentativas: int, moto_da_loja: bool) -> Decimal:
     """
     Calcula o custo REAL da entrega (gerencial).
     """
     if km is None:
         km = Decimal("0")
 
+    if entregador is None:
+        custo_base = Decimal("0")
+
     # 1️⃣ RATEIO RH (FUNCIONÁRIO)
-    if entregador.controla_rh:
+    elif entregador.controla_rh:
         if not entregador.media_entregas_configurada or entregador.media_entregas_configurada == 0:
             custo_base = Decimal("0")
         else:

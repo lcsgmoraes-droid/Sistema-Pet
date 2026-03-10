@@ -1,1 +1,0 @@
-import{a as s}from"./index-1772992934212.js";const n=async(e={})=>{const a=await s.get("/clientes/",{params:e});return a.data.items||a.data.clientes||a.data||[]},r=async e=>(await s.get(`/clientes/${e}`)).data;export{n as a,r as b};

@@ -708,9 +708,12 @@ export default function PDV() {
 
   // Carregar venda específica se vier na URL
   useEffect(() => {
-    const vendaId = searchParams.get("venda");
+    const vendaId =
+      searchParams.get("venda") ||
+      searchParams.get("vendaId") ||
+      searchParams.get("venda_id");
     if (vendaId) {
-      carregarVendaEspecifica(parseInt(vendaId));
+      carregarVendaEspecifica(Number.parseInt(vendaId));
     }
   }, [searchParams]);
 
@@ -731,7 +734,7 @@ export default function PDV() {
       sessionStorage.removeItem("abrirModalPagamento");
 
       // Carrega a venda e abre o modal
-      carregarVendaEspecifica(parseInt(vendaId), true);
+      carregarVendaEspecifica(Number.parseInt(vendaId), true);
     }
   }, []);
 

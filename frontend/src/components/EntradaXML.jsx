@@ -425,7 +425,7 @@ const EntradaXML = () => {
       setPreviewProcessamento(response.data);
       setMostrarRevisaoPrecos(true);
       
-      // FECHAR o modal de detalhes quando abrir o de revisÃ£o
+                      // FECHAR o modal de detalhes quando abrir o de revisão
       setMostrarDetalhes(false);
       
       // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
@@ -445,13 +445,13 @@ const EntradaXML = () => {
     }
   };
 
-  // Alias para melhor semÃ¢ntica
+  // Alias para melhor semântica
   const carregarPreviewProcessamento = processarNota;
 
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
-      // Atualizar precos se houver alteraÃ§Ãµes (adaptar para nova estrutura)
+      // Atualizar precos se houver alterações (adaptar para nova estrutura)
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
         const itemOriginal = previewProcessamento.itens.find(i => 
@@ -480,7 +480,7 @@ const EntradaXML = () => {
       );
 
       toast.success(
-        `âœ… Nota processada! ${response.data.itens_processados} itens lanÃ§ados no estoque`,
+        `✅ Nota processada! ${response.data.itens_processados} itens lançados no estoque`,
         { duration: 5000 }
       );
       
@@ -734,7 +734,7 @@ const EntradaXML = () => {
       });
       
     } catch (error) {
-      toast.error('Erro ao buscar sugestÃµes de SKU');
+      toast.error('Erro ao buscar sugestões de SKU');
       console.error('Erro ao buscar SKU:', error);
       
       // Preencher mesmo com erro
@@ -1707,7 +1707,7 @@ const EntradaXML = () => {
                           )}
                         </div>
 
-                        {/* COLUNA CENTRAL: Ãcone de ConexÃ£o + Alerta de DivergÃªncia */}
+                        {/* COLUNA CENTRAL: Ícone de Conexão + Alerta de Divergência */}
                         <div className="flex flex-col items-center justify-center bg-gray-100 px-2 py-4">
                           {item.produto_id ? (
                             <>
@@ -1721,13 +1721,13 @@ const EntradaXML = () => {
                               {temDivergencia && (
                                 <div className="bg-red-100 border-2 border-red-500 rounded-lg p-2 max-w-[200px]">
                                   <div className="text-center">
-                                    <div className="text-2xl mb-1">âš ï¸</div>
+                                    <div className="text-2xl mb-1">⚠️</div>
                                     <div className="font-bold text-red-700 text-xs mb-1">
-                                      DIVERGÃŠNCIA!
+                                      DIVERGÊNCIA!
                                     </div>
                                     <div className="text-[10px] text-red-600 space-y-0.5">
                                       {divergencias.map((div) => (
-                                        <div key={`${item.id}-${div}`}>â€¢ {div}</div>
+                                        <div key={`${item.id}-${div}`}>• {div}</div>
                                       ))}
                                     </div>
                                   </div>
@@ -1735,7 +1735,7 @@ const EntradaXML = () => {
                               )}
                             </>
                           ) : (
-                            <div className="text-3xl text-gray-400" title="âŒ NÃ£o vinculado">
+                            <div className="text-3xl text-gray-400" title="❌ Não vinculado">
                               X
                             </div>
                           )}
@@ -1788,7 +1788,7 @@ const EntradaXML = () => {
                                 <>
                                   <div className="flex items-center gap-2 mb-3">
                                     <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      âš ï¸ NAO VINCULADO
+                                      ⚠️ NÃO VINCULADO
                                     </div>
                                   </div>
                                   
@@ -1848,7 +1848,7 @@ const EntradaXML = () => {
                                           );
                                         }).length === 0 && (
                                           <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                            âŒ Nenhum produto encontrado
+                                            ❌ Nenhum produto encontrado
                                           </div>
                                         )}
                                       </div>
@@ -1864,7 +1864,7 @@ const EntradaXML = () => {
                                       onClick={() => abrirModalCriarProduto(item)}
                                       className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-sm"
                                     >
-                                      âž• Criar Novo Produto
+                                      ➕ Criar Novo Produto
                                     </button>
                                   </div>
                                 </>
@@ -1884,7 +1884,7 @@ const EntradaXML = () => {
                                 </>
                               ) : (
                                 <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
-                                  âš ï¸ NAO VINCULADO
+                                  ⚠️ NÃO VINCULADO
                                 </div>
                               )}
                             </div>
@@ -2137,7 +2137,7 @@ const EntradaXML = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* InformaÃ§Ãµes do Item da NF-e */}
+                  {/* Informações do Item da NF-e */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="font-semibold text-blue-900 mb-2">Dados da NF-e:</div>
                     <div className="text-sm space-y-1 text-blue-800">
@@ -2155,17 +2155,17 @@ const EntradaXML = () => {
                   {sugestaoSku?.ja_existe && (
                     <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-2xl">âš ï¸</span>
+                        <span className="text-2xl">⚠️</span>
                         <div className="flex-1">
                           <div className="font-semibold text-yellow-900 mb-2">
-                            Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja estÃ¡ em uso!
+                            Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja está em uso!
                           </div>
                           <div className="text-sm text-yellow-800 mb-3">
                             Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br/>
-                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. VocÃª pode alterar se preferir.</span>
+                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. Você pode alterar se preferir.</span>
                           </div>
                           <div className="text-sm text-yellow-800 mb-2 font-semibold">
-                            Outras opcoes de SKU disponÃ­veis:
+                            Outras opcoes de SKU disponíveis:
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {sugestaoSku.sugestoes.map(sug => (
@@ -2178,7 +2178,7 @@ const EntradaXML = () => {
                                     : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50'
                                 } ${sug.padrao ? 'ring-2 ring-yellow-400' : ''}`}
                               >
-                                {sug.sku} {sug.padrao && 'â­'}
+                                {sug.sku} {sug.padrao && '⭐'}
                               </button>
                             ))}
                           </div>
