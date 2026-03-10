@@ -154,6 +154,7 @@ class ClienteCreate(BaseModel):
     
     # Dados comuns
     nome: str  # Nome completo (PF) ou Nome Fantasia (PJ)
+    data_nascimento: Optional[date] = None
     telefone: Optional[str] = None
     celular: Optional[str] = None
     email: Optional[str] = None
@@ -238,6 +239,7 @@ class ClienteUpdate(BaseModel):
     tipo_cadastro: Optional[str] = None
     tipo_pessoa: Optional[str] = None
     nome: Optional[str] = None
+    data_nascimento: Optional[date] = None
     cpf: Optional[str] = None
     email: Optional[EmailStr] = None
     telefone: Optional[str] = None
@@ -325,6 +327,7 @@ class ClienteResponse(BaseModel):
     tipo_cadastro: str
     tipo_pessoa: str
     nome: str
+    data_nascimento: Optional[dt] = None
     cpf: Optional[str] = None
     email: Optional[str] = None
     telefone: Optional[str] = None

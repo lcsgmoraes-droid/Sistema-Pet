@@ -241,6 +241,7 @@ export default function PDV() {
   const ultimoEventoTeclaProdutoMsRef = useRef(0);
   const sequenciaRapidaProdutoRef = useRef(0);
   const leituraScannerDetectadaRef = useRef(false);
+  const adicionandoProdutoPorEnterRef = useRef(false);
 
   // Persistir estado dos painéis no localStorage
   useEffect(() => {
@@ -1404,6 +1405,49 @@ export default function PDV() {
 
     // Leitores de código de barras digitam muito rápido; usuário no teclado não.
     leituraScannerDetectadaRef.current = sequenciaRapidaProdutoRef.current >= 6;
+  }
+
+  async function adicionarProdutoViaEnter() {
+    const termo = String(buscarProduto || "").trim();
+    if (!termo || modoVisualizacao || adicionandoProdutoPorEnterRef.current) {
+      return;
+    }
+
+    adicionandoProdutoPorEnterRef.current = true;
+    try {
+      const termoLower = termo.toLowerCase();
+      let produtoSelecionado = null;
+
+      if (produtosSugeridos.length > 0) {
+        produtoSelecionado =
+          produtosSugeridos.find((p) => {
+            const codigo = String(p.codigo || "").toLowerCase();
+            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
+            return codigo === termoLower || codigoBarras === termoLower;
+          }) || produtosSugeridos[0];
+      }
+
+      if (!produtoSelecionado) {
+        const response = await getProdutosVendaveis({ busca: termo });
+        const produtos = response.data.items || [];
+        produtoSelecionado =
+          produtos.find((p) => {
+            const codigo = String(p.codigo || "").toLowerCase();
+            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
+            return codigo === termoLower || codigoBarras === termoLower;
+          }) || produtos[0] || null;
+      }
+
+      if (produtoSelecionado) {
+        adicionarProduto(produtoSelecionado);
+      }
+    } catch (error) {
+      console.error("Erro ao adicionar produto via Enter:", error);
+    } finally {
+      leituraScannerDetectadaRef.current = false;
+      sequenciaRapidaProdutoRef.current = 0;
+      adicionandoProdutoPorEnterRef.current = false;
+    }
   }
 
   function buscarClientePorCodigoExato(termo) {
@@ -2981,14 +3025,12 @@ export default function PDV() {
                       type="text"
                       value={buscarProduto}
                       onChange={(e) => setBuscarProduto(e.target.value)}
-                      onKeyDown={(e) => {
+                      onKeyDown={async (e) => {
                         registrarPossivelLeituraScanner(e);
 
-                        if (e.key === "Enter" && produtosSugeridos.length > 0) {
+                        if (e.key === "Enter") {
                           e.preventDefault();
-                          adicionarProduto(produtosSugeridos[0]);
-                          leituraScannerDetectadaRef.current = false;
-                          sequenciaRapidaProdutoRef.current = 0;
+                          await adicionarProdutoViaEnter();
                         }
                       }}
                       placeholder="Digite o nome do produto, código de barras ou serviço..."
@@ -5673,6 +5715,7 @@ export default function PDV() {
 function ModalCadastroCliente({ onClose, onClienteCriado }) {
   const [formData, setFormData] = useState({
     nome: "",
+    data_nascimento: "",
     telefone: "",
     cpf: "",
     email: "",
@@ -5694,6 +5737,7 @@ function ModalCadastroCliente({ onClose, onClienteCriado }) {
     try {
       const response = await api.post("/clientes", {
         ...formData,
+        data_nascimento: formData.data_nascimento || null,
         tipo_cadastro: "cliente",
         tipo_pessoa: "PF",
       });
@@ -5769,6 +5813,20 @@ function ModalCadastroCliente({ onClose, onClienteCriado }) {
                 setFormData({ ...formData, cpf: e.target.value })
               }
               placeholder="000.000.000-00"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Data de nascimento
+            </label>
+            <input
+              type="date"
+              value={formData.data_nascimento || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, data_nascimento: e.target.value })
+              }
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>

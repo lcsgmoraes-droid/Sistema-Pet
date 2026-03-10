@@ -77,6 +77,7 @@ const Pessoas = () => {
     tipo_cadastro: "cliente", // cliente, fornecedor, veterinario
     tipo_pessoa: "PF", // PF ou PJ
     nome: "",
+    data_nascimento: "",
     cpf: "",
     email: "",
     telefone: "",
@@ -559,6 +560,7 @@ const Pessoas = () => {
       // 🔍 Mapeamento de campos técnicos para nomes amigáveis
       const camposPtBr = {
         nome: "Nome",
+        data_nascimento: "Data de Nascimento",
         cpf: "CPF",
         cnpj: "CNPJ",
         razao_social: "Razão Social",
@@ -726,6 +728,9 @@ const Pessoas = () => {
         tipo_cadastro: cliente.tipo_cadastro || "cliente",
         tipo_pessoa: cliente.tipo_pessoa || "PF",
         nome: cliente.nome,
+        data_nascimento: cliente.data_nascimento
+          ? String(cliente.data_nascimento).slice(0, 10)
+          : "",
         cpf: cliente.cpf || "",
         email: cliente.email || "",
         telefone: cliente.telefone || "",
@@ -811,6 +816,7 @@ const Pessoas = () => {
         tipo_cadastro: tipoCadastro,
         tipo_pessoa: tipoPessoa,
         nome: "",
+        data_nascimento: "",
         cpf: "",
         email: "",
         telefone: "",
@@ -2719,6 +2725,23 @@ const Pessoas = () => {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                           placeholder="000.000.000-00"
                           maxLength="14"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Data de nascimento
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.data_nascimento || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              data_nascimento: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                         />
                       </div>
 
