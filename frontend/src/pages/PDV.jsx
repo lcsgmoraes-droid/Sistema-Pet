@@ -1406,6 +1406,15 @@ export default function PDV() {
     leituraScannerDetectadaRef.current = sequenciaRapidaProdutoRef.current >= 6;
   }
 
+  function buscarClientePorCodigoExato(termo) {
+    const termoLimpo = String(termo || "").trim().toLowerCase();
+    if (!termoLimpo) return null;
+
+    return clientesSugeridos.find((cliente) =>
+      String(cliente?.codigo || "").trim().toLowerCase() === termoLimpo,
+    );
+  }
+
   // Selecionar cliente
   const selecionarCliente = async (cliente) => {
     setVendaAtual({ ...vendaAtual, cliente, pet: null });
@@ -2683,6 +2692,15 @@ export default function PDV() {
                             type="text"
                             value={buscarCliente}
                             onChange={(e) => setBuscarCliente(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter") return;
+
+                              const clientePorCodigo = buscarClientePorCodigoExato(buscarCliente);
+                              if (clientePorCodigo) {
+                                e.preventDefault();
+                                selecionarCliente(clientePorCodigo);
+                              }
+                            }}
                             placeholder="Digite nome, CPF ou telefone do cliente..."
                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             disabled={modoVisualizacao}

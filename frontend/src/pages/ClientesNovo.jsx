@@ -1129,6 +1129,19 @@ const Pessoas = () => {
       cliente.celular?.includes(searchTerm),
   );
 
+  const abrirPessoaPorCodigoNoEnter = () => {
+    const termo = String(searchTerm || "").trim();
+    if (!termo) return;
+
+    const clienteCodigoExato = filteredClientes.find(
+      (cliente) => String(cliente?.codigo || "").trim() === termo,
+    );
+
+    if (clienteCodigoExato) {
+      openModal(clienteCodigoExato);
+    }
+  };
+
   // ============================================================================
   // COMPONENTE: ClienteSegmentoBadgeWrapper (lazy load badge na lista)
   // ============================================================================
@@ -1375,6 +1388,12 @@ const Pessoas = () => {
             placeholder="Buscar por código, nome, CPF/CNPJ, email ou telefone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                abrirPessoaPorCodigoNoEnter();
+              }
+            }}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
           />
         </div>
