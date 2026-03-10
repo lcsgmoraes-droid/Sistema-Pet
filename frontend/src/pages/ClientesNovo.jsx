@@ -37,6 +37,8 @@ const Pessoas = () => {
   const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] =
+    useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
@@ -248,6 +250,7 @@ const Pessoas = () => {
       console.error(err);
     } finally {
       setLoading(false);
+      setCarregamentoInicialConcluido(true);
     }
   };
 
@@ -1268,7 +1271,9 @@ const Pessoas = () => {
     );
   }
 
-  if (loading) {
+  const isCarregamentoInicial = loading && !carregamentoInicialConcluido;
+
+  if (isCarregamentoInicial) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
