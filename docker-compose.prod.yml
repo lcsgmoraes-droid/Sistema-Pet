@@ -66,6 +66,10 @@ services:
       BLING_REFRESH_TOKEN: ${BLING_REFRESH_TOKEN:-}
       BLING_DEPOSITO_ID: ${BLING_DEPOSITO_ID:-14887364871}
       BLING_WEBHOOK_TENANT_ID: ${BLING_WEBHOOK_TENANT_ID}
+      # IA
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs
