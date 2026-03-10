@@ -331,7 +331,12 @@ async def chat_pdv_cliente(
         if idx < 10:
             nomes_itens = []
             for item in itens:
-                nome = item.produto_nome or f"Produto #{item.produto_id}"
+                if item.produto:
+                    nome = item.produto.nome
+                elif item.servico_descricao:
+                    nome = item.servico_descricao
+                else:
+                    nome = f"Produto #{item.produto_id}"
                 qtd = float(item.quantidade)
                 nomes_itens.append(f"{nome} x{qtd:.0f}")
             historico_detalhado.append(
