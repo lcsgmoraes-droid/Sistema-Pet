@@ -1208,6 +1208,7 @@ def vincular_produto(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Vincula item a um produto manualmente"""
+    current_user, tenant_id = user_and_tenant
     item = db.query(NotaEntradaItem).filter(
         NotaEntradaItem.id == item_id,
         NotaEntradaItem.nota_entrada_id == nota_id
@@ -1258,29 +1259,35 @@ def vincular_produto(
     # Vincular produto ao fornecedor da nota automaticamente
     nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
     if nota and nota.fornecedor_id:
-        # Verificar se jÃ¡ existe vÃ­nculo
-        vinculo_existente = db.query(ProdutoFornecedor).filter(
+        # Busca o fornecedor PRINCIPAL atual do produto
+        vinculo_principal = db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == produto_id,
-            ProdutoFornecedor.fornecedor_id == nota.fornecedor_id
+            ProdutoFornecedor.e_principal == True
         ).first()
-        
-        if not vinculo_existente:
-            # Criar vÃ­nculo produto-fornecedor
+
+        if not vinculo_principal:
+            # Produto sem fornecedor -> registra o fornecedor da NF como principal
             novo_vinculo = ProdutoFornecedor(
                 produto_id=produto_id,
                 fornecedor_id=nota.fornecedor_id,
                 preco_custo=item.valor_unitario,
-                e_principal=True,  # Primeiro fornecedor Ã© principal
-                ativo=True
+                e_principal=True,
+                ativo=True,
+                tenant_id=tenant_id
             )
             db.add(novo_vinculo)
-            logger.info(f"âœ… Produto {produto_id} vinculado ao fornecedor {nota.fornecedor_id}")
+            logger.info(f"✅ Produto {produto_id} vinculado ao fornecedor {nota.fornecedor_id} como principal")
+        elif vinculo_principal.fornecedor_id == nota.fornecedor_id:
+            # Mesmo fornecedor -> só atualiza o preço
+            vinculo_principal.preco_custo = item.valor_unitario
+            vinculo_principal.ativo = True
+            logger.info(f"🔄 Preço do fornecedor principal do produto {produto_id} atualizado")
         else:
-            # Atualizar preÃ§o se jÃ¡ existir
-            vinculo_existente.preco_custo = item.valor_unitario
-            vinculo_existente.ativo = True
-            logger.info(f"ðŸ”„ VÃ­nculo produto-fornecedor atualizado")
-    
+            # Fornecedor diferente -> troca o fornecedor principal + atualiza preço
+            vinculo_principal.fornecedor_id = nota.fornecedor_id
+            vinculo_principal.preco_custo = item.valor_unitario
+            vinculo_principal.ativo = True
+            logger.info(f"🔄 Fornecedor principal do produto {produto_id} alterado para {nota.fornecedor_id}")
     # Atualizar contadores da nota
     if foi_nao_vinculado:
         nota.produtos_vinculados += 1
