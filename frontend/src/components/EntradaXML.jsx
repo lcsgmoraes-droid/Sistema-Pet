@@ -353,16 +353,6 @@ const EntradaXML = () => {
   };
 
 
-  const popularFornecedores = async (notaId) => {
-    try {
-      const res = await api.post(`/notas-entrada/${notaId}/popular-fornecedores`);
-      const { vinculados, atualizados } = res.data;
-      toast.success(`Fornecedor populado: ${vinculados} novo(s), ${atualizados} atualizado(s)`);
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao popular fornecedores');
-    }
-  };
-
   const salvarTipoRateio = async (notaId, tipo) => {
     try {
       await api.post(`/notas-entrada/${notaId}/rateio`, {
@@ -2088,16 +2078,6 @@ const EntradaXML = () => {
                             >
                               Revisar Precos
                             </button>
-                            {notaSelecionada.fornecedor_id && (
-                              <button
-                                onClick={() => popularFornecedores(notaSelecionada.id)}
-                                disabled={loading}
-                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
-                                title="Vincula o fornecedor desta NF a todos os produtos já linkados"
-                              >
-                                Popular Fornecedores
-                              </button>
-                            )}
                             <button
                               onClick={() => processarNota(notaSelecionada.id)}
                               disabled={loading}
