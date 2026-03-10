@@ -421,11 +421,21 @@ def sync_now(
             "x_motivo": resultado.get("x_motivo"),
         }
     except HTTPException as exc:
+        from datetime import timedelta as _td_sefaz
+        detail_str = str(exc.detail)
         cfg["ultimo_sync_at"] = now_iso
-        cfg["_proximo_sync_permitido_at"] = now_iso
-        cfg["ultimo_sync_status"] = "erro"
-        cfg["ultimo_sync_mensagem"] = str(exc.detail)
+        cfg["ultimo_sync_mensagem"] = detail_str
         cfg["ultimo_sync_documentos"] = 0
+        if "656" in detail_str or "Consumo Indevido" in detail_str or "ultNSU" in detail_str:
+            # Penalidade de 70 min para cStat 656 — evita ficar chamando SEFAZ dentro do bloqueio
+            from datetime import datetime as _dt_pen, timezone as _tz_pen
+            penalidade_min = 70
+            proximo_permitido = _dt_pen.now(_tz_pen.utc) + _td_sefaz(minutes=penalidade_min)
+            cfg["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
+            cfg["ultimo_sync_status"] = "erro_656"
+        else:
+            cfg["_proximo_sync_permitido_at"] = now_iso
+            cfg["ultimo_sync_status"] = "erro"
         SefazTenantConfigService.save_config(tenant_id, cfg)
         raise
 

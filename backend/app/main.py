@@ -390,7 +390,9 @@ def _loop_sefaz_sync():
                             nsu_loop = cfg.get("ultimo_nsu", "000000000000000")
                             total_docs_ciclo = 0
                             total_importadas_ciclo = 0
+                            lote_656_detectado = False  # flag para detectar cStat 656 no loop de lotes
                             import time as _time
+                            from datetime import timedelta as _td
                             MAX_LOTES_POR_CICLO = 3  # 3 lotes × 50 docs = 150 docs/hora — seguro p/ SEFAZ não bloquear por cStat 656
 
                             from app.db import SessionLocal as _SessionLocal
@@ -404,6 +406,9 @@ def _loop_sefaz_sync():
                                     )
                                 except Exception as exc_lote:
                                     logger.warning(f"[SEFAZ] Erro no lote {_lote_idx+1}: {exc_lote}")
+                                    err_str_lote = str(exc_lote)
+                                    if "656" in err_str_lote or "Consumo Indevido" in err_str_lote or "ultNSU" in err_str_lote:
+                                        lote_656_detectado = True
                                     break
 
                                 ultimo_resultado = resultado
@@ -436,18 +441,31 @@ def _loop_sefaz_sync():
                                 _time.sleep(2)
 
                             now_iso = _dt.now(_tz.utc).isoformat()
-                            cfg["ultimo_sync_at"] = now_iso        # horário REAL — exibido na UI
-                            cfg["_proximo_sync_permitido_at"] = now_iso  # controle interno (igual ao real em caso de sucesso)
-                            cfg["ultimo_sync_status"] = "ok"
-                            cfg["ultimo_nsu"] = nsu_loop
-                            cfg["ultimo_sync_documentos"] = total_docs_ciclo
-                            cfg["ultimo_sync_mensagem"] = (
-                                f"Sincronizacao concluida. {total_docs_ciclo} documento(s) processado(s), "
-                                f"{total_importadas_ciclo} NF-e(s) importada(s)."
-                                if total_docs_ciclo else "Sincronizacao concluida. Nenhum documento novo."
-                            )
-                            config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-                            logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {total_docs_ciclo} doc(s), {total_importadas_ciclo} importada(s). NSU final: {nsu_loop}")
+                            if lote_656_detectado:
+                                # cStat 656 capturado no loop de lotes — aplicar penalidade de 70 min
+                                # e mostrar mensagem de erro real ao usuário (não "Nenhum documento novo")
+                                penalidade_min = 70
+                                proximo_permitido = _dt.now(_tz.utc) + _td(minutes=penalidade_min)
+                                cfg["ultimo_sync_at"] = now_iso
+                                cfg["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
+                                cfg["ultimo_sync_status"] = "erro_656"
+                                cfg["ultimo_sync_mensagem"] = f"SEFAZ bloqueou por consumo indevido (cStat 656). Proxima tentativa em {penalidade_min} min."
+                                cfg["ultimo_sync_documentos"] = 0
+                                config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+                                logger.warning(f"[SEFAZ] ⏳ Tenant {tenant_id_str}: penalidade de {penalidade_min}min aplicada por cStat 656 (capturado no lote)")
+                            else:
+                                cfg["ultimo_sync_at"] = now_iso        # horário REAL — exibido na UI
+                                cfg["_proximo_sync_permitido_at"] = now_iso  # controle interno (igual ao real em caso de sucesso)
+                                cfg["ultimo_sync_status"] = "ok"
+                                cfg["ultimo_nsu"] = nsu_loop
+                                cfg["ultimo_sync_documentos"] = total_docs_ciclo
+                                cfg["ultimo_sync_mensagem"] = (
+                                    f"Sincronizacao concluida. {total_docs_ciclo} documento(s) processado(s), "
+                                    f"{total_importadas_ciclo} NF-e(s) importada(s)."
+                                    if total_docs_ciclo else "Sincronizacao concluida. Nenhum documento novo."
+                                )
+                                config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+                                logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {total_docs_ciclo} doc(s), {total_importadas_ciclo} importada(s). NSU final: {nsu_loop}")
                         except Exception as exc_tenant:
                             logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
                             # Se SEFAZ bloqueou por consumo indevido (cStat 656), penalizar por 70 min
