@@ -258,7 +258,8 @@ def criar_rota_por_entregador(
         ponto_final_rota=ponto_origem if payload.retorna_origem else None,
         retorna_origem=payload.retorna_origem,
     )
-    rota.numero = f"ROTA-{datetime.now().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(2).upper()}"
+    # Campo numero em rotas_entrega é VARCHAR(20); manter identificador curto e único
+    rota.numero = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
     rota.token_rastreio = secrets.token_urlsafe(32)
 
     db.add(rota)
