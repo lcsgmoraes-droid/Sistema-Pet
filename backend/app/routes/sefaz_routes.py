@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
-from app.models import Tenant
+from app.models import Tenant, Cliente
+from app.produtos_models import NotaEntrada, NotaEntradaItem
 from app.services.sefaz_service import SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
 
@@ -237,7 +238,7 @@ def sync_now(
     """
     from datetime import datetime, timezone
 
-    _, tenant_id = auth
+    current_user, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
     status = SefazService.status_configuracao(cfg)
@@ -275,17 +276,144 @@ def sync_now(
 
     try:
         resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"))
+
+        # ── Salvar documentos recebidos no banco de dados ────────────────────
+        from app.notas_entrada_routes import (
+            parse_nfe_xml,
+            criar_fornecedor_automatico,
+            encontrar_produto_similar,
+        )
+
+        docs_list = resultado.get("docs_list", [])
+        notas_salvas = 0
+        notas_puladas = 0
+
+        for doc in docs_list:
+            xml_str = doc.get("xml", "")
+            if not xml_str:
+                continue
+            # Apenas NF-e completas têm itens; resumos (resNFe) são ignorados
+            schema = doc.get("schema", "")
+            if "resNFe" in schema and "nfeProc" not in schema and "NFe" not in schema:
+                continue
+            try:
+                dados = parse_nfe_xml(xml_str)
+            except Exception:
+                continue
+
+            chave = dados.get("chave_acesso")
+            if not chave:
+                continue
+
+            # Pular se já existe
+            existe = db.query(NotaEntrada).filter(
+                NotaEntrada.chave_acesso == chave,
+                NotaEntrada.tenant_id == tenant_id,
+            ).first()
+            if existe:
+                notas_puladas += 1
+                continue
+
+            # Buscar / criar fornecedor
+            fornecedor = db.query(Cliente).filter(
+                Cliente.cnpj == dados.get("fornecedor_cnpj", ""),
+                Cliente.ativo.is_(True),
+            ).first()
+            if not fornecedor:
+                try:
+                    fornecedor, _ = criar_fornecedor_automatico(dados, db, current_user, tenant_id)
+                except Exception:
+                    fornecedor = None
+
+            nota = NotaEntrada(
+                numero_nota=dados.get("numero_nota") or "0",
+                serie=dados.get("serie") or "1",
+                chave_acesso=chave,
+                fornecedor_cnpj=dados.get("fornecedor_cnpj") or "",
+                fornecedor_nome=dados.get("fornecedor_nome") or "",
+                fornecedor_id=fornecedor.id if fornecedor else None,
+                data_emissao=dados["data_emissao"],
+                data_entrada=datetime.utcnow(),
+                valor_produtos=dados.get("valor_produtos") or dados.get("valor_total", 0),
+                valor_frete=dados.get("valor_frete", 0),
+                valor_desconto=dados.get("valor_desconto", 0),
+                valor_total=dados.get("valor_total", 0),
+                xml_content=xml_str,
+                status="pendente",
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+            )
+            db.add(nota)
+            db.flush()
+
+            vinculados = 0
+            nao_vinculados = 0
+            for item_data in dados.get("itens", []):
+                produto, confianca, _ = encontrar_produto_similar(
+                    item_data.get("descricao", ""),
+                    item_data.get("codigo_produto", ""),
+                    db,
+                    fornecedor.id if fornecedor else None,
+                )
+                item = NotaEntradaItem(
+                    nota_entrada_id=nota.id,
+                    numero_item=item_data.get("numero_item", 0),
+                    codigo_produto=item_data.get("codigo_produto", ""),
+                    descricao=item_data.get("descricao", ""),
+                    ncm=item_data.get("ncm"),
+                    cest=item_data.get("cest"),
+                    cfop=item_data.get("cfop"),
+                    origem=item_data.get("origem", "0"),
+                    aliquota_icms=item_data.get("aliquota_icms", 0),
+                    aliquota_pis=item_data.get("aliquota_pis", 0),
+                    aliquota_cofins=item_data.get("aliquota_cofins", 0),
+                    unidade=item_data.get("unidade", "UN"),
+                    quantidade=item_data.get("quantidade", 0),
+                    valor_unitario=item_data.get("valor_unitario", 0),
+                    valor_total=item_data.get("valor_total", 0),
+                    ean=item_data.get("ean"),
+                    lote=item_data.get("lote"),
+                    data_validade=item_data.get("data_validade"),
+                    produto_id=produto.id if produto else None,
+                    vinculado=bool(produto),
+                    confianca_vinculo=confianca,
+                    status="vinculado" if produto else "nao_vinculado",
+                    tenant_id=tenant_id,
+                )
+                db.add(item)
+                if produto:
+                    vinculados += 1
+                else:
+                    nao_vinculados += 1
+
+            nota.produtos_vinculados = vinculados
+            nota.produtos_nao_vinculados = nao_vinculados
+            db.commit()
+            notas_salvas += 1
+
+        # ── Atualizar config de sincronização ────────────────────────────────
+        total_docs = int(resultado.get("documentos", 0))
+        if notas_salvas or notas_puladas:
+            msg_final = (
+                f"Sincronizacao concluida. {notas_salvas} nota(s) importada(s)"
+                + (f", {notas_puladas} ja existiam." if notas_puladas else ".")
+            )
+        else:
+            msg_final = resultado["mensagem"]
+
         cfg["ultimo_sync_at"] = now_iso
         cfg["ultimo_sync_status"] = "ok"
-        cfg["ultimo_sync_mensagem"] = resultado["mensagem"]
-        cfg["ultimo_sync_documentos"] = int(resultado.get("documentos", 0))
+        cfg["ultimo_sync_mensagem"] = msg_final
+        cfg["ultimo_sync_documentos"] = total_docs
         cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000"))
         SefazTenantConfigService.save_config(tenant_id, cfg)
         return {
             "ok": True,
             "status": cfg["ultimo_sync_status"],
-            "mensagem": cfg["ultimo_sync_mensagem"],
-            "documentos": cfg["ultimo_sync_documentos"],
+            "mensagem": msg_final,
+            "documentos": total_docs,
+            "notas_salvas": notas_salvas,
+            "notas_puladas": notas_puladas,
             "ultimo_nsu": cfg["ultimo_nsu"],
             "max_nsu": resultado.get("max_nsu", cfg["ultimo_nsu"]),
             "c_stat": resultado.get("c_stat"),
