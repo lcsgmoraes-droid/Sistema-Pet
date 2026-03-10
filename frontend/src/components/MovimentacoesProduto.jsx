@@ -301,6 +301,10 @@ export default function MovimentacoesProduto() {
   };
 
   const getOrigem = (mov) => {
+    // Se for venda cancelada/excluída
+    if (mov.referencia_tipo === 'venda_excluida') {
+      return { texto: `Venda Cancelada #${mov.referencia_id}`, icone: 'cancelado', cor: 'text-gray-400', link: null };
+    }
     // Se for venda
     if (mov.referencia_tipo === 'venda') {
       // Verificar se tem NF (documento com padrão de chave NFe ou número NF)

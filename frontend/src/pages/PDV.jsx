@@ -1242,9 +1242,13 @@ export default function PDV() {
       }
     } catch (error) {
       console.error("Erro ao carregar venda:", error);
-      alert(
-        "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
-      );
+      if (error.response?.status === 404) {
+        alert("Venda não encontrada. Pode ter sido cancelada ou excluída.");
+      } else {
+        alert(
+          "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
+        );
+      }
     } finally {
       setLoading(false);
     }
