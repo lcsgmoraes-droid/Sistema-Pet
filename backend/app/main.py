@@ -412,6 +412,28 @@ def _loop_sefaz_sync():
                                     db_import.close()
                         except Exception as exc_tenant:
                             logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
+                            # Se SEFAZ bloqueou por consumo indevido (cStat 656), penalizar por 70 min
+                            # para não ficar martelando e acumulando mais bloqueios
+                            err_str = str(exc_tenant)
+                            if "656" in err_str or "Consumo Indevido" in err_str or "ultNSU" in err_str:
+                                try:
+                                    import json as _json
+                                    cfg_pen = _json.loads(config_path.read_text(encoding="utf-8"))
+                                    penalidade_min = 70
+                                    agora_pen = _dt.now(_tz.utc)
+                                    # Coloca o ultimo_sync_at no FUTURO para que a checagem
+                                    # minutos_desde_ultimo < intervalo_min fique negativa por penalidade_min
+                                    # Só após penalidade_min minutos o sistema tentará de novo
+                                    from datetime import timedelta as _td
+                                    intervalo_cfg = int(cfg_pen.get("importacao_intervalo_min", 15))
+                                    ultimo_ficticio = agora_pen + _td(minutes=penalidade_min - intervalo_cfg)
+                                    cfg_pen["ultimo_sync_at"] = ultimo_ficticio.isoformat()
+                                    cfg_pen["ultimo_sync_status"] = "erro_656"
+                                    cfg_pen["ultimo_sync_mensagem"] = f"SEFAZ bloqueou por consumo indevido (cStat 656). Aguardando {penalidade_min} min antes de tentar novamente."
+                                    config_path.write_text(_json.dumps(cfg_pen, ensure_ascii=False, indent=2), encoding="utf-8")
+                                    logger.warning(f"[SEFAZ] ⏳ Tenant {tenant_dir.name}: penalidade de {penalidade_min} min aplicada por cStat 656")
+                                except Exception as e_pen:
+                                    logger.warning(f"[SEFAZ] Erro ao gravar penalidade: {e_pen}")
             finally:
                 if _lock_f:
                     try:
