@@ -237,6 +237,7 @@ export default function PDV() {
 
   // Refs
   const inputProdutoRef = useRef(null);
+  const ultimoAutoAddProdutoRef = useRef("");
 
   // Persistir estado dos painéis no localStorage
   useEffect(() => {
@@ -1339,6 +1340,27 @@ export default function PDV() {
         try {
           const response = await getProdutosVendaveis({ busca: buscarProduto });
           const produtos = response.data.items || [];
+
+          const termo = buscarProduto.trim();
+          const termoLower = termo.toLowerCase();
+          const matchExato = produtos.find((p) => {
+            const codigo = String(p.codigo || "").toLowerCase();
+            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
+            return codigo === termoLower || codigoBarras === termoLower;
+          });
+
+          // Leitor costuma enviar Enter após o código; se encontrar match exato,
+          // adiciona direto no carrinho para não exigir clique manual.
+          if (
+            matchExato &&
+            ultimoAutoAddProdutoRef.current !== termoLower &&
+            !modoVisualizacao
+          ) {
+            ultimoAutoAddProdutoRef.current = termoLower;
+            adicionarProduto(matchExato);
+            return;
+          }
+
           setProdutosSugeridos(produtos);
         } catch (error) {
           console.error("Erro ao buscar produtos:", error);
@@ -1347,9 +1369,10 @@ export default function PDV() {
       }, 300);
       return () => clearTimeout(timer);
     } else {
+      ultimoAutoAddProdutoRef.current = "";
       setProdutosSugeridos([]);
     }
-  }, [buscarProduto]);
+  }, [buscarProduto, modoVisualizacao]);
 
   // Selecionar cliente
   const selecionarCliente = async (cliente) => {
@@ -2908,6 +2931,12 @@ export default function PDV() {
                       type="text"
                       value={buscarProduto}
                       onChange={(e) => setBuscarProduto(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && produtosSugeridos.length > 0) {
+                          e.preventDefault();
+                          adicionarProduto(produtosSugeridos[0]);
+                        }
+                      }}
                       placeholder="Digite o nome do produto, código de barras ou serviço..."
                       disabled={modoVisualizacao}
                       className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -3703,34 +3732,6 @@ export default function PDV() {
                         automaticamente.
                       </p>
 
-                      {/* 💼 Indicador de Custo Operacional (dinâmico) */}
-                      {entregadorSelecionado && custoOperacionalEntrega > 0 && (
-                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-amber-600">💼</span>
-                              <span className="text-sm font-medium text-amber-900">
-                                Custo Operacional
-                              </span>
-                            </div>
-                            <span className="text-sm font-semibold text-amber-700">
-                              {formatMoneyBRL(custoOperacionalEntrega)}
-                            </span>
-                          </div>
-                          <p className="text-xs text-amber-600 mt-1 italic">
-                            {entregadorSelecionado.nome_fantasia ||
-                              entregadorSelecionado.nome}{" "}
-                            -
-                            {entregadorSelecionado.modelo_custo_entrega ===
-                              "taxa_fixa" && " Taxa Fixa"}
-                            {entregadorSelecionado.modelo_custo_entrega ===
-                              "por_km" && " Valor por KM"}
-                            {entregadorSelecionado.modelo_custo_entrega ===
-                              "rateio_rh" && " Rateio de RH"}{" "}
-                            (não aparece no cupom)
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     <div>

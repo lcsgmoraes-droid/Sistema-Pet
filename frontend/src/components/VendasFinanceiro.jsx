@@ -34,9 +34,14 @@ import {
 } from "recharts";
 import * as XLSX from "xlsx";
 import api from "../api";
+import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/financeiro/HistoricoVendasClienteTab";
 
 export default function VendasFinanceiro() {
+  const { user } = useAuth();
+  const userPermissions = user?.permissions || [];
+  const podeVerFinanceiroCompleto =
+    user?.is_admin === true || userPermissions.includes("relatorios.financeiro");
   const [loading, setLoading] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState("resumo");
   const [dataInicio, setDataInicio] = useState("");
@@ -513,6 +518,7 @@ export default function VendasFinanceiro() {
   };
 
   const carregarDados = async () => {
+    if (!podeVerFinanceiroCompleto) return;
     if (!dataInicio || !dataFim) return;
 
     setLoading(true);
@@ -639,8 +645,24 @@ export default function VendasFinanceiro() {
   }, [produtosAnalise, abaAtiva]);
 
   useEffect(() => {
-    carregarDados();
-  }, [dataInicio, dataFim, modoComparacao, periodoComparacao, abaAtiva]);
+    if (podeVerFinanceiroCompleto) {
+      carregarDados();
+    }
+  }, [
+    dataInicio,
+    dataFim,
+    modoComparacao,
+    periodoComparacao,
+    abaAtiva,
+    podeVerFinanceiroCompleto,
+  ]);
+
+  useEffect(() => {
+    if (!podeVerFinanceiroCompleto) {
+      setAbaAtiva("historico-cliente");
+      setModoComparacao(false);
+    }
+  }, [podeVerFinanceiroCompleto]);
 
   // Aplicar filtro "Este mês" ao carregar componente pela primeira vez
   useEffect(() => {
@@ -664,7 +686,8 @@ export default function VendasFinanceiro() {
             Consulta de Vendas
           </h1>
 
-          <div className="flex items-center gap-4">
+          {podeVerFinanceiroCompleto ? (
+            <div className="flex items-center gap-4">
             {/* Botão Exportar PDF */}
             <button
               onClick={exportarParaPDF}
@@ -738,10 +761,18 @@ export default function VendasFinanceiro() {
                 </option>
               </select>
             )}
-          </div>
+            </div>
+          ) : null}
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        {!podeVerFinanceiroCompleto && (
+          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
+            Acesso limitado: você pode consultar apenas a aba Histórico por Cliente.
+          </div>
+        )}
+
+        {podeVerFinanceiroCompleto && (
+          <div className="flex flex-wrap gap-2 mb-4">
           {[
             { id: "hoje", label: "Hoje" },
             { id: "ontem", label: "Ontem" },
@@ -771,9 +802,10 @@ export default function VendasFinanceiro() {
               {filtro.label}
             </button>
           ))}
-        </div>
+          </div>
+        )}
 
-        {filtroSelecionado === "personalizado" && (
+        {podeVerFinanceiroCompleto && filtroSelecionado === "personalizado" && (
           <div className="flex gap-2 items-center mb-4 p-3 bg-gray-50 rounded">
             <Calendar className="w-5 h-5 text-gray-500" />
             <input
@@ -793,7 +825,8 @@ export default function VendasFinanceiro() {
         )}
 
         {/* Filtros Avançados */}
-        <div className="flex gap-2 items-center mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+        {podeVerFinanceiroCompleto && (
+          <div className="flex gap-2 items-center mb-4 p-3 bg-blue-50 rounded border border-blue-200">
           <Filter className="w-5 h-5 text-blue-600" />
           <span className="text-sm font-medium text-gray-700">
             Filtros Avançados:
@@ -856,20 +889,23 @@ export default function VendasFinanceiro() {
             <BarChart3 className="w-4 h-4" />
             {mostrarGraficos ? "Ocultar" : "Mostrar"} Gráficos
           </button>
-        </div>
+          </div>
+        )}
 
         {/* Abas */}
         <div className="flex gap-2 border-b">
-          <button
-            onClick={() => setAbaAtiva("resumo")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "resumo"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Resumo
-          </button>
+          {podeVerFinanceiroCompleto && (
+            <button
+              onClick={() => setAbaAtiva("resumo")}
+              className={`px-4 py-2 font-medium ${
+                abaAtiva === "resumo"
+                  ? "border-b-2 border-blue-500 text-blue-600"
+                  : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              Resumo
+            </button>
+          )}
           <button
             onClick={() => setAbaAtiva("historico-cliente")}
             className={`px-4 py-2 font-medium ${
@@ -880,46 +916,50 @@ export default function VendasFinanceiro() {
           >
             Histórico por Cliente
           </button>
-          <button
-            onClick={() => setAbaAtiva("produtos")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "produtos"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Totais por produto/serviço
-          </button>
-          <button
-            onClick={() => setAbaAtiva("lista")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "lista"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Lista de Vendas
-          </button>
-          <button
-            onClick={() => setAbaAtiva("comparacao")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "comparacao"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Comparação de Períodos
-          </button>
-          <button
-            onClick={() => setAbaAtiva("analise")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "analise"
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Análise Inteligente
-          </button>
+          {podeVerFinanceiroCompleto && (
+            <>
+              <button
+                onClick={() => setAbaAtiva("produtos")}
+                className={`px-4 py-2 font-medium ${
+                  abaAtiva === "produtos"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Totais por produto/serviço
+              </button>
+              <button
+                onClick={() => setAbaAtiva("lista")}
+                className={`px-4 py-2 font-medium ${
+                  abaAtiva === "lista"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Lista de Vendas
+              </button>
+              <button
+                onClick={() => setAbaAtiva("comparacao")}
+                className={`px-4 py-2 font-medium ${
+                  abaAtiva === "comparacao"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Comparação de Períodos
+              </button>
+              <button
+                onClick={() => setAbaAtiva("analise")}
+                className={`px-4 py-2 font-medium ${
+                  abaAtiva === "analise"
+                    ? "border-b-2 border-blue-500 text-blue-600"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                Análise Inteligente
+              </button>
+            </>
+          )}
         </div>
       </div>
 

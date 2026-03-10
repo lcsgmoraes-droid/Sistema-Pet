@@ -1458,10 +1458,12 @@ def listar_produtos_vendaveis(
     )
 
     # FILTROS OPCIONAIS
-    if busca:
+    termo_busca = (busca or "").strip()
+
+    if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
-        palavras = [p.strip() for p in busca.split() if p.strip()]
+        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
             p = f"%{palavra}%"
             query = query.filter(
@@ -1506,14 +1508,17 @@ def listar_produtos_vendaveis(
     offset = (page - 1) * page_size
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
-    if busca:
+    if termo_busca:
+        termo_lower = termo_busca.lower()
         order_clause = [
             case(
-                (Produto.codigo == busca, 1),  # Match exato no cÃ³digo
-                (Produto.codigo_barras == busca, 1),  # Match exato no cÃ³digo de barras
-                (Produto.codigo.ilike(f"{busca}%"), 2),  # CÃ³digo comeÃ§a com busca
-                (Produto.nome.ilike(f"{busca}%"), 3),  # Nome comeÃ§a com busca
-                else_=4
+                (func.lower(Produto.codigo) == termo_lower, 1),
+                (func.lower(Produto.codigo_barras) == termo_lower, 2),
+                (func.lower(Produto.nome) == termo_lower, 3),
+                (Produto.codigo.ilike(f"{termo_busca}%"), 4),
+                (Produto.codigo_barras.ilike(f"{termo_busca}%"), 5),
+                (Produto.nome.ilike(f"{termo_busca}%"), 6),
+                else_=7,
             ),
             Produto.nome
         ]

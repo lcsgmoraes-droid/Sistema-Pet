@@ -485,7 +485,12 @@ function App() {
                   <Route
                     path="financeiro/vendas"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
+                      <ProtectedRoute
+                        anyOfPermissions={[
+                          "relatorios.financeiro",
+                          "clientes.visualizar",
+                        ]}
+                      >
                         <VendasFinanceiro />
                       </ProtectedRoute>
                     }

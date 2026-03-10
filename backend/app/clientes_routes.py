@@ -10,7 +10,7 @@ Routes para gerenciamento de Clientes e Pets
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import case, or_
+from sqlalchemy import case, or_, func
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
@@ -600,18 +600,27 @@ def list_clientes(
         if is_entregador is not None:
             query = query.filter(Cliente.is_entregador == is_entregador)
         
-        # Filtro de busca
-        if search:
-            query = query.filter(
-                (Cliente.codigo.ilike(f"%{search}%")) |
-                (Cliente.nome.ilike(f"%{search}%")) |
-                (Cliente.cpf.ilike(f"%{search}%")) |
-                (Cliente.cnpj.ilike(f"%{search}%")) |
-                (Cliente.razao_social.ilike(f"%{search}%")) |
-                (Cliente.email.ilike(f"%{search}%")) |
-                (Cliente.telefone.ilike(f"%{search}%")) |
-                (Cliente.celular.ilike(f"%{search}%"))
-            )
+        termo_busca = (search or "").strip()
+
+        # Filtro de busca por múltiplas palavras (qualquer ordem)
+        # Cada palavra precisa existir em pelo menos um dos campos pesquisáveis.
+        if termo_busca:
+            palavras = [p.strip() for p in termo_busca.split() if p.strip()]
+            for palavra in palavras:
+                like = f"%{palavra}%"
+                query = query.filter(
+                    or_(
+                        Cliente.codigo.ilike(like),
+                        Cliente.nome.ilike(like),
+                        Cliente.nome_fantasia.ilike(like),
+                        Cliente.razao_social.ilike(like),
+                        Cliente.cpf.ilike(like),
+                        Cliente.cnpj.ilike(like),
+                        Cliente.email.ilike(like),
+                        Cliente.telefone.ilike(like),
+                        Cliente.celular.ilike(like),
+                    )
+                )
         
         # Filtro de ativo (padrÃ£o True - mostrar apenas ativos)
         if ativo is None:
@@ -624,14 +633,20 @@ def list_clientes(
         # Contar total (ANTES do offset/limit)
         total = query.count()
         
-        # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
-        if search:
+        # Ordenação inteligente: prioriza correspondência exata, depois prefixo.
+        if termo_busca:
+            termo_lower = termo_busca.lower()
             query = query.order_by(
                 case(
-                    (Cliente.codigo == search, 1),  # Match exato no cÃ³digo
-                    (Cliente.codigo.ilike(f"{search}%"), 2),  # CÃ³digo comeÃ§a com busca
-                    (Cliente.nome.ilike(f"{search}%"), 3),  # Nome comeÃ§a com busca
-                    else_=4
+                    (func.lower(Cliente.codigo) == termo_lower, 1),
+                    (func.lower(Cliente.nome) == termo_lower, 2),
+                    (func.lower(Cliente.nome_fantasia) == termo_lower, 3),
+                    (func.lower(Cliente.razao_social) == termo_lower, 4),
+                    (Cliente.codigo.ilike(f"{termo_busca}%"), 5),
+                    (Cliente.nome.ilike(f"{termo_busca}%"), 6),
+                    (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 7),
+                    (Cliente.razao_social.ilike(f"{termo_busca}%"), 8),
+                    else_=9,
                 ),
                 Cliente.nome
             )

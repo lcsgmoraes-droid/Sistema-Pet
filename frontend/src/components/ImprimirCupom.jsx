@@ -89,6 +89,21 @@ function montarCupom(venda) {
   const totalBruto = subtotal + descontoTotal;
   const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || 0);
   const total = Number(venda?.total || 0);
+  const telefoneCliente =
+    venda?.cliente?.celular ||
+    venda?.cliente?.telefone ||
+    venda?.cliente?.celular_whatsapp ||
+    venda?.telefone_cliente ||
+    null;
+  const enderecoCliente = [
+    venda?.cliente?.endereco,
+    venda?.cliente?.numero,
+    venda?.cliente?.bairro,
+    venda?.cliente?.cidade,
+    venda?.cliente?.estado,
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   const linhas = [
     center('PET SHOP PRO'),
@@ -101,6 +116,14 @@ function montarCupom(venda) {
 
   if (venda?.cliente?.nome || venda?.cliente_nome) {
     linhas.push(...wrap(`Cliente: ${venda.cliente?.nome || venda.cliente_nome}`, RECEIPT_WIDTH));
+  }
+
+  if (telefoneCliente) {
+    linhas.push(...wrap(`Telefone: ${telefoneCliente}`, RECEIPT_WIDTH));
+  }
+
+  if (enderecoCliente) {
+    linhas.push(...wrap(`Endereco: ${enderecoCliente}`, RECEIPT_WIDTH));
   }
 
   if (venda?.pet?.nome) {
@@ -211,15 +234,15 @@ export default function ImprimirCupom({ venda }) {
         style={{
           width: '76mm',
           fontFamily: 'Consolas, "Courier New", monospace',
-          fontSize: '11px',
-          lineHeight: 1.22,
+          fontSize: '13px',
+          lineHeight: 1.28,
           letterSpacing: '0.1px',
-          fontWeight: 700,
+          fontWeight: 800,
           whiteSpace: 'pre',
           margin: 0,
           padding: 0,
           textTransform: 'none',
-          textRendering: 'optimizeSpeed',
+          textRendering: 'geometricPrecision',
         }}
       >
         {montarCupom(venda)}
@@ -237,7 +260,18 @@ ImprimirCupom.propTypes = {
     desconto_valor: PropTypes.number,
     total: PropTypes.number,
     cliente_nome: PropTypes.string,
-    cliente: PropTypes.shape({ nome: PropTypes.string }),
+    telefone_cliente: PropTypes.string,
+    cliente: PropTypes.shape({
+      nome: PropTypes.string,
+      telefone: PropTypes.string,
+      celular: PropTypes.string,
+      celular_whatsapp: PropTypes.string,
+      endereco: PropTypes.string,
+      numero: PropTypes.string,
+      bairro: PropTypes.string,
+      cidade: PropTypes.string,
+      estado: PropTypes.string,
+    }),
     pet: PropTypes.shape({ nome: PropTypes.string }),
     itens: PropTypes.arrayOf(
       PropTypes.shape({
