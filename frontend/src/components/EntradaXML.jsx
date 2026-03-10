@@ -352,6 +352,17 @@ const EntradaXML = () => {
     }
   };
 
+
+  const popularFornecedores = async (notaId) => {
+    try {
+      const res = await api.post(`/notas-entrada/${notaId}/popular-fornecedores`);
+      const { vinculados, atualizados } = res.data;
+      toast.success(`Fornecedor populado: ${vinculados} novo(s), ${atualizados} atualizado(s)`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao popular fornecedores');
+    }
+  };
+
   const salvarTipoRateio = async (notaId, tipo) => {
     try {
       await api.post(`/notas-entrada/${notaId}/rateio`, {
@@ -1810,21 +1821,29 @@ const EntradaXML = () => {
                                     {/* Lista de produtos filtrados */}
                                     {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
                                       <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
-                                        {Array.isArray(produtos) && produtos
-                                          .filter(p => {
-                                            const filtro = filtroProduto[item.id].toLowerCase();
+                                        {(() => {
+                                          // Busca palavra a palavra: todas as palavras precisam aparecer em qualquer ordem
+                                          const palavras = filtroProduto[item.id].toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
+                                          const matchProduto = (p) => palavras.every(palavra =>
+                                            p.nome?.toLowerCase().includes(palavra) ||
+                                            p.codigo?.toLowerCase().includes(palavra) ||
+                                            p.codigo_barras?.toLowerCase().includes(palavra) ||
+                                            p.descricao?.toLowerCase().includes(palavra)
+                                          );
+                                          const filtrados = Array.isArray(produtos) ? produtos.filter(matchProduto) : [];
+                                          // Ordena: ativos primeiro, depois por nome
+                                          filtrados.sort((a, b) => {
+                                            if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+                                            return (a.nome || '').localeCompare(b.nome || '');
+                                          });
+                                          if (filtrados.length === 0) {
                                             return (
-                                              p.nome?.toLowerCase().includes(filtro) ||
-                                              p.codigo?.toLowerCase().includes(filtro) ||
-                                              p.descricao?.toLowerCase().includes(filtro)
+                                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
+                                                ❌ Nenhum produto encontrado
+                                              </div>
                                             );
-                                          })
-                                          .sort((a, b) => {
-                                            if (a.ativo === b.ativo) return 0;
-                                            return a.ativo ? -1 : 1;
-                                          })
-                                          .slice(0, 15)
-                                          .map(p => (
+                                          }
+                                          return filtrados.slice(0, 20).map(p => (
                                             <button
                                               key={`produto-${item.id}-${p.id}`}
                                               type="button"
@@ -1835,22 +1854,11 @@ const EntradaXML = () => {
                                               className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
                                             >
                                               {!p.ativo && '[INATIVO] '}{p.codigo} - {p.nome}
-                                              {!p.ativo && ' [INATIVO]'} 
+                                              {p.codigo_barras && <span className="text-gray-400 ml-1">({p.codigo_barras})</span>}
                                               <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
                                             </button>
-                                          ))}
-                                        {produtos.filter(p => {
-                                          const filtro = filtroProduto[item.id].toLowerCase();
-                                          return (
-                                            p.nome?.toLowerCase().includes(filtro) ||
-                                            p.codigo?.toLowerCase().includes(filtro) ||
-                                            p.descricao?.toLowerCase().includes(filtro)
-                                          );
-                                        }).length === 0 && (
-                                          <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                            ❌ Nenhum produto encontrado
-                                          </div>
-                                        )}
+                                          ));
+                                        })()}
                                       </div>
                                     )}
                                     
@@ -2080,6 +2088,16 @@ const EntradaXML = () => {
                             >
                               Revisar Precos
                             </button>
+                            {notaSelecionada.fornecedor_id && (
+                              <button
+                                onClick={() => popularFornecedores(notaSelecionada.id)}
+                                disabled={loading}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+                                title="Vincula o fornecedor desta NF a todos os produtos já linkados"
+                              >
+                                Popular Fornecedores
+                              </button>
+                            )}
                             <button
                               onClick={() => processarNota(notaSelecionada.id)}
                               disabled={loading}
