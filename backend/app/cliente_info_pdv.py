@@ -290,148 +290,206 @@ async def chat_pdv_cliente(
 ):
     """
     Chat IA contextual sobre o cliente no PDV.
-    Usa informações do histórico de compras para responder perguntas.
+    Envia contexto completo do cliente para um LLM real (Groq/OpenAI/Gemini).
     """
     current_user, tenant_id = user_and_tenant
-    
-    # Buscar informações do cliente
+
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id,
         Cliente.ativo == True
     ).first()
-    
+
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    
-    # Buscar histórico resumido
+
+    # ── 1. VENDAS: últimas 30, ordenadas ──────────────────────────────────
     vendas = db.query(Venda).filter(
         Venda.cliente_id == cliente_id,
         Venda.tenant_id == tenant_id,
         Venda.status != 'cancelada'
-    ).order_by(desc(Venda.data_venda)).limit(20).all()
-    
-    # Produtos mais comprados
-    produtos_ids = []
-    for venda in vendas:
+    ).order_by(desc(Venda.data_venda)).limit(30).all()
+
+    total_gasto = sum(float(v.total) for v in vendas)
+    ticket_medio = total_gasto / len(vendas) if vendas else 0
+
+    # ── 2. ITENS de todas as vendas (1 query por venda, máx 30) ──────────
+    historico_detalhado = []
+    produtos_counter = Counter()
+    produtos_ultima_compra = {}   # produto_id → última data de compra
+    produtos_primeira_compra = {} # produto_id → primeira data de compra
+
+    for idx, venda in enumerate(vendas):
         itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
-        produtos_ids.extend([item.produto_id for item in itens if item.produto_id])
-    
-    produtos_counter = Counter(produtos_ids)
-    top_produtos = []
-    for produto_id, qtd in produtos_counter.most_common(5):
+        for item in itens:
+            if item.produto_id:
+                produtos_counter[item.produto_id] += 1
+                if item.produto_id not in produtos_ultima_compra or venda.data_venda > produtos_ultima_compra[item.produto_id]:
+                    produtos_ultima_compra[item.produto_id] = venda.data_venda
+                if item.produto_id not in produtos_primeira_compra or venda.data_venda < produtos_primeira_compra[item.produto_id]:
+                    produtos_primeira_compra[item.produto_id] = venda.data_venda
+        if idx < 10:
+            nomes_itens = []
+            for item in itens:
+                nome = item.produto_nome or f"Produto #{item.produto_id}"
+                qtd = float(item.quantidade)
+                nomes_itens.append(f"{nome} x{qtd:.0f}")
+            historico_detalhado.append(
+                f"  • {venda.data_venda.strftime('%d/%m/%Y')} — R$ {float(venda.total):.2f}: {', '.join(nomes_itens)}"
+            )
+
+    # ── 3. TOP PRODUTOS (com frequência + dias desde última compra) ───────
+    top_produtos_lines = []
+    for produto_id, qtd in produtos_counter.most_common(10):
         produto = db.query(Produto).filter(Produto.id == produto_id).first()
         if produto:
-            top_produtos.append(f"{produto.nome} ({qtd}x)")
-    
-    # Pets
+            ultima = produtos_ultima_compra.get(produto_id)
+            dias = (datetime.now() - ultima).days if ultima else None
+            dias_str = f", {dias}d atrás" if dias is not None else ""
+            top_produtos_lines.append(f"    - {produto.nome} ({qtd}x{dias_str})")
+
+    # ── 4. POTENCIAIS REABASTECIMENTOS (sem queries extras) ───────────────
+    alertas_reabastecimento = []
+    for produto_id, qtd in produtos_counter.most_common():
+        if qtd < 2:
+            break
+        primeira = produtos_primeira_compra.get(produto_id)
+        ultima = produtos_ultima_compra.get(produto_id)
+        if not primeira or not ultima or primeira == ultima:
+            continue
+        dias_desde = (datetime.now() - ultima).days
+        # Intervalo médio: spread total / (nº compras - 1)
+        intervalo_medio = (ultima - primeira).days / (qtd - 1)
+        if intervalo_medio < 5:  # ignora produtos de intervalo irrealista
+            continue
+        atraso = dias_desde - intervalo_medio
+        if atraso > 7:
+            produto = db.query(Produto).filter(Produto.id == produto_id).first()
+            if produto:
+                alertas_reabastecimento.append(
+                    f"    ⚠️ {produto.nome}: compra a cada ~{int(intervalo_medio)}d, última há {dias_desde}d ({int(atraso)}d atrasado)"
+                )
+
+    # ── 5. PETS (detalhes completos) ──────────────────────────────────────
     pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo == True).all()
-    pets_info = [f"{pet.nome} ({pet.especie})" for pet in pets]
-    
-    # Preparar contexto para IA
-    total_gasto = sum(float(v.total) for v in vendas)
+    pets_lines = []
+    for pet in pets:
+        idade_str = ""
+        if pet.data_nascimento:
+            data_nasc = pet.data_nascimento.date() if isinstance(pet.data_nascimento, datetime) else pet.data_nascimento
+            idade_anos = (datetime.now().date() - data_nasc).days // 365
+            idade_str = f", {idade_anos} anos"
+        peso_str = f", {float(pet.peso):.1f}kg" if pet.peso else ""
+        raca_str = f" ({pet.raca})" if pet.raca else ""
+        pets_lines.append(f"    - {pet.nome}: {pet.especie}{raca_str}{idade_str}{peso_str}")
+
+    # ── 6. CONTEXTO COMPLETO PARA A IA ───────────────────────────────────
+    dias_desde_ultima = (datetime.now() - vendas[0].data_venda).days if vendas else None
     contexto = f"""
-Cliente: {cliente.nome}
+=== CLIENTE ===
+Nome: {cliente.nome}
+CPF/CNPJ: {cliente.cpf or cliente.cnpj or 'não informado'}
+Telefone: {cliente.telefone or cliente.celular or 'não informado'}
+Cidade: {f"{cliente.cidade}/{cliente.estado}" if cliente.cidade else 'não informada'}
+
+=== HISTÓRICO DE COMPRAS ===
+Total de compras: {len(vendas)}
 Total gasto: R$ {total_gasto:.2f}
-Número de compras: {len(vendas)}
-Pets: {', '.join(pets_info) if pets_info else 'Nenhum'}
-Produtos favoritos: {', '.join(top_produtos) if top_produtos else 'Nenhum'}
-Última compra: {vendas[0].data_venda.strftime('%d/%m/%Y') if vendas else 'Nunca'}
+Ticket médio: R$ {ticket_medio:.2f}
+Última compra: {vendas[0].data_venda.strftime('%d/%m/%Y') + f' (há {dias_desde_ultima} dias)' if vendas else 'nunca'}
+
+Detalhes das últimas {min(10, len(vendas))} compras:
+{chr(10).join(historico_detalhado) if historico_detalhado else '  (nenhuma)'}
+
+=== PRODUTOS MAIS COMPRADOS ===
+{chr(10).join(top_produtos_lines) if top_produtos_lines else '  (nenhum)'}
+
+=== ALERTAS DE REABASTECIMENTO ===
+{chr(10).join(alertas_reabastecimento) if alertas_reabastecimento else '  Nenhum atrasado no momento.'}
+
+=== PETS ===
+{chr(10).join(pets_lines) if pets_lines else '  Nenhum pet cadastrado.'}
+""".strip()
+
+    SYSTEM_PROMPT = """Você é um assistente especializado em atendimento de Pet Shop, rodando direto no caixa (PDV).
+
+Seu papel é ajudar o OPERADOR DE CAIXA a atender melhor o cliente que está na frente dele AGORA.
+
+Você tem acesso ao histórico completo de compras, produtos favoritos, pets, padrões de reabastecimento e alertas.
+
+Regras:
+- Responda SEMPRE em português do Brasil
+- Seja BREVE e DIRETO (máximo 4-5 linhas normalmente)
+- Foque no que é útil AGORA para o atendimento
+- Se perceber que um produto favorito está atrasado, mencione proativamente
+- Se os pets do cliente tiverem características relevantes (raça, peso, idade), considere isso nas sugestões
+- Responda perguntas específicas com dados exatos do histórico
+- Não invente informações — use apenas o que está no contexto
+
+Exemplos de perguntas que você responde bem:
+- "O que ele comprou na última vez?"
+- "Quantas vezes ele comprou ração X?"
+- "Qual o pet dele?"
+- "Tem algum produto que ele compra regularmente que pode estar acabando?"
+- "Qual o ticket médio dele?"
 """
-    
-    # Tentar usar IA (Groq, OpenAI ou Gemini)
+
     try:
-        # Verificar se tem API key configurada
         groq_key = os.getenv('GROQ_API_KEY')
         openai_key = os.getenv('OPENAI_API_KEY')
         gemini_key = os.getenv('GEMINI_API_KEY')
-        
+
         resposta_ia = None
-        
+
         if groq_key:
-            # Usar Groq (mais rápido e barato)
             from groq import Groq
-            client = Groq(api_key=groq_key)
-            
-            completion = client.chat.completions.create(
-                model="llama-3.1-70b-versatile",
+            client_ia = Groq(api_key=groq_key)
+            completion = client_ia.chat.completions.create(
+                model="llama-3.3-70b-versatile",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": f"""Você é um assistente de vendas em um pet shop. 
-Use as informações do cliente para dar respostas úteis e personalizadas.
-
-{contexto}
-
-Seja breve, direto e prestativo. Foque em ajudar o vendedor a atender melhor o cliente."""
-                    },
-                    {
-                        "role": "user",
-                        "content": request.mensagem
-                    }
+                    {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + contexto},
+                    {"role": "user", "content": request.mensagem}
                 ],
-                temperature=0.7,
-                max_tokens=300
+                temperature=0.4,
+                max_tokens=400
             )
-            
             resposta_ia = completion.choices[0].message.content
-            
+
         elif openai_key:
-            # Usar OpenAI
             from openai import OpenAI
-            client = OpenAI(api_key=openai_key)
-            
-            completion = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+            client_ia = OpenAI(api_key=openai_key)
+            completion = client_ia.chat.completions.create(
+                model="gpt-4o-mini",
                 messages=[
-                    {
-                        "role": "system",
-                        "content": f"""Você é um assistente de vendas em um pet shop.
-{contexto}
-
-Seja breve e prestativo."""
-                    },
-                    {
-                        "role": "user",
-                        "content": request.mensagem
-                    }
+                    {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + contexto},
+                    {"role": "user", "content": request.mensagem}
                 ],
-                temperature=0.7,
-                max_tokens=300
+                temperature=0.4,
+                max_tokens=400
             )
-            
             resposta_ia = completion.choices[0].message.content
-            
+
         elif gemini_key:
-            # Usar Gemini
             import google.generativeai as genai
             genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel('gemini-pro')
-            
-            prompt = f"""{contexto}
-
-Pergunta do vendedor: {request.mensagem}
-
-Responda de forma breve e útil para ajudar no atendimento."""
-            
-            response = model.generate_content(prompt)
+            model_ia = genai.GenerativeModel('gemini-1.5-flash')
+            prompt_completo = SYSTEM_PROMPT + "\n\n" + contexto + f"\n\nPergunta do operador: {request.mensagem}"
+            response = model_ia.generate_content(prompt_completo)
             resposta_ia = response.text
-            
+
         else:
-            # Sem IA configurada - resposta padrão inteligente
-            resposta_ia = gerar_resposta_sem_ia(request.mensagem, cliente, vendas, top_produtos, pets_info)
-        
+            resposta_ia = gerar_resposta_sem_ia(request.mensagem, cliente, vendas,
+                                                [l.strip('- ') for l in top_produtos_lines[:5]], pets_lines)
+
         return {
             "resposta": resposta_ia,
-            "contexto_usado": contexto,
             "ia_disponivel": bool(groq_key or openai_key or gemini_key)
         }
-        
+
     except Exception as e:
-        # Fallback para resposta sem IA
         return {
-            "resposta": gerar_resposta_sem_ia(request.mensagem, cliente, vendas, top_produtos, pets_info),
-            "contexto_usado": contexto,
+            "resposta": gerar_resposta_sem_ia(request.mensagem, cliente, vendas,
+                                              [l.strip('- ') for l in top_produtos_lines[:5]], pets_lines),
             "ia_disponivel": False,
             "erro": str(e)
         }
