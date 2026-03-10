@@ -56,7 +56,7 @@ def _gerar_sugestoes_historico(
             .filter(
                 Venda.cliente_id == cliente_id,
                 Venda.tenant_id == tenant_id,
-                Venda.status.in_(["finalizada", "pago_nf"]),
+                Venda.status != "cancelada",
                 VendaItem.produto_id.isnot(None),
             )
             .group_by(VendaItem.produto_id, VendaItem.produto_nome)

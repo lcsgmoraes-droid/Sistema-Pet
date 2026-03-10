@@ -10,6 +10,9 @@ import {
   AlertTriangle,
   Bell,
   BookmarkPlus,
+  Bot,
+  Loader2,
+  Send,
   CheckCircle,
   ChevronDown,
   ChevronLeft,
@@ -215,6 +218,13 @@ export default function PDV() {
     useState(false);
   const [opportunities, setOpportunities] = useState([]);
 
+  // === ASSISTENTE IA DO PDV ===
+  const [painelAssistenteAberto, setPainelAssistenteAberto] = useState(false);
+  const [mensagensAssistente, setMensagensAssistente] = useState([]);
+  const [inputAssistente, setInputAssistente] = useState('');
+  const [enviandoAssistente, setEnviandoAssistente] = useState(false);
+  const chatAssistenteEndRef = useRef(null);
+
   // 🆕 Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
   const [totalImpostos, setTotalImpostos] = useState(0);
@@ -240,6 +250,17 @@ export default function PDV() {
       carregarPendencias();
     }
   }, [vendaAtual.cliente]);
+
+  // Resetar chat do assistente quando cliente mudar
+  useEffect(() => {
+    setMensagensAssistente([]);
+    setInputAssistente('');
+  }, [vendaAtual.cliente?.id]);
+
+  // Auto-scroll chat para o final
+  useEffect(() => {
+    chatAssistenteEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [mensagensAssistente]);
 
   // Salvar dados do carrinho no sessionStorage para a calculadora universal
   useEffect(() => {
@@ -488,6 +509,53 @@ export default function PDV() {
     } catch (error) {
       // Fail-safe: erro silencioso, apenas limpa lista
       setOpportunities([]);
+    }
+  };
+
+  // Carrega resumo do cliente para o assistente IA
+  const carregarInfoCliente = async (clienteId) => {
+    if (!clienteId) return;
+    try {
+      const res = await api.get(`/clientes/${clienteId}/info-pdv`);
+      const info = res.data;
+      const pets = info.pets?.map(p => p.nome).join(', ') || 'Nenhum';
+      const ultimaCompra = info.resumo_financeiro?.ultima_compra;
+      const topProdutos = info.sugestoes?.slice(0, 3).map(s => s.nome).join(', ') || 'Nenhum';
+      const oportunidades = info.oportunidades || [];
+      let autoMsg = `Resumo de **${info.cliente?.nome}**:\n`;
+      autoMsg += `🛒 ${info.resumo_financeiro?.numero_compras || 0} compras — ticket médio: ${formatMoneyBRL(info.resumo_financeiro?.ticket_medio || 0)}\n`;
+      if (ultimaCompra?.data) {
+        autoMsg += `📅 Última compra: ${ultimaCompra.data} (${formatMoneyBRL(ultimaCompra.valor || 0)})\n`;
+      }
+      if (pets !== 'Nenhum') autoMsg += `🐾 Pets: ${pets}\n`;
+      autoMsg += `⭐ Favoritos: ${topProdutos}\n`;
+      if (oportunidades.length > 0) {
+        autoMsg += `\n⚠️ ${oportunidades.length} produto(s) para reabastecer:\n`;
+        oportunidades.slice(0, 3).forEach(op => {
+          autoMsg += `• ${op.produto_nome} (${op.dias_atraso}d atrasado)\n`;
+        });
+      }
+      autoMsg += '\nPergunta sobre este cliente?';
+      setMensagensAssistente([{ role: 'assistant', texto: autoMsg }]);
+    } catch {
+      setMensagensAssistente([{ role: 'assistant', texto: 'Não foi possível carregar o histórico. Pode me perguntar qualquer coisa!' }]);
+    }
+  };
+
+  // Envia mensagem para o chat IA do cliente
+  const enviarMensagemAssistente = async () => {
+    const msg = inputAssistente.trim();
+    if (!msg || !vendaAtual.cliente?.id || enviandoAssistente) return;
+    setMensagensAssistente(prev => [...prev, { role: 'user', texto: msg }]);
+    setInputAssistente('');
+    setEnviandoAssistente(true);
+    try {
+      const res = await api.post(`/clientes/${vendaAtual.cliente.id}/chat-pdv`, { mensagem: msg });
+      setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: res.data.resposta }]);
+    } catch {
+      setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: 'Erro ao responder. Tente novamente.' }]);
+    } finally {
+      setEnviandoAssistente(false);
     }
   };
 
@@ -2225,10 +2293,7 @@ export default function PDV() {
                   <button
                     onClick={() => {
                       setPainelOportunidadesAberto(true);
-                      // Buscar oportunidades ao abrir painel (D4 - async, non-blocking)
-                      if (vendaAtual.id) {
-                        buscarOportunidades(vendaAtual.id);
-                      }
+                      buscarOportunidades(vendaAtual.id || null);
                     }}
                     className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-yellow-50 border-2 border-yellow-400 rounded-lg transition-colors"
                     title="Ver oportunidades de venda"
@@ -2238,6 +2303,30 @@ export default function PDV() {
                       <span className="font-semibold text-yellow-600">
                         {Math.min(opportunities.length, 6)}
                       </span>
+                    )}
+                  </button>
+                )}
+
+                {/* Botão Assistente IA */}
+                {vendaAtual.cliente && (
+                  <button
+                    onClick={() => {
+                      const abrindo = !painelAssistenteAberto;
+                      setPainelAssistenteAberto(abrindo);
+                      if (abrindo && mensagensAssistente.length === 0) {
+                        carregarInfoCliente(vendaAtual.cliente.id);
+                      }
+                    }}
+                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg border-2 transition-colors ${
+                      painelAssistenteAberto
+                        ? 'bg-indigo-100 border-indigo-500 text-indigo-700'
+                        : 'bg-white hover:bg-indigo-50 border-indigo-300 text-indigo-600'
+                    }`}
+                    title="Assistente IA do cliente"
+                  >
+                    <Bot className="w-5 h-5" />
+                    {mensagensAssistente.length > 1 && !painelAssistenteAberto && (
+                      <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
                     )}
                   </button>
                 )}
@@ -4496,6 +4585,104 @@ export default function PDV() {
                     ? `${Math.min(opportunities.length, 6)} oportunidades`
                     : ""}
                 </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Painel Assistente IA do PDV */}
+        {painelAssistenteAberto && vendaAtual.cliente && (
+          <div className="fixed inset-0 z-40">
+            <div className="absolute top-0 right-0 w-96 h-full bg-white border-l border-indigo-200 shadow-xl flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-200 bg-indigo-600 text-white">
+                <div className="flex items-center gap-2">
+                  <Bot className="w-5 h-5" />
+                  <div>
+                    <h2 className="text-sm font-semibold">Assistente IA</h2>
+                    <p className="text-xs text-indigo-200">{vendaAtual.cliente.nome}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPainelAssistenteAberto(false)}
+                  className="p-1 hover:bg-indigo-500 rounded transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Área de mensagens */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50">
+                {mensagensAssistente.length === 0 && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center text-gray-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
+                      <p className="text-xs">Carregando histórico...</p>
+                    </div>
+                  </div>
+                )}
+                {mensagensAssistente.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div
+                      className={`max-w-[85%] px-3 py-2 rounded-lg text-xs leading-relaxed whitespace-pre-wrap ${
+                        msg.role === 'user'
+                          ? 'bg-indigo-600 text-white rounded-br-none'
+                          : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
+                      }`}
+                    >
+                      {msg.texto}
+                    </div>
+                  </div>
+                ))}
+                {enviandoAssistente && (
+                  <div className="flex justify-start">
+                    <div className="bg-white border border-gray-200 text-gray-400 px-3 py-2 rounded-lg rounded-bl-none text-xs flex items-center gap-1 shadow-sm">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Pensando...</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={chatAssistenteEndRef} />
+              </div>
+
+              {/* Sugestões rápidas */}
+              {mensagensAssistente.length === 1 && (
+                <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex flex-wrap gap-1">
+                  {['O que ele comprou na última vez?', 'Quantas vezes comprou ração?', 'Tem alguma alergia?'].map(sugestao => (
+                    <button
+                      key={sugestao}
+                      onClick={() => {
+                        setInputAssistente(sugestao);
+                      }}
+                      className="text-[10px] px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                    >
+                      {sugestao}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Input */}
+              <div className="p-3 border-t border-gray-200 bg-white">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inputAssistente}
+                    onChange={e => setInputAssistente(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensagemAssistente(); } }}
+                    placeholder="Pergunta sobre o cliente..."
+                    disabled={enviandoAssistente}
+                    className="flex-1 text-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 disabled:opacity-50"
+                    autoFocus
+                  />
+                  <button
+                    onClick={enviarMensagemAssistente}
+                    disabled={!inputAssistente.trim() || enviandoAssistente}
+                    className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
