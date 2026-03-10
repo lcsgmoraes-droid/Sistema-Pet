@@ -304,7 +304,7 @@ export default function ProdutosNovo() {
       
       setMarcas(marcRes.data);
       setDepartamentos(depRes.data);
-      setClientes(cliRes.data);
+      setClientes(Array.isArray(cliRes.data) ? cliRes.data : (cliRes.data.items || []));
       
       // Carregar opções de ração
       carregarOpcoesRacao();
