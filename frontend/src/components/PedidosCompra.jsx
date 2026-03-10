@@ -35,6 +35,7 @@ const PedidosCompra = () => {
   const [incluirAlerta, setIncluirAlerta] = useState(true);
   const [produtosSelecionados, setProdutosSelecionados] = useState([]);
   const [quantidadesEditadas, setQuantidadesEditadas] = useState({});
+  const [filtroSugestao, setFiltroSugestao] = useState('');
 
   const [formData, setFormData] = useState({
     fornecedor_id: '',
@@ -294,6 +295,7 @@ const PedidosCompra = () => {
     setMostrarSugestao(false);
     setProdutosSelecionados([]);
     setQuantidadesEditadas({});
+    setFiltroSugestao('');
   };
 
   const selecionarTodosCriticos = () => {
@@ -1011,8 +1013,8 @@ const PedidosCompra = () => {
 
       {/* 💡 MODAL DE SUGESTÃO INTELIGENTE */}
       {mostrarSugestao && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white w-full h-full flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
               <div className="flex justify-between items-start">
@@ -1029,9 +1031,19 @@ const PedidosCompra = () => {
               </div>
 
               {/* Filtros */}
-              <div className="mt-4 grid grid-cols-5 gap-4">
+              <div className="mt-4 grid grid-cols-6 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-sm text-purple-100 mb-1">Buscar por nome ou SKU</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Special Dog, SKU 211..."
+                    value={filtroSugestao}
+                    onChange={(e) => setFiltroSugestao(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
+                  />
+                </div>
                 <div>
-                  <label className="block text-sm text-purple-100 mb-1">Período de Análise</label>
+                  <label className="block text-sm text-purple-100 mb-1">Período</label>
                   <select
                     value={periodoSugestao}
                     onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
@@ -1045,7 +1057,7 @@ const PedidosCompra = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-purple-100 mb-1">Cobertura de Estoque</label>
+                  <label className="block text-sm text-purple-100 mb-1">Cobertura</label>
                   <select
                     value={diasCobertura}
                     onChange={(e) => setDiasCobertura(parseInt(e.target.value))}
@@ -1112,7 +1124,7 @@ const PedidosCompra = () => {
               ) : (
                 <>
                   {/* Ações Rápidas */}
-                  <div className="mb-4 flex gap-3">
+                  <div className="mb-4 flex gap-3 items-center">
                     <button
                       onClick={selecionarTodosCriticos}
                       className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
@@ -1120,42 +1132,68 @@ const PedidosCompra = () => {
                       🔴 Selecionar Todos Críticos
                     </button>
                     <div className="flex-1"></div>
-                    <span className="text-gray-600">
-                      {produtosSelecionados.length} de {sugestoes.length} produtos selecionados
+                    <span className="text-gray-500 text-sm">
+                      {(() => {
+                        const filtrados = filtroSugestao.trim()
+                          ? sugestoes.filter(s => {
+                              const q = filtroSugestao.toLowerCase();
+                              return (s.produto_nome || '').toLowerCase().includes(q) ||
+                                     (s.produto_sku || '').toLowerCase().includes(q) ||
+                                     (s.produto_codigo_barras || '').toLowerCase().includes(q);
+                            })
+                          : sugestoes;
+                        return `${produtosSelecionados.length} selecionados · ${filtrados.length} exibidos de ${sugestoes.length} total`;
+                      })()}
                     </span>
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                             <input
                               type="checkbox"
                               onChange={(e) => {
+                                const visiveis = filtroSugestao.trim()
+                                  ? sugestoes.filter(s => {
+                                      const q = filtroSugestao.toLowerCase();
+                                      return (s.produto_nome || '').toLowerCase().includes(q) ||
+                                             (s.produto_sku || '').toLowerCase().includes(q) ||
+                                             (s.produto_codigo_barras || '').toLowerCase().includes(q);
+                                    })
+                                  : sugestoes;
                                 if (e.target.checked) {
-                                  setProdutosSelecionados(sugestoes.map(s => s.produto_id));
+                                  setProdutosSelecionados(visiveis.map(s => s.produto_id));
                                 } else {
                                   setProdutosSelecionados([]);
                                 }
                               }}
-                              checked={produtosSelecionados.length === sugestoes.length}
+                              checked={produtosSelecionados.length > 0 && produtosSelecionados.length === sugestoes.length}
                               className="w-4 h-4 rounded"
                             />
                           </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Prioridade</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase" title="CRÍTICO = menos de 7 dias. ALERTA = menos de 14 dias. ATENÇÃO = menos de 30 dias.">Prioridade ℹ️</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Produto</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Estoque</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Consumo/dia</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Dias Restantes</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Qtd Sugerida</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Preço Unit.</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Total</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Tendência</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantity atual no estoque. Negativo indica divergência de ajuste.">Estoque ℹ️</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Média de unidades vendidas por dia no período selecionado.">Consumo/dia ℹ️</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantos dias o estoque atual dura ao ritmo de consumo atual. ∞ = sem venda recente.">Dias Restantes ℹ️</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantidade sugerida para cobrir o período de cobertura definido. Você pode editar.">Qtd Sugerida ℹ️</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Último preço de custo registrado para este produto.">Preço Unit. ℹ️</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Qtd sugerida × preço unitário.">Total ℹ️</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase" title="Tendência de vendas: comparação entre a primeira e segunda metade do período.">Tendência ℹ️</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {sugestoes.map((sugestao) => (
+                        {(filtroSugestao.trim()
+                          ? sugestoes.filter(s => {
+                              const q = filtroSugestao.toLowerCase();
+                              return (s.produto_nome || '').toLowerCase().includes(q) ||
+                                     (s.produto_sku || '').toLowerCase().includes(q) ||
+                                     (s.produto_codigo_barras || '').toLowerCase().includes(q);
+                            })
+                          : sugestoes
+                        ).map((sugestao) => (
                           <tr
                             key={sugestao.produto_id}
                             className={`hover:bg-gray-50 ${
@@ -1193,7 +1231,7 @@ const PedidosCompra = () => {
                               </div>
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <div className="font-medium">{sugestao.estoque_atual}</div>
+                              <div className="font-medium">{Number(sugestao.estoque_atual).toFixed(2).replace(/\.?0+$/, '') || '0'}</div>
                               <div className="text-xs text-gray-500">Mín: {sugestao.estoque_minimo}</div>
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
