@@ -94,7 +94,7 @@ def listar_rotas(
         loc = db.execute(
             text(
                 """
-                SELECT lat_atual, lon_atual, localizacao_atualizada_em
+                SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
                 FROM rotas_entrega
                 WHERE id = :rid AND tenant_id = :tenant
                 """
@@ -105,6 +105,20 @@ def listar_rotas(
             rota.lat_atual = loc[0]
             rota.lon_atual = loc[1]
             rota.localizacao_atualizada_em = loc[2]
+            token_rastreio = loc[3]
+            if not token_rastreio:
+                token_rastreio = secrets.token_urlsafe(32)
+                db.execute(
+                    text(
+                        """
+                        UPDATE rotas_entrega
+                        SET token_rastreio = :token
+                        WHERE id = :rid AND tenant_id = :tenant
+                        """
+                    ),
+                    {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
+                )
+            rota.token_rastreio = token_rastreio
 
         if rota.paradas:
             rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
@@ -115,6 +129,7 @@ def listar_rotas(
                     parada.cliente_telefone = parada.venda.cliente.telefone
                     parada.cliente_celular = parada.venda.cliente.celular
 
+    db.commit()
     return rotas
 
 
@@ -432,6 +447,36 @@ def obter_rota(
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
+
+    loc = db.execute(
+        text(
+            """
+            SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
+            FROM rotas_entrega
+            WHERE id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {"rid": rota.id, "tenant": tenant_id},
+    ).fetchone()
+    if loc:
+        rota.lat_atual = loc[0]
+        rota.lon_atual = loc[1]
+        rota.localizacao_atualizada_em = loc[2]
+        token_rastreio = loc[3]
+        if not token_rastreio:
+            token_rastreio = secrets.token_urlsafe(32)
+            db.execute(
+                text(
+                    """
+                    UPDATE rotas_entrega
+                    SET token_rastreio = :token
+                    WHERE id = :rid AND tenant_id = :tenant
+                    """
+                ),
+                {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
+            )
+            db.commit()
+        rota.token_rastreio = token_rastreio
 
     if rota.paradas:
         rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)

@@ -238,6 +238,9 @@ export default function PDV() {
   // Refs
   const inputProdutoRef = useRef(null);
   const ultimoAutoAddProdutoRef = useRef("");
+  const ultimoEventoTeclaProdutoMsRef = useRef(0);
+  const sequenciaRapidaProdutoRef = useRef(0);
+  const leituraScannerDetectadaRef = useRef(false);
 
   // Persistir estado dos painéis no localStorage
   useEffect(() => {
@@ -1354,10 +1357,13 @@ export default function PDV() {
           if (
             matchExato &&
             ultimoAutoAddProdutoRef.current !== termoLower &&
+            leituraScannerDetectadaRef.current &&
             !modoVisualizacao
           ) {
             ultimoAutoAddProdutoRef.current = termoLower;
             adicionarProduto(matchExato);
+            leituraScannerDetectadaRef.current = false;
+            sequenciaRapidaProdutoRef.current = 0;
             return;
           }
 
@@ -1370,9 +1376,35 @@ export default function PDV() {
       return () => clearTimeout(timer);
     } else {
       ultimoAutoAddProdutoRef.current = "";
+      leituraScannerDetectadaRef.current = false;
+      sequenciaRapidaProdutoRef.current = 0;
       setProdutosSugeridos([]);
     }
   }, [buscarProduto, modoVisualizacao]);
+
+  function registrarPossivelLeituraScanner(evento) {
+    if (
+      evento.key.length !== 1 ||
+      evento.ctrlKey ||
+      evento.altKey ||
+      evento.metaKey
+    ) {
+      return;
+    }
+
+    const agora = Date.now();
+    const delta = agora - ultimoEventoTeclaProdutoMsRef.current;
+    ultimoEventoTeclaProdutoMsRef.current = agora;
+
+    if (delta > 0 && delta <= 45) {
+      sequenciaRapidaProdutoRef.current += 1;
+    } else {
+      sequenciaRapidaProdutoRef.current = 1;
+    }
+
+    // Leitores de código de barras digitam muito rápido; usuário no teclado não.
+    leituraScannerDetectadaRef.current = sequenciaRapidaProdutoRef.current >= 6;
+  }
 
   // Selecionar cliente
   const selecionarCliente = async (cliente) => {
@@ -2932,9 +2964,13 @@ export default function PDV() {
                       value={buscarProduto}
                       onChange={(e) => setBuscarProduto(e.target.value)}
                       onKeyDown={(e) => {
+                        registrarPossivelLeituraScanner(e);
+
                         if (e.key === "Enter" && produtosSugeridos.length > 0) {
                           e.preventDefault();
                           adicionarProduto(produtosSugeridos[0]);
+                          leituraScannerDetectadaRef.current = false;
+                          sequenciaRapidaProdutoRef.current = 0;
                         }
                       }}
                       placeholder="Digite o nome do produto, código de barras ou serviço..."
