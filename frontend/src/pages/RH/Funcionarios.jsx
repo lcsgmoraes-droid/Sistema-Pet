@@ -118,64 +118,72 @@ export default function Funcionarios() {
         </button>
       </div>
 
-      <table className="w-full border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border p-2 text-left">Nome</th>
-            <th className="border p-2">Cargo</th>
-            <th className="border p-2">Salário</th>
-            <th className="border p-2">Status</th>
-            <th className="border p-2">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {listaFiltrada.map((f) => (
-            <tr key={f.id}>
-              <td className="border p-2">{f.nome}</td>
-              <td className="border p-2">
-                {f.cargo ? f.cargo.nome : "-"}
-              </td>
-              <td className="border p-2">
-                {f.cargo
-                  ? `R$ ${Number(f.cargo.salario_base).toFixed(2)}`
-                  : "-"}
-              </td>
-              <td className="border p-2">
-                {f.ativo ? "Ativo" : "Inativo"}
-              </td>
-              <td className="border p-2 space-x-2">
-                <button
-                  className="text-purple-600"
-                  onClick={() => setEventosFuncionario(f)}
-                >
-                  Eventos
-                </button>
-
-                <button
-                  className="text-blue-600"
-                  onClick={() =>
-                    setForm({
-                      ...f,
-                      cargo_id: f.cargo?.id,
-                    })
-                  }
-                >
-                  Editar
-                </button>
-
-                {f.ativo && (
-                  <button
-                    className="text-red-600"
-                    onClick={() => inativar(f.id)}
-                  >
-                    Inativar
-                  </button>
-                )}
-              </td>
+      <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+            <tr>
+              <th className="px-4 py-3 text-left font-semibold">Nome</th>
+              <th className="px-4 py-3 text-left font-semibold">Cargo</th>
+              <th className="px-4 py-3 text-left font-semibold">Salário</th>
+              <th className="px-4 py-3 text-center font-semibold">Status</th>
+              <th className="px-4 py-3 text-center font-semibold">Ações</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {listaFiltrada.map((f) => (
+              <tr key={f.id} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-3 font-medium text-gray-800">{f.nome}</td>
+                <td className="px-4 py-3 text-gray-600">
+                  {f.cargo ? f.cargo.nome : <span className="text-gray-400 italic">Sem cargo</span>}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {f.cargo
+                    ? `R$ ${Number(f.cargo.salario_base).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                    : <span className="text-gray-400">-</span>}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    f.ativo ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                  }`}>
+                    {f.ativo ? "Ativo" : "Inativo"}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      className="px-3 py-1.5 text-xs font-medium rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 transition-colors"
+                      onClick={() => setEventosFuncionario(f)}
+                    >
+                      Eventos
+                    </button>
+                    <button
+                      className="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
+                      onClick={() => setForm({ ...f, cargo_id: f.cargo?.id })}
+                    >
+                      Editar
+                    </button>
+                    {f.ativo && (
+                      <button
+                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors"
+                        onClick={() => inativar(f.id)}
+                      >
+                        Inativar
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {listaFiltrada.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
+                  Nenhum funcionário encontrado.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {form && (
         <div className="border rounded p-4 mt-6">
