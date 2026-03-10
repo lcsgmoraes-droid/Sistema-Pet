@@ -1222,6 +1222,7 @@ def sugerir_pedido_inteligente(
                 "quantidade_sugerida": round(quantidade_sugerida, 2),
                 "preco_unitario": float(preco_unitario),
                 "valor_total": round(valor_sugestao, 2),
+                "peso_bruto": float(produto.peso_bruto or 0),
                 "prioridade": prioridade,
                 "tendencia": tendencia,
                 "observacao": _gerar_observacao(prioridade, dias_estoque, tendencia, consumo_diario)

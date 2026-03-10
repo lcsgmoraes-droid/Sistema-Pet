@@ -298,6 +298,14 @@ const PedidosCompra = () => {
     setFiltroSugestao('');
   };
 
+  // Fechar modal com ESC
+  useEffect(() => {
+    if (!mostrarSugestao) return;
+    const handleKeyDown = (e) => { if (e.key === 'Escape') fecharModalSugestao(); };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mostrarSugestao]);
+
   const selecionarTodosCriticos = () => {
     const criticos = sugestoes
       .filter(s => s.prioridade === 'CRÍTICO' && s.quantidade_sugerida > 0)
@@ -1105,6 +1113,26 @@ const PedidosCompra = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Totalizador dos selecionados */}
+              {sugestoes.length > 0 && (
+                <div className="mt-3 flex gap-6 text-sm text-purple-100">
+                  {(() => {
+                    const selecionados = sugestoes.filter(s => produtosSelecionados.includes(s.produto_id));
+                    const totalQtd = selecionados.reduce((sum, s) => sum + Math.ceil(obterQuantidadeFinal(s)), 0);
+                    const totalPeso = selecionados.reduce((sum, s) => sum + (Math.ceil(obterQuantidadeFinal(s)) * (s.peso_bruto || 0)), 0);
+                    const totalValor = selecionados.reduce((sum, s) => sum + (Math.ceil(obterQuantidadeFinal(s)) * s.preco_unitario), 0);
+                    return (
+                      <>
+                        <span>📦 <strong className="text-white">{totalQtd}</strong> unidades</span>
+                        <span>⚖️ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong></span>
+                        <span>💰 <strong className="text-white">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        {selecionados.length === 0 && <span className="italic opacity-75">(selecione produtos para ver o total)</span>}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Tabela de Sugestões */}
