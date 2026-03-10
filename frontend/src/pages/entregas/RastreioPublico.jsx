@@ -126,15 +126,25 @@ export default function RastreioPublico() {
         {/* Última posição GPS */}
         {linkMaps && (
           <div style={styles.gpsBox}>
-            <p style={styles.gpsTexto}>📍 Última posição conhecida do entregador</p>
+            <p style={styles.gpsTexto}>🏍️ 📍 Posição atual do entregador (tempo real)</p>
             <a
               href={linkMaps}
               target="_blank"
               rel="noopener noreferrer"
               style={styles.btnMaps}
             >
-              🗺️ Ver no Google Maps
+              🗺️ Acompanhar no Google Maps
             </a>
+            <div style={styles.mapaEmbedWrap}>
+              <div style={styles.mapaBadgeMoto}>🏍️ Entregador</div>
+              <iframe
+                title="Mapa de rastreio da entrega"
+                src={`${linkMaps}&output=embed`}
+                style={styles.mapaEmbed}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
           </div>
         )}
 
@@ -289,6 +299,32 @@ const styles = {
     textDecoration: "none",
     fontWeight: "600",
     fontSize: 14,
+  },
+  mapaEmbedWrap: {
+    marginTop: 12,
+    position: "relative",
+    borderRadius: 12,
+    overflow: "hidden",
+    border: "1px solid #dbeafe",
+    backgroundColor: "#fff",
+  },
+  mapaEmbed: {
+    width: "100%",
+    height: 240,
+    border: "none",
+    display: "block",
+  },
+  mapaBadgeMoto: {
+    position: "absolute",
+    zIndex: 2,
+    top: 10,
+    left: 10,
+    backgroundColor: "rgba(17,24,39,0.8)",
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    padding: "6px 10px",
+    borderRadius: 999,
   },
   paradasBox: {
     marginBottom: 16,

@@ -420,7 +420,12 @@ def obter_rota(
     user, tenant_id = user_and_tenant
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(
+    from sqlalchemy.orm import joinedload
+
+    rota = db.query(RotaEntrega).options(
+        joinedload(RotaEntrega.entregador),
+        joinedload(RotaEntrega.paradas).joinedload(RotaEntregaParada.venda).joinedload(Venda.cliente),
+    ).filter(
         RotaEntrega.id == rota_id,
         RotaEntrega.tenant_id == tenant_id
     ).first()
@@ -428,7 +433,13 @@ def obter_rota(
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
-    rota.entregador = db.query(Cliente).filter(Cliente.id == rota.entregador_id).first()
+    if rota.paradas:
+        rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
+        for parada in rota.paradas:
+            if parada.venda and parada.venda.cliente:
+                parada.cliente_nome = parada.venda.cliente.nome
+                parada.cliente_telefone = parada.venda.cliente.telefone
+                parada.cliente_celular = parada.venda.cliente.celular
 
     return rota
 
@@ -1084,6 +1095,14 @@ def marcar_parada_entregue(
         parada.status = "entregue"
         parada.data_entrega = datetime.now()
 
+        venda = db.query(Venda).filter(
+            Venda.id == parada.venda_id,
+            Venda.tenant_id == tenant_id,
+        ).first()
+        if venda:
+            venda.status_entrega = "entregue"
+            venda.data_entrega = parada.data_entrega
+
         # Registrar KM da entrega (opcional)
         if km_entrega is not None:
             parada.km_entrega = Decimal(str(km_entrega))
@@ -1249,13 +1268,13 @@ def excluir_rota(
         RotaEntregaParada.tenant_id == tenant_id
     ).all()
 
-    # Reverter status das vendas para "aberto"
+    # Reverter status das vendas para "pendente" (voltam para Entregas em Aberto)
     vendas_liberadas = []
     for parada in paradas:
         if parada.venda_id:
             venda = db.query(Venda).filter(Venda.id == parada.venda_id).first()
             if venda:
-                venda.status_entrega = "aberto"
+                venda.status_entrega = "pendente"
                 vendas_liberadas.append(venda.id)
 
     # Deletar paradas

@@ -371,7 +371,14 @@ export default function TrackDeliveryScreen() {
               }}
               title="Entregador"
               description="Posição atual"
-            />
+            >
+              <View style={styles.markerWrap}>
+                <View style={styles.markerPulse} />
+                <View style={styles.markerIconCircle}>
+                  <Text style={styles.markerEmoji}>🏍️</Text>
+                </View>
+              </View>
+            </Marker>
           </MapView>
         </View>
       )}
@@ -545,6 +552,30 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 220,
     borderRadius: RAIO.md,
+  },
+  markerWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  markerPulse: {
+    position: "absolute",
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(37,99,235,0.25)",
+  },
+  markerIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  markerEmoji: {
+    fontSize: 12,
   },
 
   palavraChaveCard: {

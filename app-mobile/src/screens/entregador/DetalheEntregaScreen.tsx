@@ -12,6 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import api from "../../services/api";
 import { EntregadorStackParamList } from "../../types/entregadorNavigation";
 
@@ -19,6 +22,7 @@ import { EntregadorStackParamList } from "../../types/entregadorNavigation";
 
 interface Parada {
   id: number;
+  venda_id: number;
   ordem: number;
   endereco: string;
   status: string; // pendente | entregue | nao_entregue
@@ -34,6 +38,28 @@ interface Rota {
   numero: string;
   status: string;
   paradas: Parada[];
+}
+
+interface VendaDetalhes {
+  id: number;
+  cliente?: {
+    nome?: string;
+    telefone?: string;
+    celular?: string;
+  };
+  data_venda?: string;
+  forma_pagamento?: string;
+  status_pagamento?: string;
+  endereco_entrega?: string;
+  total?: number;
+  valor_total?: number;
+  itens?: Array<{
+    produto_nome?: string;
+    servico_descricao?: string;
+    quantidade?: number;
+    subtotal?: number;
+    preco_unitario?: number;
+  }>;
 }
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
@@ -83,6 +109,10 @@ export default function DetalheEntregaScreen() {
   >("pix");
   const [parcelasRecebimento, setParcelasRecebimento] = useState(1);
   const [processandoRecebimento, setProcessandoRecebimento] = useState(false);
+  const [processandoFinalizacao, setProcessandoFinalizacao] = useState(false);
+  const [modalVendaAberto, setModalVendaAberto] = useState(false);
+  const [loadingVenda, setLoadingVenda] = useState(false);
+  const [vendaDetalhes, setVendaDetalhes] = useState<VendaDetalhes | null>(null);
 
   const paradasPendentes =
     rota?.paradas?.filter((p) => p.status === "pendente").length ?? 0;
@@ -237,6 +267,92 @@ export default function DetalheEntregaScreen() {
     }
   }
 
+  async function moverParada(paradaId: number, direcao: "up" | "down") {
+    if (rota?.status !== "pendente") return;
+
+    const ordenadas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
+    const idx = ordenadas.findIndex((p) => p.id === paradaId);
+    if (idx < 0) return;
+
+    const alvo = direcao === "up" ? idx - 1 : idx + 1;
+    if (alvo < 0 || alvo >= ordenadas.length) return;
+
+    const tmp = ordenadas[idx];
+    ordenadas[idx] = ordenadas[alvo];
+    ordenadas[alvo] = tmp;
+
+    try {
+      await api.put(`/ecommerce/entregador/rotas/${rotaId}/paradas/reordenar`, {
+        parada_ids: ordenadas.map((p) => p.id),
+      });
+      const atualizadas = ordenadas.map((p, index) => ({ ...p, ordem: index + 1 }));
+      setRota((prev) => (prev ? { ...prev, paradas: atualizadas } : prev));
+    } catch {
+      Alert.alert("Erro", "Não foi possível reordenar as paradas.");
+    }
+  }
+
+  async function salvarNovaOrdemParadas(paradasOrdenadas: Parada[]) {
+    try {
+      await api.put(`/ecommerce/entregador/rotas/${rotaId}/paradas/reordenar`, {
+        parada_ids: paradasOrdenadas.map((p) => p.id),
+      });
+      const atualizadas = paradasOrdenadas.map((p, index) => ({
+        ...p,
+        ordem: index + 1,
+      }));
+      setRota((prev) => (prev ? { ...prev, paradas: atualizadas } : prev));
+    } catch {
+      Alert.alert("Erro", "Não foi possível salvar a nova ordem das paradas.");
+      await carregar();
+    }
+  }
+
+  async function finalizarRota() {
+    const confirmarFinalizacao = async () => {
+      setProcessandoFinalizacao(true);
+      try {
+        await api.post(`/rotas-entrega/${rotaId}/fechar`, {});
+        Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
+        await carregar();
+      } catch {
+        Alert.alert('Erro', 'Não foi possível finalizar a rota agora.');
+      } finally {
+        setProcessandoFinalizacao(false);
+      }
+    };
+
+    Alert.alert(
+      'Finalizar rota',
+      'Confirmar finalização da rota? Essa ação conclui a rota no ERP.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Finalizar',
+          onPress: () => {
+            void confirmarFinalizacao();
+          },
+        },
+      ],
+    );
+  }
+
+  async function abrirDetalhesVenda(vendaId: number) {
+    setLoadingVenda(true);
+    setModalVendaAberto(true);
+    try {
+      const { data } = await api.get<VendaDetalhes>(
+        `/ecommerce/entregador/vendas/${vendaId}/detalhes`,
+      );
+      setVendaDetalhes(data);
+    } catch {
+      setModalVendaAberto(false);
+      Alert.alert('Erro', 'Não foi possível carregar os detalhes da venda.');
+    } finally {
+      setLoadingVenda(false);
+    }
+  }
+
   function abrirModalRecebimento(paradaId: number) {
     setParadaRecebimentoId(paradaId);
     setFormaRecebimento("pix");
@@ -272,7 +388,7 @@ export default function DetalheEntregaScreen() {
 
   // ── Render parada ─────────────────────────────────────────────────────────
 
-  function renderParada(parada: Parada) {
+  function renderParada(parada: Parada, drag?: () => void, isActive?: boolean) {
     const badge = STATUS_BADGE[parada.status] ?? {
       label: parada.status,
       color: "#374151",
@@ -281,7 +397,10 @@ export default function DetalheEntregaScreen() {
     const emProcessamento = processando === parada.id;
 
     return (
-      <View key={parada.id} style={styles.paradaCard}>
+      <View
+        key={parada.id}
+        style={[styles.paradaCard, isActive ? styles.paradaCardAtiva : styles.paradaCardInativa]}
+      >
         {/* Cabeçalho */}
         <View style={styles.paradaHeader}>
           <View style={styles.ordemCircle}>
@@ -289,12 +408,21 @@ export default function DetalheEntregaScreen() {
           </View>
           <View style={styles.paradaInfo}>
             <Text style={styles.paradaCliente} numberOfLines={1}>
-              {parada.cliente_nome ?? "Cliente"}
+              {parada.cliente_nome ?? `Cliente da venda #${parada.venda_id}`}
             </Text>
             <Text style={styles.paradaEndereco} numberOfLines={2}>
               {parada.endereco}
             </Text>
           </View>
+          {rota?.status === "pendente" && drag ? (
+            <TouchableOpacity
+              style={[styles.btnDrag, isActive && styles.btnDragAtivo]}
+              onLongPress={drag}
+              delayLongPress={120}
+            >
+              <Text style={styles.btnDragText}>☰</Text>
+            </TouchableOpacity>
+          ) : null}
           <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
             <Text style={[styles.statusBadgeText, { color: badge.color }]}>
               {badge.label}
@@ -332,6 +460,13 @@ export default function DetalheEntregaScreen() {
             onPress={() => abrirModalRecebimento(parada.id)}
           >
             <Text style={styles.btnRecebimentoText}>💳 Recebimento</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.btnDetalhes}
+            onPress={() => abrirDetalhesVenda(parada.venda_id)}
+          >
+            <Text style={styles.btnDetalhesText}>📄 Detalhes</Text>
           </TouchableOpacity>
         </View>
 
@@ -382,6 +517,10 @@ export default function DetalheEntregaScreen() {
 
   const pendentes = rota.paradas.filter((p) => p.status === "pendente").length;
   const entregues = rota.paradas.filter((p) => p.status === "entregue").length;
+  const podeFinalizar =
+    ["em_rota", "em_andamento"].includes(rota.status) &&
+    rota.paradas.length > 0 &&
+    pendentes === 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -412,8 +551,41 @@ export default function DetalheEntregaScreen() {
         </TouchableOpacity>
       )}
 
+      {podeFinalizar && (
+        <TouchableOpacity
+          style={[styles.btnFinalizar, processandoFinalizacao && { opacity: 0.6 }]}
+          disabled={processandoFinalizacao}
+          onPress={finalizarRota}
+        >
+          <Text style={styles.btnFinalizarText}>
+            {processandoFinalizacao ? 'Finalizando...' : '✅ Finalizar Rota'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {/* Lista de paradas */}
-      {rota.paradas.map(renderParada)}
+      {rota.status === "pendente" ? (
+        <>
+          <Text style={styles.dragHint}>Arraste pelo ícone ↕️ para reordenar antes de iniciar</Text>
+          <DraggableFlatList
+            data={[...rota.paradas].sort((a, b) => a.ordem - b.ordem)}
+            keyExtractor={(item) => String(item.id)}
+            activationDistance={12}
+            autoscrollThreshold={60}
+            autoscrollSpeed={80}
+            dragItemOverflow={false}
+            onDragEnd={({ data }) => {
+              void salvarNovaOrdemParadas(data);
+            }}
+            renderItem={({ item, drag, isActive }: RenderItemParams<Parada>) =>
+              renderParada(item, drag, isActive)
+            }
+            scrollEnabled={false}
+          />
+        </>
+      ) : (
+        rota.paradas.map((p) => renderParada(p))
+      )}
 
       <Modal
         visible={modalRecebimentoAberto}
@@ -539,6 +711,79 @@ export default function DetalheEntregaScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={modalVendaAberto}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalVendaAberto(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            <View style={styles.modalHeaderDetalhes}>
+              <Text style={styles.modalTitulo}>🧾 Detalhes da Venda</Text>
+              <TouchableOpacity onPress={() => setModalVendaAberto(false)}>
+                <Text style={styles.fecharDetalhes}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingVenda ? (
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color="#2563eb" />
+              </View>
+            ) : (
+              <ScrollView>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Cliente: </Text>
+                  {vendaDetalhes?.cliente?.nome || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Telefone: </Text>
+                  {vendaDetalhes?.cliente?.celular || vendaDetalhes?.cliente?.telefone || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Data: </Text>
+                  {vendaDetalhes?.data_venda
+                    ? new Date(vendaDetalhes.data_venda).toLocaleString('pt-BR')
+                    : 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Pagamento: </Text>
+                  {vendaDetalhes?.forma_pagamento || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Status pagamento: </Text>
+                  {vendaDetalhes?.status_pagamento || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Endereço: </Text>
+                  {vendaDetalhes?.endereco_entrega || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Total: </Text>
+                  R$ {Number(vendaDetalhes?.valor_total ?? vendaDetalhes?.total ?? 0).toFixed(2)}
+                </Text>
+
+                <Text style={[styles.detalheLabel, { marginTop: 12, marginBottom: 8 }]}>Itens da venda:</Text>
+                {(vendaDetalhes?.itens || []).map((item, index) => (
+                  <View
+                    key={`${item.produto_nome || item.servico_descricao || 'item'}-${index}`}
+                    style={styles.itemVenda}
+                  >
+                    <Text style={styles.itemVendaNome}>
+                      {item.produto_nome || item.servico_descricao || 'Item'}
+                    </Text>
+                    <Text style={styles.itemVendaValor}>
+                      {Number(item.quantidade || 0)} x R$ {Number(item.preco_unitario || 0).toFixed(2)}
+                      {' • '}R$ {Number(item.subtotal || 0).toFixed(2)}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -578,6 +823,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   btnIniciarText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  btnFinalizar: {
+    backgroundColor: '#2563eb',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  btnFinalizarText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   // Card de parada
   paradaCard: {
@@ -590,6 +843,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
+  },
+  paradaCardInativa: {
+    opacity: 1,
+  },
+  paradaCardAtiva: {
+    opacity: 0.95,
+    borderWidth: 1,
+    borderColor: "#2563eb",
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    transform: [{ scale: 1.01 }],
   },
   paradaHeader: {
     flexDirection: "row",
@@ -654,6 +920,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnRecebimentoText: { color: "#6d28d9", fontWeight: "600", fontSize: 13 },
+  btnDetalhes: {
+    flex: 1,
+    backgroundColor: '#e0f2fe',
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+  },
+  btnDetalhesText: { color: '#0369a1', fontWeight: '600', fontSize: 13 },
+  btnDrag: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "#eff6ff",
+    marginRight: 8,
+    marginTop: 2,
+  },
+  btnDragAtivo: {
+    backgroundColor: "#dbeafe",
+  },
+  btnDragText: { fontSize: 14, color: "#1d4ed8", fontWeight: "700" },
+  dragHint: {
+    fontSize: 12,
+    color: "#4b5563",
+    marginBottom: 10,
+  },
 
   // Ações de entrega
   paradaAcoes: { flexDirection: "row", gap: 8 },
@@ -686,6 +977,25 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalTitulo: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  modalHeaderDetalhes: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  fecharDetalhes: { color: '#dc2626', fontWeight: '700' },
+  detalheLinha: { fontSize: 14, color: '#374151', marginBottom: 6 },
+  detalheLabel: { fontWeight: '700', color: '#111827' },
+  itemVenda: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    backgroundColor: '#f9fafb',
+  },
+  itemVendaNome: { fontSize: 14, fontWeight: '600', color: '#111827' },
+  itemVendaValor: { fontSize: 12, color: '#4b5563', marginTop: 4 },
   modalSubtitulo: {
     marginTop: 4,
     marginBottom: 12,

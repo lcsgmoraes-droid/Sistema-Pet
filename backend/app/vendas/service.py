@@ -474,68 +474,7 @@ class VendaService:
             logger.info(f"✅ ✅ ✅ Venda {numero_venda} criada com sucesso! ✅ ✅ ✅")
             
             # ============================================================
-            # ETAPA 8: CRIAR ROTA DE ENTREGA (SE TEM ENTREGA)
-            # ============================================================
-            
-            # Criar rota de entrega automaticamente se tem_entrega=True
-            rota_id = None
-            if venda.tem_entrega and venda.endereco_entrega:
-                try:
-                    from app.rotas_entrega_models import RotaEntrega
-                    from app.models import Cliente, ConfiguracaoEntrega
-                    
-                    # Buscar entregador padrão
-                    entregador_padrao = db.query(Cliente).filter(
-                        Cliente.tenant_id == tenant_id,
-                        Cliente.entregador_padrao == True,
-                        Cliente.entregador_ativo == True,
-                        Cliente.ativo == True
-                    ).first()
-                    
-                    if entregador_padrao:
-                        # Criar rota de entrega
-                        rota = RotaEntrega(
-                            tenant_id=tenant_id,
-                            venda_id=venda.id,
-                            entregador_id=entregador_padrao.id,
-                            endereco_destino=venda.endereco_entrega,
-                            taxa_entrega_cliente=float(venda.taxa_entrega) if venda.taxa_entrega else 0,
-                            status="pendente",
-                            created_by=user_id,
-                            moto_da_loja=not entregador_padrao.moto_propria  # Se não tem moto, usa da loja
-                        )
-                        rota.numero = f"ROTA-{now_brasilia().strftime('%Y%m%d%H%M%S')}"
-                        
-                        # Buscar configuração de entrega para ponto inicial
-                        config_entrega = db.query(ConfiguracaoEntrega).filter(
-                            ConfiguracaoEntrega.tenant_id == tenant_id
-                        ).first()
-                        
-                        if config_entrega:
-                            ponto_inicial = (
-                                f"{config_entrega.logradouro or ''}"
-                                f"{', ' + config_entrega.numero if config_entrega.numero else ''}"
-                                f"{' - ' + config_entrega.bairro if config_entrega.bairro else ''}"
-                                f"{' - ' + config_entrega.cidade if config_entrega.cidade else ''}"
-                                f"/{config_entrega.estado if config_entrega.estado else ''}"
-                            ).strip()
-                            rota.ponto_inicial_rota = ponto_inicial
-                            rota.ponto_final_rota = ponto_inicial  # Retorna à origem
-                            rota.retorna_origem = True
-                        
-                        db.add(rota)
-                        db.commit()
-                        rota_id = rota.id
-                        logger.info(f"🚚 Rota de entrega criada automaticamente: {rota.numero} (ID={rota_id}, Entregador={entregador_padrao.nome})")
-                    else:
-                        logger.warning(f"⚠️ Venda #{numero_venda} tem entrega mas não há entregador padrão configurado")
-                        
-                except Exception as e:
-                    logger.error(f"⚠️ Erro ao criar rota de entrega automática: {str(e)}", exc_info=True)
-                    db.rollback()  # Rollback apenas da rota (venda já commitada)
-            
-            # ============================================================
-            # ETAPA 9: AUDITORIA
+            # ETAPA 8: AUDITORIA
             # ============================================================
             
             log_action(
@@ -544,7 +483,7 @@ class VendaService:
             )
             
             # ============================================================
-            # ETAPA 10: EMITIR EVENTO DE DOMÍNIO
+            # ETAPA 9: EMITIR EVENTO DE DOMÍNIO
             # ============================================================
             
             # 🔒 EVENTOS DESABILITADOS TEMPORARIAMENTE (publish_event não exportado)

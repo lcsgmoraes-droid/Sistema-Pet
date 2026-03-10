@@ -577,74 +577,11 @@ def atualizar_venda(
                details=f'Venda {venda.numero_venda} atualizada - Total: R$ {totais["total"]:.2f}')
 
     # ============================================================================
-    # 🚚 CRIAR ROTA DE ENTREGA SE NECESSÁRIO (e não existir)
+    # ❌ IMPORTANTE: rota NÃO é criada automaticamente na edição da venda
     # ============================================================================
-    if venda.tem_entrega and venda.endereco_entrega:
-        from app.rotas_entrega_models import RotaEntrega
-        from app.models import Cliente, ConfiguracaoEntrega
-
-        # Verificar se já existe rota para esta venda
-        rota_existente = db.query(RotaEntrega).filter(
-            RotaEntrega.venda_id == venda.id,
-            RotaEntrega.tenant_id == tenant_id
-        ).first()
-
-        if not rota_existente:
-            try:
-                # Buscar entregador padrão
-                entregador_padrao = db.query(Cliente).filter(
-                    Cliente.tenant_id == tenant_id,
-                    Cliente.entregador_padrao == True,
-                    Cliente.entregador_ativo == True,
-                    Cliente.ativo == True
-                ).first()
-
-                if entregador_padrao:
-                    from app.utils.timezone import now_brasilia
-
-                    # Criar rota de entrega
-                    rota = RotaEntrega(
-                        tenant_id=tenant_id,
-                        venda_id=venda.id,
-                        entregador_id=entregador_padrao.id,
-                        endereco_destino=venda.endereco_entrega,
-                        taxa_entrega_cliente=float(venda.taxa_entrega) if venda.taxa_entrega else 0,
-                        status="pendente",
-                        created_by=current_user.id,
-                        moto_da_loja=not entregador_padrao.moto_propria,
-                        created_at=now_brasilia(),
-                        updated_at=now_brasilia()
-                    )
-                    rota.numero = f"ROTA-{now_brasilia().strftime('%Y%m%d%H%M%S')}"
-
-                    # Buscar configuração de entrega para ponto inicial
-                    config_entrega = db.query(ConfiguracaoEntrega).filter(
-                        ConfiguracaoEntrega.tenant_id == tenant_id
-                    ).first()
-
-                    if config_entrega:
-                        ponto_inicial = (
-                            f"{config_entrega.logradouro or ''}"
-                            f"{', ' + config_entrega.numero if config_entrega.numero else ''}"
-                            f"{' - ' + config_entrega.bairro if config_entrega.bairro else ''}"
-                            f"{' - ' + config_entrega.cidade if config_entrega.cidade else ''}"
-                            f"/{config_entrega.estado if config_entrega.estado else ''}"
-                        ).strip()
-                        rota.ponto_inicial_rota = ponto_inicial
-                        rota.ponto_final_rota = ponto_inicial
-                        rota.retorna_origem = True
-
-                    db.add(rota)
-                    db.commit()
-                    logger.info(f"🚚 Rota de entrega criada ao atualizar venda: {rota.numero} (ID={rota.id}, Entregador={entregador_padrao.nome})")
-                else:
-                    logger.warning(f"⚠️ Venda #{venda.numero_venda} atualizada com entrega mas não há entregador padrão configurado")
-
-            except Exception as e:
-                logger.error(f"❌ Erro ao criar rota de entrega ao atualizar venda: {e}")
-                # Não falha a atualização da venda por erro na criação da rota
-        else:
-            logger.info(f"ℹ️ Venda {venda.numero_venda} já possui rota (ID={rota_existente.id}), não criando nova")
+    # A criação da rota deve ocorrer apenas nos fluxos explícitos:
+    # - ERP (Entregas em Aberto -> Criar Rota)
+    # - App do entregador
 
     # ============================================================================
     # ❌ REMOVIDO: Não regenerar comissões no endpoint de edição
