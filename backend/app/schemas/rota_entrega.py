@@ -103,6 +103,7 @@ class RotaEntregaResponse(RotaEntregaBase):
     lat_atual: Optional[Decimal] = None
     lon_atual: Optional[Decimal] = None
     localizacao_atualizada_em: Optional[datetime] = None
+    token_rastreio: Optional[str] = None
 
     # ETAPA 9.3: Incluir paradas ordenadas
     paradas: Optional[List[RotaEntregaParadaResponse]] = []

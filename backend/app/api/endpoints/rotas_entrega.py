@@ -1070,7 +1070,7 @@ def marcar_parada_entregue(
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
-    if rota.status != "em_rota":
+    if rota.status not in ["em_rota", "em_andamento"]:
         raise HTTPException(status_code=400, detail="Rota não está em andamento")
 
     # Validar parada

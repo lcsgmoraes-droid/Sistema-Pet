@@ -224,6 +224,15 @@ export default function RotasEntrega() {
   }
 
   function abrirMapaRota(rota) {
+    if (rota?.token_rastreio) {
+      window.open(
+        `/rastreio/${encodeURIComponent(rota.token_rastreio)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      return;
+    }
+
     const lat = rota?.lat_atual;
     const lon = rota?.lon_atual;
     if (lat && lon) {
@@ -332,7 +341,7 @@ export default function RotasEntrega() {
             📡 Entregas em andamento por entregador
           </h3>
           <p style={{ marginTop: 0, marginBottom: 14, color: "#4d5b52" }}>
-            Acompanhe quem está na rua agora e abra o mapa com 1 clique.
+            Acompanhe quem está na rua agora e abra o rastreio em tempo real com 1 clique.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -411,7 +420,7 @@ export default function RotasEntrega() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          🗺️ Ver rota
+                          📡 Ver rastreio
                         </button>
                       </div>
                     );

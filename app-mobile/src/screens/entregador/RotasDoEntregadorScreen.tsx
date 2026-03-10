@@ -129,11 +129,31 @@ export default function RotasDoEntregadorScreen() {
     const confirmarCriacao = async () => {
       setCriandoRota(true);
       try {
-        await api.post('/ecommerce/entregador/rotas', { venda_ids: selecionadas });
+        const response = await api.post<Rota>('/ecommerce/entregador/rotas', { venda_ids: selecionadas });
+        const novaRota = response.data;
         setSelecionadas([]);
         setAba('rotas');
-        Alert.alert('Sucesso', 'Rota criada com sucesso.');
         await carregar();
+        if (novaRota?.id && novaRota?.numero) {
+          Alert.alert(
+            'Rota criada',
+            'Agora inicie a rota na próxima tela para começar as entregas.',
+            [
+              {
+                text: 'Abrir rota',
+                onPress: () => {
+                  navigation.navigate('DetalheEntrega', {
+                    rotaId: novaRota.id,
+                    numero: novaRota.numero,
+                  });
+                },
+              },
+              { text: 'Depois', style: 'cancel' },
+            ],
+          );
+        } else {
+          Alert.alert('Sucesso', 'Rota criada com sucesso. Abra a rota e toque em "Iniciar Rota".');
+        }
       } catch {
         Alert.alert('Erro', 'Não foi possível criar a rota agora.');
       } finally {
