@@ -4,12 +4,18 @@ import { api } from "../../../services/api";
 export default function EventosFuncionario({ funcionario, onClose }) {
   const [provisoes, setProvisoes] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState(null);
 
   const carregarProvisoes = async () => {
-    const res = await api.get(
-      `/funcionarios/${funcionario.id}/provisoes`
-    );
-    setProvisoes(res.data);
+    try {
+      setErro(null);
+      const res = await api.get(
+        `/funcionarios/${funcionario.id}/provisoes`
+      );
+      setProvisoes(res.data);
+    } catch (error) {
+      setErro(error.response?.data?.detail || "Erro ao carregar provisões do funcionário.");
+    }
   };
 
   useEffect(() => {
@@ -74,7 +80,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
     }
   };
 
-  if (!provisoes) return null;
+  if (!provisoes && !erro) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
@@ -83,6 +89,11 @@ export default function EventosFuncionario({ funcionario, onClose }) {
           Eventos — {funcionario.nome}
         </h3>
 
+        {erro ? (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            {erro}
+          </div>
+        ) : (<>
         {/* Provisões */}
         <div className="mb-4">
           <h4 className="font-semibold mb-2">Provisões</h4>
@@ -116,6 +127,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
             Pagar 2ª Parcela do 13º
           </button>
         </div>
+        </>)}
 
         <div className="mt-4 text-right">
           <button
