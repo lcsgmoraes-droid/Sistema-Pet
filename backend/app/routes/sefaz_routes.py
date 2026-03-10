@@ -56,7 +56,7 @@ class SefazConfigUpdateRequest(BaseModel):
     cnpj: str = ""
     cert_password: Optional[str] = None
     importacao_automatica: bool = False
-    importacao_intervalo_min: int = 15
+    importacao_intervalo_min: int = 60
 
 
 @router.post("/consultar", response_model=ConsultaNFeResponse)
@@ -402,6 +402,7 @@ def sync_now(
             msg_final = resultado["mensagem"]
 
         cfg["ultimo_sync_at"] = now_iso
+        cfg["_proximo_sync_permitido_at"] = now_iso
         cfg["ultimo_sync_status"] = "ok"
         cfg["ultimo_sync_mensagem"] = msg_final
         cfg["ultimo_sync_documentos"] = total_docs
@@ -421,8 +422,306 @@ def sync_now(
         }
     except HTTPException as exc:
         cfg["ultimo_sync_at"] = now_iso
+        cfg["_proximo_sync_permitido_at"] = now_iso
         cfg["ultimo_sync_status"] = "erro"
         cfg["ultimo_sync_mensagem"] = str(exc.detail)
         cfg["ultimo_sync_documentos"] = 0
         SefazTenantConfigService.save_config(tenant_id, cfg)
         raise
+
+
+@router.get("/nsu-status")
+def get_nsu_status(
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """
+    Retorna o ultimo_nsu armazenado e o maxNSU atual da SEFAZ,
+    permitindo ver quantos documentos ainda faltam ser alcançados.
+    """
+    _, tenant_id = auth
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+    status_cfg = SefazService.status_configuracao(cfg)
+
+    ultimo_nsu = cfg.get("ultimo_nsu", "000000000000000")
+
+    max_nsu = None
+    gap_estimado = None
+    erro_consulta = None
+
+    if status_cfg.enabled and cfg.get("modo") == "real" and status_cfg.cert_ok:
+        try:
+            # Faz uma chamada leve com o NSU atual só para capturar o maxNSU
+            resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=ultimo_nsu)
+            max_nsu = resultado.get("max_nsu")
+            novo_nsu = resultado.get("ultimo_nsu", ultimo_nsu)
+
+            # Salva docs se vieram
+            docs_lista = resultado.get("docs_list", [])
+            if docs_lista:
+                from app.notas_entrada_routes import importar_docs_sefaz
+                from app.db import SessionLocal as _SL
+                _db = _SL()
+                try:
+                    importar_docs_sefaz(docs_lista, str(tenant_id), _db)
+                finally:
+                    _db.close()
+                # Atualiza NSU
+                cfg["ultimo_nsu"] = novo_nsu
+                SefazTenantConfigService.save_config(tenant_id, cfg)
+                ultimo_nsu = novo_nsu
+
+            if max_nsu and ultimo_nsu:
+                try:
+                    gap_estimado = int(max_nsu) - int(ultimo_nsu)
+                except ValueError:
+                    gap_estimado = None
+        except Exception as exc:
+            erro_consulta = str(exc)
+
+    return {
+        "ultimo_nsu": ultimo_nsu,
+        "max_nsu_sefaz": max_nsu,
+        "gap_documentos": gap_estimado,
+        "documentos_por_lote": 50,
+        "lotes_restantes": (gap_estimado // 50 + 1) if gap_estimado and gap_estimado > 0 else 0,
+        "atualizado": max_nsu is not None,
+        "erro": erro_consulta,
+    }
+
+
+class ResetNsuRequest(BaseModel):
+    nsu: str = "000000000000000"
+
+
+@router.post("/reset-nsu")
+def reset_nsu(
+    payload: ResetNsuRequest,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """
+    Redefine o ultimo_nsu para o valor informado.
+    Use '000000000000000' para reiniciar do zero (busca todas as NFs disponíveis).
+    Use um valor específico para começar de um ponto determinado.
+    ATENÇÃO: notas já importadas não serão duplicadas pois há verificação por chave de acesso.
+    """
+    nsu = payload.nsu.strip().zfill(15)
+    if not nsu.isdigit() or len(nsu) != 15:
+        raise HTTPException(status_code=422, detail="NSU deve ter 15 dígitos numéricos.")
+
+    _, tenant_id = auth
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+
+    nsu_anterior = cfg.get("ultimo_nsu", "000000000000000")
+    cfg["ultimo_nsu"] = nsu
+    cfg["ultimo_sync_status"] = "nunca"
+    cfg["ultimo_sync_mensagem"] = f"NSU redefinido de {nsu_anterior} para {nsu}. Próxima sincronização buscará a partir deste ponto."
+    SefazTenantConfigService.save_config(tenant_id, cfg)
+
+    return {
+        "ok": True,
+        "nsu_anterior": nsu_anterior,
+        "novo_nsu": nsu,
+        "mensagem": f"NSU redefinido. O próximo ciclo de sincronização buscará documentos a partir do NSU {nsu}.",
+    }
+
+
+@router.post("/sync-diagnostico")
+def sync_diagnostico(
+    max_lotes: int = 5,
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """
+    Busca documentos da SEFAZ em lote (até max_lotes chamadas de 50 docs cada)
+    e retorna diagnóstico detalhado: tipo de cada documento, o que foi importado,
+    pulado (duplicado), descartado (NF de saída) ou ignorado (só resumo resNFe).
+
+    Útil para entender por que poucos documentos foram importados numa sincronização.
+    NÃO avança o ultimo_nsu globalmente — apenas lê e relata.
+    """
+    from datetime import datetime, timezone
+
+    _, tenant_id = auth
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+    status_cfg = SefazService.status_configuracao(cfg)
+
+    if not status_cfg.enabled or cfg.get("modo") != "real":
+        raise HTTPException(
+            status_code=422,
+            detail="SEFAZ precisa estar habilitado e em modo real para executar o diagnóstico.",
+        )
+    if not status_cfg.cert_ok:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Certificado não está válido: {status_cfg.mensagem}",
+        )
+
+    from app.notas_entrada_routes import importar_docs_sefaz
+    from app.services.sefaz_tenant_config_service import SefazTenantConfigService as _Cfg
+
+    tenant_cnpj = "".join(c for c in str(cfg.get("cnpj", "")) if c.isdigit())
+
+    nsu_atual = cfg.get("ultimo_nsu", "000000000000000")
+    lotes_executados = 0
+    relatorio_docs: list[dict] = []
+    total_importadas = 0
+    total_duplicadas = 0
+    total_saidas = 0
+    total_resumos = 0
+    total_erros = 0
+    novo_ultimo_nsu = nsu_atual
+    max_nsu_global = nsu_atual
+
+    for _ in range(max(1, min(max_lotes, 20))):  # Limite de segurança: máx 20 lotes
+        try:
+            resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=nsu_atual)
+        except HTTPException as exc:
+            relatorio_docs.append({
+                "lote": lotes_executados + 1,
+                "erro": str(exc.detail),
+                "nsu_inicio": nsu_atual,
+            })
+            total_erros += 1
+            break
+
+        lotes_executados += 1
+        docs = resultado.get("docs_list", [])
+        novo_ultimo_nsu = resultado.get("ultimo_nsu", nsu_atual)
+        max_nsu_global = resultado.get("max_nsu", novo_ultimo_nsu)
+
+        for doc in docs:
+            nsu = doc.get("nsu", "?")
+            schema = doc.get("schema", "")
+            xml_str = doc.get("xml", "")
+
+            entry: dict = {
+                "nsu": nsu,
+                "schema": schema,
+                "tipo": "",
+                "resultado": "",
+                "chave": None,
+                "fornecedor": None,
+                "numero_nf": None,
+                "valor_total": None,
+            }
+
+            # Resumo apenas (sem XML completo)
+            if "procNFe" not in schema and "nfeProc" not in xml_str[:200]:
+                entry["tipo"] = "resNFe (resumo)"
+                entry["resultado"] = "ignorado — sem XML completo, não é possível importar itens"
+
+                # Tentar extrair info básica do resNFe para ajudar no diagnóstico
+                try:
+                    import xml.etree.ElementTree as _ET
+                    _root = _ET.fromstring(xml_str)
+                    def _txt(tag):
+                        for el in _root.iter():
+                            if el.tag.split("}")[-1] == tag:
+                                return el.text
+                        return None
+                    entry["chave"] = _txt("chNFe")
+                    entry["fornecedor"] = _txt("xNome")
+                    entry["numero_nf"] = _txt("nNF")
+                    v = _txt("vNF")
+                    entry["valor_total"] = float(v) if v else None
+                except Exception:
+                    pass
+
+                total_resumos += 1
+                relatorio_docs.append(entry)
+                continue
+
+            # NF-e completa — tentar parsear
+            try:
+                from app.notas_entrada_routes import parse_nfe_xml
+                dados = parse_nfe_xml(xml_str)
+            except Exception as exc_parse:
+                entry["tipo"] = "procNFe"
+                entry["resultado"] = f"erro_parse — {exc_parse}"
+                total_erros += 1
+                relatorio_docs.append(entry)
+                continue
+
+            entry["tipo"] = "procNFe (completa)"
+            entry["chave"] = dados.get("chave_acesso")
+            entry["fornecedor"] = dados.get("fornecedor_nome")
+            entry["numero_nf"] = dados.get("numero_nota")
+            entry["valor_total"] = dados.get("valor_total")
+
+            # Verificar NF de saída
+            cnpj_emit = "".join(c for c in str(dados.get("fornecedor_cnpj", "")) if c.isdigit())
+            if tenant_cnpj and cnpj_emit == tenant_cnpj:
+                entry["resultado"] = "descartada — NF de saída (emitida pela própria empresa)"
+                total_saidas += 1
+                relatorio_docs.append(entry)
+                continue
+
+            # Verificar duplicata
+            chave = dados.get("chave_acesso", "")
+            if chave:
+                existente = db.query(NotaEntrada).filter(
+                    NotaEntrada.chave_acesso == chave
+                ).first()
+                if existente:
+                    entry["resultado"] = f"duplicada — já existe no sistema (id={existente.id}, status={existente.status})"
+                    total_duplicadas += 1
+                    relatorio_docs.append(entry)
+                    continue
+
+            entry["resultado"] = "importada com sucesso"
+            total_importadas += 1
+            relatorio_docs.append(entry)
+
+        # Importar de verdade os documentos deste lote
+        if docs:
+            try:
+                importar_docs_sefaz(docs, str(tenant_id), db)
+            except Exception as exc_import:
+                relatorio_docs.append({"erro_importacao_lote": str(exc_import)})
+
+        # Avança NSU para próximo lote
+        nsu_atual = novo_ultimo_nsu
+
+        # Se não há mais documentos novos, para
+        if novo_ultimo_nsu >= max_nsu_global or not docs:
+            break
+
+    # Atualiza o ultimo_nsu na config se avançou
+    if novo_ultimo_nsu != cfg.get("ultimo_nsu"):
+        cfg["ultimo_nsu"] = novo_ultimo_nsu
+        cfg["ultimo_sync_at"] = datetime.now(timezone.utc).isoformat()
+        cfg["ultimo_sync_status"] = "ok"
+        cfg["ultimo_sync_mensagem"] = (
+            f"Diagnóstico em lote: {total_importadas} importada(s), "
+            f"{total_duplicadas} duplicada(s), {total_resumos} resumo(s) ignorado(s), "
+            f"{total_saidas} NF(s) de saída descartada(s)."
+        )
+        SefazTenantConfigService.save_config(tenant_id, cfg)
+
+    return {
+        "ok": True,
+        "lotes_executados": lotes_executados,
+        "nsu_inicio": cfg.get("ultimo_nsu", "000000000000000"),
+        "novo_ultimo_nsu": novo_ultimo_nsu,
+        "max_nsu_sefaz": max_nsu_global,
+        "ha_mais_documentos": novo_ultimo_nsu < max_nsu_global,
+        "resumo": {
+            "total_documentos_analisados": len(relatorio_docs),
+            "importadas": total_importadas,
+            "duplicadas": total_duplicadas,
+            "resumos_sem_xml": total_resumos,
+            "nfs_de_saida_descartadas": total_saidas,
+            "erros": total_erros,
+        },
+        "explicacao": (
+            "resNFe = resumo enviado pela SEFAZ sem XML completo. "
+            "O XML completo (procNFe) chega depois, quando o emitente transmite a NF. "
+            "Execute o diagnóstico novamente para buscar os XMLs completos que ainda não chegaram."
+        ),
+        "documentos": relatorio_docs,
+    }

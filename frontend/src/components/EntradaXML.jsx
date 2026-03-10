@@ -84,9 +84,14 @@ const EntradaXML = () => {
   const [salvandoRotina, setSalvandoRotina] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
   const [mensagemRotina, setMensagemRotina] = useState('');
+  const [diagnosticando, setDiagnosticando] = useState(false);
+  const [resultadoDiagnostico, setResultadoDiagnostico] = useState(null);
+  const [nsuStatus, setNsuStatus] = useState(null);
+  const [carregandoNsu, setCarregandoNsu] = useState(false);
+  const [resetandoNsu, setResetandoNsu] = useState(false);
   const [cfgSefaz, setCfgSefaz] = useState({
     enabled: false, modo: 'mock', ambiente: 'homologacao', uf: 'SP', cnpj: '',
-    importacao_automatica: false, importacao_intervalo_min: 15, cert_ok: false,
+    importacao_automatica: false, importacao_intervalo_min: 60, cert_ok: false,
     ultimo_sync_status: 'nunca', ultimo_sync_mensagem: 'Ainda nao sincronizado.',
     ultimo_sync_at: null, ultimo_sync_documentos: 0,
   });
@@ -947,6 +952,49 @@ const EntradaXML = () => {
     }
   };
 
+  const diagnosticarEmLote = async () => {
+    setResultadoDiagnostico(null);
+    setDiagnosticando(true);
+    try {
+      const { data } = await api.post('/sefaz/sync-diagnostico?max_lotes=5');
+      setResultadoDiagnostico(data);
+      await carregarConfigSefaz();
+      await carregarDados();
+    } catch (err) {
+      setResultadoDiagnostico({ erro: err?.response?.data?.detail || 'Erro ao executar diagnostico em lote.' });
+    } finally {
+      setDiagnosticando(false);
+    }
+  };
+
+  const verificarNsuStatus = async () => {
+    setCarregandoNsu(true);
+    try {
+      const { data } = await api.get('/sefaz/nsu-status');
+      setNsuStatus(data);
+      await carregarConfigSefaz();
+    } catch (err) {
+      setNsuStatus({ erro: err?.response?.data?.detail || 'Erro ao consultar NSU.' });
+    } finally {
+      setCarregandoNsu(false);
+    }
+  };
+
+  const resetarNsu = async () => {
+    if (!window.confirm('Isso vai redefinir o ponto de partida da busca para o ZERO (início de tudo). As notas já importadas não serão duplicadas, mas a sincronização vai precisar paginar por todos os documentos históricos da SEFAZ.\n\nConfirma?')) return;
+    setResetandoNsu(true);
+    try {
+      await api.post('/sefaz/reset-nsu', { nsu: '000000000000000' });
+      setNsuStatus(null);
+      setMensagemRotina('NSU zerado. Próxima sincronização vai buscar todos os documentos disponíveis na SEFAZ.');
+      await carregarConfigSefaz();
+    } catch (err) {
+      setMensagemRotina(err?.response?.data?.detail || 'Erro ao resetar NSU.');
+    } finally {
+      setResetandoNsu(false);
+    }
+  };
+
   const consultarSefaz = async (e) => {
     e.preventDefault();
     setErroSefaz('');
@@ -1222,11 +1270,61 @@ const EntradaXML = () => {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                <div>Ultima sincronizacao: <strong>{cfgSefaz.ultimo_sync_at ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR') : '-'}</strong></div>
+                <div>Ultima sincronizacao: <strong>{cfgSefaz.ultimo_sync_at ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'}</strong></div>
                 <div>Status: <strong>{cfgSefaz.ultimo_sync_status}</strong></div>
                 <div>Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong></div>
                 <div>Modo atual: <strong>{cfgSefaz.modo}</strong></div>
                 <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
+              </div>
+
+              {/* Painel de NSU */}
+              <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-white">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-600">Posição na fila SEFAZ (NSU)</span>
+                  <button type="button" onClick={verificarNsuStatus} disabled={carregandoNsu} className="text-xs text-blue-600 hover:underline disabled:opacity-50">
+                    {carregandoNsu ? 'Verificando...' : 'Verificar agora'}
+                  </button>
+                </div>
+                {nsuStatus && !nsuStatus.erro && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="bg-gray-50 rounded p-2">
+                      <div className="font-mono font-bold text-gray-700 truncate">{nsuStatus.ultimo_nsu || '-'}</div>
+                      <div className="text-gray-500">Último NSU buscado</div>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <div className="font-mono font-bold text-gray-700 truncate">{nsuStatus.max_nsu_sefaz || '-'}</div>
+                      <div className="text-gray-500">Máximo na SEFAZ</div>
+                    </div>
+                    <div className={`rounded p-2 ${nsuStatus.gap_documentos > 0 ? 'bg-orange-50' : 'bg-green-50'}`}>
+                      <div className={`font-bold ${nsuStatus.gap_documentos > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                        {nsuStatus.gap_documentos != null ? nsuStatus.gap_documentos.toLocaleString('pt-BR') : '-'}
+                      </div>
+                      <div className="text-gray-500">Documentos pendentes</div>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2">
+                      <div className="font-bold text-purple-600">{nsuStatus.lotes_restantes ?? '-'}</div>
+                      <div className="text-gray-500">Lotes restantes (~50/lote)</div>
+                    </div>
+                  </div>
+                )}
+                {nsuStatus?.erro && (
+                  <p className="text-xs text-red-600">{nsuStatus.erro}</p>
+                )}
+                {!nsuStatus && (
+                  <p className="text-xs text-gray-400">Clique em &quot;Verificar agora&quot; para ver quantos documentos ainda faltam ser buscados.</p>
+                )}
+                {nsuStatus && nsuStatus.gap_documentos > 0 && (
+                  <p className="text-xs text-orange-600 mt-2">
+                    ⚠️ Há aproximadamente {nsuStatus.gap_documentos.toLocaleString('pt-BR')} documentos entre o último NSU buscado e o atual da SEFAZ.
+                    O sistema busca 10 lotes (500 docs) a cada {cfgSefaz.importacao_intervalo_min} minutos automaticamente.
+                  </p>
+                )}
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <button type="button" onClick={resetarNsu} disabled={resetandoNsu} className="text-xs text-red-500 hover:underline disabled:opacity-50">
+                    {resetandoNsu ? 'Resetando...' : 'Reiniciar busca desde o início (zerar NSU)'}
+                  </button>
+                  <span className="text-xs text-gray-400 ml-2">— use se NFs antigas não aparecem no sistema</span>
+                </div>
               </div>
               {mensagemRotina && (
                 <div className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 mb-4">{mensagemRotina}</div>
@@ -1238,7 +1336,81 @@ const EntradaXML = () => {
                 <button type="button" onClick={sincronizarAgoraSefaz} disabled={sincronizando} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60">
                   {sincronizando ? 'Sincronizando...' : 'Sincronizar agora'}
                 </button>
+                <button type="button" onClick={diagnosticarEmLote} disabled={diagnosticando || sincronizando} className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-60">
+                  {diagnosticando ? 'Buscando...' : '🔍 Importar em lote (diagnóstico)'}
+                </button>
               </div>
+              {resultadoDiagnostico && (
+                <div className="mt-4 border border-amber-200 bg-amber-50 rounded-lg p-4 text-sm">
+                  {resultadoDiagnostico.erro ? (
+                    <p className="text-red-600 font-semibold">{resultadoDiagnostico.erro}</p>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start mb-3">
+                        <h3 className="font-bold text-amber-800">Resultado do diagnóstico em lote</h3>
+                        <button onClick={() => setResultadoDiagnostico(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-lg font-bold text-green-600">{resultadoDiagnostico.resumo?.importadas ?? 0}</div>
+                          <div className="text-xs text-gray-500">Importadas agora</div>
+                        </div>
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-lg font-bold text-gray-500">{resultadoDiagnostico.resumo?.duplicadas ?? 0}</div>
+                          <div className="text-xs text-gray-500">Já existiam</div>
+                        </div>
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-lg font-bold text-yellow-600">{resultadoDiagnostico.resumo?.resumos_sem_xml ?? 0}</div>
+                          <div className="text-xs text-gray-500">Resumos (sem XML)</div>
+                        </div>
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-lg font-bold text-blue-600">{resultadoDiagnostico.resumo?.nfs_de_saida_descartadas ?? 0}</div>
+                          <div className="text-xs text-gray-500">NFs de saída</div>
+                        </div>
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-lg font-bold text-red-600">{resultadoDiagnostico.resumo?.erros ?? 0}</div>
+                          <div className="text-xs text-gray-500">Erros</div>
+                        </div>
+                        <div className="bg-white rounded p-2 border text-center">
+                          <div className="text-xs font-semibold text-purple-600">{resultadoDiagnostico.ha_mais_documentos ? '⚠️ Tem mais' : '✅ Atualizado'}</div>
+                          <div className="text-xs text-gray-500">NSU SEFAZ</div>
+                        </div>
+                      </div>
+                      {resultadoDiagnostico.ha_mais_documentos && (
+                        <p className="text-amber-700 text-xs mb-2">⚠️ Ainda há documentos pendentes na SEFAZ. Clique novamente para buscar mais.</p>
+                      )}
+                      <p className="text-xs text-gray-600 mb-3">{resultadoDiagnostico.explicacao}</p>
+                      <details>
+                        <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700">Ver todos os documentos ({resultadoDiagnostico.documentos?.length ?? 0})</summary>
+                        <div className="mt-2 max-h-64 overflow-y-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-gray-100">
+                                <th className="border px-2 py-1 text-left">NSU</th>
+                                <th className="border px-2 py-1 text-left">Tipo</th>
+                                <th className="border px-2 py-1 text-left">Fornecedor</th>
+                                <th className="border px-2 py-1 text-left">NF</th>
+                                <th className="border px-2 py-1 text-left">Resultado</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(resultadoDiagnostico.documentos || []).map((doc, i) => (
+                                <tr key={i} className={doc.resultado?.includes('importada') ? 'bg-green-50' : doc.resultado?.includes('duplicada') ? 'bg-gray-50' : doc.resultado?.includes('resumo') ? 'bg-yellow-50' : 'bg-white'}>
+                                  <td className="border px-2 py-1 font-mono">{doc.nsu ?? '-'}</td>
+                                  <td className="border px-2 py-1">{doc.tipo ?? '-'}</td>
+                                  <td className="border px-2 py-1">{doc.fornecedor ?? '-'}</td>
+                                  <td className="border px-2 py-1">{doc.numero_nf ?? '-'}</td>
+                                  <td className="border px-2 py-1 text-gray-600">{doc.resultado ?? doc.erro ?? '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

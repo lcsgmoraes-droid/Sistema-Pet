@@ -81,7 +81,7 @@ class SefazTenantConfigService:
             "cert_path": "",
             "cert_password": "",
             "importacao_automatica": False,
-            "importacao_intervalo_min": 15,
+            "importacao_intervalo_min": 60,
             "ultimo_nsu": "000000000000000",
         }
 
