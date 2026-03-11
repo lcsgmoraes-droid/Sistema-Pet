@@ -351,6 +351,12 @@ def deletar_subcategoria(
         )
     
     # Sem lançamentos: pode deletar fisicamente
+    # Antes, limpar referências em categorias_financeiras para não violar FK
+    from app.financeiro_models import CategoriaFinanceira
+    db.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.dre_subcategoria_id == subcategoria_id,
+        CategoriaFinanceira.tenant_id == tenant_id
+    ).update({"dre_subcategoria_id": None})
     db.delete(db_subcategoria)
     db.commit()
     
