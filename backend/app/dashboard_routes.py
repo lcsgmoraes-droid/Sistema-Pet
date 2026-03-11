@@ -111,7 +111,8 @@ async def obter_resumo_dashboard(
         # ========================================
         vendas_periodo = db.query(
             func.count(Venda.id).label('quantidade'),
-            func.sum(Venda.total).label('valor_total')
+            func.sum(Venda.total).label('valor_total'),
+            func.sum(Venda.subtotal).label('faturamento_bruto')
         ).filter(
             and_(
                 Venda.tenant_id == tenant_id,
@@ -121,6 +122,7 @@ async def obter_resumo_dashboard(
         
         total_vendas_periodo = vendas_periodo.valor_total or 0
         quantidade_vendas_periodo = vendas_periodo.quantidade or 0
+        faturamento_bruto_periodo = vendas_periodo.faturamento_bruto or 0
         
         # Vendas finalizadas
         vendas_finalizadas = db.query(
@@ -181,6 +183,7 @@ async def obter_resumo_dashboard(
             "vendas_periodo": {
                 "quantidade": quantidade_vendas_periodo,
                 "valor_total": round(total_vendas_periodo, 2),
+                "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
                 "finalizadas": round(vendas_finalizadas, 2),
                 "ticket_medio": round(ticket_medio, 2)
             },

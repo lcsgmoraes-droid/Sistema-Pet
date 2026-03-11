@@ -37,6 +37,7 @@ const DashboardFinanceiro = () => {
     vendas_periodo: {
       quantidade: 0,
       valor_total: 0,
+      faturamento_bruto: 0,
       finalizadas: 0,
       ticket_medio: 0,
     },
@@ -102,6 +103,10 @@ const DashboardFinanceiro = () => {
   useEffect(() => {
     carregarDados();
   }, [periodoDias]);
+
+  const coberturaPE = resumo.fluxo_periodo.saidas > 0
+    ? (resumo.fluxo_periodo.entradas / resumo.fluxo_periodo.saidas) * 100
+    : 100;
 
   if (loading) {
     return (
@@ -206,22 +211,37 @@ const DashboardFinanceiro = () => {
       {/* KPIs — linha 2: valores do período selecionado */}
       <div className="mb-4">
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}</p>
-        <div className="grid grid-cols-3 gap-3">
-          {/* Lucro do período */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Faturamento Bruto */}
           <div
-            onClick={() => navigate("/financeiro/dre")}
-            className={`rounded-xl p-3 text-white cursor-pointer transition-colors ${
-              resumo.fluxo_periodo.lucro >= 0
-                ? "bg-purple-600 hover:bg-purple-700"
-                : "bg-orange-500 hover:bg-orange-600"
-            }`}
+            onClick={() => navigate("/financeiro/relatorio-vendas")}
+            className="bg-purple-600 hover:bg-purple-700 rounded-xl p-3 text-white cursor-pointer transition-colors"
           >
             <div className="flex justify-between items-start mb-2">
               <FileText className="w-4 h-4 opacity-80" />
               <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
             </div>
+            <p className="text-xs opacity-75 mb-0.5">Faturamento Bruto</p>
+            <p className="text-base font-bold leading-tight">
+              {formatarMoeda(resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total)}
+            </p>
+          </div>
+
+          {/* Lucro do Período */}
+          <div
+            onClick={() => navigate("/financeiro/dre")}
+            className={`rounded-xl p-3 text-white cursor-pointer transition-colors ${
+              resumo.fluxo_periodo.lucro >= 0
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-orange-500 hover:bg-orange-600"
+            }`}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <TrendingUp className="w-4 h-4 opacity-80" />
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+            </div>
             <p className="text-xs opacity-75 mb-0.5">
-              {resumo.fluxo_periodo.lucro >= 0 ? "Lucro" : "Prejuízo"}
+              {resumo.fluxo_periodo.lucro >= 0 ? "Lucro do Período" : "Prejuízo"}
             </p>
             <p className="text-base font-bold leading-tight">
               {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
@@ -351,6 +371,76 @@ const DashboardFinanceiro = () => {
         <div id="tour-acoes-rapidas" className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <AlertasIA compacto />
         </div>
+      </div>
+
+      {/* Ponto de Equilíbrio */}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+          📊 Ponto de Equilíbrio — {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="bg-red-50 rounded-xl p-3">
+            <p className="text-xs text-red-600 mb-1">💸 Despesas</p>
+            <p className="text-base font-bold text-red-800">{formatarMoeda(resumo.fluxo_periodo.saidas)}</p>
+            <p className="text-xs text-red-500">pagas no período</p>
+          </div>
+          <div className="bg-emerald-50 rounded-xl p-3">
+            <p className="text-xs text-emerald-600 mb-1">💰 Faturamento</p>
+            <p className="text-base font-bold text-emerald-800">{formatarMoeda(resumo.fluxo_periodo.entradas)}</p>
+            <p className="text-xs text-emerald-500">vendas finalizadas</p>
+          </div>
+          <div className={`rounded-xl p-3 ${coberturaPE >= 100 ? 'bg-green-50' : 'bg-orange-50'}`}>
+            <p className={`text-xs mb-1 ${coberturaPE >= 100 ? 'text-green-600' : 'text-orange-600'}`}>📈 Cobertura</p>
+            <p className={`text-base font-bold ${coberturaPE >= 100 ? 'text-green-800' : 'text-orange-800'}`}>{coberturaPE.toFixed(1)}%</p>
+            <p className={`text-xs ${coberturaPE >= 100 ? 'text-green-500' : 'text-orange-500'}`}>das despesas cobertas</p>
+          </div>
+          <div className={`rounded-xl p-3 ${resumo.fluxo_periodo.lucro >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
+            <p className={`text-xs mb-1 ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+              {resumo.fluxo_periodo.lucro >= 0 ? '✅ Superávit' : '⚠️ Déficit'}
+            </p>
+            <p className={`text-base font-bold ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-800' : 'text-red-800'}`}>
+              {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
+            </p>
+            <p className={`text-xs ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-500' : 'text-red-500'}`}>resultado líquido</p>
+          </div>
+        </div>
+        <div className="mb-1 flex justify-between text-xs text-gray-500">
+          <span>0%</span>
+          <span className={coberturaPE >= 100 ? 'text-green-600 font-semibold' : 'text-orange-500 font-semibold'}>
+            {resumo.fluxo_periodo.saidas > 0
+              ? coberturaPE >= 100
+                ? '✅ Ponto de equilíbrio atingido'
+                : `Faltam ${formatarMoeda(resumo.fluxo_periodo.saidas - resumo.fluxo_periodo.entradas)} para atingir o PE`
+              : 'Sem despesas registradas'
+            }
+          </span>
+          <span>100%</span>
+        </div>
+        <div className="w-full bg-gray-100 rounded-full h-5 overflow-hidden">
+          <div
+            className={`h-5 rounded-full transition-all duration-500 ${
+              coberturaPE >= 100 ? 'bg-green-500' : coberturaPE >= 70 ? 'bg-yellow-400' : 'bg-orange-400'
+            }`}
+            style={{ width: `${Math.min(coberturaPE, 100)}%` }}
+          />
+        </div>
+        {periodoDias > 1 && resumo.fluxo_periodo.entradas > 0 && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
+            <span className="font-semibold">📅 Projeção para 30 dias: </span>
+            Faturamento estimado{' '}
+            <span className="font-semibold text-emerald-700">{formatarMoeda((resumo.fluxo_periodo.entradas / periodoDias) * 30)}</span>
+            {' '}vs. Despesas estimadas{' '}
+            <span className="font-semibold text-red-600">{formatarMoeda((resumo.fluxo_periodo.saidas / periodoDias) * 30)}</span>
+            {resumo.fluxo_periodo.saidas > 0 && (
+              <span className="ml-2 font-semibold text-blue-700">
+                → {coberturaPE >= 100
+                  ? '✅ No lucro'
+                  : `PE no dia ~${Math.ceil(resumo.fluxo_periodo.saidas / (resumo.fluxo_periodo.entradas / periodoDias))}/${periodoDias === 1 ? '' : ' do mês'}`
+                }
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Contas Vencidas */}

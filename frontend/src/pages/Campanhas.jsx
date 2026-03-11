@@ -716,6 +716,11 @@ export default function Campanhas() {
       await api.delete(`/campanhas/${c.id}`);
       setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
     } catch (e) {
+      if (e?.response?.status === 404) {
+        // Campanha já não existe no servidor — remove da lista localmente
+        setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
+        return;
+      }
       alert("Erro ao arquivar: " + (e?.response?.data?.detail || e.message));
     } finally {
       setArquivando(null);
@@ -2583,7 +2588,7 @@ export default function Campanhas() {
             </h2>
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-500">
-                {campanhas.length} campanha(s)
+                {campanhas.filter(c => c.campaign_type !== 'ranking_monthly').length} campanha(s)
               </span>
               <button
                 onClick={() => {
@@ -2607,7 +2612,7 @@ export default function Campanhas() {
             </div>
           ) : (
             <div className="divide-y">
-              {campanhas.map((c) => {
+              {campanhas.filter(c => c.campaign_type !== 'ranking_monthly').map((c) => {
                 const tipo = TIPO_LABELS[c.campaign_type] || {
                   label: c.campaign_type,
                   color: "bg-gray-100 text-gray-700",
@@ -3711,6 +3716,9 @@ export default function Campanhas() {
                         <th className="text-center p-3 border-b">
                           Meses ativos mín.
                         </th>
+                        <th className="text-center p-3 border-b">
+                          Cashback
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3745,6 +3753,12 @@ export default function Campanhas() {
                             {base
                               ? "—"
                               : (rankingConfig?.[`${key}_min_months`] ?? "…")}
+                          </td>
+                          <td className="p-3 text-center text-gray-600">
+                            {(() => {
+                              const cashPct = campanhas.find(c => c.campaign_type === 'cashback')?.params?.[`${key}_percent`];
+                              return cashPct != null ? `${cashPct}%` : '—';
+                            })()}
                           </td>
                         </tr>
                       ))}
@@ -5978,63 +5992,6 @@ export default function Campanhas() {
                         setSchedulerConfig({
                           ...schedulerConfig,
                           inactivity_send_hour: Number(e.target.value),
-                        })
-                      }
-                      className="border rounded-lg px-3 py-2 text-sm"
-                    >
-                      {Array.from({ length: 24 }, (_, i) => (
-                        <option key={i} value={i}>
-                          {String(i).padStart(2, "0")}:00
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card: Ranking Mensal */}
-              <div className="bg-white rounded-xl border shadow-sm p-6">
-                <div className="flex items-center gap-3 mb-5">
-                  <span className="text-2xl">🏆</span>
-                  <div>
-                    <h3 className="font-medium text-gray-800">
-                      Recálculo de Ranking Mensal
-                    </h3>
-                    <p className="text-xs text-gray-500">
-                      Recalcula pontuações e níveis dos clientes uma vez por mês
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-600 w-44">
-                      Dia do mês:
-                    </label>
-                    <select
-                      value={schedulerConfig.ranking_send_day}
-                      onChange={(e) =>
-                        setSchedulerConfig({
-                          ...schedulerConfig,
-                          ranking_send_day: Number(e.target.value),
-                        })
-                      }
-                      className="border rounded-lg px-3 py-2 text-sm"
-                    >
-                      {Array.from({ length: 28 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          Dia {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-600 w-44">Hora:</label>
-                    <select
-                      value={schedulerConfig.ranking_send_hour}
-                      onChange={(e) =>
-                        setSchedulerConfig({
-                          ...schedulerConfig,
-                          ranking_send_hour: Number(e.target.value),
                         })
                       }
                       className="border rounded-lg px-3 py-2 text-sm"

@@ -89,6 +89,21 @@ class QuickRepurchaseHandler:
         if existing_coupon:
             return {"evaluated": 1, "rewarded": 0, "errors": 0}
 
+        # Cooldown: não reenviar cupom se já foi gerado nos últimos 60 dias
+        sixty_days_ago = date.today() - timedelta(days=60)
+        recent_coupon = (
+            db.query(Coupon.id)
+            .filter(
+                Coupon.tenant_id == campaign.tenant_id,
+                Coupon.customer_id == customer_id,
+                Coupon.campaign_id == campaign.id,
+                Coupon.created_at >= sixty_days_ago,
+            )
+            .first()
+        )
+        if recent_coupon:
+            return {"evaluated": 1, "rewarded": 0, "errors": 0}
+
         coupon_type = params.get("coupon_type", "percent")
         coupon_value = float(params.get("coupon_value", 10.0))
         coupon_valid_days = int(params.get("coupon_valid_days", 15))
