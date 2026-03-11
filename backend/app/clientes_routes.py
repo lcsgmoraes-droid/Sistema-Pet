@@ -83,46 +83,20 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
 
 def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tenant_id: int) -> str:
     """
-    Gera cÃ³digo Ãºnico para cliente seguindo o padrÃ£o:
-    - Cliente PF: 1XXX (inicia em 1001)
-    - Cliente PJ: 2XXX (inicia em 2001)
-    - Fornecedor: 3XXX (inicia em 3001)
-    - VeterinÃ¡rio: 4XXX (inicia em 4001)
-    - FuncionÃ¡rio: 5XXX (inicia em 5001)
+    Gera código único e crescente para o cliente neste tenant.
+    Pega o maior código numérico existente (ativo ou inativo) e soma 1.
+    Código nunca é reutilizado mesmo se o cliente for inativado.
     """
-    # Definir prefixo baseado no tipo
-    if tipo_cadastro == 'cliente':
-        prefixo = 1 if tipo_pessoa == 'PF' else 2
-        base = prefixo * 1000 + 1  # 1001 ou 2001
-    elif tipo_cadastro == 'fornecedor':
-        prefixo = 3
-        base = 3001
-    elif tipo_cadastro == 'veterinario':
-        prefixo = 4
-        base = 4001
-    elif tipo_cadastro == 'funcionario':
-        prefixo = 5
-        base = 5001
-    else:
-        # Fallback para tipos nÃ£o mapeados
-        prefixo = 9
-        base = 9001
-    
-    # Buscar cÃ³digos existentes com este prefixo APENAS DESTE TENANT
-    # Inclui inativos para evitar reutilização de códigos
-    codigos_usados = db.query(Cliente.codigo).filter(
+    from sqlalchemy import func as sqlfunc, cast as sqcast, String as SqString
+    from sqlalchemy.dialects.postgresql import BIGINT
+
+    resultado = db.query(sqlfunc.max(sqcast(Cliente.codigo, BIGINT))).filter(
         Cliente.tenant_id == tenant_id,
-        Cliente.codigo.like(f'{prefixo}%'),
-    ).all()
-    
-    codigos_usados_set = {int(c[0]) for c in codigos_usados if c[0] and c[0].isdigit()}
-    
-    # Encontrar prÃ³ximo cÃ³digo disponÃ­vel
-    proximo_codigo = base
-    while proximo_codigo in codigos_usados_set:
-        proximo_codigo += 1
-    
-    return str(proximo_codigo)
+        Cliente.codigo.op('~')('^[0-9]+$'),  # apenas codigos numericos
+    ).scalar()
+
+    proximo = (resultado or 10000) + 1
+    return str(proximo)
 
 
 # Schemas
