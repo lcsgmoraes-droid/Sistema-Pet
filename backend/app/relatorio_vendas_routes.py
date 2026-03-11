@@ -674,7 +674,7 @@ async def obter_relatorio_vendas(
         # Calcular LÍQUIDA, LUCRO e MARGENS da venda (nível venda)
         # Fórmula: líquida = bruta - desconto - entrega - operacional - cartão - comissão - imposto - campanha
         #          lucro   = líquida - custo
-        venda_bruta_val = float(venda.subtotal)
+        venda_bruta_val = float(venda.subtotal) + float(venda.desconto_valor or 0)
         desconto_val = float(venda.desconto_valor or 0)
         taxa_entrega_val = float(venda.taxa_entrega or 0)
         imposto_total = float(venda.total) * (impostos_percentual / 100.0)
@@ -706,7 +706,7 @@ async def obter_relatorio_vendas(
             "numero_venda": venda.numero_venda,
             "data_venda": venda.data_venda.isoformat(),
             "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
-            "venda_bruta": round(float(venda.subtotal), 2),
+            "venda_bruta": round(float(venda.subtotal) + float(venda.desconto_valor or 0), 2),
             "desconto": round(float(venda.desconto_valor or 0), 2),
             "taxa_entrega": round(float(venda.taxa_entrega or 0), 2),
             "taxa_cartao": round(taxa_total, 2),
