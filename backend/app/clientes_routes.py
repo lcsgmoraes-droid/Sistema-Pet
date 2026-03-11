@@ -664,12 +664,12 @@ def list_clientes(
             if termo_numerico:
                 query = query.order_by(
                     case(
-                        (cast(Cliente.id, String) == termo_digitos, 1),
-                        (func.lower(Cliente.codigo) == termo_lower, 2),
+                        (func.lower(Cliente.codigo) == termo_lower, 1),       # codigo exato → prioridade máxima
+                        (cast(Cliente.id, String) == termo_digitos, 2),        # id interno exato
                         (telefone_digitos == termo_digitos, 3),
                         (celular_digitos == termo_digitos, 4),
-                        (cast(Cliente.id, String).ilike(f"{termo_digitos}%"), 5),
-                        (Cliente.codigo.ilike(f"{termo_digitos}%"), 6),
+                        (Cliente.codigo.ilike(f"{termo_digitos}%"), 5),        # codigo começa com o termo
+                        (cast(Cliente.id, String).ilike(f"{termo_digitos}%"), 6),
                         (telefone_digitos.ilike(f"{termo_digitos}%"), 7),
                         (celular_digitos.ilike(f"{termo_digitos}%"), 8),
                         (func.lower(Cliente.nome) == termo_lower, 9),
