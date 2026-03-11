@@ -11,6 +11,7 @@ Routes para gerenciamento de Clientes e Pets
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import case, or_, func, cast, String
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
@@ -584,7 +585,14 @@ def create_cliente(
     )
     
     db.add(novo_cliente)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Código de cliente já em uso. Tente cadastrar novamente."
+        )
     db.refresh(novo_cliente)
     
     # Log de auditoria

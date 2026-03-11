@@ -137,10 +137,13 @@ class AuditLog(BaseTenantModel):
 class Cliente(BaseTenantModel):
     """Cliente (tutor dos pets)"""
     __tablename__ = "clientes"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "codigo", name="uq_clientes_tenant_codigo"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
-    codigo = Column(String(20), nullable=True, index=True)  # Código único do cliente (ex: 9923)
+    codigo = Column(String(20), nullable=True, index=True)  # Código único do cliente por tenant (ex: 9923)
 
     # Tipo de cadastro e pessoa
     tipo_cadastro = Column(String(50), nullable=False, default="cliente", index=True)  # cliente, fornecedor, veterinario
