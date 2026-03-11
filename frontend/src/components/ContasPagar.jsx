@@ -37,6 +37,7 @@ const ContasPagar = () => {
   const [mostrarModalSimilares, setMostrarModalSimilares] = useState(false);
   const [ultimaClassificacao, setUltimaClassificacao] = useState(null);
   const [aplicandoEmLote, setAplicandoEmLote] = useState(false);
+  const [selecionadosLote, setSelecionadosLote] = useState(new Set());
   const [dadosClassificacao, setDadosClassificacao] = useState({
     categoria_id: null,
     dre_subcategoria_id: null,
@@ -211,6 +212,7 @@ const ContasPagar = () => {
       if (similares.length > 0) {
         setUltimaClassificacao({ ...dadosClassificacao });
         setSimilaresParaClassificar(similares);
+        setSelecionadosLote(new Set(similares.map(c => c.id)));
         setMostrarModalSimilares(true);
       } else {
         toast.success('Classificação salva com sucesso');
@@ -225,7 +227,8 @@ const ContasPagar = () => {
     if (!ultimaClassificacao || similaresParaClassificar.length === 0) return;
     setAplicandoEmLote(true);
     let ok = 0;
-    for (const conta of similaresParaClassificar) {
+    const selecionados = similaresParaClassificar.filter(c => selecionadosLote.has(c.id));
+    for (const conta of selecionados) {
       try {
         await api.patch(`/contas-pagar/${conta.id}/classificacao`, ultimaClassificacao);
         ok++;
@@ -1003,9 +1006,22 @@ const ContasPagar = () => {
               <p className="text-gray-700 mb-3">
                 Encontrei <strong>{similaresParaClassificar.length}</strong> lançamento{similaresParaClassificar.length > 1 ? 's' : ''} similar{similaresParaClassificar.length > 1 ? 'es' : ''} ainda sem classificação:
               </p>
-              <ul className="bg-gray-50 rounded p-3 max-h-40 overflow-y-auto text-sm text-gray-600 mb-4 space-y-1">
+              <ul className="bg-gray-50 rounded p-3 max-h-48 overflow-y-auto text-sm text-gray-700 mb-4 space-y-2">
                 {similaresParaClassificar.map(c => (
-                  <li key={c.id} className="truncate">• {c.descricao}</li>
+                  <li key={c.id} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`lote-${c.id}`}
+                      checked={selecionadosLote.has(c.id)}
+                      onChange={(e) => {
+                        const next = new Set(selecionadosLote);
+                        if (e.target.checked) next.add(c.id); else next.delete(c.id);
+                        setSelecionadosLote(next);
+                      }}
+                      className="accent-green-600 w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor={`lote-${c.id}`} className="truncate cursor-pointer">{c.descricao}</label>
+                  </li>
                 ))}
               </ul>
               <p className="text-sm text-gray-500">Deseja aplicar a mesma classificação a todos eles?</p>
@@ -1020,9 +1036,9 @@ const ContasPagar = () => {
               <button
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
                 onClick={aplicarClassificacaoEmLote}
-                disabled={aplicandoEmLote}
+                disabled={aplicandoEmLote || selecionadosLote.size === 0}
               >
-                {aplicandoEmLote ? 'Aplicando...' : `Sim, aplicar a todos (${similaresParaClassificar.length + 1})`}
+                {aplicandoEmLote ? 'Aplicando...' : `Sim, aplicar a selecionados (${selecionadosLote.size + 1})`}
               </button>
             </div>
           </div>

@@ -489,11 +489,34 @@ def sync_diagnostico(
     NÃO avança o ultimo_nsu globalmente — apenas lê e relata.
     """
     from datetime import datetime, timezone
+    import time as _time
 
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
     status_cfg = SefazService.status_configuracao(cfg)
+
+    # Bloquear se em penalidade 656
+    now_dt = datetime.now(timezone.utc)
+    proximo_str = cfg.get("_proximo_sync_permitido_at")
+    if proximo_str and cfg.get("_sync_bloqueado_656"):
+        try:
+            proximo_dt = datetime.fromisoformat(proximo_str)
+            if proximo_dt.tzinfo is None:
+                proximo_dt = proximo_dt.replace(tzinfo=timezone.utc)
+            if now_dt < proximo_dt:
+                faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"SEFAZ em cooldown por bloqueio (cStat 656). "
+                        f"Aguarde ~{faltam} minuto(s) antes de executar o diagnóstico."
+                    ),
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     if not status_cfg.enabled or cfg.get("modo") != "real":
         raise HTTPException(
@@ -635,6 +658,9 @@ def sync_diagnostico(
         # Se não há mais documentos novos, para
         if novo_ultimo_nsu >= max_nsu_global or not docs:
             break
+
+        # Pausa entre lotes para evitar bloqueio 656 da SEFAZ
+        _time.sleep(15)
 
     # Atualiza o ultimo_nsu na config se avançou
     if novo_ultimo_nsu != cfg.get("ultimo_nsu"):
