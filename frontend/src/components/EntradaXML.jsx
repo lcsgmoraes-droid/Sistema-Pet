@@ -1266,55 +1266,6 @@ const EntradaXML = () => {
                 <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
               </div>
 
-              {/* Painel de NSU */}
-              <div className="mb-4 border border-gray-200 rounded-lg p-3 bg-white">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-600">Posição na fila SEFAZ (NSU)</span>
-                  <button type="button" onClick={verificarNsuStatus} disabled={carregandoNsu} className="text-xs text-blue-600 hover:underline disabled:opacity-50">
-                    {carregandoNsu ? 'Verificando...' : 'Verificar agora'}
-                  </button>
-                </div>
-                {nsuStatus && !nsuStatus.erro && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="font-mono font-bold text-gray-700 truncate">{nsuStatus.ultimo_nsu || '-'}</div>
-                      <div className="text-gray-500">Último NSU buscado</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="font-mono font-bold text-gray-700 truncate">{nsuStatus.max_nsu_sefaz || '-'}</div>
-                      <div className="text-gray-500">Máximo na SEFAZ</div>
-                    </div>
-                    <div className={`rounded p-2 ${nsuStatus.gap_documentos > 0 ? 'bg-orange-50' : 'bg-green-50'}`}>
-                      <div className={`font-bold ${nsuStatus.gap_documentos > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                        {nsuStatus.gap_documentos != null ? nsuStatus.gap_documentos.toLocaleString('pt-BR') : '-'}
-                      </div>
-                      <div className="text-gray-500">Documentos pendentes</div>
-                    </div>
-                    <div className="bg-gray-50 rounded p-2">
-                      <div className="font-bold text-purple-600">{nsuStatus.lotes_restantes ?? '-'}</div>
-                      <div className="text-gray-500">Lotes restantes (~50/lote)</div>
-                    </div>
-                  </div>
-                )}
-                {nsuStatus?.erro && (
-                  <p className="text-xs text-red-600">{nsuStatus.erro}</p>
-                )}
-                {!nsuStatus && (
-                  <p className="text-xs text-gray-400">Clique em &quot;Verificar agora&quot; para ver quantos documentos ainda faltam ser buscados.</p>
-                )}
-                {nsuStatus && nsuStatus.gap_documentos > 0 && (
-                  <p className="text-xs text-orange-600 mt-2">
-                    ⚠️ Há aproximadamente {nsuStatus.gap_documentos.toLocaleString('pt-BR')} documentos entre o último NSU buscado e o atual da SEFAZ.
-                    O sistema busca 10 lotes (500 docs) a cada {cfgSefaz.importacao_intervalo_min} minutos automaticamente.
-                  </p>
-                )}
-                <div className="mt-2 pt-2 border-t border-gray-100">
-                  <button type="button" onClick={resetarNsu} disabled={resetandoNsu} className="text-xs text-red-500 hover:underline disabled:opacity-50">
-                    {resetandoNsu ? 'Resetando...' : 'Reiniciar busca desde o início (zerar NSU)'}
-                  </button>
-                  <span className="text-xs text-gray-400 ml-2">— use se NFs antigas não aparecem no sistema</span>
-                </div>
-              </div>
               {mensagemRotina && (
                 <div className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 mb-4">{mensagemRotina}</div>
               )}
