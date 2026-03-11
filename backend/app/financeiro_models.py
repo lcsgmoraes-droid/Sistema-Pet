@@ -33,6 +33,7 @@ class CategoriaFinanceira(BaseTenantModel):
         ForeignKey("dre_subcategorias.id"),
         nullable=True
     )
+    tipo_custo = Column(String(10), nullable=True)  # 'fixo', 'variavel', 'ambos'
     
     # Auditoria
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
@@ -101,6 +102,25 @@ class FormaPagamento(BaseTenantModel):
     recebimentos = relationship("Recebimento", back_populates="forma_pagamento")
 
 
+class TipoDespesa(BaseTenantModel):
+    """
+    Tipo de despesa — define se é FIXA ou VARIÁVEL.
+    Exemplos: Aluguel (fixo), Salários (fixo), Fornecedor Produto (variável), Impostos (fixo).
+    """
+    __tablename__ = "tipo_despesas"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(100), nullable=False)
+    e_custo_fixo = Column(Boolean, nullable=False, default=True)  # True = Fixo, False = Variável
+    ativo = Column(Boolean, default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    contas = relationship("ContaPagar", back_populates="tipo_despesa")
+
+
 class ContaPagar(BaseTenantModel):
     """Contas a pagar (despesas)"""
     __tablename__ = "contas_pagar"
@@ -110,6 +130,7 @@ class ContaPagar(BaseTenantModel):
     descricao = Column(String(255), nullable=False)
     fornecedor_id = Column(Integer, ForeignKey('clientes.id'))
     categoria_id = Column(Integer, ForeignKey('categorias_financeiras.id'))  # UX/Agrupamento
+    tipo_despesa_id = Column(Integer, ForeignKey('tipo_despesas.id'), nullable=True, index=True)
     
     # ============================
     # VINCULO COM DRE (OBRIGATORIO)
@@ -178,6 +199,7 @@ class ContaPagar(BaseTenantModel):
     # Relationships
     fornecedor = relationship("Cliente", foreign_keys=[fornecedor_id])
     categoria = relationship("CategoriaFinanceira", back_populates="contas_pagar")
+    tipo_despesa = relationship("TipoDespesa", back_populates="contas")
     pagamentos = relationship("Pagamento", back_populates="conta", cascade="all, delete-orphan")
     parcelas = relationship("ContaPagar", backref="conta_principal", remote_side=[id], foreign_keys=[conta_principal_id])
 

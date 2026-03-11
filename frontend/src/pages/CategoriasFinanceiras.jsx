@@ -88,6 +88,7 @@ const CategoriasFinanceiras = () => {
     icone: '•',
     descricao: '',
     ativo: true,
+    tipo_custo: null,
     novasSubcategorias: []
   });
 
@@ -186,7 +187,8 @@ const CategoriasFinanceiras = () => {
           cor: formData.cor,
           icone: formData.icone,
           descricao: formData.descricao,
-          ativo: formData.ativo
+          ativo: formData.ativo,
+          tipo_custo: formData.tipo_custo
         });
         categoriaId = editando;
         toast.success('Categoria atualizada com sucesso!');
@@ -197,7 +199,8 @@ const CategoriasFinanceiras = () => {
           cor: formData.cor,
           icone: formData.icone,
           descricao: formData.descricao,
-          ativo: formData.ativo
+          ativo: formData.ativo,
+          tipo_custo: formData.tipo_custo
         });
         categoriaId = response.data.id;
         toast.success('Categoria criada com sucesso!');
@@ -254,6 +257,7 @@ const CategoriasFinanceiras = () => {
       icone: normalizeIcon(categoria.icone),
       descricao: normalizeDisplayText(categoria.descricao || ''),
       ativo: categoria.ativo,
+      tipo_custo: categoria.tipo_custo || null,
       novasSubcategorias: subsExistentes
     });
     setEditando(categoria.id);
@@ -281,6 +285,7 @@ const CategoriasFinanceiras = () => {
       icone: '•',
       descricao: '',
       ativo: true,
+      tipo_custo: null,
       novasSubcategorias: []
     });
     setEditando(null);
@@ -494,6 +499,18 @@ const CategoriasFinanceiras = () => {
                           {cat.tipo === 'receita' ? 'Receita' : 'Despesa'}
                         </span>
                         
+                        {/* Badge Fixo/Variável */}
+                        {cat.tipo === 'despesa' && cat.tipo_custo && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            cat.tipo_custo === 'fixo' ? 'bg-orange-100 text-orange-700' :
+                            cat.tipo_custo === 'variavel' ? 'bg-blue-100 text-blue-700' :
+                            'bg-purple-100 text-purple-700'
+                          }`}>
+                            {cat.tipo_custo === 'fixo' ? '🔒 Fixo' :
+                             cat.tipo_custo === 'variavel' ? '📈 Variável' : '↕ Ambos'}
+                          </span>
+                        )}
+                        
                         {temSubcategoria && (
                           <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center gap-1">
                             <span>DRE</span>
@@ -611,7 +628,7 @@ const CategoriasFinanceiras = () => {
                 </label>
                 <select
                   value={formData.tipo}
-                  onChange={(e) => setFormData({...formData, tipo: e.target.value})}
+                  onChange={(e) => setFormData({...formData, tipo: e.target.value, tipo_custo: e.target.value === 'receita' ? null : formData.tipo_custo})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   required
                 >
@@ -619,6 +636,45 @@ const CategoriasFinanceiras = () => {
                   <option value="receita">Receita</option>
                 </select>
               </div>
+
+              {/* Classificação Fixo/Variável — apenas para despesas */}
+              {formData.tipo === 'despesa' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    💰 Classificação de Custo
+                  </label>
+                  <div className="flex gap-2">
+                    {[
+                      { value: 'fixo', label: '🔒 Fixo', desc: 'Valor fixo todo mês', activeClass: 'bg-orange-500 text-white border-orange-500' },
+                      { value: 'variavel', label: '📈 Variável', desc: 'Varia com as vendas', activeClass: 'bg-blue-500 text-white border-blue-500' },
+                      { value: 'ambos', label: '↕ Ambos', desc: 'Cada subcategoria define', activeClass: 'bg-purple-500 text-white border-purple-500' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData({...formData, tipo_custo: formData.tipo_custo === opt.value ? null : opt.value})}
+                        className={`flex-1 px-2 py-2 rounded-lg border-2 text-sm font-medium transition-colors ${
+                          formData.tipo_custo === opt.value
+                            ? opt.activeClass
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                        }`}
+                        title={opt.desc}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {formData.tipo_custo === 'ambos' && (
+                    <p className="text-xs text-purple-600 mt-1">↕ As subcategorias desta categoria terão classificação individual</p>
+                  )}
+                  {formData.tipo_custo === 'fixo' && editando && (
+                    <p className="text-xs text-orange-600 mt-1">🔒 Ao salvar, todas as subcategorias serão classificadas como Fixo</p>
+                  )}
+                  {formData.tipo_custo === 'variavel' && editando && (
+                    <p className="text-xs text-blue-600 mt-1">📈 Ao salvar, todas as subcategorias serão classificadas como Variável</p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

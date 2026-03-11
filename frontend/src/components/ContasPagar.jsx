@@ -16,7 +16,8 @@ const ContasPagar = () => {
     data_fim: '',
     apenas_vencidas: false,
     apenas_vencer: false,
-    numero_nf: ''
+    numero_nf: '',
+    tipo_custo: 'todos'
   });
   
   const [fornecedores, setFornecedores] = useState([]);
@@ -108,6 +109,7 @@ const ContasPagar = () => {
       if (filtros.apenas_vencidas) params.append('apenas_vencidas', 'true');
       if (filtros.apenas_vencer) params.append('apenas_vencer', 'true');
       if (filtros.numero_nf) params.append('numero_nf', filtros.numero_nf);
+      if (filtros.tipo_custo !== 'todos') params.append('tipo_custo', filtros.tipo_custo);
       
       const response = await api.get(`/contas-pagar/?${params}`);
       
@@ -306,6 +308,19 @@ const ContasPagar = () => {
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-1">💰 Tipo de Custo</label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2"
+              value={filtros.tipo_custo}
+              onChange={(e) => setFiltros({...filtros, tipo_custo: e.target.value})}
+            >
+              <option value="todos">Todos</option>
+              <option value="fixo">🔒 Só Fixos</option>
+              <option value="variavel">📈 Só Variáveis</option>
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-1">Data Início</label>
             <input
               type="date"
@@ -388,6 +403,12 @@ const ContasPagar = () => {
                         <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
                           {conta.numero_parcela}/{conta.total_parcelas}
                         </span>
+                      )}
+                      {conta.e_custo_fixo === true && (
+                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">🔒 Fixo</span>
+                      )}
+                      {conta.e_custo_fixo === false && (
+                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">📈 Variável</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">{conta.fornecedor_nome || '-'}</td>

@@ -49,6 +49,7 @@ from app.bling_sync_routes import router as bling_sync_router
 from app.pedidos_compra_routes import router as pedidos_compra_router
 from app.notas_entrada_routes import router as notas_entrada_router
 from app.contas_pagar_routes import router as contas_pagar_router
+from app.tipo_despesa_routes import router as tipo_despesa_router
 from app.contas_receber_routes import router as contas_receber_router
 from app.conciliacao_cartao_routes import router as conciliacao_cartao_router
 from app.conciliacao_routes import router as conciliacao_router
@@ -836,6 +837,7 @@ app.include_router(bling_sync_router, tags=["Sincronização Bling"])
 app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"])
 app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"])
 app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"])
+app.include_router(tipo_despesa_router, tags=["Cadastros - Tipo de Despesa"])
 app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"])
 app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"])
 app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"])

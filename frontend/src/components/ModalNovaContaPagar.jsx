@@ -352,6 +352,20 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
                     <Plus size={16} /> Adicionar
                   </button>
                 </div>
+                {/* Badge automático de Fixo/Variável da categoria selecionada */}
+                {dados.categoria_id && (() => {
+                  const cat = categorias.find(c => c.id === dados.categoria_id);
+                  if (!cat || !cat.tipo_custo) return null;
+                  return (
+                    <p className={`text-xs font-semibold mt-1 ${
+                      cat.tipo_custo === 'fixo' ? 'text-orange-600' :
+                      cat.tipo_custo === 'variavel' ? 'text-blue-600' : 'text-purple-600'
+                    }`}>
+                      {cat.tipo_custo === 'fixo' ? '🔒 Despesa Fixa' :
+                       cat.tipo_custo === 'variavel' ? '📈 Despesa Variável' : '↕ Custo Misto (Fixo + Variável)'}
+                    </p>
+                  );
+                })()}
               </div>
 
               <div>

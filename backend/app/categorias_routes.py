@@ -27,6 +27,7 @@ class CategoriaFinanceiraCreate(BaseModel):
     descricao: Optional[str] = None
     categoria_pai_id: Optional[int] = None
     ativo: bool = True
+    tipo_custo: Optional[str] = None  # 'fixo', 'variavel', 'ambos'
 
 
 class CategoriaFinanceiraUpdate(BaseModel):
@@ -37,6 +38,7 @@ class CategoriaFinanceiraUpdate(BaseModel):
     descricao: Optional[str] = None
     categoria_pai_id: Optional[int] = None
     ativo: Optional[bool] = None
+    tipo_custo: Optional[str] = None  # 'fixo', 'variavel', 'ambos'
 
 
 class CategoriaFinanceiraResponse(BaseModel):
@@ -48,6 +50,7 @@ class CategoriaFinanceiraResponse(BaseModel):
     descricao: Optional[str] = None
     categoria_pai_id: Optional[int] = None
     dre_subcategoria_id: Optional[int] = None  # Campo DRE
+    tipo_custo: Optional[str] = None  # 'fixo', 'variavel', 'ambos'
     ativo: bool
     
     # Informações adicionais
@@ -105,6 +108,7 @@ def categoria_para_response(categoria: CategoriaFinanceira, db: Session) -> Cate
         descricao=categoria.descricao,
         categoria_pai_id=categoria.categoria_pai_id,
         dre_subcategoria_id=categoria.dre_subcategoria_id,  # Incluir DRE
+        tipo_custo=categoria.tipo_custo,
         ativo=categoria.ativo,
         nivel=calcular_nivel_categoria(categoria, db),
         caminho_completo=obter_caminho_completo(categoria, db),
@@ -311,6 +315,15 @@ def atualizar_categoria(
     
     for key, value in update_data.items():
         setattr(categoria, key, value)
+    
+    # Propagar tipo_custo 'fixo'/'variavel' para filhos diretos
+    if 'tipo_custo' in update_data and update_data['tipo_custo'] in ('fixo', 'variavel'):
+        filhos = db.query(CategoriaFinanceira).filter(
+            CategoriaFinanceira.categoria_pai_id == categoria_id,
+            CategoriaFinanceira.user_id == current_user.id
+        ).all()
+        for filho in filhos:
+            filho.tipo_custo = update_data['tipo_custo']
     
     # Validar vínculo com DRE se foi alterado
     if 'dre_subcategoria_id' in update_data:

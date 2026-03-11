@@ -46,6 +46,7 @@ class ContaPagarCreate(BaseModel):
     # ============================
     dre_subcategoria_id: Optional[int] = None  # Será atribuído padrão 2 se não fornecido
     canal: str = 'loja_fisica'  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
+    tipo_despesa_id: Optional[int] = None  # FK para TipoDespesa (fixo/variável)
     
     valor_original: float
     data_emissao: date
@@ -70,6 +71,7 @@ class ContaPagarCreate(BaseModel):
 class ContaPagarUpdate(BaseModel):
     descricao: Optional[str] = None
     categoria_id: Optional[int] = None
+    tipo_despesa_id: Optional[int] = None
     valor_original: Optional[float] = None
     data_vencimento: Optional[date] = None
     observacoes: Optional[str] = None
@@ -106,6 +108,9 @@ class ContaPagarResponse(BaseModel):
     nfe_numero: Optional[str] = None
     observacoes: Optional[str] = None
     nota_entrada_id: Optional[int] = None
+    tipo_despesa_id: Optional[int] = None
+    tipo_despesa_nome: Optional[str] = None
+    e_custo_fixo: Optional[bool] = None
     
     model_config = {"from_attributes": True}
 
@@ -258,6 +263,7 @@ async def criar_conta_pagar(
                 categoria_id=conta.categoria_id,
                 dre_subcategoria_id=conta.dre_subcategoria_id,
                 canal=conta.canal,
+                tipo_despesa_id=conta.tipo_despesa_id,
                 valor_original=conta.valor_original,
                 valor_final=conta.valor_original,
                 data_emissao=conta.data_emissao,
@@ -460,6 +466,7 @@ def listar_contas_pagar(
     status: Optional[str] = Query(None),
     fornecedor_id: Optional[int] = Query(None),
     categoria_id: Optional[int] = Query(None),
+    tipo_custo: Optional[str] = Query(None),  # 'fixo', 'variavel'
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
@@ -490,6 +497,11 @@ def listar_contas_pagar(
         query = query.filter(ContaPagar.data_vencimento <= data_fim)
     if numero_nf:
         query = query.filter(ContaPagar.nfe_numero.ilike(f'%{numero_nf}%'))
+    if tipo_custo in ('fixo', 'variavel'):
+        from .financeiro_models import CategoriaFinanceira as CF
+        query = query.join(CF, ContaPagar.categoria_id == CF.id, isouter=True).filter(
+            CF.tipo_custo == tipo_custo
+        )
     if apenas_vencidas:
         query = query.filter(
             and_(
@@ -547,7 +559,13 @@ def listar_contas_pagar(
             "documento": conta.documento,
             "nfe_numero": conta.nfe_numero,
             "observacoes": conta.observacoes,
-            "nota_entrada_id": conta.nota_entrada_id
+            "nota_entrada_id": conta.nota_entrada_id,
+            "tipo_despesa_id": None,
+            "tipo_despesa_nome": None,
+            "e_custo_fixo": (
+                conta.categoria.tipo_custo == 'fixo' if conta.categoria and conta.categoria.tipo_custo in ('fixo', 'variavel')
+                else None
+            ),
         }
         resultado.append(item)
     
