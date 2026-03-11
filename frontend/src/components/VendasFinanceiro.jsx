@@ -35,7 +35,7 @@ import {
 import * as XLSX from "xlsx";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
-import HistoricoVendasClienteTab from "../pages/financeiro/HistoricoVendasClienteTab";
+import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 
 export default function VendasFinanceiro() {
   const { user } = useAuth();
