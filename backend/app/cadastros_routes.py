@@ -28,14 +28,25 @@ def ensure_especies_racas_tables_exist(db: Session) -> None:
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS especie_id INTEGER"))
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS tenant_id UUID"))
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
-    db.execute(text("""
-        UPDATE racas r
-        SET especie_id = e.id
-        FROM especies e
-        WHERE r.especie_id IS NULL
-          AND COALESCE(r.especie, '') <> ''
-          AND lower(trim(r.especie)) = lower(trim(e.nome))
-    """))
+    coluna_legada_especie = db.execute(text("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'racas'
+              AND column_name = 'especie'
+        )
+    """)).scalar()
+
+    # Migração de compatibilidade apenas quando a coluna textual legada existe.
+    if bool(coluna_legada_especie):
+        db.execute(text("""
+            UPDATE racas r
+            SET especie_id = e.id
+            FROM especies e
+            WHERE r.especie_id IS NULL
+              AND COALESCE(r.especie, '') <> ''
+              AND lower(trim(r.especie)) = lower(trim(e.nome))
+        """))
     db.execute(text("""
         UPDATE racas r
         SET tenant_id = e.tenant_id
