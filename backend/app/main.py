@@ -372,16 +372,23 @@ def _loop_sefaz_sync():
                                 continue
 
                             intervalo_min = int(cfg.get("importacao_intervalo_min", 15))
-                            # Usa _proximo_sync_permitido_at para controle de penalidade/intervalo
-                            # (pode ser futuro em caso de cStat 656); cai de volta em ultimo_sync_at se não existir
-                            marcador_intervalo = cfg.get("_proximo_sync_permitido_at") or cfg.get("ultimo_sync_at")
-                            if marcador_intervalo:
-                                marcador_dt = _dt.fromisoformat(marcador_intervalo)
-                                agora = _dt.now(_tz.utc)
-                                if marcador_dt.tzinfo is None:
-                                    marcador_dt = marcador_dt.replace(tzinfo=_tz.utc)
-                                minutos_desde_ultimo = (agora - marcador_dt).total_seconds() / 60
-                                if minutos_desde_ultimo < intervalo_min:
+                            agora = _dt.now(_tz.utc)
+                            # Verificação 1: penalidade por cStat 656 — _proximo_sync_permitido_at indica
+                            # um horário ABSOLUTO no futuro até o qual nenhuma chamada deve ser feita.
+                            proximo_permitido_str = cfg.get("_proximo_sync_permitido_at")
+                            if proximo_permitido_str:
+                                proximo_dt = _dt.fromisoformat(proximo_permitido_str)
+                                if proximo_dt.tzinfo is None:
+                                    proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
+                                if proximo_dt > agora:
+                                    continue  # ainda em penalidade/cooldown — não chamar SEFAZ
+                            # Verificação 2: intervalo normal entre execuções — usa ultimo_sync_at
+                            ultimo_str = cfg.get("ultimo_sync_at")
+                            if ultimo_str:
+                                ultimo_dt = _dt.fromisoformat(ultimo_str)
+                                if ultimo_dt.tzinfo is None:
+                                    ultimo_dt = ultimo_dt.replace(tzinfo=_tz.utc)
+                                if (agora - ultimo_dt).total_seconds() / 60 < intervalo_min:
                                     continue
 
                             tenant_id_str = tenant_dir.name
@@ -479,10 +486,9 @@ def _loop_sefaz_sync():
                                     penalidade_min = 70
                                     agora_pen = _dt.now(_tz.utc)
                                     from datetime import timedelta as _td
-                                    intervalo_cfg = int(cfg_pen.get("importacao_intervalo_min", 15))
-                                    # _proximo_sync_permitido_at é o campo INTERNO do scheduler (pode ser futuro)
-                                    # ultimo_sync_at guarda o horário REAL da última tentativa — exibido na UI
-                                    proximo_permitido = agora_pen + _td(minutes=penalidade_min - intervalo_cfg)
+                                    # _proximo_sync_permitido_at = horário absoluto até o qual o scheduler
+                                    # NÃO deve chamar a SEFAZ (penalidade pura, sem subtrair intervalo)
+                                    proximo_permitido = agora_pen + _td(minutes=penalidade_min)
                                     cfg_pen["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
                                     cfg_pen["ultimo_sync_at"] = agora_pen.isoformat()  # horário real
                                     cfg_pen["ultimo_sync_status"] = "erro_656"
