@@ -44,7 +44,7 @@ class DRECategoria(BaseTenantModel):
 
     nome = Column(String(100), nullable=False)
     ordem = Column(Integer, default=0)
-    natureza = Column(Enum(NaturezaDRE), nullable=False)
+    natureza = Column(Enum(NaturezaDRE, values_callable=lambda x: [e.value for e in x]), nullable=False)
     ativo = Column(Boolean, default=True)
 
     subcategorias = relationship(
@@ -71,9 +71,9 @@ class DRESubcategoria(BaseTenantModel):
     nome = Column(String(150), nullable=False)
 
     # Comportamento
-    tipo_custo = Column(Enum(TipoCusto), nullable=False)
-    base_rateio = Column(Enum(BaseRateio), nullable=True)
-    escopo_rateio = Column(Enum(EscopoRateio), nullable=False)
+    tipo_custo = Column(Enum(TipoCusto, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    base_rateio = Column(Enum(BaseRateio, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    escopo_rateio = Column(Enum(EscopoRateio, values_callable=lambda x: [e.value for e in x]), nullable=False)
 
     ativo = Column(Boolean, default=True)
     custo_pe = Column(String(10), nullable=True)  # 'fixo' | 'variavel' | null (para Ponto de Equilíbrio)
