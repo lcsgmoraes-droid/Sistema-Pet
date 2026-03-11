@@ -625,7 +625,6 @@ def list_clientes(
                 like = f"%{palavra}%"
                 palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())
                 filtros = [
-                    cast(Cliente.id, String).ilike(like),
                     Cliente.codigo.ilike(like),
                     Cliente.nome.ilike(like),
                     Cliente.nome_fantasia.ilike(like),
@@ -657,26 +656,23 @@ def list_clientes(
         # Contar total (ANTES do offset/limit)
         total = query.count()
         
-        # Ordenação inteligente: quando busca for numérica, prioriza ID/código;
-        # depois aplica nome/fantasia/razão social.
+        # Ordenação inteligente por campos visíveis ao usuário (id interno ignorado).
         if termo_busca:
             termo_lower = termo_busca.lower()
             if termo_numerico:
                 query = query.order_by(
                     case(
-                        (func.lower(Cliente.codigo) == termo_lower, 1),       # codigo exato → prioridade máxima
-                        (cast(Cliente.id, String) == termo_digitos, 2),        # id interno exato
-                        (telefone_digitos == termo_digitos, 3),
-                        (celular_digitos == termo_digitos, 4),
-                        (Cliente.codigo.ilike(f"{termo_digitos}%"), 5),        # codigo começa com o termo
-                        (cast(Cliente.id, String).ilike(f"{termo_digitos}%"), 6),
-                        (telefone_digitos.ilike(f"{termo_digitos}%"), 7),
-                        (celular_digitos.ilike(f"{termo_digitos}%"), 8),
-                        (func.lower(Cliente.nome) == termo_lower, 9),
-                        (Cliente.nome.ilike(f"{termo_busca}%"), 10),
-                        (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 11),
-                        (Cliente.razao_social.ilike(f"{termo_busca}%"), 12),
-                        else_=13,
+                        (func.lower(Cliente.codigo) == termo_lower, 1),   # codigo exato
+                        (telefone_digitos == termo_digitos, 2),            # telefone exato
+                        (celular_digitos == termo_digitos, 3),             # celular exato
+                        (Cliente.codigo.ilike(f"{termo_digitos}%"), 4),   # codigo começa com
+                        (telefone_digitos.ilike(f"{termo_digitos}%"), 5),
+                        (celular_digitos.ilike(f"{termo_digitos}%"), 6),
+                        (func.lower(Cliente.nome) == termo_lower, 7),
+                        (Cliente.nome.ilike(f"{termo_busca}%"), 8),
+                        (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 9),
+                        (Cliente.razao_social.ilike(f"{termo_busca}%"), 10),
+                        else_=11,
                     ),
                     Cliente.nome
                 )
