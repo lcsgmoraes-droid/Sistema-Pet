@@ -18,6 +18,7 @@ from .idempotency import idempotent  # ← IDEMPOTÊNCIA
 from .models import User, Cliente
 from .financeiro_models import (
     ContaPagar, Pagamento, CategoriaFinanceira, FormaPagamento, LancamentoManual,
+    TipoDespesa,
     MovimentacaoFinanceira, ContaBancaria
 )
 from .produtos_models import NotaEntrada
@@ -71,10 +72,19 @@ class ContaPagarCreate(BaseModel):
 class ContaPagarUpdate(BaseModel):
     descricao: Optional[str] = None
     categoria_id: Optional[int] = None
+    dre_subcategoria_id: Optional[int] = None
     tipo_despesa_id: Optional[int] = None
+    canal: Optional[str] = None
     valor_original: Optional[float] = None
     data_vencimento: Optional[date] = None
     observacoes: Optional[str] = None
+
+
+class ContaPagarClassificacaoUpdate(BaseModel):
+    categoria_id: Optional[int] = None
+    dre_subcategoria_id: Optional[int] = None
+    tipo_despesa_id: Optional[int] = None
+    canal: Optional[str] = None
 
 
 class PagamentoCreate(BaseModel):
@@ -92,6 +102,7 @@ class ContaPagarResponse(BaseModel):
     id: int
     descricao: str
     fornecedor_nome: Optional[str] = None
+    categoria_id: Optional[int] = None
     categoria_nome: Optional[str] = None
     valor_original: float
     valor_pago: float
@@ -108,6 +119,9 @@ class ContaPagarResponse(BaseModel):
     nfe_numero: Optional[str] = None
     observacoes: Optional[str] = None
     nota_entrada_id: Optional[int] = None
+    canal: Optional[str] = None
+    dre_subcategoria_id: Optional[int] = None
+    dre_subcategoria_nome: Optional[str] = None
     tipo_despesa_id: Optional[int] = None
     tipo_despesa_nome: Optional[str] = None
     e_custo_fixo: Optional[bool] = None
@@ -544,6 +558,7 @@ def listar_contas_pagar(
             "id": conta.id,
             "descricao": conta.descricao,
             "fornecedor_nome": fornecedor_nome,
+            "categoria_id": conta.categoria_id,
             "categoria_nome": conta.categoria.nome if conta.categoria else None,
             "valor_original": float(conta.valor_original) if conta.valor_original is not None else 0.0,
             "valor_pago": float(conta.valor_pago) if conta.valor_pago is not None else 0.0,
@@ -560,16 +575,100 @@ def listar_contas_pagar(
             "nfe_numero": conta.nfe_numero,
             "observacoes": conta.observacoes,
             "nota_entrada_id": conta.nota_entrada_id,
-            "tipo_despesa_id": None,
-            "tipo_despesa_nome": None,
+            "canal": conta.canal,
+            "dre_subcategoria_id": conta.dre_subcategoria_id,
+            "dre_subcategoria_nome": None,
+            "tipo_despesa_id": conta.tipo_despesa_id,
+            "tipo_despesa_nome": conta.tipo_despesa.nome if conta.tipo_despesa else None,
             "e_custo_fixo": (
                 conta.categoria.tipo_custo == 'fixo' if conta.categoria and conta.categoria.tipo_custo in ('fixo', 'variavel')
                 else None
             ),
         }
+
+        if conta.dre_subcategoria_id:
+            sub = db.query(DRESubcategoria).filter(
+                DRESubcategoria.id == conta.dre_subcategoria_id,
+                DRESubcategoria.tenant_id == tenant_id,
+            ).first()
+            if sub:
+                item["dre_subcategoria_nome"] = sub.nome
+
         resultado.append(item)
     
     return resultado
+
+
+@router.patch("/{conta_id}/classificacao")
+def classificar_conta_pagar(
+    conta_id: int,
+    payload: ContaPagarClassificacaoUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Permite classificar conta existente com categoria, subcategoria DRE e tipo de despesa."""
+    _, tenant_id = user_and_tenant
+
+    conta = db.query(ContaPagar).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
+
+    if (
+        payload.categoria_id is None
+        and payload.dre_subcategoria_id is None
+        and payload.tipo_despesa_id is None
+        and payload.canal is None
+    ):
+        raise HTTPException(status_code=422, detail="Informe pelo menos um campo para classificar")
+
+    if payload.categoria_id is not None:
+        categoria = db.query(CategoriaFinanceira).filter(
+            CategoriaFinanceira.id == payload.categoria_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.ativo.is_(True),
+        ).first()
+        if not categoria:
+            raise HTTPException(status_code=422, detail="Categoria financeira inválida para este tenant")
+        conta.categoria_id = payload.categoria_id
+
+    if payload.dre_subcategoria_id is not None:
+        sub = db.query(DRESubcategoria).filter(
+            DRESubcategoria.id == payload.dre_subcategoria_id,
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.ativo.is_(True),
+        ).first()
+        if not sub:
+            raise HTTPException(status_code=422, detail="Subcategoria DRE inválida para este tenant")
+        conta.dre_subcategoria_id = payload.dre_subcategoria_id
+
+    if payload.tipo_despesa_id is not None:
+        tipo = db.query(TipoDespesa).filter(
+            TipoDespesa.id == payload.tipo_despesa_id,
+            TipoDespesa.tenant_id == tenant_id,
+            TipoDespesa.ativo.is_(True),
+        ).first()
+        if not tipo:
+            raise HTTPException(status_code=422, detail="Tipo de despesa inválido para este tenant")
+        conta.tipo_despesa_id = payload.tipo_despesa_id
+
+    if payload.canal is not None:
+        conta.canal = payload.canal
+
+    db.commit()
+    db.refresh(conta)
+
+    return {
+        "ok": True,
+        "mensagem": "Classificação atualizada com sucesso",
+        "conta_id": conta.id,
+        "categoria_id": conta.categoria_id,
+        "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "tipo_despesa_id": conta.tipo_despesa_id,
+        "canal": conta.canal,
+    }
 
 
 # ============================================================================

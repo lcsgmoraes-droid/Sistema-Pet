@@ -21,14 +21,24 @@ const ContasPagar = () => {
   });
   
   const [fornecedores, setFornecedores] = useState([]);
+  const [categoriasFinanceiras, setCategoriasFinanceiras] = useState([]);
+  const [subcategoriasDre, setSubcategoriasDre] = useState([]);
+  const [tiposDespesa, setTiposDespesa] = useState([]);
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
   const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
+  const [mostrarModalClassificacao, setMostrarModalClassificacao] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
   const [novaFormaData, setNovaFormaData] = useState({ nome: '', tipo: 'dinheiro', conta_bancaria_destino_id: null });
+  const [dadosClassificacao, setDadosClassificacao] = useState({
+    categoria_id: null,
+    dre_subcategoria_id: null,
+    tipo_despesa_id: null,
+    canal: 'loja_fisica'
+  });
   
   const [dadosPagamento, setDadosPagamento] = useState({
     valor_pago: 0,
@@ -59,11 +69,22 @@ const ContasPagar = () => {
 
   const carregarDados = async () => {
     try {
-      const [contasRes, fornecedoresRes, formasRes, bancariasRes] = await Promise.allSettled([
+      const [
+        contasRes,
+        fornecedoresRes,
+        formasRes,
+        bancariasRes,
+        categoriasRes,
+        subcategoriasRes,
+        tiposRes,
+      ] = await Promise.allSettled([
         api.get(`/contas-pagar/?_t=${Date.now()}`),
         api.get(`/clientes/?tipo_cadastro=fornecedor`),
         carregarFormasPagamento(),
-        api.get(`/contas-bancarias?apenas_ativas=true`)
+        api.get(`/contas-bancarias?apenas_ativas=true`),
+        api.get('/categorias-financeiras'),
+        api.get('/dre/subcategorias'),
+        api.get('/cadastros/tipo-despesa/')
       ]);
 
       if (contasRes.status === 'fulfilled') {
@@ -90,6 +111,10 @@ const ContasPagar = () => {
       } else {
         throw bancariasRes.reason;
       }
+
+      setCategoriasFinanceiras(categoriasRes?.status === 'fulfilled' ? safeArray(categoriasRes.value.data) : []);
+      setSubcategoriasDre(subcategoriasRes?.status === 'fulfilled' ? safeArray(subcategoriasRes.value.data) : []);
+      setTiposDespesa(tiposRes?.status === 'fulfilled' ? safeArray(tiposRes.value.data) : []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar contas a pagar');
@@ -142,6 +167,34 @@ const ContasPagar = () => {
   const abrirDetalhes = (conta) => {
     setContaSelecionada(conta);
     setMostrarDetalhes(true);
+  };
+
+  const precisaClassificacao = (conta) => {
+    return !conta.categoria_id || !conta.dre_subcategoria_id || !conta.tipo_despesa_id;
+  };
+
+  const abrirModalClassificacao = (conta) => {
+    setContaSelecionada(conta);
+    setDadosClassificacao({
+      categoria_id: conta.categoria_id || null,
+      dre_subcategoria_id: conta.dre_subcategoria_id || null,
+      tipo_despesa_id: conta.tipo_despesa_id || null,
+      canal: conta.canal || 'loja_fisica'
+    });
+    setMostrarModalClassificacao(true);
+  };
+
+  const salvarClassificacao = async () => {
+    if (!contaSelecionada) return;
+    try {
+      await api.patch(`/contas-pagar/${contaSelecionada.id}/classificacao`, dadosClassificacao);
+      toast.success('Classificação atualizada com sucesso');
+      setMostrarModalClassificacao(false);
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao classificar conta:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao classificar conta');
+    }
   };
 
   const abrirNotaFiscal = (conta) => {
@@ -426,6 +479,15 @@ const ContasPagar = () => {
                           title="Registrar Pagamento"
                         >
                           💰 Pagar
+                        </button>
+                      )}
+                      {precisaClassificacao(conta) && (
+                        <button
+                          className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-xs mr-2"
+                          onClick={() => abrirModalClassificacao(conta)}
+                          title="Classificar categoria, DRE e tipo da despesa"
+                        >
+                          🏷 Classificar
                         </button>
                       )}
                       <button
@@ -806,6 +868,96 @@ const ContasPagar = () => {
                 onClick={salvarNovaForma}
               >
                 ✓ Criar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Classificacao */}
+      {mostrarModalClassificacao && contaSelecionada && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+            <div className="flex justify-between items-center border-b p-4">
+              <h5 className="text-xl font-bold">🏷 Classificar Conta #{contaSelecionada.id}</h5>
+              <button
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+                onClick={() => setMostrarModalClassificacao(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Categoria Financeira</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={dadosClassificacao.categoria_id || ''}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, categoria_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                >
+                  <option value="">Selecione...</option>
+                  {safeArray(categoriasFinanceiras).map((c) => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Subcategoria DRE</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={dadosClassificacao.dre_subcategoria_id || ''}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, dre_subcategoria_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                >
+                  <option value="">Selecione...</option>
+                  {safeArray(subcategoriasDre).map((s) => (
+                    <option key={s.id} value={s.id}>{s.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Tipo da Despesa</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={dadosClassificacao.tipo_despesa_id || ''}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, tipo_despesa_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                >
+                  <option value="">Selecione...</option>
+                  {safeArray(tiposDespesa).map((t) => (
+                    <option key={t.id} value={t.id}>{t.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Canal</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={dadosClassificacao.canal || 'loja_fisica'}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, canal: e.target.value })}
+                >
+                  <option value="loja_fisica">Loja Física</option>
+                  <option value="mercado_livre">Mercado Livre</option>
+                  <option value="shopee">Shopee</option>
+                  <option value="amazon">Amazon</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t p-4">
+              <button
+                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+                onClick={() => setMostrarModalClassificacao(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
+                onClick={salvarClassificacao}
+              >
+                Salvar Classificação
               </button>
             </div>
           </div>
