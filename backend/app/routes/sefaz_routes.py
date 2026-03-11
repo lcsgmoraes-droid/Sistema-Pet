@@ -396,34 +396,49 @@ def get_nsu_status(
     erro_consulta = None
 
     if status_cfg.enabled and cfg.get("modo") == "real" and status_cfg.cert_ok:
-        try:
-            # Faz uma chamada leve com o NSU atual só para capturar o maxNSU
-            resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=ultimo_nsu)
-            max_nsu = resultado.get("max_nsu")
-            novo_nsu = resultado.get("ultimo_nsu", ultimo_nsu)
+        # Proteção 656: não chamar SEFAZ enquanto estiver em cooldown
+        proximo_str = cfg.get("_proximo_sync_permitido_at")
+        em_cooldown_656 = False
+        if proximo_str and cfg.get("_sync_bloqueado_656"):
+            try:
+                from datetime import timezone as _tz
+                from datetime import datetime as _dt
+                proximo_dt = _dt.fromisoformat(proximo_str)
+                if proximo_dt.tzinfo is None:
+                    proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
+                em_cooldown_656 = _dt.now(_tz.utc) < proximo_dt
+            except Exception:
+                pass
 
-            # Salva docs se vieram
-            docs_lista = resultado.get("docs_list", [])
-            if docs_lista:
-                from app.notas_entrada_routes import importar_docs_sefaz
-                from app.db import SessionLocal as _SL
-                _db = _SL()
-                try:
-                    importar_docs_sefaz(docs_lista, str(tenant_id), _db)
-                finally:
-                    _db.close()
-                # Atualiza NSU
-                cfg["ultimo_nsu"] = novo_nsu
-                SefazTenantConfigService.save_config(tenant_id, cfg)
-                ultimo_nsu = novo_nsu
+        if not em_cooldown_656:
+            try:
+                # Faz uma chamada leve com o NSU atual só para capturar o maxNSU
+                resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=ultimo_nsu)
+                max_nsu = resultado.get("max_nsu")
+                novo_nsu = resultado.get("ultimo_nsu", ultimo_nsu)
 
-            if max_nsu and ultimo_nsu:
-                try:
-                    gap_estimado = int(max_nsu) - int(ultimo_nsu)
-                except ValueError:
-                    gap_estimado = None
-        except Exception as exc:
-            erro_consulta = str(exc)
+                # Salva docs se vieram
+                docs_lista = resultado.get("docs_list", [])
+                if docs_lista:
+                    from app.notas_entrada_routes import importar_docs_sefaz
+                    from app.db import SessionLocal as _SL
+                    _db = _SL()
+                    try:
+                        importar_docs_sefaz(docs_lista, str(tenant_id), _db)
+                    finally:
+                        _db.close()
+                    # Atualiza NSU
+                    cfg["ultimo_nsu"] = novo_nsu
+                    SefazTenantConfigService.save_config(tenant_id, cfg)
+                    ultimo_nsu = novo_nsu
+
+                if max_nsu and ultimo_nsu:
+                    try:
+                        gap_estimado = int(max_nsu) - int(ultimo_nsu)
+                    except ValueError:
+                        gap_estimado = None
+            except Exception as exc:
+                erro_consulta = str(exc)
 
     return {
         "ultimo_nsu": ultimo_nsu,
@@ -471,6 +486,49 @@ def reset_nsu(
         "nsu_anterior": nsu_anterior,
         "novo_nsu": nsu,
         "mensagem": f"NSU redefinido. O próximo ciclo de sincronização buscará documentos a partir do NSU {nsu}.",
+    }
+
+
+@router.post("/pular-para-hoje")
+def pular_para_hoje(
+    auth=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_db),
+):
+    """
+    Marca a configuração para pular documentos antigos na próxima sincronização.
+    Na próxima janela disponível (após o cooldown atual), o sistema avança o NSU
+    para o ponto atual da SEFAZ sem importar nenhum documento antigo.
+    Útil quando o CNPJ ficou muito atrás no NSU e há risco de cStat 656.
+    """
+    _, tenant_id = auth
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
+
+    cfg["comecar_do_hoje"] = True
+    SefazTenantConfigService.save_config(tenant_id, cfg)
+
+    proximo_str = cfg.get("_proximo_sync_permitido_at")
+    aviso_cooldown = ""
+    if proximo_str and cfg.get("_sync_bloqueado_656"):
+        try:
+            from datetime import timezone as _tz
+            proximo_dt = __import__("datetime").datetime.fromisoformat(proximo_str)
+            if proximo_dt.tzinfo is None:
+                proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
+            from datetime import datetime as _dt
+            faltam = int((_dt.now(_tz.utc) - proximo_dt).total_seconds() / -60) + 1
+            if faltam > 0:
+                aviso_cooldown = f" O sistema está em cooldown por ~{faltam} minuto(s) — o pulo será executado automaticamente após esse período."
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "mensagem": (
+            "Configurado com sucesso. Na próxima sincronização disponível, "
+            "documentos antigos serão ignorados e o sistema começará do ponto atual da SEFAZ."
+            + aviso_cooldown
+        ),
     }
 
 

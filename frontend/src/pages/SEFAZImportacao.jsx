@@ -49,6 +49,7 @@ export default function SEFAZImportacao() {
   const [configLoading, setConfigLoading] = useState(true);
   const [salvandoRotina, setSalvandoRotina] = useState(false);
   const [sincronizando, setSincronizando] = useState(false);
+  const [pulandoParaHoje, setPulandoParaHoje] = useState(false);
   const [mensagemRotina, setMensagemRotina] = useState("");
   const listaImportacoesRef = useRef(null);
   const [cfg, setCfg] = useState({
@@ -148,6 +149,24 @@ export default function SEFAZImportacao() {
       setMensagemRotina(err?.response?.data?.detail || "Erro ao sincronizar agora.");
     } finally {
       setSincronizando(false);
+    }
+  }
+
+  async function pularParaHoje() {
+    const confirmado = window.confirm(
+      "Isso vai fazer o sistema IGNORAR todas as NFs antigas e começar pelo ponto atual da SEFAZ.\n\nAs NFs antigas NÃO serão importadas. Continuar?"
+    );
+    if (!confirmado) return;
+    setMensagemRotina("");
+    try {
+      setPulandoParaHoje(true);
+      const { data } = await api.post("/sefaz/pular-para-hoje");
+      setMensagemRotina(data?.mensagem || "Configurado para começar do ponto atual.");
+      await carregarConfigOperacional();
+    } catch (err) {
+      setMensagemRotina(err?.response?.data?.detail || "Erro ao configurar pulo para hoje.");
+    } finally {
+      setPulandoParaHoje(false);
     }
   }
 
@@ -391,7 +410,7 @@ export default function SEFAZImportacao() {
 
             {emCooldown && (
               <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm">
-                ⛔ <strong>SEFAZ bloqueada por consumo indevido (código 656).</strong> O sistema tentou sincronizar vezes demais e a SEFAZ aplicou uma penalidade de 70 minutos. O botão ficará disponível em <strong>~{minutosRestantesCooldown} minuto(s)</strong>. Não tente forçar — isso reinicia o contador.
+                ⛔ <strong>SEFAZ bloqueada por consumo indevido (código 656).</strong> O sistema fez chamadas demais e a SEFAZ aplicou uma penalidade. O botão ficará disponível em <strong>~{minutosRestantesCooldown} minuto(s)</strong>. Não tente forçar — isso reinicia o contador de penalidade.
               </div>
             )}
 
@@ -413,6 +432,16 @@ export default function SEFAZImportacao() {
                 className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {sincronizando ? "Sincronizando..." : emCooldown ? `⏳ Aguarde ~${minutosRestantesCooldown} min` : "Sincronizar agora"}
+              </button>
+
+              <button
+                type="button"
+                onClick={pularParaHoje}
+                disabled={pulandoParaHoje}
+                title="Ignora todas as NFs antigas e começa do ponto atual da SEFAZ. Use quando o sistema estiver muito atrasado e causando bloqueios."
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-60"
+              >
+                {pulandoParaHoje ? "Configurando..." : "🚀 Ignorar NFs antigas"}
               </button>
             </div>
           </>

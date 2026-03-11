@@ -409,7 +409,7 @@ def _loop_sefaz_sync():
         except Exception as exc:
             logger.warning(f"[SEFAZ] ⚠️ Erro no loop de sincronizacao: {exc}")
 
-        _sefaz_sync_stop_event.wait(60)  # verifica a cada 1 minuto
+        _sefaz_sync_stop_event.wait(600)  # verifica a cada 10 minutos
 
     logger.info(f"[SEFAZ] Job de sincronizacao automatica finalizado (PID {worker_pid})")
 

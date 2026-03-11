@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 _LOCK_FILE = "/tmp/sefaz_sync.lock"
 
 # Intervalos de backoff quando não há documentos novos.
-# Política conservadora para reduzir risco de consumo indevido:
-# Índice 0 = 1ª vez sem documento → aguarda 120 min
+# Política muito conservadora: mínimo 12h, máximo 24h.
+# Índice 0 = 1ª vez sem documento → aguarda 720 min (12h)
 # Índice 4 = 5ª+ vez sem documento → aguarda 1440 min (24h)
-BACKOFF_MINUTES = [120, 240, 480, 720, 1440]
+BACKOFF_MINUTES = [720, 720, 1440, 1440, 1440]
 
 
 class SefazSyncCoordinator:
@@ -143,7 +143,8 @@ class SefazSyncCoordinator:
         total_importadas = 0
         total_duplicadas = 0
         erro_656 = False
-        MAX_LOTES = 3
+        pulou_para_hoje = False
+        MAX_LOTES = 1  # Uma chamada por ciclo — evita cStat 656 por consumo excessivo
 
         for lote_idx in range(MAX_LOTES):
             try:
@@ -161,9 +162,21 @@ class SefazSyncCoordinator:
                 break
 
             docs = resultado.get("docs_list", [])
-            total_docs += len(docs)
             novo_nsu = resultado.get("ultimo_nsu", nsu_loop)
             max_nsu = resultado.get("max_nsu", novo_nsu)
+
+            # comecar_do_hoje: avança NSU para o ponto atual sem importar docs antigos
+            if cfg.get("comecar_do_hoje"):
+                nsu_loop = max_nsu
+                pulou_para_hoje = True
+                cfg["comecar_do_hoje"] = False
+                logger.info(
+                    f"[SEFAZ] [{reason}] comecar_do_hoje ativo — NSU avançado para {max_nsu} "
+                    f"(tenant {tenant_id_str})"
+                )
+                break
+
+            total_docs += len(docs)
 
             if docs:
                 db = SessionLocal()
@@ -186,15 +199,12 @@ class SefazSyncCoordinator:
             if novo_nsu >= max_nsu or not docs:
                 break
 
-            # Pausa entre lotes — reduz risco de cStat 656
-            time.sleep(5)
-
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
 
-        # ── Erro 656 — penalidade de 90 minutos ─────────────────────────────
+        # ── Erro 656 — penalidade de 5 horas (300 min) ──────────────────────
         if erro_656:
-            penalidade_min = 180
+            penalidade_min = 300
             proximo = now + timedelta(minutes=penalidade_min)
             cfg.update({
                 "ultimo_sync_at": now_iso,
@@ -223,8 +233,8 @@ class SefazSyncCoordinator:
 
         # ── Sucesso — backoff adaptativo ─────────────────────────────────────
         backoff_index = int(cfg.get("backoff_index", 0))
-        if total_docs > 0:
-            backoff_index = 0  # documentos encontrados: resetar backoff
+        if total_docs > 0 or pulou_para_hoje:
+            backoff_index = 0  # docs encontrados ou pulo intencional: resetar backoff
         else:
             if backoff_index < len(BACKOFF_MINUTES) - 1:
                 backoff_index += 1  # sem documentos: avançar backoff
