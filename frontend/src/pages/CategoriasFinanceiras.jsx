@@ -245,6 +245,20 @@ const CategoriasFinanceiras = () => {
         });
         categoriaId = editando;
 
+        // Excluir subcategorias REMOVIDAS (tinham ID mas o usuário removeu da lista)
+        const idsAtuais = new Set(formData.novasSubcategorias.filter(s => s.id).map(s => s.id));
+        const categoriaAtualParaDelete = categorias.find(c => c.id === editando);
+        const subsOriginais = getSubcategoriasDREDaCategoria(categoriaAtualParaDelete);
+        const subsRemovidas = subsOriginais.filter(s => !idsAtuais.has(s.id));
+        for (const sub of subsRemovidas) {
+          try {
+            await api.delete(`/dre/subcategorias/${sub.id}`);
+          } catch (delError) {
+            console.error('Erro ao excluir subcategoria:', delError);
+            toast.error(`Erro ao excluir subcategoria: ${sub.nome}`);
+          }
+        }
+
         // Criar subcategorias NOVAS (sem id) adicionadas durante a edição
         const novasSubs = formData.novasSubcategorias.filter(sub => !sub.id && sub.nome?.trim());
         if (novasSubs.length > 0) {
