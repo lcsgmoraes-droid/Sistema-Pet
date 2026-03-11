@@ -35,9 +35,9 @@ class DRECategoriaUpdate(BaseModel):
 
 class DRECategoriaResponse(BaseModel):
     id: int
-    tenant_id: str
+    tenant_id: UUID | str
     nome: str
-    ordem: int
+    ordem: int | None = None
     natureza: str
     ativo: bool
     created_at: datetime
@@ -45,6 +45,10 @@ class DRECategoriaResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True
+        json_encoders = {
+            UUID: lambda v: str(v)
+        }
 
 class DRESubcategoriaCreate(BaseModel):
     categoria_id: int
