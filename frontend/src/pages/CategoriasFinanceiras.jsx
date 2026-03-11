@@ -244,6 +244,42 @@ const CategoriasFinanceiras = () => {
           tipo_custo: formData.tipo_custo
         });
         categoriaId = editando;
+
+        // Criar subcategorias NOVAS (sem id) adicionadas durante a edição
+        const novasSubs = formData.novasSubcategorias.filter(sub => !sub.id && sub.nome?.trim());
+        if (novasSubs.length > 0) {
+          const categoriaDREId = resolverCategoriaDREId(categoriaId);
+          let primeiraSubDREIdEdit = null;
+          if (categoriaDREId) {
+            for (const sub of novasSubs) {
+              try {
+                const subResp = await api.post('/dre/subcategorias', {
+                  categoria_id: categoriaDREId,
+                  nome: sub.nome,
+                  tipo_custo: formData.tipo_custo || 'direto',
+                  escopo_rateio: 'ambos'
+                });
+                if (!primeiraSubDREIdEdit && subResp?.data?.id) {
+                  primeiraSubDREIdEdit = subResp.data.id;
+                }
+              } catch (subError) {
+                console.error('Erro ao criar subcategoria:', subError);
+                toast.error(`Erro ao criar subcategoria: ${sub.nome}`);
+              }
+            }
+            // Se a categoria ainda não tinha dre_subcategoria_id, vincular agora
+            const categoriaAtual = categorias.find(c => c.id === editando);
+            if (!categoriaAtual?.dre_subcategoria_id && primeiraSubDREIdEdit) {
+              await api.put(`/categorias-financeiras/${editando}`, { dre_subcategoria_id: primeiraSubDREIdEdit });
+            }
+            if (novasSubs.length > 0) {
+              toast.success(`${novasSubs.length} subcategoria(s) criada(s)!`);
+            }
+          } else {
+            toast.error('Categoria DRE não encontrada para vincular subcategoria');
+          }
+        }
+
         toast.success('Categoria atualizada com sucesso!');
       } else {
         const response = await api.post('/categorias-financeiras', {
