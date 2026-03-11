@@ -108,6 +108,7 @@ def get_config(
         "ultimo_sync_status": cfg.get("ultimo_sync_status", "nunca"),
         "ultimo_sync_mensagem": cfg.get("ultimo_sync_mensagem", "Ainda nao sincronizado."),
         "ultimo_sync_documentos": cfg.get("ultimo_sync_documentos", 0),
+        "proximo_sync_permitido_at": cfg.get("_proximo_sync_permitido_at"),
         "cnpj_configurado": status.cnpj_configurado,
         "cert_path_configurado": status.cert_path_configurado,
         "cert_existe": status.cert_existe,
@@ -243,7 +244,30 @@ def sync_now(
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
     status = SefazService.status_configuracao(cfg)
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+
+    # ── Verificar cooldown cStat 656 ─────────────────────────────────────────
+    proximo_permitido_str = cfg.get("_proximo_sync_permitido_at")
+    if proximo_permitido_str:
+        try:
+            from datetime import timezone as _tz_check
+            proximo_dt = datetime.fromisoformat(proximo_permitido_str)
+            if proximo_dt.tzinfo is None:
+                proximo_dt = proximo_dt.replace(tzinfo=_tz_check.utc)
+            if now_dt < proximo_dt:
+                faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
+                msg_cooldown = (
+                    f"SEFAZ em cooldown por bloqueio anterior (cStat 656). "
+                    f"Proxima tentativa permitida em ~{faltam} minuto(s). "
+                    f"Aguarde antes de sincronizar novamente."
+                )
+                raise HTTPException(status_code=429, detail=msg_cooldown)
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # data invalida no config — ignora e continua
+    # ─────────────────────────────────────────────────────────────────────────
 
     if not status.enabled:
         cfg["ultimo_sync_at"] = now_iso

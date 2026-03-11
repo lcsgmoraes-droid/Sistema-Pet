@@ -64,7 +64,20 @@ export default function SEFAZImportacao() {
     ultimo_sync_mensagem: "Ainda nao sincronizado.",
     ultimo_sync_at: null,
     ultimo_sync_documentos: 0,
+    proximo_sync_permitido_at: null,
   });
+
+  const emCooldown = (() => {
+    if (!cfg.proximo_sync_permitido_at) return false;
+    return new Date(cfg.proximo_sync_permitido_at) > new Date();
+  })();
+
+  const minutosRestantesCooldown = (() => {
+    if (!cfg.proximo_sync_permitido_at) return 0;
+    const diff = new Date(cfg.proximo_sync_permitido_at) - new Date();
+    if (diff <= 0) return 0;
+    return Math.ceil(diff / 60000);
+  })();
 
   useEffect(() => {
     carregarConfigOperacional();
@@ -93,6 +106,7 @@ export default function SEFAZImportacao() {
         ultimo_sync_mensagem: data.ultimo_sync_mensagem || "Ainda nao sincronizado.",
         ultimo_sync_at: data.ultimo_sync_at || null,
         ultimo_sync_documentos: Number(data.ultimo_sync_documentos || 0),
+        proximo_sync_permitido_at: data.proximo_sync_permitido_at || null,
       }));
     } catch (err) {
       setMensagemRotina(err?.response?.data?.detail || "Nao foi possivel carregar a rotina da SEFAZ.");
@@ -375,6 +389,12 @@ export default function SEFAZImportacao() {
               </div>
             )}
 
+            {emCooldown && (
+              <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm">
+                ⛔ <strong>SEFAZ bloqueada por consumo indevido (código 656).</strong> O sistema tentou sincronizar vezes demais e a SEFAZ aplicou uma penalidade de 70 minutos. O botão ficará disponível em <strong>~{minutosRestantesCooldown} minuto(s)</strong>. Não tente forçar — isso reinicia o contador.
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -388,10 +408,11 @@ export default function SEFAZImportacao() {
               <button
                 type="button"
                 onClick={sincronizarAgora}
-                disabled={sincronizando}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                disabled={sincronizando || emCooldown}
+                title={emCooldown ? `Aguarde ${minutosRestantesCooldown} min antes de tentar novamente (cooldown SEFAZ 656)` : ""}
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {sincronizando ? "Sincronizando..." : "Sincronizar agora"}
+                {sincronizando ? "Sincronizando..." : emCooldown ? `⏳ Aguarde ~${minutosRestantesCooldown} min` : "Sincronizar agora"}
               </button>
             </div>
           </>
