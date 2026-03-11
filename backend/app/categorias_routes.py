@@ -39,6 +39,7 @@ class CategoriaFinanceiraUpdate(BaseModel):
     categoria_pai_id: Optional[int] = None
     ativo: Optional[bool] = None
     tipo_custo: Optional[str] = None  # 'fixo', 'variavel', 'ambos'
+    dre_subcategoria_id: Optional[int] = None  # Vínculo com subcategoria DRE
 
 
 class CategoriaFinanceiraResponse(BaseModel):
