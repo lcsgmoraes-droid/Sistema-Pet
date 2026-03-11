@@ -272,7 +272,7 @@ def sync_now(
         except Exception:
             pass
 
-    # ── Anti-spam: mínimo 120 segundos entre sincronizações manuais ──────────
+    # ── Anti-spam: mínimo 20 minutos entre sincronizações manuais ────────────
     ultimo_sync_str = cfg.get("ultimo_sync_at")
     if ultimo_sync_str:
         try:
@@ -281,12 +281,14 @@ def sync_now(
             if ultimo_dt.tzinfo is None:
                 ultimo_dt = ultimo_dt.replace(tzinfo=_tz_spam.utc)
             segundos = (now_dt - ultimo_dt).total_seconds()
-            if segundos < 120:
+            min_segundos = 20 * 60
+            if segundos < min_segundos:
+                faltam_min = int((min_segundos - segundos) / 60) + 1
                 raise HTTPException(
                     status_code=429,
                     detail=(
                         f"Uma sincronizacao foi executada ha {int(segundos)} segundos. "
-                        f"Aguarde alguns minutos antes de tentar novamente."
+                        f"Aguarde cerca de {faltam_min} minuto(s) antes de tentar novamente."
                     ),
                 )
         except HTTPException:

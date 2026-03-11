@@ -31,9 +31,10 @@ logger = logging.getLogger(__name__)
 _LOCK_FILE = "/tmp/sefaz_sync.lock"
 
 # Intervalos de backoff quando não há documentos novos.
-# Índice 0 = 1ª vez sem documento → aguarda 60 min
-# Índice 4 = 5ª+ vez sem documento → aguarda 720 min (12h)
-BACKOFF_MINUTES = [60, 120, 240, 480, 720]
+# Política conservadora para reduzir risco de consumo indevido:
+# Índice 0 = 1ª vez sem documento → aguarda 120 min
+# Índice 4 = 5ª+ vez sem documento → aguarda 1440 min (24h)
+BACKOFF_MINUTES = [120, 240, 480, 720, 1440]
 
 
 class SefazSyncCoordinator:
@@ -193,7 +194,7 @@ class SefazSyncCoordinator:
 
         # ── Erro 656 — penalidade de 90 minutos ─────────────────────────────
         if erro_656:
-            penalidade_min = 90
+            penalidade_min = 180
             proximo = now + timedelta(minutes=penalidade_min)
             cfg.update({
                 "ultimo_sync_at": now_iso,
