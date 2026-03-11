@@ -256,7 +256,7 @@ const CategoriasFinanceiras = () => {
                 const subResp = await api.post('/dre/subcategorias', {
                   categoria_id: categoriaDREId,
                   nome: sub.nome,
-                  tipo_custo: formData.tipo_custo || 'direto',
+                  tipo_custo: 'direto',
                   escopo_rateio: 'ambos'
                 });
                 if (!primeiraSubDREIdEdit && subResp?.data?.id) {
@@ -308,7 +308,7 @@ const CategoriasFinanceiras = () => {
               const subResp = await api.post('/dre/subcategorias', {
                 categoria_id: categoriaDREId,
                 nome: sub.nome,
-                tipo_custo: formData.tipo_custo || 'direto',
+                tipo_custo: 'direto',
                 escopo_rateio: 'ambos'
               });
               if (!primeiraSubDREId && subResp?.data?.id) {
@@ -476,7 +476,7 @@ const CategoriasFinanceiras = () => {
         const subResp = await api.post('/dre/subcategorias', {
           categoria_id: categoriaDREId,
           nome: formSubData.nome,
-          tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
+          tipo_custo: 'direto',
           escopo_rateio: 'ambos'
         });
 
