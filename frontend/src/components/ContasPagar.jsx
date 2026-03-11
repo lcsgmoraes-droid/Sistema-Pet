@@ -894,7 +894,7 @@ const ContasPagar = () => {
                 <select
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   value={dadosClassificacao.categoria_id || ''}
-                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, categoria_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, categoria_id: e.target.value ? parseInt(e.target.value, 10) : null, dre_subcategoria_id: null })}
                 >
                   <option value="">Selecione...</option>
                   {safeArray(categoriasFinanceiras).map((c) => (
@@ -911,7 +911,7 @@ const ContasPagar = () => {
                   onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, dre_subcategoria_id: e.target.value ? parseInt(e.target.value, 10) : null })}
                 >
                   <option value="">Selecione...</option>
-                  {safeArray(subcategoriasDre).map((s) => (
+                  {safeArray(subcategoriasDre).filter(s => s.categoria_financeira_id === dadosClassificacao.categoria_id).map((s) => (
                     <option key={s.id} value={s.id}>{s.nome}</option>
                   ))}
                 </select>
