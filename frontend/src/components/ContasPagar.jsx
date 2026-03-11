@@ -170,7 +170,7 @@ const ContasPagar = () => {
   };
 
   const precisaClassificacao = (conta) => {
-    return !conta.categoria_id || !conta.dre_subcategoria_id || !conta.tipo_despesa_id;
+    return !conta.categoria_id || !conta.dre_subcategoria_id;
   };
 
   const abrirModalClassificacao = (conta) => {
@@ -178,7 +178,6 @@ const ContasPagar = () => {
     setDadosClassificacao({
       categoria_id: conta.categoria_id || null,
       dre_subcategoria_id: conta.dre_subcategoria_id || null,
-      tipo_despesa_id: conta.tipo_despesa_id || null,
       canal: conta.canal || 'loja_fisica'
     });
     setMostrarModalClassificacao(true);
@@ -913,20 +912,6 @@ const ContasPagar = () => {
                   <option value="">Selecione...</option>
                   {safeArray(subcategoriasDre).filter(s => s.categoria_financeira_id === dadosClassificacao.categoria_id).map((s) => (
                     <option key={s.id} value={s.id}>{s.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Tipo da Despesa</label>
-                <select
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  value={dadosClassificacao.tipo_despesa_id || ''}
-                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, tipo_despesa_id: e.target.value ? parseInt(e.target.value, 10) : null })}
-                >
-                  <option value="">Selecione...</option>
-                  {safeArray(tiposDespesa).map((t) => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
                   ))}
                 </select>
               </div>
