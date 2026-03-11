@@ -2786,8 +2786,15 @@ export default function PDV() {
                               onClick={() => selecionarCliente(cliente)}
                               className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
                             >
-                              <div className="font-medium text-gray-900">
-                                {cliente.nome}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="font-medium text-gray-900 flex-1">
+                                  {cliente.nome}
+                                </div>
+                                {cliente.codigo && (
+                                  <div className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded flex-shrink-0">
+                                    #{cliente.codigo}
+                                  </div>
+                                )}
                               </div>
                               <div className="text-sm text-gray-500">
                                 {cliente.cpf && `CPF: ${cliente.cpf}`}

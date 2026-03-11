@@ -108,10 +108,10 @@ def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tena
         base = 9001
     
     # Buscar cÃ³digos existentes com este prefixo APENAS DESTE TENANT
+    # Inclui inativos para evitar reutilização de códigos
     codigos_usados = db.query(Cliente.codigo).filter(
         Cliente.tenant_id == tenant_id,
         Cliente.codigo.like(f'{prefixo}%'),
-        Cliente.ativo == True
     ).all()
     
     codigos_usados_set = {int(c[0]) for c in codigos_usados if c[0] and c[0].isdigit()}
