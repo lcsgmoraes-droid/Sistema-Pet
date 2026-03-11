@@ -230,11 +230,11 @@ const CategoriasFinanceiras = () => {
           const subsValidas = formData.novasSubcategorias.filter(sub => sub.nome.trim());
           for (const sub of subsValidas) {
             try {
-              await api.post('/subcategorias/', {
+              await api.post('/dre/subcategorias', {
                 categoria_id: categoriaId,
                 nome: sub.nome,
-                descricao: sub.descricao,
-                ativo: sub.ativo
+                tipo_custo: formData.tipo_custo || 'direto',
+                escopo_rateio: 'ambos'
               });
             } catch (subError) {
               console.error('Erro ao criar subcategoria:', subError);
@@ -374,10 +374,16 @@ const CategoriasFinanceiras = () => {
 
     try {
       if (editandoSub) {
-        await api.put(`/subcategorias/${editandoSub}`, formSubData);
+        await api.put(`/dre/subcategorias/${editandoSub}`, formSubData);
         toast.success('Subcategoria atualizada!');
       } else {
-        await api.post('/subcategorias', formSubData);
+        const categoriaSelecionada = categorias.find(c => c.id === formSubData.categoria_id);
+        await api.post('/dre/subcategorias', {
+          categoria_id: formSubData.categoria_id,
+          nome: formSubData.nome,
+          tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
+          escopo_rateio: 'ambos'
+        });
         toast.success('Subcategoria criada!');
       }
       
@@ -405,7 +411,7 @@ const CategoriasFinanceiras = () => {
     if (!window.confirm('Deseja realmente excluir esta subcategoria?')) return;
     
     try {
-      await api.delete(`/subcategorias/${id}`);
+      await api.delete(`/dre/subcategorias/${id}`);
       toast.success('Subcategoria excluída!');
       carregarSubcategorias();
     } catch (error) {

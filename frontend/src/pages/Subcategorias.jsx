@@ -32,7 +32,7 @@ export default function Subcategorias() {
   const carregarSubcategorias = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/subcategorias');
+      const response = await api.get('/dre/subcategorias');
       setSubcategorias(response.data);
     } catch (error) {
       console.error('Erro ao carregar subcategorias:', error);
@@ -52,9 +52,15 @@ export default function Subcategorias() {
 
     try {
       if (formData.id) {
-        await api.put(`/subcategorias/${formData.id}`, formData);
+        await api.put(`/dre/subcategorias/${formData.id}`, formData);
       } else {
-        await api.post('/subcategorias', formData);
+        const categoriaSelecionada = categorias.find(c => c.id === Number(formData.categoria_id));
+        await api.post('/dre/subcategorias', {
+          categoria_id: Number(formData.categoria_id),
+          nome: formData.nome,
+          tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
+          escopo_rateio: 'ambos'
+        });
       }
       
       setModalOpen(false);
@@ -75,7 +81,7 @@ export default function Subcategorias() {
     if (!confirm('Deseja realmente excluir esta subcategoria?')) return;
     
     try {
-      await api.delete(`/subcategorias/${id}`);
+      await api.delete(`/dre/subcategorias/${id}`);
       carregarSubcategorias();
     } catch (error) {
       console.error('Erro ao excluir:', error);

@@ -174,11 +174,11 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
         const subsValidas = formCategoria.novasSubcategorias.filter(sub => sub.nome.trim());
         for (const sub of subsValidas) {
           try {
-            await api.post('/subcategorias/', {
+            await api.post('/dre/subcategorias', {
               categoria_id: categoriaId,
               nome: sub.nome,
-              descricao: sub.descricao,
-              ativo: sub.ativo
+              tipo_custo: 'direto',
+              escopo_rateio: 'ambos'
             });
           } catch (subError) {
             console.error('Erro ao criar subcategoria:', subError);
