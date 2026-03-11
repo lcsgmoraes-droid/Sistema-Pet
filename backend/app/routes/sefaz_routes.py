@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
-from app.models import Tenant, Cliente
-from app.produtos_models import NotaEntrada, NotaEntradaItem
+from app.models import Tenant
+from app.produtos_models import NotaEntrada
 from app.services.sefaz_service import SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
 
@@ -236,232 +236,132 @@ def sync_now(
 ):
     """
     Dispara sincronizacao manual.
+    Usa o mesmo coordinator do scheduler para garantir exclusividade.
     """
     from datetime import datetime, timezone
 
     current_user, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-    status = SefazService.status_configuracao(cfg)
 
     now_dt = datetime.now(timezone.utc)
-    now_iso = now_dt.isoformat()
 
-    # ── Verificar cooldown cStat 656 ─────────────────────────────────────────
-    proximo_permitido_str = cfg.get("_proximo_sync_permitido_at")
-    if proximo_permitido_str:
+    # ── Verificar penalidade 656 (bloqueia sync manual) ──────────────────────
+    proximo_str = cfg.get("_proximo_sync_permitido_at")
+    if proximo_str and cfg.get("_sync_bloqueado_656"):
         try:
             from datetime import timezone as _tz_check
-            proximo_dt = datetime.fromisoformat(proximo_permitido_str)
+            proximo_dt = datetime.fromisoformat(proximo_str)
             if proximo_dt.tzinfo is None:
                 proximo_dt = proximo_dt.replace(tzinfo=_tz_check.utc)
             if now_dt < proximo_dt:
                 faltam = int((proximo_dt - now_dt).total_seconds() / 60) + 1
-                msg_cooldown = (
-                    f"SEFAZ em cooldown por bloqueio anterior (cStat 656). "
-                    f"Proxima tentativa permitida em ~{faltam} minuto(s). "
-                    f"Aguarde antes de sincronizar novamente."
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"SEFAZ em cooldown por bloqueio anterior (cStat 656). "
+                        f"Proxima tentativa permitida em ~{faltam} minuto(s). "
+                        f"Aguarde antes de sincronizar novamente."
+                    ),
                 )
-                raise HTTPException(status_code=429, detail=msg_cooldown)
         except HTTPException:
             raise
         except Exception:
-            pass  # data invalida no config — ignora e continua
-    # ─────────────────────────────────────────────────────────────────────────
+            pass
+
+    # ── Anti-spam: mínimo 120 segundos entre sincronizações manuais ──────────
+    ultimo_sync_str = cfg.get("ultimo_sync_at")
+    if ultimo_sync_str:
+        try:
+            from datetime import timezone as _tz_spam
+            ultimo_dt = datetime.fromisoformat(ultimo_sync_str)
+            if ultimo_dt.tzinfo is None:
+                ultimo_dt = ultimo_dt.replace(tzinfo=_tz_spam.utc)
+            segundos = (now_dt - ultimo_dt).total_seconds()
+            if segundos < 120:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"Uma sincronizacao foi executada ha {int(segundos)} segundos. "
+                        f"Aguarde alguns minutos antes de tentar novamente."
+                    ),
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
+    # ── Verificar configuração ────────────────────────────────────────────────
+    status = SefazService.status_configuracao(cfg)
 
     if not status.enabled:
-        cfg["ultimo_sync_at"] = now_iso
-        cfg["ultimo_sync_status"] = "erro"
-        cfg["ultimo_sync_mensagem"] = "SEFAZ desabilitado. Ative a integracao para sincronizar automaticamente."
-        cfg["ultimo_sync_documentos"] = 0
-        SefazTenantConfigService.save_config(tenant_id, cfg)
-        raise HTTPException(status_code=422, detail=cfg["ultimo_sync_mensagem"])
+        raise HTTPException(
+            status_code=422,
+            detail="SEFAZ desabilitado. Ative a integracao para sincronizar.",
+        )
 
     if cfg.get("modo") != "real":
-        cfg["ultimo_sync_at"] = now_iso
-        cfg["ultimo_sync_status"] = "pendente"
-        cfg["ultimo_sync_mensagem"] = "Integracao pronta, mas em modo mock. Troque para modo real para sincronizacao oficial da SEFAZ SP."
-        cfg["ultimo_sync_documentos"] = 0
-        SefazTenantConfigService.save_config(tenant_id, cfg)
         return {
             "ok": True,
-            "status": cfg["ultimo_sync_status"],
-            "mensagem": cfg["ultimo_sync_mensagem"],
+            "status": "pendente",
+            "mensagem": "Integracao em modo mock. Troque para modo real para sincronizacao oficial.",
             "documentos": 0,
+            "notas_salvas": 0,
+            "notas_puladas": 0,
+            "ultimo_nsu": cfg.get("ultimo_nsu", "000000000000000"),
         }
 
     if not status.cert_ok:
-        cfg["ultimo_sync_at"] = now_iso
-        cfg["ultimo_sync_status"] = "erro"
-        cfg["ultimo_sync_mensagem"] = f"Configuracao incompleta para sincronizacao: {status.mensagem}"
-        cfg["ultimo_sync_documentos"] = 0
-        SefazTenantConfigService.save_config(tenant_id, cfg)
-        raise HTTPException(status_code=422, detail=cfg["ultimo_sync_mensagem"])
-
-    try:
-        resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=cfg.get("ultimo_nsu", "000000000000000"))
-
-        # ── Salvar documentos recebidos no banco de dados ────────────────────
-        from app.notas_entrada_routes import (
-            parse_nfe_xml,
-            criar_fornecedor_automatico,
-            encontrar_produto_similar,
+        raise HTTPException(
+            status_code=422,
+            detail=f"Configuracao incompleta: {status.mensagem}",
         )
 
-        docs_list = resultado.get("docs_list", [])
-        notas_salvas = 0
-        notas_puladas = 0
+    # ── Executar via coordinator ──────────────────────────────────────────────
+    # Garante exclusividade: scheduler e sync-now nunca chamam SEFAZ ao mesmo tempo.
+    from app.services.sefaz_sync_coordinator import sefaz_coordinator
 
-        for doc in docs_list:
-            xml_str = doc.get("xml", "")
-            if not xml_str:
-                continue
-            # Apenas NF-e completas têm itens; resumos (resNFe) são ignorados
-            schema = doc.get("schema", "")
-            if "resNFe" in schema and "nfeProc" not in schema and "NFe" not in schema:
-                continue
-            try:
-                dados = parse_nfe_xml(xml_str)
-            except Exception:
-                continue
+    config_path = SefazTenantConfigService._config_path(tenant_id)
+    result = sefaz_coordinator.try_sync(
+        tenant_id_str=str(tenant_id),
+        config_path=config_path,
+        cfg=cfg,
+        reason="manual",
+    )
 
-            chave = dados.get("chave_acesso")
-            if not chave:
-                continue
+    r_status = result.get("status")
 
-            # Pular se já existe
-            existe = db.query(NotaEntrada).filter(
-                NotaEntrada.chave_acesso == chave,
-                NotaEntrada.tenant_id == tenant_id,
-            ).first()
-            if existe:
-                notas_puladas += 1
-                continue
+    if r_status in ("already_running", "lock_busy"):
+        raise HTTPException(
+            status_code=409,
+            detail="Sincronizacao SEFAZ ja esta em execucao. Aguarde alguns instantes.",
+        )
 
-            # Buscar / criar fornecedor
-            fornecedor = db.query(Cliente).filter(
-                Cliente.cnpj == dados.get("fornecedor_cnpj", ""),
-                Cliente.ativo.is_(True),
-            ).first()
-            if not fornecedor:
-                try:
-                    fornecedor, _ = criar_fornecedor_automatico(dados, db, current_user, tenant_id)
-                except Exception:
-                    fornecedor = None
+    if r_status == "erro_656":
+        raise HTTPException(
+            status_code=429,
+            detail=result.get("mensagem", "SEFAZ bloqueou a requisicao (cStat 656)."),
+        )
 
-            nota = NotaEntrada(
-                numero_nota=dados.get("numero_nota") or "0",
-                serie=dados.get("serie") or "1",
-                chave_acesso=chave,
-                fornecedor_cnpj=dados.get("fornecedor_cnpj") or "",
-                fornecedor_nome=dados.get("fornecedor_nome") or "",
-                fornecedor_id=fornecedor.id if fornecedor else None,
-                data_emissao=dados["data_emissao"],
-                data_entrada=datetime.utcnow(),
-                valor_produtos=dados.get("valor_produtos") or dados.get("valor_total", 0),
-                valor_frete=dados.get("valor_frete", 0),
-                valor_desconto=dados.get("valor_desconto", 0),
-                valor_total=dados.get("valor_total", 0),
-                xml_content=xml_str,
-                status="pendente",
-                user_id=current_user.id,
-                tenant_id=tenant_id,
-            )
-            db.add(nota)
-            db.flush()
+    if r_status == "error":
+        raise HTTPException(
+            status_code=502,
+            detail=result.get("mensagem", "Erro interno na sincronizacao SEFAZ."),
+        )
 
-            vinculados = 0
-            nao_vinculados = 0
-            for item_data in dados.get("itens", []):
-                produto, confianca, _ = encontrar_produto_similar(
-                    item_data.get("descricao", ""),
-                    item_data.get("codigo_produto", ""),
-                    db,
-                    fornecedor.id if fornecedor else None,
-                )
-                item = NotaEntradaItem(
-                    nota_entrada_id=nota.id,
-                    numero_item=item_data.get("numero_item", 0),
-                    codigo_produto=item_data.get("codigo_produto", ""),
-                    descricao=item_data.get("descricao", ""),
-                    ncm=item_data.get("ncm"),
-                    cest=item_data.get("cest"),
-                    cfop=item_data.get("cfop"),
-                    origem=item_data.get("origem", "0"),
-                    aliquota_icms=item_data.get("aliquota_icms", 0),
-                    aliquota_pis=item_data.get("aliquota_pis", 0),
-                    aliquota_cofins=item_data.get("aliquota_cofins", 0),
-                    unidade=item_data.get("unidade", "UN"),
-                    quantidade=item_data.get("quantidade", 0),
-                    valor_unitario=item_data.get("valor_unitario", 0),
-                    valor_total=item_data.get("valor_total", 0),
-                    ean=item_data.get("ean"),
-                    lote=item_data.get("lote"),
-                    data_validade=item_data.get("data_validade"),
-                    produto_id=produto.id if produto else None,
-                    vinculado=bool(produto),
-                    confianca_vinculo=confianca,
-                    status="vinculado" if produto else "nao_vinculado",
-                    tenant_id=tenant_id,
-                )
-                db.add(item)
-                if produto:
-                    vinculados += 1
-                else:
-                    nao_vinculados += 1
+    return {
+        "ok": True,
+        "status": "ok",
+        "mensagem": result.get("mensagem", "Sincronizacao concluida."),
+        "documentos": result.get("documentos", 0),
+        "notas_salvas": result.get("importadas", 0),
+        "notas_puladas": result.get("duplicadas", 0),
+        "ultimo_nsu": result.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000")),
+        "max_nsu": result.get("ultimo_nsu", ""),
+        "c_stat": None,
+        "x_motivo": None,
+    }
 
-            nota.produtos_vinculados = vinculados
-            nota.produtos_nao_vinculados = nao_vinculados
-            db.commit()
-            notas_salvas += 1
-
-        # ── Atualizar config de sincronização ────────────────────────────────
-        total_docs = int(resultado.get("documentos", 0))
-        if notas_salvas or notas_puladas:
-            msg_final = (
-                f"Sincronizacao concluida. {notas_salvas} nota(s) importada(s)"
-                + (f", {notas_puladas} ja existiam." if notas_puladas else ".")
-            )
-        else:
-            msg_final = resultado["mensagem"]
-
-        cfg["ultimo_sync_at"] = now_iso
-        cfg["_proximo_sync_permitido_at"] = now_iso
-        cfg["ultimo_sync_status"] = "ok"
-        cfg["ultimo_sync_mensagem"] = msg_final
-        cfg["ultimo_sync_documentos"] = total_docs
-        cfg["ultimo_nsu"] = resultado.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000"))
-        SefazTenantConfigService.save_config(tenant_id, cfg)
-        return {
-            "ok": True,
-            "status": cfg["ultimo_sync_status"],
-            "mensagem": msg_final,
-            "documentos": total_docs,
-            "notas_salvas": notas_salvas,
-            "notas_puladas": notas_puladas,
-            "ultimo_nsu": cfg["ultimo_nsu"],
-            "max_nsu": resultado.get("max_nsu", cfg["ultimo_nsu"]),
-            "c_stat": resultado.get("c_stat"),
-            "x_motivo": resultado.get("x_motivo"),
-        }
-    except HTTPException as exc:
-        from datetime import timedelta as _td_sefaz
-        detail_str = str(exc.detail)
-        cfg["ultimo_sync_at"] = now_iso
-        cfg["ultimo_sync_mensagem"] = detail_str
-        cfg["ultimo_sync_documentos"] = 0
-        if "656" in detail_str or "Consumo Indevido" in detail_str or "ultNSU" in detail_str:
-            # Penalidade de 70 min para cStat 656 — evita ficar chamando SEFAZ dentro do bloqueio
-            from datetime import datetime as _dt_pen, timezone as _tz_pen
-            penalidade_min = 70
-            proximo_permitido = _dt_pen.now(_tz_pen.utc) + _td_sefaz(minutes=penalidade_min)
-            cfg["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
-            cfg["ultimo_sync_status"] = "erro_656"
-        else:
-            cfg["_proximo_sync_permitido_at"] = now_iso
-            cfg["ultimo_sync_status"] = "erro"
-        SefazTenantConfigService.save_config(tenant_id, cfg)
-        raise
 
 
 @router.get("/nsu-status")

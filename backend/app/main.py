@@ -331,178 +331,81 @@ def _loop_sefaz_sync():
 
     while not _sefaz_sync_stop_event.is_set():
         try:
-            # Garante que apenas 1 dos 4 workers uvicorn execute o sync por vez
-            try:
-                import fcntl as _fcntl
-                _lock_f = open(_SEFAZ_LOCK_FILE, "w")
-                try:
-                    _fcntl.flock(_lock_f, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
-                    _lock_acquired = True
-                except OSError:
-                    _lock_f.close()
-                    _sefaz_sync_stop_event.wait(60)
-                    continue
-            except ImportError:
-                _lock_f = None
-                _lock_acquired = True
+            import json as _json
+            from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+            from app.services.sefaz_sync_coordinator import sefaz_coordinator
 
-            try:
-                from app.services.sefaz_tenant_config_service import SefazTenantConfigService
-                from app.services.sefaz_service import SefazService
+            base_dir = SefazTenantConfigService.BASE_DIR
+            if base_dir.exists():
+                for tenant_dir in base_dir.iterdir():
+                    if not tenant_dir.is_dir():
+                        continue
+                    config_path = tenant_dir / SefazTenantConfigService.CONFIG_FILE
+                    if not config_path.exists():
+                        continue
+                    try:
+                        cfg = _json.loads(config_path.read_text(encoding="utf-8"))
 
-                base_dir = SefazTenantConfigService.BASE_DIR
-                if base_dir.exists():
-                    for tenant_dir in base_dir.iterdir():
-                        if not tenant_dir.is_dir():
+                        # Verificações básicas de habilitação
+                        if not cfg.get("importacao_automatica"):
                             continue
-                        config_path = tenant_dir / SefazTenantConfigService.CONFIG_FILE
-                        if not config_path.exists():
+                        if not cfg.get("enabled"):
                             continue
-                        try:
-                            import json as _json
-                            cfg = _json.loads(config_path.read_text(encoding="utf-8"))
+                        if cfg.get("modo") != "real":
+                            continue
+                        if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
+                            continue
 
-                            if not cfg.get("importacao_automatica"):
-                                continue
-                            if not cfg.get("enabled"):
-                                continue
-                            if cfg.get("modo") != "real":
-                                continue
-                            if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
-                                continue
+                        # Verificação de timing:
+                        # _proximo_sync_permitido_at controla tanto penalidade 656
+                        # quanto o intervalo de backoff — setado pelo coordinator
+                        # após cada sync (bem-sucedida ou não).
+                        agora = _dt.now(_tz.utc)
+                        proximo_str = cfg.get("_proximo_sync_permitido_at")
+                        if proximo_str:
+                            proximo_dt = _dt.fromisoformat(proximo_str)
+                            if proximo_dt.tzinfo is None:
+                                proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
+                            if proximo_dt > agora:
+                                continue  # em penalidade 656 ou backoff ainda ativo
 
-                            intervalo_min = int(cfg.get("importacao_intervalo_min", 15))
-                            agora = _dt.now(_tz.utc)
-                            # Verificação 1: penalidade por cStat 656 — _proximo_sync_permitido_at indica
-                            # um horário ABSOLUTO no futuro até o qual nenhuma chamada deve ser feita.
-                            proximo_permitido_str = cfg.get("_proximo_sync_permitido_at")
-                            if proximo_permitido_str:
-                                proximo_dt = _dt.fromisoformat(proximo_permitido_str)
-                                if proximo_dt.tzinfo is None:
-                                    proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
-                                if proximo_dt > agora:
-                                    continue  # ainda em penalidade/cooldown — não chamar SEFAZ
-                            # Verificação 2: intervalo normal entre execuções — usa ultimo_sync_at
+                        # Fallback para configs antigas (só existia ultimo_sync_at)
+                        else:
                             ultimo_str = cfg.get("ultimo_sync_at")
                             if ultimo_str:
                                 ultimo_dt = _dt.fromisoformat(ultimo_str)
                                 if ultimo_dt.tzinfo is None:
                                     ultimo_dt = ultimo_dt.replace(tzinfo=_tz.utc)
+                                intervalo_min = int(cfg.get("importacao_intervalo_min", 60))
                                 if (agora - ultimo_dt).total_seconds() / 60 < intervalo_min:
                                     continue
 
-                            tenant_id_str = tenant_dir.name
-                            logger.info(f"[SEFAZ] Sincronizando tenant {tenant_id_str}...")
-
-                            # Processar até 10 lotes por ciclo para alcançar o maxNSU mais rapidamente
-                            nsu_loop = cfg.get("ultimo_nsu", "000000000000000")
-                            total_docs_ciclo = 0
-                            total_importadas_ciclo = 0
-                            lote_656_detectado = False  # flag para detectar cStat 656 no loop de lotes
-                            import time as _time
-                            from datetime import timedelta as _td
-                            MAX_LOTES_POR_CICLO = 3  # 3 lotes × 50 docs = 150 docs/hora — seguro p/ SEFAZ não bloquear por cStat 656
-
-                            from app.db import SessionLocal as _SessionLocal
-                            from app.notas_entrada_routes import importar_docs_sefaz
-
-                            for _lote_idx in range(MAX_LOTES_POR_CICLO):
-                                try:
-                                    resultado = SefazService.sincronizar_nsu(
-                                        config=cfg,
-                                        ultimo_nsu=nsu_loop,
-                                    )
-                                except Exception as exc_lote:
-                                    logger.warning(f"[SEFAZ] Erro no lote {_lote_idx+1}: {exc_lote}")
-                                    err_str_lote = str(exc_lote)
-                                    if "656" in err_str_lote or "Consumo Indevido" in err_str_lote or "ultNSU" in err_str_lote:
-                                        lote_656_detectado = True
-                                    break
-
-                                ultimo_resultado = resultado
-                                docs_lote = resultado.get("docs_list", [])
-                                total_docs_ciclo += len(docs_lote)
-                                novo_nsu = resultado.get("ultimo_nsu", nsu_loop)
-                                max_nsu = resultado.get("max_nsu", novo_nsu)
-
-                                if docs_lote:
-                                    db_import = _SessionLocal()
-                                    try:
-                                        r = importar_docs_sefaz(docs_lote, tenant_id_str, db_import)
-                                        total_importadas_ciclo += r.get("importadas", 0)
-                                        if r["importadas"] > 0 or r.get("erros", 0) > 0:
-                                            logger.info(
-                                                f"[SEFAZ] 📥 Lote {_lote_idx+1}: {r['importadas']} NF-e(s) salvas, "
-                                                f"{r['duplicadas']} duplicadas, {r['erros']} erros, "
-                                                f"{r.get('saidas_descartadas', 0)} saídas. NSU: {novo_nsu}"
-                                            )
-                                    finally:
-                                        db_import.close()
-
-                                nsu_loop = novo_nsu
-
-                                # Para se não há mais documentos novos
-                                if novo_nsu >= max_nsu or not docs_lote:
-                                    break
-
-                                # Pequena pausa entre lotes para não acionar cStat 656 (consumo indevido)
-                                _time.sleep(2)
-
-                            now_iso = _dt.now(_tz.utc).isoformat()
-                            if lote_656_detectado:
-                                # cStat 656 capturado no loop de lotes — aplicar penalidade de 70 min
-                                # e mostrar mensagem de erro real ao usuário (não "Nenhum documento novo")
-                                penalidade_min = 70
-                                proximo_permitido = _dt.now(_tz.utc) + _td(minutes=penalidade_min)
-                                cfg["ultimo_sync_at"] = now_iso
-                                cfg["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
-                                cfg["ultimo_sync_status"] = "erro_656"
-                                cfg["ultimo_sync_mensagem"] = f"SEFAZ bloqueou por consumo indevido (cStat 656). Proxima tentativa em {penalidade_min} min."
-                                cfg["ultimo_sync_documentos"] = 0
-                                config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-                                logger.warning(f"[SEFAZ] ⏳ Tenant {tenant_id_str}: penalidade de {penalidade_min}min aplicada por cStat 656 (capturado no lote)")
-                            else:
-                                cfg["ultimo_sync_at"] = now_iso        # horário REAL — exibido na UI
-                                cfg["_proximo_sync_permitido_at"] = now_iso  # controle interno (igual ao real em caso de sucesso)
-                                cfg["ultimo_sync_status"] = "ok"
-                                cfg["ultimo_nsu"] = nsu_loop
-                                cfg["ultimo_sync_documentos"] = total_docs_ciclo
-                                cfg["ultimo_sync_mensagem"] = (
-                                    f"Sincronizacao concluida. {total_docs_ciclo} documento(s) processado(s), "
-                                    f"{total_importadas_ciclo} NF-e(s) importada(s)."
-                                    if total_docs_ciclo else "Sincronizacao concluida. Nenhum documento novo."
-                                )
-                                config_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-                                logger.info(f"[SEFAZ] ✅ Tenant {tenant_id_str}: {total_docs_ciclo} doc(s), {total_importadas_ciclo} importada(s). NSU final: {nsu_loop}")
-                        except Exception as exc_tenant:
-                            logger.warning(f"[SEFAZ] ⚠️ Erro ao sincronizar tenant {tenant_dir.name}: {exc_tenant}")
-                            # Se SEFAZ bloqueou por consumo indevido (cStat 656), penalizar por 70 min
-                            # para não ficar martelando e acumulando mais bloqueios
-                            err_str = str(exc_tenant)
-                            if "656" in err_str or "Consumo Indevido" in err_str or "ultNSU" in err_str:
-                                try:
-                                    import json as _json
-                                    cfg_pen = _json.loads(config_path.read_text(encoding="utf-8"))
-                                    penalidade_min = 70
-                                    agora_pen = _dt.now(_tz.utc)
-                                    from datetime import timedelta as _td
-                                    # _proximo_sync_permitido_at = horário absoluto até o qual o scheduler
-                                    # NÃO deve chamar a SEFAZ (penalidade pura, sem subtrair intervalo)
-                                    proximo_permitido = agora_pen + _td(minutes=penalidade_min)
-                                    cfg_pen["_proximo_sync_permitido_at"] = proximo_permitido.isoformat()
-                                    cfg_pen["ultimo_sync_at"] = agora_pen.isoformat()  # horário real
-                                    cfg_pen["ultimo_sync_status"] = "erro_656"
-                                    cfg_pen["ultimo_sync_mensagem"] = f"SEFAZ bloqueou por consumo indevido (cStat 656). Aguardando {penalidade_min} min antes de tentar novamente."
-                                    config_path.write_text(_json.dumps(cfg_pen, ensure_ascii=False, indent=2), encoding="utf-8")
-                                    logger.warning(f"[SEFAZ] ⏳ Tenant {tenant_dir.name}: penalidade de {penalidade_min} min aplicada por cStat 656")
-                                except Exception as e_pen:
-                                    logger.warning(f"[SEFAZ] Erro ao gravar penalidade: {e_pen}")
-            finally:
-                if _lock_f:
-                    try:
-                        _lock_f.close()
-                    except Exception:
-                        pass
+                        tenant_id_str = tenant_dir.name
+                        result = sefaz_coordinator.try_sync(
+                            tenant_id_str=tenant_id_str,
+                            config_path=config_path,
+                            cfg=cfg,
+                            reason="scheduler",
+                        )
+                        r_status = result.get("status")
+                        if r_status == "lock_busy":
+                            logger.debug(
+                                f"[SEFAZ] Scheduler: lock ocupado para {tenant_id_str} "
+                                f"— outro worker já executou este ciclo."
+                            )
+                        elif r_status == "already_running":
+                            logger.debug(
+                                f"[SEFAZ] Scheduler: sync já em andamento para {tenant_id_str}."
+                            )
+                        elif r_status not in ("ok", "erro_656"):
+                            logger.warning(
+                                f"[SEFAZ] Scheduler: resultado inesperado para "
+                                f"{tenant_id_str}: {result}"
+                            )
+                    except Exception as exc_tenant:
+                        logger.warning(
+                            f"[SEFAZ] ⚠️ Erro ao processar tenant {tenant_dir.name}: {exc_tenant}"
+                        )
         except Exception as exc:
             logger.warning(f"[SEFAZ] ⚠️ Erro no loop de sincronizacao: {exc}")
 
