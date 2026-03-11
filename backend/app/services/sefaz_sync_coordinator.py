@@ -75,6 +75,9 @@ class SefazSyncCoordinator:
         # 1. Verificar execução in-process (thread-safe)
         with self._lock:
             if tenant_id_str in self._running:
+                logger.info(
+                    f"[SEFAZ] [{reason}] Sync ignorada (already_running) — tenant {tenant_id_str}"
+                )
                 return {
                     "status": "already_running",
                     "mensagem": "Sincronização SEFAZ já está em andamento. Aguarde.",
@@ -94,6 +97,9 @@ class SefazSyncCoordinator:
                     lock_f = None
                     with self._lock:
                         self._running.discard(tenant_id_str)
+                    logger.info(
+                        f"[SEFAZ] [{reason}] Sync ignorada (lock_busy) — tenant {tenant_id_str}"
+                    )
                     return {
                         "status": "lock_busy",
                         "mensagem": "Outro processo já está sincronizando com a SEFAZ. Aguarde instantes.",
@@ -211,6 +217,7 @@ class SefazSyncCoordinator:
                 "documentos": 0,
                 "importadas": 0,
                 "duplicadas": 0,
+                "proximo_permitido_at": proximo.isoformat(),
             }
 
         # ── Sucesso — backoff adaptativo ─────────────────────────────────────
@@ -255,6 +262,7 @@ class SefazSyncCoordinator:
             "duplicadas": total_duplicadas,
             "ultimo_nsu": nsu_loop,
             "mensagem": msg,
+            "proximo_permitido_at": proximo.isoformat(),
         }
 
     @staticmethod

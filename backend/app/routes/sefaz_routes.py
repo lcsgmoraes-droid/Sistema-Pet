@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
+import logging
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
@@ -15,6 +16,7 @@ from app.services.sefaz_service import SefazService
 from app.services.sefaz_tenant_config_service import SefazTenantConfigService
 
 router = APIRouter(prefix="/sefaz", tags=["sefaz"])
+logger = logging.getLogger(__name__)
 
 
 class ConsultaNFeRequest(BaseModel):
@@ -241,6 +243,7 @@ def sync_now(
     from datetime import datetime, timezone
 
     current_user, tenant_id = auth
+    logger.info(f"[SEFAZ] [manual] Pedido de sync manual — tenant {tenant_id} user {current_user.id}")
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
 
@@ -328,6 +331,11 @@ def sync_now(
         cfg=cfg,
         reason="manual",
     )
+    logger.info(
+        f"[SEFAZ] [manual] Resultado sync manual — tenant {tenant_id} "
+        f"status={result.get('status')} docs={result.get('documentos', 0)} "
+        f"importadas={result.get('importadas', 0)}"
+    )
 
     r_status = result.get("status")
 
@@ -357,6 +365,7 @@ def sync_now(
         "notas_salvas": result.get("importadas", 0),
         "notas_puladas": result.get("duplicadas", 0),
         "ultimo_nsu": result.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000")),
+        "proximo_permitido_at": result.get("proximo_permitido_at", cfg.get("_proximo_sync_permitido_at")),
         "max_nsu": result.get("ultimo_nsu", ""),
         "c_stat": None,
         "x_motivo": None,
