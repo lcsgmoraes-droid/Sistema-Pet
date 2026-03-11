@@ -358,7 +358,7 @@ export default function SEFAZImportacao() {
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -367,21 +367,6 @@ export default function SEFAZImportacao() {
                 />
                 <span>Ativar importacao automatica</span>
               </label>
-
-              <div>
-                <label htmlFor="intervalo-importacao" className="block text-sm font-medium text-gray-700 mb-1">
-                  Intervalo (minutos)
-                </label>
-                <input
-                  id="intervalo-importacao"
-                  type="number"
-                  min={5}
-                  step={1}
-                  value={cfg.importacao_intervalo_min}
-                  onChange={(e) => atualizarRotina("importacao_intervalo_min", Number(e.target.value || 15))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
@@ -421,27 +406,7 @@ export default function SEFAZImportacao() {
                 disabled={salvandoRotina}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
               >
-                {salvandoRotina ? "Salvando rotina..." : "Salvar rotina"}
-              </button>
-
-              <button
-                type="button"
-                onClick={sincronizarAgora}
-                disabled={sincronizando || emCooldown}
-                title={emCooldown ? `Aguarde ${minutosRestantesCooldown} min antes de tentar novamente (cooldown SEFAZ 656)` : ""}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {sincronizando ? "Sincronizando..." : emCooldown ? `⏳ Aguarde ~${minutosRestantesCooldown} min` : "Sincronizar agora"}
-              </button>
-
-              <button
-                type="button"
-                onClick={pularParaHoje}
-                disabled={pulandoParaHoje}
-                title="Ignora todas as NFs antigas e começa do ponto atual da SEFAZ. Use quando o sistema estiver muito atrasado e causando bloqueios."
-                className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-60"
-              >
-                {pulandoParaHoje ? "Configurando..." : "🚀 Ignorar NFs antigas"}
+                {salvandoRotina ? "Salvando..." : "Salvar configuracao"}
               </button>
             </div>
           </>
