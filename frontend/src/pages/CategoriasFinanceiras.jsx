@@ -180,25 +180,18 @@ const CategoriasFinanceiras = () => {
     setCategoriaExpandida(novasExpandidas);
   };
 
-  // Busca TODAS as Subcategorias DRE vinculadas à Categoria Financeira
-  // Agora agrupa por categoria_id (não mais por dre_subcategoria_id individual)
+  // Busca APENAS as Subcategorias DRE que pertencem a esta categoria financeira
   const getSubcategoriasDREDaCategoria = (categoria) => {
-    // Se a categoria não tem dre_subcategoria_id, não tem vínculo DRE
-    if (!categoria.dre_subcategoria_id) {
-      return [];
-    }
-    
-    // Buscar a subcategoria DRE principal vinculada
-    const subPrincipal = subcategoriasDRE.find(s => s.id === categoria.dre_subcategoria_id);
-    
-    if (!subPrincipal) {
-      return [];
-    }
-    
-    // Retornar TODAS as subcategorias da mesma categoria DRE
-    const todasSubcategorias = subcategoriasDRE.filter(s => s.categoria_id === subPrincipal.categoria_id);
-    
-    return todasSubcategorias;
+    // Filtrar por categoria_financeira_id (campo que indica a qual categoria financeira pertence)
+    const porCatFinanceira = subcategoriasDRE.filter(s => s.categoria_financeira_id === categoria.id);
+    if (porCatFinanceira.length > 0) return porCatFinanceira;
+
+    // Fallback legado: subcategorias sem categoria_financeira_id vinculadas via dre_subcategoria_id
+    if (!categoria.dre_subcategoria_id) return [];
+    const subPrincipal = subcategoriasDRE.find(s => s.id === categoria.dre_subcategoria_id && !s.categoria_financeira_id);
+    if (!subPrincipal) return [];
+    // Retornar apenas as que também não têm categoria_financeira_id (legado sem dono)
+    return subcategoriasDRE.filter(s => s.categoria_id === subPrincipal.categoria_id && !s.categoria_financeira_id);
   };
 
   const resolverCategoriaDREId = (categoriaFinanceiraId) => {
@@ -271,7 +264,8 @@ const CategoriasFinanceiras = () => {
                   categoria_id: categoriaDREId,
                   nome: sub.nome,
                   tipo_custo: 'direto',
-                  escopo_rateio: 'ambos'
+                  escopo_rateio: 'ambos',
+                  categoria_financeira_id: categoriaId
                 });
                 if (!primeiraSubDREIdEdit && subResp?.data?.id) {
                   primeiraSubDREIdEdit = subResp.data.id;
@@ -323,7 +317,8 @@ const CategoriasFinanceiras = () => {
                 categoria_id: categoriaDREId,
                 nome: sub.nome,
                 tipo_custo: 'direto',
-                escopo_rateio: 'ambos'
+                escopo_rateio: 'ambos',
+                categoria_financeira_id: categoriaId
               });
               if (!primeiraSubDREId && subResp?.data?.id) {
                 primeiraSubDREId = subResp.data.id;
@@ -491,7 +486,8 @@ const CategoriasFinanceiras = () => {
           categoria_id: categoriaDREId,
           nome: formSubData.nome,
           tipo_custo: 'direto',
-          escopo_rateio: 'ambos'
+          escopo_rateio: 'ambos',
+          categoria_financeira_id: formSubData.categoria_id
         });
 
         const categoriaFinanceira = categorias.find(c => c.id === formSubData.categoria_id);

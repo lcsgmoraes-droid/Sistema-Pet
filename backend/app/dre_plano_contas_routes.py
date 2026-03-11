@@ -56,6 +56,7 @@ class DRESubcategoriaCreate(BaseModel):
     tipo_custo: TipoCusto
     base_rateio: BaseRateio | None = None
     escopo_rateio: EscopoRateio
+    categoria_financeira_id: int | None = None
     
     @validator('base_rateio', always=True)
     def validar_base_rateio(cls, v, values):
@@ -82,6 +83,7 @@ class DRESubcategoriaResponse(BaseModel):
     id: int
     tenant_id: UUID | str  # Aceita UUID ou string
     categoria_id: int
+    categoria_financeira_id: int | None = None
     nome: str
     tipo_custo: str
     base_rateio: str | None
@@ -254,7 +256,8 @@ def criar_subcategoria(
         tipo_custo=subcategoria.tipo_custo,
         base_rateio=subcategoria.base_rateio,
         escopo_rateio=subcategoria.escopo_rateio,
-        ativo=True
+        ativo=True,
+        categoria_financeira_id=subcategoria.categoria_financeira_id
     )
     
     db.add(nova_subcategoria)

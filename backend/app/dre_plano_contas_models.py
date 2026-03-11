@@ -77,5 +77,6 @@ class DRESubcategoria(BaseTenantModel):
 
     ativo = Column(Boolean, default=True)
     custo_pe = Column(String(10), nullable=True)  # 'fixo' | 'variavel' | null (para Ponto de Equilíbrio)
+    categoria_financeira_id = Column(Integer, ForeignKey("categorias_financeiras.id", ondelete="SET NULL"), nullable=True)
 
     categoria = relationship("DRECategoria", back_populates="subcategorias")
