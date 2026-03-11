@@ -112,11 +112,12 @@ const ContasPagar = () => {
       if (filtros.tipo_custo !== 'todos') params.append('tipo_custo', filtros.tipo_custo);
       
       const response = await api.get(`/contas-pagar/?${params}`);
-      
-      setContas(response.data);
+
+      setContas(safeArray(response.data));
     } catch (error) {
       console.error('Erro ao filtrar:', error);
       toast.error('Erro ao aplicar filtros');
+      setContas([]);
     } finally {
       setLoading(false);
     }

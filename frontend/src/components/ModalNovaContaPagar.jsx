@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus } from 'lucide-react';
+import { safeArray } from '../utils/safeArray';
 
 const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
@@ -61,10 +62,10 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
       
       console.log('📦 Categorias recebidas:', categoriasRes.data);
       
-      setFornecedores(fornecedoresRes.data);
+      setFornecedores(safeArray(fornecedoresRes.data));
       
       // Filtrar categorias: EXCLUIR apenas receitas/entradas explícitas
-      const categoriasDespesa = categoriasRes.data.filter(c => {
+      const categoriasDespesa = safeArray(categoriasRes.data).filter(c => {
         const tipo = c.tipo ? c.tipo.toLowerCase() : '';
         const nome = c.nome ? c.nome.toLowerCase() : '';
         
@@ -77,7 +78,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
       });
       
       setCategorias(categoriasDespesa);
-      setSubcategoriasDRE(subcategoriasDRERes.data || []);
+      setSubcategoriasDRE(safeArray(subcategoriasDRERes.data));
       
       console.log('✅ Categorias de DESPESA setadas:', categoriasDespesa.length);
       console.log('📋 Lista completa:', categoriasDespesa);
@@ -321,7 +322,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione...</option>
-                  {fornecedores.map(f => (
+                  {safeArray(fornecedores).map(f => (
                     <option key={f.id} value={f.id}>{f.nome}</option>
                   ))}
                 </select>
@@ -339,7 +340,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Selecione...</option>
-                    {categorias.map(c => (
+                    {safeArray(categorias).map(c => (
                       <option key={c.id} value={c.id}>{c.nome}</option>
                     ))}
                   </select>
@@ -378,7 +379,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Sem classificação DRE</option>
-                  {subcategoriasDRE.map(sub => (
+                  {safeArray(subcategoriasDRE).map(sub => (
                     <option key={sub.id} value={sub.id}>{sub.nome}</option>
                   ))}
                 </select>
