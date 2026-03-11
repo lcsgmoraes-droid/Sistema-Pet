@@ -10,7 +10,7 @@ Routes para gerenciamento de Clientes e Pets
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import case, or_, func
+from sqlalchemy import case, or_, func, cast, String
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
@@ -27,6 +27,31 @@ from app.security.permissions_decorator import require_permission
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
+
+
+def _somente_digitos_coluna(coluna):
+    """Normaliza telefone/celular removendo caracteres de máscara para busca numérica."""
+    return func.replace(
+        func.replace(
+            func.replace(
+                func.replace(
+                    func.replace(
+                        func.replace(func.coalesce(coluna, ""), "(", ""),
+                        ")",
+                        "",
+                    ),
+                    "-",
+                    "",
+                ),
+                " ",
+                "",
+            ),
+            "+",
+            "",
+        ),
+        ".",
+        "",
+    )
 
 
 # ========== HELPERS INTERNOS ==========
@@ -605,24 +630,38 @@ def list_clientes(
         
         termo_busca = (search or "").strip()
 
+        termo_digitos = "".join(ch for ch in termo_busca if ch.isdigit())
+        termo_numerico = bool(termo_digitos)
+        telefone_digitos = _somente_digitos_coluna(Cliente.telefone)
+        celular_digitos = _somente_digitos_coluna(Cliente.celular)
+
         # Filtro de busca por múltiplas palavras (qualquer ordem)
         # Cada palavra precisa existir em pelo menos um dos campos pesquisáveis.
         if termo_busca:
             palavras = [p.strip() for p in termo_busca.split() if p.strip()]
             for palavra in palavras:
                 like = f"%{palavra}%"
+                palavra_digitos = "".join(ch for ch in palavra if ch.isdigit())
+                filtros = [
+                    cast(Cliente.id, String).ilike(like),
+                    Cliente.codigo.ilike(like),
+                    Cliente.nome.ilike(like),
+                    Cliente.nome_fantasia.ilike(like),
+                    Cliente.razao_social.ilike(like),
+                    Cliente.cpf.ilike(like),
+                    Cliente.cnpj.ilike(like),
+                    Cliente.email.ilike(like),
+                    Cliente.telefone.ilike(like),
+                    Cliente.celular.ilike(like),
+                ]
+                if palavra_digitos:
+                    like_digitos = f"%{palavra_digitos}%"
+                    filtros.extend([
+                        telefone_digitos.ilike(like_digitos),
+                        celular_digitos.ilike(like_digitos),
+                    ])
                 query = query.filter(
-                    or_(
-                        Cliente.codigo.ilike(like),
-                        Cliente.nome.ilike(like),
-                        Cliente.nome_fantasia.ilike(like),
-                        Cliente.razao_social.ilike(like),
-                        Cliente.cpf.ilike(like),
-                        Cliente.cnpj.ilike(like),
-                        Cliente.email.ilike(like),
-                        Cliente.telefone.ilike(like),
-                        Cliente.celular.ilike(like),
-                    )
+                    or_(*filtros)
                 )
         
         # Filtro de ativo (padrÃ£o True - mostrar apenas ativos)
@@ -636,23 +675,44 @@ def list_clientes(
         # Contar total (ANTES do offset/limit)
         total = query.count()
         
-        # Ordenação inteligente: prioriza correspondência exata, depois prefixo.
+        # Ordenação inteligente: quando busca for numérica, prioriza ID/código;
+        # depois aplica nome/fantasia/razão social.
         if termo_busca:
             termo_lower = termo_busca.lower()
-            query = query.order_by(
-                case(
-                    (func.lower(Cliente.codigo) == termo_lower, 1),
-                    (func.lower(Cliente.nome) == termo_lower, 2),
-                    (func.lower(Cliente.nome_fantasia) == termo_lower, 3),
-                    (func.lower(Cliente.razao_social) == termo_lower, 4),
-                    (Cliente.codigo.ilike(f"{termo_busca}%"), 5),
-                    (Cliente.nome.ilike(f"{termo_busca}%"), 6),
-                    (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 7),
-                    (Cliente.razao_social.ilike(f"{termo_busca}%"), 8),
-                    else_=9,
-                ),
-                Cliente.nome
-            )
+            if termo_numerico:
+                query = query.order_by(
+                    case(
+                        (cast(Cliente.id, String) == termo_digitos, 1),
+                        (func.lower(Cliente.codigo) == termo_lower, 2),
+                        (telefone_digitos == termo_digitos, 3),
+                        (celular_digitos == termo_digitos, 4),
+                        (cast(Cliente.id, String).ilike(f"{termo_digitos}%"), 5),
+                        (Cliente.codigo.ilike(f"{termo_digitos}%"), 6),
+                        (telefone_digitos.ilike(f"{termo_digitos}%"), 7),
+                        (celular_digitos.ilike(f"{termo_digitos}%"), 8),
+                        (func.lower(Cliente.nome) == termo_lower, 9),
+                        (Cliente.nome.ilike(f"{termo_busca}%"), 10),
+                        (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 11),
+                        (Cliente.razao_social.ilike(f"{termo_busca}%"), 12),
+                        else_=13,
+                    ),
+                    Cliente.nome
+                )
+            else:
+                query = query.order_by(
+                    case(
+                        (func.lower(Cliente.codigo) == termo_lower, 1),
+                        (func.lower(Cliente.nome) == termo_lower, 2),
+                        (func.lower(Cliente.nome_fantasia) == termo_lower, 3),
+                        (func.lower(Cliente.razao_social) == termo_lower, 4),
+                        (Cliente.codigo.ilike(f"{termo_busca}%"), 5),
+                        (Cliente.nome.ilike(f"{termo_busca}%"), 6),
+                        (Cliente.nome_fantasia.ilike(f"{termo_busca}%"), 7),
+                        (Cliente.razao_social.ilike(f"{termo_busca}%"), 8),
+                        else_=9,
+                    ),
+                    Cliente.nome
+                )
         else:
             query = query.order_by(Cliente.nome)
         

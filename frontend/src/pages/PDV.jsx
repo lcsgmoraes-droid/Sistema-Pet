@@ -1324,10 +1324,11 @@ export default function PDV() {
     if (buscarCliente.length >= 1) {
       const timer = setTimeout(async () => {
         try {
-          // Remove apenas parênteses e traços (formatação de telefone do WhatsApp)
-          // MAS mantém espaços para que busca por nome completo funcione
-          // Ex: "(18)99740-1641" → "1899740164", "Camila Silva" → "Camila Silva"
-          const termoBusca = buscarCliente.replace(/[()-]/g, "").trim();
+          // Se a busca for telefone, usa só dígitos para bater com qualquer máscara.
+          // Se for nome/texto, mantém como foi digitado.
+          const termoOriginal = buscarCliente.trim();
+          const termoDigitos = termoOriginal.replace(/\D/g, "");
+          const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termoOriginal;
           const clientes = await buscarClientes({
             search: termoBusca,
             limit: 20,
@@ -1461,8 +1462,16 @@ export default function PDV() {
     const termoLimpo = String(termo || "").trim().toLowerCase();
     if (!termoLimpo) return null;
 
-    return clientesSugeridos.find((cliente) =>
-      String(cliente?.codigo || "").trim().toLowerCase() === termoLimpo,
+    // Quando a busca for numérica, prioriza ID exato do cliente.
+    const porId = clientesSugeridos.find(
+      (cliente) => String(cliente?.id || "").trim().toLowerCase() === termoLimpo,
+    );
+    if (porId) return porId;
+
+    // Em seguida, tenta código exato.
+    return clientesSugeridos.find(
+      (cliente) =>
+        String(cliente?.codigo || "").trim().toLowerCase() === termoLimpo,
     );
   }
 

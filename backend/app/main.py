@@ -233,6 +233,66 @@ _BLING_RENEWAL_COOLDOWN = 60
 # File lock para coordenar sincronização SEFAZ entre workers uvicorn
 _SEFAZ_LOCK_FILE = "/tmp/sefaz_sync.lock"
 
+# Lock líder para garantir que apenas 1 worker rode jobs de background
+_BACKGROUND_JOBS_LOCK_FILE = "/tmp/petshop_background_jobs.lock"
+_background_jobs_lock_handle = None
+_is_background_jobs_leader = False
+
+
+def _try_become_background_jobs_leader() -> bool:
+    """
+    Tenta eleger este processo como líder dos jobs de background.
+
+    Em Linux (produção), usa fcntl+arquivo para garantir exclusividade entre
+    processos uvicorn workers. Em ambientes sem fcntl (ex.: Windows), retorna
+    True para facilitar desenvolvimento local.
+    """
+    global _background_jobs_lock_handle
+    global _is_background_jobs_leader
+
+    try:
+        import fcntl  # Linux
+
+        lock_handle = open(_BACKGROUND_JOBS_LOCK_FILE, "w")
+        try:
+            fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _background_jobs_lock_handle = lock_handle
+            _is_background_jobs_leader = True
+            return True
+        except OSError:
+            lock_handle.close()
+            _background_jobs_lock_handle = None
+            _is_background_jobs_leader = False
+            return False
+    except ImportError:
+        # Windows/dev: sem fcntl, mantém comportamento simples
+        _is_background_jobs_leader = True
+        return True
+
+
+def _release_background_jobs_leader() -> None:
+    """Libera lock de liderança dos jobs de background, quando existir."""
+    global _background_jobs_lock_handle
+    global _is_background_jobs_leader
+
+    if _background_jobs_lock_handle is None:
+        _is_background_jobs_leader = False
+        return
+
+    try:
+        import fcntl
+        fcntl.flock(_background_jobs_lock_handle, fcntl.LOCK_UN)
+    except Exception:
+        pass
+
+    try:
+        _background_jobs_lock_handle.close()
+    except Exception:
+        pass
+
+    _background_jobs_lock_handle = None
+    _is_background_jobs_leader = False
+
 
 def _bling_recarregar_tokens_do_env():
     """Relê o access_token e refresh_token do .env e atualiza os.environ."""
@@ -950,45 +1010,52 @@ def on_startup():
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao iniciar scheduler de acertos: {str(e)}")
 
-    # Iniciar scheduler de campanhas
-    try:
-        from app.campaigns.scheduler import CampaignScheduler
-        global _campaign_scheduler
-        _campaign_scheduler = CampaignScheduler()
-        _campaign_scheduler.start()
-        logger.info("[OK] Campaign Scheduler iniciado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
+    # Eleger apenas 1 worker para executar jobs de background
+    became_leader = _try_become_background_jobs_leader()
+    if became_leader:
+        logger.info("[JOBS] Este worker e o lider de background jobs.")
 
-    # Iniciar renovação automática de token Bling (a cada 5h)
-    global _bling_token_thread
-    _bling_token_stop_event.clear()
-    _bling_token_thread = threading.Thread(
-        target=_loop_renovacao_token_bling,
-        name="bling-token-renovacao",
-        daemon=True,
-    )
-    _bling_token_thread.start()
+        # Iniciar scheduler de campanhas
+        try:
+            from app.campaigns.scheduler import CampaignScheduler
+            global _campaign_scheduler
+            _campaign_scheduler = CampaignScheduler()
+            _campaign_scheduler.start()
+            logger.info("[OK] Campaign Scheduler iniciado!")
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
 
-    # Iniciar job de expiração de reservas de pedidos vencidos (a cada 30min)
-    global _expirar_reservas_thread
-    _expirar_reservas_stop_event.clear()
-    _expirar_reservas_thread = threading.Thread(
-        target=_loop_expirar_reservas,
-        name="expirar-reservas",
-        daemon=True,
-    )
-    _expirar_reservas_thread.start()
+        # Iniciar renovação automática de token Bling (a cada 5h)
+        global _bling_token_thread
+        _bling_token_stop_event.clear()
+        _bling_token_thread = threading.Thread(
+            target=_loop_renovacao_token_bling,
+            name="bling-token-renovacao",
+            daemon=True,
+        )
+        _bling_token_thread.start()
 
-    # Iniciar job de sincronização automática SEFAZ (a cada 1min, verifica tenants)
-    global _sefaz_sync_thread
-    _sefaz_sync_stop_event.clear()
-    _sefaz_sync_thread = threading.Thread(
-        target=_loop_sefaz_sync,
-        name="sefaz-sync-automatico",
-        daemon=True,
-    )
-    _sefaz_sync_thread.start()
+        # Iniciar job de expiração de reservas de pedidos vencidos (a cada 30min)
+        global _expirar_reservas_thread
+        _expirar_reservas_stop_event.clear()
+        _expirar_reservas_thread = threading.Thread(
+            target=_loop_expirar_reservas,
+            name="expirar-reservas",
+            daemon=True,
+        )
+        _expirar_reservas_thread.start()
+
+        # Iniciar job de sincronização automática SEFAZ
+        global _sefaz_sync_thread
+        _sefaz_sync_stop_event.clear()
+        _sefaz_sync_thread = threading.Thread(
+            target=_loop_sefaz_sync,
+            name="sefaz-sync-automatico",
+            daemon=True,
+        )
+        _sefaz_sync_thread.start()
+    else:
+        logger.info("[JOBS] Worker secundario: background jobs desativados neste processo.")
 
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
@@ -1007,29 +1074,32 @@ def on_shutdown():
     # except Exception as e:
     #     logger.error(f"[ERROR] Erro ao parar scheduler: {str(e)}")
 
-    # Parar scheduler de campanhas
-    try:
-        global _campaign_scheduler
-        if _campaign_scheduler:
-            _campaign_scheduler.shutdown()
-            logger.info("[STOP] Campaign Scheduler parado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
+    if _is_background_jobs_leader:
+        # Parar scheduler de campanhas
+        try:
+            global _campaign_scheduler
+            if _campaign_scheduler:
+                _campaign_scheduler.shutdown()
+                logger.info("[STOP] Campaign Scheduler parado!")
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
 
-    global _sefaz_sync_thread
-    _sefaz_sync_stop_event.set()
+        global _sefaz_sync_thread
+        _sefaz_sync_stop_event.set()
 
-    global _bling_token_thread
-    _bling_token_stop_event.set()
-    if _bling_token_thread and _bling_token_thread.is_alive():
-        _bling_token_thread.join(timeout=2)
-    _bling_token_thread = None
+        global _bling_token_thread
+        _bling_token_stop_event.set()
+        if _bling_token_thread and _bling_token_thread.is_alive():
+            _bling_token_thread.join(timeout=2)
+        _bling_token_thread = None
 
-    global _expirar_reservas_thread
-    _expirar_reservas_stop_event.set()
-    if _expirar_reservas_thread and _expirar_reservas_thread.is_alive():
-        _expirar_reservas_thread.join(timeout=2)
-    _expirar_reservas_thread = None
+        global _expirar_reservas_thread
+        _expirar_reservas_stop_event.set()
+        if _expirar_reservas_thread and _expirar_reservas_thread.is_alive():
+            _expirar_reservas_thread.join(timeout=2)
+        _expirar_reservas_thread = None
+
+        _release_background_jobs_leader()
 
     logger.info("[STOP] Sistema encerrado")
 
