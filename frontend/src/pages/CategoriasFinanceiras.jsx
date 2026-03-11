@@ -455,7 +455,7 @@ const CategoriasFinanceiras = () => {
       
       setShowSubModal(false);
       resetSubForm();
-      carregarSubcategorias();
+      carregarDados();
     } catch (error) {
       console.error('Erro ao salvar:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar subcategoria');
@@ -479,7 +479,7 @@ const CategoriasFinanceiras = () => {
     try {
       await api.delete(`/dre/subcategorias/${id}`);
       toast.success('Subcategoria excluída!');
-      carregarSubcategorias();
+      carregarDados();
     } catch (error) {
       console.error('Erro ao excluir:', error);
       toast.error(error.response?.data?.detail || 'Erro ao excluir subcategoria');
