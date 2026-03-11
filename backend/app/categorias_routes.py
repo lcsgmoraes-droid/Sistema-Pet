@@ -251,7 +251,8 @@ def criar_categoria(
     
     categoria = CategoriaFinanceira(
         **categoria_data.model_dump(),
-        user_id=current_user.id
+        user_id=current_user.id,
+        tenant_id=tenant_id,
     )
     
     db.add(categoria)
