@@ -38,7 +38,6 @@ from app.auth_routes_multitenant import router as auth_router
 from app.clientes_routes import router as clientes_router
 from app.pets_routes import router as pets_router  # Módulo dedicado de pets
 from app.cadastros_routes import router as cadastros_router  # Espécies e Raças
-from app.subcategorias_routes import router as subcategorias_legacy_router
 from app.produtos_routes import router as produtos_router
 from app.variacoes_routes import router as variacoes_router  # Sprint 2: Variações
 from app.vendas_routes import router as vendas_router
@@ -768,7 +767,6 @@ app.include_router(acertos_router, prefix="/acertos", tags=["Acertos Financeiros
 app.include_router(dre_router, tags=["Financeiro - DRE"])
 app.include_router(dre_canais_router, tags=["Financeiro - DRE por Canal"])
 app.include_router(dre_plano_contas_router)
-app.include_router(subcategorias_legacy_router)
 app.include_router(dre_classificacao_router, tags=["DRE - Classificação Automática"])
 app.include_router(contas_bancarias_router, tags=["Financeiro - Contas Bancárias"])
 app.include_router(financeiro_router, tags=["Financeiro - Configurações"])
