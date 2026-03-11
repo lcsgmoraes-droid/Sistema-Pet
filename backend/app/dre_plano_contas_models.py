@@ -76,5 +76,6 @@ class DRESubcategoria(BaseTenantModel):
     escopo_rateio = Column(Enum(EscopoRateio), nullable=False)
 
     ativo = Column(Boolean, default=True)
+    custo_pe = Column(String(10), nullable=True)  # 'fixo' | 'variavel' | null (para Ponto de Equilíbrio)
 
     categoria = relationship("DRECategoria", back_populates="subcategorias")

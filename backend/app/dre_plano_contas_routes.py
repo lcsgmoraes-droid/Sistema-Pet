@@ -69,6 +69,7 @@ class DRESubcategoriaUpdate(BaseModel):
     base_rateio: BaseRateio | None = None
     escopo_rateio: EscopoRateio | None = None
     ativo: bool | None = None
+    custo_pe: str | None = None  # 'fixo' | 'variavel' | null
     
     class Config:
         use_enum_values = True
@@ -82,6 +83,7 @@ class DRESubcategoriaResponse(BaseModel):
     base_rateio: str | None
     escopo_rateio: str
     ativo: bool
+    custo_pe: str | None = None
     created_at: datetime
     updated_at: datetime
     
@@ -285,6 +287,8 @@ def atualizar_subcategoria(
         db_subcategoria.escopo_rateio = subcategoria.escopo_rateio
     if subcategoria.ativo is not None:
         db_subcategoria.ativo = subcategoria.ativo
+    if subcategoria.custo_pe is not None:
+        db_subcategoria.custo_pe = subcategoria.custo_pe if subcategoria.custo_pe != '' else None
     
     # Validar regra: INDIRETO_RATEAVEL precisa de base_rateio
     if db_subcategoria.tipo_custo == TipoCusto.INDIRETO_RATEAVEL and db_subcategoria.base_rateio is None:

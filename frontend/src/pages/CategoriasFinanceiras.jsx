@@ -47,6 +47,26 @@ const QUESTION_MARK_WORD_FIXES = [
   [/provis\?+o/gi, 'provisão'],
   [/descri\?+o/gi, 'descrição'],
   [/n\?mero/gi, 'número'],
+  // Novos padrões para subcategorias DRE
+  [/F\?+sica/g, 'Física'],
+  [/f\?+sica/gi, 'física'],
+  [/Padr\?+o/g, 'Padrão'],
+  [/padr\?+o/gi, 'padrão'],
+  [/Espa\?+o/g, 'Espaço'],
+  [/espa\?+o/gi, 'espaço'],
+  [/Di\?+rias/g, 'Diárias'],
+  [/Di\?+ria/g, 'Diária'],
+  [/di\?+ria/gi, 'diária'],
+  [/Vacina\?+o/g, 'Vacinação'],
+  [/vacina\?+o/gi, 'vacinação'],
+  [/Participa\?+o/g, 'Participação'],
+  [/participa\?+o/gi, 'participação'],
+  [/Ra\?+es/g, 'Rações'],
+  [/ra\?+es/gi, 'rações'],
+  [/Redu\?+o/g, 'Redução'],
+  [/redu\?+o/gi, 'redução'],
+  [/Cr\?+dito/g, 'Crédito'],
+  [/cr\?+dito/gi, 'crédito'],
 ];
 
 const normalizeDisplayText = (value) => {
@@ -277,6 +297,24 @@ const CategoriasFinanceiras = () => {
     }
   };
 
+  const handleQuickTipoCusto = async (id, novoTipoCusto) => {
+    try {
+      await api.put(`/categorias-financeiras/${id}`, { tipo_custo: novoTipoCusto });
+      carregarDados();
+    } catch (error) {
+      toast.error('Erro ao classificar categoria');
+    }
+  };
+
+  const handleQuickCustoPeDRE = async (subId, novoValor) => {
+    try {
+      await api.put(`/dre/subcategorias/${subId}`, { custo_pe: novoValor });
+      carregarDados();
+    } catch (error) {
+      toast.error('Erro ao classificar subcategoria');
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       nome: '',
@@ -387,6 +425,7 @@ const CategoriasFinanceiras = () => {
   };
 
   const categoriasFiltradas = categorias.filter(cat => {
+    if (cat.categoria_pai_id) return false; // filhas aparecem dentro do pai
     if (filtroTipo === 'todos') return true;
     return cat.tipo === filtroTipo;
   });
@@ -451,8 +490,9 @@ const CategoriasFinanceiras = () => {
           <div className="divide-y divide-gray-200">
             {categoriasFiltradas.map((cat) => {
               const subsDRE = getSubcategoriasDREDaCategoria(cat);
+              const filhasFinanceiras = categorias.filter(c => c.categoria_pai_id === cat.id);
               const isExpanded = categoriaExpandida.has(cat.id);
-              const temSubcategoria = subsDRE.length > 0;
+              const temSubcategoria = subsDRE.length > 0 || filhasFinanceiras.length > 0;
               
               return (
                 <div key={cat.id}>
@@ -541,49 +581,105 @@ const CategoriasFinanceiras = () => {
                     </div>
                   </div>
                   
-                  {/* Subcategorias DRE (Expansível) */}
+                  {/* Subcategorias (Expansível) */}
                   {isExpanded && (
                     <div className="bg-gradient-to-r from-purple-50 to-blue-50 border-t border-purple-100">
-                      {temSubcategoria ? (
+                      {/* Subcategorias Financeiras — apenas quando há filhas */}
+                      {filhasFinanceiras.length > 0 && (
+                        <>
+                          <div className="px-6 py-2 bg-orange-50 border-b border-orange-200">
+                            <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">
+                              Subcategorias Financeiras ({filhasFinanceiras.length}) — classifique cada uma
+                            </span>
+                          </div>
+                          {filhasFinanceiras.map(filha => (
+                            <div key={filha.id} className="px-6 py-3 flex items-center gap-3 ml-9 border-b border-orange-100 last:border-b-0">
+                              <span className="text-orange-400 text-lg">└─</span>
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-gray-700">{normalizeDisplayText(filha.nome)}</div>
+                              </div>
+                              {/* Botões inline Fixo/Variável */}
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleQuickTipoCusto(filha.id, filha.tipo_custo === 'fixo' ? null : 'fixo')}
+                                  className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                                    filha.tipo_custo === 'fixo'
+                                      ? 'bg-orange-500 text-white border-orange-500'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400 hover:text-orange-600'
+                                  }`}
+                                >
+                                  🔒 Fixo
+                                </button>
+                                <button
+                                  onClick={() => handleQuickTipoCusto(filha.id, filha.tipo_custo === 'variavel' ? null : 'variavel')}
+                                  className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                                    filha.tipo_custo === 'variavel'
+                                      ? 'bg-blue-500 text-white border-blue-500'
+                                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                                  }`}
+                                >
+                                  📈 Variável
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {/* Subcategorias DRE */}
+                      {subsDRE.length > 0 && (
                         <>
                           <div className="px-6 py-2 bg-purple-100/50 border-b border-purple-200">
                             <span className="text-xs font-semibold text-purple-700 uppercase tracking-wide">
-                              Subcategorias DRE ({subsDRE.length})
+                              Subcategorias DRE ({subsDRE.length}){cat.tipo_custo === 'ambos' && ' — classifique cada uma'}
                             </span>
                           </div>
                           {subsDRE.map((sub) => (
-                            <div key={sub.id} className="px-6 py-3 flex items-center gap-4 ml-9">
-                            <span className="text-purple-400 text-lg">└─</span>
-                            <div className="flex-1">
-                              <div className="text-sm font-medium text-gray-700">{normalizeDisplayText(sub.nome)}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
-                                  {sub.tipo_custo}
-                                </span>
-                                {sub.escopo_rateio && (
-                                  <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
-                                    {sub.escopo_rateio}
+                            <div key={sub.id} className="px-6 py-3 flex items-center gap-4 ml-9 border-b border-purple-100 last:border-b-0">
+                              <span className="text-purple-400 text-lg">└─</span>
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-gray-700">{normalizeDisplayText(sub.nome)}</div>
+                              </div>
+                              {/* Botões Fixo/Variável — aparecem sempre, mas são destaque quando pai é Ambos */}
+                              <div className="flex gap-1 items-center">
+                                {sub.custo_pe && (
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                    sub.custo_pe === 'fixo' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {sub.custo_pe === 'fixo' ? '🔒 Fixo' : '📈 Variável'}
                                   </span>
+                                )}
+                                {cat.tipo_custo === 'ambos' && (
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleQuickCustoPeDRE(sub.id, sub.custo_pe === 'fixo' ? '' : 'fixo')}
+                                      className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                                        sub.custo_pe === 'fixo'
+                                          ? 'bg-orange-500 text-white border-orange-500'
+                                          : 'bg-white text-gray-500 border-gray-300 hover:border-orange-400 hover:text-orange-600'
+                                      }`}
+                                    >
+                                      🔒 Fixo
+                                    </button>
+                                    <button
+                                      onClick={() => handleQuickCustoPeDRE(sub.id, sub.custo_pe === 'variavel' ? '' : 'variavel')}
+                                      className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
+                                        sub.custo_pe === 'variavel'
+                                          ? 'bg-blue-500 text-white border-blue-500'
+                                          : 'bg-white text-gray-500 border-gray-300 hover:border-blue-400 hover:text-blue-600'
+                                      }`}
+                                    >
+                                      📈 Variável
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                             </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              sub.ativo 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-gray-200 text-gray-600'
-                            }`}>
-                              {sub.ativo ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </div>
-                        ))}
+                          ))}
                         </>
-                      ) : (
+                      )}
+                      {filhasFinanceiras.length === 0 && subsDRE.length === 0 && (
                         <div className="px-6 py-4 ml-9 text-center">
-                          <div className="text-gray-400 text-sm">
-                            <div className="mb-2">-</div>
-                            <div className="font-medium">Nenhuma subcategoria DRE cadastrada</div>
-                            <div className="text-xs mt-1">Configure subcategorias no módulo DRE</div>
-                          </div>
+                          <div className="text-gray-400 text-sm">Nenhuma subcategoria cadastrada</div>
                         </div>
                       )}
                     </div>
