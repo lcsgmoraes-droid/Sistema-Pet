@@ -93,6 +93,7 @@ const normalizeIcon = (iconValue) => {
 const CategoriasFinanceiras = () => {
   const [categorias, setCategorias] = useState([]);
   const [subcategoriasDRE, setSubcategoriasDRE] = useState([]); // Subcategorias DRE
+  const [dreCategorias, setDreCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
@@ -129,8 +130,19 @@ const CategoriasFinanceiras = () => {
   const carregarDados = async () => {
     await Promise.all([
       carregarCategorias(),
-      carregarSubcategoriasDRE()
+      carregarSubcategoriasDRE(),
+      carregarCategoriasDRE()
     ]);
+  };
+
+  const carregarCategoriasDRE = async () => {
+    try {
+      const response = await api.get('/dre/categorias');
+      setDreCategorias(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erro ao carregar categorias DRE:', error);
+      setDreCategorias([]);
+    }
   };
 
   const carregarCategorias = async () => {
@@ -189,6 +201,27 @@ const CategoriasFinanceiras = () => {
     return todasSubcategorias;
   };
 
+  const resolverCategoriaDREId = (categoriaFinanceiraId) => {
+    const categoriaFinanceira = categorias.find(c => c.id === Number(categoriaFinanceiraId));
+    if (!categoriaFinanceira) return null;
+
+    if (categoriaFinanceira.dre_subcategoria_id) {
+      const subPrincipal = subcategoriasDRE.find(s => s.id === categoriaFinanceira.dre_subcategoria_id);
+      if (subPrincipal?.categoria_id) return subPrincipal.categoria_id;
+    }
+
+    const natureza = categoriaFinanceira.tipo === 'receita' ? 'receita' : 'despesa';
+    const categoriasMesmaNatureza = dreCategorias.filter(c => c.natureza === natureza && c.ativo !== false);
+    if (natureza === 'despesa') {
+      const operacional = categoriasMesmaNatureza.find(c =>
+        (c.nome || '').toLowerCase().includes('operacion')
+      );
+      if (operacional) return operacional.id;
+    }
+
+    return categoriasMesmaNatureza[0]?.id || null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -224,18 +257,27 @@ const CategoriasFinanceiras = () => {
         });
         categoriaId = response.data.id;
         toast.success('Categoria criada com sucesso!');
+        let primeiraSubDREId = null;
 
         // Criar subcategorias se houver
         if (formData.novasSubcategorias.length > 0) {
           const subsValidas = formData.novasSubcategorias.filter(sub => sub.nome.trim());
+          const categoriaDREId = resolverCategoriaDREId(categoriaId);
+          if (!categoriaDREId) {
+            toast.error('Categoria DRE não encontrada para vincular subcategoria');
+          }
           for (const sub of subsValidas) {
             try {
-              await api.post('/dre/subcategorias', {
-                categoria_id: categoriaId,
+              if (!categoriaDREId) continue;
+              const subResp = await api.post('/dre/subcategorias', {
+                categoria_id: categoriaDREId,
                 nome: sub.nome,
                 tipo_custo: formData.tipo_custo || 'direto',
                 escopo_rateio: 'ambos'
               });
+              if (!primeiraSubDREId && subResp?.data?.id) {
+                primeiraSubDREId = subResp.data.id;
+              }
             } catch (subError) {
               console.error('Erro ao criar subcategoria:', subError);
               toast.error(`Erro ao criar subcategoria: ${sub.nome}`);
@@ -243,6 +285,14 @@ const CategoriasFinanceiras = () => {
           }
           if (subsValidas.length > 0) {
             toast.success(`${subsValidas.length} subcategoria(s) criada(s)!`);
+          }
+        }
+
+        if (primeiraSubDREId) {
+          try {
+            await api.put(`/categorias-financeiras/${categoriaId}`, { dre_subcategoria_id: primeiraSubDREId });
+          } catch (vinculoError) {
+            console.error('Erro ao vincular categoria com DRE:', vinculoError);
           }
         }
       }
@@ -374,16 +424,32 @@ const CategoriasFinanceiras = () => {
 
     try {
       if (editandoSub) {
-        await api.put(`/dre/subcategorias/${editandoSub}`, formSubData);
+        await api.put(`/dre/subcategorias/${editandoSub}`, {
+          nome: formSubData.nome,
+          ativo: formSubData.ativo
+        });
         toast.success('Subcategoria atualizada!');
       } else {
         const categoriaSelecionada = categorias.find(c => c.id === formSubData.categoria_id);
-        await api.post('/dre/subcategorias', {
-          categoria_id: formSubData.categoria_id,
+        const categoriaDREId = resolverCategoriaDREId(formSubData.categoria_id);
+        if (!categoriaDREId) {
+          toast.error('Categoria DRE não encontrada para vincular subcategoria');
+          return;
+        }
+
+        const subResp = await api.post('/dre/subcategorias', {
+          categoria_id: categoriaDREId,
           nome: formSubData.nome,
           tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
           escopo_rateio: 'ambos'
         });
+
+        const categoriaFinanceira = categorias.find(c => c.id === formSubData.categoria_id);
+        if (!categoriaFinanceira?.dre_subcategoria_id && subResp?.data?.id) {
+          await api.put(`/categorias-financeiras/${formSubData.categoria_id}`, {
+            dre_subcategoria_id: subResp.data.id
+          });
+        }
         toast.success('Subcategoria criada!');
       }
       

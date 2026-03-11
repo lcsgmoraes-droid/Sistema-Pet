@@ -4,6 +4,7 @@ import api from '../api';
 export default function Subcategorias() {
   const [categorias, setCategorias] = useState([]);
   const [subcategorias, setSubcategorias] = useState([]);
+  const [dreCategorias, setDreCategorias] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -15,9 +16,26 @@ export default function Subcategorias() {
   });
 
   useEffect(() => {
-    carregarCategorias();
-    carregarSubcategorias();
+    carregarDados();
   }, []);
+
+  const carregarDados = async () => {
+    await Promise.all([
+      carregarCategorias(),
+      carregarCategoriasDRE(),
+      carregarSubcategorias()
+    ]);
+  };
+
+  const carregarCategoriasDRE = async () => {
+    try {
+      const response = await api.get('/dre/categorias');
+      setDreCategorias(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erro ao carregar categorias DRE:', error);
+      setDreCategorias([]);
+    }
+  };
 
   const carregarCategorias = async () => {
     try {
@@ -55,8 +73,18 @@ export default function Subcategorias() {
         await api.put(`/dre/subcategorias/${formData.id}`, formData);
       } else {
         const categoriaSelecionada = categorias.find(c => c.id === Number(formData.categoria_id));
+        const subPrincipal = subcategorias.find(s => s.id === categoriaSelecionada?.dre_subcategoria_id);
+        const natureza = categoriaSelecionada?.tipo === 'receita' ? 'receita' : 'despesa';
+        const categoriaDREFallback = dreCategorias.find(c => c.natureza === natureza && c.ativo !== false);
+        const categoriaDREId = subPrincipal?.categoria_id || categoriaDREFallback?.id;
+
+        if (!categoriaDREId) {
+          alert('Não foi possível identificar categoria DRE para essa categoria financeira');
+          return;
+        }
+
         await api.post('/dre/subcategorias', {
-          categoria_id: Number(formData.categoria_id),
+          categoria_id: Number(categoriaDREId),
           nome: formData.nome,
           tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
           escopo_rateio: 'ambos'
