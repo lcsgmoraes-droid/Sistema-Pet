@@ -162,6 +162,8 @@ from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
+from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
+import app.veterinario_models  # noqa: F401 — garante registro no SQLAlchemy
 
 # ============================================================================
 # CAMPANHAS — Motor de Campanhas (Fase 1)
@@ -783,6 +785,7 @@ app.include_router(roles_router, tags=["Roles & RBAC"])
 app.include_router(permissions_router, tags=["Permissions & RBAC"])
 app.include_router(clientes_router, tags=["Clientes & Pets"])
 app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
+app.include_router(veterinario_router, tags=["Veterinário"])  # Módulo Veterinário
 app.include_router(cadastros_router, tags=["Cadastros - Espécies & Raças"])  # Cadastros básicos
 app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
 app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!

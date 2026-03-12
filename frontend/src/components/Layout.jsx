@@ -1,4 +1,4 @@
-import { PawPrint } from "lucide-react";
+import { PawPrint, Stethoscope } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -360,6 +360,45 @@ const Layout = () => {
       highlight: true,
       permission: "clientes.visualizar",
     }, // Vinculado a clientes
+    {
+      path: "/veterinario",
+      icon: Stethoscope,
+      label: "Veterinário",
+      highlight: true,
+      permission: null,
+      submenu: [
+        {
+          path: "/veterinario",
+          label: "Dashboard",
+          permission: null,
+        },
+        {
+          path: "/veterinario/agenda",
+          label: "Agenda",
+          permission: null,
+        },
+        {
+          path: "/veterinario/consultas",
+          label: "Consultas / Prontuário",
+          permission: null,
+        },
+        {
+          path: "/veterinario/vacinas",
+          label: "Vacinas",
+          permission: null,
+        },
+        {
+          path: "/veterinario/internacoes",
+          label: "Internações",
+          permission: null,
+        },
+        {
+          path: "/veterinario/catalogo",
+          label: "Catálogos",
+          permission: null,
+        },
+      ],
+    },
     {
       path: "/produtos",
       icon: FiPackage,

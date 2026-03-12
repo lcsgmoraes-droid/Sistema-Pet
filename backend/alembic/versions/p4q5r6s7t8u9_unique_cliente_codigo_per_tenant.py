@@ -58,12 +58,16 @@ def upgrade() -> None:
                 WHERE id = :cliente_id
             """), {"novo_codigo": novo_codigo, "cliente_id": cliente_id})
 
-    # 2. Agora que nao ha mais duplicatas, criar o UniqueConstraint
-    op.create_unique_constraint(
-        "uq_clientes_tenant_codigo",
-        "clientes",
-        ["tenant_id", "codigo"],
-    )
+    # 2. Agora que nao ha mais duplicatas, criar o UniqueConstraint (se ainda nao existe)
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_constraints = [uc["name"] for uc in inspector.get_unique_constraints("clientes")]
+    if "uq_clientes_tenant_codigo" not in existing_constraints:
+        op.create_unique_constraint(
+            "uq_clientes_tenant_codigo",
+            "clientes",
+            ["tenant_id", "codigo"],
+        )
 
 
 def downgrade() -> None:

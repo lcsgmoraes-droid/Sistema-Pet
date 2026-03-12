@@ -39,6 +39,17 @@ const GerenciamentoPets = lazy(() => import("./pages/GerenciamentoPets"));
 const PetDetalhes = lazy(() => import("./pages/PetDetalhes"));
 const PetForm = lazy(() => import("./pages/PetForm"));
 
+// ========================================
+// 🩺 MÓDULO VETERINÁRIO
+// ========================================
+const VetDashboard = lazy(() => import("./pages/veterinario/VetDashboard"));
+const VetAgenda = lazy(() => import("./pages/veterinario/VetAgenda"));
+const VetConsultas = lazy(() => import("./pages/veterinario/VetConsultas"));
+const VetConsultaForm = lazy(() => import("./pages/veterinario/VetConsultaForm"));
+const VetVacinas = lazy(() => import("./pages/veterinario/VetVacinas"));
+const VetInternacoes = lazy(() => import("./pages/veterinario/VetInternacoes"));
+const VetCatalogo = lazy(() => import("./pages/veterinario/VetCatalogo"));
+
 const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
 const MeusCaixas = lazy(() => import("./pages/MeusCaixas"));
@@ -313,6 +324,18 @@ function App() {
                   <Route path="pets/novo" element={<PetForm />} />
                   <Route path="pets/:petId" element={<PetDetalhes />} />
                   <Route path="pets/:petId/editar" element={<PetForm />} />
+
+                  {/* ========================================
+                🩺 MÓDULO VETERINÁRIO
+                ======================================== */}
+                  <Route path="veterinario" element={<VetDashboard />} />
+                  <Route path="veterinario/agenda" element={<VetAgenda />} />
+                  <Route path="veterinario/consultas" element={<VetConsultas />} />
+                  <Route path="veterinario/consultas/nova" element={<VetConsultaForm />} />
+                  <Route path="veterinario/consultas/:consultaId" element={<VetConsultaForm />} />
+                  <Route path="veterinario/vacinas" element={<VetVacinas />} />
+                  <Route path="veterinario/internacoes" element={<VetInternacoes />} />
+                  <Route path="veterinario/catalogo" element={<VetCatalogo />} />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS

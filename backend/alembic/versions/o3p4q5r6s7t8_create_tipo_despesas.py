@@ -17,44 +17,51 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 1. Criar tabela tipo_despesas
-    op.create_table(
-        "tipo_despesas",
-        sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("tenant_id", sa.UUID(), nullable=False),
-        sa.Column("nome", sa.String(length=100), nullable=False),
-        sa.Column("e_custo_fixo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column(
-            "created_at",
-            sa.DateTime(),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_tipo_despesas_tenant_id", "tipo_despesas", ["tenant_id"])
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    tables = inspector.get_table_names()
 
-    # 2. Adicionar FK em contas_pagar
-    op.add_column(
-        "contas_pagar",
-        sa.Column("tipo_despesa_id", sa.Integer(), nullable=True),
-    )
-    op.create_index("ix_contas_pagar_tipo_despesa_id", "contas_pagar", ["tipo_despesa_id"])
-    op.create_foreign_key(
-        "fk_contas_pagar_tipo_despesa",
-        "contas_pagar",
-        "tipo_despesas",
-        ["tipo_despesa_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
+    # 1. Criar tabela tipo_despesas
+    if "tipo_despesas" not in tables:
+        op.create_table(
+            "tipo_despesas",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("tenant_id", sa.UUID(), nullable=False),
+            sa.Column("nome", sa.String(length=100), nullable=False),
+            sa.Column("e_custo_fixo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                server_default=sa.text("now()"),
+                nullable=False,
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                server_default=sa.text("now()"),
+                nullable=False,
+            ),
+            sa.PrimaryKeyConstraint("id"),
+        )
+        op.create_index("ix_tipo_despesas_tenant_id", "tipo_despesas", ["tenant_id"])
+
+    # 2. Adicionar FK em contas_pagar (se coluna ainda não existe)
+    contas_pagar_cols = [c["name"] for c in inspector.get_columns("contas_pagar")]
+    if "tipo_despesa_id" not in contas_pagar_cols:
+        op.add_column(
+            "contas_pagar",
+            sa.Column("tipo_despesa_id", sa.Integer(), nullable=True),
+        )
+        op.create_index("ix_contas_pagar_tipo_despesa_id", "contas_pagar", ["tipo_despesa_id"])
+        op.create_foreign_key(
+            "fk_contas_pagar_tipo_despesa",
+            "contas_pagar",
+            "tipo_despesas",
+            ["tipo_despesa_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
 
 
 def downgrade() -> None:
