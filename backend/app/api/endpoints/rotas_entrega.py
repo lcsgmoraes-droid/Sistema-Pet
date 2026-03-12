@@ -1423,7 +1423,7 @@ def rastreio_publico(
     rota_row = db.execute(
         text(
             """
-            SELECT id, numero, status, entregador_id
+            SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em
             FROM rotas_entrega
             WHERE token_rastreio = :token
             LIMIT 1
@@ -1435,7 +1435,7 @@ def rastreio_publico(
     if not rota_row:
         raise HTTPException(status_code=404, detail="Rastreio não encontrado ou link inválido")
 
-    rota_id, rota_numero, rota_status, entregador_id = rota_row
+    rota_id, rota_numero, rota_status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em = rota_row
     entregador = db.query(Cliente).filter(Cliente.id == entregador_id).first() if entregador_id else None
 
     # Buscar paradas com última posição GPS conhecida
@@ -1443,23 +1443,37 @@ def rastreio_publico(
         RotaEntregaParada.rota_id == rota_id
     ).order_by(RotaEntregaParada.ordem).all()
 
-    # Última posição GPS (última parada entregue com GPS)
+    # Prioriza posição atual da rota (enviada pelo app do entregador).
+    # Fallback: última parada entregue com GPS.
     ultima_posicao = None
-    for p in reversed(paradas):
-        lat = None
-        lon = None
-        try:
-            result = db.execute(
-                text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
-                {"pid": p.id}
-            ).fetchone()
-            if result:
-                lat, lon = result
-        except Exception:
-            pass
-        if lat is not None and lon is not None:
-            ultima_posicao = {"lat": float(lat), "lon": float(lon)}
-            break
+    if lat_atual is not None and lon_atual is not None:
+        ultima_posicao = {
+            "lat": float(lat_atual),
+            "lon": float(lon_atual),
+            "atualizada_em": localizacao_atualizada_em.isoformat() if localizacao_atualizada_em else None,
+            "fonte": "rota_atual",
+        }
+    else:
+        for p in reversed(paradas):
+            lat = None
+            lon = None
+            try:
+                result = db.execute(
+                    text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
+                    {"pid": p.id}
+                ).fetchone()
+                if result:
+                    lat, lon = result
+            except Exception:
+                pass
+            if lat is not None and lon is not None:
+                ultima_posicao = {
+                    "lat": float(lat),
+                    "lon": float(lon),
+                    "atualizada_em": p.data_entrega.isoformat() if p.data_entrega else None,
+                    "fonte": "ultima_parada",
+                }
+                break
 
     entregues = sum(1 for p in paradas if p.status == "entregue")
     total = len(paradas)
