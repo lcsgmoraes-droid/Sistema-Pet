@@ -24,6 +24,7 @@ from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
 from .models import User, Cliente
+from app.partner_utils import get_all_accessible_tenant_ids, is_partner_owned
 from .produtos_models import (
     Categoria, Marca, Departamento, Produto, ProdutoLote,
     ProdutoImagem, ProdutoFornecedor, ListaPreco, ProdutoListaPreco,
@@ -476,6 +477,8 @@ class ProdutoResponse(ProdutoBase):
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
     predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
     sucessor_nome: Optional[str] = None  # Nome do sucessor (se existir)
+    # Campo de parceria (True = pertence ao tenant parceiro)
+    de_parceiro: bool = False
 
     @field_validator('categoria_nome', mode='before')
     @classmethod
@@ -1182,10 +1185,9 @@ def gerar_codigo_barras(
         # Gerar cÃ³digo
         codigo = gerar_codigo_barras_ean13(request.sku)
 
-        # Verificar se jÃ¡ existe
+        # Verificar se já existe globalmente (constraint é global, não por tenant)
         existe = db.query(Produto).filter(
-            Produto.codigo_barras == codigo,
-            Produto.tenant_id == tenant_id
+            Produto.codigo_barras == codigo
         ).first()
 
         if not existe:
@@ -1611,25 +1613,24 @@ def listar_produtos(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
+    # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+
     # QUERY BASE - Buscar apenas produtos principais (SIMPLES, PAI e KIT)
-    # VARIACAO nÃ£o aparecem sozinhas, apenas agrupadas com o PAI
-    # EXCEÃ‡ÃƒO: Se filtrar explicitamente por tipo_produto, respeita o filtro
-    # EXCEÃ‡ÃƒO 2: Se filtrar por produto_predecessor_id, buscar apenas sucessores (qualquer tipo)
     if produto_predecessor_id:
-        # Buscar produtos que sÃ£o sucessores do produto especificado
         query = db.query(Produto).filter(
-            Produto.tenant_id == tenant_id,
+            Produto.tenant_id.in_(access_ids),
             Produto.produto_predecessor_id == produto_predecessor_id
         )
     elif tipo_produto:
         query = db.query(Produto).filter(
-            Produto.tenant_id == tenant_id,
-            Produto.tipo_produto == tipo_produto  # Filtro especÃ­fico
+            Produto.tenant_id.in_(access_ids),
+            Produto.tipo_produto == tipo_produto
         )
     else:
         query = db.query(Produto).filter(
-            Produto.tenant_id == tenant_id,
-            Produto.tipo_produto.in_(['SIMPLES', 'PAI', 'KIT'])  # Sprint 2 + KIT: Mostrar SIMPLES, PAI e KIT
+            Produto.tenant_id.in_(access_ids),
+            Produto.tipo_produto.in_(['SIMPLES', 'PAI', 'KIT'])
         )
 
     # Aplicar filtro de ativo (se especificado)
@@ -1762,6 +1763,8 @@ def listar_produtos(
                 produto.estoque_virtual = 0
 
         produto.estoque_reservado = float(reservas_v2.get(produto.codigo, 0))
+        # Marcar produto como de parceiro se pertencer a outro tenant
+        produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
         produtos_expandidos.append(produto)
 
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
@@ -1923,6 +1926,8 @@ def excluir_variacao_permanentemente(
     Exclui DEFINITIVAMENTE uma variaÃ§Ã£o do banco de dados
     ATENÃ‡ÃƒO: Esta aÃ§Ã£o Ã© irreversÃ­vel!
     """
+
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
@@ -2333,6 +2338,8 @@ def deletar_produto(
 ):
     """Deleta (soft delete) um produto"""
 
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id
@@ -2380,19 +2387,18 @@ def gerar_sku(
     """
     current_user, tenant_id = user_and_tenant
 
-    # Buscar Ãºltimo SKU com o mesmo prefixo
+    # Buscar maior número já usado com esse prefixo em TODA a tabela
+    # (a constraint de unicidade em 'codigo' é global, não por tenant)
     ultimo_produto = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
         Produto.codigo.like(f"{prefixo}-%")
     ).order_by(Produto.id.desc()).first()
 
     if ultimo_produto:
-        # Extrair nÃºmero do Ãºltimo SKU
+        # Extrair número do último SKU
         try:
             ultimo_numero = int(ultimo_produto.codigo.split("-")[-1])
             proximo_numero = ultimo_numero + 1
         except ValueError:
-            # Se nÃ£o conseguir extrair, comeÃ§ar do 1
             proximo_numero = 1
     else:
         proximo_numero = 1
@@ -2400,14 +2406,12 @@ def gerar_sku(
     # Gerar novo SKU
     novo_sku = f"{prefixo}-{proximo_numero:05d}"
 
-    # Verificar se jÃ¡ existe (caso de race condition)
+    # Verificar se já existe globalmente (evita race condition)
     existe = db.query(Produto).filter(
-        Produto.codigo == novo_sku,
-        Produto.tenant_id == tenant_id
+        Produto.codigo == novo_sku
     ).first()
 
     if existe:
-        # Se existir, tentar prÃ³ximo nÃºmero
         novo_sku = f"{prefixo}-{proximo_numero + 1:05d}"
 
     return {
@@ -2629,6 +2633,8 @@ def entrada_estoque(
 ):
     """Registra entrada de estoque criando um lote"""
 
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     # Verificar se produto existe
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
@@ -2723,6 +2729,8 @@ def saida_estoque_fifo(
     Registra saÃ­da de estoque usando FIFO
     Consome lotes mais antigos primeiro
     """
+
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Verificar se produto existe
     produto = db.query(Produto).filter(

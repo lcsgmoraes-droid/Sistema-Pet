@@ -96,6 +96,7 @@ class RegisterRequest(BaseModel):
     password: str
     nome: Optional[str] = None
     nome_loja: Optional[str] = None
+    organization_type: Optional[str] = "petshop"
 
 
 class LoginResponse(BaseModel):
@@ -147,7 +148,8 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         id=str(tenant_id),
         name=tenant_name,
         status='active',
-        plan='free'
+        plan='free',
+        organization_type=payload.organization_type or 'petshop'
     )
     db.add(tenant)
     db.flush()  # Para garantir que o tenant existe

@@ -128,7 +128,7 @@ export default function VetConsultaForm() {
   // Carrega pets e veterinários
   useEffect(() => {
     api
-      .get("/pets", { params: { limit: 500 } })
+      .get("/vet/pets", { params: { limit: 500 } })
       .then((r) => setPets(r.data?.items ?? r.data ?? []))
       .catch(() => {});
     api

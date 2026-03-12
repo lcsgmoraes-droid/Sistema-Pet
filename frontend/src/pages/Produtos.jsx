@@ -234,6 +234,11 @@ const PRODUTOS_COLUNAS = [
                       ⚠️ Descontinuado
                     </span>
                   )}
+                  {produto.de_parceiro && (
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                      Pet Shop Parceiro
+                    </span>
+                  )}
                 </div>
               </div>
               {produto.descricao && (
@@ -570,6 +575,7 @@ const PRODUTOS_COLUNAS = [
               />
             </svg>
           </button>
+          {!produto.de_parceiro && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -592,6 +598,7 @@ const PRODUTOS_COLUNAS = [
               />
             </svg>
           </button>
+          )}
         </div>
       </td>
     ),

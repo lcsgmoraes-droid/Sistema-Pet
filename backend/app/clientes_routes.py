@@ -24,6 +24,7 @@ from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
 from app.security.permissions_decorator import require_permission
+from app.partner_utils import get_all_accessible_tenant_ids
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,9 @@ class ClienteResponse(BaseModel):
             return result
         return v if v else []
 
+    # Campo de parceria (True = pertence ao tenant parceiro, False = próprio)
+    de_parceiro: bool = False
+
     model_config = {"from_attributes": True}
 
 
@@ -597,7 +601,9 @@ def list_clientes(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     
     try:
-        query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id)
+        # Incluir clientes de tenants parceiros (ex.: pet shop parceiro da clínica)
+        access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+        query = db.query(Cliente).filter(Cliente.tenant_id.in_(access_ids))
         
         # Filtro por tipo de cadastro (aceita lista ou string)
         if tipo_cadastro:
@@ -696,7 +702,13 @@ def list_clientes(
         
         # Buscar registros paginados
         clientes = query.offset(skip).limit(limit).all()
-        
+
+        # Marcar clientes que pertencem ao tenant parceiro
+        tenant_id_str = str(tenant_id)
+        for c in clientes:
+            if str(c.tenant_id) != tenant_id_str:
+                c.de_parceiro = True
+
         return ClientesListResponse(
             items=clientes,
             total=total,

@@ -129,9 +129,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (email, password, nome) => {
+  const register = async (email, password, nome, organization_type = 'petshop') => {
     try {
-      const response = await api.post('/auth/register', { email, password, nome });
+      const response = await api.post('/auth/register', { email, password, nome, organization_type });
       const { access_token } = response.data;
       
       localStorage.setItem('access_token', access_token);

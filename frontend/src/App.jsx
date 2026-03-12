@@ -49,6 +49,7 @@ const VetConsultaForm = lazy(() => import("./pages/veterinario/VetConsultaForm")
 const VetVacinas = lazy(() => import("./pages/veterinario/VetVacinas"));
 const VetInternacoes = lazy(() => import("./pages/veterinario/VetInternacoes"));
 const VetCatalogo = lazy(() => import("./pages/veterinario/VetCatalogo"));
+const VetConfiguracoes = lazy(() => import("./pages/veterinario/VetConfiguracoes"));
 
 const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
@@ -336,6 +337,7 @@ function App() {
                   <Route path="veterinario/vacinas" element={<VetVacinas />} />
                   <Route path="veterinario/internacoes" element={<VetInternacoes />} />
                   <Route path="veterinario/catalogo" element={<VetCatalogo />} />
+                  <Route path="veterinario/configuracoes" element={<VetConfiguracoes />} />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS

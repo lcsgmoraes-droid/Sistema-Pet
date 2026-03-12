@@ -93,7 +93,7 @@ export default function VetAgenda() {
   useEffect(() => { carregar(); }, [carregar]);
 
   useEffect(() => {
-    api.get("/pets", { params: { limit: 500 } })
+    api.get("/vet/pets", { params: { limit: 500 } })
       .then((r) => setPets(r.data?.items ?? r.data ?? []))
       .catch(() => {});
   }, []);

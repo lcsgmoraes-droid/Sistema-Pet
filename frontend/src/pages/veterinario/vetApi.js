@@ -122,4 +122,11 @@ export const vetApi = {
   // Perfil comportamental
   obterPerfilComportamental: (petId) => api.get(`${BASE}/pets/${petId}/perfil-comportamental`),
   salvarPerfilComportamental: (petId, data) => api.put(`${BASE}/pets/${petId}/perfil-comportamental`, data),
+
+  // Parceiros (Multi-Tenant)
+  listarParceiros: () => api.get(`${BASE}/parceiros`),
+  criarParceiro: (data) => api.post(`${BASE}/parceiros`, data),
+  atualizarParceiro: (id, data) => api.patch(`${BASE}/parceiros/${id}`, data),
+  removerParceiro: (id) => api.delete(`${BASE}/parceiros/${id}`),
+  listarTenantsVeterinarios: () => api.get(`${BASE}/tenants-veterinarios`),
 };

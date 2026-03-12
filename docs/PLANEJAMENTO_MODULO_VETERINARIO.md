@@ -23,10 +23,10 @@
 |---|---|---|
 | `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` |
 | `VetConsultas.jsx` — lista paginada de consultas | ✅ | Filtros por data e status |
-| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | Etapas: sinais vitais, anamnese, diagnóstico; falta prescrição completa e IA |
-| `VetAgenda.jsx` — calendário dia/semana | 🔶 | Visual OK, falta criar agendamento + integração com push |
-| `VetVacinas.jsx` — registro de vacinas | 🔶 | CRUD básico; falta calendário preventivo e alerta de vencimento |
-| `VetInternacoes.jsx` — fichas de internação | 🔶 | Abertura/fechamento OK; falta protocolo de medicações e alertas |
+| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`); falta IA integrada e cálculo automático de dose por peso |
+| `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`); falta integração com push notifications |
+| `VetVacinas.jsx` — registro de vacinas | 🔶 | ✅ Alerta de vencimento implementado (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital |
+| `VetInternacoes.jsx` — fichas de internação | 🔶 | ✅ Criação/alta/evolução/procedimento implementados; falta alertas automáticos de horário e gráficos de evolução |
 | `VetCatalogo.jsx` — catálogos (medicamentos e procedimentos) | 🔶 | Tabela com CRUD; falta banco de bulas completo e vinculação de insumos |
 | `vetApi.js` — helper Axios para todas as rotas `/vet` | ✅ | Cobre todos os endpoints |
 | Rotas em `App.jsx` | ✅ | `/vet/*` mapeadas |
@@ -1160,11 +1160,11 @@ PRONTUÁRIO / LGPD
 2. ❌ Catálogo global de produtos/medicamentos + tabela `tenant_stock`
 3. 🔶 Módulo de Medicamentos / Bulas — tabela `vet_medicamentos_catalogo` criada + tela `VetCatalogo.jsx`; falta banco de bulas completo, doses por espécie, interações
 4. ❌ Calculadora de doses (peso → dose automática)
-5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas); falta prescrição vinculada ao peso e IA
+5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas) ✅ + prescrição implementada ✅; falta cálculo automático de dose por peso e IA
 6. ❌ Configuração do módulo (modelo operacional, faturamento, estoque separado)
 
 ### Fase 2 — Clínica em funcionamento
-7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx`; falta criação de agendamento pela agenda e push notifications
+7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx` ✅ + criação de agendamento implementada ✅; falta apenas push notifications
 8. 🔶 Formulários dinâmicos / Receituário com cálculo automático de dose — tabelas `vet_prescricoes` + `vet_itens_prescricao` criadas; falta cálculo automático e geração de PDF
 9. 🔶 Procedimentos cadastráveis com insumos vinculados — tabelas `vet_catalogo_procedimentos` + `vet_procedimentos_consulta` criadas; falta vinculação de insumos e dedução de estoque
 10. 🔶 Upload e análise de exames pela IA — tabela `vet_exames` criada; falta upload de arquivo e análise por IA
@@ -1172,9 +1172,9 @@ PRONTUÁRIO / LGPD
 12. ❌ Comissão automática (para modelo parceiro)
 
 ### Fase 3 — Nível avançado
-13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — tabelas `vet_internacoes` + `vet_evolucoes_internacao` criadas + `VetInternacoes.jsx`; falta protocolo de medicações com alertas de horário e gráficos de evolução
+13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — ✅ criação/alta/evolução/procedimento implementados (backend + frontend); falta alertas automáticos de horário e gráficos de evolução de temperatura/parâmetros
 14. ❌ IA consultora de diagnóstico (modo Debater Caso + Analisar Exame)
-15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — tabelas `vet_vacinas_registros` + `vet_protocolos_vacinas` criadas + `VetVacinas.jsx`; falta calendário preventivo por espécie, alertas de vencimento e carteirinha digital
+15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — ✅ tabelas + `VetVacinas.jsx` + alertas de vencimento implementados (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital no app
 16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` criado; falta KPIs reais (tempo médio, taxa de retorno) conectados ao banco
 17. ❌ Banco de protocolos veterinários reutilizáveis
 

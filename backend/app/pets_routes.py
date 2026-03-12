@@ -13,6 +13,7 @@ from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Pet, Cliente
+from app.partner_utils import get_all_accessible_tenant_ids
 
 from pydantic import BaseModel, Field
 
@@ -74,6 +75,8 @@ class PetResponse(PetBase):
     cliente_nome: Optional[str] = None
     cliente_telefone: Optional[str] = None
     cliente_celular: Optional[str] = None
+    # Campo de parceria (True = pertence ao tenant parceiro)
+    de_parceiro: bool = False
 
     class Config:
         from_attributes = True
@@ -122,7 +125,7 @@ def gerar_codigo_pet(db: Session, user_id: int) -> str:
             return codigo
 
 
-def enriquecer_pet_response(pet: Pet) -> dict:
+def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
     """Adiciona dados do cliente ao response"""
     pet_dict = {
         "id": pet.id,
@@ -152,6 +155,7 @@ def enriquecer_pet_response(pet: Pet) -> dict:
         "cliente_nome": pet.cliente.nome if pet.cliente else None,
         "cliente_telefone": pet.cliente.telefone if pet.cliente else None,
         "cliente_celular": pet.cliente.celular if pet.cliente else None,
+        "de_parceiro": de_parceiro,
     }
     return pet_dict
 
@@ -176,8 +180,11 @@ def listar_pets(
     """
     current_user, tenant_id = user_and_tenant
     
+    # Incluir pets de tenants parceiros (ex.: pet shop parceiro da clínica)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+
     # Filtrar por tenant_id (multi-tenant)
-    query = db.query(Pet).join(Cliente).filter(Cliente.tenant_id == tenant_id)
+    query = db.query(Pet).join(Cliente).filter(Cliente.tenant_id.in_(access_ids))
     query = query.options(joinedload(Pet.cliente))
     
     # Filtros
@@ -207,8 +214,15 @@ def listar_pets(
     query = query.order_by(Pet.ativo.desc(), Pet.nome.asc())
     
     pets = query.offset(skip).limit(limit).all()
-    
-    return [enriquecer_pet_response(pet) for pet in pets]
+
+    tenant_id_str = str(tenant_id)
+    return [
+        enriquecer_pet_response(
+            pet,
+            de_parceiro=(str(pet.cliente.tenant_id) != tenant_id_str if pet.cliente else False)
+        )
+        for pet in pets
+    ]
 
 
 @router.post("", response_model=PetResponse, status_code=status.HTTP_201_CREATED)

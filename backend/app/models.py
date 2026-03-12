@@ -567,6 +567,10 @@ class Tenant(Base):
     # Ex.: '["entregas", "campanhas"]'
     modulos_ativos = Column(Text, nullable=True)
 
+    # Tipo de organização — usado pelo módulo veterinário multi-tenant
+    # petshop | veterinary_clinic | grooming | hospital
+    organization_type = Column(String(50), nullable=False, server_default="petshop")
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 

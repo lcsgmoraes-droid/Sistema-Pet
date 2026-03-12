@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .models import Cliente, Pet, User
+from .models import Cliente, Pet, Tenant, User
 from .veterinario_models import (
     AgendamentoVet,
     CatalogoProcedimento,
@@ -34,6 +34,7 @@ from .veterinario_models import (
     ProcedimentoConsulta,
     ProtocoloVacina,
     VacinaRegistro,
+    VetPartnerLink,
 )
 
 router = APIRouter(prefix="/vet", tags=["Veterinário"])
@@ -49,8 +50,29 @@ def _get_tenant(current: tuple) -> tuple:
     return user, tenant_id
 
 
+def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
+    """Retorna lista de empresa_tenant_ids onde este vet é parceiro ativo."""
+    links = db.query(VetPartnerLink).filter(
+        VetPartnerLink.vet_tenant_id == str(tenant_id),
+        VetPartnerLink.ativo == True,
+    ).all()
+    return [link.empresa_tenant_id for link in links]
+
+
+def _all_accessible_tenant_ids(db: Session, tenant_id) -> list:
+    """Retorna tenant_id atual + todos os tenants das empresas parceiras vinculadas."""
+    return [str(tenant_id)] + _get_partner_tenant_ids(db, tenant_id)
+
+
 def _pet_or_404(db: Session, pet_id: int, tenant_id) -> Pet:
-    pet = db.query(Pet).filter(Pet.id == pet_id, Pet.user_id == db.query(User.id).filter(User.tenant_id == tenant_id).scalar_subquery()).first()
+    tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+    pet = (
+        db.query(Pet)
+        .join(Cliente)
+        .options(joinedload(Pet.cliente))
+        .filter(Pet.id == pet_id, Cliente.tenant_id.in_(tenant_ids))
+        .first()
+    )
     if not pet:
         raise HTTPException(status_code=404, detail="Pet não encontrado")
     return pet
@@ -233,6 +255,74 @@ def listar_veterinarios(
     return [
         {"id": v.id, "nome": v.nome, "crmv": getattr(v, "crmv", None), "email": v.email, "telefone": v.telefone}
         for v in vets
+    ]
+
+
+# ═══════════════════════════════════════════════════════════════
+# PETS ACESSÍVEIS (próprio tenant + empresas parceiras)
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/pets")
+def listar_pets_vet(
+    busca: Optional[str] = Query(None),
+    limit: int = Query(500, ge=1, le=1000),
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    """
+    Lista os pets acessíveis ao veterinário:
+    - pets do próprio tenant (se tiver cadastros próprios)
+    - pets de todas as empresas parceiras ativas vinculadas
+    """
+    user, tenant_id = _get_tenant(current)
+    tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+
+    q = (
+        db.query(Pet)
+        .join(Cliente)
+        .options(joinedload(Pet.cliente))
+        .filter(Cliente.tenant_id.in_(tenant_ids), Pet.ativo == True)
+    )
+
+    if busca:
+        busca_term = f"%{busca}%"
+        q = q.filter(
+            or_(
+                Pet.nome.ilike(busca_term),
+                Pet.raca.ilike(busca_term),
+                Cliente.nome.ilike(busca_term),
+            )
+        )
+
+    pets = q.order_by(Pet.nome).limit(limit).all()
+
+    return [
+        {
+            "id": p.id,
+            "codigo": p.codigo,
+            "cliente_id": p.cliente_id,
+            "nome": p.nome,
+            "especie": p.especie,
+            "raca": p.raca,
+            "sexo": p.sexo,
+            "castrado": p.castrado,
+            "data_nascimento": p.data_nascimento,
+            "peso": p.peso,
+            "porte": p.porte,
+            "microchip": p.microchip,
+            "alergias": p.alergias,
+            "doencas_cronicas": p.doencas_cronicas,
+            "medicamentos_continuos": p.medicamentos_continuos,
+            "historico_clinico": p.historico_clinico,
+            "observacoes": p.observacoes,
+            "foto_url": p.foto_url,
+            "ativo": p.ativo,
+            "tenant_id": str(p.tenant_id),
+            "cliente_nome": p.cliente.nome if p.cliente else None,
+            "cliente_telefone": p.cliente.telefone if p.cliente else None,
+            "cliente_celular": p.cliente.celular if p.cliente else None,
+        }
+        for p in pets
     ]
 
 
@@ -1817,3 +1907,183 @@ def dashboard_vet(
         "vacinas_vencendo_30d": vacinas_vencendo_30d,
         "consultas_mes": consultas_mes,
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# PARCEIRO VETERINÁRIO (MULTI-TENANT)
+# ═══════════════════════════════════════════════════════════════
+
+
+class PartnerLinkCreate(BaseModel):
+    vet_tenant_id: str  # UUID do tenant do veterinário parceiro
+    tipo_relacao: str = "parceiro"  # 'parceiro' | 'funcionario'
+    comissao_empresa_pct: Optional[float] = None
+
+
+class PartnerLinkUpdate(BaseModel):
+    tipo_relacao: Optional[str] = None
+    comissao_empresa_pct: Optional[float] = None
+    ativo: Optional[bool] = None
+
+
+class PartnerLinkResponse(BaseModel):
+    id: int
+    empresa_tenant_id: str
+    vet_tenant_id: str
+    tipo_relacao: str
+    comissao_empresa_pct: Optional[float]
+    ativo: bool
+    criado_em: datetime
+    # campos extras enriquecidos
+    vet_tenant_nome: Optional[str] = None
+    empresa_tenant_nome: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/parceiros", response_model=List[PartnerLinkResponse], summary="Lista parcerias do tenant atual")
+def listar_parceiros(
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    """Retorna todos os vínculos de parceria em que o tenant atual é a empresa (loja)."""
+    user, tenant_id = _get_tenant(current)
+    links = db.query(VetPartnerLink).filter(
+        VetPartnerLink.empresa_tenant_id == str(tenant_id),
+    ).all()
+
+    result = []
+    for link in links:
+        vet_tenant = db.query(Tenant).filter(Tenant.id == str(link.vet_tenant_id)).first()
+        result.append(
+            PartnerLinkResponse(
+                id=link.id,
+                empresa_tenant_id=str(link.empresa_tenant_id),
+                vet_tenant_id=str(link.vet_tenant_id),
+                tipo_relacao=link.tipo_relacao,
+                comissao_empresa_pct=float(link.comissao_empresa_pct) if link.comissao_empresa_pct else None,
+                ativo=link.ativo,
+                criado_em=link.criado_em,
+                vet_tenant_nome=vet_tenant.name if vet_tenant else None,
+            )
+        )
+    return result
+
+
+@router.post("/parceiros", response_model=PartnerLinkResponse, status_code=201, summary="Cria vínculo com veterinário parceiro")
+def criar_parceiro(
+    payload: PartnerLinkCreate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    """Cria um vínculo de parceria entre o tenant atual (loja) e um tenant veterinário."""
+    user, tenant_id = _get_tenant(current)
+
+    # Verifica se o tenant de destino existe
+    vet_tenant = db.query(Tenant).filter(Tenant.id == payload.vet_tenant_id).first()
+    if not vet_tenant:
+        raise HTTPException(status_code=404, detail="Tenant do veterinário não encontrado.")
+
+    # Impede vínculo consigo mesmo
+    if str(payload.vet_tenant_id) == str(tenant_id):
+        raise HTTPException(status_code=400, detail="O tenant parceiro não pode ser o mesmo tenant atual.")
+
+    # Impede duplicata
+    existente = db.query(VetPartnerLink).filter(
+        VetPartnerLink.empresa_tenant_id == str(tenant_id),
+        VetPartnerLink.vet_tenant_id == payload.vet_tenant_id,
+    ).first()
+    if existente:
+        raise HTTPException(status_code=409, detail="Já existe um vínculo com este veterinário parceiro.")
+
+    link = VetPartnerLink(
+        empresa_tenant_id=str(tenant_id),
+        vet_tenant_id=payload.vet_tenant_id,
+        tipo_relacao=payload.tipo_relacao,
+        comissao_empresa_pct=payload.comissao_empresa_pct,
+        ativo=True,
+    )
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+
+    return PartnerLinkResponse(
+        id=link.id,
+        empresa_tenant_id=str(link.empresa_tenant_id),
+        vet_tenant_id=str(link.vet_tenant_id),
+        tipo_relacao=link.tipo_relacao,
+        comissao_empresa_pct=float(link.comissao_empresa_pct) if link.comissao_empresa_pct else None,
+        ativo=link.ativo,
+        criado_em=link.criado_em,
+        vet_tenant_nome=vet_tenant.name,
+    )
+
+
+@router.patch("/parceiros/{link_id}", response_model=PartnerLinkResponse, summary="Atualiza vínculo de parceria")
+def atualizar_parceiro(
+    link_id: int,
+    payload: PartnerLinkUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    link = db.query(VetPartnerLink).filter(
+        VetPartnerLink.id == link_id,
+        VetPartnerLink.empresa_tenant_id == str(tenant_id),
+    ).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Vínculo de parceria não encontrado.")
+
+    if payload.tipo_relacao is not None:
+        link.tipo_relacao = payload.tipo_relacao
+    if payload.comissao_empresa_pct is not None:
+        link.comissao_empresa_pct = payload.comissao_empresa_pct
+    if payload.ativo is not None:
+        link.ativo = payload.ativo
+
+    db.commit()
+    db.refresh(link)
+
+    vet_tenant = db.query(Tenant).filter(Tenant.id == str(link.vet_tenant_id)).first()
+    return PartnerLinkResponse(
+        id=link.id,
+        empresa_tenant_id=str(link.empresa_tenant_id),
+        vet_tenant_id=str(link.vet_tenant_id),
+        tipo_relacao=link.tipo_relacao,
+        comissao_empresa_pct=float(link.comissao_empresa_pct) if link.comissao_empresa_pct else None,
+        ativo=link.ativo,
+        criado_em=link.criado_em,
+        vet_tenant_nome=vet_tenant.name if vet_tenant else None,
+    )
+
+
+@router.delete("/parceiros/{link_id}", status_code=204, summary="Remove vínculo de parceria")
+def remover_parceiro(
+    link_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    link = db.query(VetPartnerLink).filter(
+        VetPartnerLink.id == link_id,
+        VetPartnerLink.empresa_tenant_id == str(tenant_id),
+    ).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Vínculo de parceria não encontrado.")
+    db.delete(link)
+    db.commit()
+
+
+@router.get("/tenants-veterinarios", summary="Lista tenants com tipo veterinary_clinic")
+def listar_tenants_veterinarios(
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    """Lista tenants que podem ser vinculados como parceiros (veterinary_clinic)."""
+    _get_tenant(current)
+    tenants = db.query(Tenant).filter(
+        Tenant.organization_type == "veterinary_clinic",
+        Tenant.status == "active",
+    ).all()
+    return [{"id": str(t.id), "nome": t.name, "cnpj": t.cnpj} for t in tenants]

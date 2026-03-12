@@ -280,7 +280,30 @@ export default function DetalheEntregaScreen() {
 
   async function iniciarRota() {
     try {
-      await api.post(`/rotas-entrega/${rotaId}/iniciar`, {});
+      let latInicio: number | undefined;
+      let lonInicio: number | undefined;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const posicao = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          latInicio = posicao.coords.latitude;
+          lonInicio = posicao.coords.longitude;
+        }
+      } catch {
+        // GPS é opcional: a rota inicia mesmo sem coordenadas.
+      }
+      await api.post(
+        `/rotas-entrega/${rotaId}/iniciar`,
+        {},
+        {
+          params: {
+            lat_inicio: latInicio,
+            lon_inicio: lonInicio,
+          },
+        },
+      );
       await carregar();
     } catch {
       Alert.alert("Erro", "Não foi possível iniciar a rota.");

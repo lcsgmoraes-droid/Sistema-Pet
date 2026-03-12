@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PawPrint } from 'lucide-react';
-import { FiMail, FiLock, FiUser, FiAlertCircle, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiMail, FiLock, FiUser, FiAlertCircle, FiEye, FiEyeOff, FiBriefcase } from 'react-icons/fi';
 
 const Register = () => {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [organizationType, setOrganizationType] = useState('petshop');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,7 +33,7 @@ const Register = () => {
 
     setLoading(true);
 
-    const result = await register(email, password, nome);
+    const result = await register(email, password, nome, organizationType);
 
     if (result.success) {
       navigate('/dashboard');
@@ -79,6 +80,25 @@ const Register = () => {
                 placeholder="Seu nome"
                 required
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Empresa
+            </label>
+            <div className="relative">
+              <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={organizationType}
+                onChange={(e) => setOrganizationType(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition bg-white"
+              >
+                <option value="petshop">Pet Shop</option>
+                <option value="veterinary_clinic">Clínica Veterinária</option>
+                <option value="grooming">Banho e Tosa</option>
+                <option value="hospital">Hospital Veterinário</option>
+              </select>
             </div>
           </div>
 

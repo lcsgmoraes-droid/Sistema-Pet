@@ -1629,6 +1629,11 @@ const Pessoas = () => {
                               Parceiro
                             </span>
                           )}
+                          {cliente.de_parceiro && (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full w-fit">
+                              Pet Shop Parceiro
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
@@ -1697,6 +1702,7 @@ const Pessoas = () => {
                           >
                             <FiEdit2 size={16} />
                           </button>
+                          {!cliente.de_parceiro && (
                           <button
                             onClick={() => handleDelete(cliente.id)}
                             className="text-red-600 hover:text-red-900 transition-colors"
@@ -1704,6 +1710,7 @@ const Pessoas = () => {
                           >
                             <FiTrash2 size={16} />
                           </button>
+                          )}
                         </div>
                       </td>
                     </tr>

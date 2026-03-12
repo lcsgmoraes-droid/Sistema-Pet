@@ -397,6 +397,11 @@ const Layout = () => {
           label: "Catálogos",
           permission: null,
         },
+        {
+          path: "/veterinario/configuracoes",
+          label: "Configurações Vet",
+          permission: null,
+        },
       ],
     },
     {

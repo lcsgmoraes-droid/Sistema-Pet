@@ -998,6 +998,8 @@ def reordenar_paradas(
 def iniciar_rota(
     rota_id: int,
     km_inicial: Optional[float] = None,
+    lat_inicio: Optional[float] = None,
+    lon_inicio: Optional[float] = None,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -1042,20 +1044,22 @@ def iniciar_rota(
     rota.status = "em_rota"
     rota.data_inicio = datetime.now()
 
-    # Zerar métricas reais de GPS no início da rota
+    # Zerar métricas reais de GPS no início da rota.
+    # Se o app enviou a posição de partida, gravá-la já como ponto inicial
+    # para que o primeiro ping de GPS calcule distância corretamente.
     db.execute(
         text(
             """
             UPDATE rotas_entrega
-            SET lat_atual = NULL,
-                lon_atual = NULL,
-                localizacao_atualizada_em = NULL,
+            SET lat_atual = :lat,
+                lon_atual = :lon,
+                localizacao_atualizada_em = CASE WHEN :lat IS NOT NULL THEN NOW() ELSE NULL END,
                 distancia_total_km_real = 0,
                 distancia_retorno_km_real = 0
             WHERE id = :rid AND tenant_id = :tenant
             """
         ),
-        {"rid": rota_id, "tenant": tenant_id},
+        {"lat": lat_inicio, "lon": lon_inicio, "rid": rota_id, "tenant": tenant_id},
     )
     db.execute(
         text(

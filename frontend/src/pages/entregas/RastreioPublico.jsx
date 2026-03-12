@@ -1,5 +1,7 @@
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 // Instância sem autenticação — endpoint público
@@ -10,7 +12,9 @@ export default function RastreioPublico() {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [motoFrame, setMotoFrame] = useState(false);
+  const mapaRef = useRef(null);
+  const leafletMapRef = useRef(null);
+  const leafletMarkerRef = useRef(null);
 
   useEffect(() => {
     if (!token) return;
@@ -20,11 +24,41 @@ export default function RastreioPublico() {
     return () => clearInterval(interval);
   }, [token]);
 
+  // Inicializa ou atualiza o mapa Leaflet a cada atualização de GPS
   useEffect(() => {
-    const animationInterval = setInterval(() => {
-      setMotoFrame((prev) => !prev);
-    }, 700);
-    return () => clearInterval(animationInterval);
+    if (!dados?.ultima_posicao_gps || !mapaRef.current) return;
+    const { lat, lon } = dados.ultima_posicao_gps;
+    if (!leafletMapRef.current) {
+      const map = L.map(mapaRef.current, {
+        dragging: false,
+        scrollWheelZoom: false,
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([lat, lon], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+      const motoIcon = L.divIcon({
+        html: '<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">🛵</div>',
+        className: "",
+        iconSize: [32, 32],
+        iconAnchor: [16, 28],
+      });
+      leafletMarkerRef.current = L.marker([lat, lon], { icon: motoIcon }).addTo(map);
+      leafletMapRef.current = map;
+    } else {
+      leafletMarkerRef.current.setLatLng([lat, lon]);
+      leafletMapRef.current.setView([lat, lon], leafletMapRef.current.getZoom());
+    }
+  }, [dados]);
+
+  // Limpa o mapa ao sair da página
+  useEffect(() => {
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        leafletMarkerRef.current = null;
+      }
+    };
   }, []);
 
   async function carregarRastreio() {
@@ -172,14 +206,7 @@ export default function RastreioPublico() {
               <div style={styles.mapaBadgeMoto}>
                 {gpsEhTempoReal ? "🏍️ Entregador ao vivo" : "📌 Último ponto confirmado"}
               </div>
-              <div style={styles.motoOverlay(motoFrame, gpsEhTempoReal)}>🛵</div>
-              <iframe
-                title="Mapa de rastreio da entrega"
-                src={`${linkMaps}&output=embed`}
-                style={styles.mapaEmbed}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
+              <div ref={mapaRef} style={styles.mapaLeaflet} />
             </div>
           </div>
         )}
@@ -210,14 +237,11 @@ export default function RastreioPublico() {
               <div style={styles.paradaOrdem}>{parada.ordem}</div>
               <div style={styles.paradaInfo}>
                 <div style={styles.paradaEndereco}>{parada.endereco}</div>
-                {(parada.distancia_trecho_real_km || parada.distancia_acumulada_real_km) && (
+                {parada.status === "entregue" && Number(parada.distancia_trecho_real_km) > 0 && (
                   <div style={styles.paradaDistanciaReal}>
-                    {parada.distancia_trecho_real_km
-                      ? `Trecho: ${Number(parada.distancia_trecho_real_km).toFixed(2)} km`
-                      : ""}
-                    {parada.distancia_trecho_real_km && parada.distancia_acumulada_real_km ? " • " : ""}
-                    {parada.distancia_acumulada_real_km
-                      ? `Acumulado: ${Number(parada.distancia_acumulada_real_km).toFixed(2)} km`
+                    {`Trecho: ${Number(parada.distancia_trecho_real_km).toFixed(2)} km`}
+                    {parada.distancia_acumulada_real_km > 0
+                      ? ` • Acumulado: ${Number(parada.distancia_acumulada_real_km).toFixed(2)} km`
                       : ""}
                   </div>
                 )}
@@ -238,8 +262,21 @@ export default function RastreioPublico() {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          ))}          {/* Retorno vazio ao estabelecimento */}
+          {distanciaRetornoReal > 0 && (
+            <div style={{...styles.paradaItem("entregue"), opacity: 0.8}}>
+              <div style={{...styles.paradaOrdem, backgroundColor: "#6b7280"}}>↩</div>
+              <div style={styles.paradaInfo}>
+                <div style={styles.paradaEndereco}>Retorno ao estabelecimento</div>
+                <div style={styles.paradaDistanciaReal}>
+                  {`Trecho: ${distanciaRetornoReal.toFixed(2)} km`}
+                </div>
+                <div style={styles.paradaStatusRow}>
+                  <span style={{fontSize: 12, fontWeight: "600", color: "#6b7280"}}>🏠 Retorno vazio</span>
+                </div>
+              </div>
+            </div>
+          )}        </div>
 
         {/* Rodapé */}
         <p style={styles.atualizacao}>
@@ -379,15 +416,13 @@ const styles = {
     border: "1px solid #dbeafe",
     backgroundColor: "#fff",
   },
-  mapaEmbed: {
+  mapaLeaflet: {
     width: "100%",
     height: 240,
-    border: "none",
-    display: "block",
   },
   mapaBadgeMoto: {
     position: "absolute",
-    zIndex: 2,
+    zIndex: 1000,
     top: 10,
     left: 10,
     backgroundColor: "rgba(17,24,39,0.8)",
@@ -397,19 +432,6 @@ const styles = {
     padding: "6px 10px",
     borderRadius: 999,
   },
-  motoOverlay: (motoFrame, gpsEhTempoReal) => ({
-    position: "absolute",
-    left: "50%",
-    top: "52%",
-    zIndex: 3,
-    fontSize: 30,
-    transform: `translate(-50%, -50%) translateX(${motoFrame ? 5 : -5}px)`,
-    transition: "transform 0.65s ease-in-out",
-    filter: gpsEhTempoReal
-      ? "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
-      : "grayscale(0.35)",
-    pointerEvents: "none",
-  }),
   distBox: {
     backgroundColor: "#f8fafc",
     border: "1px solid #e5e7eb",

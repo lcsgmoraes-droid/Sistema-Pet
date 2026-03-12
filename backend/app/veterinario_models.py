@@ -6,10 +6,12 @@ from sqlalchemy import (
     Column, Integer, String, Boolean, Float, Text,
     DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, Index
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
+from app.db import Base
 
 
 # ==============================================================
@@ -464,3 +466,49 @@ class PerfilComportamental(BaseTenantModel):
 
     # Relacionamentos
     pet = relationship("Pet", foreign_keys=[pet_id])
+
+
+# ==============================================================
+# VÍNCULO ENTRE TENANTS (MULTI-TENANT PARCEIRO)
+# ==============================================================
+
+class VetPartnerLink(Base):
+    """
+    Vínculo entre o tenant da loja (empresa_tenant_id) e o tenant do
+    veterinário parceiro (vet_tenant_id).
+
+    tipo_relacao:
+      'parceiro'   — veterinário tem tenant próprio, financeiro separado
+      'funcionario' — veterinário trabalha dentro do mesmo tenant da loja
+
+    Não herda BaseTenantModel pois não pertence a um tenant específico.
+    """
+    __tablename__ = "vet_partner_link"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    empresa_tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    vet_tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tipo_relacao = Column(
+        String(20),
+        nullable=False,
+        default="parceiro",
+        server_default="parceiro",
+    )  # 'parceiro' | 'funcionario'
+    comissao_empresa_pct = Column(Numeric(5, 2), nullable=True)  # ex: 20.00
+    ativo = Column(Boolean, nullable=False, default=True, server_default="true")
+    criado_em = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
