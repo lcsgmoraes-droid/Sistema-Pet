@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Stethoscope,
   ChevronRight,
@@ -13,15 +13,17 @@ import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 
 // ---------- helpers ----------
-function campo(label, children, obrigatorio = false) {
-  return (
-    <div className="space-y-1">
-      <label className="block text-xs font-medium text-gray-600">
-        {label} {obrigatorio && <span className="text-red-400">*</span>}
-      </label>
-      {children}
-    </div>
-  );
+function campo(label, obrigatorio = false) {
+  return function renderCampo(children) {
+    return (
+      <div className="space-y-1">
+        <label className="block text-xs font-medium text-gray-600">
+          {label} {obrigatorio && <span className="text-red-400">*</span>}
+        </label>
+        {children}
+      </div>
+    );
+  };
 }
 
 const css = {
@@ -39,18 +41,26 @@ const ETAPAS = ["Triagem", "Exame Clínico", "Diagnóstico / Prescrição"];
 export default function VetConsultaForm() {
   const navigate = useNavigate();
   const { consultaId } = useParams();
+  const [searchParams] = useSearchParams();
   const isEdicao = Boolean(consultaId);
+  const petIdQuery = searchParams.get("pet_id") || "";
 
   const [etapa, setEtapa] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState(null);
+  const [sucesso, setSucesso] = useState(null);
   const [consultaIdAtual, setConsultaIdAtual] = useState(consultaId ?? null);
   const [finalizado, setFinalizado] = useState(false);
   const [carregando, setCarregando] = useState(isEdicao);
+  const modoSomenteLeitura = isEdicao && finalizado;
 
   // listas externas
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
+  const [buscaTutor, setBuscaTutor] = useState("");
+  const [tutorSelecionado, setTutorSelecionado] = useState(null);
+  const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
+  const [listaPetsExpandida, setListaPetsExpandida] = useState(false);
 
   // ---------- Form state ----------
   const [form, setForm] = useState({
@@ -122,24 +132,160 @@ export default function VetConsultaForm() {
       .then((r) => setPets(r.data?.items ?? r.data ?? []))
       .catch(() => {});
     api
-      .get("/clientes", { params: { tipo: "veterinario", limit: 200 } })
-      .then((r) => setVeterinarios(r.data?.items ?? r.data ?? []))
+      .get("/vet/veterinarios")
+      .then((r) => setVeterinarios(r.data ?? []))
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (isEdicao) return;
+    if (!petIdQuery || !pets.length) return;
+
+    const petEncontrado = pets.find((p) => String(p.id) === String(petIdQuery));
+    if (!petEncontrado) return;
+
+    set("pet_id", String(petEncontrado.id));
+    setTutorSelecionado({
+      id: petEncontrado.cliente_id,
+      nome: petEncontrado.cliente_nome ?? `Tutor #${petEncontrado.cliente_id}`,
+      telefone: petEncontrado.cliente_telefone ?? "",
+      celular: petEncontrado.cliente_celular ?? "",
+    });
+    setBuscaTutor(petEncontrado.cliente_nome ?? "");
+    setListaPetsExpandida(false);
+  }, [isEdicao, petIdQuery, pets]);
+
   function set(campo, valor) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
+  }
+
+  const tutoresIndex = useMemo(() => {
+    const mapa = new Map();
+    for (const p of pets) {
+      const tutorId = p.cliente_id;
+      if (!tutorId) continue;
+      if (!mapa.has(tutorId)) {
+        mapa.set(tutorId, {
+          id: tutorId,
+          nome: p.cliente_nome ?? `Tutor #${tutorId}`,
+          telefone: p.cliente_telefone ?? "",
+          celular: p.cliente_celular ?? "",
+        });
+      }
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [pets]);
+
+  const petsDoTutor = useMemo(() => {
+    if (!tutorSelecionado) return [];
+
+    const petsTutor = pets.filter(
+      (p) => String(p.cliente_id) === String(tutorSelecionado.id) && p.ativo !== false
+    );
+
+    // Evita duplicidade visual caso a API devolva itens repetidos
+    const porId = new Map();
+    for (const pet of petsTutor) {
+      porId.set(String(pet.id), pet);
+    }
+    return Array.from(porId.values());
+  }, [pets, tutorSelecionado]);
+
+  const petSelecionado = useMemo(
+    () => pets.find((p) => String(p.id) === String(form.pet_id)) ?? null,
+    [pets, form.pet_id]
+  );
+
+  const petSelecionadoLabel = useMemo(() => {
+    if (!petSelecionado) return "Selecione o pet";
+    const especie = petSelecionado.especie;
+    const especieValida = especie && !/\?/.test(especie);
+    return especieValida ? `${petSelecionado.nome} (${especie})` : petSelecionado.nome;
+  }, [petSelecionado]);
+
+  useEffect(() => {
+    const termo = buscaTutor.trim();
+    if (!termo) {
+      setTutoresSugeridos([]);
+      return;
+    }
+
+    const termoLower = termo.toLowerCase();
+    const termoDigitos = termo.replaceAll(/\D/g, "");
+
+    const sugestoes = tutoresIndex
+      .filter((t) => {
+        const nome = (t.nome ?? "").toLowerCase();
+        const telefone = (t.telefone ?? "").toLowerCase();
+        const celular = (t.celular ?? "").toLowerCase();
+        const telefoneDigitos = telefone.replaceAll(/\D/g, "");
+        const celularDigitos = celular.replaceAll(/\D/g, "");
+
+        return (
+          nome.includes(termoLower) ||
+          telefone.includes(termoLower) ||
+          celular.includes(termoLower) ||
+          (termoDigitos && (telefoneDigitos.includes(termoDigitos) || celularDigitos.includes(termoDigitos)))
+        );
+      })
+      .slice(0, 20);
+
+    setTutoresSugeridos(sugestoes);
+  }, [buscaTutor, tutoresIndex]);
+
+  useEffect(() => {
+    if (!form.pet_id || !pets.length) return;
+    const petAtual = pets.find((p) => String(p.id) === String(form.pet_id));
+    if (!petAtual) return;
+
+    setTutorSelecionado((prev) => {
+      if (prev && String(prev.id) === String(petAtual.cliente_id)) return prev;
+      return {
+        id: petAtual.cliente_id,
+        nome: petAtual.cliente_nome ?? `Tutor #${petAtual.cliente_id}`,
+        telefone: petAtual.cliente_telefone ?? "",
+        celular: petAtual.cliente_celular ?? "",
+      };
+    });
+    setBuscaTutor((prev) => prev || petAtual.cliente_nome || "");
+  }, [form.pet_id, pets]);
+
+  function selecionarTutor(tutor) {
+    setTutorSelecionado(tutor);
+    setBuscaTutor(tutor.nome);
+    setTutoresSugeridos([]);
+    setListaPetsExpandida(true);
+    set("pet_id", "");
+  }
+
+  function limparTutor() {
+    setTutorSelecionado(null);
+    setBuscaTutor("");
+    setTutoresSugeridos([]);
+    setListaPetsExpandida(false);
+    set("pet_id", "");
   }
 
   // ---------- Salvar rascunho ----------
   async function salvarRascunho() {
     setSalvando(true);
     setErro(null);
+    setSucesso(null);
     try {
+      const petSelecionadoAtual = pets.find((p) => String(p.id) === String(form.pet_id));
+
+      if (!petSelecionadoAtual?.cliente_id) {
+        setErro("Selecione um pet válido vinculado a um tutor.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       const payload = {
         pet_id: form.pet_id || undefined,
+        cliente_id: petSelecionadoAtual.cliente_id,
         veterinario_id: form.veterinario_id || undefined,
-        motivo_consulta: form.motivo_consulta || undefined,
+        queixa_principal: form.motivo_consulta || undefined,
+        // Campos extras são ignorados pelo backend no create e usados no patch quando suportados.
         peso_kg: form.peso_kg ? parseFloat(form.peso_kg) : undefined,
         temperatura: form.temperatura ? parseFloat(form.temperatura) : undefined,
         freq_cardiaca: form.freq_cardiaca ? parseInt(form.freq_cardiaca) : undefined,
@@ -159,16 +305,23 @@ export default function VetConsultaForm() {
       };
 
       if (!consultaIdAtual) {
-        if (!form.pet_id) { setErro("Selecione o pet."); return; }
         const res = await vetApi.criarConsulta(payload);
         setConsultaIdAtual(res.data.id);
         navigate(`/veterinario/consultas/${res.data.id}`, { replace: true });
       } else {
         await vetApi.atualizarConsulta(consultaIdAtual, payload);
       }
+
+      setSucesso(
+        etapa < ETAPAS.length - 1
+          ? "Rascunho salvo com sucesso."
+          : "Rascunho salvo com sucesso. Você pode finalizar quando quiser."
+      );
+
       if (etapa < ETAPAS.length - 1) setEtapa((e) => e + 1);
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao salvar. Tente novamente.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSalvando(false);
     }
@@ -176,6 +329,7 @@ export default function VetConsultaForm() {
 
   // ---------- Finalizar ----------
   async function finalizar() {
+    setSucesso(null);
     if (!consultaIdAtual) { setErro("Salve a consulta antes de finalizar."); return; }
     setSalvando(true);
     setErro(null);
@@ -190,9 +344,41 @@ export default function VetConsultaForm() {
       });
       // cria prescrição se houver itens
       if (form.prescricao_itens.length > 0) {
+        const itensPrescricao = form.prescricao_itens
+          .map((it) => {
+            const nome = (it.nome || "").trim();
+            const frequencia = (it.frequencia || "").trim();
+            const instrucoes = (it.instrucoes || "").trim();
+            const dose = (it.dose_mg || "").toString().trim();
+            const unidade = (it.unidade || "mg").trim();
+            const posologia = [dose ? `${dose} ${unidade}` : "", frequencia, instrucoes]
+              .filter(Boolean)
+              .join(" - ");
+
+            if (!nome || !posologia) return null;
+
+            return {
+              nome_medicamento: nome,
+              concentracao: it.principio_ativo || undefined,
+              quantidade: dose || undefined,
+              posologia,
+              via_administracao: it.via || undefined,
+              duracao_dias: it.duracao_dias ? Number.parseInt(it.duracao_dias) : undefined,
+            };
+          })
+          .filter(Boolean);
+
+        if (itensPrescricao.length === 0) {
+          setErro("Adicione ao menos 1 item de prescrição com nome e posologia.");
+          return;
+        }
+
         await vetApi.criarPrescricao({
           consulta_id: consultaIdAtual,
-          itens: form.prescricao_itens,
+          pet_id: form.pet_id ? Number.parseInt(form.pet_id) : undefined,
+          veterinario_id: form.veterinario_id ? Number.parseInt(form.veterinario_id) : undefined,
+          tipo_receituario: "simples",
+          itens: itensPrescricao,
         });
       }
       // finaliza (gera hash)
@@ -240,7 +426,7 @@ export default function VetConsultaForm() {
     );
   }
 
-  if (finalizado) {
+  if (finalizado && !isEdicao) {
     return (
       <div className="p-6 max-w-lg mx-auto text-center space-y-4">
         <div className="p-4 bg-green-50 rounded-xl border border-green-200">
@@ -275,18 +461,31 @@ export default function VetConsultaForm() {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-800">
-            {isEdicao ? "Continuar consulta" : "Nova consulta"}
+            {modoSomenteLeitura ? "Consulta finalizada (somente visualização)" : isEdicao ? "Continuar consulta" : "Nova consulta"}
           </h1>
-          <p className="text-xs text-gray-400">{consultaIdAtual ? `ID: ${consultaIdAtual.slice(0, 8)}…` : "Ainda não salva"}</p>
+          <p className="text-xs text-gray-400">{consultaIdAtual ? `ID: ${String(consultaIdAtual).slice(0, 8)}…` : "Ainda não salva"}</p>
         </div>
       </div>
+
+      {modoSomenteLeitura && (
+        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+          <Lock size={15} />
+          <span>Consulta assinada digitalmente. Você pode visualizar todos os dados, mas não pode editar.</span>
+        </div>
+      )}
 
       {/* Passos */}
       <div className="flex items-center gap-1">
         {ETAPAS.map((nome, i) => (
           <div key={i} className="flex items-center gap-1">
             <button
-              onClick={() => i < etapa && setEtapa(i)}
+              onClick={() => {
+                if (modoSomenteLeitura) {
+                  setEtapa(i);
+                  return;
+                }
+                if (i < etapa) setEtapa(i);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 i === etapa
                   ? "bg-blue-600 text-white"
@@ -312,20 +511,66 @@ export default function VetConsultaForm() {
         </div>
       )}
 
+      {sucesso && (
+        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+          <CheckCircle size={16} />
+          <span>{sucesso}</span>
+          <button className="ml-auto" onClick={() => setSucesso(null)}><X size={14} /></button>
+        </div>
+      )}
+
       {/* =========== ETAPA 1: TRIAGEM =========== */}
       {etapa === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
           <h2 className="font-semibold text-gray-700">Triagem inicial</h2>
 
           <div className="grid grid-cols-2 gap-4">
-            {campo("Pet", true)(
-              <select value={form.pet_id} onChange={(e) => set("pet_id", e.target.value)} className={css.select} disabled={isEdicao}>
-                <option value="">Selecione o pet…</option>
-                {pets.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nome} ({p.especie ?? "pet"})</option>
-                ))}
-              </select>
+            {campo("Tutor (nome/telefone)", true)(
+              <div className="relative">
+                <input
+                  type="text"
+                  value={buscaTutor}
+                  onChange={(e) => {
+                    setBuscaTutor(e.target.value);
+                    if (tutorSelecionado) {
+                      setTutorSelecionado(null);
+                      set("pet_id", "");
+                    }
+                  }}
+                  placeholder="Digite nome ou telefone do tutor..."
+                  className={css.input}
+                  disabled={isEdicao}
+                />
+                {!isEdicao && tutorSelecionado && (
+                  <button
+                    type="button"
+                    onClick={limparTutor}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700"
+                  >
+                    limpar
+                  </button>
+                )}
+
+                {!isEdicao && buscaTutor.trim().length >= 1 && !tutorSelecionado && tutoresSugeridos.length > 0 && (
+                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                    {tutoresSugeridos.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => selecionarTutor(t)}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="text-sm font-medium text-gray-800">{t.nome}</div>
+                        <div className="text-xs text-gray-500">
+                          {[t.telefone, t.celular].filter(Boolean).join(" • ") || "Sem telefone"}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
+
             {campo("Veterinário")(
               <select value={form.veterinario_id} onChange={(e) => set("veterinario_id", e.target.value)} className={css.select}>
                 <option value="">Selecione…</option>
@@ -335,6 +580,61 @@ export default function VetConsultaForm() {
               </select>
             )}
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              {campo("Pet", true)(
+              <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => tutorSelecionado && setListaPetsExpandida((prev) => !prev)}
+                  disabled={!tutorSelecionado || isEdicao}
+                  className="w-full flex items-center justify-between px-3 py-2 text-sm disabled:opacity-60"
+                >
+                  <span className="text-left">
+                    {petSelecionadoLabel}
+                  </span>
+                  <span className="text-gray-500 text-xs">
+                    {tutorSelecionado ? `${petsDoTutor.length} pet(s)` : "Sem tutor"}
+                  </span>
+                </button>
+
+                {listaPetsExpandida && tutorSelecionado && !isEdicao && (
+                  <div className="border-t border-gray-200 max-h-52 overflow-y-auto p-2 space-y-1">
+                    {petsDoTutor.map((p) => {
+                      const ativo = String(form.pet_id) === String(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            set("pet_id", p.id);
+                            setListaPetsExpandida(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded text-sm transition-colors ${
+                            ativo ? "bg-blue-50 border border-blue-200 text-blue-700" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <div className="font-medium">{p.nome}</div>
+                          <div className="text-xs text-gray-500">
+                            {p.especie && !/\?/.test(p.especie) ? p.especie : "Pet"}
+                            {p.codigo ? ` • ${p.codigo}` : ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+          </div>
+
+          {!isEdicao && tutorSelecionado && petsDoTutor.length === 0 && (
+            <p className="text-xs text-amber-600">
+              Nenhum pet ativo vinculado a esse tutor.
+            </p>
+          )}
 
           {campo("Motivo da consulta", true)(
             <textarea
@@ -386,12 +686,12 @@ export default function VetConsultaForm() {
               <input type="number" min={0} max={10} value={form.nivel_dor} onChange={(e) => set("nivel_dor", e.target.value)} className={css.input} placeholder="0 = sem dor" />
             )}
           </div>
-        </div>
+        </fieldset>
       )}
 
       {/* =========== ETAPA 2: EXAME CLÍNICO =========== */}
       {etapa === 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
           <h2 className="font-semibold text-gray-700">Exame clínico</h2>
           {campo("Histórico clínico")(
             <textarea
@@ -410,13 +710,13 @@ export default function VetConsultaForm() {
               placeholder="Descrição sistemática: cabeça, tórax, abdômen, membros, pele…"
             />
           )}
-        </div>
+        </fieldset>
       )}
 
       {/* =========== ETAPA 3: DIAGNÓSTICO =========== */}
       {etapa === 2 && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
             <h2 className="font-semibold text-gray-700">Diagnóstico e tratamento</h2>
             {campo("Diagnóstico")(
               <textarea value={form.diagnostico} onChange={(e) => set("diagnostico", e.target.value)} className={css.textarea} placeholder="Diagnóstico principal e diferenciais…" />
@@ -438,10 +738,10 @@ export default function VetConsultaForm() {
             {campo("Observações adicionais")(
               <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} className={css.textarea} placeholder="Observações para o tutor, cuidados especiais…" />
             )}
-          </div>
+          </fieldset>
 
           {/* Prescrição */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3">
+          <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-700">Prescrição (opcional)</h2>
               <button
@@ -478,7 +778,7 @@ export default function VetConsultaForm() {
                 <input type="text" placeholder="Instruções ao tutor" value={item.instrucoes} onChange={(e) => setItem(idx, "instrucoes", e.target.value)} className={css.input} />
               </div>
             ))}
-          </div>
+          </fieldset>
         </div>
       )}
 
@@ -492,6 +792,15 @@ export default function VetConsultaForm() {
         </button>
 
         <div className="flex gap-3">
+          {modoSomenteLeitura ? (
+            <button
+              onClick={() => navigate("/veterinario/consultas")}
+              className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Voltar para consultas
+            </button>
+          ) : (
+            <>
           {etapa > 0 && (
             <button
               onClick={() => setEtapa((e) => e - 1)}
@@ -531,22 +840,12 @@ export default function VetConsultaForm() {
               </button>
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// Pequeno helper para campos (tag-like)
-function campo(label, obrigatorio) {
-  return function renderCampo(children) {
-    return (
-      <div className="space-y-1">
-        <label className="block text-xs font-medium text-gray-600">
-          {label} {obrigatorio && <span className="text-red-400">*</span>}
-        </label>
-        {children}
-      </div>
-    );
-  };
-}
+

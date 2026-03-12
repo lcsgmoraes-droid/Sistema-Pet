@@ -107,6 +107,7 @@ export default function PDV() {
   const [buscarProduto, setBuscarProduto] = useState("");
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [produtosSugeridos, setProdutosSugeridos] = useState([]);
+  const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
 
   // Estados de UI
   const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
@@ -237,11 +238,13 @@ export default function PDV() {
 
   // Refs
   const inputProdutoRef = useRef(null);
+  const buscaProdutoContainerRef = useRef(null);
   const ultimoAutoAddProdutoRef = useRef("");
   const ultimoEventoTeclaProdutoMsRef = useRef(0);
   const sequenciaRapidaProdutoRef = useRef(0);
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
+  const buscaProdutoAtualRef = useRef("");
 
   // Persistir estado dos painéis no localStorage
   useEffect(() => {
@@ -1347,13 +1350,23 @@ export default function PDV() {
 
   // Buscar produtos
   useEffect(() => {
-    if (buscarProduto.length >= 2) {
+    const termoAtual = String(buscarProduto || "").trim();
+    buscaProdutoAtualRef.current = termoAtual;
+
+    if (termoAtual.length >= 2) {
+      setMostrarSugestoesProduto(true);
       const timer = setTimeout(async () => {
         try {
-          const response = await getProdutosVendaveis({ busca: buscarProduto });
+          const response = await getProdutosVendaveis({ busca: termoAtual });
+
+          // Evita reabrir sugestão com resposta atrasada após Enter/limpeza do campo
+          if (buscaProdutoAtualRef.current !== termoAtual) {
+            return;
+          }
+
           const produtos = response.data.items || [];
 
-          const termo = buscarProduto.trim();
+          const termo = termoAtual;
           const termoLower = termo.toLowerCase();
           const matchExato = produtos.find((p) => {
             const codigo = String(p.codigo || "").toLowerCase();
@@ -1373,6 +1386,7 @@ export default function PDV() {
             adicionarProduto(matchExato);
             leituraScannerDetectadaRef.current = false;
             sequenciaRapidaProdutoRef.current = 0;
+            setMostrarSugestoesProduto(false);
             return;
           }
 
@@ -1388,8 +1402,21 @@ export default function PDV() {
       leituraScannerDetectadaRef.current = false;
       sequenciaRapidaProdutoRef.current = 0;
       setProdutosSugeridos([]);
+      setMostrarSugestoesProduto(false);
     }
   }, [buscarProduto, modoVisualizacao]);
+
+  useEffect(() => {
+    const handleCliqueFora = (event) => {
+      if (!buscaProdutoContainerRef.current) return;
+      if (!buscaProdutoContainerRef.current.contains(event.target)) {
+        setMostrarSugestoesProduto(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleCliqueFora);
+    return () => document.removeEventListener("mousedown", handleCliqueFora);
+  }, []);
 
   function registrarPossivelLeituraScanner(evento) {
     if (
@@ -1578,6 +1605,7 @@ export default function PDV() {
     recalcularTotais(novosItens);
     setBuscarProduto("");
     setProdutosSugeridos([]);
+    setMostrarSugestoesProduto(false);
     inputProdutoRef.current?.focus();
 
     // ✅ ABERTURA AUTOMÁTICA DESATIVADA
@@ -3041,13 +3069,25 @@ export default function PDV() {
                 </h2>
 
                 {/* Buscar produto */}
-                <div id="tour-pdv-busca" className="relative mb-4">
+                <div id="tour-pdv-busca" ref={buscaProdutoContainerRef} className="relative mb-4">
                   <div className="flex items-center">
                     <input
                       ref={inputProdutoRef}
                       type="text"
                       value={buscarProduto}
-                      onChange={(e) => setBuscarProduto(e.target.value)}
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        setBuscarProduto(valor);
+                        if (!String(valor || "").trim()) {
+                          setProdutosSugeridos([]);
+                          setMostrarSugestoesProduto(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (String(buscarProduto || "").trim().length >= 2 && produtosSugeridos.length > 0) {
+                          setMostrarSugestoesProduto(true);
+                        }
+                      }}
                       onKeyDown={async (e) => {
                         registrarPossivelLeituraScanner(e);
 
@@ -3065,7 +3105,7 @@ export default function PDV() {
                   </div>
 
                   {/* Sugestões de produtos */}
-                  {produtosSugeridos.length > 0 && (
+                  {mostrarSugestoesProduto && String(buscarProduto || "").trim().length >= 2 && produtosSugeridos.length > 0 && (
                     <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {produtosSugeridos.map((produto) => {
                         const estoqueZerado =
@@ -3079,7 +3119,10 @@ export default function PDV() {
                         return (
                         <button
                           key={produto.id}
-                          onClick={() => adicionarProduto(produto)}
+                          onClick={() => {
+                            adicionarProduto(produto);
+                            setMostrarSugestoesProduto(false);
+                          }}
                           className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
                         >
                           <div className="flex items-center justify-between">

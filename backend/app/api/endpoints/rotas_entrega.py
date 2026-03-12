@@ -1418,6 +1418,8 @@ def rastreio_publico(
     Endpoint público para rastreamento de rota por token.
     Retorna última posição GPS e status das paradas (sem dados sensíveis).
     """
+    ensure_rotas_entrega_schema(db)
+
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.token_rastreio == token
     ).first()

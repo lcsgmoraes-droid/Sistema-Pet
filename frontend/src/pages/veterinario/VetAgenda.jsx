@@ -38,10 +38,23 @@ function addDias(d, n) {
   return r;
 }
 
+function inicioMes(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function fimMes(d) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+function inicioDaGradeMensal(d) {
+  const primeiro = inicioMes(d);
+  return addDias(primeiro, -primeiro.getDay());
+}
+
 export default function VetAgenda() {
   const navigate = useNavigate();
   const [dataRef, setDataRef] = useState(new Date());
-  const [modo, setModo] = useState("dia"); // "dia" | "semana"
+  const [modo, setModo] = useState("dia"); // "dia" | "semana" | "mes"
   const [agendamentos, setAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
@@ -50,20 +63,23 @@ export default function VetAgenda() {
   const [formNovo, setFormNovo] = useState({ pet_id: "", data_hora: "", motivo: "", emergencia: false });
   const [salvandoNovo, setSalvandoNovo] = useState(false);
 
-  const inicioSemana = modo === "semana"
+  const inicioSemana = (modo === "semana" || modo === "mes")
     ? addDias(dataRef, -dataRef.getDay())
     : dataRef;
-  const fimSemana = modo === "semana"
+  const fimSemana = (modo === "semana" || modo === "mes")
     ? addDias(inicioSemana, 6)
     : dataRef;
+
+  const dataInicioConsulta = modo === "mes" ? inicioMes(dataRef) : inicioSemana;
+  const dataFimConsulta = modo === "mes" ? fimMes(dataRef) : fimSemana;
 
   const carregar = useCallback(async () => {
     try {
       setCarregando(true);
       setErro(null);
       const res = await vetApi.listarAgendamentos({
-        data_inicio: isoDate(inicioSemana),
-        data_fim: isoDate(fimSemana),
+        data_inicio: isoDate(dataInicioConsulta),
+        data_fim: isoDate(dataFimConsulta),
       });
       const data = res.data;
       setAgendamentos(Array.isArray(data) ? data : (data.items ?? []));
@@ -72,7 +88,7 @@ export default function VetAgenda() {
     } finally {
       setCarregando(false);
     }
-  }, [inicioSemana, fimSemana]);
+  }, [dataInicioConsulta, dataFimConsulta]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -83,6 +99,10 @@ export default function VetAgenda() {
   }, []);
 
   function nav(direcao) {
+    if (modo === "mes") {
+      setDataRef((d) => new Date(d.getFullYear(), d.getMonth() + direcao, 1));
+      return;
+    }
     const delta = modo === "dia" ? 1 : 7;
     setDataRef((d) => addDias(d, direcao * delta));
   }
@@ -90,6 +110,9 @@ export default function VetAgenda() {
   function formatTitulo() {
     if (modo === "dia") {
       return dataRef.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+    }
+    if (modo === "mes") {
+      return dataRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
     }
     return `${inicioSemana.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${fimSemana.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
   }
@@ -125,6 +148,10 @@ export default function VetAgenda() {
     ? Array.from({ length: 7 }, (_, i) => addDias(inicioSemana, i))
     : [dataRef];
 
+  const diasMes = modo === "mes"
+    ? Array.from({ length: 42 }, (_, i) => addDias(inicioDaGradeMensal(dataRef), i))
+    : [];
+
   return (
     <div className="p-6 space-y-5">
       {/* Cabeçalho */}
@@ -139,6 +166,7 @@ export default function VetAgenda() {
           <div className="flex border border-gray-200 rounded-lg overflow-hidden text-sm">
             <button onClick={() => setModo("dia")} className={`px-3 py-1.5 ${modo === "dia" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}>Dia</button>
             <button onClick={() => setModo("semana")} className={`px-3 py-1.5 ${modo === "semana" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}>Semana</button>
+            <button onClick={() => setModo("mes")} className={`px-3 py-1.5 ${modo === "mes" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}>Mês</button>
           </div>
           <button
             onClick={() => setNovoAberto(true)}
@@ -179,6 +207,53 @@ export default function VetAgenda() {
         <div className="flex items-center justify-center h-40">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
         </div>
+      ) : modo === "mes" ? (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((nomeDia) => (
+              <div key={nomeDia} className="px-3 py-2 text-xs font-semibold text-gray-600 text-center">{nomeDia}</div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {diasMes.map((dia) => {
+              const ags = agsDia(dia);
+              const ehHoje = isoDate(dia) === isoDate(new Date());
+              const foraDoMes = dia.getMonth() !== dataRef.getMonth();
+              return (
+                <div
+                  key={isoDate(dia)}
+                  className={`min-h-[110px] border-b border-r border-gray-100 p-2 ${foraDoMes ? "bg-gray-50" : "bg-white"}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-medium ${ehHoje ? "text-blue-700" : foraDoMes ? "text-gray-400" : "text-gray-700"}`}>
+                      {String(dia.getDate()).padStart(2, "0")}
+                    </span>
+                    {ags.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">{ags.length}</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-1">
+                    {ags.slice(0, 2).map((ag) => (
+                      <button
+                        key={ag.id}
+                        type="button"
+                        onClick={() => {
+                          if (ag.consulta_id) navigate(`/veterinario/consultas/${ag.consulta_id}`);
+                        }}
+                        className={`w-full text-left text-[11px] px-1.5 py-1 rounded border-l-2 ${STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"}`}
+                      >
+                        <p className="truncate">{ag.data_hora?.slice(11, 16)} • {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}</p>
+                      </button>
+                    ))}
+                    {ags.length > 2 && <p className="text-[10px] text-gray-400">+{ags.length - 2} mais</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
         <div className={`grid gap-4 ${modo === "semana" ? "grid-cols-7" : "grid-cols-1"}`}>
           {diasVisiveis.map((dia) => {
@@ -214,7 +289,7 @@ export default function VetAgenda() {
                         {ag.emergencia && <Activity size={10} className="text-red-500 ml-auto" />}
                       </div>
                       <p className="text-xs font-medium text-gray-700 truncate">
-                        {ag.pet_nome ?? `Pet #${(ag.pet_id ?? "").slice(0, 6)}`}
+                        {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
                       </p>
                       <p className="text-xs text-gray-400 truncate">{ag.motivo ?? "—"}</p>
                       <span className={`mt-1 inline-flex text-xs px-1.5 py-0.5 rounded-full font-medium ${STATUS_BADGE[ag.status] ?? "bg-gray-100"}`}>

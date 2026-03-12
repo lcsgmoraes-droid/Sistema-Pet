@@ -25,6 +25,9 @@ export const vetApi = {
   listarPrescricoes: (consultaId) => api.get(`${BASE}/consultas/${consultaId}/prescricoes`),
   criarPrescricao: (data) => api.post(`${BASE}/prescricoes`, data),
 
+  // Veterinários
+  listarVeterinarios: () => api.get(`${BASE}/veterinarios`),
+
   // Vacinas
   listarVacinasPet: (petId) => api.get(`${BASE}/pets/${petId}/vacinas`),
   registrarVacina: (data) => api.post(`${BASE}/vacinas`, data),
@@ -45,9 +48,67 @@ export const vetApi = {
   adicionarProcedimento: (data) => api.post(`${BASE}/procedimentos`, data),
 
   // Internações
-  listarInternacoes: (status) => api.get(`${BASE}/internacoes`, { params: { status } }),
+  listarInternacoes: (statusOrParams) => {
+    const params = (statusOrParams && typeof statusOrParams === "object")
+      ? statusOrParams
+      : { status: statusOrParams };
+    return api.get(`${BASE}/internacoes`, { params });
+  },
+  obterInternacao: (internacaoId) => api.get(`${BASE}/internacoes/${internacaoId}`),
   criarInternacao: (data) => api.post(`${BASE}/internacoes`, data),
   registrarEvolucao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/evolucao`, data),
+  registrarProcedimentoInternacao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/procedimento`, data),
+  historicoInternacoesPet: async (petId) => {
+    const base = await api.get(`${BASE}/internacoes`, {
+      params: {
+        status: "",
+        pet_id: petId,
+      },
+    });
+
+    const lista = Array.isArray(base.data)
+      ? base.data
+      : (base.data?.items ?? []);
+
+    const historicoDetalhado = await Promise.all(
+      lista.map(async (internacao) => {
+        try {
+          const detalhe = await api.get(`${BASE}/internacoes/${internacao.id}`);
+          return {
+            internacao_id: internacao.id,
+            status: detalhe.data?.status ?? internacao.status,
+            motivo: detalhe.data?.motivo ?? internacao.motivo,
+            box: detalhe.data?.box ?? internacao.box,
+            data_entrada: detalhe.data?.data_entrada ?? internacao.data_entrada,
+            data_saida: detalhe.data?.data_saida ?? internacao.data_saida,
+            observacoes_alta: detalhe.data?.observacoes_alta ?? internacao.observacoes_alta,
+            evolucoes: detalhe.data?.evolucoes ?? [],
+            procedimentos: detalhe.data?.procedimentos ?? [],
+          };
+        } catch {
+          return {
+            internacao_id: internacao.id,
+            status: internacao.status,
+            motivo: internacao.motivo,
+            box: internacao.box,
+            data_entrada: internacao.data_entrada,
+            data_saida: internacao.data_saida,
+            observacoes_alta: internacao.observacoes_alta,
+            evolucoes: [],
+            procedimentos: [],
+          };
+        }
+      })
+    );
+
+    return {
+      ...base,
+      data: {
+        pet_id: petId,
+        historico: historicoDetalhado,
+      },
+    };
+  },
   darAlta: (internacaoId, obs) =>
     api.patch(`${BASE}/internacoes/${internacaoId}/alta`, null, { params: { observacoes: obs } }),
 

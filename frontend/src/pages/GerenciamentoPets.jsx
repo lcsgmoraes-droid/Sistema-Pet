@@ -18,7 +18,10 @@ const GerenciamentoPets = () => {
   const [error, setError] = useState('');
   
   // Filtros
+  const [buscaTutor, setBuscaTutor] = useState('');
   const [busca, setBusca] = useState('');
+  const [clientesSugeridos, setClientesSugeridos] = useState([]);
+  const [sugestaoCongelada, setSugestaoCongelada] = useState(false);
   const [clienteFiltro, setClienteFiltro] = useState(clienteIdParam || '');
   const [especieFiltro, setEspecieFiltro] = useState('');
   const [statusFiltro, setStatusFiltro] = useState(''); // '', 'ativo', 'inativo'
@@ -31,6 +34,12 @@ const GerenciamentoPets = () => {
   }, [clienteFiltro, especieFiltro, statusFiltro]);
 
   const loadPets = async () => {
+    if (busca.trim() && !clienteFiltro) {
+      setPets([]);
+      setError('Para pesquisar pet, primeiro selecione o tutor (nome, telefone ou CPF).');
+      return;
+    }
+
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -41,7 +50,8 @@ const GerenciamentoPets = () => {
       if (statusFiltro) params.append('ativo', statusFiltro === 'ativo' ? 'true' : 'false');
       
       const response = await api.get(`/pets?${params.toString()}`);
-      setPets(response.data);
+      const lista = response.data?.items || response.data?.pets || response.data || [];
+      setPets(Array.isArray(lista) ? lista : []);
       setError('');
     } catch (err) {
       console.error('Erro ao carregar pets:', err);
@@ -54,10 +64,44 @@ const GerenciamentoPets = () => {
   const loadClientes = async () => {
     try {
       const response = await api.get('/clientes/');
-      setClientes(response.data);
+      const lista = response.data?.items || response.data?.clientes || response.data || [];
+      setClientes(Array.isArray(lista) ? lista : []);
     } catch (err) {
       console.error('Erro ao carregar clientes:', err);
+      setClientes([]);
     }
+  };
+
+  useEffect(() => {
+    const termo = buscaTutor.trim();
+    if (!termo || sugestaoCongelada) {
+      setClientesSugeridos([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const termoDigitos = termo.replace(/\D/g, '');
+        const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termo;
+        const response = await api.get('/clientes/', {
+          params: { search: termoBusca, limit: 20 }
+        });
+        const lista = response.data?.items || response.data?.clientes || response.data || [];
+        setClientesSugeridos(Array.isArray(lista) ? lista : []);
+      } catch {
+        setClientesSugeridos([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [buscaTutor, sugestaoCongelada]);
+
+  const selecionarTutor = (cliente) => {
+    setClienteFiltro(String(cliente.id));
+    setBuscaTutor(cliente.nome || '');
+    setSugestaoCongelada(true);
+    setClientesSugeridos([]);
+    setError('');
   };
 
   const handleBusca = (e) => {
@@ -66,10 +110,14 @@ const GerenciamentoPets = () => {
   };
 
   const limparFiltros = () => {
+    setBuscaTutor('');
     setBusca('');
+    setSugestaoCongelada(false);
     setClienteFiltro('');
     setEspecieFiltro('');
     setStatusFiltro('');
+    setClientesSugeridos([]);
+    setError('');
   };
 
   const calcularIdade = (dataNascimento) => {
@@ -123,7 +171,7 @@ const GerenciamentoPets = () => {
           </h1>
           <p className="text-gray-600 mt-1">
             {clienteFiltro 
-              ? `Pets do cliente: ${clientes.find(c => c.id === parseInt(clienteFiltro))?.nome || ''}`
+              ? `Pets do cliente: ${clientes.find(c => String(c.id) === String(clienteFiltro))?.nome || ''}`
               : 'Gestão completa dos animais de estimação'}
           </p>
         </div>
@@ -145,9 +193,45 @@ const GerenciamentoPets = () => {
               <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Buscar por nome, raça, microchip ou código..."
+                placeholder="Buscar tutor por nome, telefone ou CPF..."
+                value={buscaTutor}
+                onChange={(e) => {
+                  setBuscaTutor(e.target.value);
+                  setSugestaoCongelada(false);
+                  if (!e.target.value.trim()) {
+                    setClienteFiltro('');
+                  }
+                }}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+
+              {clientesSugeridos.length > 0 && buscaTutor.trim() && (
+                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {clientesSugeridos.map((cliente) => (
+                    <button
+                      key={cliente.id}
+                      type="button"
+                      onClick={() => selecionarTutor(cliente)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                    >
+                      <div className="text-sm font-medium text-gray-800">{cliente.nome}</div>
+                      <div className="text-xs text-gray-500">
+                        {[cliente.telefone, cliente.celular, cliente.cpf].filter(Boolean).join(' • ') || 'Sem telefone/CPF'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 relative">
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder={clienteFiltro ? 'Buscar pet pelo nome...' : 'Primeiro selecione o tutor'}
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
+                disabled={!clienteFiltro}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
@@ -176,7 +260,17 @@ const GerenciamentoPets = () => {
                 </label>
                 <select
                   value={clienteFiltro}
-                  onChange={(e) => setClienteFiltro(e.target.value)}
+                  onChange={(e) => {
+                    setClienteFiltro(e.target.value);
+                    if (!e.target.value) {
+                      setBuscaTutor('');
+                      return;
+                    }
+                    const encontrado = clientes.find((c) => String(c.id) === String(e.target.value));
+                    if (encontrado?.nome) {
+                      setBuscaTutor(encontrado.nome);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 >
                   <option value="">Todos os clientes</option>

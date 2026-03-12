@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
+import { vetApi } from './veterinario/vetApi';
 import { 
   FiArrowLeft, FiEdit2, FiUser, FiPhone, FiCalendar, FiActivity,
   FiHeart, FiClipboard, FiAlertCircle, FiCheckCircle, FiXCircle
@@ -16,9 +17,25 @@ const PetDetalhes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [abaAtiva, setAbaAtiva] = useState('geral');
+  const [historicoInternacoes, setHistoricoInternacoes] = useState([]);
+  const [loadingInternacoes, setLoadingInternacoes] = useState(false);
+  const [historicoVacinas, setHistoricoVacinas] = useState([]);
+  const [loadingVacinas, setLoadingVacinas] = useState(false);
+  const [historicoConsultas, setHistoricoConsultas] = useState([]);
+  const [loadingConsultas, setLoadingConsultas] = useState(false);
+  const [filtroVacinas, setFiltroVacinas] = useState('');
+  const [filtroConsultas, setFiltroConsultas] = useState('');
+  const [limiteVacinas, setLimiteVacinas] = useState(6);
+  const [limiteConsultas, setLimiteConsultas] = useState(6);
+  const [ultimaVacina, setUltimaVacina] = useState(null);
+  const [ultimaAlta, setUltimaAlta] = useState(null);
 
   useEffect(() => {
     loadPet();
+  }, [petId]);
+
+  useEffect(() => {
+    carregarResumoClinico();
   }, [petId]);
 
   const loadPet = async () => {
@@ -58,6 +75,158 @@ const PetDetalhes = () => {
     if (!data) return '-';
     return new Date(data).toLocaleDateString('pt-BR');
   };
+
+  const formatarDataHora = (data) => {
+    if (!data) return '-';
+    return new Date(data).toLocaleString('pt-BR');
+  };
+
+  const carregarHistoricoInternacoes = async () => {
+    try {
+      setLoadingInternacoes(true);
+      const response = await vetApi.historicoInternacoesPet(petId);
+      const lista = Array.isArray(response.data?.historico) ? response.data.historico : [];
+      setHistoricoInternacoes(lista);
+    } catch {
+      setHistoricoInternacoes([]);
+    } finally {
+      setLoadingInternacoes(false);
+    }
+  };
+
+  const carregarHistoricoVacinas = async () => {
+    try {
+      setLoadingVacinas(true);
+      const response = await vetApi.listarVacinasPet(petId);
+      const lista = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.items ?? []);
+
+      const ordenadas = [...lista].sort((a, b) => {
+        const da = new Date(a.data_aplicacao || 0).getTime();
+        const db = new Date(b.data_aplicacao || 0).getTime();
+        return db - da;
+      });
+
+      setHistoricoVacinas(ordenadas);
+    } catch {
+      setHistoricoVacinas([]);
+    } finally {
+      setLoadingVacinas(false);
+    }
+  };
+
+  const carregarHistoricoConsultas = async () => {
+    try {
+      setLoadingConsultas(true);
+      const response = await vetApi.listarConsultas({
+        pet_id: petId,
+        limit: 200,
+      });
+
+      const lista = Array.isArray(response.data)
+        ? response.data
+        : (response.data?.items ?? []);
+
+      const ordenadas = [...lista].sort((a, b) => {
+        const da = new Date(a.inicio_atendimento || a.created_at || 0).getTime();
+        const db = new Date(b.inicio_atendimento || b.created_at || 0).getTime();
+        return db - da;
+      });
+
+      setHistoricoConsultas(ordenadas);
+    } catch {
+      setHistoricoConsultas([]);
+    } finally {
+      setLoadingConsultas(false);
+    }
+  };
+
+  const carregarResumoClinico = async () => {
+    try {
+      const [resVacinas, resHistoricoInternacoes] = await Promise.all([
+        api.get(`/vet/pets/${petId}/vacinas`).catch(() => ({ data: [] })),
+        vetApi.historicoInternacoesPet(petId).catch(() => ({ data: { historico: [] } })),
+      ]);
+
+      const listaVacinas = Array.isArray(resVacinas.data)
+        ? resVacinas.data
+        : (resVacinas.data?.items ?? []);
+
+      const vacinasOrdenadas = [...listaVacinas].sort((a, b) => {
+        const da = new Date(a.data_aplicacao || 0).getTime();
+        const db = new Date(b.data_aplicacao || 0).getTime();
+        return db - da;
+      });
+      setUltimaVacina(vacinasOrdenadas[0] ?? null);
+
+      const listaHistorico = Array.isArray(resHistoricoInternacoes.data?.historico)
+        ? resHistoricoInternacoes.data.historico
+        : [];
+
+      const altas = listaHistorico.filter((item) => item?.data_saida);
+      const altasOrdenadas = [...altas].sort((a, b) => {
+        const da = new Date(a.data_saida || 0).getTime();
+        const db = new Date(b.data_saida || 0).getTime();
+        return db - da;
+      });
+      setUltimaAlta(altasOrdenadas[0] ?? null);
+    } catch {
+      setUltimaVacina(null);
+      setUltimaAlta(null);
+    }
+  };
+
+  useEffect(() => {
+    if (abaAtiva !== 'internacoes') return;
+    carregarHistoricoInternacoes();
+  }, [abaAtiva, petId]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'vacinas') return;
+    carregarHistoricoVacinas();
+  }, [abaAtiva, petId]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'consultas') return;
+    carregarHistoricoConsultas();
+  }, [abaAtiva, petId]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'vacinas') return;
+    setLimiteVacinas(6);
+  }, [abaAtiva, filtroVacinas]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'consultas') return;
+    setLimiteConsultas(6);
+  }, [abaAtiva, filtroConsultas]);
+
+  const vacinasFiltradas = historicoVacinas.filter((vacina) => {
+    const termo = filtroVacinas.trim().toLowerCase();
+    if (!termo) return true;
+    const texto = [
+      vacina?.nome_vacina,
+      vacina?.fabricante,
+      vacina?.lote,
+      vacina?.veterinario_responsavel,
+      vacina?.veterinario_nome,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return texto.includes(termo);
+  });
+
+  const consultasFiltradas = historicoConsultas.filter((consulta) => {
+    const termo = filtroConsultas.trim().toLowerCase();
+    if (!termo) return true;
+    const texto = [
+      consulta?.queixa_principal,
+      consulta?.motivo_consulta,
+      consulta?.diagnostico,
+      consulta?.veterinario_nome,
+      consulta?.status,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return texto.includes(termo);
+  });
 
   const toggleAtivacao = async () => {
     try {
@@ -107,6 +276,7 @@ const PetDetalhes = () => {
     { id: 'saude', label: 'Saúde', icon: FiHeart },
     { id: 'vacinas', label: 'Vacinas', icon: FiActivity },
     { id: 'consultas', label: 'Consultas', icon: FiCalendar },
+    { id: 'internacoes', label: 'Internações', icon: FiActivity },
     { id: 'servicos', label: 'Serviços', icon: PawPrint },
   ];
 
@@ -226,6 +396,34 @@ const PetDetalhes = () => {
         {abaAtiva === 'geral' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Informações Gerais</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                <p className="text-xs font-semibold text-blue-700 mb-1">Última vacina</p>
+                {ultimaVacina ? (
+                  <>
+                    <p className="text-sm font-semibold text-blue-900">{ultimaVacina.nome_vacina || 'Vacina'}</p>
+                    <p className="text-xs text-blue-800">Aplicada em: {formatarData(ultimaVacina.data_aplicacao)}</p>
+                    <p className="text-xs text-blue-800">Próxima dose: {formatarData(ultimaVacina.proxima_dose || ultimaVacina.data_proxima_dose)}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-blue-800">Nenhuma vacina registrada.</p>
+                )}
+              </div>
+
+              <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                <p className="text-xs font-semibold text-green-700 mb-1">Resumo da última alta</p>
+                {ultimaAlta ? (
+                  <>
+                    <p className="text-xs text-green-800">Alta em: {formatarDataHora(ultimaAlta.data_saida)}</p>
+                    <p className="text-sm font-semibold text-green-900 mt-1">Motivo: {ultimaAlta.motivo || '-'}</p>
+                    <p className="text-xs text-green-800 mt-1">Observação: {ultimaAlta.observacoes_alta || 'Sem observação de alta.'}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-green-800">Nenhuma alta registrada.</p>
+                )}
+              </div>
+            </div>
             
             <div className="grid grid-cols-2 gap-6">
               <div>
@@ -351,15 +549,64 @@ const PetDetalhes = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Carteira de Vacinação</h2>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium">
+              <button
+                onClick={() => navigate(`/veterinario/vacinas?pet_id=${pet.id}&acao=novo`)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
                 + Registrar Vacina
               </button>
             </div>
-            <div className="text-center py-12 text-gray-500">
-              <FiActivity size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium mb-2">Módulo em desenvolvimento</p>
-              <p className="text-sm">Em breve você poderá gerenciar o histórico de vacinas do pet</p>
+
+            <div>
+              <input
+                type="text"
+                value={filtroVacinas}
+                onChange={(e) => setFiltroVacinas(e.target.value)}
+                placeholder="Filtrar por vacina, fabricante, lote ou veterinário..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
             </div>
+
+            {loadingVacinas ? (
+              <div className="text-center py-10 text-gray-500">Carregando histórico de vacinas...</div>
+            ) : vacinasFiltradas.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
+                Nenhuma vacina encontrada com esse filtro.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {vacinasFiltradas.slice(0, limiteVacinas).map((vacina) => (
+                  <div key={vacina.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="font-semibold text-gray-800">{vacina.nome_vacina || 'Vacina'}</p>
+                      <p className="text-xs text-gray-500">{formatarData(vacina.data_aplicacao)}</p>
+                    </div>
+                    <p className="text-sm text-gray-600">Fabricante: {vacina.fabricante || '-'}</p>
+                    <p className="text-sm text-gray-600">Lote: {vacina.lote || '-'}</p>
+                    <p className="text-sm text-gray-600">
+                      Próxima dose: {formatarData(vacina.proxima_dose || vacina.data_proxima_dose)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Veterinário: {vacina.veterinario_responsavel || vacina.veterinario_nome || '-'}
+                    </p>
+                    {vacina.observacoes && (
+                      <p className="text-sm text-gray-700 mt-1">Obs.: {vacina.observacoes}</p>
+                    )}
+                  </div>
+                ))}
+
+                {vacinasFiltradas.length > limiteVacinas && (
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setLimiteVacinas((prev) => prev + 6)}
+                      className="text-sm text-blue-600 hover:text-blue-700 underline"
+                    >
+                      Ver mais vacinas ({vacinasFiltradas.length - limiteVacinas} restantes)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -368,15 +615,163 @@ const PetDetalhes = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Histórico de Consultas</h2>
-              <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium">
+              <button
+                onClick={() => navigate(`/veterinario/consultas/nova?pet_id=${pet.id}`)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
                 + Nova Consulta
               </button>
             </div>
-            <div className="text-center py-12 text-gray-500">
-              <FiCalendar size={48} className="mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium mb-2">Módulo em desenvolvimento</p>
-              <p className="text-sm">Em breve você poderá gerenciar consultas veterinárias</p>
+
+            <div>
+              <input
+                type="text"
+                value={filtroConsultas}
+                onChange={(e) => setFiltroConsultas(e.target.value)}
+                placeholder="Filtrar por motivo, diagnóstico, veterinário ou status..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
             </div>
+
+            {loadingConsultas ? (
+              <div className="text-center py-10 text-gray-500">Carregando histórico de consultas...</div>
+            ) : consultasFiltradas.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
+                Nenhuma consulta encontrada com esse filtro.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {consultasFiltradas.slice(0, limiteConsultas).map((consulta) => (
+                  <div key={consulta.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="font-semibold text-gray-800">
+                        {consulta.queixa_principal || consulta.motivo_consulta || 'Consulta veterinária'}
+                      </p>
+                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                        {consulta.status || 'registrada'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Data: {formatarDataHora(consulta.inicio_atendimento || consulta.created_at)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Veterinário: {consulta.veterinario_nome || '-'}
+                    </p>
+                    <p className="text-sm text-gray-700 mt-1">
+                      Diagnóstico: {consulta.diagnostico || '-'}
+                    </p>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => navigate(`/veterinario/consultas/${consulta.id}`)}
+                        className="text-sm text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Abrir consulta completa
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {consultasFiltradas.length > limiteConsultas && (
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setLimiteConsultas((prev) => prev + 6)}
+                      className="text-sm text-blue-600 hover:text-blue-700 underline"
+                    >
+                      Ver mais consultas ({consultasFiltradas.length - limiteConsultas} restantes)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Aba: Serviços */}
+        {abaAtiva === 'internacoes' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Histórico de Internações</h2>
+              <button
+                onClick={() => navigate('/veterinario/internacoes')}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                Abrir módulo de internações
+              </button>
+            </div>
+
+            {loadingInternacoes ? (
+              <div className="text-center py-10 text-gray-500">Carregando histórico...</div>
+            ) : historicoInternacoes.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
+                Nenhuma internação registrada para este pet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {historicoInternacoes.map((internacao) => (
+                  <div key={internacao.internacao_id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <p className="font-semibold text-gray-800">
+                        Internação #{internacao.internacao_id} {internacao.box ? `• Baia ${internacao.box}` : '• Sem baia'}
+                      </p>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${internacao.status === 'alta' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {internacao.status}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-gray-600">Motivo: {internacao.motivo || '-'}</p>
+                    <p className="text-sm text-gray-600">Entrada: {formatarDataHora(internacao.data_entrada)}</p>
+                    <p className="text-sm text-gray-600">Alta: {formatarDataHora(internacao.data_saida)}</p>
+                    {internacao.observacoes_alta && (
+                      <p className="text-sm text-green-700 mt-1">Obs. alta: {internacao.observacoes_alta}</p>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Evoluções ({internacao.evolucoes?.length || 0})</p>
+                        {(internacao.evolucoes?.length || 0) === 0 ? (
+                          <p className="text-xs text-gray-400">Nenhuma evolução.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {(internacao.evolucoes || []).slice(0, 5).map((ev) => (
+                              <div key={ev.id} className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2">
+                                <p className="text-gray-500">{formatarDataHora(ev.data_hora)}</p>
+                                <p>Temp: {ev.temperatura || '-'} • FC: {ev.freq_cardiaca || '-'} • FR: {ev.freq_respiratoria || '-'}</p>
+                                {ev.observacoes && <p className="text-gray-600">{ev.observacoes}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Procedimentos ({internacao.procedimentos?.length || 0})</p>
+                        {(internacao.procedimentos?.length || 0) === 0 ? (
+                          <p className="text-xs text-gray-400">Nenhum procedimento.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {(internacao.procedimentos || []).slice(0, 8).map((proc, idx) => (
+                              <div key={`${proc.id || idx}_pet_proc`} className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2">
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <p className="font-semibold text-gray-800">{proc.medicamento || 'Procedimento'}</p>
+                                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${proc.status === 'agendado' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    {proc.status === 'agendado' ? 'Agendado' : 'Concluído'}
+                                  </span>
+                                </div>
+                                <p>Agendado: {formatarDataHora(proc.horario_agendado)}</p>
+                                <p>Executado: {formatarDataHora(proc.horario_execucao)}</p>
+                                <p>Dose: {proc.dose || '-'} • Via: {proc.via || '-'}</p>
+                                <p>Responsável: {proc.executado_por || '-'}</p>
+                                {proc.observacao_execucao && <p>Obs: {proc.observacao_execucao}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -73,9 +73,11 @@ const PetForm = () => {
   const loadClientes = async () => {
     try {
       const response = await api.get('/clientes/');
-      setClientes(response.data);
+      const lista = response.data?.items || response.data?.clientes || response.data || [];
+      setClientes(Array.isArray(lista) ? lista : []);
     } catch (err) {
       console.error('Erro ao carregar clientes:', err);
+      setClientes([]);
     }
   };
 

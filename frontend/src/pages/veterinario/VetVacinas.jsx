@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Syringe, Plus, AlertCircle, CheckCircle, Search, ChevronDown } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
@@ -24,15 +25,19 @@ function badgeProxDose(iso) {
 }
 
 export default function VetVacinas() {
+  const [searchParams] = useSearchParams();
   const [aba, setAba] = useState("registros"); // "registros" | "vencendo"
+  const [pessoaFiltro, setPessoaFiltro] = useState("");
   const [petSelecionado, setPetSelecionado] = useState("");
   const [pets, setPets] = useState([]);
+  const [veterinarios, setVeterinarios] = useState([]);
   const [vacinas, setVacinas] = useState([]);
   const [vacinasVencendo, setVacinasVencendo] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [novaAberta, setNovaAberta] = useState(false);
   const [form, setForm] = useState({
+    pessoa_id: "",
     pet_id: "",
     nome_vacina: "",
     fabricante: "",
@@ -44,17 +49,29 @@ export default function VetVacinas() {
   });
   const [salvando, setSalvando] = useState(false);
 
+  const petIdQuery = searchParams.get("pet_id") || "";
+  const acaoQuery = searchParams.get("acao") || "";
+
   useEffect(() => {
     api.get("/pets", { params: { limit: 500 } })
       .then((r) => setPets(r.data?.items ?? r.data ?? []))
       .catch(() => {});
+    vetApi.listarVeterinarios()
+      .then((r) => setVeterinarios(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setVeterinarios([]));
     carregarVencendo();
   }, []);
 
   async function carregarVencendo() {
     try {
       const res = await vetApi.vacinasVencendo(30);
-      setVacinasVencendo(Array.isArray(res.data) ? res.data : (res.data?.items ?? []));
+      const itens = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+      setVacinasVencendo(
+        itens.map((v) => ({
+          ...v,
+          proxima_dose: v.proxima_dose ?? v.data_proxima_dose ?? null,
+        }))
+      );
     } catch {}
   }
 
@@ -63,7 +80,13 @@ export default function VetVacinas() {
     try {
       setCarregando(true);
       const res = await vetApi.listarVacinasPet(petSelecionado);
-      setVacinas(Array.isArray(res.data) ? res.data : (res.data?.items ?? []));
+      const itens = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
+      setVacinas(
+        itens.map((v) => ({
+          ...v,
+          proxima_dose: v.proxima_dose ?? v.data_proxima_dose ?? null,
+        }))
+      );
     } catch {
       setErro("Erro ao carregar vacinas.");
     } finally {
@@ -72,6 +95,60 @@ export default function VetVacinas() {
   }, [petSelecionado]);
 
   useEffect(() => { carregarVacinasPet(); }, [carregarVacinasPet]);
+
+  useEffect(() => {
+    if (!petIdQuery || !pets.length) return;
+
+    const petEncontrado = pets.find((p) => String(p.id) === String(petIdQuery));
+    if (!petEncontrado) return;
+
+    const pessoaId = petEncontrado?.cliente_id ? String(petEncontrado.cliente_id) : "";
+    if (pessoaId) {
+      setPessoaFiltro(pessoaId);
+      setForm((prev) => ({ ...prev, pessoa_id: pessoaId }));
+    }
+
+    setPetSelecionado(String(petEncontrado.id));
+    setForm((prev) => ({ ...prev, pet_id: String(petEncontrado.id) }));
+
+    if (acaoQuery === "novo") {
+      setNovaAberta(true);
+    }
+  }, [petIdQuery, acaoQuery, pets]);
+
+  const pessoas = useMemo(() => {
+    const mapa = new Map();
+    for (const p of pets) {
+      if (!p?.cliente_id) continue;
+      if (mapa.has(String(p.cliente_id))) continue;
+      mapa.set(String(p.cliente_id), {
+        id: String(p.cliente_id),
+        nome: p.cliente_nome ?? `Pessoa #${p.cliente_id}`,
+      });
+    }
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [pets]);
+
+  const petsDaPessoa = useMemo(() => {
+    if (!form.pessoa_id) return [];
+    return pets.filter(
+      (p) => String(p.cliente_id) === String(form.pessoa_id) && p.ativo !== false
+    );
+  }, [pets, form.pessoa_id]);
+
+  const pessoaIdPorPet = useCallback(
+    (petId) => {
+      if (!petId) return "";
+      const pet = pets.find((p) => String(p.id) === String(petId));
+      return pet?.cliente_id ? String(pet.cliente_id) : "";
+    },
+    [pets]
+  );
+
+  const petsFiltradosCarteira = useMemo(() => {
+    if (!pessoaFiltro) return pets;
+    return pets.filter((p) => String(p.cliente_id) === String(pessoaFiltro) && p.ativo !== false);
+  }, [pets, pessoaFiltro]);
 
   function set(campo, valor) { setForm((p) => ({ ...p, [campo]: valor })); }
 
@@ -86,12 +163,12 @@ export default function VetVacinas() {
         fabricante: form.fabricante || undefined,
         lote: form.lote || undefined,
         data_aplicacao: form.data_aplicacao,
-        proxima_dose: form.proxima_dose || undefined,
+        data_proxima_dose: form.proxima_dose || undefined,
         veterinario_responsavel: form.veterinario_responsavel || undefined,
         observacoes: form.observacoes || undefined,
       });
       setNovaAberta(false);
-      setForm({ pet_id: "", nome_vacina: "", fabricante: "", lote: "", data_aplicacao: "", proxima_dose: "", veterinario_responsavel: "", observacoes: "" });
+      setForm({ pessoa_id: "", pet_id: "", nome_vacina: "", fabricante: "", lote: "", data_aplicacao: "", proxima_dose: "", veterinario_responsavel: "", observacoes: "" });
       // Recarrega a lista se for o mesmo pet
       if (form.pet_id === petSelecionado) await carregarVacinasPet();
       await carregarVencendo();
@@ -150,16 +227,34 @@ export default function VetVacinas() {
       {/* ABA: Registros por pet */}
       {aba === "registros" && (
         <div className="space-y-4">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <select
-              value={petSelecionado}
-              onChange={(e) => setPetSelecionado(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-            >
-              <option value="">Selecione um pet para ver a carteira…</option>
-              {pets.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.especie ?? "pet"})</option>)}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={pessoaFiltro}
+                onChange={(e) => {
+                  setPessoaFiltro(e.target.value);
+                  setPetSelecionado("");
+                }}
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+              >
+                <option value="">Selecione o tutor…</option>
+                {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
+              </select>
+            </div>
+
+            <div className="relative">
+              <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <select
+                value={petSelecionado}
+                onChange={(e) => setPetSelecionado(e.target.value)}
+                disabled={!pessoaFiltro}
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-300 disabled:opacity-60"
+              >
+                <option value="">Selecione um pet para ver a carteira…</option>
+                {petsFiltradosCarteira.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.especie ?? "pet"})</option>)}
+              </select>
+            </div>
           </div>
 
           {!petSelecionado && (
@@ -181,7 +276,14 @@ export default function VetVacinas() {
                 <div className="p-8 text-center bg-white border border-gray-200 rounded-xl">
                   <p className="text-gray-400 text-sm">Nenhuma vacina registrada para este pet.</p>
                   <button
-                    onClick={() => { setForm((prev) => ({ ...prev, pet_id: petSelecionado })); setNovaAberta(true); }}
+                    onClick={() => {
+                      setForm((prev) => ({
+                        ...prev,
+                        pessoa_id: pessoaIdPorPet(petSelecionado),
+                        pet_id: petSelecionado,
+                      }));
+                      setNovaAberta(true);
+                    }}
                     className="mt-3 text-sm text-orange-500 underline"
                   >
                     Registrar primeira vacina →
@@ -282,14 +384,29 @@ export default function VetVacinas() {
             <div className="grid grid-cols-2 gap-3">
               {/* Pet */}
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Pet *</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Pessoa (tutor) *</label>
                 <select
-                  value={form.pet_id}
-                  onChange={(e) => set("pet_id", e.target.value)}
+                  value={form.pessoa_id}
+                  onChange={(e) => {
+                    set("pessoa_id", e.target.value);
+                    set("pet_id", "");
+                  }}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
                 >
                   <option value="">Selecione…</option>
-                  {pets.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Pet da pessoa *</label>
+                <select
+                  value={form.pet_id}
+                  onChange={(e) => set("pet_id", e.target.value)}
+                  disabled={!form.pessoa_id}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white disabled:opacity-60"
+                >
+                  <option value="">Selecione…</option>
+                  {petsDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
                 </select>
               </div>
               {/* Vacina */}
@@ -321,8 +438,18 @@ export default function VetVacinas() {
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Veterinário responsável</label>
-                <input type="text" value={form.veterinario_responsavel} onChange={(e) => set("veterinario_responsavel", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
+                <select
+                  value={form.veterinario_responsavel}
+                  onChange={(e) => set("veterinario_responsavel", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">Selecione…</option>
+                  {veterinarios.map((v) => (
+                    <option key={v.id} value={v.nome}>
+                      {v.nome}{v.crmv ? ` - CRMV ${v.crmv}` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Observações</label>

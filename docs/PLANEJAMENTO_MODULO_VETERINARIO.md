@@ -1,7 +1,38 @@
 # Planejamento — Módulo Veterinário (Sistema Pet)
 
-> **Versão:** 2.0 — Março 2026  
-> **Status:** Planejamento / Pré-implementação
+> **Versão:** 2.1 — Março 2026  
+> **Status:** Em desenvolvimento — Fase 1 e 2 parcialmente implementadas
+
+---
+
+## 🗂️ STATUS GERAL DA IMPLEMENTAÇÃO
+
+> Legenda: ✅ Completo | 🔶 Parcial (estrutura pronta, falta detalhe) | ❌ Pendente
+
+### Infraestrutura e Banco de Dados
+| Item | Status | Observação |
+|---|---|---|
+| 15 tabelas `vet_*` criadas no banco (DEV) | ✅ | Migração `v1a2b3c4d5e6` aplicada |
+| Backend: `veterinario_models.py` | ✅ | Todos os modelos SQLAlchemy |
+| Backend: `veterinario_routes.py` | ✅ | Rotas CRUD em `/vet` |
+| Backend: router registrado em `main.py` | ✅ | `/vet/*` respondendo `403` (auth OK) |
+| Migrações intermediárias corrigidas | ✅ | `60a7b78b30b8` stamped + 3 corrigidas |
+
+### Frontend — Telas criadas
+| Tela | Status | Observação |
+|---|---|---|
+| `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` |
+| `VetConsultas.jsx` — lista paginada de consultas | ✅ | Filtros por data e status |
+| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | Etapas: sinais vitais, anamnese, diagnóstico; falta prescrição completa e IA |
+| `VetAgenda.jsx` — calendário dia/semana | 🔶 | Visual OK, falta criar agendamento + integração com push |
+| `VetVacinas.jsx` — registro de vacinas | 🔶 | CRUD básico; falta calendário preventivo e alerta de vencimento |
+| `VetInternacoes.jsx` — fichas de internação | 🔶 | Abertura/fechamento OK; falta protocolo de medicações e alertas |
+| `VetCatalogo.jsx` — catálogos (medicamentos e procedimentos) | 🔶 | Tabela com CRUD; falta banco de bulas completo e vinculação de insumos |
+| `vetApi.js` — helper Axios para todas as rotas `/vet` | ✅ | Cobre todos os endpoints |
+| Rotas em `App.jsx` | ✅ | `/vet/*` mapeadas |
+| Menu lateral em `Layout.jsx` | ✅ | Sub-itens do módulo veterinário |
+
+---
 
 ---
 
@@ -1122,40 +1153,42 @@ PRONTUÁRIO / LGPD
 
 ## 12. Fases de Implementação Sugeridas
 
+> Legenda: ✅ Completo | 🔶 Parcial | ❌ Pendente
+
 ### Fase 1 — Fundação (base sólida)
-1. Expandir campos clínicos do cadastro de Pet (campos estruturados — não texto livre)
-2. Catálogo global de produtos/medicamentos + tabela `tenant_stock`
-3. Módulo de Medicamentos / Bulas
-4. Calculadora de doses
-5. Prontuário (consulta) com sinais vitais estruturados
-6. Configuração do módulo (modelo operacional, faturamento, estoque separado)
+1. ❌ Expandir campos clínicos do cadastro de Pet (campos estruturados — não texto livre)
+2. ❌ Catálogo global de produtos/medicamentos + tabela `tenant_stock`
+3. 🔶 Módulo de Medicamentos / Bulas — tabela `vet_medicamentos_catalogo` criada + tela `VetCatalogo.jsx`; falta banco de bulas completo, doses por espécie, interações
+4. ❌ Calculadora de doses (peso → dose automática)
+5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas); falta prescrição vinculada ao peso e IA
+6. ❌ Configuração do módulo (modelo operacional, faturamento, estoque separado)
 
 ### Fase 2 — Clínica em funcionamento
-7. Agenda veterinária com push notifications (sem custo extra)
-8. Formulários dinâmicos / Receituário com cálculo automático de dose
-9. Procedimentos cadastráveis com insumos vinculados
-10. Upload e análise de exames pela IA
-11. Integração alertas → PDV e Banho/Tosa
-12. Comissão automática (para modelo parceiro)
+7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx`; falta criação de agendamento pela agenda e push notifications
+8. 🔶 Formulários dinâmicos / Receituário com cálculo automático de dose — tabelas `vet_prescricoes` + `vet_itens_prescricao` criadas; falta cálculo automático e geração de PDF
+9. 🔶 Procedimentos cadastráveis com insumos vinculados — tabelas `vet_catalogo_procedimentos` + `vet_procedimentos_consulta` criadas; falta vinculação de insumos e dedução de estoque
+10. 🔶 Upload e análise de exames pela IA — tabela `vet_exames` criada; falta upload de arquivo e análise por IA
+11. ❌ Integração alertas → PDV e Banho/Tosa
+12. ❌ Comissão automática (para modelo parceiro)
 
 ### Fase 3 — Nível avançado
-13. Internação completa (protocolos, lembretes, curva de temperatura)
-14. IA consultora de diagnóstico (modo Debater Caso + Analisar Exame)
-15. Vacinação, calendário preventivo + carteirinha digital online no app
-16. Dashboard clínico e relatórios de performance
-17. Banco de protocolos veterinários
+13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — tabelas `vet_internacoes` + `vet_evolucoes_internacao` criadas + `VetInternacoes.jsx`; falta protocolo de medicações com alertas de horário e gráficos de evolução
+14. ❌ IA consultora de diagnóstico (modo Debater Caso + Analisar Exame)
+15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — tabelas `vet_vacinas_registros` + `vet_protocolos_vacinas` criadas + `VetVacinas.jsx`; falta calendário preventivo por espécie, alertas de vencimento e carteirinha digital
+16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` criado; falta KPIs reais (tempo médio, taxa de retorno) conectados ao banco
+17. ❌ Banco de protocolos veterinários reutilizáveis
 
 ### Fase 4 — Multi-Tenant Avançado
-18. Tabela `vet_partner_link` e arquitetura de eventos entre tenants
-19. `organization_type` (petshop / veterinary_clinic / grooming / hospital)
-20. IA clínica coletiva (dados anonimizados multi-tenant)
+18. ❌ Tabela `vet_partner_link` e arquitetura de eventos entre tenants
+19. ❌ `organization_type` (petshop / veterinary_clinic / grooming / hospital)
+20. ❌ IA clínica coletiva (dados anonimizados multi-tenant)
 
 ### Fase 5 — App e Diferenciais
-21. Seção veterinária no app (agendamentos, exames, receitas, carteirinha)
-22. QR Code do pet → carteirinha pública na web
-23. Curva de peso + linha do tempo do pet
-24. NPS pós-consulta
-25. Telemedicina
+21. ❌ Seção veterinária no app mobile (agendamentos, exames, receitas, carteirinha)
+22. ❌ QR Code do pet → carteirinha pública na web
+23. ❌ Curva de peso + linha do tempo do pet
+24. ❌ NPS pós-consulta
+25. ❌ Telemedicina
 
 ---
 
