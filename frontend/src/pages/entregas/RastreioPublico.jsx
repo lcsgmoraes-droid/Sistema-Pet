@@ -10,6 +10,7 @@ export default function RastreioPublico() {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [motoFrame, setMotoFrame] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -18,6 +19,13 @@ export default function RastreioPublico() {
     const interval = setInterval(carregarRastreio, 10000);
     return () => clearInterval(interval);
   }, [token]);
+
+  useEffect(() => {
+    const animationInterval = setInterval(() => {
+      setMotoFrame((prev) => !prev);
+    }, 700);
+    return () => clearInterval(animationInterval);
+  }, []);
 
   async function carregarRastreio() {
     try {
@@ -84,6 +92,22 @@ export default function RastreioPublico() {
     ? `https://www.google.com/maps?q=${dados.ultima_posicao_gps.lat},${dados.ultima_posicao_gps.lon}`
     : null;
 
+  const gpsFonte = dados.ultima_posicao_gps?.fonte || null;
+  const gpsAtualizadoEm = dados.ultima_posicao_gps?.atualizada_em
+    ? new Date(dados.ultima_posicao_gps.atualizada_em).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
+  const gpsEhTempoReal = gpsFonte === "rota_atual";
+  const distanciaTotalReal = Number(dados.distancia_total_km_real || 0);
+  const distanciaRetornoReal = Number(dados.distancia_retorno_km_real || 0);
+  const distanciaAteUltima = Number(
+    dados.distancia_ate_ultima_entrega_km_real || 0,
+  );
+
   return (
     <div style={styles.page}>
       <div style={styles.card}>
@@ -126,17 +150,29 @@ export default function RastreioPublico() {
         {/* Última posição GPS */}
         {linkMaps && (
           <div style={styles.gpsBox}>
-            <p style={styles.gpsTexto}>🏍️ 📍 Posição atual do entregador (tempo real)</p>
+            <p style={styles.gpsTexto}>
+              {gpsEhTempoReal
+                ? "🏍️ 📍 GPS ao vivo do entregador"
+                : "📍 Última posição registrada na rota"}
+            </p>
+            {gpsAtualizadoEm && (
+              <p style={styles.gpsSubtexto}>
+                Atualizado em {gpsAtualizadoEm}
+              </p>
+            )}
             <a
               href={linkMaps}
               target="_blank"
               rel="noopener noreferrer"
               style={styles.btnMaps}
             >
-              🗺️ Acompanhar no Google Maps
+              🗺️ Abrir no Google Maps
             </a>
             <div style={styles.mapaEmbedWrap}>
-              <div style={styles.mapaBadgeMoto}>🏍️ Entregador</div>
+              <div style={styles.mapaBadgeMoto}>
+                {gpsEhTempoReal ? "🏍️ Entregador ao vivo" : "📌 Último ponto confirmado"}
+              </div>
+              <div style={styles.motoOverlay(motoFrame, gpsEhTempoReal)}>🛵</div>
               <iframe
                 title="Mapa de rastreio da entrega"
                 src={`${linkMaps}&output=embed`}
@@ -144,6 +180,24 @@ export default function RastreioPublico() {
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
+            </div>
+          </div>
+        )}
+
+        {(distanciaTotalReal > 0 || distanciaRetornoReal > 0 || distanciaAteUltima > 0) && (
+          <div style={styles.distBox}>
+            <div style={styles.distTitulo}>📏 Distância percorrida na rota</div>
+            <div style={styles.distLinha}>
+              <span>Total rodado</span>
+              <strong>{distanciaTotalReal.toFixed(2)} km</strong>
+            </div>
+            <div style={styles.distLinha}>
+              <span>Até última entrega</span>
+              <strong>{distanciaAteUltima.toFixed(2)} km</strong>
+            </div>
+            <div style={styles.distLinha}>
+              <span>Retorno vazio</span>
+              <strong>{distanciaRetornoReal.toFixed(2)} km</strong>
             </div>
           </div>
         )}
@@ -156,6 +210,17 @@ export default function RastreioPublico() {
               <div style={styles.paradaOrdem}>{parada.ordem}</div>
               <div style={styles.paradaInfo}>
                 <div style={styles.paradaEndereco}>{parada.endereco}</div>
+                {(parada.distancia_trecho_real_km || parada.distancia_acumulada_real_km) && (
+                  <div style={styles.paradaDistanciaReal}>
+                    {parada.distancia_trecho_real_km
+                      ? `Trecho: ${Number(parada.distancia_trecho_real_km).toFixed(2)} km`
+                      : ""}
+                    {parada.distancia_trecho_real_km && parada.distancia_acumulada_real_km ? " • " : ""}
+                    {parada.distancia_acumulada_real_km
+                      ? `Acumulado: ${Number(parada.distancia_acumulada_real_km).toFixed(2)} km`
+                      : ""}
+                  </div>
+                )}
                 <div style={styles.paradaStatusRow}>
                   <span style={styles.paradaStatus(parada.status)}>
                     {getParadaStatusIcon(parada.status)}{" "}
@@ -288,6 +353,12 @@ const styles = {
   gpsTexto: {
     fontSize: 13,
     color: "#333",
+    marginBottom: 4,
+  },
+  gpsSubtexto: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 0,
     marginBottom: 8,
   },
   btnMaps: {
@@ -325,6 +396,39 @@ const styles = {
     fontWeight: "700",
     padding: "6px 10px",
     borderRadius: 999,
+  },
+  motoOverlay: (motoFrame, gpsEhTempoReal) => ({
+    position: "absolute",
+    left: "50%",
+    top: "52%",
+    zIndex: 3,
+    fontSize: 30,
+    transform: `translate(-50%, -50%) translateX(${motoFrame ? 5 : -5}px)`,
+    transition: "transform 0.65s ease-in-out",
+    filter: gpsEhTempoReal
+      ? "drop-shadow(0 2px 4px rgba(0,0,0,0.25))"
+      : "grayscale(0.35)",
+    pointerEvents: "none",
+  }),
+  distBox: {
+    backgroundColor: "#f8fafc",
+    border: "1px solid #e5e7eb",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 18,
+  },
+  distTitulo: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 8,
+    color: "#1f2937",
+  },
+  distLinha: {
+    display: "flex",
+    justifyContent: "space-between",
+    fontSize: 13,
+    color: "#374151",
+    marginBottom: 4,
   },
   paradasBox: {
     marginBottom: 16,
@@ -376,6 +480,12 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  paradaDistanciaReal: {
+    fontSize: 12,
+    color: "#0f766e",
+    marginBottom: 4,
+    fontWeight: "600",
   },
   paradaStatus: (status) => ({
     fontSize: 12,

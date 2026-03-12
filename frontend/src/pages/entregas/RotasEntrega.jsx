@@ -703,11 +703,16 @@ function RotaCard({
     const distanciaRouteTotal = ultimaParadaComDistancia
       ? parseFloat(ultimaParadaComDistancia.distancia_acumulada)
       : null;
+    const distanciaGpsTotal = rota.distancia_total_km_real
+      ? parseFloat(rota.distancia_total_km_real)
+      : null;
 
     // Montar mensagem de confirmação com distância se disponível
     let msgConfirm =
       "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
-    if (metodo === "auto_rota" && distanciaRouteTotal) {
+    if (distanciaGpsTotal) {
+      msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância real pelo GPS: ${distanciaGpsTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
+    } else if (metodo === "auto_rota" && distanciaRouteTotal) {
       msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância percorrida estimada: ${distanciaRouteTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     }
 
@@ -735,6 +740,11 @@ function RotaCard({
             payload.distancia_real =
               parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
           }
+        }
+      } else if (distanciaGpsTotal) {
+        payload.distancia_real = distanciaGpsTotal;
+        if (kmInicial) {
+          payload.km_final = parseFloat(kmInicial) + distanciaGpsTotal;
         }
       } else if (metodo === "auto_rota") {
         // Auto-calcular a partir da distância da rota
@@ -836,6 +846,27 @@ function RotaCard({
                 <div>
                   <strong>Distância Prevista:</strong> {rota.distancia_prevista}{" "}
                   km
+                </div>
+              )}
+
+              {rota.distancia_total_km_real && (
+                <div style={{ color: "#0c4a6e", fontWeight: "600" }}>
+                  <strong>📍 Distância Real (GPS):</strong>{" "}
+                  {parseFloat(rota.distancia_total_km_real).toFixed(2)} km
+                </div>
+              )}
+
+              {rota.distancia_ate_ultima_entrega_km_real && (
+                <div>
+                  <strong>📦 Até última entrega:</strong>{" "}
+                  {parseFloat(rota.distancia_ate_ultima_entrega_km_real).toFixed(2)} km
+                </div>
+              )}
+
+              {rota.distancia_retorno_km_real && (
+                <div>
+                  <strong>↩️ Retorno vazio:</strong>{" "}
+                  {parseFloat(rota.distancia_retorno_km_real).toFixed(2)} km
                 </div>
               )}
 
@@ -1160,6 +1191,16 @@ function RotaCard({
                     {/* Endereço */}
                     <div style={{ color: "#555" }}>
                       📍 {parada.endereco}
+                      {parada.distancia_trecho_real_km && (
+                        <span style={{ marginLeft: 12, color: "#0f766e", fontWeight: 600 }}>
+                          • Trecho real: {Number(parada.distancia_trecho_real_km).toFixed(2)} km
+                        </span>
+                      )}
+                      {parada.distancia_acumulada_real_km && (
+                        <span style={{ marginLeft: 12, color: "#0f766e" }}>
+                          • Acumulado real: {Number(parada.distancia_acumulada_real_km).toFixed(2)} km
+                        </span>
+                      )}
                       {parada.distancia_acumulada && (
                         <span style={{ marginLeft: 12, color: "#777" }}>
                           • Dist: {parada.distancia_acumulada} km

@@ -68,6 +68,8 @@ class RotaEntregaParadaResponse(BaseModel):
     data_entrega: Optional[datetime] = None  # ETAPA 9.4
     observacoes: Optional[str] = None  # Observações sobre a entrega
     km_entrega: Optional[Decimal] = None  # KM da moto ao entregar
+    distancia_trecho_real_km: Optional[Decimal] = None
+    distancia_acumulada_real_km: Optional[Decimal] = None
     created_at: datetime
 
     # Informações do cliente para facilitar visualização
@@ -104,6 +106,9 @@ class RotaEntregaResponse(RotaEntregaBase):
     lon_atual: Optional[Decimal] = None
     localizacao_atualizada_em: Optional[datetime] = None
     token_rastreio: Optional[str] = None
+    distancia_total_km_real: Optional[Decimal] = None
+    distancia_retorno_km_real: Optional[Decimal] = None
+    distancia_ate_ultima_entrega_km_real: Optional[Decimal] = None
 
     # ETAPA 9.3: Incluir paradas ordenadas
     paradas: Optional[List[RotaEntregaParadaResponse]] = []

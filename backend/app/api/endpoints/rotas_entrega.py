@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
 from decimal import Decimal
+from math import radians, sin, cos, sqrt, atan2
 from typing import List, Optional
 import secrets
 
@@ -46,12 +47,27 @@ def ensure_rotas_entrega_schema(db: Session) -> None:
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lat_atual NUMERIC(10,6)"))
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lon_atual NUMERIC(10,6)"))
     db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS localizacao_atualizada_em TIMESTAMP"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_total_km_real NUMERIC(10,3)"))
+    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_retorno_km_real NUMERIC(10,3)"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"))
     db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lon_entrega NUMERIC(10,6)"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_trecho_real_km NUMERIC(10,3)"))
+    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_acumulada_real_km NUMERIC(10,3)"))
     db.commit()
     _rotas_schema_checked = True
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calcula distância entre 2 coordenadas geográficas em km."""
+    raio_terra_km = 6371.0
+
+    d_lat = radians(lat2 - lat1)
+    d_lon = radians(lon2 - lon1)
+    a = sin(d_lat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return raio_terra_km * c
 
 
 @router.get("/", response_model=List[RotaEntregaResponse])
@@ -95,6 +111,7 @@ def listar_rotas(
             text(
                 """
                 SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
+                     , distancia_total_km_real, distancia_retorno_km_real
                 FROM rotas_entrega
                 WHERE id = :rid AND tenant_id = :tenant
                 """
@@ -106,6 +123,12 @@ def listar_rotas(
             rota.lon_atual = loc[1]
             rota.localizacao_atualizada_em = loc[2]
             token_rastreio = loc[3]
+            rota.distancia_total_km_real = loc[4]
+            rota.distancia_retorno_km_real = loc[5]
+            if loc[4] is not None:
+                total_real = float(loc[4])
+                retorno_real = float(loc[5] or 0)
+                rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
             if not token_rastreio:
                 token_rastreio = secrets.token_urlsafe(32)
                 db.execute(
@@ -121,9 +144,25 @@ def listar_rotas(
             rota.token_rastreio = token_rastreio
 
         if rota.paradas:
+            dist_rows = db.execute(
+                text(
+                    """
+                    SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
+                    FROM rotas_entrega_paradas
+                    WHERE rota_id = :rid AND tenant_id = :tenant
+                    """
+                ),
+                {"rid": rota.id, "tenant": tenant_id},
+            ).fetchall()
+            dist_por_parada = {row[0]: row for row in dist_rows}
+
             rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
             # Adicionar informações do cliente em cada parada
             for parada in rota.paradas:
+                dist_row = dist_por_parada.get(parada.id)
+                if dist_row:
+                    parada.distancia_trecho_real_km = dist_row[1]
+                    parada.distancia_acumulada_real_km = dist_row[2]
                 if parada.venda and parada.venda.cliente:
                     parada.cliente_nome = parada.venda.cliente.nome
                     parada.cliente_telefone = parada.venda.cliente.telefone
@@ -452,6 +491,7 @@ def obter_rota(
         text(
             """
             SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
+                  , distancia_total_km_real, distancia_retorno_km_real
             FROM rotas_entrega
             WHERE id = :rid AND tenant_id = :tenant
             """
@@ -463,6 +503,12 @@ def obter_rota(
         rota.lon_atual = loc[1]
         rota.localizacao_atualizada_em = loc[2]
         token_rastreio = loc[3]
+        rota.distancia_total_km_real = loc[4]
+        rota.distancia_retorno_km_real = loc[5]
+        if loc[4] is not None:
+            total_real = float(loc[4])
+            retorno_real = float(loc[5] or 0)
+            rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
         if not token_rastreio:
             token_rastreio = secrets.token_urlsafe(32)
             db.execute(
@@ -479,8 +525,24 @@ def obter_rota(
         rota.token_rastreio = token_rastreio
 
     if rota.paradas:
+        dist_rows = db.execute(
+            text(
+                """
+                SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
+                FROM rotas_entrega_paradas
+                WHERE rota_id = :rid AND tenant_id = :tenant
+                """
+            ),
+            {"rid": rota.id, "tenant": tenant_id},
+        ).fetchall()
+        dist_por_parada = {row[0]: row for row in dist_rows}
+
         rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
         for parada in rota.paradas:
+            dist_row = dist_por_parada.get(parada.id)
+            if dist_row:
+                parada.distancia_trecho_real_km = dist_row[1]
+                parada.distancia_acumulada_real_km = dist_row[2]
             if parada.venda and parada.venda.cliente:
                 parada.cliente_nome = parada.venda.cliente.nome
                 parada.cliente_telefone = parada.venda.cliente.telefone
@@ -759,6 +821,7 @@ def fechar_rota(
     Se km_inicial e km_final forem informados, calcula distancia_real automaticamente.
     """
     user, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
 
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.id == rota_id,
@@ -793,6 +856,20 @@ def fechar_rota(
     # Se não calculou automaticamente, usar valor informado
     if payload.distancia_real is not None and rota.distancia_real is None:
         rota.distancia_real = payload.distancia_real
+
+    if rota.distancia_real is None:
+        dist_real_gps = db.execute(
+            text(
+                """
+                SELECT distancia_total_km_real
+                FROM rotas_entrega
+                WHERE id = :rid AND tenant_id = :tenant
+                """
+            ),
+            {"rid": rota_id, "tenant": tenant_id},
+        ).scalar()
+        if dist_real_gps is not None:
+            rota.distancia_real = Decimal(str(dist_real_gps))
 
     rota.tentativas = payload.tentativas or 1
     rota.observacoes = payload.observacoes
@@ -933,6 +1010,7 @@ def iniciar_rota(
     - Dispara eventos de mensagens
     """
     user, tenant_id = user_and_tenant
+    ensure_rotas_entrega_schema(db)
 
     # Validar rota
     rota = db.query(RotaEntrega).filter(
@@ -963,6 +1041,33 @@ def iniciar_rota(
     # Iniciar rota
     rota.status = "em_rota"
     rota.data_inicio = datetime.now()
+
+    # Zerar métricas reais de GPS no início da rota
+    db.execute(
+        text(
+            """
+            UPDATE rotas_entrega
+            SET lat_atual = NULL,
+                lon_atual = NULL,
+                localizacao_atualizada_em = NULL,
+                distancia_total_km_real = 0,
+                distancia_retorno_km_real = 0
+            WHERE id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {"rid": rota_id, "tenant": tenant_id},
+    )
+    db.execute(
+        text(
+            """
+            UPDATE rotas_entrega_paradas
+            SET distancia_trecho_real_km = 0,
+                distancia_acumulada_real_km = 0
+            WHERE rota_id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {"rid": rota_id, "tenant": tenant_id},
+    )
 
     # Registrar KM inicial (opcional)
     if km_inicial is not None:
@@ -1061,13 +1166,97 @@ def atualizar_localizacao_rota(
     if rota.status not in ("em_rota", "em_andamento"):
         raise HTTPException(status_code=400, detail="Rota não está em andamento")
 
+    loc_anterior = db.execute(
+        text(
+            """
+            SELECT lat_atual, lon_atual
+            FROM rotas_entrega
+            WHERE id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {"rid": rota_id, "tenant": tenant_id},
+    ).fetchone()
+
+    delta_km = 0.0
+    if loc_anterior and loc_anterior[0] is not None and loc_anterior[1] is not None:
+        delta_km = _haversine_km(float(loc_anterior[0]), float(loc_anterior[1]), float(lat), float(lon))
+        if delta_km < 0.003:
+            delta_km = 0.0
+        if delta_km > 5:
+            delta_km = 5.0
+
+    if delta_km > 0:
+        parada_pendente = db.execute(
+            text(
+                """
+                SELECT id, ordem
+                FROM rotas_entrega_paradas
+                WHERE rota_id = :rid
+                  AND tenant_id = :tenant
+                  AND status <> 'entregue'
+                ORDER BY ordem ASC
+                LIMIT 1
+                """
+            ),
+            {"rid": rota_id, "tenant": tenant_id},
+        ).fetchone()
+
+        if parada_pendente:
+            parada_id, ordem_parada = parada_pendente
+            db.execute(
+                text(
+                    """
+                    UPDATE rotas_entrega_paradas
+                    SET distancia_trecho_real_km = COALESCE(distancia_trecho_real_km, 0) + :delta
+                    WHERE id = :pid AND tenant_id = :tenant
+                    """
+                ),
+                {"delta": delta_km, "pid": parada_id, "tenant": tenant_id},
+            )
+
+            acumulada_real = db.execute(
+                text(
+                    """
+                    SELECT COALESCE(SUM(COALESCE(distancia_trecho_real_km, 0)), 0)
+                    FROM rotas_entrega_paradas
+                    WHERE rota_id = :rid
+                      AND tenant_id = :tenant
+                      AND ordem <= :ordem
+                    """
+                ),
+                {"rid": rota_id, "tenant": tenant_id, "ordem": ordem_parada},
+            ).scalar() or 0
+
+            db.execute(
+                text(
+                    """
+                    UPDATE rotas_entrega_paradas
+                    SET distancia_acumulada_real_km = :acumulada
+                    WHERE id = :pid AND tenant_id = :tenant
+                    """
+                ),
+                {"acumulada": acumulada_real, "pid": parada_id, "tenant": tenant_id},
+            )
+        else:
+            db.execute(
+                text(
+                    """
+                    UPDATE rotas_entrega
+                    SET distancia_retorno_km_real = COALESCE(distancia_retorno_km_real, 0) + :delta
+                    WHERE id = :rid AND tenant_id = :tenant
+                    """
+                ),
+                {"delta": delta_km, "rid": rota_id, "tenant": tenant_id},
+            )
+
     db.execute(
         text(
             """
             UPDATE rotas_entrega
             SET lat_atual = :lat,
                 lon_atual = :lon,
-                localizacao_atualizada_em = :agora
+                localizacao_atualizada_em = :agora,
+                distancia_total_km_real = COALESCE(distancia_total_km_real, 0) + :delta
             WHERE id = :rid AND tenant_id = :tenant
             """
         ),
@@ -1075,6 +1264,7 @@ def atualizar_localizacao_rota(
             "lat": lat,
             "lon": lon,
             "agora": datetime.now(),
+            "delta": delta_km,
             "rid": rota_id,
             "tenant": tenant_id,
         },
@@ -1423,7 +1613,8 @@ def rastreio_publico(
     rota_row = db.execute(
         text(
             """
-            SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em
+                 SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em,
+                     distancia_total_km_real, distancia_retorno_km_real
             FROM rotas_entrega
             WHERE token_rastreio = :token
             LIMIT 1
@@ -1435,13 +1626,25 @@ def rastreio_publico(
     if not rota_row:
         raise HTTPException(status_code=404, detail="Rastreio não encontrado ou link inválido")
 
-    rota_id, rota_numero, rota_status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em = rota_row
+    rota_id, rota_numero, rota_status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em, distancia_total_real, distancia_retorno_real = rota_row
     entregador = db.query(Cliente).filter(Cliente.id == entregador_id).first() if entregador_id else None
 
     # Buscar paradas com última posição GPS conhecida
     paradas = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.rota_id == rota_id
     ).order_by(RotaEntregaParada.ordem).all()
+
+    dist_paradas = db.execute(
+        text(
+            """
+            SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
+            FROM rotas_entrega_paradas
+            WHERE rota_id = :rid
+            """
+        ),
+        {"rid": rota_id},
+    ).fetchall()
+    dist_por_parada = {row[0]: row for row in dist_paradas}
 
     # Prioriza posição atual da rota (enviada pelo app do entregador).
     # Fallback: última parada entregue com GPS.
@@ -1485,6 +1688,13 @@ def rastreio_publico(
         "total_paradas": total,
         "entregues": entregues,
         "pendentes": total - entregues,
+        "distancia_total_km_real": float(distancia_total_real) if distancia_total_real is not None else None,
+        "distancia_retorno_km_real": float(distancia_retorno_real) if distancia_retorno_real is not None else None,
+        "distancia_ate_ultima_entrega_km_real": (
+            max(float(distancia_total_real or 0) - float(distancia_retorno_real or 0), 0)
+            if distancia_total_real is not None
+            else None
+        ),
         "ultima_posicao_gps": ultima_posicao,
         "paradas": [
             {
@@ -1492,6 +1702,12 @@ def rastreio_publico(
                 "endereco": p.endereco,
                 "status": p.status,
                 "data_entrega": p.data_entrega.isoformat() if p.data_entrega else None,
+                "distancia_trecho_real_km": (
+                    float(dist_por_parada[p.id][1]) if p.id in dist_por_parada and dist_por_parada[p.id][1] is not None else None
+                ),
+                "distancia_acumulada_real_km": (
+                    float(dist_por_parada[p.id][2]) if p.id in dist_por_parada and dist_por_parada[p.id][2] is not None else None
+                ),
             }
             for p in paradas
         ],

@@ -180,14 +180,21 @@ export default function PDV() {
 
   // ✅ Sincronizar entregador_id com vendaAtual sempre que mudar
   useEffect(() => {
-    console.log(
-      "🔄 Sincronizando entregador_id:",
-      entregadorSelecionado?.id || null,
-    );
-    setVendaAtual((prev) => ({
-      ...prev,
-      entregador_id: entregadorSelecionado?.id || null,
-    }));
+    const novoEntregadorId = entregadorSelecionado?.id || null;
+    if (!novoEntregadorId) {
+      return;
+    }
+
+    console.log("🔄 Sincronizando entregador_id:", novoEntregadorId);
+    setVendaAtual((prev) => {
+      if (prev.entregador_id === novoEntregadorId) {
+        return prev;
+      }
+      return {
+        ...prev,
+        entregador_id: novoEntregadorId,
+      };
+    });
   }, [entregadorSelecionado]);
 
   // Estados do drawer de análise de venda
@@ -1738,6 +1745,9 @@ export default function PDV() {
 
     setLoading(true);
     try {
+      const entregadorIdResolvido =
+        vendaAtual.entregador_id || entregadorSelecionado?.id || null;
+
       // Se a venda já existe (foi reaberta), atualizar ao invés de criar
       if (vendaAtual.id) {
         // Atualizar venda existente
@@ -1765,12 +1775,12 @@ export default function PDV() {
           distancia_km: vendaAtual.entrega?.distancia_km,
           valor_por_km: vendaAtual.entrega?.valor_por_km,
           loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: vendaAtual.entregador_id,
+          entregador_id: entregadorIdResolvido,
         });
 
         console.log("🚨 DEBUG - Payload sendo enviado:", {
           tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: vendaAtual.entregador_id,
+          entregador_id: entregadorIdResolvido,
           vendaAtual_completo: vendaAtual,
         });
 
@@ -1862,7 +1872,7 @@ export default function PDV() {
           distancia_km: vendaAtual.entrega?.distancia_km,
           valor_por_km: vendaAtual.entrega?.valor_por_km,
           loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: vendaAtual.entregador_id,
+          entregador_id: entregadorIdResolvido,
         };
 
         console.log(
@@ -1871,7 +1881,7 @@ export default function PDV() {
         );
         console.log("🚚 Dados de entrega:", {
           tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: vendaAtual.entregador_id,
+          entregador_id: entregadorIdResolvido,
           entregadorSelecionado: entregadorSelecionado?.id,
           vendaAtual_completo: vendaAtual,
         });

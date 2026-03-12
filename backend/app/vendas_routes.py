@@ -473,7 +473,9 @@ def atualizar_venda(
         )
 
     # Validar entregador obrigatório quando tem entrega
-    if dados.tem_entrega and not dados.entregador_id:
+    entregador_id_resolvido = dados.entregador_id or venda.entregador_id
+
+    if dados.tem_entrega and not entregador_id_resolvido:
         raise HTTPException(
             status_code=400,
             detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
@@ -505,7 +507,7 @@ def atualizar_venda(
     venda.observacoes = dados.observacoes
     venda.tem_entrega = dados.tem_entrega
     venda.taxa_entrega = dados.taxa_entrega or 0
-    venda.entregador_id = dados.entregador_id
+    venda.entregador_id = entregador_id_resolvido
     venda.loja_origem = dados.loja_origem
     venda.endereco_entrega = dados.endereco_entrega
     venda.distancia_km = dados.distancia_km
