@@ -1420,16 +1420,27 @@ def rastreio_publico(
     """
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.token_rastreio == token
-    ).first()
+    rota_row = db.execute(
+        text(
+            """
+            SELECT id, numero, status, entregador_id
+            FROM rotas_entrega
+            WHERE token_rastreio = :token
+            LIMIT 1
+            """
+        ),
+        {"token": token},
+    ).fetchone()
 
-    if not rota:
+    if not rota_row:
         raise HTTPException(status_code=404, detail="Rastreio não encontrado ou link inválido")
+
+    rota_id, rota_numero, rota_status, entregador_id = rota_row
+    entregador = db.query(Cliente).filter(Cliente.id == entregador_id).first() if entregador_id else None
 
     # Buscar paradas com última posição GPS conhecida
     paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id
+        RotaEntregaParada.rota_id == rota_id
     ).order_by(RotaEntregaParada.ordem).all()
 
     # Última posição GPS (última parada entregue com GPS)
@@ -1454,9 +1465,9 @@ def rastreio_publico(
     total = len(paradas)
 
     return {
-        "rota_numero": rota.numero,
-        "status": rota.status,
-        "entregador_nome": rota.entregador.nome if rota.entregador else "Entregador",
+        "rota_numero": rota_numero,
+        "status": rota_status,
+        "entregador_nome": entregador.nome if entregador else "Entregador",
         "total_paradas": total,
         "entregues": entregues,
         "pendentes": total - entregues,
