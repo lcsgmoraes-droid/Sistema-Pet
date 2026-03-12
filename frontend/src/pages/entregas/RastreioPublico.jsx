@@ -14,8 +14,8 @@ export default function RastreioPublico() {
   useEffect(() => {
     if (!token) return;
     carregarRastreio();
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(carregarRastreio, 30000);
+    // Atualizar a cada 10 segundos
+    const interval = setInterval(carregarRastreio, 10000);
     return () => clearInterval(interval);
   }, [token]);
 
@@ -178,7 +178,7 @@ export default function RastreioPublico() {
 
         {/* Rodapé */}
         <p style={styles.atualizacao}>
-          🔄 Atualiza automaticamente a cada 30 segundos
+          🔄 Atualiza automaticamente a cada 10 segundos
         </p>
       </div>
     </div>
