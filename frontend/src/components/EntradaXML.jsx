@@ -97,7 +97,7 @@ const EntradaXML = () => {
   });
 
   useEffect(() => {
-    console.log('ðŸ”„ [EntradaXML] Componente montado, iniciando carregamento...');
+    console.log('🔄 [EntradaXML] Componente montado, iniciando carregamento...');
     carregarDados();
   }, []);
 
@@ -118,13 +118,13 @@ const EntradaXML = () => {
   }, [searchParams, setSearchParams]);
 
   const carregarDados = async () => {
-    console.log('ðŸ“Š [EntradaXML] Carregando dados...');
+    console.log('📊 [EntradaXML] Carregando dados...');
     try {
       const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-      console.log('ðŸ”‘ [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
+      console.log('🔑 [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log('ðŸŒ [EntradaXML] Fazendo requisicoes para:', {
+      console.log('🌐 [EntradaXML] Fazendo requisicoes para:', {
         notasEntrada: `/notas-entrada/`,
         produtos: `/produtos/` // Sem filtro de ativo para trazer todos os produtos
       });
@@ -134,7 +134,7 @@ const EntradaXML = () => {
         api.get(`/produtos/`, { headers, params: { ativo: null } }) // null = todos os produtos
       ]);
 
-      console.log('âœ… [EntradaXML] Dados carregados:', {
+      console.log('✅ [EntradaXML] Dados carregados:', {
         notasEntrada: notasRes.data?.length || 0,
         produtos: produtosRes.data?.items?.length || produtosRes.data?.length || 0
       });
@@ -145,7 +145,7 @@ const EntradaXML = () => {
       const produtosAtivos = listaProdutos.filter(p => p.ativo === true).length;
       const produtosInativos = listaProdutos.filter(p => p.ativo === false).length;
       
-      console.log('ðŸ“Š [EntradaXML] Produtos por status:', {
+      console.log('📊 [EntradaXML] Produtos por status:', {
         ativos: produtosAtivos,
         inativos: produtosInativos,
         total: listaProdutos.length
@@ -154,7 +154,7 @@ const EntradaXML = () => {
       setNotasEntrada(notasRes.data);
       setProdutos(listaProdutos);
     } catch (error) {
-      console.error('âŒ [EntradaXML] ERRO ao carregar dados:');
+      console.error('❌ [EntradaXML] ERRO ao carregar dados:');
       console.error('  - Mensagem:', error.message);
       console.error('  - Response:', error.response?.data);
       console.error('  - Status:', error.response?.status);
@@ -165,19 +165,19 @@ const EntradaXML = () => {
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    console.log('ðŸ“¤ [EntradaXML] Upload iniciado');
+    console.log('📤 [EntradaXML] Upload iniciado');
     console.log('  - Arquivo selecionado:', file?.name);
     console.log('  - Tamanho:', file?.size, 'bytes');
     console.log('  - Tipo:', file?.type);
     
     if (!file) {
-      console.warn('âš ï¸ [EntradaXML] Nenhum arquivo selecionado');
+      console.warn('⚠️ [EntradaXML] Nenhum arquivo selecionado');
       return;
     }
 
     if (!file.name.toLowerCase().endsWith('.xml')) {
-      console.error('âŒ [EntradaXML] Arquivo nao Ã© XML:', file.name);
-      toast.error('âŒ Por favor, selecione um arquivo XML');
+      console.error('❌ [EntradaXML] Arquivo nao é XML:', file.name);
+      toast.error('❌ Por favor, selecione um arquivo XML');
       return;
     }
 
@@ -185,8 +185,8 @@ const EntradaXML = () => {
     const formData = new FormData();
     formData.append('file', file);
 
-    console.log('ðŸš€ [EntradaXML] Enviando arquivo para:', `/notas-entrada/upload`);
-    console.log('ðŸ“¦ [EntradaXML] FormData preparado:', file.name, file.size, 'bytes');
+    console.log('🚀 [EntradaXML] Enviando arquivo para:', `/notas-entrada/upload`);
+    console.log('📦 [EntradaXML] FormData preparado:', file.name, file.size, 'bytes');
 
     try {
       const response = await api.post(`/notas-entrada/upload`, formData, {
@@ -195,18 +195,18 @@ const EntradaXML = () => {
         },
       });
 
-      console.log('âœ… [EntradaXML] Upload bem-sucedido!');
+      console.log('✅ [EntradaXML] Upload bem-sucedido!');
       console.log('  - Response data:', response.data);
 
       const itensVinculados = response.data.produtos_vinculados || 0;
       const totalItens = response.data.itens_total || 0;
 
-      console.log(`ðŸ“Š [EntradaXML] Produtos vinculados: ${itensVinculados}/${totalItens}`);
+      console.log(`📊 [EntradaXML] Produtos vinculados: ${itensVinculados}/${totalItens}`);
 
       // Mensagem de fornecedor criado
       if (response.data.fornecedor_criado_automaticamente) {
         toast.success(
-          `ðŸ¢ Novo fornecedor cadastrado: ${response.data.fornecedor}`,
+          `🏢 Novo fornecedor cadastrado: ${response.data.fornecedor}`,
           { duration: 4000 }
         );
       }
@@ -214,20 +214,20 @@ const EntradaXML = () => {
       // Mensagem de produtos reativados
       if (response.data.produtos_reativados > 0) {
         toast.success(
-          `â™»ï¸ ${response.data.produtos_reativados} produto(s) inativo(s) reativado(s) automaticamente`,
+          `♻️ ${response.data.produtos_reativados} produto(s) inativo(s) reativado(s) automaticamente`,
           { duration: 4000 }
         );
       }
 
       toast.success(
-        `âœ… NF-e ${response.data.numero_nota} processada! ${itensVinculados}/${totalItens} produtos vinculados automaticamente`,
+        `✅ NF-e ${response.data.numero_nota} processada! ${itensVinculados}/${totalItens} produtos vinculados automaticamente`,
         { duration: 5000 }
       );
       
       carregarDados();
       event.target.value = ''; // Limpar input
     } catch (error) {
-      console.error('âŒ [EntradaXML] ERRO no upload:');
+      console.error('❌ [EntradaXML] ERRO no upload:');
       console.error('  - Mensagem:', error.message);
       console.error('  - Response data:', error.response?.data);
       console.error('  - Status:', error.response?.status);
@@ -237,26 +237,26 @@ const EntradaXML = () => {
       const errorMsg = error.response?.data?.detail || error.message || 'Erro ao processar XML da NF-e';
       console.error('  - Mensagem para usuario:', errorMsg);
       
-      toast.error(`âŒ ${errorMsg}`);
+      toast.error(`❌ ${errorMsg}`);
     } finally {
       setUploadingFile(false);
-      console.log('ðŸ [EntradaXML] Upload finalizado');
+      console.log('🏁 [EntradaXML] Upload finalizado');
     }
   };
 
   const handleMultipleFilesUpload = async (event) => {
     const files = Array.from(event.target.files);
-    console.log('ðŸ“¦ [EntradaXML] Upload em lote iniciado -', files.length, 'arquivos');
+    console.log('📦 [EntradaXML] Upload em lote iniciado -', files.length, 'arquivos');
     
     if (files.length === 0) {
-      console.warn('âš ï¸ [EntradaXML] Nenhum arquivo selecionado');
+      console.warn('⚠️ [EntradaXML] Nenhum arquivo selecionado');
       return;
     }
 
-    // Validar se todos sÃ£o XML
+    // Validar se todos são XML
     const invalidFiles = files.filter(f => !f.name.toLowerCase().endsWith('.xml'));
     if (invalidFiles.length > 0) {
-      toast.error(`âŒ ${invalidFiles.length} arquivo(s) nao sÃ£o XML: ${invalidFiles.map(f => f.name).join(', ')}`);
+      toast.error(`❌ ${invalidFiles.length} arquivo(s) nao são XML: ${invalidFiles.map(f => f.name).join(', ')}`);
       return;
     }
 
@@ -269,26 +269,26 @@ const EntradaXML = () => {
       formData.append('files', file);
     });
 
-    console.log('ðŸš€ [EntradaXML] Enviando', files.length, 'arquivos para:', `/notas-entrada/upload-lote`);
+    console.log('🚀 [EntradaXML] Enviando', files.length, 'arquivos para:', `/notas-entrada/upload-lote`);
 
     try {
             const response = await api.post(`/notas-entrada/upload-lote`, formData);
 
-      console.log('âœ… [EntradaXML] Upload em lote bem-sucedido!');
+      console.log('✅ [EntradaXML] Upload em lote bem-sucedido!');
       console.log('  - Response:', response.data);
 
       setResultadoLote(response.data);
       
       if (response.data.sucessos > 0) {
         toast.success(
-          `âœ… ${response.data.sucessos}/${response.data.total_arquivos} nota(s) processada(s) com sucesso!`,
+          `✅ ${response.data.sucessos}/${response.data.total_arquivos} nota(s) processada(s) com sucesso!`,
           { duration: 5000 }
         );
       }
       
       if (response.data.erros > 0) {
         toast.error(
-          `âš ï¸ ${response.data.erros}/${response.data.total_arquivos} nota(s) com erro`,
+          `⚠️ ${response.data.erros}/${response.data.total_arquivos} nota(s) com erro`,
           { duration: 5000 }
         );
       }
@@ -296,8 +296,8 @@ const EntradaXML = () => {
       carregarDados();
       event.target.value = ''; // Limpar input
     } catch (error) {
-      console.error('âŒ [EntradaXML] ERRO no upload em lote:', error);
-      toast.error(`âŒ Erro ao processar lote: ${error.response?.data?.detail || error.message}`);
+      console.error('❌ [EntradaXML] ERRO no upload em lote:', error);
+      toast.error(`❌ Erro ao processar lote: ${error.response?.data?.detail || error.message}`);
       setMostrarModalLote(false);
     } finally {
       setUploadingLote(false);
@@ -337,7 +337,7 @@ const EntradaXML = () => {
         `/notas-entrada/${notaId}/itens/${itemId}/vincular?produto_id=${Number.parseInt(produtoId)}`
       );
       
-      toast.success('âœ… Produto vinculado com sucesso!');
+      toast.success('✅ Produto vinculado com sucesso!');
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -347,7 +347,7 @@ const EntradaXML = () => {
       }
       setNotaSelecionada(response.data);
     } catch (error) {
-      console.error('âŒ Erro ao vincular produto:', error);
+      console.error('❌ Erro ao vincular produto:', error);
       toast.error(error.response?.data?.detail || 'Erro ao vincular produto');
     }
   };
@@ -371,7 +371,7 @@ const EntradaXML = () => {
       // Atualizar estado local para selecao visual
       setTipoRateio(tipo);
     } catch (error) {
-      console.error('âŒ Erro ao salvar tipo de rateio:', error);
+      console.error('❌ Erro ao salvar tipo de rateio:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
     }
   };
@@ -382,7 +382,7 @@ const EntradaXML = () => {
         quantidade_online: Number.parseFloat(quantidadeOnline) || 0  // Permitir 0
       });
       
-      toast.success('ðŸ“Š Quantidade online configurada!');
+      toast.success('📊 Quantidade online configurada!');
       
       // Mostrar totais da nota
       const totais = response.data.nota_totais;
@@ -411,7 +411,7 @@ const EntradaXML = () => {
         [itemId]: Number.parseFloat(quantidadeOnline) || 0
       }));
     } catch (error) {
-      console.error('âŒ Erro ao salvar quantidade online:', error);
+      console.error('❌ Erro ao salvar quantidade online:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar');
     }
   };
@@ -498,14 +498,14 @@ const EntradaXML = () => {
   };
 
   const calcularPrecoVenda = (custoNovo, margemDesejada) => {
-    // Margem = (PreÃ§o Venda - Custo) / PreÃ§o Venda * 100
-    // PreÃ§o Venda = Custo / (1 - Margem/100)
+    // Margem = (Preço Venda - Custo) / Preço Venda * 100
+    // Preço Venda = Custo / (1 - Margem/100)
     if (margemDesejada >= 100) return custoNovo * 2;
     return custoNovo / (1 - margemDesejada / 100);
   };
 
   const calcularMargem = (precoVenda, custoNovo) => {
-    // Margem = (PreÃ§o Venda - Custo) / PreÃ§o Venda * 100
+    // Margem = (Preço Venda - Custo) / Preço Venda * 100
     if (precoVenda <= 0) return 0;
     return ((precoVenda - custoNovo) / precoVenda) * 100;
   };
@@ -541,7 +541,7 @@ const EntradaXML = () => {
     try {
             await api.delete(`/notas-entrada/${notaId}`);
 
-      toast.success('ðŸ—‘ï¸ Nota excluÃ­da com sucesso!');
+      toast.success('🗑️ Nota excluída com sucesso!');
       
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);
@@ -576,7 +576,7 @@ const EntradaXML = () => {
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (!confirm(`âš ï¸ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\nâ€¢ Remover as quantidades do estoque\nâ€¢ Excluir os lotes criados\nâ€¢ Estornar as contas a pagar lanÃ§adas\nâ€¢ Restaurar o status da nota para pendente`)) {
+    if (!confirm(`⚠️ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`)) {
       return;
     }
 
@@ -588,7 +588,7 @@ const EntradaXML = () => {
       );
 
       toast.success(
-        `âœ… Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
+        `✅ Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
         { duration: 5000 }
       );
       
@@ -609,7 +609,7 @@ const EntradaXML = () => {
     try {
       await api.post(`/notas-entrada/${notaId}/itens/${itemId}/desvincular`);
       
-      toast.success('âœ… Produto desvinculado!');
+      toast.success('✅ Produto desvinculado!');
       
       // Recarregar detalhes da nota
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -623,7 +623,7 @@ const EntradaXML = () => {
     }
   };
 
-  // Detectar divergÃªncias entre NF e produto vinculado
+  // Detectar divergências entre NF e produto vinculado
   const detectarDivergencias = (item) => {
     // Verificar se tem produto vinculado (pode estar em produto_vinculado ou produto_nome)
     const produtoNome = item.produto_vinculado?.produto_nome || item.produto_nome;
@@ -660,8 +660,8 @@ const EntradaXML = () => {
       divergencias.push(`Cor diferente: NF="${corNF}" vs Produto="${corProd}"`);
     }
     
-    // Detectar sabor (para raÃ§Ãµes)
-    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmÃ£o', 'atum', 'vegetais'];
+    // Detectar sabor (para rações)
+    const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmão', 'atum', 'vegetais'];
     const saborNF = sabores.find(sabor => descNFLower.includes(sabor));
     const saborProd = sabores.find(sabor => descProdLower.includes(sabor));
     
@@ -672,12 +672,12 @@ const EntradaXML = () => {
     // Detectar animal (cachorro/gato)
     if ((descNFLower.includes('cao') || descNFLower.includes('cachorro') || descNFLower.includes('dog')) && 
         (descProdLower.includes('gato') || descProdLower.includes('cat'))) {
-      divergencias.push('âš ï¸ Animal diferente: NF para CACHORRO mas produto Ã© para GATO');
+      divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
     }
     
     if ((descNFLower.includes('gato') || descNFLower.includes('cat')) && 
         (descProdLower.includes('cao') || descProdLower.includes('cachorro') || descProdLower.includes('dog'))) {
-      divergencias.push('âš ï¸ Animal diferente: NF para GATO mas produto Ã© para CACHORRO');
+      divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
     }
     
     return divergencias;
@@ -710,7 +710,7 @@ const EntradaXML = () => {
       // Determinar qual SKU usar
       let skuParaUsar = response.data.sku_proposto || item.codigo_produto || 'PROD-' + item.id;
       
-      // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com â­)
+      // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com ⭐)
       if (response.data.ja_existe && response.data.sugestoes && response.data.sugestoes.length > 0) {
         const sugestaoRecomendada = response.data.sugestoes.find(s => s.padrao) || response.data.sugestoes[0];
         skuParaUsar = sugestaoRecomendada.sku;
@@ -722,13 +722,13 @@ const EntradaXML = () => {
         nome: item.descricao || item.descricao_produto || 'Produto sem nome',
         descricao: item.descricao || item.descricao_produto || '',
         preco_custo: item.valor_unitario.toString(),
-        preco_venda: (item.valor_unitario * 1.5).toFixed(2), // SugestÃ£o de 50% de margem
+        preco_venda: (item.valor_unitario * 1.5).toFixed(2), // Sugestão de 50% de margem
         margem_lucro: '50',
         estoque_minimo: 10,
         estoque_maximo: 100
       });
       
-      console.log('âœ… FormulÃ¡rio preenchido:', {
+      console.log('✅ Formulário preenchido:', {
         sku: skuParaUsar,
         nome: item.descricao,
         preco_custo: item.valor_unitario
@@ -757,7 +757,7 @@ const EntradaXML = () => {
   const criarProdutoNovo = async () => {
     try {
       setLoading(true);
-            // Preparar dados convertendo strings para nÃºmeros
+            // Preparar dados convertendo strings para números
       const dadosProduto = {
         ...formProduto,
         preco_custo: Number.parseFloat(formProduto.preco_custo) || 0,
@@ -772,7 +772,7 @@ const EntradaXML = () => {
         dadosProduto
       );
       
-      toast.success(`âœ… Produto ${response.data.produto.codigo} criado e vinculado!`);
+      toast.success(`✅ Produto ${response.data.produto.codigo} criado e vinculado!`);
       
       // Fechar modal
       setMostrarModalCriarProduto(false);
@@ -800,17 +800,17 @@ const EntradaXML = () => {
     const itensNaoVinculados = notaSelecionada.itens.filter(item => !item.produto_id);
     
     if (itensNaoVinculados.length === 0) {
-      toast.success('Todos os produtos ja estÃ£o vinculados!');
+      toast.success('Todos os produtos ja estão vinculados!');
       return;
     }
     
     const confirmacao = globalThis.confirm(
       `Criar ${itensNaoVinculados.length} produto(s) automaticamente?\n\n` +
-      `PadrÃµes aplicados:\n` +
-      `â€¢ Estoque mÃ­nimo: 10\n` +
-      `â€¢ Estoque mÃ¡ximo: 100\n` +
-      `â€¢ Margem de lucro: 50%\n\n` +
-      `VocÃª poderÃ¡ editar os produtos depois no cadastro.`
+      `Padrões aplicados:\n` +
+      `• Estoque mínimo: 10\n` +
+      `• Estoque máximo: 100\n` +
+      `• Margem de lucro: 50%\n\n` +
+      `Você poderá editar os produtos depois no cadastro.`
     );
     
     if (!confirmacao) return;
@@ -820,7 +820,7 @@ const EntradaXML = () => {
       let sucessos = 0;
       let erros = 0;
       
-      const loadingToast = toast.loading(`ðŸ“¦ Criando ${itensNaoVinculados.length} produtos...`);
+      const loadingToast = toast.loading(`📦 Criando ${itensNaoVinculados.length} produtos...`);
       
       for (const item of itensNaoVinculados) {
         try {
@@ -837,7 +837,7 @@ const EntradaXML = () => {
             skuParaUsar = sugestaoRecomendada.sku;
           }
           
-          // Criar produto com padrÃµes
+          // Criar produto com padrões
           const dadosProduto = {
             sku: skuParaUsar,
             nome: item.descricao || 'Produto sem nome',
@@ -864,11 +864,11 @@ const EntradaXML = () => {
       toast.dismiss(loadingToast);
       
       if (sucessos > 0) {
-        toast.success(`âœ… ${sucessos} produto(s) criado(s) com sucesso!`);
+        toast.success(`✅ ${sucessos} produto(s) criado(s) com sucesso!`);
       }
       
       if (erros > 0) {
-        toast.error(`âŒ ${erros} erro(s) ao criar produtos`);
+        toast.error(`❌ ${erros} erro(s) ao criar produtos`);
       }
       
       // Recarregar dados
@@ -1488,7 +1488,7 @@ const EntradaXML = () => {
                     onClick={criarTodosProdutosNaoVinculados}
                     disabled={loading}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-                    title="Cria automaticamente todos os produtos nao vinculados com os padrÃµes: Estoque mÃ­n: 10, mÃ¡x: 100, Margem: 50%"
+                    title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
                   >
                     <span>Criar Todos Nao Vinculados</span>
                     <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
@@ -1505,7 +1505,7 @@ const EntradaXML = () => {
                   
                   return (
                     <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
-                      {/* Grade de 2 Colunas: NF-e (esquerda) | ConexÃ£o | Produto Sistema (direita) */}
+                      {/* Grade de 2 Colunas: NF-e (esquerda) | Conexão | Produto Sistema (direita) */}
                       <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
                         {/* COLUNA ESQUERDA: Dados da NF-e */}
                         <div className="bg-blue-50 border-r-2 border-gray-300 p-4">
@@ -2207,7 +2207,7 @@ const EntradaXML = () => {
               )}
             </div>
 
-            {/* RodapÃ© */}
+            {/* Rodapé */}
             <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -2239,7 +2239,7 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de VisualizaÃ§Ã£o da Nota */}
+      {/* Modal de Visualização da Nota */}
       {mostrarVisualizacao && notaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -2264,7 +2264,7 @@ const EntradaXML = () => {
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-              {/* InformaÃ§Ãµes da Nota */}
+              {/* Informações da Nota */}
               <div className="grid grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="font-semibold text-gray-700 mb-3">Dados da Nota</h3>
@@ -2305,7 +2305,7 @@ const EntradaXML = () => {
                 <div className="font-mono text-xs break-all">{notaSelecionada.chave_acesso}</div>
               </div>
 
-              {/* Status de VinculaÃ§Ã£o */}
+              {/* Status de Vinculação */}
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-blue-600">{notaSelecionada.itens?.length || 0}</div>
@@ -2340,7 +2340,7 @@ const EntradaXML = () => {
                           </span>
                         ) : (
                           <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded">
-                            âš  NÃ£o Vinculado
+                            ⚠ Não Vinculado
                           </span>
                         )}
                       </div>
@@ -2375,7 +2375,7 @@ const EntradaXML = () => {
                           )}
                           {item.data_validade && (
                             <div className="bg-orange-50 border border-orange-200 rounded p-2">
-                              <span className="text-gray-600">ðŸ“… Validade:</span>
+                              <span className="text-gray-600">📅 Validade:</span>
                               <div className="font-semibold text-orange-800">
                                 {new Date(item.data_validade).toLocaleDateString('pt-BR')}
                               </div>
@@ -2386,7 +2386,7 @@ const EntradaXML = () => {
 
                       {item.vinculado && item.produto_nome && (
                         <div className="mt-3 pt-3 border-t border-gray-200">
-                          <span className="text-xs text-gray-600">â†’ Produto vinculado: </span>
+                          <span className="text-xs text-gray-600">→ Produto vinculado: </span>
                           <span className="text-sm font-semibold text-blue-600">{item.produto_nome}</span>
                         </div>
                       )}
@@ -2400,9 +2400,9 @@ const EntradaXML = () => {
             <div className="border-t p-6 bg-gray-50 flex justify-between items-center">
               <div className="text-sm text-gray-600">
                 {notaSelecionada.entrada_estoque_realizada ? (
-                  <span className="text-green-600 font-semibold">âœ… Entrada realizada no estoque</span>
+                  <span className="text-green-600 font-semibold">✅ Entrada realizada no estoque</span>
                 ) : (
-                  <span className="text-orange-600 font-semibold">âš ï¸ Entrada ainda nao processada</span>
+                  <span className="text-orange-600 font-semibold">⚠️ Entrada ainda nao processada</span>
                 )}
               </div>
               <div className="flex gap-3">
@@ -2415,7 +2415,7 @@ const EntradaXML = () => {
                       }}
                       className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                     >
-                      ðŸ’° Revisar Precos e Processar
+                      💰 Revisar Precos e Processar
                     </button>
                   </>
                 )}
@@ -2427,7 +2427,7 @@ const EntradaXML = () => {
                     }}
                     className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
                   >
-                    ðŸ”— Vincular Produtos
+                    🔗 Vincular Produtos
                   </button>
                 )}
                 <button
@@ -2445,19 +2445,19 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de RevisÃ£o de PreÃ§os */}
+      {/* Modal de Revisão de Preços */}
       {mostrarRevisaoPrecos && previewProcessamento && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
-              <h2 className="text-2xl font-bold">ðŸ’° RevisÃ£o de PreÃ§os e Custos</h2>
+              <h2 className="text-2xl font-bold">💰 Revisão de Preços e Custos</h2>
               <p className="text-purple-100 mt-1">
                 NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
               </p>
             </div>
 
-            {/* Resumo de AlteraÃ§Ãµes */}
+            {/* Resumo de Alterações */}
             <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-semibold text-gray-700">Filtrar:</span>
@@ -2490,7 +2490,7 @@ const EntradaXML = () => {
                             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                         }`}
                       >
-                        <span className="text-base">ðŸ“‹</span>
+                        <span className="text-base">📋</span>
                         Todos ({total})
                       </button>
                       
@@ -2503,7 +2503,7 @@ const EntradaXML = () => {
                               : 'bg-red-100 text-red-700 hover:bg-red-200'
                           }`}
                         >
-                          <span className="text-base">ðŸ“ˆ</span>
+                          <span className="text-base">📈</span>
                           {aumentos} custo{aumentos > 1 ? 's' : ''} maior{aumentos > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2517,7 +2517,7 @@ const EntradaXML = () => {
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
                           }`}
                         >
-                          <span className="text-base">ðŸ“‰</span>
+                          <span className="text-base">📉</span>
                           {reducoes} custo{reducoes > 1 ? 's' : ''} menor{reducoes > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2531,8 +2531,8 @@ const EntradaXML = () => {
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           }`}
                         >
-                          <span className="text-base">âž¡ï¸</span>
-                          {iguais} sem alteraÃ§Ã£o
+                          <span className="text-base">➡️</span>
+                          {iguais} sem alteração
                         </button>
                       )}
                     </>
@@ -2551,7 +2551,7 @@ const EntradaXML = () => {
                     
                     if (!vinculado) return false;
                     
-                    // Pegar variaÃ§Ã£o de custo (pode estar em produto_vinculado ou diretamente no item)
+                    // Pegar variação de custo (pode estar em produto_vinculado ou diretamente no item)
                     const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || item.variacao_custo_percentual || 0;
                     
                     if (filtroCusto === 'todos') return true;
@@ -2601,7 +2601,7 @@ const EntradaXML = () => {
                               onClick={() => buscarHistoricoPrecos(produtoVinc.produto_id, produtoVinc.produto_nome)}
                               className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
                             >
-                              ðŸ“Š HistÃ³rico
+                              📊 Histórico
                             </button>
                             <div className="mt-1 text-sm">
                               Quantidade <strong>{item.quantidade || item.quantidade_nf || 0}</strong>
@@ -2611,33 +2611,33 @@ const EntradaXML = () => {
                       </div>
 
                       <div className="p-5 bg-white space-y-4">
-                        {/* ComparaÃ§Ã£o de Custos */}
+                        {/* Comparação de Custos */}
                         <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">ðŸ’µ Custo Anterior</div>
+                            <div className="text-xs text-gray-500 mb-1">💵 Custo Anterior</div>
                             <div className="text-2xl font-bold text-gray-700">
                               R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">ðŸ†• Custo Novo</div>
+                            <div className="text-xs text-gray-500 mb-1">🆕 Custo Novo</div>
                             <div className="text-2xl font-bold text-blue-600">
                               R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">ðŸ“Š VariaÃ§Ã£o</div>
+                            <div className="text-xs text-gray-500 mb-1">📊 Variação</div>
                             <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                              {custoVariacao > 0 ? 'â†—' : custoVariacao < 0 ? 'â†˜' : 'âž¡'} {Math.abs(custoVariacao).toFixed(1)}%
+                              {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
                             </div>
                           </div>
                         </div>
 
-                        {/* Campos de PreÃ§o e Margem */}
+                        {/* Campos de Preço e Margem */}
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              ðŸ’° PreÃ§o de Venda
+                              💰 Preço de Venda
                             </label>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
@@ -2660,7 +2660,7 @@ const EntradaXML = () => {
 
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              ðŸ“ˆ Margem de Lucro
+                              📈 Margem de Lucro
                             </label>
                             <div className="relative">
                               <input
@@ -2682,20 +2682,20 @@ const EntradaXML = () => {
                           </div>
                         </div>
 
-                        {/* AnÃ¡lise Comparativa */}
+                        {/* Análise Comparativa */}
                         <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                          <h4 className="text-sm font-semibold text-purple-800 mb-3">ðŸ“Š AnÃ¡lise Comparativa (Valores Anteriores)</h4>
+                          <h4 className="text-sm font-semibold text-purple-800 mb-3">📊 Análise Comparativa (Valores Anteriores)</h4>
                           <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">ðŸ’µ Custo Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
                               <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">ðŸ’° PreÃ§o Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">💰 Preço Anterior</div>
                               <div className="text-lg font-bold text-blue-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">ðŸ“ˆ Margem Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">📈 Margem Anterior</div>
                               <div className="text-lg font-bold text-purple-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
                             </div>
                           </div>
@@ -2716,7 +2716,7 @@ const EntradaXML = () => {
                 }}
                 className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors"
               >
-                âŒ Cancelar
+                ❌ Cancelar
               </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -2730,7 +2730,7 @@ const EntradaXML = () => {
                   disabled={loading}
                   className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-lg shadow-lg disabled:opacity-50 transition-all"
                 >
-                  {loading ? 'â³ Processando...' : 'âœ… Confirmar e Processar Nota'}
+                  {loading ? '⏳ Processando...' : '✅ Confirmar e Processar Nota'}
                 </button>
               </div>
             </div>
@@ -2738,13 +2738,13 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de HistÃ³rico de PreÃ§os */}
+      {/* Modal de Histórico de Preços */}
       {mostrarHistoricoPrecos && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
-              <h2 className="text-2xl font-bold">ðŸ“Š HistÃ³rico de AlteraÃ§Ãµes de PreÃ§os</h2>
+              <h2 className="text-2xl font-bold">📊 Histórico de Alterações de Preços</h2>
               {produtoHistorico && (
                 <p className="mt-2 text-purple-100">
                   {produtoHistorico.nome}
@@ -2760,7 +2760,7 @@ const EntradaXML = () => {
                 </div>
               ) : historicoPrecos.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">Nenhuma alteraÃ§Ã£o de preco registrada</p>
+                  <p className="text-gray-500 text-lg">Nenhuma alteração de preco registrada</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -2771,13 +2771,13 @@ const EntradaXML = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-2xl">
-                              {hist.motivo === 'nfe_entrada' ? 'ðŸ“¦' : 
-                               hist.motivo === 'nfe_revisao_precos' ? 'ðŸ’°' : 
-                               hist.motivo === 'manual' ? 'âœï¸' : 'ðŸ“'}
+                              {hist.motivo === 'nfe_entrada' ? '📦' : 
+                               hist.motivo === 'nfe_revisao_precos' ? '💰' : 
+                               hist.motivo === 'manual' ? '✏️' : '📝'}
                             </span>
                             <span className="font-semibold text-gray-800">
                               {hist.motivo === 'nfe_entrada' ? 'Entrada NF-e' :
-                               hist.motivo === 'nfe_revisao_precos' ? 'RevisÃ£o de PreÃ§os' :
+                               hist.motivo === 'nfe_revisao_precos' ? 'Revisão de Preços' :
                                hist.motivo === 'manual' ? 'Ajuste Manual' :
                                hist.motivo}
                             </span>
@@ -2797,18 +2797,18 @@ const EntradaXML = () => {
                         </div>
                       </div>
 
-                      {/* AlteraÃ§Ãµes de PreÃ§o */}
+                      {/* Alterações de Preço */}
                       <div className="grid grid-cols-2 gap-4">
                         {/* Custo */}
                         {hist.preco_custo_anterior !== null && hist.preco_custo_novo !== null && (
                           <div className="bg-blue-50 rounded-lg p-3">
-                            <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ’µ CUSTO</div>
+                            <div className="text-xs text-gray-600 font-semibold mb-2">💵 CUSTO</div>
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm text-gray-500">Anterior</div>
                                 <div className="text-lg font-bold">R$ {hist.preco_custo_anterior.toFixed(2)}</div>
                               </div>
-                              <div className="text-2xl">â†’</div>
+                              <div className="text-2xl">→</div>
                               <div>
                                 <div className="text-sm text-gray-500">Novo</div>
                                 <div className="text-lg font-bold text-blue-700">R$ {hist.preco_custo_novo.toFixed(2)}</div>
@@ -2818,22 +2818,22 @@ const EntradaXML = () => {
                               <div className={`mt-2 text-sm font-semibold text-center ${
                                 hist.variacao_custo_percentual > 0 ? 'text-red-600' : 'text-green-600'
                               }`}>
-                                {hist.variacao_custo_percentual > 0 ? 'â†‘' : 'â†“'} {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
+                                {hist.variacao_custo_percentual > 0 ? '↑' : '↓'} {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
                               </div>
                             )}
                           </div>
                         )}
 
-                        {/* PreÃ§o de Venda */}
+                        {/* Preço de Venda */}
                         {hist.preco_venda_anterior !== null && hist.preco_venda_novo !== null && (
                           <div className="bg-green-50 rounded-lg p-3">
-                            <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ’² PREÃ‡O DE VENDA</div>
+                            <div className="text-xs text-gray-600 font-semibold mb-2">💲 PREÇO DE VENDA</div>
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="text-sm text-gray-500">Anterior</div>
                                 <div className="text-lg font-bold">R$ {hist.preco_venda_anterior.toFixed(2)}</div>
                               </div>
-                              <div className="text-2xl">â†’</div>
+                              <div className="text-2xl">→</div>
                               <div>
                                 <div className="text-sm text-gray-500">Novo</div>
                                 <div className="text-lg font-bold text-green-700">R$ {hist.preco_venda_novo.toFixed(2)}</div>
@@ -2843,7 +2843,7 @@ const EntradaXML = () => {
                               <div className={`mt-2 text-sm font-semibold text-center ${
                                 hist.variacao_venda_percentual > 0 ? 'text-green-600' : 'text-red-600'
                               }`}>
-                                {hist.variacao_venda_percentual > 0 ? 'â†‘' : 'â†“'} {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
+                                {hist.variacao_venda_percentual > 0 ? '↑' : '↓'} {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
                               </div>
                             )}
                           </div>
@@ -2853,13 +2853,13 @@ const EntradaXML = () => {
                       {/* Margens */}
                       {hist.margem_anterior !== null && hist.margem_nova !== null && (
                         <div className="mt-3 bg-purple-50 rounded-lg p-3">
-                          <div className="text-xs text-gray-600 font-semibold mb-2">ðŸ“ˆ MARGEM DE LUCRO</div>
+                          <div className="text-xs text-gray-600 font-semibold mb-2">📈 MARGEM DE LUCRO</div>
                           <div className="flex items-center justify-around">
                             <div className="text-center">
                               <div className="text-sm text-gray-500">Anterior</div>
                               <div className="text-xl font-bold">{hist.margem_anterior.toFixed(1)}%</div>
                             </div>
-                            <div className="text-2xl">â†’</div>
+                            <div className="text-2xl">→</div>
                             <div className="text-center">
                               <div className="text-sm text-gray-500">Nova</div>
                               <div className="text-xl font-bold text-purple-700">{hist.margem_nova.toFixed(1)}%</div>
@@ -2868,7 +2868,7 @@ const EntradaXML = () => {
                         </div>
                       )}
 
-                      {/* ObservaÃ§Ãµes */}
+                      {/* Observações */}
                       {hist.observacoes && (
                         <div className="mt-3 text-sm text-gray-600 italic bg-gray-50 rounded p-2">
                           {hist.observacoes}
@@ -2904,7 +2904,7 @@ const EntradaXML = () => {
             {/* Header */}
             <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
               <h2 className="text-2xl font-bold">
-                ðŸ“¦ Resultado do Processamento em Lote
+                📦 Resultado do Processamento em Lote
               </h2>
               {resultadoLote && (
                 <p className="mt-2">
@@ -2955,7 +2955,7 @@ const EntradaXML = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="text-2xl">
-                                {resultado.sucesso ? 'âœ…' : 'âŒ'}
+                                {resultado.sucesso ? '✅' : '❌'}
                               </span>
                               <span className="font-semibold text-gray-800">
                                 {resultado.arquivo}
@@ -3000,7 +3000,7 @@ const EntradaXML = () => {
                 disabled={uploadingLote}
                 className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-colors"
               >
-                {uploadingLote ? 'â³ Processando...' : 'Fechar'}
+                {uploadingLote ? '⏳ Processando...' : 'Fechar'}
               </button>
             </div>
           </div>
