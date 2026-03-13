@@ -34,6 +34,8 @@ export default function ProdutosBalanco() {
   const [submetendo, setSubmetendo] = useState({});
   const [inputs, setInputs] = useState({});
   const [destacados, setDestacados] = useState({});
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const itensPorPagina = 20;
   const [filtros, setFiltros] = useState({
     busca: "",
     marca_id: "",
@@ -42,37 +44,62 @@ export default function ProdutosBalanco() {
 
   const inputRefs = useRef({});
 
-  const produtosOrdenados = useMemo(() => {
+  const produtosFiltrados = useMemo(() => {
     const termo = normalizeSearchText(filtros.busca);
     if (!termo) return produtos;
 
     const termos = termo
-      .split(" ")
-      .map((item) => item.trim())
+      .split(/\s+/)
       .filter(Boolean);
 
     return produtos.filter((p) => {
-      const base = [p.nome, p.codigo, p.codigo_barras, p.marca?.nome]
-        .map((item) => normalizeSearchText(item))
-        .join(" ");
-      return termos.every((t) => base.includes(t));
+      const searchableText = normalizeSearchText(
+        [
+          p.nome,
+          p.codigo,
+          p.codigo_barras,
+          p.sku,
+          p.referencia,
+          p.referencia_sku,
+          p.marca?.nome,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return termos.every((item) => searchableText.includes(item));
     });
   }, [produtos, filtros.busca]);
+
+  const { produtosPaginados, totalItens, totalPaginas, inicioItem, fimItem } = useMemo(() => {
+    const total = produtosFiltrados.length;
+    const paginas = Math.max(1, Math.ceil(total / itensPorPagina));
+    const paginaSegura = Math.min(paginaAtual, paginas);
+    const inicio = (paginaSegura - 1) * itensPorPagina;
+    const fim = inicio + itensPorPagina;
+
+    return {
+      produtosPaginados: produtosFiltrados.slice(inicio, fim),
+      totalItens: total,
+      totalPaginas: paginas,
+      inicioItem: total === 0 ? 0 : inicio + 1,
+      fimItem: Math.min(fim, total),
+    };
+  }, [produtosFiltrados, paginaAtual]);
 
   useEffect(() => {
     carregarDadosComFiltros(filtros);
   }, []);
 
   useEffect(() => {
-    carregarDadosComFiltros(filtros);
-  }, [filtros.marca_id, filtros.fornecedor_id]);
+    setPaginaAtual(1);
+  }, [filtros]);
 
   const carregarDadosComFiltros = async (filtrosAtuais) => {
     try {
       setCarregando(true);
       const params = {
         page: 1,
-        page_size: 1000,
+        page_size: 99999,
         include_variations: false,
       };
 
@@ -90,6 +117,7 @@ export default function ProdutosBalanco() {
       setProdutos(prodRes.data?.items || []);
       setMarcas(marcasRes.data || []);
       setFornecedores(Array.isArray(cliRes.data) ? cliRes.data : (cliRes.data?.items || []));
+      setPaginaAtual(1);
     } catch (error) {
       console.error("Erro ao carregar balanço:", error);
       toast.error("Erro ao carregar produtos para balanço.");
@@ -115,9 +143,9 @@ export default function ProdutosBalanco() {
   };
 
   const proximoProdutoId = (produtoId) => {
-    const idx = produtosOrdenados.findIndex((p) => p.id === produtoId);
-    if (idx < 0 || idx + 1 >= produtosOrdenados.length) return null;
-    return produtosOrdenados[idx + 1].id;
+    const idx = produtosPaginados.findIndex((p) => p.id === produtoId);
+    if (idx < 0 || idx + 1 >= produtosPaginados.length) return null;
+    return produtosPaginados[idx + 1].id;
   };
 
   const focarProximoCampo = (produtoId, campo) => {
@@ -313,6 +341,13 @@ export default function ProdutosBalanco() {
         </div>
       </div>
 
+      <div className="flex items-center justify-between text-sm text-gray-500 px-1">
+        <span>
+          Mostrando {inicioItem} a {fimItem} de {totalItens} produtos
+        </span>
+        <span>20 por página</span>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
         <table className="w-full min-w-[1100px]">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -328,7 +363,7 @@ export default function ProdutosBalanco() {
             </tr>
           </thead>
           <tbody>
-            {produtosOrdenados.map((produto) => {
+            {produtosPaginados.map((produto) => {
               const destaque = destacados[produto.id];
               const corDestaque = destaque
                 ? "bg-emerald-50 border-l-4 border-emerald-500"
@@ -388,7 +423,7 @@ export default function ProdutosBalanco() {
               );
             })}
 
-            {produtosOrdenados.length === 0 && (
+            {produtosPaginados.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-3 py-8 text-center text-sm text-gray-500">
                   Nenhum produto encontrado com os filtros atuais.
@@ -397,6 +432,28 @@ export default function ProdutosBalanco() {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
+          disabled={paginaAtual <= 1}
+          className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 disabled:opacity-50"
+        >
+          Anterior
+        </button>
+        <span className="text-sm text-gray-500">
+          Página {Math.min(paginaAtual, totalPaginas)} de {totalPaginas}
+        </span>
+        <button
+          type="button"
+          onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
+          disabled={paginaAtual >= totalPaginas}
+          className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm text-gray-700 disabled:opacity-50"
+        >
+          Próxima
+        </button>
       </div>
     </div>
   );
