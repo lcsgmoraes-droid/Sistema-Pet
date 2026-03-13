@@ -1,7 +1,7 @@
 # Planejamento — Módulo Veterinário (Sistema Pet)
 
-> **Versão:** 2.1 — Março 2026  
-> **Status:** Em desenvolvimento — Fase 1 e 2 parcialmente implementadas
+> **Versão:** 2.2 — Março 2026  
+> **Status:** Em desenvolvimento — Fase 1 e 2 parcialmente implementadas (com correções recentes de estabilidade em Agenda e Dashboard)
 
 ---
 
@@ -23,14 +23,22 @@
 |---|---|---|
 | `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` + KPIs avançados (retornos pendentes, taxa de retorno 30d, tempo médio) + exportação CSV de relatório clínico |
 | `VetConsultas.jsx` — lista paginada de consultas | ✅ | Filtros por data e status |
-| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`) + consulta de assinatura (`validarAssinaturaConsulta`) em modo finalizado; falta IA integrada, cálculo automático de dose por peso e geração de PDF de prontuário/receita |
-| `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`); falta integração com push notifications |
+| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`) + consulta de assinatura (`validarAssinaturaConsulta`) em modo finalizado + cálculo automático de dose por peso + download de PDF de prontuário/receita; falta IA integrada |
+| `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`) + correção de loop/reload infinito aplicada + backend de push 24h/1h implementado (fila + envio Expo); falta homologação em dispositivo real |
 | `VetVacinas.jsx` — registro de vacinas | 🔶 | ✅ Alerta de vencimento implementado (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital |
 | `VetInternacoes.jsx` — fichas de internação | 🔶 | ✅ Criação/alta/evolução/procedimento implementados; falta alertas automáticos de horário e gráficos de evolução |
 | `VetCatalogo.jsx` — catálogos (medicamentos e procedimentos) | 🔶 | Tabela com CRUD; falta banco de bulas completo e vinculação de insumos |
 | `vetApi.js` — helper Axios para todas as rotas `/vet` | ✅ | Cobre todos os endpoints |
 | Rotas em `App.jsx` | ✅ | `/vet/*` mapeadas |
 | Menu lateral em `Layout.jsx` | ✅ | Sub-itens do módulo veterinário |
+
+### Atualização rápida (Mar/2026)
+- ✅ Dashboard veterinário ficou resiliente a falha de endpoint secundário (carrega painel mesmo se relatório clínico falhar).
+- ✅ Agenda veterinária estabilizada (corrigido ciclo de recarregamento infinito na troca de modo/data).
+- ✅ Endpoint `/vet/relatorios/clinicos` confirmado ativo no backend (retorno `403` sem autenticação, comportamento esperado).
+- ✅ Cálculo automático de dose por peso implementado no fluxo de prescrição de consulta (seleção por catálogo + recalcular dose).
+- ✅ PDF de prontuário e receita implementado no backend com hash e QR de validação (`/vet/consultas/{id}/prontuario.pdf` e `/vet/prescricoes/{id}/pdf`).
+- ✅ Lembretes push de agenda (24h e 1h) implementados no backend: enfileiramento no agendamento + envio via Expo Push no `notification_sender`.
 
 ---
 
@@ -1167,13 +1175,13 @@ PRONTUÁRIO / LGPD
 1. ❌ Expandir campos clínicos do cadastro de Pet (campos estruturados — não texto livre)
 2. ❌ Catálogo global de produtos/medicamentos + tabela `tenant_stock`
 3. 🔶 Módulo de Medicamentos / Bulas — tabela `vet_medicamentos_catalogo` criada + tela `VetCatalogo.jsx`; falta banco de bulas completo, doses por espécie, interações
-4. ❌ Calculadora de doses (peso → dose automática)
+4. 🔶 Cálculo de dose no fluxo de consulta/prescrição implementado; falta tela independente de calculadora de doses
 5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas) ✅ + prescrição implementada ✅; falta cálculo automático de dose por peso e IA
 6. ❌ Configuração do módulo (modelo operacional, faturamento, estoque separado)
 
 ### Fase 2 — Clínica em funcionamento
-7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx` ✅ + criação de agendamento implementada ✅; falta apenas push notifications
-8. 🔶 Formulários dinâmicos / Receituário com cálculo automático de dose — tabelas `vet_prescricoes` + `vet_itens_prescricao` criadas; falta cálculo automático e geração de PDF
+7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx` ✅ + criação de agendamento ✅ + lembretes push 24h/1h no backend ✅; falta homologação de ponta a ponta em dispositivo real
+8. ✅ Formulários dinâmicos / Receituário — tabelas `vet_prescricoes` + `vet_itens_prescricao` + cálculo automático de dose + geração de PDF
 9. 🔶 Procedimentos cadastráveis com insumos vinculados — tabelas `vet_catalogo_procedimentos` + `vet_procedimentos_consulta` criadas; falta vinculação de insumos e dedução de estoque
 10. 🔶 Upload e análise de exames pela IA — tabela `vet_exames` criada; falta upload de arquivo e análise por IA
 11. ❌ Integração alertas → PDV e Banho/Tosa
@@ -1197,6 +1205,12 @@ PRONTUÁRIO / LGPD
 23. ❌ Curva de peso + linha do tempo do pet
 24. ❌ NPS pós-consulta
 25. ❌ Telemedicina
+
+### Pendências prioritárias (próximo ciclo)
+1. Finalizar integração de insumos por procedimento com dedução automática de estoque.
+2. Entregar upload de exames com análise por IA (texto/imagem) no fluxo de consulta.
+3. Evoluir verificação por QR para modo público (sem login), mantendo segurança e rastreabilidade.
+4. Homologar push notifications da agenda em dispositivo real (token válido + recebimento 24h/1h).
 
 ---
 
@@ -1278,7 +1292,7 @@ O prontuário veterinário é dado sensível e precisa de tratamento especial:
 - 🔶 Existe assinatura digital básica por hash no fluxo de finalização da consulta.
 - ✅ Endpoint de validação de integridade implementado: `/vet/consultas/{consulta_id}/assinatura`.
 - 🔶 A interface de consulta finalizada já exibe o resultado da validação da assinatura/hash.
-- ❌ Ainda não existe geração de PDF do prontuário com QR Code público de verificação.
+- ✅ Geração de PDF de prontuário e receita implementada com hash + QR de validação (modo autenticado no endpoint atual).
 - ❌ Ainda não existe assinatura do tutor para termos (balcão/remoto) integrada ao módulo.
 
 ### O que é o Prontuário Digital

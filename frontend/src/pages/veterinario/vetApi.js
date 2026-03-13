@@ -24,10 +24,14 @@ export const vetApi = {
   atualizarConsulta: (id, data) => api.patch(`${BASE}/consultas/${id}`, data),
   finalizarConsulta: (id) => api.post(`${BASE}/consultas/${id}/finalizar`),
   validarAssinaturaConsulta: (id) => api.get(`${BASE}/consultas/${id}/assinatura`),
+  baixarProntuarioPdf: (id) =>
+    api.get(`${BASE}/consultas/${id}/prontuario.pdf`, { responseType: "blob" }),
 
   // Prescrições
   listarPrescricoes: (consultaId) => api.get(`${BASE}/consultas/${consultaId}/prescricoes`),
   criarPrescricao: (data) => api.post(`${BASE}/prescricoes`, data),
+  baixarPrescricaoPdf: (prescricaoId) =>
+    api.get(`${BASE}/prescricoes/${prescricaoId}/pdf`, { responseType: "blob" }),
 
   // Veterinários
   listarVeterinarios: () => api.get(`${BASE}/veterinarios`),

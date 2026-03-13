@@ -19,13 +19,18 @@ import smtplib
 import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 
+import requests
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
 # Máximo de notificações por rodada (evita saturar conexão SMTP)
 BATCH_SIZE = 50
+EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
 def _smtp_config_ok() -> bool:
@@ -123,6 +128,33 @@ def _send_email(to_address: str, subject: str, body_text: str, campaign_type: st
         server.sendmail(SMTP_EMAIL, to_address, msg.as_string())
 
 
+def _send_push(push_token: str, title: str, body_text: str, data: dict | None = None) -> None:
+    """Envia push usando Expo Push API."""
+    if not push_token:
+        raise ValueError("Notificação sem push_token")
+
+    payload = {
+        "to": push_token,
+        "title": title,
+        "body": body_text,
+        "sound": "default",
+        "data": data or {},
+    }
+
+    response = requests.post(EXPO_PUSH_URL, json=payload, timeout=10)
+    response.raise_for_status()
+    body_json = response.json()
+
+    data_obj = body_json.get("data") if isinstance(body_json, dict) else None
+    if not isinstance(data_obj, dict):
+        return
+
+    status = data_obj.get("status")
+    if status and status != "ok":
+        detail = data_obj.get("details")
+        raise RuntimeError(f"Falha no push Expo: status={status} details={detail}")
+
+
 class NotificationSender:
     """Processa lotes de notificações pendentes da fila."""
 
@@ -144,6 +176,12 @@ class NotificationSender:
             pending = (
                 db.query(NotificationQueue)
                 .filter(NotificationQueue.status == NotificationStatusEnum.pending)
+                .filter(
+                    or_(
+                        NotificationQueue.scheduled_at.is_(None),
+                        NotificationQueue.scheduled_at <= datetime.now(),
+                    )
+                )
                 .with_for_update(skip_locked=True)
                 .order_by(NotificationQueue.created_at.asc())
                 .limit(batch_size)
@@ -160,8 +198,12 @@ class NotificationSender:
                         self._dispatch_email(notif)
                         notif.status = NotificationStatusEnum.sent
                         stats["sent"] += 1
+                    elif notif.channel.value == "push":
+                        self._dispatch_push(notif)
+                        notif.status = NotificationStatusEnum.sent
+                        stats["sent"] += 1
                     else:
-                        # push — App não publicado, marca como skipped
+                        # Canal não suportado no sender atual
                         notif.status = NotificationStatusEnum.skipped
                         stats["skipped"] += 1
                 except Exception as exc:
@@ -225,3 +267,15 @@ class NotificationSender:
                 campaign_type = ctype
                 break
         _send_email(notif.email_address, subject, notif.body, campaign_type)
+
+    def _dispatch_push(self, notif) -> None:
+        if not notif.push_token:
+            raise ValueError("Notificação sem push_token")
+
+        subject = notif.subject or "Sistema Pet"
+        _send_push(
+            push_token=notif.push_token,
+            title=subject,
+            body_text=notif.body,
+            data={"idempotency_key": notif.idempotency_key},
+        )

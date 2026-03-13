@@ -8,6 +8,7 @@ import {
   Save,
   X,
   Lock,
+  Calculator,
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
@@ -53,11 +54,13 @@ export default function VetConsultaForm() {
   const [finalizado, setFinalizado] = useState(false);
   const [carregando, setCarregando] = useState(isEdicao);
   const [assinatura, setAssinatura] = useState(null);
+  const [baixandoPdf, setBaixandoPdf] = useState(false);
   const modoSomenteLeitura = isEdicao && finalizado;
 
   // listas externas
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
+  const [medicamentosCatalogo, setMedicamentosCatalogo] = useState([]);
   const [buscaTutor, setBuscaTutor] = useState("");
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
@@ -143,6 +146,11 @@ export default function VetConsultaForm() {
     api
       .get("/vet/veterinarios")
       .then((r) => setVeterinarios(r.data ?? []))
+      .catch(() => {});
+
+    vetApi
+      .listarMedicamentos()
+      .then((r) => setMedicamentosCatalogo(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
       .catch(() => {});
   }, []);
 
@@ -406,7 +414,19 @@ export default function VetConsultaForm() {
       ...prev,
       prescricao_itens: [
         ...prev.prescricao_itens,
-        { nome: "", principio_ativo: "", dose_mg: "", unidade: "mg", frequencia: "", duracao_dias: "", via: "oral", instrucoes: "" },
+        {
+          medicamento_id: "",
+          nome: "",
+          principio_ativo: "",
+          dose_mg: "",
+          unidade: "mg",
+          dose_minima_mg_kg: "",
+          dose_maxima_mg_kg: "",
+          frequencia: "",
+          duracao_dias: "",
+          via: "oral",
+          instrucoes: "",
+        },
       ],
     }));
   }
@@ -424,6 +444,134 @@ export default function VetConsultaForm() {
       itens[idx] = { ...itens[idx], [chave]: valor };
       return { ...prev, prescricao_itens: itens };
     });
+  }
+
+  function parseNumero(valor) {
+    if (valor === null || valor === undefined) return NaN;
+    const texto = String(valor).trim().replace(",", ".");
+    if (!texto) return NaN;
+    return Number.parseFloat(texto);
+  }
+
+  function calcularDosePorPeso(item) {
+    const peso = parseNumero(form.peso_kg);
+    if (!Number.isFinite(peso) || peso <= 0) {
+      setErro("Informe o peso do pet para calcular a dose automaticamente.");
+      return null;
+    }
+
+    const doseMin = parseNumero(item.dose_minima_mg_kg);
+    const doseMax = parseNumero(item.dose_maxima_mg_kg);
+    let doseMgKg = Number.isFinite(doseMin) ? doseMin : NaN;
+
+    if (Number.isFinite(doseMin) && Number.isFinite(doseMax)) {
+      doseMgKg = (doseMin + doseMax) / 2;
+    } else if (!Number.isFinite(doseMgKg) && Number.isFinite(doseMax)) {
+      doseMgKg = doseMax;
+    }
+
+    if (!Number.isFinite(doseMgKg) || doseMgKg <= 0) {
+      setErro("Esse medicamento não tem dose mg/kg cadastrada no catálogo.");
+      return null;
+    }
+
+    return {
+      dose_mg: (doseMgKg * peso).toFixed(2),
+      unidade: "mg",
+    };
+  }
+
+  function selecionarMedicamentoNoItem(idx, medicamentoId) {
+    const medicamento = medicamentosCatalogo.find((m) => String(m.id) === String(medicamentoId));
+    if (!medicamento) return;
+
+    setForm((prev) => {
+      const itens = [...prev.prescricao_itens];
+      const itemAtual = itens[idx] ?? {};
+      const itemAtualizado = {
+        ...itemAtual,
+        medicamento_id: medicamento.id,
+        nome: medicamento.nome ?? itemAtual.nome ?? "",
+        principio_ativo: medicamento.principio_ativo ?? itemAtual.principio_ativo ?? "",
+        via: medicamento.via_administracao ?? itemAtual.via ?? "oral",
+        dose_minima_mg_kg: medicamento.dose_minima_mg_kg,
+        dose_maxima_mg_kg: medicamento.dose_maxima_mg_kg,
+      };
+
+      const doseCalculada = calcularDosePorPeso(itemAtualizado);
+      if (doseCalculada) {
+        itemAtualizado.dose_mg = doseCalculada.dose_mg;
+        itemAtualizado.unidade = doseCalculada.unidade;
+      }
+
+      itens[idx] = itemAtualizado;
+      return { ...prev, prescricao_itens: itens };
+    });
+  }
+
+  function recalcularDoseItem(idx) {
+    const item = form.prescricao_itens[idx];
+    if (!item) return;
+
+    const doseCalculada = calcularDosePorPeso(item);
+    if (!doseCalculada) return;
+
+    setForm((prev) => {
+      const itens = [...prev.prescricao_itens];
+      itens[idx] = {
+        ...itens[idx],
+        dose_mg: doseCalculada.dose_mg,
+        unidade: doseCalculada.unidade,
+      };
+      return { ...prev, prescricao_itens: itens };
+    });
+  }
+
+  function baixarArquivo(blob, nomeArquivo) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivo;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function baixarProntuarioPdf() {
+    if (!consultaIdAtual) return;
+    setBaixandoPdf(true);
+    setErro(null);
+    try {
+      const res = await vetApi.baixarProntuarioPdf(consultaIdAtual);
+      baixarArquivo(res.data, `prontuario_consulta_${consultaIdAtual}.pdf`);
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Não foi possível baixar o prontuário em PDF.");
+    } finally {
+      setBaixandoPdf(false);
+    }
+  }
+
+  async function baixarUltimaReceitaPdf() {
+    if (!consultaIdAtual) return;
+    setBaixandoPdf(true);
+    setErro(null);
+    try {
+      const lista = await vetApi.listarPrescricoes(consultaIdAtual);
+      const prescricoes = Array.isArray(lista.data) ? lista.data : (lista.data?.items ?? []);
+      if (!prescricoes.length) {
+        setErro("Essa consulta não tem prescrição emitida.");
+        return;
+      }
+
+      const ultima = prescricoes[prescricoes.length - 1];
+      const res = await vetApi.baixarPrescricaoPdf(ultima.id);
+      baixarArquivo(res.data, `${ultima.numero || `prescricao_${ultima.id}`}.pdf`);
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Não foi possível baixar a receita em PDF.");
+    } finally {
+      setBaixandoPdf(false);
+    }
   }
 
   // ---------- Render ----------
@@ -492,6 +640,24 @@ export default function VetConsultaForm() {
               </div>
             </div>
           )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={baixarProntuarioPdf}
+              disabled={baixandoPdf}
+              className="px-3 py-1.5 text-xs border border-green-300 rounded-md hover:bg-green-100 disabled:opacity-60"
+            >
+              {baixandoPdf ? "Baixando..." : "Baixar prontuário PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={baixarUltimaReceitaPdf}
+              disabled={baixandoPdf}
+              className="px-3 py-1.5 text-xs border border-green-300 rounded-md hover:bg-green-100 disabled:opacity-60"
+            >
+              {baixandoPdf ? "Baixando..." : "Baixar receita PDF"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -783,6 +949,32 @@ export default function VetConsultaForm() {
                 >
                   <X size={14} />
                 </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={item.medicamento_id || ""}
+                    onChange={(e) => selecionarMedicamentoNoItem(idx, e.target.value)}
+                    className={css.select}
+                  >
+                    <option value="">Selecionar do catálogo…</option>
+                    {medicamentosCatalogo.map((m) => (
+                      <option key={m.id} value={m.id}>{m.nome}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => recalcularDoseItem(idx)}
+                    className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50"
+                  >
+                    <Calculator size={14} />
+                    Calcular dose pelo peso
+                  </button>
+                </div>
+                {(item.dose_minima_mg_kg || item.dose_maxima_mg_kg) && (
+                  <p className="text-[11px] text-gray-500">
+                    Referência do catálogo: {item.dose_minima_mg_kg || "—"}
+                    {item.dose_maxima_mg_kg ? ` a ${item.dose_maxima_mg_kg}` : ""} mg/kg
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <input type="text" placeholder="Nome do medicamento" value={item.nome} onChange={(e) => setItem(idx, "nome", e.target.value)} className={css.input} />
                   <input type="text" placeholder="Princípio ativo" value={item.principio_ativo} onChange={(e) => setItem(idx, "principio_ativo", e.target.value)} className={css.input} />

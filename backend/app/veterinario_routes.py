@@ -12,7 +12,8 @@ from datetime import date, datetime, timedelta
 from io import StringIO
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session, joinedload
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Cliente, Pet, Tenant, User
+from .pdf_veterinario import gerar_pdf_prontuario, gerar_pdf_receita
 from .veterinario_models import (
     AgendamentoVet,
     CatalogoProcedimento,
@@ -85,6 +87,89 @@ def _consulta_or_404(db: Session, consulta_id: int, tenant_id) -> ConsultaVet:
     if not c:
         raise HTTPException(status_code=404, detail="Consulta não encontrada")
     return c
+
+
+def _prescricao_or_404(db: Session, prescricao_id: int, tenant_id) -> PrescricaoVet:
+    p = (
+        db.query(PrescricaoVet)
+        .options(joinedload(PrescricaoVet.itens), joinedload(PrescricaoVet.pet), joinedload(PrescricaoVet.consulta))
+        .filter(PrescricaoVet.id == prescricao_id, PrescricaoVet.tenant_id == tenant_id)
+        .first()
+    )
+    if not p:
+        raise HTTPException(status_code=404, detail="Prescrição não encontrada")
+    return p
+
+
+def _upsert_lembretes_push_agendamento(db: Session, ag: AgendamentoVet, tenant_id) -> None:
+    """Cria/atualiza lembretes push de 24h e 1h para o tutor no app mobile."""
+    if not ag.data_hora or not ag.cliente_id:
+        return
+
+    if ag.status in {"cancelado", "faltou"}:
+        return
+
+    from app.campaigns.models import NotificationChannelEnum, NotificationQueue, NotificationStatusEnum
+
+    cliente = db.query(Cliente).filter(
+        Cliente.id == ag.cliente_id,
+        Cliente.tenant_id == str(tenant_id),
+    ).first()
+    if not cliente or not cliente.user_id:
+        return
+
+    user_tutor = db.query(User).filter(
+        User.id == cliente.user_id,
+        User.tenant_id == str(tenant_id),
+    ).first()
+    if not user_tutor or not getattr(user_tutor, "push_token", None):
+        return
+
+    prefixo = f"vet-agendamento:{ag.id}:"
+
+    db.query(NotificationQueue).filter(
+        NotificationQueue.idempotency_key.like(f"{prefixo}%"),
+        NotificationQueue.status == NotificationStatusEnum.pending,
+    ).delete(synchronize_session=False)
+
+    agora = datetime.now(ag.data_hora.tzinfo) if getattr(ag.data_hora, "tzinfo", None) else datetime.now()
+    lembretes = [
+        (
+            24,
+            "Lembrete de consulta veterinária",
+            f"Olá! A consulta do pet está marcada para amanhã às {ag.data_hora.strftime('%H:%M')}.",
+        ),
+        (
+            1,
+            "Lembrete de consulta veterinária",
+            f"A consulta do pet começa em 1 hora ({ag.data_hora.strftime('%H:%M')}).",
+        ),
+    ]
+
+    for horas, assunto, mensagem in lembretes:
+        envio_em = ag.data_hora - timedelta(hours=horas)
+        if envio_em <= agora:
+            continue
+
+        idempotencia = f"{prefixo}{horas}h:{ag.data_hora.isoformat()}"
+        existe = db.query(NotificationQueue.id).filter(
+            NotificationQueue.idempotency_key == idempotencia
+        ).first()
+        if existe:
+            continue
+
+        db.add(
+            NotificationQueue(
+                tenant_id=tenant_id,
+                idempotency_key=idempotencia,
+                customer_id=cliente.id,
+                channel=NotificationChannelEnum.push,
+                subject=assunto,
+                body=mensagem,
+                push_token=user_tutor.push_token,
+                scheduled_at=envio_em,
+            )
+        )
 
 
 _BAIA_MOTIVO_RE = re.compile(r"\s*\[BAIA:(?P<baia>[^\]]+)\]\s*$")
@@ -403,6 +488,8 @@ def criar_agendamento(
         status="agendado",
     )
     db.add(ag)
+    db.flush()
+    _upsert_lembretes_push_agendamento(db, ag, tenant_id)
     db.commit()
     db.refresh(ag)
     return _agendamento_to_dict(ag)
@@ -426,6 +513,7 @@ def atualizar_agendamento(
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(ag, field, value)
 
+    _upsert_lembretes_push_agendamento(db, ag, tenant_id)
     db.commit()
     db.refresh(ag)
     return _agendamento_to_dict(ag)
@@ -2119,6 +2207,68 @@ def validar_assinatura_consulta(
         "finalizado_em": c.finalizado_em,
         "motivo": "OK" if hash_recalculado == c.hash_prontuario else "Hash divergente: possível alteração após finalização.",
     }
+
+
+@router.get("/consultas/{consulta_id}/prontuario.pdf")
+def baixar_prontuario_pdf(
+    consulta_id: int,
+    request: Request,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    c = (
+        db.query(ConsultaVet)
+        .options(
+            joinedload(ConsultaVet.pet),
+            joinedload(ConsultaVet.cliente),
+            joinedload(ConsultaVet.veterinario),
+            joinedload(ConsultaVet.prescricoes).joinedload(PrescricaoVet.itens),
+        )
+        .filter(ConsultaVet.id == consulta_id, ConsultaVet.tenant_id == tenant_id)
+        .first()
+    )
+    if not c:
+        raise HTTPException(status_code=404, detail="Consulta não encontrada")
+    if c.status != "finalizada":
+        raise HTTPException(status_code=400, detail="A consulta precisa estar finalizada para gerar o prontuário em PDF")
+
+    hash_recalculado = _hash_prontuario_consulta(c)
+    validacao = {
+        "assinada": bool(c.finalizado_em and c.hash_prontuario),
+        "hash_valido": hash_recalculado == c.hash_prontuario,
+        "hash_prontuario": c.hash_prontuario,
+    }
+    url_validacao = f"{str(request.base_url).rstrip('/')}/vet/consultas/{consulta_id}/assinatura"
+    pdf_buffer = gerar_pdf_prontuario(c, validacao, c.prescricoes or [], url_validacao)
+
+    filename = f"prontuario_consulta_{consulta_id}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/prescricoes/{prescricao_id}/pdf")
+def baixar_prescricao_pdf(
+    prescricao_id: int,
+    request: Request,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    p = _prescricao_or_404(db, prescricao_id, tenant_id)
+    url_validacao = f"{str(request.base_url).rstrip('/')}/vet/consultas/{p.consulta_id}/assinatura"
+    pdf_buffer = gerar_pdf_receita(p, url_validacao)
+
+    numero = (p.numero or f"prescricao_{p.id}").replace("/", "-")
+    filename = f"{numero}.pdf"
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
