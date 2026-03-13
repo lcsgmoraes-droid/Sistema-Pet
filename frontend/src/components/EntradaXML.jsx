@@ -187,8 +187,14 @@ const EntradaXML = () => {
     setBuscandoProduto(prev => ({ ...prev, [itemId]: true }));
 
     try {
+      const palavras = textoBusca.toLowerCase().split(/\s+/).filter(Boolean);
+      // Envia ao servidor apenas a palavra mais longa (busca mais ampla),
+      // depois filtra todas as palavras no cliente — assim encontra mesmo
+      // que as palavras estejam em ordem diferente do nome do produto.
+      const termoBusca = palavras.reduce((a, b) => a.length >= b.length ? a : b, palavras[0]);
+
       const baseParams = {
-        busca: textoBusca,
+        busca: termoBusca,
         ativo: null,
         page: 1,
         page_size: 150
@@ -205,15 +211,16 @@ const EntradaXML = () => {
       const mapaPorId = new Map();
       [...listaBase, ...listaVariacao].forEach((p) => mapaPorId.set(p.id, p));
 
-      const palavras = textoBusca.toLowerCase().split(/\s+/).filter(Boolean);
-      const encontrados = Array.from(mapaPorId.values()).filter((p) =>
-        palavras.every((palavra) =>
-          p.nome?.toLowerCase().includes(palavra) ||
-          p.codigo?.toLowerCase().includes(palavra) ||
-          p.codigo_barras?.toLowerCase().includes(palavra) ||
-          p.descricao?.toLowerCase().includes(palavra)
-        )
-      );
+      // Filtra client-side: todas as palavras devem aparecer (qualquer ordem)
+      const encontrados = Array.from(mapaPorId.values()).filter((p) => {
+        const campos = [
+          p.nome?.toLowerCase() || '',
+          p.codigo?.toLowerCase() || '',
+          p.codigo_barras?.toLowerCase() || '',
+          p.descricao?.toLowerCase() || ''
+        ].join(' ');
+        return palavras.every((palavra) => campos.includes(palavra));
+      });
 
       encontrados.sort((a, b) => {
         if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
