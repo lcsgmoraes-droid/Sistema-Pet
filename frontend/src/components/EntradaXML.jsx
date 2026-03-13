@@ -66,6 +66,9 @@ const EntradaXML = () => {
   
   // Estado para filtro de pesquisa de produtos (por item)
   const [filtroProduto, setFiltroProduto] = useState({});
+  const [resultadosBuscaProduto, setResultadosBuscaProduto] = useState({});
+  const [buscandoProduto, setBuscandoProduto] = useState({});
+  const buscaProdutoTimersRef = useRef({});
 
   // Filtro de status da tabela
   const [filtroStatus, setFiltroStatus] = useState('todos');
@@ -102,6 +105,15 @@ const EntradaXML = () => {
   }, []);
 
   useEffect(() => {
+    return () => {
+      Object.values(buscaProdutoTimersRef.current).forEach((timerId) => {
+        if (timerId) clearTimeout(timerId);
+      });
+      buscaProdutoTimersRef.current = {};
+    };
+  }, []);
+
+  useEffect(() => {
     const notaIdParam = searchParams.get('nota_id');
     if (!notaIdParam) return;
     if (autoOpenNotaIdRef.current === notaIdParam) return;
@@ -131,7 +143,7 @@ const EntradaXML = () => {
 
       const [notasRes, produtosRes] = await Promise.all([
         api.get(`/notas-entrada/`, { headers }),
-        api.get(`/produtos/`, { headers, params: { ativo: null } }) // null = todos os produtos
+        api.get(`/produtos/`, { headers, params: { ativo: null, page_size: 5000 } }) // null = todos os produtos
       ]);
 
       console.log('✅ [EntradaXML] Dados carregados:', {
@@ -161,6 +173,78 @@ const EntradaXML = () => {
       console.error('  - Stack:', error.stack);
       toast.error(`Erro ao carregar dados: ${error.response?.data?.detail || error.message}`);
     }
+  };
+
+  const buscarProdutosParaVinculo = async (itemId, termo) => {
+    const textoBusca = (termo || '').trim();
+
+    if (textoBusca.length < 2) {
+      setResultadosBuscaProduto(prev => ({ ...prev, [itemId]: [] }));
+      setBuscandoProduto(prev => ({ ...prev, [itemId]: false }));
+      return;
+    }
+
+    setBuscandoProduto(prev => ({ ...prev, [itemId]: true }));
+
+    try {
+      const baseParams = {
+        busca: textoBusca,
+        ativo: null,
+        page: 1,
+        page_size: 150
+      };
+
+      // Busca em paralelo para também cobrir produtos do tipo VARIACAO.
+      const [resBase, resVariacao] = await Promise.all([
+        api.get('/produtos/', { params: baseParams }),
+        api.get('/produtos/', { params: { ...baseParams, tipo_produto: 'VARIACAO' } })
+      ]);
+
+      const listaBase = resBase.data?.items || [];
+      const listaVariacao = resVariacao.data?.items || [];
+      const mapaPorId = new Map();
+      [...listaBase, ...listaVariacao].forEach((p) => mapaPorId.set(p.id, p));
+
+      const palavras = textoBusca.toLowerCase().split(/\s+/).filter(Boolean);
+      const encontrados = Array.from(mapaPorId.values()).filter((p) =>
+        palavras.every((palavra) =>
+          p.nome?.toLowerCase().includes(palavra) ||
+          p.codigo?.toLowerCase().includes(palavra) ||
+          p.codigo_barras?.toLowerCase().includes(palavra) ||
+          p.descricao?.toLowerCase().includes(palavra)
+        )
+      );
+
+      encontrados.sort((a, b) => {
+        if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+        return (a.nome || '').localeCompare(b.nome || '');
+      });
+
+      setResultadosBuscaProduto(prev => ({ ...prev, [itemId]: encontrados.slice(0, 60) }));
+    } catch (error) {
+      console.error('Erro ao buscar produtos para vinculo:', error);
+      setResultadosBuscaProduto(prev => ({ ...prev, [itemId]: [] }));
+    } finally {
+      setBuscandoProduto(prev => ({ ...prev, [itemId]: false }));
+    }
+  };
+
+  const atualizarFiltroProduto = (itemId, valor) => {
+    setFiltroProduto(prev => ({ ...prev, [itemId]: valor }));
+
+    if (buscaProdutoTimersRef.current[itemId]) {
+      clearTimeout(buscaProdutoTimersRef.current[itemId]);
+    }
+
+    if ((valor || '').trim().length < 2) {
+      setResultadosBuscaProduto(prev => ({ ...prev, [itemId]: [] }));
+      setBuscandoProduto(prev => ({ ...prev, [itemId]: false }));
+      return;
+    }
+
+    buscaProdutoTimersRef.current[itemId] = setTimeout(() => {
+      buscarProdutosParaVinculo(itemId, valor);
+    }, 250);
   };
 
   const handleFileUpload = async (event) => {
@@ -1665,7 +1749,7 @@ const EntradaXML = () => {
                                         type="text"
                                         placeholder="Digite nome ou SKU..."
                                         value={filtroProduto[item.id] || ''}
-                                        onChange={(e) => setFiltroProduto({...filtroProduto, [item.id]: e.target.value})}
+                                        onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
                                         className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
                                       />
                                     </div>
@@ -1674,20 +1758,14 @@ const EntradaXML = () => {
                                     {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
                                       <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
                                         {(() => {
-                                          // Busca palavra a palavra: todas as palavras precisam aparecer em qualquer ordem
-                                          const palavras = filtroProduto[item.id].toLowerCase().trim().split(/\s+/).filter(w => w.length > 0);
-                                          const matchProduto = (p) => palavras.every(palavra =>
-                                            p.nome?.toLowerCase().includes(palavra) ||
-                                            p.codigo?.toLowerCase().includes(palavra) ||
-                                            p.codigo_barras?.toLowerCase().includes(palavra) ||
-                                            p.descricao?.toLowerCase().includes(palavra)
-                                          );
-                                          const filtrados = Array.isArray(produtos) ? produtos.filter(matchProduto) : [];
-                                          // Ordena: ativos primeiro, depois por nome
-                                          filtrados.sort((a, b) => {
-                                            if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
-                                            return (a.nome || '').localeCompare(b.nome || '');
-                                          });
+                                          const filtrados = resultadosBuscaProduto[item.id] || [];
+                                          if (buscandoProduto[item.id]) {
+                                            return (
+                                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
+                                                Buscando produtos...
+                                              </div>
+                                            );
+                                          }
                                           if (filtrados.length === 0) {
                                             return (
                                               <div className="px-3 py-4 text-center text-gray-500 text-xs">
@@ -1695,13 +1773,14 @@ const EntradaXML = () => {
                                               </div>
                                             );
                                           }
-                                          return filtrados.slice(0, 20).map(p => (
+                                          return filtrados.map(p => (
                                             <button
                                               key={`produto-${item.id}-${p.id}`}
                                               type="button"
                                               onClick={() => {
                                                 vincularProduto(notaSelecionada.id, item.id, p.id);
-                                                setFiltroProduto({...filtroProduto, [item.id]: ''});
+                                                setFiltroProduto(prev => ({ ...prev, [item.id]: '' }));
+                                                setResultadosBuscaProduto(prev => ({ ...prev, [item.id]: [] }));
                                               }}
                                               className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
                                             >
