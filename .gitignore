@@ -138,3 +138,6 @@ secrets/
 
 # Vite temp files
 frontend/vite.config.js.timestamp-*.mjs
+
+# MCP Debug Tools (gerado automaticamente pelo VS Code, nunca versionar)
+.mcp-debug-tools/

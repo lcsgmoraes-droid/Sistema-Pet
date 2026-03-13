@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Plus, ChevronLeft, ChevronRight, AlertCircle, Clock, Activity } from "lucide-react";
 import { vetApi } from "./vetApi";
@@ -70,10 +70,10 @@ export default function VetAgenda() {
     ? addDias(inicioSemana, 6)
     : dataRef;
 
-  const dataInicioConsulta = modo === "mes" ? inicioMes(dataRef) : inicioSemana;
-  const dataFimConsulta = modo === "mes" ? fimMes(dataRef) : fimSemana;
+  async function carregar() {
+    const dataInicioConsulta = modo === "mes" ? inicioMes(dataRef) : inicioSemana;
+    const dataFimConsulta = modo === "mes" ? fimMes(dataRef) : fimSemana;
 
-  const carregar = useCallback(async () => {
     try {
       setCarregando(true);
       setErro(null);
@@ -88,9 +88,11 @@ export default function VetAgenda() {
     } finally {
       setCarregando(false);
     }
-  }, [dataInicioConsulta, dataFimConsulta]);
+  }
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [modo, dataRef]);
 
   useEffect(() => {
     api.get("/vet/pets", { params: { limit: 500 } })

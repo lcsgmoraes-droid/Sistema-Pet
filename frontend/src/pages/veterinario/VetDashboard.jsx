@@ -30,15 +30,27 @@ export default function VetDashboard() {
     async function carregar() {
       try {
         setCarregando(true);
+        setErro(null);
         const hoje = new Date().toISOString().slice(0, 10);
-        const [dashRes, agRes, relRes] = await Promise.all([
+        const [dashRes, agRes, relRes] = await Promise.allSettled([
           vetApi.dashboard(),
           vetApi.listarAgendamentos({ data_inicio: hoje, data_fim: hoje }),
           vetApi.relatorioClinico({ dias: 30, top: 5 }),
         ]);
-        setDados(dashRes.data);
-        setAgendamentos(agRes.data?.items ?? agRes.data ?? []);
-        setRelatorio(relRes.data);
+
+        if (dashRes.status !== "fulfilled" || agRes.status !== "fulfilled") {
+          throw new Error("Falha ao carregar dados principais do painel veterinário.");
+        }
+
+        setDados(dashRes.value.data);
+        setAgendamentos(agRes.value.data?.items ?? agRes.value.data ?? []);
+
+        if (relRes.status === "fulfilled") {
+          setRelatorio(relRes.value.data);
+        } else {
+          console.warn("Relatório clínico indisponível no momento", relRes.reason);
+          setRelatorio(null);
+        }
       } catch (e) {
         console.error("Erro ao carregar painel veterinário", e);
         setErro("Não foi possível carregar o painel veterinário.");
