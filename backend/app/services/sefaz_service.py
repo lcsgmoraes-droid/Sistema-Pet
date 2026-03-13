@@ -30,6 +30,16 @@ class SefazConfigStatus:
     mensagem: str
 
 
+class SefazConsumoIndevidoError(Exception):
+    """Erro específico para cStat 656 contendo ultNSU/maxNSU retornados pela SEFAZ."""
+
+    def __init__(self, mensagem: str, ult_nsu: str, max_nsu: str) -> None:
+        super().__init__(mensagem)
+        self.mensagem = mensagem
+        self.ult_nsu = str(ult_nsu or "000000000000000")
+        self.max_nsu = str(max_nsu or self.ult_nsu)
+
+
 class SefazService:
     """Camada de serviço para validar e preparar integração SEFAZ."""
 
@@ -423,6 +433,16 @@ class SefazService:
         soap = cls._post_soap_dist_dfe(cfg, xml_msg)
         parsed = cls._parse_retorno_dist_dfe(soap)
         c_stat = parsed["c_stat"]
+
+        if c_stat == "656":
+            raise SefazConsumoIndevidoError(
+                mensagem=(
+                    f"SEFAZ retornou cStat 656 na sincronização: "
+                    f"{parsed['x_motivo'] or 'sem detalhe'}"
+                ),
+                ult_nsu=parsed.get("ult_nsu", "000000000000000"),
+                max_nsu=parsed.get("max_nsu", parsed.get("ult_nsu", "000000000000000")),
+            )
 
         if c_stat not in {"137", "138"}:
             raise HTTPException(

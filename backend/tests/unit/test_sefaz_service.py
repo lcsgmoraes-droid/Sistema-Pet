@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from app.services.sefaz_service import SefazService
+from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 
 
 def _config_real_base() -> dict:
@@ -112,3 +112,30 @@ def test_sincronizar_nsu_retorno_inesperado_gera_502(monkeypatch: pytest.MonkeyP
 
     assert exc.value.status_code == 502
     assert "cStat 999" in str(exc.value.detail)
+
+
+def test_sincronizar_nsu_cstat_656_retorna_excecao_com_nsu(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = _config_real_base()
+
+    monkeypatch.setattr(SefazService, "garantir_pronto_para_consulta_real", classmethod(lambda cls, _cfg=None: None))
+    monkeypatch.setattr(SefazService, "_post_soap_dist_dfe", classmethod(lambda cls, _cfg, _xml: "<xml />"))
+    monkeypatch.setattr(
+        SefazService,
+        "_parse_retorno_dist_dfe",
+        classmethod(
+            lambda cls, _soap: {
+                "c_stat": "656",
+                "x_motivo": "Rejeicao: Consumo Indevido (Use ultNSU)",
+                "ult_nsu": "000000000001234",
+                "max_nsu": "000000000001240",
+                "docs": [],
+            }
+        ),
+    )
+
+    with pytest.raises(SefazConsumoIndevidoError) as exc:
+        SefazService.sincronizar_nsu(config=cfg, ultimo_nsu="000000000000009")
+
+    assert "cStat 656" in str(exc.value)
+    assert exc.value.ult_nsu == "000000000001234"
+    assert exc.value.max_nsu == "000000000001240"

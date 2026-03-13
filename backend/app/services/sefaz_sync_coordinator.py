@@ -35,6 +35,7 @@ _LOCK_FILE = "/tmp/sefaz_sync.lock"
 # Índice 0 = 1ª vez sem documento → aguarda 720 min (12h)
 # Índice 4 = 5ª+ vez sem documento → aguarda 1440 min (24h)
 BACKOFF_MINUTES = [720, 720, 1440, 1440, 1440]
+PENALIDADE_656_MINUTOS = 300
 
 
 class SefazSyncCoordinator:
@@ -136,13 +137,18 @@ class SefazSyncCoordinator:
     ) -> dict[str, Any]:
         from app.db import SessionLocal
         from app.notas_entrada_routes import importar_docs_sefaz
-        from app.services.sefaz_service import SefazService
+        from app.services.sefaz_service import SefazConsumoIndevidoError, SefazService
 
         nsu_loop = cfg.get("ultimo_nsu", "000000000000000")
         total_docs = 0
         total_importadas = 0
         total_duplicadas = 0
         erro_656 = False
+        erro_generico = False
+        mensagem_erro_generico: str | None = None
+        mensagem_erro_656: str | None = None
+        nsu_sugerido_656: str | None = None
+        max_nsu_sugerido_656: str | None = None
         pulou_para_hoje = False
         MAX_LOTES = 1  # Uma chamada por ciclo — evita cStat 656 por consumo excessivo
 
@@ -153,12 +159,28 @@ class SefazSyncCoordinator:
                     ultimo_nsu=nsu_loop,
                 )
             except Exception as exc:
+                if isinstance(exc, SefazConsumoIndevidoError):
+                    erro_656 = True
+                    mensagem_erro_656 = exc.mensagem
+                    nsu_sugerido_656 = exc.ult_nsu or exc.max_nsu
+                    max_nsu_sugerido_656 = exc.max_nsu
+                    logger.warning(
+                        f"[SEFAZ] [{reason}] cStat 656 no lote {lote_idx + 1} "
+                        f"(tenant {tenant_id_str}) — ultNSU sugerido={nsu_sugerido_656}"
+                    )
+                    break
+
                 logger.warning(
                     f"[SEFAZ] [{reason}] Erro no lote {lote_idx + 1} "
                     f"(tenant {tenant_id_str}): {exc}"
                 )
                 if "656" in str(exc) or "Consumo Indevido" in str(exc):
                     erro_656 = True
+                    mensagem_erro_656 = str(exc)
+                    break
+
+                erro_generico = True
+                mensagem_erro_generico = str(exc)
                 break
 
             docs = resultado.get("docs_list", [])
@@ -202,19 +224,29 @@ class SefazSyncCoordinator:
         now = datetime.now(timezone.utc)
         now_iso = now.isoformat()
 
-        # ── Erro 656 — penalidade de 5 horas (300 min) ──────────────────────
+        # ── Erro 656 — aplicar cooldown e salvar ultNSU sugerido ────────────
         if erro_656:
-            penalidade_min = 300
+            penalidade_min = PENALIDADE_656_MINUTOS
             proximo = now + timedelta(minutes=penalidade_min)
+            nsu_ult_retorno = str(nsu_sugerido_656 or cfg.get("ultimo_nsu", "000000000000000")).strip().zfill(15)
+            nsu_max_retorno = str(max_nsu_sugerido_656 or nsu_sugerido_656 or cfg.get("ultimo_nsu", "000000000000000")).strip().zfill(15)
+            if nsu_sugerido_656:
+                cfg["ultimo_nsu"] = nsu_ult_retorno
+            detalhe_656 = mensagem_erro_656 or "SEFAZ bloqueou por consumo indevido."
             cfg.update({
                 "ultimo_sync_at": now_iso,
                 "_proximo_sync_permitido_at": proximo.isoformat(),
                 "_sync_bloqueado_656": True,
                 "ultimo_sync_status": "erro_656",
                 "ultimo_sync_mensagem": (
-                    f"SEFAZ bloqueou (cStat 656). "
+                    f"{detalhe_656} "
+                    f"ultNSU={nsu_ult_retorno}, maxNSU={nsu_max_retorno}. "
                     f"Próxima tentativa em {penalidade_min} min."
                 ),
+                "ultimo_sync_cstat": "656",
+                "ultimo_sync_xmotivo": detalhe_656,
+                "ultimo_sync_ult_nsu_retorno": nsu_ult_retorno,
+                "ultimo_sync_max_nsu_retorno": nsu_max_retorno,
                 "ultimo_sync_documentos": 0,
             })
             self._atomic_save(config_path, cfg)
@@ -229,6 +261,40 @@ class SefazSyncCoordinator:
                 "importadas": 0,
                 "duplicadas": 0,
                 "proximo_permitido_at": proximo.isoformat(),
+            }
+
+        # ── Erro genérico — registrar detalhe real e não mascarar como OK ───
+        if erro_generico:
+            intervalo_erro_min = max(5, int(cfg.get("importacao_intervalo_min", 15)))
+            proximo_erro = now + timedelta(minutes=intervalo_erro_min)
+            detalhe = mensagem_erro_generico or "Falha desconhecida na sincronização SEFAZ."
+            cfg.update({
+                "ultimo_sync_at": now_iso,
+                "_proximo_sync_permitido_at": proximo_erro.isoformat(),
+                "_sync_bloqueado_656": False,
+                "ultimo_sync_status": "erro",
+                "ultimo_sync_mensagem": (
+                    f"Falha na sincronização SEFAZ: {detalhe}. "
+                    f"Nova tentativa automática em {intervalo_erro_min} min."
+                ),
+                "ultimo_sync_cstat": None,
+                "ultimo_sync_xmotivo": detalhe,
+                "ultimo_sync_ult_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
+                "ultimo_sync_max_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
+                "ultimo_sync_documentos": 0,
+            })
+            self._atomic_save(config_path, cfg)
+            logger.warning(
+                f"[SEFAZ] [{reason}] ❌ Tenant {tenant_id_str}: erro real registrado. "
+                f"Detalhe={detalhe}"
+            )
+            return {
+                "status": "error",
+                "mensagem": cfg["ultimo_sync_mensagem"],
+                "documentos": 0,
+                "importadas": 0,
+                "duplicadas": 0,
+                "proximo_permitido_at": proximo_erro.isoformat(),
             }
 
         # ── Sucesso — backoff adaptativo ─────────────────────────────────────
@@ -256,6 +322,10 @@ class SefazSyncCoordinator:
             "backoff_index": backoff_index,
             "ultimo_sync_status": "ok",
             "ultimo_nsu": nsu_loop,
+            "ultimo_sync_cstat": str(resultado.get("c_stat", "ok")),
+            "ultimo_sync_xmotivo": str(resultado.get("x_motivo", "")),
+            "ultimo_sync_ult_nsu_retorno": str(resultado.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
+            "ultimo_sync_max_nsu_retorno": str(resultado.get("max_nsu", nsu_loop)).strip().zfill(15),
             "ultimo_sync_documentos": total_docs,
             "ultimo_sync_mensagem": msg,
         })
