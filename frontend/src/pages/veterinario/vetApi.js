@@ -8,6 +8,9 @@ const BASE = "/vet";
 export const vetApi = {
   // Dashboard
   dashboard: () => api.get(`${BASE}/dashboard`),
+  relatorioClinico: (params) => api.get(`${BASE}/relatorios/clinicos`, { params }),
+  exportarRelatorioClinicoCsv: (params) =>
+    api.get(`${BASE}/relatorios/clinicos/export.csv`, { params, responseType: "blob" }),
 
   // Agendamentos
   listarAgendamentos: (params) => api.get(`${BASE}/agendamentos`, { params }),
@@ -20,6 +23,7 @@ export const vetApi = {
   criarConsulta: (data) => api.post(`${BASE}/consultas`, data),
   atualizarConsulta: (id, data) => api.patch(`${BASE}/consultas/${id}`, data),
   finalizarConsulta: (id) => api.post(`${BASE}/consultas/${id}/finalizar`),
+  validarAssinaturaConsulta: (id) => api.get(`${BASE}/consultas/${id}/assinatura`),
 
   // Prescrições
   listarPrescricoes: (consultaId) => api.get(`${BASE}/consultas/${consultaId}/prescricoes`),

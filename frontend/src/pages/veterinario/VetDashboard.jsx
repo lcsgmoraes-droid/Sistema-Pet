@@ -20,8 +20,10 @@ const statusLabel = {
 export default function VetDashboard() {
   const navigate = useNavigate();
   const [dados, setDados] = useState(null);
+  const [relatorio, setRelatorio] = useState(null);
   const [agendamentos, setAgendamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
+  const [exportando, setExportando] = useState(false);
   const [erro, setErro] = useState(null);
 
   useEffect(() => {
@@ -29,13 +31,16 @@ export default function VetDashboard() {
       try {
         setCarregando(true);
         const hoje = new Date().toISOString().slice(0, 10);
-        const [dashRes, agRes] = await Promise.all([
+        const [dashRes, agRes, relRes] = await Promise.all([
           vetApi.dashboard(),
           vetApi.listarAgendamentos({ data_inicio: hoje, data_fim: hoje }),
+          vetApi.relatorioClinico({ dias: 30, top: 5 }),
         ]);
         setDados(dashRes.data);
         setAgendamentos(agRes.data?.items ?? agRes.data ?? []);
+        setRelatorio(relRes.data);
       } catch (e) {
+        console.error("Erro ao carregar painel veterinário", e);
         setErro("Não foi possível carregar o painel veterinário.");
       } finally {
         setCarregando(false);
@@ -84,7 +89,7 @@ export default function VetDashboard() {
     },
     {
       label: "Vacinas vencendo (30d)",
-      valor: dados?.vacinas_vencendo ?? 0,
+      valor: dados?.vacinas_vencendo_30d ?? 0,
       icon: Syringe,
       cor: "from-orange-500 to-orange-600",
     },
@@ -94,7 +99,46 @@ export default function VetDashboard() {
       icon: TrendingUp,
       cor: "from-teal-500 to-teal-600",
     },
+    {
+      label: "Retornos pendentes",
+      valor: dados?.retornos_pendentes ?? 0,
+      icon: AlertCircle,
+      cor: "from-rose-500 to-rose-600",
+    },
+    {
+      label: "Taxa de retorno (30d)",
+      valor: `${dados?.taxa_retorno_30d ?? 0}%`,
+      icon: TrendingUp,
+      cor: "from-indigo-500 to-indigo-600",
+    },
+    {
+      label: "Tempo médio de atendimento",
+      valor: `${dados?.tempo_medio_atendimento_min ?? 0} min`,
+      icon: Stethoscope,
+      cor: "from-cyan-500 to-cyan-600",
+    },
   ];
+
+  async function exportarCsvRelatorio() {
+    try {
+      setExportando(true);
+      const resposta = await vetApi.exportarRelatorioClinicoCsv({ dias: 30, top: 5 });
+      const blob = new Blob([resposta.data], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "relatorio_clinico_veterinario_30d.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Erro ao exportar relatório clínico", e);
+      setErro("Não foi possível exportar o relatório clínico.");
+    } finally {
+      setExportando(false);
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -109,17 +153,26 @@ export default function VetDashboard() {
             <p className="text-sm text-gray-500">Visão geral do dia</p>
           </div>
         </div>
-        <button
-          onClick={() => navigate("/veterinario/consultas/nova")}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Nova consulta
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportarCsvRelatorio}
+            disabled={exportando}
+            className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
+          >
+            {exportando ? "Exportando..." : "Exportar relatório (CSV)"}
+          </button>
+          <button
+            onClick={() => navigate("/veterinario/consultas/nova")}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Nova consulta
+          </button>
+        </div>
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
@@ -159,9 +212,10 @@ export default function VetDashboard() {
         ) : (
           <div className="divide-y divide-gray-50">
             {agendamentos.slice(0, 10).map((ag) => (
-              <div
+              <button
                 key={ag.id}
-                className="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                type="button"
+                className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-gray-50 transition-colors"
                 onClick={() => {
                   if (ag.consulta_id) navigate(`/veterinario/consultas/${ag.consulta_id}`);
                   else navigate("/veterinario/agenda");
@@ -172,7 +226,7 @@ export default function VetDashboard() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">
-                    {ag.pet_nome ?? `Pet #${ag.pet_id?.slice(0, 6)}`}
+                    {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
                   </p>
                   <p className="text-xs text-gray-400 truncate">{ag.motivo ?? "—"}</p>
                 </div>
@@ -189,9 +243,27 @@ export default function VetDashboard() {
                 >
                   {statusLabel[ag.status] ?? ag.status}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {renderTopListCard(
+          "Top diagnósticos (30d)",
+          relatorio?.top_diagnosticos ?? [],
+          "Sem diagnósticos registrados no período.",
+        )}
+        {renderTopListCard(
+          "Top procedimentos (30d)",
+          relatorio?.top_procedimentos ?? [],
+          "Sem procedimentos registrados no período.",
+        )}
+        {renderTopListCard(
+          "Top medicamentos (30d)",
+          relatorio?.top_medicamentos ?? [],
+          "Sem medicamentos prescritos no período.",
         )}
       </div>
 
@@ -216,6 +288,28 @@ export default function VetDashboard() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function renderTopListCard(title, itens, vazio) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
+      {itens.length === 0 ? (
+        <p className="text-xs text-gray-400">{vazio}</p>
+      ) : (
+        <div className="space-y-2">
+          {itens.map((item, idx) => (
+            <div key={`${item.nome}-${idx}`} className="flex items-center justify-between gap-3">
+              <span className="text-sm text-gray-700 truncate">{item.nome}</span>
+              <span className="text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">
+                {item.quantidade}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

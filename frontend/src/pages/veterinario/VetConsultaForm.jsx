@@ -52,6 +52,7 @@ export default function VetConsultaForm() {
   const [consultaIdAtual, setConsultaIdAtual] = useState(consultaId ?? null);
   const [finalizado, setFinalizado] = useState(false);
   const [carregando, setCarregando] = useState(isEdicao);
+  const [assinatura, setAssinatura] = useState(null);
   const modoSomenteLeitura = isEdicao && finalizado;
 
   // listas externas
@@ -124,6 +125,14 @@ export default function VetConsultaForm() {
       .catch(() => setErro("Não foi possível carregar a consulta."))
       .finally(() => setCarregando(false));
   }, [consultaId, isEdicao]);
+
+  useEffect(() => {
+    if (!modoSomenteLeitura || !consultaIdAtual) return;
+    vetApi
+      .validarAssinaturaConsulta(consultaIdAtual)
+      .then((res) => setAssinatura(res.data))
+      .catch(() => setAssinatura(null));
+  }, [modoSomenteLeitura, consultaIdAtual]);
 
   // Carrega pets e veterinários
   useEffect(() => {
@@ -286,8 +295,8 @@ export default function VetConsultaForm() {
         veterinario_id: form.veterinario_id || undefined,
         queixa_principal: form.motivo_consulta || undefined,
         // Campos extras são ignorados pelo backend no create e usados no patch quando suportados.
-        peso_kg: form.peso_kg ? parseFloat(form.peso_kg) : undefined,
-        temperatura: form.temperatura ? parseFloat(form.temperatura) : undefined,
+        peso_kg: form.peso_kg ? Number.parseFloat(form.peso_kg) : undefined,
+        temperatura: form.temperatura ? Number.parseFloat(form.temperatura) : undefined,
         freq_cardiaca: form.freq_cardiaca ? parseInt(form.freq_cardiaca) : undefined,
         freq_respiratoria: form.freq_respiratoria ? parseInt(form.freq_respiratoria) : undefined,
         tpc: form.tpc || undefined,
@@ -468,9 +477,21 @@ export default function VetConsultaForm() {
       </div>
 
       {modoSomenteLeitura && (
-        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
-          <Lock size={15} />
-          <span>Consulta assinada digitalmente. Você pode visualizar todos os dados, mas não pode editar.</span>
+        <div className="space-y-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Lock size={15} />
+            <span>Consulta assinada digitalmente. Você pode visualizar todos os dados, mas não pode editar.</span>
+          </div>
+          {assinatura && (
+            <div className="text-xs text-green-800 bg-white/70 border border-green-200 rounded px-3 py-2">
+              <div>
+                Integridade do prontuário: <strong>{assinatura.hash_valido ? "válida" : "divergente"}</strong>
+              </div>
+              <div>
+                Hash: <span className="font-mono">{assinatura.hash_prontuario || "—"}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

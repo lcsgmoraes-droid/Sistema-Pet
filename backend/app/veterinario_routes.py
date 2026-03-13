@@ -7,10 +7,12 @@ import hashlib
 import json
 import re
 import secrets
-from datetime import date, datetime
+import csv
+from datetime import date, datetime, timedelta
+from io import StringIO
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
@@ -681,8 +683,7 @@ def finalizar_consulta(
     c.finalizado_por_id = user.id
 
     # Hash do prontuário para imutabilidade
-    conteudo = f"{c.id}|{c.pet_id}|{c.diagnostico}|{c.conduta}|{c.finalizado_em}"
-    c.hash_prontuario = hashlib.sha256(conteudo.encode()).hexdigest()
+    c.hash_prontuario = _hash_prontuario_consulta(c)
 
     # Finaliza agendamento vinculado
     if c.agendamento:
@@ -736,6 +737,11 @@ def _consulta_to_dict(c: ConsultaVet) -> dict:
         "veterinario_nome": c.veterinario.nome if c.veterinario else None,
         "created_at": c.created_at,
     }
+
+
+def _hash_prontuario_consulta(c: ConsultaVet) -> str:
+    conteudo = f"{c.id}|{c.pet_id}|{c.diagnostico}|{c.conduta}|{c.finalizado_em}"
+    return hashlib.sha256(conteudo.encode()).hexdigest()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1868,12 +1874,18 @@ def dashboard_vet(
     current=Depends(get_current_user_and_tenant),
 ):
     """Resumo do dia para o dashboard veterinário."""
-    user, tenant_id = _get_tenant(current)
+    _, tenant_id = _get_tenant(current)
     hoje = date.today()
+    janela_30d = hoje - timedelta(days=30)
 
     agendamentos_hoje = db.query(func.count(AgendamentoVet.id)).filter(
         AgendamentoVet.tenant_id == tenant_id,
         func.date(AgendamentoVet.data_hora) == hoje,
+    ).scalar() or 0
+
+    consultas_hoje = db.query(func.count(ConsultaVet.id)).filter(
+        ConsultaVet.tenant_id == tenant_id,
+        func.date(ConsultaVet.created_at) == hoje,
     ).scalar() or 0
 
     em_atendimento = db.query(func.count(ConsultaVet.id)).filter(
@@ -1886,7 +1898,6 @@ def dashboard_vet(
         InternacaoVet.status == "internado",
     ).scalar() or 0
 
-    from datetime import timedelta
     vacinas_vencendo_30d = db.query(func.count(VacinaRegistro.id)).filter(
         VacinaRegistro.tenant_id == tenant_id,
         VacinaRegistro.data_proxima_dose != None,  # noqa
@@ -1900,12 +1911,213 @@ def dashboard_vet(
         func.extract("year", ConsultaVet.created_at) == hoje.year,
     ).scalar() or 0
 
+    consultas_com_retorno_vencido = db.query(ConsultaVet).filter(
+        ConsultaVet.tenant_id == tenant_id,
+        ConsultaVet.data_retorno.isnot(None),
+        ConsultaVet.data_retorno < hoje,
+        ConsultaVet.status == "finalizada",
+    ).all()
+
+    retornos_pendentes = 0
+    for consulta_base in consultas_com_retorno_vencido:
+        existe_retorno = db.query(ConsultaVet.id).filter(
+            ConsultaVet.tenant_id == tenant_id,
+            ConsultaVet.pet_id == consulta_base.pet_id,
+            ConsultaVet.tipo == "retorno",
+            ConsultaVet.status != "cancelada",
+            func.date(ConsultaVet.created_at) >= consulta_base.data_retorno,
+        ).first()
+        if not existe_retorno:
+            retornos_pendentes += 1
+
+    consultas_30d = db.query(ConsultaVet).filter(
+        ConsultaVet.tenant_id == tenant_id,
+        func.date(ConsultaVet.created_at) >= janela_30d,
+    ).all()
+
+    total_30d = len(consultas_30d)
+    retornos_30d = sum(1 for c in consultas_30d if (c.tipo or "").strip().lower() == "retorno")
+    taxa_retorno_30d = round((retornos_30d / total_30d) * 100, 1) if total_30d else 0.0
+
+    duracoes_min = []
+    for consulta in consultas_30d:
+        if consulta.inicio_atendimento and consulta.fim_atendimento:
+            delta = consulta.fim_atendimento - consulta.inicio_atendimento
+            duracoes_min.append(max(delta.total_seconds() / 60.0, 0))
+
+    tempo_medio_atendimento_min = round(sum(duracoes_min) / len(duracoes_min), 1) if duracoes_min else 0.0
+
     return {
+        "consultas_hoje": consultas_hoje,
         "agendamentos_hoje": agendamentos_hoje,
         "em_atendimento": em_atendimento,
         "internados": internados,
         "vacinas_vencendo_30d": vacinas_vencendo_30d,
         "consultas_mes": consultas_mes,
+        "retornos_pendentes": retornos_pendentes,
+        "total_consultas_30d": total_30d,
+        "retornos_30d": retornos_30d,
+        "taxa_retorno_30d": taxa_retorno_30d,
+        "tempo_medio_atendimento_min": tempo_medio_atendimento_min,
+    }
+
+
+@router.get("/relatorios/clinicos")
+def relatorio_clinico_vet(
+    dias: int = Query(default=30, ge=7, le=365),
+    top: int = Query(default=5, ge=3, le=15),
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    data_inicio = date.today() - timedelta(days=dias)
+
+    consultas = db.query(ConsultaVet).filter(
+        ConsultaVet.tenant_id == tenant_id,
+        func.date(ConsultaVet.created_at) >= data_inicio,
+    ).all()
+
+    total_consultas = len(consultas)
+    consultas_finalizadas = sum(1 for c in consultas if (c.status or "").strip().lower() == "finalizada")
+
+    diagnosticos_count = {}
+    for consulta in consultas:
+        diagnostico = (consulta.diagnostico or "").strip()
+        if not diagnostico:
+            continue
+        chave = diagnostico.split("\n")[0].split(";")[0].strip()
+        if not chave:
+            continue
+        diagnosticos_count[chave] = diagnosticos_count.get(chave, 0) + 1
+
+    top_diagnosticos = [
+        {"nome": nome, "quantidade": qtd}
+        for nome, qtd in sorted(diagnosticos_count.items(), key=lambda item: item[1], reverse=True)[:top]
+    ]
+
+    top_procedimentos_db = (
+        db.query(
+            ProcedimentoConsulta.nome.label("nome"),
+            func.count(ProcedimentoConsulta.id).label("quantidade"),
+        )
+        .join(ConsultaVet, ConsultaVet.id == ProcedimentoConsulta.consulta_id)
+        .filter(
+            ProcedimentoConsulta.tenant_id == tenant_id,
+            func.date(ConsultaVet.created_at) >= data_inicio,
+        )
+        .group_by(ProcedimentoConsulta.nome)
+        .order_by(func.count(ProcedimentoConsulta.id).desc())
+        .limit(top)
+        .all()
+    )
+
+    top_medicamentos_db = (
+        db.query(
+            ItemPrescricao.nome_medicamento.label("nome"),
+            func.count(ItemPrescricao.id).label("quantidade"),
+        )
+        .join(PrescricaoVet, PrescricaoVet.id == ItemPrescricao.prescricao_id)
+        .filter(
+            PrescricaoVet.tenant_id == tenant_id,
+            func.date(PrescricaoVet.created_at) >= data_inicio,
+        )
+        .group_by(ItemPrescricao.nome_medicamento)
+        .order_by(func.count(ItemPrescricao.id).desc())
+        .limit(top)
+        .all()
+    )
+
+    return {
+        "periodo_dias": dias,
+        "consultas": {
+            "total": total_consultas,
+            "finalizadas": consultas_finalizadas,
+            "em_andamento": max(total_consultas - consultas_finalizadas, 0),
+        },
+        "top_diagnosticos": [
+            {"nome": item["nome"], "quantidade": int(item["quantidade"])}
+            for item in top_diagnosticos
+        ],
+        "top_procedimentos": [
+            {"nome": item.nome, "quantidade": int(item.quantidade)}
+            for item in top_procedimentos_db
+        ],
+        "top_medicamentos": [
+            {"nome": item.nome, "quantidade": int(item.quantidade)}
+            for item in top_medicamentos_db
+        ],
+    }
+
+
+@router.get("/relatorios/clinicos/export.csv")
+def exportar_relatorio_clinico_csv(
+    dias: int = Query(default=30, ge=7, le=365),
+    top: int = Query(default=5, ge=3, le=15),
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    dados = relatorio_clinico_vet(dias=dias, top=top, db=db, current=current)
+    conteudo = []
+    conteudo.append(["Relatório clínico veterinário"])
+    conteudo.append(["Período (dias)", str(dados["periodo_dias"])])
+    conteudo.append(["Consultas totais", str(dados["consultas"]["total"])])
+    conteudo.append(["Consultas finalizadas", str(dados["consultas"]["finalizadas"])])
+    conteudo.append(["Consultas em andamento", str(dados["consultas"]["em_andamento"])])
+    conteudo.append([])
+    conteudo.append(["Top diagnósticos"])
+    conteudo.append(["Nome", "Quantidade"])
+    for item in dados["top_diagnosticos"]:
+        conteudo.append([item["nome"], str(item["quantidade"])])
+    conteudo.append([])
+    conteudo.append(["Top procedimentos"])
+    conteudo.append(["Nome", "Quantidade"])
+    for item in dados["top_procedimentos"]:
+        conteudo.append([item["nome"], str(item["quantidade"])])
+    conteudo.append([])
+    conteudo.append(["Top medicamentos"])
+    conteudo.append(["Nome", "Quantidade"])
+    for item in dados["top_medicamentos"]:
+        conteudo.append([item["nome"], str(item["quantidade"])])
+
+    sio = StringIO()
+    writer = csv.writer(sio, delimiter=';')
+    writer.writerows(conteudo)
+    csv_string = "\ufeff" + sio.getvalue()
+
+    return Response(
+        content=csv_string,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=relatorio_clinico_vet_{dias}d.csv"},
+    )
+
+
+@router.get("/consultas/{consulta_id}/assinatura")
+def validar_assinatura_consulta(
+    consulta_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    c = _consulta_or_404(db, consulta_id, tenant_id)
+
+    if not c.finalizado_em or not c.hash_prontuario:
+        return {
+            "assinada": False,
+            "hash_valido": False,
+            "hash_prontuario": c.hash_prontuario,
+            "hash_recalculado": None,
+            "finalizado_em": c.finalizado_em,
+            "motivo": "Consulta ainda não foi finalizada e assinada digitalmente.",
+        }
+
+    hash_recalculado = _hash_prontuario_consulta(c)
+    return {
+        "assinada": True,
+        "hash_valido": hash_recalculado == c.hash_prontuario,
+        "hash_prontuario": c.hash_prontuario,
+        "hash_recalculado": hash_recalculado,
+        "finalizado_em": c.finalizado_em,
+        "motivo": "OK" if hash_recalculado == c.hash_prontuario else "Hash divergente: possível alteração após finalização.",
     }
 
 

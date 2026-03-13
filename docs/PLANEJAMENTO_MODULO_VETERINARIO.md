@@ -14,16 +14,16 @@
 |---|---|---|
 | 15 tabelas `vet_*` criadas no banco (DEV) | ✅ | Migração `v1a2b3c4d5e6` aplicada |
 | Backend: `veterinario_models.py` | ✅ | Todos os modelos SQLAlchemy |
-| Backend: `veterinario_routes.py` | ✅ | Rotas CRUD em `/vet` |
+| Backend: `veterinario_routes.py` | ✅ | Rotas CRUD em `/vet` + dashboard avançado, relatório clínico e validação de assinatura de prontuário |
 | Backend: router registrado em `main.py` | ✅ | `/vet/*` respondendo `403` (auth OK) |
 | Migrações intermediárias corrigidas | ✅ | `60a7b78b30b8` stamped + 3 corrigidas |
 
 ### Frontend — Telas criadas
 | Tela | Status | Observação |
 |---|---|---|
-| `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` |
+| `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` + KPIs avançados (retornos pendentes, taxa de retorno 30d, tempo médio) + exportação CSV de relatório clínico |
 | `VetConsultas.jsx` — lista paginada de consultas | ✅ | Filtros por data e status |
-| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`); falta IA integrada e cálculo automático de dose por peso |
+| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`) + consulta de assinatura (`validarAssinaturaConsulta`) em modo finalizado; falta IA integrada, cálculo automático de dose por peso e geração de PDF de prontuário/receita |
 | `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`); falta integração com push notifications |
 | `VetVacinas.jsx` — registro de vacinas | 🔶 | ✅ Alerta de vencimento implementado (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital |
 | `VetInternacoes.jsx` — fichas de internação | 🔶 | ✅ Criação/alta/evolução/procedimento implementados; falta alertas automáticos de horário e gráficos de evolução |
@@ -644,6 +644,14 @@ Módulo separado, mas integrado:
 
 ## 7. Relatórios e Dashboard Clínico
 
+### Status real de implementação (Mar/2026)
+- ✅ Dashboard do dia implementado em `/vet/dashboard` com: consultas do dia, internados, vacinas vencendo em 30 dias, retornos pendentes.
+- ✅ KPIs clínicos avançados implementados: taxa de retorno em 30 dias e tempo médio de atendimento.
+- ✅ Relatório clínico consolidado implementado: endpoint `/vet/relatorios/clinicos`.
+- ✅ Exportação CSV implementada: endpoint `/vet/relatorios/clinicos/export.csv` e botão no `VetDashboard.jsx`.
+- 🔶 Parte financeira ainda pendente: custo de insumos por procedimento e margem por procedimento.
+- 🔶 Benchmark regional anonimizado ainda pendente.
+
 ### Dashboard do Veterinário (visão do dia)
 - Pacientes agendados para hoje
 - Internados no momento (com status rápido)
@@ -1175,7 +1183,7 @@ PRONTUÁRIO / LGPD
 13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — ✅ criação/alta/evolução/procedimento implementados (backend + frontend); falta alertas automáticos de horário e gráficos de evolução de temperatura/parâmetros
 14. ❌ IA consultora de diagnóstico (modo Debater Caso + Analisar Exame)
 15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — ✅ tabelas + `VetVacinas.jsx` + alertas de vencimento implementados (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital no app
-16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` criado; falta KPIs reais (tempo médio, taxa de retorno) conectados ao banco
+16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` + `/vet/dashboard` + `/vet/relatorios/clinicos` + exportação CSV implementados; KPIs reais (tempo médio e taxa de retorno) já conectados ao banco; falta custo de insumos por procedimento e benchmark regional
 17. ❌ Banco de protocolos veterinários reutilizáveis
 
 ### Fase 4 — Multi-Tenant Avançado
@@ -1265,6 +1273,13 @@ O prontuário veterinário é dado sensível e precisa de tratamento especial:
 ---
 
 ## 16. Prontuário Digital com Assinatura
+
+### Status real de implementação (Mar/2026)
+- 🔶 Existe assinatura digital básica por hash no fluxo de finalização da consulta.
+- ✅ Endpoint de validação de integridade implementado: `/vet/consultas/{consulta_id}/assinatura`.
+- 🔶 A interface de consulta finalizada já exibe o resultado da validação da assinatura/hash.
+- ❌ Ainda não existe geração de PDF do prontuário com QR Code público de verificação.
+- ❌ Ainda não existe assinatura do tutor para termos (balcão/remoto) integrada ao módulo.
 
 ### O que é o Prontuário Digital
 

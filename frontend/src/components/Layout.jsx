@@ -421,6 +421,11 @@ const Layout = () => {
           permission: "produtos.visualizar",
         },
         {
+          path: "/produtos/balanco",
+          label: "Balanço",
+          permission: "produtos.editar",
+        },
+        {
           path: "/estoque/alertas",
           label: "Alertas de Estoque",
           permission: "produtos.visualizar",

@@ -27,6 +27,7 @@ const preloadProdutos = () => import("./pages/Produtos");
 const Produtos = lazy(preloadProdutos);
 const ProdutosNovo = lazy(() => import("./pages/ProdutosNovo"));
 const ProdutosRelatorio = lazy(() => import("./pages/ProdutosRelatorio"));
+const ProdutosBalanco = lazy(() => import("./pages/ProdutosBalanco"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
 const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
 const SEFAZImportacao = lazy(() => import("./pages/SEFAZImportacao"));
@@ -382,6 +383,14 @@ function App() {
                   <Route
                     path="produtos/relatorio"
                     element={<ProdutosRelatorio />}
+                  />
+                  <Route
+                    path="produtos/balanco"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <ProdutosBalanco />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="estoque/alertas"
