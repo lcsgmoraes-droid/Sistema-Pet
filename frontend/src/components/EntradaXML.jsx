@@ -188,30 +188,31 @@ const EntradaXML = () => {
 
     try {
       const palavras = textoBusca.toLowerCase().split(/\s+/).filter(Boolean);
-      // Envia ao servidor apenas a palavra mais longa (busca mais ampla),
-      // depois filtra todas as palavras no cliente — assim encontra mesmo
-      // que as palavras estejam em ordem diferente do nome do produto.
-      const termoBusca = palavras.reduce((a, b) => a.length >= b.length ? a : b, palavras[0]);
 
-      const baseParams = {
-        busca: termoBusca,
-        ativo: null,
-        page: 1,
-        page_size: 150
-      };
+      // Faz uma chamada por palavra (até 4 palavras, as mais longas primeiro).
+      // Resultado é a UNIÃO de todos — garante que o produto apareça desde que
+      // qualquer uma das palavras o encontre no servidor (ex: "bob" traz todos
+      // os produtos Bob mesmo que "filhote" retorne centenas de outros produtos).
+      const palavrasServidor = [...palavras]
+        .sort((a, b) => b.length - a.length)
+        .slice(0, 4);
 
-      // Busca em paralelo para também cobrir produtos do tipo VARIACAO.
-      const [resBase, resVariacao] = await Promise.all([
-        api.get('/produtos/', { params: baseParams }),
-        api.get('/produtos/', { params: { ...baseParams, tipo_produto: 'VARIACAO' } })
-      ]);
+      const promises = [];
+      palavrasServidor.forEach((palavra) => {
+        const params = { busca: palavra, ativo: null, page: 1, page_size: 300 };
+        promises.push(api.get('/produtos/', { params }));
+        promises.push(api.get('/produtos/', { params: { ...params, tipo_produto: 'VARIACAO' } }));
+      });
 
-      const listaBase = resBase.data?.items || [];
-      const listaVariacao = resVariacao.data?.items || [];
+      const respostas = await Promise.all(promises);
+
+      // UNIÃO: junta tudo em um mapa por ID (sem duplicatas)
       const mapaPorId = new Map();
-      [...listaBase, ...listaVariacao].forEach((p) => mapaPorId.set(p.id, p));
+      respostas.forEach((res) => {
+        (res.data?.items || []).forEach((p) => mapaPorId.set(p.id, p));
+      });
 
-      // Filtra client-side: todas as palavras devem aparecer (qualquer ordem)
+      // Filtro client-side: TODAS as palavras devem estar no produto (qualquer ordem)
       const encontrados = Array.from(mapaPorId.values()).filter((p) => {
         const campos = [
           p.nome?.toLowerCase() || '',
@@ -222,9 +223,18 @@ const EntradaXML = () => {
         return palavras.every((palavra) => campos.includes(palavra));
       });
 
+      // Ordena por relevância:
+      // 1. Ativos primeiro
+      // 2. Quantas palavras aparecem especificamente no NOME (mais = mais próximo)
+      // 3. Alfabético
       encontrados.sort((a, b) => {
         if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
-        return (a.nome || '').localeCompare(b.nome || '');
+        const na = (a.nome || '').toLowerCase();
+        const nb = (b.nome || '').toLowerCase();
+        const scoreA = palavras.filter((w) => na.includes(w)).length;
+        const scoreB = palavras.filter((w) => nb.includes(w)).length;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return na.localeCompare(nb);
       });
 
       setResultadosBuscaProduto(prev => ({ ...prev, [itemId]: encontrados.slice(0, 60) }));
