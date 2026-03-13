@@ -585,6 +585,16 @@ async def obter_relatorio_vendas(
         else:
             pass  # Sem warning se não tem entrega
 
+        # Separar valores de entrega:
+        # - taxa_entrega_total: valor cobrado do cliente (receita bruta de entrega)
+        # - taxa_entrega_entregador: repasse ao entregador (custo)
+        taxa_entrega_total = float(venda.taxa_entrega or 0)
+        taxa_entrega_entregador = float(venda.valor_taxa_entregador or 0)
+        if taxa_entrega_entregador < 0:
+            taxa_entrega_entregador = 0.0
+        if taxa_entrega_entregador > taxa_entrega_total:
+            taxa_entrega_entregador = taxa_entrega_total
+
         # Calcular CUSTO TOTAL e SUBTOTAL dos produtos para rateio
         custo_total = 0
         subtotal_itens = 0
@@ -621,18 +631,21 @@ async def obter_relatorio_vendas(
 
             # RATEIO PROPORCIONAL de despesas
             desconto_rateado = float(venda.desconto_valor or 0) * percentual_item
-            taxa_entrega_rateada = float(venda.taxa_entrega or 0) * percentual_item
+            taxa_loja_rateada = taxa_entrega_total * percentual_item
+            taxa_entrega_entregador_rateada = taxa_entrega_entregador * percentual_item
             taxa_cartao_rateada = taxa_total * percentual_item
             comissao_rateada = comissao * percentual_item
-            imposto_rateado = subtotal_item * (impostos_percentual / 100.0)  # proporcional ao subtotal do item
+            # Imposto por item: base = venda bruta do item + taxa de entrega total rateada
+            imposto_rateado = (subtotal_item + taxa_loja_rateada) * (impostos_percentual / 100.0)
             taxa_operacional_rateada = taxa_operacional_entrega * percentual_item
             campanha_rateada = custo_campanha * percentual_item
 
-            # Valor líquido do item (mesma lógica da venda: bruta - todas as deduções exceto custo)
+            # Valor líquido do item (mesma lógica da venda: bruta + tx loja - deduções)
             valor_liquido_item = (
                 subtotal_item
+                + taxa_loja_rateada
                 - desconto_rateado
-                - taxa_entrega_rateada
+                - taxa_entrega_entregador_rateada
                 - taxa_operacional_rateada
                 - taxa_cartao_rateada
                 - comissao_rateada
@@ -655,8 +668,9 @@ async def obter_relatorio_vendas(
                 "quantidade": quantidade,
                 "preco_unitario": round(preco_unit, 2),
                 "venda_bruta": round(subtotal_item, 2),
+                "taxa_loja": round(taxa_loja_rateada, 2),
                 "desconto": round(desconto_rateado, 2),
-                "taxa_entrega": round(taxa_entrega_rateada, 2),
+                "taxa_entrega": round(taxa_entrega_entregador_rateada, 2),
                 "taxa_cartao": round(taxa_cartao_rateada, 2),
                 "comissao": round(comissao_rateada, 2),
                 "imposto": round(imposto_rateado, 2),
@@ -672,15 +686,17 @@ async def obter_relatorio_vendas(
             })
 
         # Calcular LÍQUIDA, LUCRO e MARGENS da venda (nível venda)
-        # Fórmula: líquida = bruta - desconto - entrega - operacional - cartão - comissão - imposto - campanha
+        # Fórmula: líquida = bruta + tx_loja - desconto - tx_entregador - operacional - cartão - comissão - imposto - campanha
         #          lucro   = líquida - custo
         venda_bruta_val = float(venda.subtotal) + float(venda.desconto_valor or 0)
         desconto_val = float(venda.desconto_valor or 0)
-        taxa_entrega_val = float(venda.taxa_entrega or 0)
-        imposto_total = float(venda.total) * (impostos_percentual / 100.0)
+        taxa_loja_val = taxa_entrega_total
+        taxa_entrega_val = taxa_entrega_entregador
+        imposto_total = (venda_bruta_val + taxa_loja_val) * (impostos_percentual / 100.0)
 
         venda_liquida_calc = (
             venda_bruta_val
+            + taxa_loja_val
             - desconto_val
             - taxa_entrega_val
             - taxa_operacional_entrega
@@ -707,8 +723,9 @@ async def obter_relatorio_vendas(
             "data_venda": venda.data_venda.isoformat(),
             "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
             "venda_bruta": round(float(venda.subtotal) + float(venda.desconto_valor or 0), 2),
+            "taxa_loja": round(taxa_loja_val, 2),
             "desconto": round(float(venda.desconto_valor or 0), 2),
-            "taxa_entrega": round(float(venda.taxa_entrega or 0), 2),
+            "taxa_entrega": round(taxa_entrega_val, 2),
             "taxa_cartao": round(taxa_total, 2),
             "comissao": round(comissao, 2),
             "imposto": round(imposto_total, 2),

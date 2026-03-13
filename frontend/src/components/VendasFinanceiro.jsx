@@ -1808,6 +1808,7 @@ export default function VendasFinanceiro() {
                   <th className="px-1 py-2 text-left">Código</th>
                   <th className="px-1 py-2 text-left">Cliente</th>
                   <th className="px-1 py-2 text-right">Venda Bruta</th>
+                  <th className="px-1 py-2 text-right">Tx Loja</th>
                   <th className="px-1 py-2 text-right">Desconto</th>
                   <th className="px-1 py-2 text-right">Tx. Entrega</th>
                   <th className="px-1 py-2 text-right">Tx. Operac.</th>
@@ -1851,6 +1852,12 @@ export default function VendasFinanceiro() {
                       <td className="px-1 py-2">{venda.cliente_nome}</td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
                         {formatarMoeda(venda.venda_bruta)}
+                      </td>
+                      <td
+                        className="px-1 py-2 text-right text-green-700 whitespace-nowrap"
+                        title="Taxa de entrega total cobrada do cliente"
+                      >
+                        +{formatarMoeda(venda.taxa_loja || 0)}
                       </td>
                       <td className="px-1 py-2 text-right text-red-600 whitespace-nowrap">
                         -{formatarMoeda(venda.desconto)}
@@ -1928,7 +1935,7 @@ export default function VendasFinanceiro() {
                       venda.itens &&
                       venda.itens.length > 0 && (
                         <tr key={`${venda.id}-detalhes`} className="bg-blue-50">
-                          <td colSpan="18" className="px-4 py-3">
+                          <td colSpan="19" className="px-4 py-3">
                             <div className="pl-8">
                               <div className="font-semibold text-gray-700 mb-2">
                                 Produtos desta venda:
@@ -1947,6 +1954,9 @@ export default function VendasFinanceiro() {
                                     </th>
                                     <th className="px-1 py-1 text-right">
                                       Venda Bruta
+                                    </th>
+                                    <th className="px-1 py-1 text-right">
+                                      Tx Loja
                                     </th>
                                     <th className="px-1 py-1 text-right">
                                       Desconto
@@ -2009,6 +2019,9 @@ export default function VendasFinanceiro() {
                                       </td>
                                       <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
                                         {formatarMoeda(item.venda_bruta)}
+                                      </td>
+                                      <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
+                                        +{formatarMoeda(item.taxa_loja || 0)}
                                       </td>
                                       <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
                                         -{formatarMoeda(item.desconto)}
