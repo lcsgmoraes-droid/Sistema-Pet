@@ -391,67 +391,17 @@ def get_nsu_status(
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
-    status_cfg = SefazService.status_configuracao(cfg)
 
     ultimo_nsu = cfg.get("ultimo_nsu", "000000000000000")
 
-    max_nsu = None
-    gap_estimado = None
-    erro_consulta = None
-
-    if status_cfg.enabled and cfg.get("modo") == "real" and status_cfg.cert_ok:
-        # Proteção 656: não chamar SEFAZ enquanto estiver em cooldown
-        proximo_str = cfg.get("_proximo_sync_permitido_at")
-        em_cooldown_656 = False
-        if proximo_str and cfg.get("_sync_bloqueado_656"):
-            try:
-                from datetime import timezone as _tz
-                from datetime import datetime as _dt
-                proximo_dt = _dt.fromisoformat(proximo_str)
-                if proximo_dt.tzinfo is None:
-                    proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
-                em_cooldown_656 = _dt.now(_tz.utc) < proximo_dt
-            except Exception:
-                pass
-
-        if not em_cooldown_656:
-            try:
-                # Faz uma chamada leve com o NSU atual só para capturar o maxNSU
-                resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=ultimo_nsu)
-                max_nsu = resultado.get("max_nsu")
-                novo_nsu = resultado.get("ultimo_nsu", ultimo_nsu)
-
-                # Salva docs se vieram
-                docs_lista = resultado.get("docs_list", [])
-                if docs_lista:
-                    from app.notas_entrada_routes import importar_docs_sefaz
-                    from app.db import SessionLocal as _SL
-                    _db = _SL()
-                    try:
-                        importar_docs_sefaz(docs_lista, str(tenant_id), _db)
-                    finally:
-                        _db.close()
-                    # Atualiza NSU
-                    cfg["ultimo_nsu"] = novo_nsu
-                    SefazTenantConfigService.save_config(tenant_id, cfg)
-                    ultimo_nsu = novo_nsu
-
-                if max_nsu and ultimo_nsu:
-                    try:
-                        gap_estimado = int(max_nsu) - int(ultimo_nsu)
-                    except ValueError:
-                        gap_estimado = None
-            except Exception as exc:
-                erro_consulta = str(exc)
-
     return {
         "ultimo_nsu": ultimo_nsu,
-        "max_nsu_sefaz": max_nsu,
-        "gap_documentos": gap_estimado,
+        "max_nsu_sefaz": None,
+        "gap_documentos": None,
         "documentos_por_lote": 50,
-        "lotes_restantes": (gap_estimado // 50 + 1) if gap_estimado and gap_estimado > 0 else 0,
-        "atualizado": max_nsu is not None,
-        "erro": erro_consulta,
+        "lotes_restantes": 0,
+        "atualizado": False,
+        "erro": None,
     }
 
 

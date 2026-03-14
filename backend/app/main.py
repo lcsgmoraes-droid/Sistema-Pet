@@ -378,9 +378,13 @@ def _loop_renovacao_token_bling():
 def _loop_sefaz_sync():
     """
     Job em background para sincronizar NF-e automaticamente via SEFAZ.
-    Roda a cada minuto e verifica quais tenants tem importacao_automatica=true.
-    Para cada um, verifica se o intervalo configurado ja passou e dispara o sync.
+    *** DESATIVADO TEMPORARIAMENTE — sincronização apenas via chamada manual. ***
+    Para reativar: remover o return logo abaixo.
     """
+    logger.info("[SEFAZ] Sincronização automática DESATIVADA — usando apenas modo manual.")
+    return
+
+    # --- CÓDIGO ABAIXO PRESERVADO PARA REATIVAÇÃO FUTURA ---
     import os as _os
     from datetime import datetime as _dt, timezone as _tz
     from pathlib import Path as _Path
