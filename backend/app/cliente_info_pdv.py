@@ -16,6 +16,7 @@ from app.models import User, Cliente, Pet
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
 from app.auth import get_current_user, get_current_user_and_tenant
+from app.veterinario_models import ExameVet
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
@@ -188,6 +189,7 @@ def get_cliente_info_pdv(
     ).all()
     
     pets_info = []
+    alertas_veterinarios = []
     for pet in pets:
         idade_anos = None
         if pet.data_nascimento:
@@ -196,6 +198,22 @@ def get_cliente_info_pdv(
             idade = datetime.now().date() - data_nasc
             idade_anos = idade.days // 365
         
+        alergias_lista = getattr(pet, "alergias_lista", None) or ([pet.alergias] if pet.alergias else [])
+        restricoes_lista = getattr(pet, "restricoes_alimentares_lista", None) or []
+        vacinas_vencidas = []
+        try:
+            from app.veterinario_routes import _status_vacinal_pet
+            status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
+            vacinas_vencidas = status_vacinal.get("vencidas", [])
+        except Exception:
+            status_vacinal = {"resumo": {"total_vencidas": 0, "total_pendentes": 0}}
+
+        exames_pendentes = db.query(ExameVet).filter(
+            ExameVet.pet_id == pet.id,
+            ExameVet.tenant_id == tenant_id,
+            ExameVet.status.in_(["solicitado", "aguardando", "disponivel"]),
+        ).count()
+
         pets_info.append({
             "id": pet.id,
             "nome": pet.nome,
@@ -203,8 +221,45 @@ def get_cliente_info_pdv(
             "raca": pet.raca,
             "peso": float(pet.peso) if pet.peso else None,
             "idade_anos": idade_anos,
-            "sexo": pet.sexo
+            "sexo": pet.sexo,
+            "alergias_lista": alergias_lista,
+            "restricoes_alimentares_lista": restricoes_lista,
+            "vacinas_vencidas": vacinas_vencidas,
+            "exames_pendentes": exames_pendentes,
         })
+
+        for alergia in alergias_lista:
+            alertas_veterinarios.append({
+                "pet_id": pet.id,
+                "pet_nome": pet.nome,
+                "tipo": "alergia",
+                "nivel": "critico",
+                "mensagem": f"{pet.nome}: alergia registrada em {alergia}.",
+            })
+        for restricao in restricoes_lista:
+            alertas_veterinarios.append({
+                "pet_id": pet.id,
+                "pet_nome": pet.nome,
+                "tipo": "restricao",
+                "nivel": "aviso",
+                "mensagem": f"{pet.nome}: restrição alimentar em {restricao}.",
+            })
+        for vacina in vacinas_vencidas:
+            alertas_veterinarios.append({
+                "pet_id": pet.id,
+                "pet_nome": pet.nome,
+                "tipo": "vacina_atrasada",
+                "nivel": "aviso",
+                "mensagem": f"{pet.nome}: vacina {vacina['nome']} atrasada há {vacina['dias_atraso']} dia(s).",
+            })
+        if exames_pendentes:
+            alertas_veterinarios.append({
+                "pet_id": pet.id,
+                "pet_nome": pet.nome,
+                "tipo": "exame_pendente",
+                "nivel": "info",
+                "mensagem": f"{pet.nome}: {exames_pendentes} exame(s) pendente(s) de revisão.",
+            })
     
     # ========== 3. ÚLTIMAS COMPRAS (5 mais recentes) ==========
     ultimas_vendas = sorted(vendas, key=lambda v: v.data_venda, reverse=True)[:5]
@@ -373,6 +428,7 @@ def get_cliente_info_pdv(
         },
         "resumo_financeiro": resumo_financeiro,
         "pets": pets_info,
+        "alertas_veterinarios": alertas_veterinarios[:12],
         "ultimas_compras": ultimas_compras,
         "oportunidades": oportunidades,
         "sugestoes": sugestoes,

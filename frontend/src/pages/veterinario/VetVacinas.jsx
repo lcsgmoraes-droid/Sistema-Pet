@@ -1,8 +1,39 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Syringe, Plus, AlertCircle, CheckCircle, Search, ChevronDown } from "lucide-react";
+import { Syringe, Plus, AlertCircle, CheckCircle, Search, ChevronDown, CalendarDays, RefreshCw } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+function adicionarDias(dataIso, dias) {
+  if (!dataIso || !dias) return "";
+  const data = new Date(`${dataIso}T12:00:00`);
+  data.setDate(data.getDate() + Number(dias));
+  return data.toISOString().slice(0, 10);
+}
+
+function sugerirProximaDose(protocolos, pets, form) {
+  if (!form.pet_id || !form.nome_vacina || !form.data_aplicacao) return null;
+
+  const pet = pets.find((item) => String(item.id) === String(form.pet_id));
+  const especiePet = (pet?.especie || "").toLowerCase();
+  const nomeVacina = form.nome_vacina.toLowerCase();
+
+  const protocolo = protocolos.find((item) => {
+    const nome = (item?.nome || "").toLowerCase();
+    const especie = (item?.especie || "").toLowerCase();
+    const especieCompativel = !especie || !especiePet || especiePet.includes(especie) || especie.includes(especiePet);
+    return especieCompativel && (nomeVacina.includes(nome) || nome.includes(nomeVacina));
+  });
+
+  if (!protocolo) return null;
+
+  const dias = protocolo.intervalo_doses_dias || (protocolo.reforco_anual ? 365 : null);
+  if (!dias) return { protocolo, proximaDose: "" };
+
+  return {
+    protocolo,
+    proximaDose: adicionarDias(form.data_aplicacao, dias),
+  };
+}
 
 function formatData(iso) {
   if (!iso) return "—";
@@ -26,16 +57,20 @@ function badgeProxDose(iso) {
 
 export default function VetVacinas() {
   const [searchParams] = useSearchParams();
-  const [aba, setAba] = useState("registros"); // "registros" | "vencendo"
+  const [aba, setAba] = useState("registros"); // "registros" | "vencendo" | "calendario"
   const [pessoaFiltro, setPessoaFiltro] = useState("");
   const [petSelecionado, setPetSelecionado] = useState("");
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
   const [vacinas, setVacinas] = useState([]);
   const [vacinasVencendo, setVacinasVencendo] = useState([]);
+  const [protocolos, setProtocolos] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [novaAberta, setNovaAberta] = useState(false);
+  const [calendario, setCalendario] = useState([]);
+  const [especieCalendario, setEspecieCalendario] = useState("");
+  const [carregandoCalendario, setCarregandoCalendario] = useState(false);
   const [form, setForm] = useState({
     pessoa_id: "",
     pet_id: "",
@@ -59,6 +94,9 @@ export default function VetVacinas() {
     vetApi.listarVeterinarios()
       .then((r) => setVeterinarios(Array.isArray(r.data) ? r.data : []))
       .catch(() => setVeterinarios([]));
+    vetApi.listarProtocolosVacinas()
+      .then((r) => setProtocolos(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setProtocolos([]));
     carregarVencendo();
   }, []);
 
@@ -150,6 +188,11 @@ export default function VetVacinas() {
     return pets.filter((p) => String(p.cliente_id) === String(pessoaFiltro) && p.ativo !== false);
   }, [pets, pessoaFiltro]);
 
+  const sugestaoDose = useMemo(
+    () => sugerirProximaDose(protocolos, pets, form),
+    [protocolos, pets, form]
+  );
+
   function set(campo, valor) { setForm((p) => ({ ...p, [campo]: valor })); }
 
   async function salvarVacina() {
@@ -163,7 +206,7 @@ export default function VetVacinas() {
         fabricante: form.fabricante || undefined,
         lote: form.lote || undefined,
         data_aplicacao: form.data_aplicacao,
-        data_proxima_dose: form.proxima_dose || undefined,
+        data_proxima_dose: form.proxima_dose || sugestaoDose?.proximaDose || undefined,
         veterinario_responsavel: form.veterinario_responsavel || undefined,
         observacoes: form.observacoes || undefined,
       });
@@ -205,6 +248,7 @@ export default function VetVacinas() {
         {[
           { id: "registros", label: "Por pet" },
           { id: "vencendo", label: `A vencer (${vacinasVencendo.length})` },
+          { id: "calendario", label: "Calendário Preventivo" },
         ].map((a) => (
           <button
             key={a.id}
@@ -376,6 +420,108 @@ export default function VetVacinas() {
         </div>
       )}
 
+      {/* ABA: Calendário preventivo */}
+      {aba === "calendario" && (
+        <div className="space-y-4">
+          {/* Filtro de espécie + botão carregar */}
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={especieCalendario}
+              onChange={(e) => setEspecieCalendario(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
+            >
+              <option value="">Todas as espécies</option>
+              <option value="cão">Cão</option>
+              <option value="gato">Gato</option>
+              <option value="coelho">Coelho</option>
+            </select>
+            <button
+              type="button"
+              onClick={async () => {
+                setCarregandoCalendario(true);
+                try {
+                  const res = await vetApi.calendarioPreventivo(especieCalendario || undefined);
+                  setCalendario(res.data?.items ?? []);
+                } catch {
+                  setCalendario([]);
+                } finally {
+                  setCarregandoCalendario(false);
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-60"
+              disabled={carregandoCalendario}
+            >
+              <RefreshCw size={14} className={carregandoCalendario ? "animate-spin" : ""} />
+              {carregandoCalendario ? "Carregando…" : "Carregar calendário"}
+            </button>
+          </div>
+
+          {calendario.length === 0 && !carregandoCalendario && (
+            <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
+              <CalendarDays size={36} className="mx-auto text-orange-200 mb-3" />
+              <p className="text-gray-400 text-sm">Clique em "Carregar calendário" para ver os protocolos preventivos por espécie.</p>
+            </div>
+          )}
+
+          {calendario.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Vacina / Protocolo</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Espécie</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Fase</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Idade mín.</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Reforço anual</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Observações</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Fonte</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {calendario.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-orange-50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-gray-800">{item.vacina}</td>
+                      <td className="px-4 py-3 text-gray-600 capitalize">{item.especie ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          item.fase === "filhote"
+                            ? "bg-blue-100 text-blue-700"
+                            : item.fase === "adulto"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-600"
+                        }`}>
+                          {item.fase ?? "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">
+                        {item.idade_semanas_min != null ? `${item.idade_semanas_min} sem.` : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.reforco_anual ? (
+                          <CheckCircle size={15} className="text-green-500" />
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{item.observacoes ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          item.fonte === "personalizado"
+                            ? "bg-violet-100 text-violet-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}>
+                          {item.fonte === "personalizado" ? "Personalizado" : "Padrão"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Modal nova vacina */}
       {novaAberta && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -409,6 +555,28 @@ export default function VetVacinas() {
                   {petsDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
                 </select>
               </div>
+
+              {sugestaoDose?.protocolo && (
+                <div className="md:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm">
+                  <p className="font-semibold text-emerald-800">Sugestão automática de protocolo</p>
+                  <p className="text-emerald-700 mt-1">
+                    Protocolo encontrado: {sugestaoDose.protocolo.nome}
+                    {sugestaoDose.protocolo.especie ? ` • ${sugestaoDose.protocolo.especie}` : ""}
+                  </p>
+                  <p className="text-emerald-700 mt-1">
+                    Próxima dose sugerida: {sugestaoDose.proximaDose ? formatData(sugestaoDose.proximaDose) : "sem cálculo automático"}
+                  </p>
+                  {sugestaoDose.proximaDose && !form.proxima_dose && (
+                    <button
+                      type="button"
+                      onClick={() => set("proxima_dose", sugestaoDose.proximaDose)}
+                      className="mt-2 inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                    >
+                      Usar esta sugestão
+                    </button>
+                  )}
+                </div>
+              )}
               {/* Vacina */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Nome da vacina *</label>

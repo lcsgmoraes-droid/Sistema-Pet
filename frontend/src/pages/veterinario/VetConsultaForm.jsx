@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Stethoscope,
@@ -9,9 +9,13 @@ import {
   X,
   Lock,
   Calculator,
+  MessageSquare,
+  Send,
+  Bot,
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 
 // ---------- helpers ----------
 function campo(label, obrigatorio = false) {
@@ -24,6 +28,26 @@ function campo(label, obrigatorio = false) {
         {children}
       </div>
     );
+  };
+}
+
+function toNumber(value) {
+  if (value == null || value === "") return 0;
+  return Number(String(value).replace(",", ".")) || 0;
+}
+
+function obterResumoProcedimentoSelecionado(item, catalogos) {
+  const catalogo = catalogos.find((proc) => String(proc.id) === String(item.catalogo_id));
+  const valorCobrado = toNumber(item.valor || catalogo?.valor_padrao || 0);
+  const custoTotal = toNumber(catalogo?.custo_estimado || 0);
+  const margemValor = valorCobrado - custoTotal;
+  const margemPercentual = valorCobrado > 0 ? (margemValor / valorCobrado) * 100 : 0;
+  return {
+    possuiCatalogo: Boolean(catalogo),
+    valorCobrado,
+    custoTotal,
+    margemValor,
+    margemPercentual,
   };
 }
 
@@ -56,11 +80,17 @@ export default function VetConsultaForm() {
   const [assinatura, setAssinatura] = useState(null);
   const [baixandoPdf, setBaixandoPdf] = useState(false);
   const modoSomenteLeitura = isEdicao && finalizado;
+  const tituloConsulta = modoSomenteLeitura
+    ? "Consulta finalizada (somente visualização)"
+    : isEdicao
+      ? "Continuar consulta"
+      : "Nova consulta";
 
   // listas externas
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
   const [medicamentosCatalogo, setMedicamentosCatalogo] = useState([]);
+  const [procedimentosCatalogo, setProcedimentosCatalogo] = useState([]);
   const [buscaTutor, setBuscaTutor] = useState("");
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
@@ -92,7 +122,11 @@ export default function VetConsultaForm() {
     retorno_em_dias: "",
     // Prescrição
     prescricao_itens: [], // [{nome, principio, dose_mg, frequencia, duracao}]
+    procedimentos_realizados: [],
   });
+  const rotaCalculadora = form.pet_id
+    ? `/veterinario/calculadora-doses?pet_id=${form.pet_id}`
+    : "/veterinario/calculadora-doses";
 
   // Carrega dados ao editar
   useEffect(() => {
@@ -151,6 +185,10 @@ export default function VetConsultaForm() {
     vetApi
       .listarMedicamentos()
       .then((r) => setMedicamentosCatalogo(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
+      .catch(() => {});
+    vetApi
+      .listarCatalogoProcedimentos()
+      .then((r) => setProcedimentosCatalogo(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
       .catch(() => {});
   }, []);
 
@@ -398,6 +436,22 @@ export default function VetConsultaForm() {
           itens: itensPrescricao,
         });
       }
+
+      if (form.procedimentos_realizados.length > 0) {
+        const procedimentosValidos = form.procedimentos_realizados.filter((item) => item.nome?.trim());
+        for (const procedimento of procedimentosValidos) {
+          await vetApi.adicionarProcedimento({
+            consulta_id: consultaIdAtual,
+            catalogo_id: procedimento.catalogo_id ? Number.parseInt(procedimento.catalogo_id) : undefined,
+            nome: procedimento.nome,
+            descricao: procedimento.descricao || undefined,
+            valor: procedimento.valor ? Number(String(procedimento.valor).replace(",", ".")) : undefined,
+            observacoes: procedimento.observacoes || undefined,
+            realizado: true,
+            baixar_estoque: procedimento.baixar_estoque !== false,
+          });
+        }
+      }
       // finaliza (gera hash)
       await vetApi.finalizarConsulta(consultaIdAtual);
       setFinalizado(true);
@@ -429,6 +483,53 @@ export default function VetConsultaForm() {
         },
       ],
     }));
+  }
+
+  function adicionarProcedimento() {
+    setForm((prev) => ({
+      ...prev,
+      procedimentos_realizados: [
+        ...prev.procedimentos_realizados,
+        {
+          catalogo_id: "",
+          nome: "",
+          descricao: "",
+          valor: "",
+          observacoes: "",
+          baixar_estoque: true,
+        },
+      ],
+    }));
+  }
+
+  function removerProcedimento(idx) {
+    setForm((prev) => ({
+      ...prev,
+      procedimentos_realizados: prev.procedimentos_realizados.filter((_, i) => i !== idx),
+    }));
+  }
+
+  function setProcedimentoItem(idx, campo, valor) {
+    setForm((prev) => {
+      const itens = [...prev.procedimentos_realizados];
+      itens[idx] = { ...itens[idx], [campo]: valor };
+      return { ...prev, procedimentos_realizados: itens };
+    });
+  }
+
+  function selecionarProcedimentoCatalogo(idx, catalogoId) {
+    const procedimento = procedimentosCatalogo.find((item) => String(item.id) === String(catalogoId));
+    setForm((prev) => {
+      const itens = [...prev.procedimentos_realizados];
+      itens[idx] = {
+        ...itens[idx],
+        catalogo_id: catalogoId,
+        nome: procedimento?.nome || itens[idx].nome,
+        descricao: procedimento?.descricao || "",
+        valor: procedimento?.valor_padrao != null ? String(procedimento.valor_padrao) : itens[idx].valor,
+      };
+      return { ...prev, procedimentos_realizados: itens };
+    });
   }
 
   function removerItem(idx) {
@@ -612,16 +713,26 @@ export default function VetConsultaForm() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-blue-100 rounded-xl">
-          <Stethoscope size={22} className="text-blue-600" />
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-xl">
+            <Stethoscope size={22} className="text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">
+              {tituloConsulta}
+            </h1>
+            <p className="text-xs text-gray-400">{consultaIdAtual ? `ID: ${String(consultaIdAtual).slice(0, 8)}…` : "Ainda não salva"}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">
-            {modoSomenteLeitura ? "Consulta finalizada (somente visualização)" : isEdicao ? "Continuar consulta" : "Nova consulta"}
-          </h1>
-          <p className="text-xs text-gray-400">{consultaIdAtual ? `ID: ${String(consultaIdAtual).slice(0, 8)}…` : "Ainda não salva"}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => navigate(rotaCalculadora)}
+          className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
+        >
+          <Calculator size={16} />
+          Calculadora livre
+        </button>
       </div>
 
       {modoSomenteLeitura && (
@@ -878,26 +989,31 @@ export default function VetConsultaForm() {
 
       {/* =========== ETAPA 2: EXAME CLÍNICO =========== */}
       {etapa === 1 && (
-        <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
-          <h2 className="font-semibold text-gray-700">Exame clínico</h2>
-          {campo("Histórico clínico")(
-            <textarea
-              value={form.historico_clinico}
-              onChange={(e) => set("historico_clinico", e.target.value)}
-              className={css.textarea}
-              placeholder="Histórico médico, cirurgias anteriores, medicações em uso…"
-            />
-          )}
-          {campo("Exame físico detalhado")(
-            <textarea
-              value={form.exame_fisico}
-              onChange={(e) => set("exame_fisico", e.target.value)}
-              className={css.textarea}
-              style={{ minHeight: 200 }}
-              placeholder="Descrição sistemática: cabeça, tórax, abdômen, membros, pele…"
-            />
-          )}
-        </fieldset>
+        <>
+          <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
+            <h2 className="font-semibold text-gray-700">Exame clínico</h2>
+            {campo("Histórico clínico")(
+              <textarea
+                value={form.historico_clinico}
+                onChange={(e) => set("historico_clinico", e.target.value)}
+                className={css.textarea}
+                placeholder="Histórico médico, cirurgias anteriores, medicações em uso…"
+              />
+            )}
+            {campo("Exame físico detalhado")(
+              <textarea
+                value={form.exame_fisico}
+                onChange={(e) => set("exame_fisico", e.target.value)}
+                className={css.textarea}
+                style={{ minHeight: 200 }}
+                placeholder="Descrição sistemática: cabeça, tórax, abdômen, membros, pele…"
+              />
+            )}
+          </fieldset>
+
+          {/* Painel chat IA de exames */}
+          <ExameChatIA petId={form.pet_id} />
+        </>
       )}
 
       {/* =========== ETAPA 3: DIAGNÓSTICO =========== */}
@@ -992,6 +1108,67 @@ export default function VetConsultaForm() {
               </div>
             ))}
           </fieldset>
+
+          <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-gray-700">Procedimentos realizados</h2>
+              <button onClick={adicionarProcedimento} className="text-xs text-blue-600 hover:text-blue-800 underline">
+                + Adicionar procedimento
+              </button>
+            </div>
+            {form.procedimentos_realizados.length === 0 && (
+              <p className="text-xs text-gray-400">Nenhum procedimento lançado ainda.</p>
+            )}
+            {form.procedimentos_realizados.map((item, idx) => (
+              <div key={`procedimento_${idx}`} className="border border-gray-100 rounded-lg p-3 space-y-2 relative">
+                <button onClick={() => removerProcedimento(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-400">
+                  <X size={14} />
+                </button>
+                {(() => {
+                  const resumo = obterResumoProcedimentoSelecionado(item, procedimentosCatalogo);
+                  return (
+                    <>
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={item.catalogo_id || ""} onChange={(e) => selecionarProcedimentoCatalogo(idx, e.target.value)} className={css.select}>
+                    <option value="">Selecionar do catálogo…</option>
+                    {procedimentosCatalogo.map((proc) => (
+                      <option key={proc.id} value={proc.id}>{proc.nome}</option>
+                    ))}
+                  </select>
+                  <input type="text" placeholder="Nome do procedimento" value={item.nome} onChange={(e) => setProcedimentoItem(idx, "nome", e.target.value)} className={css.input} />
+                  <input type="text" placeholder="Descrição" value={item.descricao} onChange={(e) => setProcedimentoItem(idx, "descricao", e.target.value)} className={css.input} />
+                  <input type="text" placeholder="Valor" value={item.valor} onChange={(e) => setProcedimentoItem(idx, "valor", e.target.value)} className={css.input} />
+                </div>
+                <input type="text" placeholder="Observações" value={item.observacoes} onChange={(e) => setProcedimentoItem(idx, "observacoes", e.target.value)} className={css.input} />
+                {resumo.possuiCatalogo && (
+                  <div className="grid grid-cols-3 gap-2 rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Cobrado</p>
+                      <p className="text-sm font-semibold text-gray-800">{formatMoneyBRL(resumo.valorCobrado)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Custo est.</p>
+                      <p className="text-sm font-semibold text-amber-700">{formatMoneyBRL(resumo.custoTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-400">Margem est.</p>
+                      <p className={`text-sm font-semibold ${resumo.margemValor < 0 ? "text-red-600" : "text-emerald-700"}`}>
+                        {formatMoneyBRL(resumo.margemValor)}
+                      </p>
+                      <p className="text-[11px] text-gray-400">{formatPercent(resumo.margemPercentual)}</p>
+                    </div>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input type="checkbox" checked={item.baixar_estoque !== false} onChange={(e) => setProcedimentoItem(idx, "baixar_estoque", e.target.checked)} />
+                  Baixar estoque automático dos insumos vinculados
+                </label>
+                    </>
+                  );
+                })()}
+              </div>
+            ))}
+          </fieldset>
         </div>
       )}
 
@@ -1061,4 +1238,166 @@ export default function VetConsultaForm() {
   );
 }
 
+// ---------- Componente ExameChatIA ----------
+function ExameChatIA({ petId }) {
+  const [expandido, setExpandido] = useState(false);
+  const [exames, setExames] = useState([]);
+  const [exameId, setExameId] = useState("");
+  const [pergunta, setPergunta] = useState("");
+  const [historico, setHistorico] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const chatFimRef = useRef(null);
+
+  useEffect(() => {
+    if (!petId) return;
+    vetApi
+      .listarExamesPet(petId)
+      .then((r) => setExames(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
+      .catch(() => {});
+  }, [petId]);
+
+  useEffect(() => {
+    chatFimRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [historico]);
+
+  async function enviar() {
+    if (!exameId || !pergunta.trim() || carregando) return;
+    const perg = pergunta.trim();
+    setHistorico((h) => [...h, { role: "user", text: perg }]);
+    setPergunta("");
+    setCarregando(true);
+    try {
+      const res = await vetApi.chatExameIA(Number(exameId), perg);
+      setHistorico((h) => [...h, { role: "ia", text: res.data.resposta }]);
+    } catch {
+      setHistorico((h) => [...h, { role: "ia", text: "Erro ao consultar a IA. Tente novamente." }]);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      enviar();
+    }
+  }
+
+  return (
+    <div className="bg-indigo-50 border border-indigo-200 rounded-xl overflow-hidden">
+      {/* Cabeçalho clicável */}
+      <button
+        type="button"
+        onClick={() => setExpandido((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-indigo-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Bot size={18} className="text-indigo-500" />
+          <span className="text-sm font-semibold text-indigo-800">Consultor IA de exames</span>
+          {exames.length > 0 && (
+            <span className="text-xs bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">
+              {exames.length} exame{exames.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-indigo-500">{expandido ? "▲ fechar" : "▼ abrir"}</span>
+      </button>
+
+      {expandido && (
+        <div className="px-4 pb-4 space-y-3">
+          {!petId ? (
+            <p className="text-xs text-indigo-500 italic">Selecione o pet para carregar os exames.</p>
+          ) : exames.length === 0 ? (
+            <p className="text-xs text-indigo-500 italic">Nenhum exame encontrado para este pet ainda.</p>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-indigo-700 mb-1">Exame para consultar</label>
+                <select
+                  value={exameId}
+                  onChange={(e) => { setExameId(e.target.value); setHistorico([]); }}
+                  className="w-full border border-indigo-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Selecione um exame…</option>
+                  {exames.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.nome || ex.tipo || `Exame #${ex.id}`}
+                      {ex.data_solicitacao ? ` — ${ex.data_solicitacao}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {exameId && (
+                <>
+                  {/* Histórico do chat */}
+                  {historico.length > 0 && (
+                    <div className="max-h-56 overflow-y-auto space-y-2 bg-white border border-indigo-100 rounded-lg p-3">
+                      {historico.map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`flex ${
+                            msg.role === "user" ? "justify-end" : "justify-start"
+                          }`}
+                        >
+                          <div
+                            className={`max-w-[85%] px-3 py-2 rounded-xl text-sm ${
+                              msg.role === "user"
+                                ? "bg-indigo-600 text-white rounded-br-none"
+                                : "bg-gray-100 text-gray-800 rounded-bl-none"
+                            }`}
+                          >
+                            {msg.role === "ia" && (
+                              <span className="text-xs font-semibold text-indigo-500 block mb-0.5">IA</span>
+                            )}
+                            {msg.text}
+                          </div>
+                        </div>
+                      ))}
+                      {carregando && (
+                        <div className="flex justify-start">
+                          <div className="bg-gray-100 text-gray-500 px-3 py-2 rounded-xl text-sm rounded-bl-none animate-pulse">
+                            Analisando…
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatFimRef} />
+                    </div>
+                  )}
+
+                  {historico.length === 0 && (
+                    <p className="text-xs text-indigo-400 italic">
+                      Faça uma pergunta sobre o exame selecionado (ex: "Há algum alerta?", "Qual o próximo passo?").
+                    </p>
+                  )}
+
+                  {/* Input de pergunta */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={pergunta}
+                      onChange={(e) => setPergunta(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Digite sua pergunta sobre o exame…"
+                      disabled={carregando}
+                      className="flex-1 border border-indigo-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={enviar}
+                      disabled={!pergunta.trim() || carregando}
+                      className="flex items-center gap-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Send size={14} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 

@@ -299,6 +299,10 @@ class ExameVet(BaseTenantModel):
     resultado_json = Column(JSON, nullable=True)             # valores estruturados
     interpretacao = Column(Text, nullable=True)              # interpretação do vet
     interpretacao_ia = Column(Text, nullable=True)           # sugestão da IA
+    interpretacao_ia_resumo = Column(Text, nullable=True)
+    interpretacao_ia_confianca = Column(Float, nullable=True)
+    interpretacao_ia_alertas = Column(JSON, nullable=True)
+    interpretacao_ia_payload = Column(JSON, nullable=True)
 
     # Arquivo/imagem do resultado
     arquivo_url = Column(String(500), nullable=True)
@@ -326,6 +330,7 @@ class CatalogoProcedimento(BaseTenantModel):
     duracao_minutos = Column(Integer, nullable=True)
     requer_anestesia = Column(Boolean, default=False)
     observacoes = Column(Text, nullable=True)
+    insumos = Column(JSON, nullable=True)
     ativo = Column(Boolean, default=True, nullable=False)
 
 
@@ -343,6 +348,9 @@ class ProcedimentoConsulta(BaseTenantModel):
     realizado = Column(Boolean, default=True)
 
     observacoes = Column(Text, nullable=True)
+    insumos = Column(JSON, nullable=True)
+    estoque_baixado = Column(Boolean, default=False, nullable=False)
+    estoque_movimentacao_ids = Column(JSON, nullable=True)
 
     # Relacionamentos
     consulta = relationship("ConsultaVet", back_populates="procedimentos")

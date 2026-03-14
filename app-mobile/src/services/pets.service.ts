@@ -1,5 +1,5 @@
 import api from './api';
-import { Pet, PetFormData, CalculadoraInput, CalculadoraResultado } from '../types';
+import { Pet, PetFormData, CalculadoraInput, CalculadoraResultado, PetCarteirinha, PushStatus } from '../types';
 import { API_BASE_URL } from '../config';
 
 function resolveUrl(url: string | null | undefined): string | null {
@@ -51,6 +51,23 @@ export async function uploadFotoPet(petId: number, localUri: string): Promise<Pe
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return mapPet(data);
+}
+
+export async function obterCarteirinhaPet(petId: number): Promise<PetCarteirinha> {
+  const { data } = await api.get<PetCarteirinha>(`/app/pets/${petId}/carteirinha`);
+  return {
+    ...data,
+    pet: mapPet(data.pet),
+    exames: (data.exames || []).map((item) => ({
+      ...item,
+      arquivo_url: resolveUrl(item.arquivo_url),
+    })),
+  };
+}
+
+export async function obterStatusPush(): Promise<PushStatus> {
+  const { data } = await api.get<PushStatus>('/app/push-status');
+  return data;
 }
 
 // ─────────────────────────────────────────────────────────────

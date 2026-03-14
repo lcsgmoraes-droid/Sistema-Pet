@@ -383,6 +383,21 @@ const Layout = () => {
           permission: null,
         },
         {
+          path: "/veterinario/exames",
+          label: "Exames Anexados",
+          permission: null,
+        },
+        {
+          path: "/veterinario/ia",
+          label: "Assistente IA Vet",
+          permission: null,
+        },
+        {
+          path: "/veterinario/calculadora-doses",
+          label: "Calculadora de Doses",
+          permission: null,
+        },
+        {
           path: "/veterinario/vacinas",
           label: "Vacinas",
           permission: null,
@@ -395,6 +410,11 @@ const Layout = () => {
         {
           path: "/veterinario/catalogo",
           label: "Catálogos",
+          permission: null,
+        },
+        {
+          path: "/veterinario/repasse",
+          label: "Repasse Parceiro",
           permission: null,
         },
         {

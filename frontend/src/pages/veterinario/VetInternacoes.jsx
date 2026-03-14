@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { BedDouble, Plus, Activity, ArrowUpCircle, AlertCircle, Clock, Map as MapIcon, List, LayoutGrid, BellRing, Trash2, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 
@@ -15,6 +16,18 @@ function formatDateTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function montarSerieEvolucao(registros = []) {
+  return registros
+    .filter((item) => item?.data_hora)
+    .map((item) => ({
+      horario: new Date(item.data_hora).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+      temperatura: item.temperatura ?? null,
+      fc: item.freq_cardiaca ?? null,
+      fr: item.freq_respiratoria ?? null,
+      peso: item.peso ?? null,
+    }));
 }
 
 const STATUS_CORES = {
@@ -733,6 +746,30 @@ export default function VetInternacoes() {
 
                     {aberta && (
                       <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
+                        {(() => {
+                          const serie = montarSerieEvolucao(evolucoes[intern.id] ?? []);
+                          if (serie.length < 2) return null;
+                          return (
+                            <div className="mb-4 rounded-xl border border-blue-100 bg-white p-4">
+                              <p className="text-xs font-semibold text-gray-500 mb-3">Curva de evolução</p>
+                              <ResponsiveContainer width="100%" height={240}>
+                                <LineChart data={serie}>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                  <XAxis dataKey="horario" tick={{ fontSize: 11 }} />
+                                  <YAxis yAxisId="vital" tick={{ fontSize: 11 }} />
+                                  <YAxis yAxisId="peso" orientation="right" tick={{ fontSize: 11 }} />
+                                  <Tooltip />
+                                  <Legend />
+                                  <Line yAxisId="vital" type="monotone" dataKey="temperatura" name="Temperatura" stroke="#ef4444" strokeWidth={2} dot={false} connectNulls />
+                                  <Line yAxisId="vital" type="monotone" dataKey="fc" name="FC" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
+                                  <Line yAxisId="vital" type="monotone" dataKey="fr" name="FR" stroke="#14b8a6" strokeWidth={2} dot={false} connectNulls />
+                                  <Line yAxisId="peso" type="monotone" dataKey="peso" name="Peso" stroke="#7c3aed" strokeWidth={2} dot={false} connectNulls />
+                                </LineChart>
+                              </ResponsiveContainer>
+                            </div>
+                          );
+                        })()}
+
                         {(intern.observacoes_alta || intern.observacoes) && (
                           <div className="mb-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                             <p className="text-xs font-semibold text-green-700 mb-1">Observação da alta</p>

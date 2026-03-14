@@ -67,7 +67,7 @@ export default function PetListScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => navigation.navigate('FormPet', { pet: item })}
+        onPress={() => navigation.navigate('DetalhePet', { pet: item })}
       >
         {item.foto_url ? (
           <Image source={{ uri: item.foto_url }} style={styles.foto} />
@@ -90,6 +90,12 @@ export default function PetListScreen() {
           )}
         </View>
         <View style={styles.acoes}>
+          <TouchableOpacity
+            style={styles.botaoCalculadora}
+            onPress={() => navigation.navigate('FormPet', { pet: item })}
+          >
+            <Ionicons name="create-outline" size={20} color={CORES.primario} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.botaoCalculadora}
             onPress={() => navigation.navigate('CalculadoraRacao', { pet: item })}

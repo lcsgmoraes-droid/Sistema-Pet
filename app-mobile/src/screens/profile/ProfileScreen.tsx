@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../store/auth.store';
 import { updateProfile } from '../../services/auth.service';
+import { obterStatusPush } from '../../services/pets.service';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { PONTOS } from '../../config';
 import { formatarMoeda } from '../../utils/format';
@@ -36,6 +37,11 @@ export default function ProfileScreen() {
   const [buscandoCep, setBuscandoCep] = useState(false);
 
   const [salvando, setSalvando] = useState(false);
+  const [pushStatus, setPushStatus] = useState<any>(null);
+
+  useEffect(() => {
+    obterStatusPush().then(setPushStatus).catch(() => setPushStatus(null));
+  }, []);
 
   const pontos = user?.pontos ?? 0;
   const valorPontos = (pontos / 100) * PONTOS.REAIS_POR_100_PONTOS;
@@ -305,6 +311,14 @@ export default function ProfileScreen() {
           <MenuItem emoji="🩺" titulo="Consultas veterinárias" em_breve />
           <MenuItem emoji="📋" titulo="Resultado de exames" em_breve />
           <MenuItem emoji="💉" titulo="Carteirinha de vacinas" em_breve />
+        </View>
+
+        <View style={styles.secao}>
+          <Text style={styles.secaoTitulo}>🔔 Status do push</Text>
+          <InfoRow label="Token registrado" valor={pushStatus?.token_registrado ? 'Sim' : 'Não'} />
+          <InfoRow label="Lembretes pendentes" valor={String(pushStatus?.pendencias?.length ?? 0)} />
+          <InfoRow label="Próximos agendamentos" valor={String(pushStatus?.proximos_agendamentos?.length ?? 0)} />
+          <Text style={styles.enderecoVazio}>{pushStatus?.observacao || 'Sem diagnóstico disponível no momento.'}</Text>
         </View>
 
         {/* Sair */}

@@ -15,6 +15,7 @@ import HomeScreen from "../screens/HomeScreen";
 import OrdersScreen from "../screens/orders/OrdersScreen";
 import TrackDeliveryScreen from "../screens/orders/TrackDeliveryScreen";
 import FoodCalculatorScreen from "../screens/pets/FoodCalculatorScreen";
+import PetDetailScreen from "../screens/pets/PetDetailScreen";
 import PetFormScreen from "../screens/pets/PetFormScreen";
 import PetListScreen from "../screens/pets/PetListScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
@@ -71,6 +72,11 @@ function PetsNavigator() {
         options={({ route }: any) => ({
           title: route.params?.pet ? "Editar Pet" : "Novo Pet",
         })}
+      />
+      <PetsStack.Screen
+        name="DetalhePet"
+        component={PetDetailScreen}
+        options={{ title: "Carteirinha do Pet" }}
       />
       <PetsStack.Screen
         name="CalculadoraRacao"

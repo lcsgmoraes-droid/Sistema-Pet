@@ -48,8 +48,70 @@ export interface Pet {
   cor?: string | null;
   porte?: string | null; // mini, pequeno, médio, grande, gigante
   alergias?: string | null;
+  alergias_lista?: string[];
   observacoes?: string | null;
+  restricoes_alimentares_lista?: string[];
+  condicoes_cronicas_lista?: string[];
+  medicamentos_continuos_lista?: string[];
+  tipo_sanguineo?: string | null;
   foto_url?: string | null;
+}
+
+export interface PetAlerta {
+  tipo: string;
+  nivel: string;
+  mensagem: string;
+}
+
+export interface VacinaCarteirinha {
+  id: number;
+  nome: string;
+  data_aplicacao?: string | null;
+  data_proxima_dose?: string | null;
+  numero_dose?: number | null;
+  lote?: string | null;
+  fabricante?: string | null;
+  status?: string | null;
+}
+
+export interface PetCarteirinha {
+  pet: Pet;
+  alertas: PetAlerta[];
+  status_vacinal: {
+    carteira: VacinaCarteirinha[];
+    pendentes: { nome: string; motivo?: string | null }[];
+    vencidas: { nome: string; data_proxima_dose?: string | null; dias_atraso?: number | null }[];
+    resumo: {
+      total_aplicadas: number;
+      total_pendentes: number;
+      total_vencidas: number;
+    };
+  };
+  consultas: {
+    id: number;
+    data?: string | null;
+    tipo?: string | null;
+    status?: string | null;
+    diagnostico?: string | null;
+    observacoes_tutor?: string | null;
+  }[];
+  exames: {
+    id: number;
+    nome: string;
+    tipo?: string | null;
+    status?: string | null;
+    data_resultado?: string | null;
+    interpretacao_ia_resumo?: string | null;
+    arquivo_url?: string | null;
+  }[];
+}
+
+export interface PushStatus {
+  token_registrado: boolean;
+  push_token_preview?: string | null;
+  pendencias: { id: number; assunto?: string | null; mensagem?: string | null; scheduled_at?: string | null }[];
+  proximos_agendamentos: { id: number; pet_id: number; data_hora?: string | null; tipo?: string | null; status?: string | null }[];
+  observacao?: string | null;
 }
 
 export interface PetFormData {
@@ -174,4 +236,5 @@ export type PetsStackParamList = {
   ListaPets: undefined;
   FormPet: { pet?: Pet };
   CalculadoraRacao: { pet?: Pet };
+  DetalhePet: { pet: Pet };
 };

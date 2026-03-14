@@ -49,8 +49,12 @@ const VetConsultas = lazy(() => import("./pages/veterinario/VetConsultas"));
 const VetConsultaForm = lazy(() => import("./pages/veterinario/VetConsultaForm"));
 const VetVacinas = lazy(() => import("./pages/veterinario/VetVacinas"));
 const VetInternacoes = lazy(() => import("./pages/veterinario/VetInternacoes"));
+const VetCalculadoraDoses = lazy(() => import("./pages/veterinario/VetCalculadoraDoses"));
 const VetCatalogo = lazy(() => import("./pages/veterinario/VetCatalogo"));
 const VetConfiguracoes = lazy(() => import("./pages/veterinario/VetConfiguracoes"));
+const VetRepasse = lazy(() => import("./pages/veterinario/VetRepasse"));
+const VetExamesAnexados = lazy(() => import("./pages/veterinario/VetExamesAnexados"));
+const VetAssistenteIA = lazy(() => import("./pages/veterinario/VetAssistenteIA"));
 
 const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
@@ -335,10 +339,14 @@ function App() {
                   <Route path="veterinario/consultas" element={<VetConsultas />} />
                   <Route path="veterinario/consultas/nova" element={<VetConsultaForm />} />
                   <Route path="veterinario/consultas/:consultaId" element={<VetConsultaForm />} />
+                  <Route path="veterinario/exames" element={<VetExamesAnexados />} />
+                  <Route path="veterinario/ia" element={<VetAssistenteIA />} />
+                  <Route path="veterinario/calculadora-doses" element={<VetCalculadoraDoses />} />
                   <Route path="veterinario/vacinas" element={<VetVacinas />} />
                   <Route path="veterinario/internacoes" element={<VetInternacoes />} />
                   <Route path="veterinario/catalogo" element={<VetCatalogo />} />
                   <Route path="veterinario/configuracoes" element={<VetConfiguracoes />} />
+                  <Route path="veterinario/repasse" element={<VetRepasse />} />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS

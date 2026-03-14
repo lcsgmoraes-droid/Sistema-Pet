@@ -1,7 +1,26 @@
 # Planejamento — Módulo Veterinário (Sistema Pet)
 
-> **Versão:** 2.2 — Março 2026  
-> **Status:** Em desenvolvimento — Fase 1 e 2 parcialmente implementadas (com correções recentes de estabilidade em Agenda e Dashboard)
+> **Versão:** 2.6 — Março 2026  
+> **Status:** Em desenvolvimento — Fase 1 e 2 avançadas, com base clínica do Pet expandida, carteirinha digital no app, alertas já conectados ao operacional e financeiro automático de procedimentos já integrado
+
+---
+
+## Atualização desta entrega (feito x falta)
+
+### Feito agora
+- Assistente IA veterinário conectado ao provedor real com prioridade e fallback seguro para resposta local quando não houver chave/serviço.
+- Reuso das mesmas variáveis de ambiente já usadas no PDV (`GROQ_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`).
+- Memória de conversas da IA veterinária ativa com persistência de `modelo_usado` no histórico.
+- Script idempotente criado para popular base veterinária por tenant: materiais, medicamentos, protocolos vacinais e catálogo de procedimentos com insumos.
+- Opção de lançamentos de teste criada no seed (`--with-test-launches`) para validar fluxo completo em DEV.
+- Seed validado após correção de UUID: execução concluída com sucesso, sem duplicação na segunda execução.
+
+### Falta (próximos passos)
+- Separar formalmente seed de produção (somente base) de seed de teste (somente DEV), para evitar risco operacional.
+- Definir mecanismo oficial de atualização de catálogo veterinário em produção (versão do seed + rotina de execução controlada).
+- Homologar ponta a ponta em ambiente real com usuário autenticado: `/vet/ia/assistente`, `/vet/ia/memoria-status` e `/vet/ia/conversas`.
+- Implementar trilha de aprendizado contínuo com curadoria (feedback -> revisão -> atualização de prompt/base), sem autoaprendizado cego em produção.
+- Executar fluxo de release/deploy apenas após autorização explícita do Lucas.
 
 ---
 
@@ -14,21 +33,24 @@
 |---|---|---|
 | 15 tabelas `vet_*` criadas no banco (DEV) | ✅ | Migração `v1a2b3c4d5e6` aplicada |
 | Backend: `veterinario_models.py` | ✅ | Todos os modelos SQLAlchemy |
-| Backend: `veterinario_routes.py` | ✅ | Rotas CRUD em `/vet` + dashboard avançado, relatório clínico e validação de assinatura de prontuário |
+| Backend: `veterinario_routes.py` | ✅ | Rotas CRUD em `/vet` + dashboard avançado, relatório clínico, validação de assinatura de prontuário e endpoints de IA com memória persistente |
 | Backend: router registrado em `main.py` | ✅ | `/vet/*` respondendo `403` (auth OK) |
 | Migrações intermediárias corrigidas | ✅ | `60a7b78b30b8` stamped + 3 corrigidas |
 
 ### Frontend — Telas criadas
 | Tela | Status | Observação |
 |---|---|---|
-| `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` + KPIs avançados (retornos pendentes, taxa de retorno 30d, tempo médio) + exportação CSV de relatório clínico |
+| `VetDashboard.jsx` — painel com KPIs e agenda do dia | ✅ | Integrado com `/vet/dashboard` + KPIs avançados (retornos pendentes, taxa de retorno 30d, tempo médio) + exportação CSV de relatório clínico + resumo financeiro de procedimentos (faturamento, custo, margem, entrada da empresa, repasse e líquido do veterinário) |
 | `VetConsultas.jsx` — lista paginada de consultas | ✅ | Filtros por data e status |
-| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`) + consulta de assinatura (`validarAssinaturaConsulta`) em modo finalizado + cálculo automático de dose por peso + download de PDF de prontuário/receita; falta IA integrada |
-| `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`) + correção de loop/reload infinito aplicada + backend de push 24h/1h implementado (fila + envio Expo); falta homologação em dispositivo real |
-| `VetVacinas.jsx` — registro de vacinas | 🔶 | ✅ Alerta de vencimento implementado (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital |
-| `VetInternacoes.jsx` — fichas de internação | 🔶 | ✅ Criação/alta/evolução/procedimento implementados; falta alertas automáticos de horário e gráficos de evolução |
-| `VetCatalogo.jsx` — catálogos (medicamentos e procedimentos) | 🔶 | Tabela com CRUD; falta banco de bulas completo e vinculação de insumos |
-| `vetApi.js` — helper Axios para todas as rotas `/vet` | ✅ | Cobre todos os endpoints |
+| `VetConsultaForm.jsx` — formulário de consulta (3 etapas) | 🔶 | ✅ Prescrições implementadas (`criarPrescricao`, `finalizarConsulta`) + consulta de assinatura (`validarAssinaturaConsulta`) em modo finalizado + cálculo automático de dose por peso + download de PDF de prontuário/receita + atalho para calculadora livre + lançamento de procedimentos do catálogo com baixa automática de estoque e margem estimada + painel de chat IA de exames dentro da etapa de Exame Clínico; ainda falta evoluir para debate clínico mais profundo (modo consultor completo) |
+| `VetAgenda.jsx` — calendário dia/semana | 🔶 | ✅ Criação de agendamento implementada (`criarAgendamento`) + correção de loop/reload infinito aplicada + backend de push 24h/1h implementado (fila + envio Expo) + endpoints de diagnóstico de push; falta homologação em dispositivo real |
+| `VetVacinas.jsx` — registro de vacinas | 🔶 | ✅ Alerta de vencimento implementado (`vacinasVencendo`) + sugestão automática de próxima dose por protocolo + aba de calendário preventivo por espécie integrada ao backend (`calendarioPreventivo`) + backend de status vacinal/carteirinha; ainda faltam regras clínicas mais detalhadas por idade/reforço |
+| `VetInternacoes.jsx` — fichas de internação | 🔶 | ✅ Criação/alta/evolução/procedimento implementados + gráfico de evolução clínica; falta alertas automáticos de horário |
+| `VetCalculadoraDoses.jsx` — calculadora independente | ✅ | Tela dedicada criada, puxando pet/peso e catálogo de medicamentos |
+| `VetCatalogo.jsx` — catálogos (medicamentos e procedimentos) | 🔶 | CRUD de medicamentos e procedimentos com vinculação de insumos do estoque + custo estimado e margem estimada por procedimento; falta banco de bulas completo |
+| `VetRepasse.jsx` — fechamento operacional do repasse | ✅ | Relatório por período/status/tipo + totais + baixa de recebimento no lançamento (`/vet/relatorios/repasse` e `/vet/relatorios/repasse/{conta_id}/baixar`) |
+| App Mobile — pets/carteirinha | 🔶 | ✅ Nova tela de carteirinha digital do pet + histórico de vacinas, exames, consultas e alertas + diagnóstico de push no perfil; falta seção veterinária completa no app |
+| `vetApi.js` — helper Axios para todas as rotas `/vet` | ✅ | Cobre endpoints clínicos, vacinas, internação, catálogos e upload de exames |
 | Rotas em `App.jsx` | ✅ | `/vet/*` mapeadas |
 | Menu lateral em `Layout.jsx` | ✅ | Sub-itens do módulo veterinário |
 
@@ -39,6 +61,20 @@
 - ✅ Cálculo automático de dose por peso implementado no fluxo de prescrição de consulta (seleção por catálogo + recalcular dose).
 - ✅ PDF de prontuário e receita implementado no backend com hash e QR de validação (`/vet/consultas/{id}/prontuario.pdf` e `/vet/prescricoes/{id}/pdf`).
 - ✅ Lembretes push de agenda (24h e 1h) implementados no backend: enfileiramento no agendamento + envio via Expo Push no `notification_sender`.
+- ✅ Cadastro do Pet expandido com campos clínicos estruturados (alergias, condições crônicas, medicamentos contínuos, restrições alimentares, tipo sanguíneo, pedigree, data de castração) com compatibilidade com os campos antigos.
+- ✅ Aba de saúde da ficha do pet agora mostra listas clínicas estruturadas e permite cadastrar exame com anexo PDF/imagem.
+- ✅ Tela independente de calculadora de doses criada no módulo veterinário.
+- ✅ Internações agora exibem gráfico de evolução clínica.
+- ✅ Vacinas agora sugerem próxima dose a partir dos protocolos cadastrados.
+- ✅ Exames agora contam com triagem automática por IA baseada em valores estruturados e texto do laudo.
+- ✅ Consulta agora tem painel de chat IA de exames (pergunta e resposta contextual por exame selecionado).
+- ✅ Procedimentos agora podem carregar insumos do estoque e fazer baixa automática ao finalizar a consulta.
+- ✅ Procedimentos agora calculam custo real dos insumos e margem no backend, no dashboard e no CSV clínico.
+- ✅ Procedimentos agora geram base financeira automática no contas a receber: entrada integral da empresa no modo vinculado e split empresa/veterinário no modo parceiro.
+- ✅ Fechamento operacional do repasse entregue: relatório por período/status/tipo + baixa de recebimento por lançamento.
+- ✅ Resumo veterinário do pet foi conectado ao PDV e à área de serviços para mostrar alergias, restrições, vacinas atrasadas e exames pendentes.
+- ✅ App mobile ganhou carteirinha digital do pet e endpoint de diagnóstico para push de agenda.
+- ✅ Assistente IA veterinário agora salva histórico persistente com garantia automática das tabelas de memória (sem dependência manual de migração), possui filtro de conversas por contexto (pet/consulta/exame) e feedback com comentário para melhoria contínua.
 
 ---
 
@@ -657,7 +693,7 @@ Módulo separado, mas integrado:
 - ✅ KPIs clínicos avançados implementados: taxa de retorno em 30 dias e tempo médio de atendimento.
 - ✅ Relatório clínico consolidado implementado: endpoint `/vet/relatorios/clinicos`.
 - ✅ Exportação CSV implementada: endpoint `/vet/relatorios/clinicos/export.csv` e botão no `VetDashboard.jsx`.
-- 🔶 Parte financeira ainda pendente: custo de insumos por procedimento e margem por procedimento.
+- ✅ Parte financeira de procedimentos implementada: custo real por insumo, margem por procedimento e consolidação no dashboard/CSV.
 - 🔶 Benchmark regional anonimizado ainda pendente.
 
 ### Dashboard do Veterinário (visão do dia)
@@ -1172,26 +1208,26 @@ PRONTUÁRIO / LGPD
 > Legenda: ✅ Completo | 🔶 Parcial | ❌ Pendente
 
 ### Fase 1 — Fundação (base sólida)
-1. ❌ Expandir campos clínicos do cadastro de Pet (campos estruturados — não texto livre)
+1. ✅ Expandir campos clínicos do cadastro de Pet (campos estruturados — não texto livre)
 2. ❌ Catálogo global de produtos/medicamentos + tabela `tenant_stock`
 3. 🔶 Módulo de Medicamentos / Bulas — tabela `vet_medicamentos_catalogo` criada + tela `VetCatalogo.jsx`; falta banco de bulas completo, doses por espécie, interações
-4. 🔶 Cálculo de dose no fluxo de consulta/prescrição implementado; falta tela independente de calculadora de doses
-5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas) ✅ + prescrição implementada ✅; falta cálculo automático de dose por peso e IA
+4. ✅ Cálculo de dose no fluxo de consulta/prescrição + tela independente de calculadora de doses
+5. 🔶 Prontuário (consulta) com sinais vitais estruturados — tabela `vet_consultas` criada + `VetConsultaForm.jsx` (3 etapas) ✅ + prescrição implementada ✅ + cálculo automático de dose por peso ✅; falta IA
 6. ❌ Configuração do módulo (modelo operacional, faturamento, estoque separado)
 
 ### Fase 2 — Clínica em funcionamento
 7. 🔶 Agenda veterinária com push notifications — tabela `vet_agendamentos` criada + `VetAgenda.jsx` ✅ + criação de agendamento ✅ + lembretes push 24h/1h no backend ✅; falta homologação de ponta a ponta em dispositivo real
 8. ✅ Formulários dinâmicos / Receituário — tabelas `vet_prescricoes` + `vet_itens_prescricao` + cálculo automático de dose + geração de PDF
-9. 🔶 Procedimentos cadastráveis com insumos vinculados — tabelas `vet_catalogo_procedimentos` + `vet_procedimentos_consulta` criadas; falta vinculação de insumos e dedução de estoque
-10. 🔶 Upload e análise de exames pela IA — tabela `vet_exames` criada; falta upload de arquivo e análise por IA
-11. ❌ Integração alertas → PDV e Banho/Tosa
-12. ❌ Comissão automática (para modelo parceiro)
+9. ✅ Procedimentos cadastráveis com insumos vinculados — tabelas `vet_catalogo_procedimentos` + `vet_procedimentos_consulta` criadas; catálogo com insumos, dedução automática de estoque, custo/margem e integração automática com contas a receber já implementados
+10. 🔶 Upload e análise de exames pela IA — tabela `vet_exames` criada + upload de arquivo no backend/frontend implementado + triagem automática IA em texto/JSON + chat conversacional por exame dentro da consulta; falta evoluir para debate clínico mais profundo (condutas diferenciais)
+11. 🔶 Integração alertas → PDV e Banho/Tosa — ✅ alertas conectados ao PDV e à aba de serviços do pet; falta módulo próprio de Banho/Tosa consumindo esses alertas
+12. ✅ Comissão automática (para modelo parceiro) — base de repasse e split automático empresa/veterinário implementados + fechamento operacional do repasse por período com baixa de recebimento
 
 ### Fase 3 — Nível avançado
-13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — ✅ criação/alta/evolução/procedimento implementados (backend + frontend); falta alertas automáticos de horário e gráficos de evolução de temperatura/parâmetros
-14. ❌ IA consultora de diagnóstico (modo Debater Caso + Analisar Exame)
-15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — ✅ tabelas + `VetVacinas.jsx` + alertas de vencimento implementados (`vacinasVencendo`); falta calendário preventivo por espécie e carteirinha digital no app
-16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` + `/vet/dashboard` + `/vet/relatorios/clinicos` + exportação CSV implementados; KPIs reais (tempo médio e taxa de retorno) já conectados ao banco; falta custo de insumos por procedimento e benchmark regional
+13. 🔶 Internação completa (protocolos, lembretes, curva de temperatura) — ✅ criação/alta/evolução/procedimento implementados (backend + frontend) + gráfico de evolução de temperatura/parâmetros; falta alertas automáticos de horário
+14. 🔶 IA consultora de diagnóstico (modo Debater Caso + Analisar Exame) — chat de exames já entregue no formulário de consulta; falta modo Debater Caso completo e raciocínio clínico ampliado
+15. 🔶 Vacinação, calendário preventivo + carteirinha digital no app — ✅ tabelas + `VetVacinas.jsx` + alertas de vencimento implementados (`vacinasVencendo`) + sugestão automática de próxima dose por protocolo + aba de calendário preventivo por espécie + carteirinha digital no app; faltam regras clínicas mais detalhadas por idade/reforço
+16. 🔶 Dashboard clínico e relatórios de performance — `VetDashboard.jsx` + `/vet/dashboard` + `/vet/relatorios/clinicos` + exportação CSV implementados; KPIs reais (tempo médio e taxa de retorno) já conectados ao banco; custo/margem e split financeiro dos procedimentos já conectados; falta benchmark regional
 17. ❌ Banco de protocolos veterinários reutilizáveis
 
 ### Fase 4 — Multi-Tenant Avançado
@@ -1200,17 +1236,18 @@ PRONTUÁRIO / LGPD
 20. ❌ IA clínica coletiva (dados anonimizados multi-tenant)
 
 ### Fase 5 — App e Diferenciais
-21. ❌ Seção veterinária no app mobile (agendamentos, exames, receitas, carteirinha)
+21. 🔶 Seção veterinária no app mobile (agendamentos, exames, receitas, carteirinha) — ✅ carteirinha do pet, vacinas, exames, consultas e alertas entregues; faltam agenda, receitas e fluxo veterinário completo no app
 22. ❌ QR Code do pet → carteirinha pública na web
 23. ❌ Curva de peso + linha do tempo do pet
 24. ❌ NPS pós-consulta
 25. ❌ Telemedicina
 
 ### Pendências prioritárias (próximo ciclo)
-1. Finalizar integração de insumos por procedimento com dedução automática de estoque.
-2. Entregar upload de exames com análise por IA (texto/imagem) no fluxo de consulta.
-3. Evoluir verificação por QR para modo público (sem login), mantendo segurança e rastreabilidade.
-4. Homologar push notifications da agenda em dispositivo real (token válido + recebimento 24h/1h).
+1. Evoluir o chat IA de exames para modo consultor clínico completo (debate de hipóteses e condutas diferenciais).
+2. Refinar o calendário preventivo com regras clínicas avançadas por idade, espécie, reforço e exceções.
+3. Homologar push notifications da agenda em dispositivo real (token válido + recebimento 24h/1h fora do Expo Go).
+4. Criar o módulo próprio de Banho/Tosa consumindo os alertas veterinários já expostos.
+5. Incluir ponto de entrada mais explícito para gestão de exames no menu veterinário (atalho para upload e análise).
 
 ---
 

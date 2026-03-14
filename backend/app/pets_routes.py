@@ -2,6 +2,8 @@
 Módulo dedicado para gestão de PETS
 Separado do cadastro de clientes para permitir evolução veterinária
 """
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_, func
@@ -13,6 +15,7 @@ from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Pet, Cliente
+from .pet_clinical_utils import normalize_pet_clinical_payload
 from app.partner_utils import get_all_accessible_tenant_ids
 
 from pydantic import BaseModel, Field
@@ -40,9 +43,16 @@ class PetBase(BaseModel):
     # Saúde
     microchip: Optional[str] = Field(None, max_length=50)
     alergias: Optional[str] = None
+    alergias_lista: List[str] = Field(default_factory=list)
     doencas_cronicas: Optional[str] = None
+    condicoes_cronicas_lista: List[str] = Field(default_factory=list)
     medicamentos_continuos: Optional[str] = None
+    medicamentos_continuos_lista: List[str] = Field(default_factory=list)
+    restricoes_alimentares_lista: List[str] = Field(default_factory=list)
     historico_clinico: Optional[str] = None
+    tipo_sanguineo: Optional[str] = Field(None, max_length=20)
+    pedigree_registro: Optional[str] = Field(None, max_length=100)
+    castrado_data: Optional[date] = None
     
     # Outros
     observacoes: Optional[str] = None
@@ -144,9 +154,16 @@ def enriquecer_pet_response(pet: Pet, de_parceiro: bool = False) -> dict:
         "porte": pet.porte,
         "microchip": pet.microchip,
         "alergias": pet.alergias,
+        "alergias_lista": pet.alergias_lista or [],
         "doencas_cronicas": pet.doencas_cronicas,
+        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
         "medicamentos_continuos": pet.medicamentos_continuos,
+        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
+        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
         "historico_clinico": pet.historico_clinico,
+        "tipo_sanguineo": pet.tipo_sanguineo,
+        "pedigree_registro": pet.pedigree_registro,
+        "castrado_data": pet.castrado_data,
         "observacoes": pet.observacoes,
         "foto_url": pet.foto_url,
         "ativo": pet.ativo,
@@ -251,30 +268,15 @@ def criar_pet(
     # Gerar código único
     codigo = gerar_codigo_pet(db, current_user.id)
     
+    pet_payload = normalize_pet_clinical_payload(pet_data.model_dump())
+
     # Criar pet
     novo_pet = Pet(
         user_id=current_user.id,
         tenant_id=tenant_id,
         cliente_id=pet_data.cliente_id,
         codigo=codigo,
-        nome=pet_data.nome,
-        especie=pet_data.especie,
-        raca=pet_data.raca,
-        sexo=pet_data.sexo,
-        castrado=pet_data.castrado,
-        data_nascimento=pet_data.data_nascimento,
-        idade_aproximada=pet_data.idade_aproximada,
-        peso=pet_data.peso,
-        cor=pet_data.cor,
-        porte=pet_data.porte,
-        microchip=pet_data.microchip,
-        alergias=pet_data.alergias,
-        doencas_cronicas=pet_data.doencas_cronicas,
-        medicamentos_continuos=pet_data.medicamentos_continuos,
-        historico_clinico=pet_data.historico_clinico,
-        observacoes=pet_data.observacoes,
-        foto_url=pet_data.foto_url,
-        ativo=pet_data.ativo
+        **pet_payload,
     )
     
     db.add(novo_pet)
@@ -354,7 +356,7 @@ def atualizar_pet(
             )
     
     # Atualizar campos fornecidos
-    update_data = pet_data.model_dump(exclude_unset=True)
+    update_data = normalize_pet_clinical_payload(pet_data.model_dump(exclude_unset=True))
     
     # Se idade_aproximada foi fornecida, converter para data_nascimento
     if 'idade_aproximada' in update_data and update_data['idade_aproximada'] is not None:

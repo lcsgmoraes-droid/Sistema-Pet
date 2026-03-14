@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, Field, validator
 import logging
 
 from app.db import get_session
@@ -23,6 +23,7 @@ from app.models import User, Cliente, Pet, Raca
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
+from app.pet_clinical_utils import normalize_pet_clinical_payload
 from app.security.permissions_decorator import require_permission
 from app.partner_utils import get_all_accessible_tenant_ids
 
@@ -107,9 +108,26 @@ class PetCreate(BaseModel):
     raca: Optional[str] = None
     sexo: Optional[str] = None
     data_nascimento: Optional[date] = None
+    idade_aproximada: Optional[int] = None
+    castrado: Optional[bool] = False
     cor: Optional[str] = None
+    porte: Optional[str] = None
     peso: Optional[float] = None
+    microchip: Optional[str] = None
+    alergias: Optional[str] = None
+    alergias_lista: List[str] = Field(default_factory=list)
+    doencas_cronicas: Optional[str] = None
+    condicoes_cronicas_lista: List[str] = Field(default_factory=list)
+    medicamentos_continuos: Optional[str] = None
+    medicamentos_continuos_lista: List[str] = Field(default_factory=list)
+    restricoes_alimentares_lista: List[str] = Field(default_factory=list)
+    historico_clinico: Optional[str] = None
+    tipo_sanguineo: Optional[str] = None
+    pedigree_registro: Optional[str] = None
+    castrado_data: Optional[date] = None
     observacoes: Optional[str] = None
+    foto_url: Optional[str] = None
+    ativo: Optional[bool] = True
 
     model_config = {"from_attributes": True}
 
@@ -120,9 +138,25 @@ class PetUpdate(BaseModel):
     raca: Optional[str] = None
     sexo: Optional[str] = None
     data_nascimento: Optional[dt] = None
+    idade_aproximada: Optional[int] = None
+    castrado: Optional[bool] = None
     cor: Optional[str] = None
+    porte: Optional[str] = None
     peso: Optional[float] = None
+    microchip: Optional[str] = None
+    alergias: Optional[str] = None
+    alergias_lista: Optional[List[str]] = None
+    doencas_cronicas: Optional[str] = None
+    condicoes_cronicas_lista: Optional[List[str]] = None
+    medicamentos_continuos: Optional[str] = None
+    medicamentos_continuos_lista: Optional[List[str]] = None
+    restricoes_alimentares_lista: Optional[List[str]] = None
+    historico_clinico: Optional[str] = None
+    tipo_sanguineo: Optional[str] = None
+    pedigree_registro: Optional[str] = None
+    castrado_data: Optional[date] = None
     observacoes: Optional[str] = None
+    foto_url: Optional[str] = None
     ativo: Optional[bool] = None
 
     model_config = {"from_attributes": True}
@@ -136,14 +170,45 @@ class PetResponse(BaseModel):
     raca: Optional[str]
     sexo: Optional[str]
     data_nascimento: Optional[dt]
+    idade_aproximada: Optional[int] = None
+    castrado: Optional[bool] = None
+    castrado_data: Optional[date] = None
     cor: Optional[str]
+    porte: Optional[str] = None
     peso: Optional[float]
     peso_kg: Optional[float] = None  # Alias para compatibilidade
     idade_meses: Optional[int] = None  # Calculado a partir da data_nascimento
+    microchip: Optional[str] = None
+    alergias: Optional[str] = None
+    alergias_lista: List[str] = Field(default_factory=list)
+    doencas_cronicas: Optional[str] = None
+    condicoes_cronicas_lista: List[str] = Field(default_factory=list)
+    medicamentos_continuos: Optional[str] = None
+    medicamentos_continuos_lista: List[str] = Field(default_factory=list)
+    restricoes_alimentares_lista: List[str] = Field(default_factory=list)
+    historico_clinico: Optional[str] = None
+    tipo_sanguineo: Optional[str] = None
+    pedigree_registro: Optional[str] = None
     observacoes: Optional[str]
+    foto_url: Optional[str] = None
     ativo: bool
     created_at: dt
     updated_at: dt
+
+    @validator(
+        "alergias_lista",
+        "condicoes_cronicas_lista",
+        "medicamentos_continuos_lista",
+        "restricoes_alimentares_lista",
+        pre=True,
+    )
+    def normalize_list_fields(cls, v):
+        # Compatibilidade com registros antigos que possuem null no banco.
+        if v is None:
+            return []
+        if isinstance(v, list):
+            return v
+        return []
 
     model_config = {"from_attributes": True}
 
@@ -1348,6 +1413,7 @@ def create_pet(
     
     # Gerar cÃ³digo Ãºnico para o pet baseado no cÃ³digo do cliente
     codigo_pet = f"{cliente.codigo}-PET-{db.query(Pet).filter(Pet.cliente_id == cliente_id).count() + 1:04d}"
+    pet_payload = normalize_pet_clinical_payload(pet_data.model_dump())
     
     # Criar pet
     novo_pet = Pet(
@@ -1355,7 +1421,7 @@ def create_pet(
         user_id=current_user.id,
         tenant_id=tenant_id,
         codigo=codigo_pet,
-        **pet_data.model_dump()
+        **pet_payload
     )
     
     db.add(novo_pet)
@@ -1365,7 +1431,7 @@ def create_pet(
     # Log de auditoria
     log_create(db, current_user.id, "pet", novo_pet.id, {
         "cliente_id": cliente_id,
-        **pet_data.model_dump()
+        **pet_payload
     })
     
     return novo_pet
@@ -1442,11 +1508,27 @@ def get_pet(
         "raca": pet.raca,
         "sexo": pet.sexo,
         "data_nascimento": pet.data_nascimento,
+        "idade_aproximada": pet.idade_aproximada,
+        "castrado": pet.castrado,
+        "castrado_data": pet.castrado_data,
         "cor": pet.cor,
+        "porte": pet.porte,
         "peso": pet.peso,
         "peso_kg": pet.peso,  # Alias para compatibilidade
         "idade_meses": idade_meses,  # Calculado
+        "microchip": pet.microchip,
+        "alergias": pet.alergias,
+        "alergias_lista": pet.alergias_lista or [],
+        "doencas_cronicas": pet.doencas_cronicas,
+        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
+        "medicamentos_continuos": pet.medicamentos_continuos,
+        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
+        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
+        "historico_clinico": pet.historico_clinico,
+        "tipo_sanguineo": pet.tipo_sanguineo,
+        "pedigree_registro": pet.pedigree_registro,
         "observacoes": pet.observacoes,
+        "foto_url": pet.foto_url,
         "ativo": pet.ativo,
         "created_at": pet.created_at,
         "updated_at": pet.updated_at
@@ -1489,7 +1571,7 @@ def update_pet(
     }
     
     # Atualizar campos
-    update_data = pet_data.model_dump(exclude_unset=True)
+    update_data = normalize_pet_clinical_payload(pet_data.model_dump(exclude_unset=True))
     
     # Se idade_aproximada foi fornecida, converter para data_nascimento
     if 'idade_aproximada' in update_data and update_data['idade_aproximada'] is not None:
@@ -1537,11 +1619,27 @@ def update_pet(
         "raca": pet.raca,
         "sexo": pet.sexo,
         "data_nascimento": pet.data_nascimento,
+        "idade_aproximada": pet.idade_aproximada,
+        "castrado": pet.castrado,
+        "castrado_data": pet.castrado_data,
         "cor": pet.cor,
+        "porte": pet.porte,
         "peso": pet.peso,
         "peso_kg": pet.peso,  # Alias
         "idade_meses": idade_meses,
+        "microchip": pet.microchip,
+        "alergias": pet.alergias,
+        "alergias_lista": pet.alergias_lista or [],
+        "doencas_cronicas": pet.doencas_cronicas,
+        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
+        "medicamentos_continuos": pet.medicamentos_continuos,
+        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
+        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
+        "historico_clinico": pet.historico_clinico,
+        "tipo_sanguineo": pet.tipo_sanguineo,
+        "pedigree_registro": pet.pedigree_registro,
         "observacoes": pet.observacoes,
+        "foto_url": pet.foto_url,
         "ativo": pet.ativo,
         "created_at": pet.created_at,
         "updated_at": pet.updated_at

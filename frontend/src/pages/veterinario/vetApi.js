@@ -40,11 +40,22 @@ export const vetApi = {
   listarVacinasPet: (petId) => api.get(`${BASE}/pets/${petId}/vacinas`),
   registrarVacina: (data) => api.post(`${BASE}/vacinas`, data),
   vacinasVencendo: (dias = 30) => api.get(`${BASE}/vacinas/vencendo`, { params: { dias } }),
+  obterCarteirinhaPet: (petId) => api.get(`${BASE}/pets/${petId}/carteirinha`),
+  listarAlertasPet: (petId) => api.get(`${BASE}/pets/${petId}/alertas`),
 
   // Exames
   listarExamesPet: (petId) => api.get(`${BASE}/pets/${petId}/exames`),
+  listarExamesAnexados: (params) => api.get(`${BASE}/exames`, { params }),
   criarExame: (data) => api.post(`${BASE}/exames`, data),
   atualizarExame: (id, data) => api.patch(`${BASE}/exames/${id}`, data),
+  interpretarExameIA: (id) => api.post(`${BASE}/exames/${id}/interpretar-ia`),
+  uploadArquivoExame: (id, file) => {
+    const formData = new FormData();
+    formData.append("arquivo", file);
+    return api.post(`${BASE}/exames/${id}/arquivo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 
   // Peso
   curvaPeso: (petId) => api.get(`${BASE}/pets/${petId}/peso`),
@@ -54,6 +65,7 @@ export const vetApi = {
   // Procedimentos
   listarProcedimentosConsulta: (consultaId) => api.get(`${BASE}/consultas/${consultaId}/procedimentos`),
   adicionarProcedimento: (data) => api.post(`${BASE}/procedimentos`, data),
+  diagnosticoPushAgendamento: (agendamentoId) => api.get(`${BASE}/agendamentos/${agendamentoId}/push-diagnostico`),
 
   // Internações
   listarInternacoes: (statusOrParams) => {
@@ -123,9 +135,11 @@ export const vetApi = {
   // Catálogos
   listarCatalogoProcedimentos: () => api.get(`${BASE}/catalogo/procedimentos`),
   criarCatalogoProcedimento: (data) => api.post(`${BASE}/catalogo/procedimentos`, data),
+  listarProdutosEstoque: (busca) => api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
   listarMedicamentos: (busca) => api.get(`${BASE}/catalogo/medicamentos`, { params: { busca } }),
   criarMedicamento: (data) => api.post(`${BASE}/catalogo/medicamentos`, data),
   listarProtocolosVacinas: () => api.get(`${BASE}/catalogo/protocolos-vacinas`),
+  criarProtocoloVacina: (params) => api.post(`${BASE}/catalogo/protocolos-vacinas`, null, { params }),
 
   // Perfil comportamental
   obterPerfilComportamental: (petId) => api.get(`${BASE}/pets/${petId}/perfil-comportamental`),
@@ -137,4 +151,27 @@ export const vetApi = {
   atualizarParceiro: (id, data) => api.patch(`${BASE}/parceiros/${id}`, data),
   removerParceiro: (id) => api.delete(`${BASE}/parceiros/${id}`),
   listarTenantsVeterinarios: () => api.get(`${BASE}/tenants-veterinarios`),
+
+  // Relatório de repasse
+  relatorioRepasse: (params) => api.get(`${BASE}/relatorios/repasse`, { params }),
+  baixarRepasse: (contaId, dataRecebimento) =>
+    api.post(`${BASE}/relatorios/repasse/${contaId}/baixar`, null, {
+      params: dataRecebimento ? { data_recebimento: dataRecebimento } : {},
+    }),
+
+  // Chat IA de exames
+  chatExameIA: (exameId, pergunta) =>
+    api.post(`${BASE}/exames/${exameId}/chat`, { pergunta }),
+
+  // Assistente IA clínico (livre ou vinculado ao atendimento)
+  assistenteIA: (payload) => api.post(`${BASE}/ia/assistente`, payload),
+  memoriaStatusAssistenteIA: () => api.get(`${BASE}/ia/memoria-status`),
+  listarConversasAssistenteIA: (params) => api.get(`${BASE}/ia/conversas`, { params }),
+  listarMensagensConversaAssistenteIA: (conversaId) => api.get(`${BASE}/ia/conversas/${conversaId}/mensagens`),
+  feedbackMensagemAssistenteIA: (mensagemId, payload) =>
+    api.post(`${BASE}/ia/mensagens/${mensagemId}/feedback`, payload),
+
+  // Calendário preventivo
+  calendarioPreventivo: (especie) =>
+    api.get(`${BASE}/catalogo/calendario-preventivo`, { params: especie ? { especie } : {} }),
 };

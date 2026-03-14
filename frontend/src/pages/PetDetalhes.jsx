@@ -9,6 +9,16 @@ import {
 import { PawPrint } from 'lucide-react';
 import { formatarIdadeMeses } from '../helpers/idadeHelper';
 
+const listaClinica = (lista = [], fallback = '') => {
+  if (Array.isArray(lista) && lista.length > 0) {
+    return lista;
+  }
+  return (fallback || '')
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
 const PetDetalhes = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
@@ -29,6 +39,18 @@ const PetDetalhes = () => {
   const [limiteConsultas, setLimiteConsultas] = useState(6);
   const [ultimaVacina, setUltimaVacina] = useState(null);
   const [ultimaAlta, setUltimaAlta] = useState(null);
+  const [carteirinha, setCarteirinha] = useState(null);
+  const [exames, setExames] = useState([]);
+  const [loadingExames, setLoadingExames] = useState(false);
+  const [salvandoExame, setSalvandoExame] = useState(false);
+  const [novoExame, setNovoExame] = useState({
+    nome: '',
+    tipo: 'laboratorial',
+    data_solicitacao: '',
+    laboratorio: '',
+    observacoes: '',
+    arquivo: null,
+  });
 
   useEffect(() => {
     loadPet();
@@ -80,6 +102,25 @@ const PetDetalhes = () => {
     if (!data) return '-';
     return new Date(data).toLocaleString('pt-BR');
   };
+
+  const renderListaClinica = (titulo, itens, vazio = 'Nada registrado') => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">{titulo}</label>
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        {itens.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {itens.map((item) => (
+              <span key={`${titulo}_${item}`} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-sm text-gray-800">
+                {item}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">{vazio}</p>
+        )}
+      </div>
+    </div>
+  );
 
   const carregarHistoricoInternacoes = async () => {
     try {
@@ -142,16 +183,32 @@ const PetDetalhes = () => {
     }
   };
 
+  const carregarExames = async () => {
+    try {
+      setLoadingExames(true);
+      const response = await vetApi.listarExamesPet(petId);
+      const lista = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
+      setExames(lista);
+    } catch {
+      setExames([]);
+    } finally {
+      setLoadingExames(false);
+    }
+  };
+
   const carregarResumoClinico = async () => {
     try {
-      const [resVacinas, resHistoricoInternacoes] = await Promise.all([
-        api.get(`/vet/pets/${petId}/vacinas`).catch(() => ({ data: [] })),
+      const [resCarteirinha, resHistoricoInternacoes] = await Promise.all([
+        vetApi.obterCarteirinhaPet(petId).catch(() => ({ data: null })),
         vetApi.historicoInternacoesPet(petId).catch(() => ({ data: { historico: [] } })),
       ]);
 
-      const listaVacinas = Array.isArray(resVacinas.data)
-        ? resVacinas.data
-        : (resVacinas.data?.items ?? []);
+      const resumoCarteirinha = resCarteirinha.data || null;
+      setCarteirinha(resumoCarteirinha);
+
+      const listaVacinas = Array.isArray(resumoCarteirinha?.status_vacinal?.carteira)
+        ? resumoCarteirinha.status_vacinal.carteira
+        : [];
 
       const vacinasOrdenadas = [...listaVacinas].sort((a, b) => {
         const da = new Date(a.data_aplicacao || 0).getTime();
@@ -172,8 +229,18 @@ const PetDetalhes = () => {
       });
       setUltimaAlta(altasOrdenadas[0] ?? null);
     } catch {
+      setCarteirinha(null);
       setUltimaVacina(null);
       setUltimaAlta(null);
+    }
+  };
+
+  const interpretarExameIA = async (exameId) => {
+    try {
+      await vetApi.interpretarExameIA(exameId);
+      await Promise.all([carregarExames(), carregarResumoClinico()]);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Não foi possível interpretar o exame com IA');
     }
   };
 
@@ -190,6 +257,11 @@ const PetDetalhes = () => {
   useEffect(() => {
     if (abaAtiva !== 'consultas') return;
     carregarHistoricoConsultas();
+  }, [abaAtiva, petId]);
+
+  useEffect(() => {
+    if (abaAtiva !== 'saude') return;
+    carregarExames();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
@@ -239,6 +311,41 @@ const PetDetalhes = () => {
     } catch (err) {
       console.error('Erro ao alterar status do pet:', err);
       alert('Erro ao alterar status do pet');
+    }
+  };
+
+  const salvarNovoExame = async () => {
+    if (!novoExame.nome.trim()) return;
+
+    try {
+      setSalvandoExame(true);
+      const response = await vetApi.criarExame({
+        pet_id: Number(petId),
+        nome: novoExame.nome,
+        tipo: novoExame.tipo,
+        data_solicitacao: novoExame.data_solicitacao || undefined,
+        laboratorio: novoExame.laboratorio || undefined,
+        observacoes: novoExame.observacoes || undefined,
+      });
+
+      if (novoExame.arquivo) {
+        await vetApi.uploadArquivoExame(response.data.id, novoExame.arquivo);
+      }
+
+      setNovoExame({
+        nome: '',
+        tipo: 'laboratorial',
+        data_solicitacao: '',
+        laboratorio: '',
+        observacoes: '',
+        arquivo: null,
+      });
+      await carregarExames();
+    } catch (err) {
+      console.error('Erro ao salvar exame:', err);
+      alert(err.response?.data?.detail || 'Erro ao salvar exame');
+    } finally {
+      setSalvandoExame(false);
     }
   };
 
@@ -489,6 +596,21 @@ const PetDetalhes = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Microchip</label>
                 <p className="text-gray-900 font-mono text-sm">{pet.microchip || '-'}</p>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo sanguíneo</label>
+                <p className="text-gray-900">{pet.tipo_sanguineo || '-'}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pedigree</label>
+                <p className="text-gray-900">{pet.pedigree_registro || '-'}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Data da castração</label>
+                <p className="text-gray-900">{formatarData(pet.castrado_data)}</p>
+              </div>
             </div>
 
             {pet.observacoes && (
@@ -509,35 +631,154 @@ const PetDetalhes = () => {
         {abaAtiva === 'saude' && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Informações de Saúde</h2>
-            
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {renderListaClinica('Alergias', listaClinica(pet.alergias_lista, pet.alergias), 'Nenhuma alergia registrada')}
+              {renderListaClinica('Doenças crônicas', listaClinica(pet.condicoes_cronicas_lista, pet.doencas_cronicas), 'Nenhuma doença crônica registrada')}
+              {renderListaClinica('Medicamentos contínuos', listaClinica(pet.medicamentos_continuos_lista, pet.medicamentos_continuos), 'Nenhum medicamento contínuo registrado')}
+              {renderListaClinica('Restrições alimentares', listaClinica(pet.restricoes_alimentares_lista), 'Nenhuma restrição alimentar registrada')}
+            </div>
+
+            {Array.isArray(carteirinha?.alertas) && carteirinha.alertas.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-amber-900 mb-2">Alertas para atendimento e venda</h3>
+                <div className="space-y-2">
+                  {carteirinha.alertas.slice(0, 6).map((alerta, idx) => (
+                    <div key={`alerta_${idx}`} className="text-sm text-amber-900">
+                      • {alerta.mensagem}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Alergias</label>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <p className="text-gray-900">{pet.alergias || 'Nenhuma alergia registrada'}</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Doenças Crônicas</label>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <p className="text-gray-900">{pet.doencas_cronicas || 'Nenhuma doença crônica registrada'}</p>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Medicamentos Contínuos</label>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <p className="text-gray-900">{pet.medicamentos_continuos || 'Nenhum medicamento contínuo registrado'}</p>
-                </div>
-              </div>
-              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Histórico Clínico</label>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-gray-900 whitespace-pre-line">
                     {pet.historico_clinico || 'Nenhum histórico clínico registrado'}
                   </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-[1fr_0.95fr] gap-4">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-semibold text-gray-900">Exames recentes</h3>
+                    <button
+                      type="button"
+                      onClick={carregarExames}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      Atualizar
+                    </button>
+                  </div>
+
+                  {loadingExames ? (
+                    <div className="text-sm text-gray-500">Carregando exames...</div>
+                  ) : exames.length === 0 ? (
+                    <div className="text-sm text-gray-500">Nenhum exame registrado ainda.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {exames.map((exame) => (
+                        <div key={exame.id} className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-gray-900">{exame.nome}</p>
+                              <p className="text-sm text-gray-500">
+                                {exame.tipo || 'Exame'} • {formatarData(exame.data_solicitacao)} • {exame.status || '-'}
+                              </p>
+                            </div>
+                            {exame.arquivo_url && (
+                              <a
+                                href={exame.arquivo_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-700"
+                              >
+                                Abrir arquivo
+                              </a>
+                            )}
+                          </div>
+                          {exame.laboratorio && <p className="text-sm text-gray-600 mt-2">Laboratório: {exame.laboratorio}</p>}
+                          {exame.interpretacao_ia_resumo && (
+                            <div className="mt-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+                              <p className="text-xs font-semibold text-cyan-800">Triagem IA</p>
+                              <p className="text-sm text-cyan-900">{exame.interpretacao_ia_resumo}</p>
+                            </div>
+                          )}
+                          {exame.observacoes && <p className="text-sm text-gray-600 mt-2">Obs.: {exame.observacoes}</p>}
+                          <div className="mt-3 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => interpretarExameIA(exame.id)}
+                              className="text-sm text-cyan-700 hover:text-cyan-800"
+                            >
+                              {exame.interpretacao_ia_resumo ? 'Reprocessar triagem IA' : 'Interpretar com IA'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <h3 className="text-lg font-semibold text-gray-900">Novo exame</h3>
+                  <input
+                    type="text"
+                    value={novoExame.nome}
+                    onChange={(e) => setNovoExame((prev) => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Nome do exame"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      value={novoExame.tipo}
+                      onChange={(e) => setNovoExame((prev) => ({ ...prev, tipo: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    >
+                      <option value="laboratorial">Laboratorial</option>
+                      <option value="imagem">Imagem</option>
+                      <option value="citologia">Citologia</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                    <input
+                      type="date"
+                      value={novoExame.data_solicitacao}
+                      onChange={(e) => setNovoExame((prev) => ({ ...prev, data_solicitacao: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    value={novoExame.laboratorio}
+                    onChange={(e) => setNovoExame((prev) => ({ ...prev, laboratorio: e.target.value }))}
+                    placeholder="Laboratório ou clínica"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <textarea
+                    value={novoExame.observacoes}
+                    onChange={(e) => setNovoExame((prev) => ({ ...prev, observacoes: e.target.value }))}
+                    rows="3"
+                    placeholder="Observações do pedido ou resultado"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
+                    onChange={(e) => setNovoExame((prev) => ({ ...prev, arquivo: e.target.files?.[0] || null }))}
+                    className="w-full text-sm text-gray-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={salvarNovoExame}
+                    disabled={salvandoExame || !novoExame.nome.trim()}
+                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-colors font-medium"
+                  >
+                    {salvandoExame ? 'Salvando exame...' : 'Salvar exame'}
+                  </button>
                 </div>
               </div>
             </div>
@@ -558,6 +799,34 @@ const PetDetalhes = () => {
             </div>
 
             <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Aplicadas</p>
+                  <p className="text-2xl font-bold text-gray-900">{carteirinha?.status_vacinal?.resumo?.total_aplicadas ?? historicoVacinas.length}</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-amber-700">Pendentes</p>
+                  <p className="text-2xl font-bold text-amber-900">{carteirinha?.status_vacinal?.resumo?.total_pendentes ?? 0}</p>
+                </div>
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <p className="text-xs uppercase tracking-wide text-rose-700">Atrasadas</p>
+                  <p className="text-2xl font-bold text-rose-900">{carteirinha?.status_vacinal?.resumo?.total_vencidas ?? 0}</p>
+                </div>
+              </div>
+
+              {Array.isArray(carteirinha?.status_vacinal?.pendentes) && carteirinha.status_vacinal.pendentes.length > 0 && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <h3 className="text-sm font-semibold text-amber-900 mb-2">Protocolos pendentes</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {carteirinha.status_vacinal.pendentes.map((item) => (
+                      <span key={`pendente_${item.nome}`} className="px-3 py-1 rounded-full bg-white border border-amber-200 text-sm text-amber-900">
+                        {item.nome}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <input
                 type="text"
                 value={filtroVacinas}
@@ -784,6 +1053,16 @@ const PetDetalhes = () => {
                 + Registrar Serviço
               </button>
             </div>
+            {Array.isArray(carteirinha?.alertas) && carteirinha.alertas.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h3 className="text-sm font-semibold text-amber-900 mb-2">Alertas para banho, tosa e serviços</h3>
+                <div className="space-y-2 text-sm text-amber-900">
+                  {carteirinha.alertas.slice(0, 5).map((alerta, idx) => (
+                    <p key={`servico_alerta_${idx}`}>• {alerta.mensagem}</p>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="text-center py-12 text-gray-500">
               <PawPrint size={48} className="mx-auto mb-4 text-gray-300" />
               <p className="text-lg font-medium mb-2">Módulo em desenvolvimento</p>

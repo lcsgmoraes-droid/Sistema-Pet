@@ -20,6 +20,7 @@ from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.veterinario_models import AgendamentoVet, ConsultaVet, ExameVet
 
 router = APIRouter(prefix="/app", tags=["App Mobile"])
 
@@ -45,7 +46,12 @@ class PetResponse(BaseModel):
     porte: Optional[str]
     cor: Optional[str]
     alergias: Optional[str]
+    alergias_lista: list[str] = []
     observacoes: Optional[str]
+    restricoes_alimentares_lista: list[str] = []
+    condicoes_cronicas_lista: list[str] = []
+    medicamentos_continuos_lista: list[str] = []
+    tipo_sanguineo: Optional[str] = None
     foto_url: Optional[str]
 
     class Config:
@@ -133,6 +139,14 @@ class PushTokenPayload(BaseModel):
     plataforma: Optional[str] = None  # "android" | "ios"
 
 
+class PetCarteirinhaResponse(BaseModel):
+    pet: dict
+    alertas: list[dict]
+    status_vacinal: dict
+    consultas: list[dict]
+    exames: list[dict]
+
+
 # ─────────────────────────────────────────
 # Serialização
 # ─────────────────────────────────────────
@@ -151,9 +165,31 @@ def _serialize_pet(pet: Pet) -> dict:
         "porte": pet.porte,
         "cor": pet.cor,
         "alergias": pet.alergias,
+        "alergias_lista": getattr(pet, "alergias_lista", None) or [],
         "observacoes": pet.observacoes,
+        "restricoes_alimentares_lista": getattr(pet, "restricoes_alimentares_lista", None) or [],
+        "condicoes_cronicas_lista": getattr(pet, "condicoes_cronicas_lista", None) or [],
+        "medicamentos_continuos_lista": getattr(pet, "medicamentos_continuos_lista", None) or [],
+        "tipo_sanguineo": getattr(pet, "tipo_sanguineo", None),
         "foto_url": pet.foto_url,
     }
+
+
+def _get_pet_owned_or_404(db: Session, pet_id: int, current_user: User) -> Pet:
+    cliente = _get_cliente_or_404(db, current_user)
+    pet = (
+        db.query(Pet)
+        .filter(
+            Pet.id == pet_id,
+            Pet.tenant_id == str(current_user.tenant_id),
+            Pet.cliente_id == cliente.id,
+            Pet.ativo == True,
+        )
+        .first()
+    )
+    if not pet:
+        raise HTTPException(status_code=404, detail="Pet não encontrado.")
+    return pet
 
 
 # ─────────────────────────────────────────
@@ -223,19 +259,7 @@ def atualizar_pet(
     db: Session = Depends(get_session),
 ):
     """Atualiza dados de um pet do cliente autenticado."""
-    cliente = _get_cliente_or_404(db, current_user)
-    pet = (
-        db.query(Pet)
-        .filter(
-            Pet.id == pet_id,
-            Pet.tenant_id == str(current_user.tenant_id),
-            Pet.cliente_id == cliente.id,
-            Pet.ativo == True,
-        )
-        .first()
-    )
-    if not pet:
-        raise HTTPException(status_code=404, detail="Pet não encontrado.")
+    pet = _get_pet_owned_or_404(db, pet_id, current_user)
 
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(pet, field, value)
@@ -252,19 +276,7 @@ def deletar_pet(
     db: Session = Depends(get_session),
 ):
     """Remove (soft-delete) um pet do cliente autenticado."""
-    cliente = _get_cliente_or_404(db, current_user)
-    pet = (
-        db.query(Pet)
-        .filter(
-            Pet.id == pet_id,
-            Pet.tenant_id == str(current_user.tenant_id),
-            Pet.cliente_id == cliente.id,
-            Pet.ativo == True,
-        )
-        .first()
-    )
-    if not pet:
-        raise HTTPException(status_code=404, detail="Pet não encontrado.")
+    pet = _get_pet_owned_or_404(db, pet_id, current_user)
 
     pet.ativo = False
     db.commit()
@@ -278,19 +290,7 @@ async def upload_foto_pet(
     db: Session = Depends(get_session),
 ):
     """Faz upload da foto do pet e salva em /uploads/pets/{tenant_id}/."""
-    cliente = _get_cliente_or_404(db, current_user)
-    pet = (
-        db.query(Pet)
-        .filter(
-            Pet.id == pet_id,
-            Pet.tenant_id == str(current_user.tenant_id),
-            Pet.cliente_id == cliente.id,
-            Pet.ativo == True,
-        )
-        .first()
-    )
-    if not pet:
-        raise HTTPException(status_code=404, detail="Pet não encontrado.")
+    pet = _get_pet_owned_or_404(db, pet_id, current_user)
 
     # Valida tipo de arquivo
     allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -317,6 +317,104 @@ async def upload_foto_pet(
     db.commit()
     db.refresh(pet)
     return _serialize_pet(pet)
+
+
+@router.get("/pets/{pet_id}/carteirinha", response_model=PetCarteirinhaResponse)
+def obter_carteirinha_pet_app(
+    pet_id: int,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    pet = _get_pet_owned_or_404(db, pet_id, current_user)
+    from app.veterinario_routes import _montar_alertas_pet, _status_vacinal_pet
+
+    tenant_id = str(current_user.tenant_id)
+    status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
+    consultas = db.query(ConsultaVet).filter(
+        ConsultaVet.pet_id == pet.id,
+        ConsultaVet.tenant_id == tenant_id,
+    ).order_by(ConsultaVet.created_at.desc()).limit(10).all()
+    exames = db.query(ExameVet).filter(
+        ExameVet.pet_id == pet.id,
+        ExameVet.tenant_id == tenant_id,
+    ).order_by(ExameVet.created_at.desc()).limit(10).all()
+
+    return {
+        "pet": _serialize_pet(pet),
+        "alertas": _montar_alertas_pet(db, pet, tenant_id),
+        "status_vacinal": status_vacinal,
+        "consultas": [
+            {
+                "id": consulta.id,
+                "data": consulta.created_at.isoformat() if consulta.created_at else None,
+                "tipo": consulta.tipo,
+                "status": consulta.status,
+                "diagnostico": consulta.diagnostico,
+                "observacoes_tutor": consulta.observacoes_tutor,
+            }
+            for consulta in consultas
+        ],
+        "exames": [
+            {
+                "id": exame.id,
+                "nome": exame.nome,
+                "tipo": exame.tipo,
+                "status": exame.status,
+                "data_resultado": exame.data_resultado.isoformat() if exame.data_resultado else None,
+                "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
+                "arquivo_url": exame.arquivo_url,
+            }
+            for exame in exames
+        ],
+    }
+
+
+@router.get("/push-status")
+def obter_status_push(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    from app.campaigns.models import NotificationQueue, NotificationStatusEnum
+
+    cliente = _get_cliente_or_404(db, current_user)
+    pendentes = db.query(NotificationQueue).filter(
+        NotificationQueue.tenant_id == str(current_user.tenant_id),
+        NotificationQueue.customer_id == cliente.id,
+        NotificationQueue.status == NotificationStatusEnum.pending,
+    ).order_by(NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()).limit(10).all()
+
+    proximos_agendamentos = db.query(AgendamentoVet).filter(
+        AgendamentoVet.tenant_id == str(current_user.tenant_id),
+        AgendamentoVet.cliente_id == cliente.id,
+        AgendamentoVet.status.in_(["agendado", "confirmado", "em_atendimento"]),
+        AgendamentoVet.data_hora >= datetime.now(),
+    ).order_by(AgendamentoVet.data_hora.asc()).limit(5).all()
+
+    push_token = getattr(current_user, "push_token", None)
+    return {
+        "token_registrado": bool(push_token),
+        "push_token_preview": f"{push_token[:18]}..." if push_token else None,
+        "pendencias": [
+            {
+                "id": item.id,
+                "assunto": item.subject,
+                "mensagem": item.body,
+                "scheduled_at": item.scheduled_at.isoformat() if item.scheduled_at else None,
+            }
+            for item in pendentes
+        ],
+        "proximos_agendamentos": [
+            {
+                "id": ag.id,
+                "pet_id": ag.pet_id,
+                "data_hora": ag.data_hora.isoformat() if ag.data_hora else None,
+                "tipo": ag.tipo,
+                "status": ag.status,
+            }
+            for ag in proximos_agendamentos
+        ],
+        "observacao": "Push remoto não funciona no Expo Go nas versões atuais. Para homologação real, use build dev client ou APK/IPA.",
+    }
 
 
 # ─────────────────────────────────────────

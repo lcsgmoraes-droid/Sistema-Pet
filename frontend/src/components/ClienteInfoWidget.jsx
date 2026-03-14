@@ -26,6 +26,7 @@ export default function ClienteInfoWidget({ clienteId }) {
   const [expandido, setExpandido] = useState({
     resumo: false,
     pets: false,
+    alertasVet: false,
     compras: false,
     oportunidades: false,
     sugestoes: false,
@@ -140,6 +141,7 @@ export default function ClienteInfoWidget({ clienteId }) {
     cliente, 
     resumo_financeiro, 
     pets, 
+    alertas_veterinarios,
     ultimas_compras, 
     oportunidades, 
     sugestoes,
@@ -259,7 +261,39 @@ export default function ClienteInfoWidget({ clienteId }) {
                     {pet.peso && ` • ${pet.peso}kg`}
                     {pet.idade_anos !== null && ` • ${pet.idade_anos} anos`}
                   </p>
+                  {!!pet.alergias_lista?.length && (
+                    <p className="text-xs text-red-600 mt-1">Alergias: {pet.alergias_lista.join(', ')}</p>
+                  )}
+                  {!!pet.restricoes_alimentares_lista?.length && (
+                    <p className="text-xs text-amber-700 mt-1">Restrições: {pet.restricoes_alimentares_lista.join(', ')}</p>
+                  )}
+                  {!!pet.vacinas_vencidas?.length && (
+                    <p className="text-xs text-amber-700 mt-1">Vacinas atrasadas: {pet.vacinas_vencidas.length}</p>
+                  )}
+                  {!!pet.exames_pendentes && (
+                    <p className="text-xs text-blue-700 mt-1">Exames pendentes: {pet.exames_pendentes}</p>
+                  )}
                 </div>
+              </div>
+            ))}
+          </div>
+        </SecaoCollapsible>
+      )}
+
+      {alertas_veterinarios && alertas_veterinarios.length > 0 && (
+        <SecaoCollapsible
+          titulo="Alertas Veterinários"
+          icone={<FiAlertCircle />}
+          expandido={expandido.alertasVet}
+          onToggle={() => toggleSecao('alertasVet')}
+          badge={alertas_veterinarios.length}
+          badgeColor="bg-red-500"
+        >
+          <div className="space-y-2">
+            {alertas_veterinarios.map((alerta, idx) => (
+              <div key={`${alerta.pet_id}_${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-sm font-medium text-amber-900">{alerta.pet_nome}</p>
+                <p className="text-xs text-amber-800 mt-1">{alerta.mensagem}</p>
               </div>
             ))}
           </div>

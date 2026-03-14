@@ -7,6 +7,18 @@ import CampoIdadeInteligente from '../components/CampoIdadeInteligente';
 import QuickAddModal from '../components/QuickAddModal';
 import './EspeciesRacas.css'; // Para estilos do botão de adicionar rápido
 
+const listToTextarea = (items = [], fallback = '') => {
+  if (Array.isArray(items) && items.length > 0) {
+    return items.join('\n');
+  }
+  return fallback || '';
+};
+
+const textareaToList = (value = '') => value
+  .split('\n')
+  .map((item) => item.trim())
+  .filter(Boolean);
+
 const PetForm = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
@@ -44,7 +56,11 @@ const PetForm = () => {
     alergias: '',
     doencas_cronicas: '',
     medicamentos_continuos: '',
+    restricoes_alimentares: '',
     historico_clinico: '',
+    tipo_sanguineo: '',
+    pedigree_registro: '',
+    castrado_data: '',
     observacoes: '',
     foto_url: '',
     ativo: true
@@ -128,10 +144,14 @@ const PetForm = () => {
         cor: pet.cor || '',
         porte: pet.porte || '',
         microchip: pet.microchip || '',
-        alergias: pet.alergias || '',
-        doencas_cronicas: pet.doencas_cronicas || '',
-        medicamentos_continuos: pet.medicamentos_continuos || '',
+        alergias: listToTextarea(pet.alergias_lista, pet.alergias),
+        doencas_cronicas: listToTextarea(pet.condicoes_cronicas_lista, pet.doencas_cronicas),
+        medicamentos_continuos: listToTextarea(pet.medicamentos_continuos_lista, pet.medicamentos_continuos),
+        restricoes_alimentares: listToTextarea(pet.restricoes_alimentares_lista),
         historico_clinico: pet.historico_clinico || '',
+        tipo_sanguineo: pet.tipo_sanguineo || '',
+        pedigree_registro: pet.pedigree_registro || '',
+        castrado_data: pet.castrado_data || '',
         observacoes: pet.observacoes || '',
         foto_url: pet.foto_url || '',
         ativo: pet.ativo !== undefined ? pet.ativo : true
@@ -217,7 +237,12 @@ const PetForm = () => {
         cliente_id: parseInt(formData.cliente_id),
         peso: formData.peso ? parseFloat(formData.peso) : null,
         idade_aproximada: formData.idade_aproximada ? parseInt(formData.idade_aproximada) : null,
-        data_nascimento: formData.data_nascimento || null
+        data_nascimento: formData.data_nascimento || null,
+        alergias_lista: textareaToList(formData.alergias),
+        condicoes_cronicas_lista: textareaToList(formData.doencas_cronicas),
+        medicamentos_continuos_lista: textareaToList(formData.medicamentos_continuos),
+        restricoes_alimentares_lista: textareaToList(formData.restricoes_alimentares),
+        castrado_data: formData.castrado_data || null,
       };
 
       if (isEditing) {
@@ -527,6 +552,48 @@ const PetForm = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tipo sanguíneo
+              </label>
+              <input
+                type="text"
+                name="tipo_sanguineo"
+                value={formData.tipo_sanguineo}
+                onChange={handleChange}
+                placeholder="Ex: DEA 1.1, A, B"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Registro de pedigree
+              </label>
+              <input
+                type="text"
+                name="pedigree_registro"
+                value={formData.pedigree_registro}
+                onChange={handleChange}
+                placeholder="Código do registro, se houver"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Data da castração
+              </label>
+              <input
+                type="date"
+                name="castrado_data"
+                value={formData.castrado_data}
+                onChange={handleChange}
+                disabled={!formData.castrado}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:bg-gray-100"
+              />
+            </div>
+
             <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 URL da Foto
@@ -552,6 +619,7 @@ const PetForm = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Alergias
               </label>
+              <p className="text-xs text-gray-500 mb-2">Uma linha por item.</p>
               <textarea
                 name="alergias"
                 value={formData.alergias}
@@ -566,6 +634,7 @@ const PetForm = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Doenças Crônicas
               </label>
+              <p className="text-xs text-gray-500 mb-2">Uma linha por condição registrada.</p>
               <textarea
                 name="doencas_cronicas"
                 value={formData.doencas_cronicas}
@@ -580,12 +649,28 @@ const PetForm = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Medicamentos Contínuos
               </label>
+              <p className="text-xs text-gray-500 mb-2">Uma linha por medicamento, de preferência com dose.</p>
               <textarea
                 name="medicamentos_continuos"
                 value={formData.medicamentos_continuos}
                 onChange={handleChange}
                 rows="3"
                 placeholder="Liste medicamentos de uso contínuo com dosagem"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Restrições alimentares
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Uma linha por restrição, intolerância ou dieta especial.</p>
+              <textarea
+                name="restricoes_alimentares"
+                value={formData.restricoes_alimentares}
+                onChange={handleChange}
+                rows="3"
+                placeholder="Ex: sem frango, dieta renal, alimento úmido controlado"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>

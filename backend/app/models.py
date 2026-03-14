@@ -308,9 +308,16 @@ class Pet(BaseTenantModel):
     # Saúde
     microchip = Column(String(50), nullable=True)
     alergias = Column(Text, nullable=True)
+    alergias_lista = Column(JSON, nullable=True)
     doencas_cronicas = Column(Text, nullable=True)
+    condicoes_cronicas_lista = Column(JSON, nullable=True)
     medicamentos_continuos = Column(Text, nullable=True)
+    medicamentos_continuos_lista = Column(JSON, nullable=True)
+    restricoes_alimentares_lista = Column(JSON, nullable=True)
     historico_clinico = Column(Text, nullable=True)
+    tipo_sanguineo = Column(String(20), nullable=True)
+    pedigree_registro = Column(String(100), nullable=True)
+    castrado_data = Column(Date, nullable=True)
 
     # Outros
     observacoes = Column(Text, nullable=True)
