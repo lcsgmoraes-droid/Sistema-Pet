@@ -137,7 +137,7 @@ class CategoriaBase(BaseModel):
     descricao: Optional[str] = None
     icone: Optional[str] = None
     cor: Optional[str] = None
-    ordem: int = 0
+    ordem: Optional[int] = 0
 
 
 class CategoriaCreate(CategoriaBase):
