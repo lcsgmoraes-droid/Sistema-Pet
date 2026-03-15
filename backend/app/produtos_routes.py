@@ -133,6 +133,7 @@ def _validar_codigo_barras_unico(db: Session, codigo_barras: str, tenant_id: int
 class CategoriaBase(BaseModel):
     nome: str
     categoria_pai_id: Optional[int] = None
+    departamento_id: Optional[int] = None
     descricao: Optional[str] = None
     icone: Optional[str] = None
     cor: Optional[str] = None
@@ -157,6 +158,7 @@ class CategoriaResponse(CategoriaBase):
     nivel: Optional[int] = None
     total_filhos: Optional[int] = 0
     total_produtos: Optional[int] = 0
+    departamento_nome: Optional[str] = None
 
 
 # ==========================================
@@ -651,6 +653,8 @@ def listar_categorias(
             "nome": cat.nome,
             "descricao": cat.descricao,
             "categoria_pai_id": cat.categoria_pai_id,
+            "departamento_id": cat.departamento_id,
+            "departamento_nome": cat.departamento.nome if cat.departamento else None,
             "icone": cat.icone,
             "cor": cat.cor,
             "ordem": cat.ordem,

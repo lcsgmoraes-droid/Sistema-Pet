@@ -131,6 +131,7 @@ const RelatoriosComissoes = lazy(
 );
 const Subcategorias = lazy(() => import("./pages/Subcategorias"));
 const Categorias = lazy(() => import("./pages/Cadastros/Categorias"));
+const Departamentos = lazy(() => import("./pages/Cadastros/Departamentos"));
 const CategoriasFinanceiras = lazy(
   () => import("./pages/CategoriasFinanceiras"),
 );
@@ -631,6 +632,7 @@ function App() {
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
+                  <Route path="cadastros/departamentos" element={<Departamentos />} />
                   <Route path="cadastros/categorias" element={<Categorias />} />
                   <Route
                     path="cadastros/categorias-financeiras"

@@ -669,6 +669,11 @@ const Layout = () => {
           permission: "cadastros.cargos",
         },
         {
+          path: "/cadastros/departamentos",
+          label: "Departamentos",
+          permission: "cadastros.categorias_produtos",
+        },
+        {
           path: "/cadastros/categorias",
           label: "Categorias de Produtos",
           permission: "cadastros.categorias_produtos",

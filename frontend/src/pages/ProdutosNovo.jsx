@@ -1387,8 +1387,39 @@ export default function ProdutosNovo() {
                 />
               </div>
 
-              {/* Linha 3: ClassificaÃ§Ã£o */}
+              {/* Linha 3: Classificação */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo
+                  </label>
+                  <select
+                    value={formData.tipo}
+                    onChange={(e) => handleChange('tipo', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="produto">Produto</option>
+                    <option value="servico">Serviço</option>
+                    <option value="ambos">Produto e Serviço</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Departamento
+                  </label>
+                  <select
+                    value={formData.departamento_id}
+                    onChange={(e) => handleChange('departamento_id', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Selecione...</option>
+                    {departamentos.map(dep => (
+                      <option key={dep.id} value={dep.id}>{dep.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Categoria
@@ -1420,37 +1451,6 @@ export default function ProdutosNovo() {
                     {marcas.map(marca => (
                       <option key={marca.id} value={marca.id}>{marca.nome}</option>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Departamento
-                  </label>
-                  <select
-                    value={formData.departamento_id}
-                    onChange={(e) => handleChange('departamento_id', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Selecione...</option>
-                    {departamentos.map(dep => (
-                      <option key={dep.id} value={dep.id}>{dep.nome}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo
-                  </label>
-                  <select
-                    value={formData.tipo}
-                    onChange={(e) => handleChange('tipo', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="produto">Produto</option>
-                    <option value="servico">Serviço</option>
-                    <option value="ambos">Produto e Serviço</option>
                   </select>
                 </div>
               </div>

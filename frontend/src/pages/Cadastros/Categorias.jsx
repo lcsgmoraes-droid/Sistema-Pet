@@ -4,6 +4,7 @@ import api from '../../api';
 
 const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
+  const [departamentos, setDepartamentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -12,6 +13,7 @@ const Categorias = () => {
     nome: '',
     descricao: '',
     categoria_pai_id: null,
+    departamento_id: null,
     ordem: 0
   });
 
@@ -19,6 +21,7 @@ const Categorias = () => {
 
   useEffect(() => {
     carregarCategorias();
+    carregarDepartamentos();
   }, []);
 
   const carregarCategorias = async () => {
@@ -31,6 +34,15 @@ const Categorias = () => {
       alert('Erro ao carregar categorias');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarDepartamentos = async () => {
+    try {
+      const response = await api.get('/produtos/departamentos');
+      setDepartamentos(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar departamentos:', error);
     }
   };
 
@@ -56,7 +68,7 @@ const Categorias = () => {
       
       setShowModal(false);
       setEditando(null);
-      setFormData({ nome: '', descricao: '', categoria_pai_id: null, ordem: 0 });
+      setFormData({ nome: '', descricao: '', categoria_pai_id: null, departamento_id: null, ordem: 0 });
       carregarCategorias();
     } catch (error) {
       console.error('Erro ao salvar categoria:', error);
@@ -74,6 +86,7 @@ const Categorias = () => {
       nome: categoria.nome,
       descricao: categoria.descricao || '',
       categoria_pai_id: categoria.categoria_pai_id,
+      departamento_id: categoria.departamento_id || null,
       ordem: categoria.ordem
     });
     setShowModal(true);
@@ -111,6 +124,7 @@ const Categorias = () => {
       nome: '',
       descricao: '',
       categoria_pai_id: categoriaPai.id,
+      departamento_id: categoriaPai.departamento_id || null,
       ordem: 0
     });
     setShowModal(true);
@@ -122,6 +136,7 @@ const Categorias = () => {
       nome: '',
       descricao: '',
       categoria_pai_id: null,
+      departamento_id: null,
       ordem: 0
     });
     setShowModal(true);
@@ -175,6 +190,11 @@ const Categorias = () => {
               <span className="text-xs text-gray-500">
                 Nível {nivel}
               </span>
+              {categoria.departamento_nome && (
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                  {categoria.departamento_nome}
+                </span>
+              )}
               {categoria.total_filhos > 0 && (
                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
                   {categoria.total_filhos} sub
@@ -309,6 +329,27 @@ const Categorias = () => {
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Departamento
+                </label>
+                <select
+                  value={formData.departamento_id || ''}
+                  onChange={(e) => setFormData({ ...formData, departamento_id: e.target.value ? parseInt(e.target.value) : null })}
+                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Sem departamento</option>
+                  {departamentos.map((dep) => (
+                    <option key={dep.id} value={dep.id}>{dep.nome}</option>
+                  ))}
+                </select>
+                {departamentos.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Nenhum departamento cadastrado ainda. <a href="/cadastros/departamentos" className="underline">Criar departamentos</a>
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Descrição
                 </label>
                 <textarea
@@ -350,7 +391,7 @@ const Categorias = () => {
                   onClick={() => {
                     setShowModal(false);
                     setEditando(null);
-                    setFormData({ nome: '', descricao: '', categoria_pai_id: null, ordem: 0 });
+                    setFormData({ nome: '', descricao: '', categoria_pai_id: null, departamento_id: null, ordem: 0 });
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
                 >

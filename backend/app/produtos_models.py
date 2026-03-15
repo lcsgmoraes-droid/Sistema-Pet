@@ -21,6 +21,7 @@ class Categoria(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     nome = Column(String(100), nullable=False)
     categoria_pai_id = Column(Integer, ForeignKey('categorias.id'), nullable=True)
+    departamento_id = Column(Integer, ForeignKey('departamentos.id'), nullable=True)
     descricao = Column(Text, nullable=True)
     icone = Column(String(50), nullable=True)
     cor = Column(String(7), nullable=True)  # Hex color
@@ -34,6 +35,7 @@ class Categoria(BaseTenantModel):
     
     # Relationships
     categoria_pai = relationship("Categoria", remote_side=[id], backref="subcategorias")
+    departamento = relationship("Departamento", back_populates="categorias")
     produtos = relationship("Produto", back_populates="categoria")
     user = relationship("User")
 
@@ -77,6 +79,7 @@ class Departamento(BaseTenantModel):
     
     # Relationships
     produtos = relationship("Produto", back_populates="departamento")
+    categorias = relationship("Categoria", back_populates="departamento")
     user = relationship("User")
 
 
