@@ -26,7 +26,7 @@ class PagarmeConnectClient:
     """
 
     BASE_URL = "https://api.pagar.me/core/v5"
-    SERVICE_REFERER_NAME = "698babbf7ef14a04992e3e0a"
+    SERVICE_REFERER_NAME = "698d02a558ac1b4c5d750c78"  # Partner Hub → ServiceRefererName
 
     def __init__(self, secret_key: str):
         """
@@ -130,9 +130,21 @@ class PagarmeConnectClient:
         """Consulta status atualizado de um pedido."""
         return await self._request("GET", f"/orders/{order_id}")
 
+    async def fechar_pedido(self, order_id: str) -> Dict[str, Any]:
+        """
+        Fecha um pedido após confirmação de pagamento (OBRIGATÓRIO após charge.paid).
+        Stone tem limite de 30 pedidos abertos — fechar sempre que o pagamento for confirmado.
+        Endpoint: PATCH /orders/{order_id}/closed
+        """
+        return await self._request("PATCH", f"/orders/{order_id}/closed", json={"status": "paid"})
+
     async def cancelar_pedido(self, order_id: str) -> Dict[str, Any]:
-        """Cancela um pedido aberto."""
-        return await self._request("DELETE", f"/orders/{order_id}")
+        """
+        Cancela um pedido aberto (retira da fila da maquininha).
+        Só pode ser cancelado ANTES do pagamento.
+        Endpoint: PATCH /orders/{order_id}/closed/ com status=canceled
+        """
+        return await self._request("PATCH", f"/orders/{order_id}/closed/", json={"status": "canceled"})
 
     # ---------------------------------------------------------------------------
     # Webhook

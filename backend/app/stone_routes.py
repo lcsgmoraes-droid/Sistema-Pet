@@ -5,10 +5,11 @@ Endpoints para processar pagamentos PIX e Cartão via Stone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import logging
+import uuid
 
 from .db import get_session
 from .auth import get_current_user
@@ -87,11 +88,24 @@ class RefundPaymentSchema(BaseModel):
     reason: Optional[str] = None
 
 
+class CriarPedidoPosSchema(BaseModel):
+    """Schema para criar pedido na maquininha (POS)"""
+    serial_number: str = Field(..., description="Número de série da maquininha Stone")
+    items: List[Dict] = Field(..., description="Itens: [{amount (centavos), description, quantity, code}]")
+    customer_name: str = Field(default="Cliente")
+    customer_email: Optional[str] = None
+    customer_document: Optional[str] = None
+    payment_type: Optional[str] = Field(None, description="debit | credit | pix | None (cliente escolhe)")
+    installments: int = Field(default=1, ge=1, le=12)
+    venda_id: Optional[int] = None
+    external_id: Optional[str] = None
+
+
 # ==========================================
 # FUNÇÕES AUXILIARES
 # ==========================================
 
-def get_stone_client(db: Session, tenant_id: int) -> StoneAPIClient:
+def get_stone_client(db: Session, tenant_id) -> StoneAPIClient:
     """Obtém cliente Stone configurado para o tenant"""
     config = db.query(StoneConfig).filter(
         StoneConfig.tenant_id == tenant_id,
@@ -104,12 +118,156 @@ def get_stone_client(db: Session, tenant_id: int) -> StoneAPIClient:
             detail="Configuração Stone não encontrada. Configure primeiro em /api/stone/config"
         )
 
-    return StoneAPIClient(
-        client_id=config.client_id,
-        client_secret=config.client_secret,
-        merchant_id=config.merchant_id,
-        sandbox=config.sandbox
-    )
+    return StoneAPIClient(secret_key=config.client_id)
+
+
+# ==========================================
+# PEDIDO POS (MAQUININHA)
+# ==========================================
+
+@router.post("/pedido-pos")
+async def criar_pedido_pos(
+    pedido: CriarPedidoPosSchema,
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Cria um pedido na maquininha Stone (POS).
+
+    O pedido aparece na tela da maquininha para o cliente pagar.
+    Após o pagamento, a Stone envia webhook charge.paid e o pedido é fechado automaticamente.
+
+    - payment_type = None → cliente escolhe na maquininha (fluxo Listagem)
+    - payment_type = debit/credit/pix → tipo definido pelo sistema (fluxo Direto)
+    """
+    user, tenant_id = auth
+    tenant_id_str = str(tenant_id)
+
+    stone_client = get_stone_client(db, tenant_id_str)
+
+    external_id = pedido.external_id or f"VENDA-{pedido.venda_id or uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:6]}"
+
+    customer = {
+        "name": pedido.customer_name,
+        "type": "individual",
+    }
+    if pedido.customer_email:
+        customer["email"] = pedido.customer_email
+    if pedido.customer_document:
+        customer["document"] = pedido.customer_document.replace(".", "").replace("-", "").replace("/", "")
+
+    payment_setup = None
+    if pedido.payment_type:
+        payment_setup = {
+            "type": pedido.payment_type,
+            "installments": pedido.installments,
+            "installment_type": "merchant",
+        }
+
+    try:
+        stone_response = await stone_client.criar_pedido_pos(
+            items=pedido.items,
+            customer=customer,
+            serial_number=pedido.serial_number,
+            payment_setup=payment_setup,
+            metadata={"external_id": external_id, "venda_id": pedido.venda_id},
+        )
+
+        amount_reais = Decimal(sum(i.get("amount", 0) for i in pedido.items)) / 100
+
+        transaction = StoneTransaction(
+            stone_payment_id=stone_response["id"],
+            external_id=external_id,
+            venda_id=pedido.venda_id,
+            payment_method=pedido.payment_type or "pos",
+            amount=amount_reais,
+            description=f"Pedido POS - {len(pedido.items)} item(ns)",
+            installments=pedido.installments,
+            status="pending",
+            stone_status=stone_response.get("status"),
+            customer_name=pedido.customer_name,
+            customer_document=pedido.customer_document,
+            customer_email=pedido.customer_email,
+            stone_response=stone_response,
+            tenant_id=tenant_id_str,
+            user_id=user.id,
+        )
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
+
+        registrar_log(
+            db=db,
+            transaction_id=transaction.id,
+            event_type="pedido_pos_criado",
+            event_source="sistema",
+            description=f"Pedido POS criado na maquininha {pedido.serial_number}",
+            new_status="pending",
+            user_id=user.id,
+            tenant_id=tenant_id_str,
+        )
+
+        logger.info(f"Pedido POS criado: order_id={stone_response['id']} serial={pedido.serial_number}")
+
+        return {
+            "success": True,
+            "message": "Pedido enviado para a maquininha",
+            "order_id": stone_response["id"],
+            "transaction_id": transaction.id,
+            "status": stone_response.get("status"),
+        }
+
+    except Exception as e:
+        logger.error(f"Erro ao criar pedido POS: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar pedido POS: {str(e)}")
+
+
+@router.post("/pedido-pos/{order_id}/fechar")
+async def fechar_pedido_pos(
+    order_id: str,
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Fecha um pedido POS manualmente (normalmente feito automaticamente pelo webhook).
+    Necessário quando o webhook não chegou ou para forçar fechamento.
+    """
+    user, tenant_id = auth
+    tenant_id_str = str(tenant_id)
+
+    transaction = db.query(StoneTransaction).filter(
+        StoneTransaction.stone_payment_id == order_id,
+        StoneTransaction.tenant_id == tenant_id_str,
+    ).first()
+
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    stone_client = get_stone_client(db, tenant_id_str)
+    try:
+        await stone_client.fechar_pedido(order_id)
+
+        old_status = transaction.status
+        transaction.status = "approved"
+        transaction.paid_at = transaction.paid_at or datetime.now(timezone.utc)
+        transaction.updated_at = datetime.now(timezone.utc)
+        db.commit()
+
+        registrar_log(
+            db=db,
+            transaction_id=transaction.id,
+            event_type="pedido_pos_fechado",
+            event_source="manual",
+            description="Pedido fechado manualmente",
+            old_status=old_status,
+            new_status="approved",
+            user_id=user.id,
+            tenant_id=tenant_id_str,
+        )
+
+        return {"success": True, "message": "Pedido fechado com sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao fechar pedido: {str(e)}")
 
 
 def registrar_log(
@@ -699,6 +857,29 @@ async def estornar_pagamento(
 # WEBHOOK (Recebe notificações da Stone)
 # ==========================================
 
+_WEBHOOK_STATUS_MAP = {
+    "charge.paid": "approved",
+    "charge.refunded": "refunded",
+    "charge.chargedback": "refunded",
+    "charge.payment_failed": "failed",
+}
+
+
+async def _fechar_pedido_stone(db: Session, tenant_id: str, order_id: str) -> None:
+    """Fecha um pedido na Stone após pagamento confirmado (obrigatório, limite 30 abertos)."""
+    config = db.query(StoneConfig).filter(StoneConfig.tenant_id == tenant_id).first()
+    if config:
+        try:
+            await StoneAPIClient(secret_key=config.client_id).fechar_pedido(order_id)
+            logger.info(f"Pedido {order_id} fechado automaticamente após charge.paid")
+        except Exception as e:
+            logger.error(f"Erro ao fechar pedido {order_id} após webhook: {e}")
+
+
+# ==========================================
+# WEBHOOK (Recebe notificações da Stone)
+# ==========================================
+
 @router.post("/webhook")
 async def receber_webhook_stone(
     request: Request,
@@ -706,74 +887,73 @@ async def receber_webhook_stone(
     db: Session = Depends(get_session)
 ):
     """
-    Endpoint para receber webhooks da Stone
+    Recebe webhooks da Stone Connect (charge.paid, charge.refunded, etc.).
 
-    Configure esta URL no dashboard da Stone:
-    https://seu-dominio.com/api/stone/webhook
+    Formato Stone Connect:
+    {
+      "type": "charge.paid",
+      "data": {
+        "id": "ch_...",
+        "status": "paid",
+        "order": { "id": "or_...", ... }
+      }
+    }
+
+    Após charge.paid: fecha o pedido automaticamente na Stone.
     """
-    # Obtém dados do webhook
     webhook_data = await request.json()
+    event_type = webhook_data.get("type", "")
+    data = webhook_data.get("data", {})
 
-    logger.info(f"Webhook Stone recebido: {webhook_data.get('event')}")
+    logger.info(f"Webhook Stone Connect recebido: {event_type}")
 
-    # Identifica a transação
-    payment_id = webhook_data.get('payment', {}).get('id')
+    order_id = data.get("order", {}).get("id") or data.get("id")
 
-    if not payment_id:
-        logger.error("Webhook sem payment_id")
-        return {"success": False, "error": "payment_id não encontrado"}
+    if not order_id:
+        logger.error(f"Webhook Stone sem order_id: {webhook_data}")
+        return {"success": False, "error": "order_id não encontrado no payload"}
 
-    # Busca transação
     transaction = db.query(StoneTransaction).filter(
-        StoneTransaction.stone_payment_id == payment_id
+        StoneTransaction.stone_payment_id == order_id
     ).first()
 
     if not transaction:
-        logger.warning(f"Transação não encontrada para payment_id: {payment_id}")
-        return {"success": False, "error": "Transação não encontrada"}
+        logger.warning(f"Transação não encontrada para order_id: {order_id}")
+        return {"success": True, "message": "Pedido não rastreado por este sistema"}
 
-    # Validação de signature: implementar quando Stone fornecer a chave webhook_secret
-    # config = db.query(StoneConfig).filter(StoneConfig.tenant_id == transaction.tenant_id).first()
-    # if config and config.webhook_secret:
-    #     if not StoneAPIClient.validar_webhook_signature(...):
-    #         raise HTTPException(status_code=401, detail="Signature inválida")
-
-    # Atualiza status
     old_status = transaction.status
-    new_status = webhook_data.get('payment', {}).get('status')
+    new_status = _WEBHOOK_STATUS_MAP.get(event_type, old_status)
+
+    if event_type == "charge.paid":
+        if not transaction.paid_at:
+            transaction.paid_at = datetime.now(timezone.utc)
+        await _fechar_pedido_stone(db, transaction.tenant_id, order_id)
+    elif event_type in ("charge.refunded", "charge.chargedback"):
+        if not transaction.refunded_at:
+            transaction.refunded_at = datetime.now(timezone.utc)
 
     transaction.status = new_status
-    transaction.stone_status = new_status
+    transaction.stone_status = data.get("status", new_status)
     transaction.last_webhook_at = datetime.now(timezone.utc)
-    transaction.webhook_count += 1
-    transaction.stone_response = webhook_data.get('payment')
-
-    # Atualiza datas específicas
-    if new_status == 'approved' and not transaction.paid_at:
-        transaction.paid_at = datetime.now(timezone.utc)
-    elif new_status == 'cancelled' and not transaction.cancelled_at:
-        transaction.cancelled_at = datetime.now(timezone.utc)
-    elif new_status == 'refunded' and not transaction.refunded_at:
-        transaction.refunded_at = datetime.now(timezone.utc)
-
+    transaction.webhook_count = (transaction.webhook_count or 0) + 1
+    transaction.stone_response = data
+    transaction.updated_at = datetime.now(timezone.utc)
     db.commit()
 
-    # Registra log do webhook
     registrar_log(
         db=db,
         transaction_id=transaction.id,
-        event_type='webhook_received',
-        event_source='stone_webhook',
-        description=f"Webhook: {webhook_data.get('event')}",
+        event_type="webhook_recebido",
+        event_source="stone_webhook",
+        description=f"Webhook: {event_type}",
         old_status=old_status,
         new_status=new_status,
         webhook_data=webhook_data,
-        tenant_id=transaction.tenant_id
+        tenant_id=transaction.tenant_id,
     )
 
-    logger.info(f"Webhook processado: Transaction {transaction.id} - {old_status} -> {new_status}")
-
-    return {"success": True, "message": "Webhook processado com sucesso"}
+    logger.info(f"Webhook processado: order={order_id} {old_status} → {new_status}")
+    return {"success": True, "message": "Webhook processado"}
 
 
 # ==========================================
