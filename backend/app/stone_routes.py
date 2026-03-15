@@ -324,16 +324,23 @@ def configurar_stone(
         StoneConfig.tenant_id == tenant_id
     ).first()
 
+    config_payload = config_data.dict()
+
     if existing_config:
+        # Se o frontend reenviar a chave mascarada, preserva a chave real salva.
+        incoming_client_id = config_payload.get("client_id")
+        if incoming_client_id and "*" in incoming_client_id:
+            config_payload["client_id"] = existing_config.client_id
+
         # Atualiza configuração existente
-        for key, value in config_data.dict().items():
+        for key, value in config_payload.items():
             setattr(existing_config, key, value)
         existing_config.updated_at = datetime.now(timezone.utc)
         config = existing_config
     else:
         # Cria nova configuração
         config = StoneConfig(
-            **config_data.dict(),
+            **config_payload,
             tenant_id=tenant_id,
             user_id=current_user['id']
         )

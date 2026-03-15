@@ -236,8 +236,16 @@ class StoneConfig(BaseTenantModel):
 
     def to_dict(self):
         """Serializa para dicionário (sem expor secrets)"""
+        masked_client_id = ""
+        if self.client_id:
+            if len(self.client_id) > 7:
+                masked_client_id = f"{self.client_id[:3]}***{self.client_id[-4:]}"
+            else:
+                masked_client_id = self.client_id
+
         return {
             'id': self.id,
+            'client_id': masked_client_id,
             'merchant_id': self.merchant_id,
             'sandbox': self.sandbox,
             'enable_pix': self.enable_pix,
