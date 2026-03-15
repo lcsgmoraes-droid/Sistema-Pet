@@ -282,8 +282,11 @@ export default function VetVacinas() {
             />
 
             <div className="relative">
+              <label htmlFor="vacinas-pet-filtro" className="sr-only">Pet</label>
               <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <select
+                id="vacinas-pet-filtro"
+                name="vacinas-pet-filtro"
                 value={petSelecionado}
                 onChange={(e) => setPetSelecionado(e.target.value)}
                 disabled={!pessoaFiltro}
