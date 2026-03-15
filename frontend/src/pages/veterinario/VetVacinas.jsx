@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Syringe, Plus, AlertCircle, CheckCircle, Search, ChevronDown, CalendarDays, RefreshCw } from "lucide-react";
+import { Syringe, Plus, AlertCircle, CheckCircle, ChevronDown, CalendarDays, RefreshCw } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+import TutorAutocomplete from "../../components/TutorAutocomplete";
+
 function adicionarDias(dataIso, dias) {
   if (!dataIso || !dias) return "";
   const data = new Date(`${dataIso}T12:00:00`);
@@ -42,7 +44,7 @@ function formatData(iso) {
 
 function diasRestantes(iso) {
   if (!iso) return null;
-  const diff = Math.ceil((new Date(iso) - new Date()) / 86400000);
+  const diff = Math.ceil((new Date(iso) - Date.now()) / 86400000);
   return diff;
 }
 
@@ -50,15 +52,22 @@ function badgeProxDose(iso) {
   if (!iso) return null;
   const dias = diasRestantes(iso);
   if (dias < 0) return { label: `Vencida há ${Math.abs(dias)}d`, cls: "bg-red-100 text-red-700" };
-  if (dias <= 7) return { label: `${dias === 0 ? "Hoje" : `em ${dias}d`}`, cls: "bg-red-100 text-red-700" };
+  if (dias <= 7) return { label: dias === 0 ? "Hoje" : `em ${dias}d`, cls: "bg-red-100 text-red-700" };
   if (dias <= 30) return { label: `em ${dias}d`, cls: "bg-yellow-100 text-yellow-700" };
   return { label: `em ${dias}d`, cls: "bg-green-100 text-green-700" };
+}
+
+function classeFaseCalendario(fase) {
+  if (fase === "filhote") return "bg-blue-100 text-blue-700";
+  if (fase === "adulto") return "bg-green-100 text-green-700";
+  return "bg-gray-100 text-gray-600";
 }
 
 export default function VetVacinas() {
   const [searchParams] = useSearchParams();
   const [aba, setAba] = useState("registros"); // "registros" | "vencendo" | "calendario"
   const [pessoaFiltro, setPessoaFiltro] = useState("");
+  const [tutorFiltroSelecionado, setTutorFiltroSelecionado] = useState(null);
   const [petSelecionado, setPetSelecionado] = useState("");
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
@@ -71,6 +80,7 @@ export default function VetVacinas() {
   const [calendario, setCalendario] = useState([]);
   const [especieCalendario, setEspecieCalendario] = useState("");
   const [carregandoCalendario, setCarregandoCalendario] = useState(false);
+  const [tutorFormSelecionado, setTutorFormSelecionado] = useState(null);
   const [form, setForm] = useState({
     pessoa_id: "",
     pet_id: "",
@@ -143,7 +153,9 @@ export default function VetVacinas() {
     const pessoaId = petEncontrado?.cliente_id ? String(petEncontrado.cliente_id) : "";
     if (pessoaId) {
       setPessoaFiltro(pessoaId);
+      setTutorFiltroSelecionado({ id: pessoaId, nome: petEncontrado.cliente_nome ?? `Pessoa #${pessoaId}` });
       setForm((prev) => ({ ...prev, pessoa_id: pessoaId }));
+      setTutorFormSelecionado({ id: pessoaId, nome: petEncontrado.cliente_nome ?? `Pessoa #${pessoaId}` });
     }
 
     setPetSelecionado(String(petEncontrado.id));
@@ -153,19 +165,6 @@ export default function VetVacinas() {
       setNovaAberta(true);
     }
   }, [petIdQuery, acaoQuery, pets]);
-
-  const pessoas = useMemo(() => {
-    const mapa = new Map();
-    for (const p of pets) {
-      if (!p?.cliente_id) continue;
-      if (mapa.has(String(p.cliente_id))) continue;
-      mapa.set(String(p.cliente_id), {
-        id: String(p.cliente_id),
-        nome: p.cliente_nome ?? `Pessoa #${p.cliente_id}`,
-      });
-    }
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pets]);
 
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
@@ -211,6 +210,7 @@ export default function VetVacinas() {
         observacoes: form.observacoes || undefined,
       });
       setNovaAberta(false);
+      setTutorFormSelecionado(null);
       setForm({ pessoa_id: "", pet_id: "", nome_vacina: "", fabricante: "", lote: "", data_aplicacao: "", proxima_dose: "", veterinario_responsavel: "", observacoes: "" });
       // Recarrega a lista se for o mesmo pet
       if (form.pet_id === petSelecionado) await carregarVacinasPet();
@@ -221,8 +221,6 @@ export default function VetVacinas() {
       setSalvando(false);
     }
   }
-
-  const petNome = (id) => pets.find((p) => p.id === id)?.nome ?? id;
 
   return (
     <div className="p-6 space-y-5">
@@ -272,20 +270,16 @@ export default function VetVacinas() {
       {aba === "registros" && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <select
-                value={pessoaFiltro}
-                onChange={(e) => {
-                  setPessoaFiltro(e.target.value);
-                  setPetSelecionado("");
-                }}
-                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-300"
-              >
-                <option value="">Selecione o tutor…</option>
-                {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
-              </select>
-            </div>
+            <TutorAutocomplete
+              label="Tutor"
+              inputId="vacinas-tutor-filtro"
+              selectedTutor={tutorFiltroSelecionado}
+              onSelect={(cliente) => {
+                setTutorFiltroSelecionado(cliente);
+                setPessoaFiltro(cliente?.id ? String(cliente.id) : "");
+                setPetSelecionado("");
+              }}
+            />
 
             <div className="relative">
               <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -321,9 +315,16 @@ export default function VetVacinas() {
                   <p className="text-gray-400 text-sm">Nenhuma vacina registrada para este pet.</p>
                   <button
                     onClick={() => {
+                      const pessoaIdAtual = pessoaIdPorPet(petSelecionado);
+                      const petAtual = pets.find((p) => String(p.id) === String(petSelecionado));
+                      setTutorFormSelecionado(
+                        pessoaIdAtual
+                          ? { id: pessoaIdAtual, nome: petAtual?.cliente_nome ?? `Pessoa #${pessoaIdAtual}` }
+                          : null
+                      );
                       setForm((prev) => ({
                         ...prev,
-                        pessoa_id: pessoaIdPorPet(petSelecionado),
+                        pessoa_id: pessoaIdAtual,
                         pet_id: petSelecionado,
                       }));
                       setNovaAberta(true);
@@ -478,23 +479,17 @@ export default function VetVacinas() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {calendario.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-orange-50 transition-colors">
+                  {calendario.map((item) => (
+                    <tr key={`${item.vacina || "vacina"}-${item.especie || "especie"}-${item.fase || "fase"}-${item.idade_semanas_min || "sem-idade"}`} className="hover:bg-orange-50 transition-colors">
                       <td className="px-4 py-3 font-medium text-gray-800">{item.vacina}</td>
                       <td className="px-4 py-3 text-gray-600 capitalize">{item.especie ?? "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          item.fase === "filhote"
-                            ? "bg-blue-100 text-blue-700"
-                            : item.fase === "adulto"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${classeFaseCalendario(item.fase)}`}>
                           {item.fase ?? "—"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
-                        {item.idade_semanas_min != null ? `${item.idade_semanas_min} sem.` : "—"}
+                        {item.idade_semanas_min == null ? "—" : `${item.idade_semanas_min} sem.`}
                       </td>
                       <td className="px-4 py-3">
                         {item.reforco_anual ? (
@@ -530,22 +525,21 @@ export default function VetVacinas() {
             <div className="grid grid-cols-2 gap-3">
               {/* Pet */}
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Pessoa (tutor) *</label>
-                <select
-                  value={form.pessoa_id}
-                  onChange={(e) => {
-                    set("pessoa_id", e.target.value);
+                <TutorAutocomplete
+                  label="Pessoa (tutor) *"
+                  inputId="vacinas-tutor-form"
+                  selectedTutor={tutorFormSelecionado}
+                  onSelect={(cliente) => {
+                    setTutorFormSelecionado(cliente);
+                    set("pessoa_id", cliente?.id ? String(cliente.id) : "");
                     set("pet_id", "");
                   }}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                >
-                  <option value="">Selecione…</option>
-                  {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
-                </select>
+                />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Pet da pessoa *</label>
+                <label htmlFor="vacinas-pet-form" className="block text-xs font-medium text-gray-600 mb-1">Pet da pessoa *</label>
                 <select
+                  id="vacinas-pet-form"
                   value={form.pet_id}
                   onChange={(e) => set("pet_id", e.target.value)}
                   disabled={!form.pessoa_id}
@@ -579,34 +573,35 @@ export default function VetVacinas() {
               )}
               {/* Vacina */}
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Nome da vacina *</label>
-                <input type="text" value={form.nome_vacina} onChange={(e) => set("nome_vacina", e.target.value)}
+                <label htmlFor="vacinas-nome" className="block text-xs font-medium text-gray-600 mb-1">Nome da vacina *</label>
+                <input id="vacinas-nome" type="text" value={form.nome_vacina} onChange={(e) => set("nome_vacina", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   placeholder="Ex: V10, Antirrábica, Gripe felina…" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Fabricante</label>
-                <input type="text" value={form.fabricante} onChange={(e) => set("fabricante", e.target.value)}
+                <label htmlFor="vacinas-fabricante" className="block text-xs font-medium text-gray-600 mb-1">Fabricante</label>
+                <input id="vacinas-fabricante" type="text" value={form.fabricante} onChange={(e) => set("fabricante", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Lote</label>
-                <input type="text" value={form.lote} onChange={(e) => set("lote", e.target.value)}
+                <label htmlFor="vacinas-lote" className="block text-xs font-medium text-gray-600 mb-1">Lote</label>
+                <input id="vacinas-lote" type="text" value={form.lote} onChange={(e) => set("lote", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data de aplicação *</label>
-                <input type="date" value={form.data_aplicacao} onChange={(e) => set("data_aplicacao", e.target.value)}
+                <label htmlFor="vacinas-data-aplicacao" className="block text-xs font-medium text-gray-600 mb-1">Data de aplicação *</label>
+                <input id="vacinas-data-aplicacao" type="date" value={form.data_aplicacao} onChange={(e) => set("data_aplicacao", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Próxima dose</label>
-                <input type="date" value={form.proxima_dose} onChange={(e) => set("proxima_dose", e.target.value)}
+                <label htmlFor="vacinas-proxima-dose" className="block text-xs font-medium text-gray-600 mb-1">Próxima dose</label>
+                <input id="vacinas-proxima-dose" type="date" value={form.proxima_dose} onChange={(e) => set("proxima_dose", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Veterinário responsável</label>
+                <label htmlFor="vacinas-veterinario" className="block text-xs font-medium text-gray-600 mb-1">Veterinário responsável</label>
                 <select
+                  id="vacinas-veterinario"
                   value={form.veterinario_responsavel}
                   onChange={(e) => set("veterinario_responsavel", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
@@ -620,8 +615,8 @@ export default function VetVacinas() {
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Observações</label>
-                <textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)}
+                <label htmlFor="vacinas-observacoes" className="block text-xs font-medium text-gray-600 mb-1">Observações</label>
+                <textarea id="vacinas-observacoes" value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-16" />
               </div>
             </div>

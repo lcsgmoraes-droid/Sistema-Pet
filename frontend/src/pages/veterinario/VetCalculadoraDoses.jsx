@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Calculator, Pill, Scale } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+import TutorAutocomplete from "../../components/TutorAutocomplete";
 
 function numero(valor) {
   const parsed = Number.parseFloat(String(valor).replace(",", "."));
@@ -14,6 +15,7 @@ export default function VetCalculadoraDoses() {
   const petIdQuery = searchParams.get("pet_id") || "";
   const [pets, setPets] = useState([]);
   const [medicamentos, setMedicamentos] = useState([]);
+  const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [form, setForm] = useState({
     pessoa_id: "",
     pet_id: petIdQuery,
@@ -44,20 +46,12 @@ export default function VetCalculadoraDoses() {
       pet_id: String(pet.id),
       peso_kg: prev.peso_kg || String(pet.peso || ""),
     }));
+    setTutorSelecionado(
+      pet?.cliente_id
+        ? { id: String(pet.cliente_id), nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}` }
+        : null
+    );
   }, [petIdQuery, pets]);
-
-  const pessoas = useMemo(() => {
-    const mapa = new Map();
-    for (const pet of pets) {
-      if (!pet?.cliente_id) continue;
-      if (mapa.has(String(pet.cliente_id))) continue;
-      mapa.set(String(pet.cliente_id), {
-        id: String(pet.cliente_id),
-        nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}`,
-      });
-    }
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pets]);
 
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
@@ -124,27 +118,21 @@ export default function VetCalculadoraDoses() {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="calc-dose-tutor" className="block text-sm font-medium text-gray-700 mb-1">Tutor</label>
-              <select
-                id="calc-dose-tutor"
-                value={form.pessoa_id}
-                onChange={(e) => {
-                  const pessoaId = e.target.value;
+            <div className="md:col-span-2">
+              <TutorAutocomplete
+                label="Tutor"
+                inputId="calc-dose-tutor"
+                selectedTutor={tutorSelecionado}
+                onSelect={(cliente) => {
+                  setTutorSelecionado(cliente);
                   setForm((prev) => ({
                     ...prev,
-                    pessoa_id: pessoaId,
+                    pessoa_id: cliente?.id ? String(cliente.id) : "",
                     pet_id: "",
                     peso_kg: "",
                   }));
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              >
-                <option value="">Selecione o tutor...</option>
-                {pessoas.map((pessoa) => (
-                  <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>
-                ))}
-              </select>
+              />
             </div>
 
             <div>
@@ -281,7 +269,7 @@ export default function VetCalculadoraDoses() {
               <Pill size={16} />
               <span className="font-medium">Resumo</span>
             </div>
-            <p>Tutor: {pessoas.find((item) => String(item.id) === String(form.pessoa_id))?.nome || "não selecionado"}</p>
+            <p>Tutor: {tutorSelecionado?.nome || petSelecionado?.cliente_nome || "não selecionado"}</p>
             <p>Pet: {petSelecionado?.nome || "não selecionado"}</p>
             <p>Medicamento: {medicamentoSelecionado?.nome || "não selecionado"}</p>
             <p>Peso considerado: {form.peso_kg || "--"} kg</p>

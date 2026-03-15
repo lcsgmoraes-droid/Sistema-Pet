@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+import TutorAutocomplete from "../../components/TutorAutocomplete";
 
 const css = {
   input:
@@ -23,6 +24,13 @@ const css = {
     "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-cyan-300",
 };
 
+function criarIdMensagemLocal() {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `msg-${Date.now()}-${Math.round(Math.random() * 100000)}`;
+}
+
 export default function VetAssistenteIA() {
   const [modo, setModo] = useState("atendimento"); // atendimento | livre
   const [conversaId, setConversaId] = useState("");
@@ -32,6 +40,7 @@ export default function VetAssistenteIA() {
   const [pets, setPets] = useState([]);
   const [consultas, setConsultas] = useState([]);
   const [exames, setExames] = useState([]);
+  const [tutorSelecionado, setTutorSelecionado] = useState(null);
 
   const [petId, setPetId] = useState("");
   const [consultaId, setConsultaId] = useState("");
@@ -52,6 +61,13 @@ export default function VetAssistenteIA() {
     () => pets.find((p) => String(p.id) === String(petId)) || null,
     [pets, petId]
   );
+
+  const petsDoTutor = useMemo(() => {
+    if (!tutorSelecionado?.id) return [];
+    return pets.filter(
+      (pet) => String(pet.cliente_id) === String(tutorSelecionado.id) && pet.ativo !== false
+    );
+  }, [pets, tutorSelecionado]);
 
   useEffect(() => {
     carregarConversas();
@@ -117,8 +133,10 @@ export default function VetAssistenteIA() {
     if (!mensagem.trim() || carregando) return;
 
     const msg = mensagem.trim();
+    const mensagemUsuarioLocalId = criarIdMensagemLocal();
+    const mensagemIaLocalId = criarIdMensagemLocal();
     setErro("");
-    setHistorico((h) => [...h, { role: "user", text: msg }]);
+    setHistorico((h) => [...h, { localId: mensagemUsuarioLocalId, role: "user", text: msg }]);
     setMensagem("");
     setCarregando(true);
 
@@ -138,7 +156,7 @@ export default function VetAssistenteIA() {
 
       const res = await vetApi.assistenteIA(payload);
       const novaConversaId = res.data?.conversa_id;
-      setHistorico((h) => [...h, { role: "ia", text: res.data?.resposta || "Sem resposta." }]);
+      setHistorico((h) => [...h, { localId: mensagemIaLocalId, role: "ia", text: res.data?.resposta || "Sem resposta." }]);
 
       if (novaConversaId) {
         setConversaId(String(novaConversaId));
@@ -148,7 +166,7 @@ export default function VetAssistenteIA() {
     } catch (e) {
       const detail = e?.response?.data?.detail || "Não foi possível falar com a IA agora.";
       setErro(detail);
-      setHistorico((h) => [...h, { role: "ia", text: `Erro: ${detail}` }]);
+      setHistorico((h) => [...h, { localId: mensagemIaLocalId, role: "ia", text: `Erro: ${detail}` }]);
     } finally {
       setCarregando(false);
     }
@@ -201,7 +219,7 @@ export default function VetAssistenteIA() {
     if (!mensagemId || salvandoFeedbackId) return;
     setSalvandoFeedbackId(String(mensagemId));
     try {
-      const comentarioBruto = window.prompt("Comentário opcional para melhorar a IA:", "") || "";
+      const comentarioBruto = globalThis.prompt("Comentário opcional para melhorar a IA:", "") || "";
       const comentario = comentarioBruto.trim();
       const payload = {
         util,
@@ -227,6 +245,14 @@ export default function VetAssistenteIA() {
     setMensagem(texto);
   }
 
+  let memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">Memória: verificando...</span>;
+  if (memoriaAtiva === true) {
+    memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Memória ativa</span>;
+  }
+  if (memoriaAtiva === false) {
+    memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Memória indisponível</span>;
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
@@ -237,22 +263,14 @@ export default function VetAssistenteIA() {
           <h1 className="text-xl font-bold text-gray-800">Assistente IA Veterinário</h1>
           <p className="text-xs text-gray-500">Aba dedicada para cálculo de dose, interação medicamentosa e discussão clínica.</p>
         </div>
-        <div className="ml-auto">
-          {memoriaAtiva === null ? (
-            <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">Memória: verificando...</span>
-          ) : memoriaAtiva ? (
-            <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Memória ativa</span>
-          ) : (
-            <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Memória indisponível</span>
-          )}
-        </div>
+        <div className="ml-auto">{memoriaBadge}</div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Conversa salva</label>
-            <select value={conversaId} onChange={(e) => setConversaId(e.target.value)} className={css.select}>
+            <label htmlFor="vet-ia-conversa" className="block text-xs font-medium text-gray-600 mb-1">Conversa salva</label>
+            <select id="vet-ia-conversa" value={conversaId} onChange={(e) => setConversaId(e.target.value)} className={css.select}>
               <option value="">Nova conversa</option>
               {conversas.map((c) => (
                 <option key={c.id} value={c.id}>{c.titulo || `Conversa #${c.id}`}</option>
@@ -264,7 +282,7 @@ export default function VetAssistenteIA() {
                 checked={filtrarConversasContexto}
                 onChange={(e) => setFiltrarConversasContexto(e.target.checked)}
               />
-              Filtrar conversas pelo contexto atual (pet/consulta/exame)
+              <span>Filtrar conversas pelo contexto atual (pet/consulta/exame)</span>
             </label>
           </div>
           <div className="flex gap-2">
@@ -310,12 +328,32 @@ export default function VetAssistenteIA() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2">
+            <TutorAutocomplete
+              label="Tutor"
+              inputId="vet-ia-tutor"
+              selectedTutor={tutorSelecionado}
+              onSelect={(cliente) => {
+                setTutorSelecionado(cliente);
+                setPetId("");
+                setConsultaId("");
+                setExameId("");
+              }}
+            />
+          </div>
+
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Pet (opcional)</label>
-            <select value={petId} onChange={(e) => setPetId(e.target.value)} className={css.select}>
-              <option value="">Sem pet</option>
-              {pets.map((p) => (
+            <label htmlFor="vet-ia-pet" className="block text-xs font-medium text-gray-600 mb-1">Pet (opcional)</label>
+            <select
+              id="vet-ia-pet"
+              value={petId}
+              onChange={(e) => setPetId(e.target.value)}
+              className={css.select}
+              disabled={!tutorSelecionado?.id}
+            >
+              <option value="">{tutorSelecionado?.id ? "Selecione o pet..." : "Selecione o tutor primeiro..."}</option>
+              {petsDoTutor.map((p) => (
                 <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>
               ))}
             </select>
@@ -324,8 +362,8 @@ export default function VetAssistenteIA() {
           {modo === "atendimento" && (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Consulta (opcional)</label>
-                <select value={consultaId} onChange={(e) => setConsultaId(e.target.value)} className={css.select}>
+                <label htmlFor="vet-ia-consulta" className="block text-xs font-medium text-gray-600 mb-1">Consulta (opcional)</label>
+                <select id="vet-ia-consulta" value={consultaId} onChange={(e) => setConsultaId(e.target.value)} className={css.select}>
                   <option value="">Sem consulta</option>
                   {consultas.map((c) => (
                     <option key={c.id} value={c.id}>Consulta #{c.id} {c.data_consulta ? `- ${c.data_consulta}` : ""}</option>
@@ -333,8 +371,8 @@ export default function VetAssistenteIA() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Exame (opcional)</label>
-                <select value={exameId} onChange={(e) => setExameId(e.target.value)} className={css.select}>
+                <label htmlFor="vet-ia-exame" className="block text-xs font-medium text-gray-600 mb-1">Exame (opcional)</label>
+                <select id="vet-ia-exame" value={exameId} onChange={(e) => setExameId(e.target.value)} className={css.select}>
                   <option value="">Sem exame</option>
                   {exames.map((ex) => (
                     <option key={ex.id} value={ex.id}>{ex.nome || ex.tipo || `Exame #${ex.id}`}</option>
@@ -347,24 +385,24 @@ export default function VetAssistenteIA() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Peso (kg) para cálculo de dose</label>
+            <label htmlFor="vet-ia-peso" className="block text-xs font-medium text-gray-600 mb-1">Peso (kg) para cálculo de dose</label>
             <div className="relative">
               <Calculator size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: 12,5" />
+              <input id="vet-ia-peso" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: 12,5" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Medicamento 1 (opcional)</label>
+            <label htmlFor="vet-ia-med1" className="block text-xs font-medium text-gray-600 mb-1">Medicamento 1 (opcional)</label>
             <div className="relative">
               <Pill size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={med1} onChange={(e) => setMed1(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: amoxicilina" />
+              <input id="vet-ia-med1" value={med1} onChange={(e) => setMed1(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: amoxicilina" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Medicamento 2 (opcional)</label>
+            <label htmlFor="vet-ia-med2" className="block text-xs font-medium text-gray-600 mb-1">Medicamento 2 (opcional)</label>
             <div className="relative">
               <Pill size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={med2} onChange={(e) => setMed2(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: prednisolona" />
+              <input id="vet-ia-med2" value={med2} onChange={(e) => setMed2(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: prednisolona" />
             </div>
           </div>
         </div>
@@ -406,8 +444,8 @@ export default function VetAssistenteIA() {
           <p className="text-sm text-gray-400">Ainda sem mensagens. Envie a primeira pergunta.</p>
         ) : (
           <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-            {historico.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            {historico.map((msg) => (
+              <div key={msg.id || msg.localId || criarIdMensagemLocal()} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[88%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${msg.role === "user" ? "bg-cyan-600 text-white rounded-br-none" : "bg-gray-100 text-gray-800 rounded-bl-none"}`}>
                   {msg.role === "ia" && <div className="text-[11px] font-semibold text-cyan-700 mb-1">IA Vet</div>}
                   {msg.text}
