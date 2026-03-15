@@ -36,10 +36,10 @@ _MSG_TRANSACAO_NAO_ENCONTRADA = "Transação não encontrada"
 class StoneConfigSchema(BaseModel):
     """Schema para configuração Stone"""
     client_id: str
-    client_secret: str
-    merchant_id: str
+    client_secret: Optional[str] = ""
+    merchant_id: Optional[str] = None
     webhook_secret: Optional[str] = None
-    sandbox: bool = True
+    sandbox: bool = False
     enable_pix: bool = True
     enable_credit_card: bool = True
     enable_debit_card: bool = False
