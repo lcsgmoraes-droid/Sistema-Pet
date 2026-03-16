@@ -20,7 +20,6 @@ const EntradaXML = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const autoOpenNotaIdRef = useRef(null);
   const [notasEntrada, setNotasEntrada] = useState([]);
-  const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [notaSelecionada, setNotaSelecionada] = useState(null);
@@ -47,6 +46,7 @@ const EntradaXML = () => {
   // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
   const [quantidadesOnline, setQuantidadesOnline] = useState({}); // {item_id: quantidade_online}
+  const [multiplicadoresPack, setMultiplicadoresPack] = useState({}); // {item_id: multiplicador} para override manual
   
   // Estados para criar produto
   const [mostrarModalCriarProduto, setMostrarModalCriarProduto] = useState(false);
@@ -137,34 +137,16 @@ const EntradaXML = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       console.log('🌐 [EntradaXML] Fazendo requisicoes para:', {
-        notasEntrada: `/notas-entrada/`,
-        produtos: `/produtos/` // Sem filtro de ativo para trazer todos os produtos
+        notasEntrada: `/notas-entrada/`
       });
 
-      const [notasRes, produtosRes] = await Promise.all([
-        api.get(`/notas-entrada/`, { headers }),
-        api.get(`/produtos/`, { headers, params: { ativo: null, page_size: 5000 } }) // null = todos os produtos
-      ]);
+      const notasRes = await api.get(`/notas-entrada/`, { headers });
 
       console.log('✅ [EntradaXML] Dados carregados:', {
-        notasEntrada: notasRes.data?.length || 0,
-        produtos: produtosRes.data?.items?.length || produtosRes.data?.length || 0
-      });
-
-      const listaProdutos = produtosRes.data?.items || produtosRes.data;
-      
-      // Log para debug: contar produtos ativos vs inativos
-      const produtosAtivos = listaProdutos.filter(p => p.ativo === true).length;
-      const produtosInativos = listaProdutos.filter(p => p.ativo === false).length;
-      
-      console.log('📊 [EntradaXML] Produtos por status:', {
-        ativos: produtosAtivos,
-        inativos: produtosInativos,
-        total: listaProdutos.length
+        notasEntrada: notasRes.data?.length || 0
       });
 
       setNotasEntrada(notasRes.data);
-      setProdutos(listaProdutos);
     } catch (error) {
       console.error('❌ [EntradaXML] ERRO ao carregar dados:');
       console.error('  - Mensagem:', error.message);
@@ -414,6 +396,7 @@ const EntradaXML = () => {
       }
       setNotaSelecionada(response.data);
       setMostrarDetalhes(true);
+      setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
       
       // Sincronizar estado de rateio
       setTipoRateio(response.data.tipo_rateio || 'loja');
@@ -575,10 +558,13 @@ const EntradaXML = () => {
         );
       }
       
-      // Processar a nota
+      // Processar a nota (enviar overrides de multiplicador manual quando existirem)
+      const overridesNaoDefault = Object.fromEntries(
+        Object.entries(multiplicadoresPack).filter(([, v]) => v > 1)
+      );
       const response = await api.post(
         `/notas-entrada/${previewProcessamento.nota_id}/processar`,
-        {}
+        Object.keys(overridesNaoDefault).length > 0 ? { multiplicadores_override: overridesNaoDefault } : {}
       );
 
       toast.success(
@@ -736,8 +722,32 @@ const EntradaXML = () => {
     
     if (!descNF || !descProd) return [];
     
-    const descNFLower = descNF.toLowerCase();
-    const descProdLower = descProd.toLowerCase();
+    const normalizarTexto = (txt) =>
+      (txt || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
+    const normalizarPesoToken = (pesoToken) => {
+      const match = String(pesoToken || '').match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|un|und|unid)/i);
+      if (!match) return null;
+      const valor = Number.parseFloat(match[1].replace(',', '.'));
+      if (Number.isNaN(valor)) return null;
+      const unidade = match[2].toLowerCase();
+      const valorNormalizado = Number.parseFloat(valor.toFixed(3));
+      return `${valorNormalizado}${unidade}`;
+    };
+
+    const detectarEspecie = (txt) => {
+      const t = normalizarTexto(txt);
+      if (/(\bgato\b|\bcat\b|\bfelino\b)/.test(t)) return 'gato';
+      if (/(\bcachorro\b|\bcao\b|\bdog\b|\bcanino\b)/.test(t)) return 'cachorro';
+      return null;
+    };
+
+    const descNFLower = normalizarTexto(descNF);
+    const descProdLower = normalizarTexto(descProd);
     
     // Detectar peso/tamanho
     const regexPeso = /(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|un|und|unid)/gi;
@@ -745,8 +755,8 @@ const EntradaXML = () => {
     const pesosProd = [...descProdLower.matchAll(regexPeso)];
     
     if (pesosNF.length > 0 && pesosProd.length > 0) {
-      const pesoNF = pesosNF[0][0];
-      const pesoProd = pesosProd[0][0];
+      const pesoNF = normalizarPesoToken(pesosNF[0][0]);
+      const pesoProd = normalizarPesoToken(pesosProd[0][0]);
       if (pesoNF !== pesoProd) {
         divergencias.push(`Peso/Tamanho diferente: NF="${pesoNF}" vs Produto="${pesoProd}"`);
       }
@@ -771,14 +781,15 @@ const EntradaXML = () => {
     }
     
     // Detectar animal (cachorro/gato)
-    if ((descNFLower.includes('cao') || descNFLower.includes('cachorro') || descNFLower.includes('dog')) && 
-        (descProdLower.includes('gato') || descProdLower.includes('cat'))) {
-      divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
-    }
-    
-    if ((descNFLower.includes('gato') || descNFLower.includes('cat')) && 
-        (descProdLower.includes('cao') || descProdLower.includes('cachorro') || descProdLower.includes('dog'))) {
-      divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
+    const especieNF = detectarEspecie(descNF);
+    const especieProduto = detectarEspecie(descProd);
+
+    if (especieNF && especieProduto && especieNF !== especieProduto) {
+      if (especieNF === 'cachorro') {
+        divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
+      } else {
+        divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
+      }
     }
     
     return divergencias;
@@ -1648,6 +1659,48 @@ const EntradaXML = () => {
                               <span className="text-gray-600">CFOP:</span>
                               <span className="font-semibold">{item.cfop}</span>
                             </div>
+
+                            {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
+                            {notaSelecionada.status === 'pendente' && (
+                              <div className="mt-2 pt-2 border-t border-blue-200">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
+                                  {item.pack_detectado_automatico && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">📦 auto</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="200"
+                                    value={item.id in multiplicadoresPack ? multiplicadoresPack[item.id] : (item.pack_multiplicador_detectado || 1)}
+                                    onChange={(e) => {
+                                      const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
+                                      setMultiplicadoresPack(prev => ({ ...prev, [item.id]: v }));
+                                    }}
+                                    className="w-20 px-2 py-1 border-2 border-blue-300 rounded text-sm text-right font-semibold focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <span className="text-xs text-gray-500">unid. por caixa</span>
+                                </div>
+                                {(() => {
+                                  const mult = item.id in multiplicadoresPack
+                                    ? multiplicadoresPack[item.id]
+                                    : (item.pack_multiplicador_detectado || 1);
+                                  if (mult > 1) {
+                                    const qtdReal = item.quantidade * mult;
+                                    const custoReal = item.valor_total / qtdReal;
+                                    return (
+                                      <div className="mt-1.5 bg-green-50 border border-green-300 rounded p-2 text-xs text-green-800 space-y-0.5">
+                                        <div>🔢 Qtd real: <strong>{qtdReal}</strong> unid. ({item.quantidade} cx × {mult})</div>
+                                        <div>💰 Custo unit.: <strong>R$ {custoReal.toFixed(4)}</strong></div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            )}
                           </div>
 
                           {/* Lote e Validade */}
@@ -1728,6 +1781,14 @@ const EntradaXML = () => {
                                     Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
                                   </div>
 
+                                  <input
+                                    type="text"
+                                    placeholder="Pesquisar outro produto para trocar..."
+                                    value={filtroProduto[item.id] || ''}
+                                    onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
+                                    className="w-full px-3 py-2 border-2 border-green-300 rounded focus:ring-2 focus:ring-green-500 text-sm mb-2"
+                                  />
+
                                   {/* Select para trocar produto */}
                                   <select
                                     value={item.produto_id}
@@ -1739,11 +1800,11 @@ const EntradaXML = () => {
                                     className="w-full px-3 py-2 border-2 border-green-400 rounded text-sm focus:ring-2 focus:ring-green-500"
                                   >
                                     <option value={item.produto_id}>{item.produto_nome}</option>
-                                    {Array.isArray(produtos) && produtos
+                                    {(resultadosBuscaProduto[item.id] || [])
                                       .filter(p => p.id !== item.produto_id)
                                       .map(p => (
                                         <option key={p.id} value={p.id}>
-                                          {p.codigo} - {p.nome} {p.descricao ? `| ${p.descricao.substring(0, 50)}...` : ''} (Est: {p.estoque_atual || 0})
+                                          {p.codigo} - {p.nome} (Est: {p.estoque_atual || 0})
                                         </option>
                                       ))}
                                   </select>

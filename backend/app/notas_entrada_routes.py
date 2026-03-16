@@ -16,6 +16,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import xml.etree.ElementTree as ET
+import re
 from difflib import SequenceMatcher
 
 from app.clientes_routes import gerar_codigo_cliente
@@ -62,6 +63,68 @@ class NotaEntradaResponse(BaseModel):
 # ============================================================================
 # PARSER DE XML NF-e
 # ============================================================================
+
+def detectar_multiplicador_pack(descricao: str) -> int:
+    """
+    Detecta padrão de pack no texto, ex:
+    - 10X250G
+    - 3X2,5KG
+    - 6x3
+    Retorna multiplicador (>=1).
+    """
+    if not descricao:
+        return 1
+
+    texto = str(descricao).upper()
+
+    padroes = [
+        re.compile(r'(?<!\d)(\d{1,3})\s*[X]\s*(\d+(?:[\.,]\d+)?)(?:\s*(KG|G|GR|ML|L|MG|UN|UND|PCT|PC|SACHE|SACHES|SACHÊ))?'),
+        re.compile(r'(?<!\d)(\d{1,3})\s*[X]\s*(\d{1,3})(?!\d)')
+    ]
+
+    for padrao in padroes:
+        match = padrao.search(texto)
+        if not match:
+            continue
+
+        try:
+            multiplicador = int(match.group(1))
+        except (TypeError, ValueError):
+            continue
+
+        if 1 < multiplicador <= 200:
+            return multiplicador
+
+    return 1
+
+
+def calcular_quantidade_custo_efetivos(descricao: str, quantidade: float, valor_unitario: float, valor_total: float) -> dict:
+    """
+    Calcula quantidade efetiva e custo unitário efetivo considerando pack.
+    """
+    qtd_base = float(quantidade or 0)
+    v_unit = float(valor_unitario or 0)
+    v_total = float(valor_total or 0)
+
+    multiplicador_pack = detectar_multiplicador_pack(descricao)
+    quantidade_efetiva = qtd_base * multiplicador_pack
+
+    if quantidade_efetiva > 0:
+        if v_total > 0:
+            custo_unitario_efetivo = v_total / quantidade_efetiva
+        elif multiplicador_pack > 1 and v_unit > 0:
+            custo_unitario_efetivo = v_unit / multiplicador_pack
+        else:
+            custo_unitario_efetivo = v_unit
+    else:
+        custo_unitario_efetivo = 0.0
+
+    return {
+        "pack_detectado": multiplicador_pack > 1,
+        "multiplicador_pack": multiplicador_pack,
+        "quantidade_efetiva": quantidade_efetiva,
+        "custo_unitario_efetivo": custo_unitario_efetivo
+    }
 
 def parse_nfe_xml(xml_content: str) -> dict:
     """
@@ -1055,6 +1118,39 @@ def buscar_nota(
             if diferenca < timedelta(hours=24):
                 fornecedor_criado_automaticamente = True
     
+    itens_formatados = []
+    for item in nota.itens:
+        dados_pack = calcular_quantidade_custo_efetivos(
+            item.descricao,
+            item.quantidade,
+            item.valor_unitario,
+            item.valor_total
+        )
+        itens_formatados.append({
+            "id": item.id,
+            "numero_item": item.numero_item,
+            "codigo_produto": item.codigo_produto,
+            "descricao": item.descricao,
+            "ncm": item.ncm,
+            "cfop": item.cfop,
+            "unidade": item.unidade,
+            "quantidade": item.quantidade,
+            "valor_unitario": item.valor_unitario,
+            "valor_total": item.valor_total,
+            "ean": item.ean,
+            "lote": item.lote,
+            "data_validade": item.data_validade.isoformat() if item.data_validade else None,
+            "produto_id": item.produto_id,
+            "produto_nome": item.produto.nome if item.produto else None,
+            "vinculado": item.vinculado,
+            "confianca_vinculo": item.confianca_vinculo,
+            "status": item.status,
+            "pack_detectado_automatico": dados_pack["pack_detectado"],
+            "pack_multiplicador_detectado": dados_pack["multiplicador_pack"],
+            "quantidade_efetiva": dados_pack["quantidade_efetiva"],
+            "custo_unitario_efetivo": dados_pack["custo_unitario_efetivo"]
+        })
+
     # Formatar resposta
     return {
         "id": nota.id,
@@ -1071,29 +1167,7 @@ def buscar_nota(
         "produtos_vinculados": nota.produtos_vinculados,
         "produtos_nao_vinculados": nota.produtos_nao_vinculados,
         "entrada_estoque_realizada": nota.entrada_estoque_realizada,
-        "itens": [
-            {
-                "id": item.id,
-                "numero_item": item.numero_item,
-                "codigo_produto": item.codigo_produto,
-                "descricao": item.descricao,
-                "ncm": item.ncm,
-                "cfop": item.cfop,
-                "unidade": item.unidade,
-                "quantidade": item.quantidade,
-                "valor_unitario": item.valor_unitario,
-                "valor_total": item.valor_total,
-                "ean": item.ean,
-                "lote": item.lote,
-                "data_validade": item.data_validade.isoformat() if item.data_validade else None,
-                "produto_id": item.produto_id,
-                "produto_nome": item.produto.nome if item.produto else None,
-                "vinculado": item.vinculado,
-                "confianca_vinculo": item.confianca_vinculo,
-                "status": item.status
-            }
-            for item in nota.itens
-        ]
+        "itens": itens_formatados
     }
 
 
@@ -1481,19 +1555,28 @@ def configurar_rateio_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item nÃ£o encontrado")
     
+    dados_pack = calcular_quantidade_custo_efetivos(
+        item.descricao,
+        item.quantidade,
+        item.valor_unitario,
+        item.valor_total
+    )
+    quantidade_total_disponivel = dados_pack["quantidade_efetiva"]
+    custo_unitario_efetivo = dados_pack["custo_unitario_efetivo"]
+
     # Validar quantidade
     if rateio.quantidade_online < 0:
         raise HTTPException(status_code=400, detail="Quantidade online nÃ£o pode ser negativa")
     
-    if rateio.quantidade_online > item.quantidade:
+    if rateio.quantidade_online > quantidade_total_disponivel:
         raise HTTPException(
             status_code=400, 
-            detail=f"Quantidade online ({rateio.quantidade_online}) nÃ£o pode ser maior que a quantidade total ({item.quantidade})"
+            detail=f"Quantidade online ({rateio.quantidade_online}) nÃ£o pode ser maior que a quantidade total ({quantidade_total_disponivel})"
         )
     
     # Atualizar item
     item.quantidade_online = rateio.quantidade_online
-    item.valor_online = rateio.quantidade_online * item.valor_unitario
+    item.valor_online = rateio.quantidade_online * custo_unitario_efetivo
     
     # Recalcular totais da nota
     valor_online_total = 0
@@ -1525,9 +1608,11 @@ def configurar_rateio_item(
         "message": "Rateio do item configurado com sucesso",
         "item": {
             "id": item.id,
-            "quantidade_total": item.quantidade,
+            "quantidade_total": quantidade_total_disponivel,
             "quantidade_online": item.quantidade_online,
-            "valor_online": item.valor_online
+            "valor_online": item.valor_online,
+            "pack_detectado_automatico": dados_pack["pack_detectado"],
+            "pack_multiplicador_detectado": dados_pack["multiplicador_pack"]
         },
         "nota_totais": {
             "valor_total": nota.valor_total,
@@ -1569,12 +1654,23 @@ def preview_processamento(
     
     for item in nota.itens:
         # Dados do item da NF (sempre presente)
+        dados_pack = calcular_quantidade_custo_efetivos(
+            item.descricao,
+            item.quantidade,
+            item.valor_unitario,
+            item.valor_total
+        )
+
         item_nf = {
             "item_id": item.id,
             "codigo_produto_nf": item.codigo_produto,
             "descricao_nf": item.descricao,
             "quantidade_nf": item.quantidade,
             "valor_unitario_nf": item.valor_unitario,
+            "quantidade_efetiva_nf": dados_pack["quantidade_efetiva"],
+            "custo_unitario_efetivo_nf": dados_pack["custo_unitario_efetivo"],
+            "pack_detectado_automatico": dados_pack["pack_detectado"],
+            "pack_multiplicador_detectado": dados_pack["multiplicador_pack"],
             "ean_nf": item.ean,
             "ncm_nf": item.ncm,
             "vinculado": item.vinculado,
@@ -1586,7 +1682,7 @@ def preview_processamento(
         if item.produto_id:
             produto = item.produto
             custo_atual = produto.preco_custo or 0
-            custo_novo = item.valor_unitario
+            custo_novo = dados_pack["custo_unitario_efetivo"]
             variacao_custo = ((custo_novo - custo_atual) / custo_atual * 100) if custo_atual > 0 else 0
             
             # Calcular margem atual
@@ -1697,14 +1793,21 @@ def atualizar_precos_produtos(
 # DAR ENTRADA NO ESTOQUE
 # ============================================================================
 
+class ProcessarConfig(BaseModel):
+    # chave = str(item_id), valor = multiplicador (ex: {"42": 10})
+    multiplicadores_override: dict = {}
+
+
 @router.post("/{nota_id}/processar")
 def processar_entrada_estoque(
     nota_id: int,
+    config: ProcessarConfig = ProcessarConfig(),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Processa entrada no estoque de todos os itens vinculados
+    Processa entrada no estoque de todos os itens vinculados.
+    Aceita multiplicadores_override: {"item_id": multiplicador} para packs manuais.
     """
     current_user, tenant_id = user_and_tenant
     logger.info(f"ðŸ“¦ Processando entrada no estoque - Nota {nota_id}")
@@ -1735,6 +1838,29 @@ def processar_entrada_estoque(
     for item in nota.itens:
         if not item.produto_id:
             continue
+
+        # Verificar override manual antes de usar auto-deteccao
+        override_raw = config.multiplicadores_override.get(str(item.id)) or config.multiplicadores_override.get(item.id)
+        try:
+            override_mult = int(override_raw) if override_raw is not None else None
+        except (ValueError, TypeError):
+            override_mult = None
+
+        if override_mult and 1 < override_mult <= 200:
+            multiplicador_pack = override_mult
+            quantidade_entrada = item.quantidade * override_mult
+            custo_unitario_entrada = (item.valor_total / quantidade_entrada) if quantidade_entrada > 0 else item.valor_unitario
+            logger.info(f"📦 Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} → qtd entrada {quantidade_entrada})")
+        else:
+            dados_pack = calcular_quantidade_custo_efetivos(
+                item.descricao,
+                item.quantidade,
+                item.valor_unitario,
+                item.valor_total
+            )
+            quantidade_entrada = dados_pack["quantidade_efetiva"]
+            custo_unitario_entrada = dados_pack["custo_unitario_efetivo"]
+            multiplicador_pack = dados_pack["multiplicador_pack"]
         
         produto = item.produto
         
@@ -1768,7 +1894,7 @@ def processar_entrada_estoque(
                 novo_vinculo = ProdutoFornecedor(
                     produto_id=produto.id,
                     fornecedor_id=nota.fornecedor_id,
-                    preco_custo=item.valor_unitario,
+                    preco_custo=custo_unitario_entrada,
                     e_principal=True,
                     ativo=True,
                     tenant_id=tenant_id
@@ -1781,7 +1907,7 @@ def processar_entrada_estoque(
                     vinculo_existente.ativo = True
                     logger.info(f"  â™»ï¸  VÃ­nculo de fornecedor reativado: {produto.codigo}")
                 # Atualizar preÃ§o de custo no vÃ­nculo
-                vinculo_existente.preco_custo = item.valor_unitario
+                vinculo_existente.preco_custo = custo_unitario_entrada
         
         # Criar lote
         nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
@@ -1799,9 +1925,9 @@ def processar_entrada_estoque(
         lote = ProdutoLote(
             produto_id=produto.id,
             nome_lote=nome_lote,
-            quantidade_inicial=item.quantidade,
-            quantidade_disponivel=item.quantidade,
-            custo_unitario=float(item.valor_unitario) if item.valor_unitario is not None else 0.0,
+            quantidade_inicial=quantidade_entrada,
+            quantidade_disponivel=quantidade_entrada,
+            custo_unitario=float(custo_unitario_entrada),
             data_fabricacao=None,
             data_validade=data_validade,
             ordem_entrada=int(datetime.utcnow().timestamp()),
@@ -1812,7 +1938,7 @@ def processar_entrada_estoque(
         
         # Atualizar estoque
         estoque_anterior = produto.estoque_atual or 0
-        produto.estoque_atual = estoque_anterior + item.quantidade
+        produto.estoque_atual = estoque_anterior + quantidade_entrada
         
         # Atualizar preÃ§o de custo e registrar histÃ³rico
         preco_custo_anterior = produto.preco_custo
@@ -1820,8 +1946,8 @@ def processar_entrada_estoque(
         margem_anterior = ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100) if preco_venda_anterior > 0 else 0
         
         alterou_custo = False
-        if item.valor_unitario != preco_custo_anterior:
-            produto.preco_custo = item.valor_unitario
+        if custo_unitario_entrada != preco_custo_anterior:
+            produto.preco_custo = custo_unitario_entrada
             alterou_custo = True
         
         # Calcular margem nova
@@ -1862,10 +1988,10 @@ def processar_entrada_estoque(
             lote_id=lote.id,
             tipo="entrada",
             motivo="compra",
-            quantidade=item.quantidade,
+            quantidade=quantidade_entrada,
             quantidade_anterior=estoque_anterior,
             quantidade_nova=produto.estoque_atual,
-            custo_unitario=float(item.valor_unitario) if item.valor_unitario is not None else 0.0,
+            custo_unitario=float(custo_unitario_entrada),
             valor_total=float(item.valor_total) if item.valor_total is not None else 0.0,
             documento=nota.chave_acesso,
             referencia_tipo="nota_entrada",
@@ -1882,15 +2008,22 @@ def processar_entrada_estoque(
         itens_processados.append({
             "produto_id": produto.id,
             "produto_nome": produto.nome,
-            "quantidade": item.quantidade,
+            "quantidade": quantidade_entrada,
             "lote": nome_lote,
-            "estoque_atual": produto.estoque_atual
+            "estoque_atual": produto.estoque_atual,
+            "pack_multiplicador": multiplicador_pack
         })
         
         logger.info(
-            f"  âœ… {produto.nome}: +{item.quantidade} unidades "
+            f"  âœ… {produto.nome}: +{quantidade_entrada} unidades "
             f"(estoque: {estoque_anterior} â†’ {produto.estoque_atual})"
         )
+
+        if multiplicador_pack > 1:
+            logger.info(
+                f"  ðŸ“¦ Pack detectado automaticamente no item {item.numero_item}: "
+                f"x{multiplicador_pack} (qtd NF {item.quantidade} â†’ qtd entrada {quantidade_entrada})"
+            )
     
     # Atualizar nota
     nota.status = 'processada'
