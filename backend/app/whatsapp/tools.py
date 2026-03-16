@@ -314,61 +314,43 @@ class ToolExecutor:
     ) -> Dict[str, Any]:
         """Busca produtos no catálogo"""
         try:
-            # TODO: Integrar com tabela real de produtos quando disponível
-            # Por enquanto, retorna mock data
-            
-            mock_produtos = [
-                {
-                    "id": "1",
-                    "nome": "Ração Golden Fórmula Adulto 15kg",
-                    "preco": 189.90,
-                    "estoque": 12,
-                    "categoria": "racao",
-                    "descricao": "Ração super premium para cães adultos"
-                },
-                {
-                    "id": "2",
-                    "nome": "Ração Premier Ambientes Internos 10kg",
-                    "preco": 156.50,
-                    "estoque": 8,
-                    "categoria": "racao",
-                    "descricao": "Para cães que vivem em apartamento"
-                },
-                {
-                    "id": "3",
-                    "nome": "Brinquedo Kong Classic M",
-                    "preco": 45.90,
-                    "estoque": 25,
-                    "categoria": "brinquedo",
-                    "descricao": "Brinquedo resistente de borracha"
-                }
-            ]
-            
-            # Filtrar por query e categoria
-            query_lower = query.lower()
-            resultados = [
-                p for p in mock_produtos
-                if query_lower in p["nome"].lower() or query_lower in p["descricao"].lower()
-            ]
-            
-            if categoria:
-                resultados = [p for p in resultados if p["categoria"] == categoria]
-            
-            resultados = resultados[:limite]
-            
-            if not resultados:
+            from app.produtos_models import Produto
+            from sqlalchemy import or_
+
+            q = self.db.query(Produto).filter(
+                Produto.tenant_id == self.tenant_id,
+                Produto.situacao == True,
+                Produto.tipo_produto != 'PAI',
+                or_(
+                    Produto.nome.ilike(f'%{query}%'),
+                    Produto.descricao_curta.ilike(f'%{query}%')
+                )
+            ).limit(limite).all()
+
+            if not q:
                 return {
                     "success": True,
                     "produtos": [],
                     "message": f"Nenhum produto encontrado para '{query}'"
                 }
-            
+
+            produtos = [
+                {
+                    "id": str(p.id),
+                    "nome": p.nome,
+                    "preco": float(p.preco_venda) if p.preco_venda else 0.0,
+                    "estoque": float(p.estoque_atual) if p.estoque_atual is not None else 0,
+                    "descricao": p.descricao_curta or ""
+                }
+                for p in q
+            ]
+
             return {
                 "success": True,
-                "produtos": resultados,
-                "total": len(resultados)
+                "produtos": produtos,
+                "total": len(produtos)
             }
-        
+
         except Exception as e:
             logger.error(f"Erro ao buscar produtos: {e}")
             return {"success": False, "error": str(e)}
@@ -418,33 +400,72 @@ class ToolExecutor:
     ) -> Dict[str, Any]:
         """Busca status de pedidos"""
         try:
-            # TODO: Integrar com sistema real de pedidos
-            # Por enquanto, retorna mock data
-            
-            mock_pedidos = [
-                {
-                    "codigo": "PED-12345",
-                    "data": "25/01/2026",
-                    "status": "em_transito",
-                    "status_descricao": "Em trânsito para entrega",
-                    "previsao_entrega": "02/02/2026",
-                    "itens": ["Ração Golden 15kg", "Shampoo Pet"]
+            from app.vendas_models import Venda
+            from app.models import Cliente
+            from sqlalchemy import or_
+
+            q = self.db.query(Venda).filter(Venda.tenant_id == self.tenant_id)
+
+            if codigo_pedido:
+                q = q.filter(Venda.numero_venda == codigo_pedido)
+            elif telefone:
+                tel_digits = ''.join(filter(str.isdigit, telefone))
+                sufixo = tel_digits[-8:] if len(tel_digits) >= 8 else tel_digits
+                q = q.join(Cliente, Venda.cliente_id == Cliente.id).filter(
+                    or_(
+                        Cliente.celular.ilike(f'%{sufixo}%'),
+                        Cliente.telefone.ilike(f'%{sufixo}%')
+                    )
+                )
+            else:
+                return {
+                    "success": True,
+                    "pedidos": [],
+                    "message": "Informe o número do pedido ou telefone para consultar"
                 }
-            ]
-            
-            if not mock_pedidos:
+
+            vendas = q.order_by(Venda.created_at.desc()).limit(5).all()
+
+            if not vendas:
                 return {
                     "success": True,
                     "pedidos": [],
                     "message": "Nenhum pedido encontrado"
                 }
-            
+
+            status_label = {
+                "aberta": "Em aberto",
+                "finalizada": "Finalizada",
+                "cancelada": "Cancelada"
+            }
+            entrega_label = {
+                "pendente": "Aguardando retirada",
+                "em_rota": "Em rota de entrega",
+                "entregue": "Entregue",
+                "cancelado": "Entrega cancelada"
+            }
+
+            pedidos = [
+                {
+                    "codigo": v.numero_venda,
+                    "data": v.created_at.strftime("%d/%m/%Y") if v.created_at else "",
+                    "status": status_label.get(v.status, v.status),
+                    "status_entrega": entrega_label.get(v.status_entrega or "", v.status_entrega or "sem entrega"),
+                    "total": float(v.total) if v.total else 0.0,
+                    "itens": [
+                        (i.produto.nome if i.produto else i.servico_descricao or "item")
+                        for i in (v.itens or [])
+                    ]
+                }
+                for v in vendas
+            ]
+
             return {
                 "success": True,
-                "pedidos": mock_pedidos,
-                "total": len(mock_pedidos)
+                "pedidos": pedidos,
+                "total": len(pedidos)
             }
-        
+
         except Exception as e:
             logger.error(f"Erro ao buscar pedidos: {e}")
             return {"success": False, "error": str(e)}
@@ -456,13 +477,55 @@ class ToolExecutor:
     ) -> Dict[str, Any]:
         """Busca histórico de compras do cliente"""
         try:
-            # TODO: Integrar com sistema real
+            from app.vendas_models import Venda
+            from app.models import Cliente
+            from sqlalchemy import or_
+
+            tel_digits = ''.join(filter(str.isdigit, telefone))
+            sufixo = tel_digits[-8:] if len(tel_digits) >= 8 else tel_digits
+
+            vendas = (
+                self.db.query(Venda)
+                .join(Cliente, Venda.cliente_id == Cliente.id)
+                .filter(
+                    Venda.tenant_id == self.tenant_id,
+                    Venda.status == 'finalizada',
+                    or_(
+                        Cliente.celular.ilike(f'%{sufixo}%'),
+                        Cliente.telefone.ilike(f'%{sufixo}%')
+                    )
+                )
+                .order_by(Venda.created_at.desc())
+                .limit(limite)
+                .all()
+            )
+
+            if not vendas:
+                return {
+                    "success": True,
+                    "compras": [],
+                    "message": "Nenhuma compra anterior encontrada"
+                }
+
+            compras = [
+                {
+                    "codigo": v.numero_venda,
+                    "data": v.created_at.strftime("%d/%m/%Y") if v.created_at else "",
+                    "total": float(v.total) if v.total else 0.0,
+                    "itens": [
+                        (i.produto.nome if i.produto else i.servico_descricao or "item")
+                        for i in (v.itens or [])
+                    ]
+                }
+                for v in vendas
+            ]
+
             return {
                 "success": True,
-                "compras": [],
-                "message": "Nenhuma compra anterior encontrada"
+                "compras": compras,
+                "total": len(compras)
             }
-        
+
         except Exception as e:
             logger.error(f"Erro ao buscar histórico: {e}")
             return {"success": False, "error": str(e)}
@@ -473,43 +536,56 @@ class ToolExecutor:
     ) -> Dict[str, Any]:
         """Retorna informações da loja"""
         try:
-            # TODO: Buscar de configurações do tenant
-            info_loja = {
-                "nome": "Pet Shop Amigo",
-                "endereco": "Rua das Flores, 123 - Centro",
-                "cidade": "São Paulo - SP",
-                "telefone": "(11) 98765-4321",
-                "horario": {
-                    "semana": "Segunda a Sexta: 8h às 18h",
-                    "sabado": "Sábado: 8h às 14h",
-                    "domingo": "Domingo: Fechado"
-                },
-                "servicos": ["Banho", "Tosa", "Consulta Veterinária", "Vacinas"],
-                "formas_pagamento": ["Dinheiro", "Cartão", "Pix"]
-            }
-            
-            if tipo_info == "endereco":
-                return {
-                    "success": True,
-                    "endereco": info_loja["endereco"],
-                    "cidade": info_loja["cidade"]
-                }
-            elif tipo_info == "horario":
-                return {
-                    "success": True,
-                    "horario": info_loja["horario"]
-                }
-            elif tipo_info == "contato":
-                return {
-                    "success": True,
-                    "telefone": info_loja["telefone"]
-                }
+            from app.whatsapp.models import TenantWhatsAppConfig
+            from app.models import Tenant
+
+            tenant = self.db.query(Tenant).filter(Tenant.id == self.tenant_id).first()
+            wa_config = self.db.query(TenantWhatsAppConfig).filter(
+                TenantWhatsAppConfig.tenant_id == self.tenant_id
+            ).first()
+
+            nome = (wa_config.bot_name if wa_config and wa_config.bot_name else None) or (tenant.name if tenant else "Pet Shop")
+
+            if tenant:
+                partes_end = [p for p in [tenant.endereco, tenant.numero, tenant.bairro] if p]
+                endereco = ", ".join(partes_end) if partes_end else "Não informado"
+                cidade = f"{tenant.cidade} - {tenant.uf}" if tenant.cidade else "Não informado"
+                telefone_loja = tenant.telefone or "Não informado"
             else:
-                return {
-                    "success": True,
-                    **info_loja
+                endereco = "Não informado"
+                cidade = "Não informado"
+                telefone_loja = "Não informado"
+
+            if wa_config and wa_config.working_hours_start and wa_config.working_hours_end:
+                h_ini = wa_config.working_hours_start.strftime("%H:%M")
+                h_fim = wa_config.working_hours_end.strftime("%H:%M")
+                horario_semana = f"Segunda a Sexta: {h_ini} às {h_fim}"
+            elif tenant and tenant.ecommerce_horario_abertura and tenant.ecommerce_horario_fechamento:
+                horario_semana = f"Segunda a Sexta: {tenant.ecommerce_horario_abertura} às {tenant.ecommerce_horario_fechamento}"
+            else:
+                horario_semana = "Horário não informado — entre em contato para confirmar"
+
+            info_loja = {
+                "nome": nome,
+                "endereco": endereco,
+                "cidade": cidade,
+                "telefone": telefone_loja,
+                "horario": {
+                    "semana": horario_semana,
+                    "sabado": "Consultar a loja",
+                    "domingo": "Consultar a loja"
                 }
-        
+            }
+
+            if tipo_info == "endereco":
+                return {"success": True, "endereco": info_loja["endereco"], "cidade": info_loja["cidade"]}
+            elif tipo_info == "horario":
+                return {"success": True, "horario": info_loja["horario"]}
+            elif tipo_info == "contato":
+                return {"success": True, "telefone": info_loja["telefone"]}
+            else:
+                return {"success": True, **info_loja}
+
         except Exception as e:
             logger.error(f"Erro ao obter informações da loja: {e}")
             return {"success": False, "error": str(e)}
