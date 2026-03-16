@@ -293,7 +293,7 @@ IMPORTANTE:
 # FUNCTION DEFINITIONS (para function calling)
 # ============================================================================
 
-AVAILABLE_FUNCTIONS = [
+AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY = [
     {
         "name": "buscar_produto",
         "description": "Busca produtos no catálogo por nome, categoria ou descrição",
@@ -345,6 +345,10 @@ AVAILABLE_FUNCTIONS = [
             "required": ["cep"]
         }
     },
+]
+
+# Escrita mantida para próximas fases (não usada no fluxo ativo da Fase 1).
+AVAILABLE_FUNCTIONS_WRITE = [
     {
         "name": "criar_pedido",
         "description": "Cria um novo pedido para o cliente",
@@ -389,3 +393,6 @@ AVAILABLE_FUNCTIONS = [
         }
     }
 ]
+
+# Compatibilidade: lista completa (leitura + escrita).
+AVAILABLE_FUNCTIONS = AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY + AVAILABLE_FUNCTIONS_WRITE

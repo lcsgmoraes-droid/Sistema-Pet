@@ -17,7 +17,7 @@ from datetime import datetime
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
 from app.ai.context_builder import ContextBuilder
-from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS
+from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY
 from app.whatsapp.sender import send_whatsapp_message
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric, TenantWhatsAppConfig
 
@@ -184,7 +184,7 @@ class MessageProcessor:
                 model=model,
                 temperature=0.7,
                 max_tokens=500,
-                functions=AVAILABLE_FUNCTIONS,
+                functions=AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY,
                 function_call="auto"
             )
             

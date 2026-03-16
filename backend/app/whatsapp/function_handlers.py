@@ -445,6 +445,33 @@ FUNCTION_HANDLERS = {
 }
 
 
+def _normalize_function_result(raw_result: Any) -> Dict[str, Any]:
+    """Padroniza retorno no contrato: success/data/error_code."""
+    if isinstance(raw_result, dict):
+        if "error" in raw_result and raw_result.get("error"):
+            return {
+                "success": False,
+                "data": None,
+                "error_code": "FUNCTION_EXECUTION_ERROR",
+                "error": str(raw_result.get("error")),
+            }
+
+        # Compatibilidade: handlers legados continuam retornando payload próprio.
+        return {
+            "success": True,
+            "data": raw_result,
+            "error_code": None,
+            "error": None,
+        }
+
+    return {
+        "success": True,
+        "data": {"result": raw_result},
+        "error_code": None,
+        "error": None,
+    }
+
+
 def execute_function(
     function_name: str,
     db: Session,
@@ -467,10 +494,21 @@ def execute_function(
     
     if not handler:
         logger.error(f"❌ Função não encontrada: {function_name}")
-        return {"error": f"Função {function_name} não implementada"}
+        return {
+            "success": False,
+            "data": None,
+            "error_code": "FUNCTION_NOT_IMPLEMENTED",
+            "error": f"Função {function_name} não implementada",
+        }
     
     try:
-        return handler(db=db, tenant_id=tenant_id, **kwargs)
+        raw_result = handler(db=db, tenant_id=tenant_id, **kwargs)
+        return _normalize_function_result(raw_result)
     except Exception as e:
         logger.error(f"❌ Erro ao executar {function_name}: {e}")
-        return {"error": str(e)}
+        return {
+            "success": False,
+            "data": None,
+            "error_code": "FUNCTION_EXECUTION_EXCEPTION",
+            "error": str(e),
+        }

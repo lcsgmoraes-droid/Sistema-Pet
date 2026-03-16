@@ -211,10 +211,15 @@ class IntentRouter:
         
         Transfere se:
         - Reclamação
+        - Pedido na Fase 1 (fluxo somente leitura)
         - Confidence muito baixa
         - Intent "suporte" específico
         """
         if intent == "reclamacao":
+            return True
+
+        # Fase 1: não fechar pedido automaticamente.
+        if intent in {"pedido_novo", "pedido_recompra"}:
             return True
         
         if confidence < 0.4:
