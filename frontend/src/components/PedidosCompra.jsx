@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 
@@ -36,6 +36,7 @@ const PedidosCompra = () => {
   const [produtosSelecionados, setProdutosSelecionados] = useState([]);
   const [quantidadesEditadas, setQuantidadesEditadas] = useState({});
   const [filtroSugestao, setFiltroSugestao] = useState('');
+  const [mostrarSoPreenchidos, setMostrarSoPreenchidos] = useState(false);
 
   const [formData, setFormData] = useState({
     fornecedor_id: '',
@@ -55,6 +56,46 @@ const PedidosCompra = () => {
   // Estados para inputs digitáveis
   const [fornecedorTexto, setFornecedorTexto] = useState('');
   const [produtoTexto, setProdutoTexto] = useState('');
+  const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
+  const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
+
+  const normalizarTexto = (texto = '') =>
+    texto
+      .toLowerCase()
+      .normalize('NFD')
+      .replaceAll(/[\u0300-\u036f]/g, '');
+
+  const fornecedoresFiltrados = useMemo(() => {
+    const termo = normalizarTexto(fornecedorTexto.trim());
+    if (!termo) return fornecedores.slice(0, 12);
+
+    return fornecedores
+      .filter((f) => normalizarTexto(f.nome || '').includes(termo))
+      .slice(0, 12);
+  }, [fornecedores, fornecedorTexto]);
+
+  const produtosFiltrados = useMemo(() => {
+    const termo = normalizarTexto(produtoTexto.trim());
+    if (!termo) return produtos.slice(0, 15);
+
+    return produtos
+      .filter((p) => normalizarTexto(p.nome || '').includes(termo))
+      .slice(0, 15);
+  }, [produtos, produtoTexto]);
+
+  const selecionarFornecedor = (fornecedor) => {
+    setFornecedorTexto(fornecedor.nome || '');
+    setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
+    setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
+    setProdutoTexto('');
+    setMostrarSugestoesFornecedor(false);
+    carregarProdutosFornecedor(fornecedor.id);
+  };
+
+  const selecionarProduto = (produto) => {
+    preencherPreco(produto.id.toString());
+    setMostrarSugestoesProduto(false);
+  };
 
   useEffect(() => {
     carregarDados();
@@ -185,6 +226,7 @@ const PedidosCompra = () => {
 
       // Limpar form
       setProdutoTexto('');
+      setMostrarSugestoesProduto(false);
       setItemForm({
         produto_id: '',
         quantidade_pedida: '',
@@ -211,6 +253,7 @@ const PedidosCompra = () => {
 
     // Limpar apenas os campos do item, mantendo o texto do produto limpo
     setProdutoTexto('');
+    setMostrarSugestoesProduto(false);
     setItemForm({
       produto_id: '',
       quantidade_pedida: '',
@@ -291,11 +334,41 @@ const PedidosCompra = () => {
       : sugestao.quantidade_sugerida;
   };
 
+  const obterQuantidadeInteira = (sugestao) => Math.max(0, Math.ceil(obterQuantidadeFinal(sugestao)));
+
+  const sugestoesFiltradas = useMemo(() => {
+    const q = filtroSugestao.trim().toLowerCase();
+    return sugestoes.filter((s) => {
+      const passaBusca = !q
+        || (s.produto_nome || '').toLowerCase().includes(q)
+        || (s.produto_sku || '').toLowerCase().includes(q)
+        || (s.produto_codigo_barras || '').toLowerCase().includes(q);
+
+      if (!passaBusca) {
+        return false;
+      }
+
+      if (!mostrarSoPreenchidos) {
+        return true;
+      }
+
+      return obterQuantidadeInteira(s) > 0;
+    });
+  }, [sugestoes, filtroSugestao, mostrarSoPreenchidos, quantidadesEditadas]);
+
+  const selecionadosComQuantidade = useMemo(
+    () => sugestoes
+      .filter((s) => produtosSelecionados.includes(s.produto_id))
+      .filter((s) => obterQuantidadeInteira(s) > 0),
+    [sugestoes, produtosSelecionados, quantidadesEditadas],
+  );
+
   const fecharModalSugestao = () => {
     setMostrarSugestao(false);
     setProdutosSelecionados([]);
     setQuantidadesEditadas({});
     setFiltroSugestao('');
+    setMostrarSoPreenchidos(false);
   };
 
   // Fechar modal com ESC
@@ -308,9 +381,16 @@ const PedidosCompra = () => {
 
   const selecionarTodosCriticos = () => {
     const criticos = sugestoes
-      .filter(s => s.prioridade === 'CRÍTICO' && s.quantidade_sugerida > 0)
+      .filter(s => s.prioridade === 'CRÍTICO' && obterQuantidadeInteira(s) > 0)
       .map(s => s.produto_id);
     setProdutosSelecionados(criticos);
+  };
+
+  const selecionarPreenchidosVisiveis = () => {
+    const preenchidos = sugestoesFiltradas
+      .filter((s) => obterQuantidadeInteira(s) > 0)
+      .map((s) => s.produto_id);
+    setProdutosSelecionados(preenchidos);
   };
 
   const adicionarSugestoesAoPedido = () => {
@@ -319,19 +399,27 @@ const PedidosCompra = () => {
       return;
     }
 
-    const produtosParaAdicionar = sugestoes.filter(s => 
-      produtosSelecionados.includes(s.produto_id)
-    );
+    const produtosParaAdicionar = sugestoes
+      .filter((s) => produtosSelecionados.includes(s.produto_id))
+      .map((sugestao) => ({
+        sugestao,
+        quantidade: obterQuantidadeInteira(sugestao),
+      }))
+      .filter((item) => item.quantidade > 0);
 
-    const novosItens = produtosParaAdicionar.map(sugestao => {
-      const quantidade = obterQuantidadeFinal(sugestao);
+    if (produtosParaAdicionar.length === 0) {
+      toast.error('Os produtos selecionados estão com quantidade 0. Preencha pelo menos 1 unidade.');
+      return;
+    }
+
+    const novosItens = produtosParaAdicionar.map(({ sugestao, quantidade }) => {
       return {
         produto_id: sugestao.produto_id,
         produto_nome: sugestao.produto_nome,
-        quantidade_pedida: Math.ceil(quantidade),
+        quantidade_pedida: quantidade,
         preco_unitario: sugestao.preco_unitario,
         desconto_item: 0,
-        total: Math.ceil(quantidade) * sugestao.preco_unitario
+        total: quantidade * sugestao.preco_unitario
       };
     });
 
@@ -370,6 +458,9 @@ const PedidosCompra = () => {
         observacoes: '',
         itens: []
       });
+      setFornecedorTexto('');
+      setProdutoTexto('');
+      setMostrarSugestoesProduto(false);
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao criar pedido');
@@ -545,6 +636,10 @@ const PedidosCompra = () => {
       
       // Carregar produtos do fornecedor
       if (pedidoCompleto.fornecedor_id) {
+        const fornecedorSelecionado = fornecedores.find(
+          (f) => f.id === pedidoCompleto.fornecedor_id,
+        );
+        setFornecedorTexto(fornecedorSelecionado?.nome || '');
         carregarProdutosFornecedor(pedidoCompleto.fornecedor_id);
       }
       
@@ -599,6 +694,9 @@ const PedidosCompra = () => {
         observacoes: '',
         itens: []
       });
+      setFornecedorTexto('');
+      setProdutoTexto('');
+      setMostrarSugestoesProduto(false);
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao atualizar pedido');
@@ -688,35 +786,56 @@ const PedidosCompra = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Fornecedor *
                 </label>
+                <div className="relative">
                 <input
-                  list="fornecedores-list"
                   value={fornecedorTexto}
                   onChange={(e) => {
                     const valor = e.target.value;
                     setFornecedorTexto(valor);
-                    
-                    // Buscar fornecedor que corresponda exatamente
-                    const fornecedor = fornecedores.find(f => f.nome === valor);
-                    if (fornecedor) {
-                      setFormData({ ...formData, fornecedor_id: fornecedor.id.toString(), itens: [] });
-                      setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
-                      carregarProdutosFornecedor(fornecedor.id);
+                    setMostrarSugestoesFornecedor(true);
+
+                    // Mantém selecionado só quando casar exatamente (digitado/manual)
+                    const fornecedorExato = fornecedores.find(
+                      (f) => (f.nome || '').toLowerCase() === valor.toLowerCase(),
+                    );
+                    if (fornecedorExato) {
+                      selecionarFornecedor(fornecedorExato);
                     } else {
-                      setFormData({ ...formData, fornecedor_id: '', itens: [] });
+                      setFormData((prev) => ({ ...prev, fornecedor_id: '', itens: [] }));
                       setProdutos([]);
+                      setProdutoTexto('');
+                      setMostrarSugestoesProduto(false);
+                      setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
                     }
+                  }}
+                  onFocus={() => setMostrarSugestoesFornecedor(true)}
+                  onBlur={() => {
+                    // Pequeno delay para permitir clique na sugestão
+                    setTimeout(() => setMostrarSugestoesFornecedor(false), 120);
                   }}
                   placeholder="Digite ou selecione o fornecedor"
                   required={!!formData.fornecedor_id}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-                <datalist id="fornecedores-list">
-                  {fornecedores.map(f => (
-                    <option key={f.id} value={f.nome}>
-                      {f.cpf_cnpj ? `- ${f.cpf_cnpj}` : ''}
-                    </option>
-                  ))}
-                </datalist>
+                {mostrarSugestoesFornecedor && fornecedoresFiltrados.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {fornecedoresFiltrados.map((f) => (
+                      <button
+                        type="button"
+                        key={f.id}
+                        onMouseDown={(ev) => ev.preventDefault()}
+                        onClick={() => selecionarFornecedor(f)}
+                        className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-800">{f.nome}</div>
+                        {f.cpf_cnpj && (
+                          <div className="text-xs text-gray-500">{f.cpf_cnpj}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                </div>
                 <p className="text-xs text-gray-500 mt-1">Digite ou selecione um fornecedor para carregar seus produtos</p>
                 {formData.fornecedor_id && (
                   <button
@@ -748,32 +867,55 @@ const PedidosCompra = () => {
             <div className="border-t pt-4">
               <h3 className="font-semibold mb-4">Itens do Pedido</h3>
               <div className="grid grid-cols-4 gap-4 mb-4">
-                <input
-                  list="produtos-list"
-                  value={produtoTexto}
-                  onChange={(e) => {
-                    const valor = e.target.value;
-                    setProdutoTexto(valor);
-                    
-                    // Buscar produto que corresponda exatamente
-                    const produto = produtos.find(p => p.nome === valor);
-                    if (produto) {
-                      preencherPreco(produto.id.toString());
-                    } else {
-                      setItemForm({ ...itemForm, produto_id: '' });
-                    }
-                  }}
-                  placeholder={!formData.fornecedor_id ? 'Selecione um fornecedor primeiro' : 'Digite ou selecione o produto'}
-                  disabled={!formData.fornecedor_id}
-                  className="col-span-2 px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500"
-                />
-                <datalist id="produtos-list">
-                  {produtos.map(p => (
-                    <option key={p.id} value={p.nome}>
-                      {`SKU: ${p.sku || p.codigo || 'N/A'} | Barras: ${p.codigo_barras || 'N/A'} | Estoque: ${p.estoque_atual || 0}`}
-                    </option>
-                  ))}
-                </datalist>
+                <div className="col-span-2 relative">
+                  <input
+                    value={produtoTexto}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      setProdutoTexto(valor);
+                      setMostrarSugestoesProduto(true);
+
+                      const produtoExato = produtos.find(
+                        (p) => (p.nome || '').toLowerCase() === valor.toLowerCase(),
+                      );
+
+                      if (produtoExato) {
+                        selecionarProduto(produtoExato);
+                      } else {
+                        setItemForm((prev) => ({ ...prev, produto_id: '' }));
+                      }
+                    }}
+                    onFocus={() => {
+                      if (formData.fornecedor_id) {
+                        setMostrarSugestoesProduto(true);
+                      }
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setMostrarSugestoesProduto(false), 120);
+                    }}
+                    placeholder={!formData.fornecedor_id ? 'Selecione um fornecedor primeiro' : 'Digite ou selecione o produto'}
+                    disabled={!formData.fornecedor_id}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500"
+                  />
+                  {mostrarSugestoesProduto && produtosFiltrados.length > 0 && formData.fornecedor_id && (
+                    <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {produtosFiltrados.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={(ev) => ev.preventDefault()}
+                          onClick={() => selecionarProduto(p)}
+                          className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-gray-800">{p.nome}</div>
+                          <div className="text-xs text-gray-500">
+                            SKU: {p.sku || p.codigo || 'N/A'} | Barras: {p.codigo_barras || 'N/A'} | Estoque: {p.estoque_atual || 0}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <input
                   type="number"
                   step="0.01"
@@ -1119,9 +1261,9 @@ const PedidosCompra = () => {
                 <div className="mt-3 flex gap-6 text-sm text-purple-100">
                   {(() => {
                     const selecionados = sugestoes.filter(s => produtosSelecionados.includes(s.produto_id));
-                    const totalQtd = selecionados.reduce((sum, s) => sum + Math.ceil(obterQuantidadeFinal(s)), 0);
-                    const totalPeso = selecionados.reduce((sum, s) => sum + (Math.ceil(obterQuantidadeFinal(s)) * (s.peso_bruto || 0)), 0);
-                    const totalValor = selecionados.reduce((sum, s) => sum + (Math.ceil(obterQuantidadeFinal(s)) * s.preco_unitario), 0);
+                    const totalQtd = selecionados.reduce((sum, s) => sum + obterQuantidadeInteira(s), 0);
+                    const totalPeso = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * (s.peso_bruto || 0)), 0);
+                    const totalValor = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0);
                     return (
                       <>
                         <span>📦 <strong className="text-white">{totalQtd}</strong> unidades</span>
@@ -1153,25 +1295,30 @@ const PedidosCompra = () => {
                 <>
                   {/* Ações Rápidas */}
                   <div className="mb-4 flex gap-3 items-center">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={mostrarSoPreenchidos}
+                        onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
+                        className="w-4 h-4 rounded"
+                      />
+                      Mostrar só preenchidos (qtd {`>`} 0)
+                    </label>
                     <button
                       onClick={selecionarTodosCriticos}
                       className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
                     >
                       🔴 Selecionar Todos Críticos
                     </button>
+                    <button
+                      onClick={selecionarPreenchidosVisiveis}
+                      className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-200"
+                    >
+                      ✅ Selecionar Preenchidos
+                    </button>
                     <div className="flex-1"></div>
                     <span className="text-gray-500 text-sm">
-                      {(() => {
-                        const filtrados = filtroSugestao.trim()
-                          ? sugestoes.filter(s => {
-                              const q = filtroSugestao.toLowerCase();
-                              return (s.produto_nome || '').toLowerCase().includes(q) ||
-                                     (s.produto_sku || '').toLowerCase().includes(q) ||
-                                     (s.produto_codigo_barras || '').toLowerCase().includes(q);
-                            })
-                          : sugestoes;
-                        return `${produtosSelecionados.length} selecionados · ${filtrados.length} exibidos de ${sugestoes.length} total`;
-                      })()}
+                      {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) · ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
                     </span>
                   </div>
 
@@ -1183,21 +1330,17 @@ const PedidosCompra = () => {
                             <input
                               type="checkbox"
                               onChange={(e) => {
-                                const visiveis = filtroSugestao.trim()
-                                  ? sugestoes.filter(s => {
-                                      const q = filtroSugestao.toLowerCase();
-                                      return (s.produto_nome || '').toLowerCase().includes(q) ||
-                                             (s.produto_sku || '').toLowerCase().includes(q) ||
-                                             (s.produto_codigo_barras || '').toLowerCase().includes(q);
-                                    })
-                                  : sugestoes;
+                                const visiveis = sugestoesFiltradas;
                                 if (e.target.checked) {
-                                  setProdutosSelecionados(visiveis.map(s => s.produto_id));
+                                  setProdutosSelecionados((prev) => [
+                                    ...new Set([...prev, ...visiveis.map((s) => s.produto_id)]),
+                                  ]);
                                 } else {
-                                  setProdutosSelecionados([]);
+                                  const idsVisiveis = new Set(visiveis.map((s) => s.produto_id));
+                                  setProdutosSelecionados((prev) => prev.filter((id) => !idsVisiveis.has(id)));
                                 }
                               }}
-                              checked={produtosSelecionados.length > 0 && produtosSelecionados.length === sugestoes.length}
+                              checked={sugestoesFiltradas.length > 0 && sugestoesFiltradas.every((s) => produtosSelecionados.includes(s.produto_id))}
                               className="w-4 h-4 rounded"
                             />
                           </th>
@@ -1213,15 +1356,7 @@ const PedidosCompra = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {(filtroSugestao.trim()
-                          ? sugestoes.filter(s => {
-                              const q = filtroSugestao.toLowerCase();
-                              return (s.produto_nome || '').toLowerCase().includes(q) ||
-                                     (s.produto_sku || '').toLowerCase().includes(q) ||
-                                     (s.produto_codigo_barras || '').toLowerCase().includes(q);
-                            })
-                          : sugestoes
-                        ).map((sugestao) => (
+                        {sugestoesFiltradas.map((sugestao) => (
                           <tr
                             key={sugestao.produto_id}
                             className={`hover:bg-gray-50 ${
@@ -1279,7 +1414,7 @@ const PedidosCompra = () => {
                                 type="number"
                                 min="0"
                                 step="1"
-                                value={Math.ceil(obterQuantidadeFinal(sugestao))}
+                                value={obterQuantidadeInteira(sugestao)}
                                 onChange={(e) => atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)}
                                 className="w-20 px-2 py-1 text-right font-bold text-purple-600 border rounded focus:ring-2 focus:ring-purple-300"
                               />
@@ -1288,7 +1423,7 @@ const PedidosCompra = () => {
                               R$ {sugestao.preco_unitario.toFixed(2)}
                             </td>
                             <td className="px-4 py-3 text-right font-semibold">
-                              R$ {(obterQuantidadeFinal(sugestao) * sugestao.preco_unitario).toFixed(2)}
+                              R$ {(obterQuantidadeInteira(sugestao) * sugestao.preco_unitario).toFixed(2)}
                             </td>
                             <td className="px-4 py-3">
                               <span className={`text-xs ${
@@ -1327,7 +1462,7 @@ const PedidosCompra = () => {
                       <div>
                         💰 Total: <strong>R$ {sugestoes
                           .filter(s => produtosSelecionados.includes(s.produto_id))
-                          .reduce((sum, s) => sum + (obterQuantidadeFinal(s) * s.preco_unitario), 0)
+                          .reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0)
                           .toFixed(2)}</strong>
                       </div>
                     </div>
@@ -1341,10 +1476,10 @@ const PedidosCompra = () => {
                     </button>
                     <button
                       onClick={adicionarSugestoesAoPedido}
-                      disabled={produtosSelecionados.length === 0}
+                      disabled={selecionadosComQuantidade.length === 0}
                       className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      ✅ Adicionar {produtosSelecionados.length} Produtos ao Pedido
+                      ✅ Adicionar {selecionadosComQuantidade.length} Produtos ao Pedido
                     </button>
                   </div>
                 </div>
