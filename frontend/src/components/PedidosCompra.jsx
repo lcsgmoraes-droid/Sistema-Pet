@@ -393,6 +393,11 @@ const PedidosCompra = () => {
     setProdutosSelecionados(preenchidos);
   };
 
+  const desmarcarVisiveis = () => {
+    const idsVisiveis = new Set(sugestoesFiltradas.map((s) => s.produto_id));
+    setProdutosSelecionados((prev) => prev.filter((id) => !idsVisiveis.has(id)));
+  };
+
   const adicionarSugestoesAoPedido = () => {
     if (produtosSelecionados.length === 0) {
       toast.error('Selecione pelo menos um produto');
@@ -1315,6 +1320,12 @@ const PedidosCompra = () => {
                       className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-200"
                     >
                       ✅ Selecionar Preenchidos
+                    </button>
+                    <button
+                      onClick={desmarcarVisiveis}
+                      className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200"
+                    >
+                      ⛔ Desmarcar Visíveis
                     </button>
                     <div className="flex-1"></div>
                     <span className="text-gray-500 text-sm">
