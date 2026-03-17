@@ -117,6 +117,22 @@ interface Notification {
   timestamp: string;
 }
 
+async function withRequestTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Request timeout')), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   // Initial State
   stats: null,
@@ -149,15 +165,13 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
       return;
     }
     
-    console.log('📊 Fetching stats...');
     set({ isLoadingStats: true });
 
     try {
-      const stats = await whatsappService.getStats();
-      console.log('✅ Stats received:', stats);
+      const stats = await withRequestTimeout(whatsappService.getStats());
       set({ stats, isLoadingStats: false });
     } catch (error) {
-      console.error('❌ Error fetching stats:', error);
+      console.warn('Stats indisponivel no momento:', error);
       // Mesmo com erro, desbloqueia o loading
       set({ isLoadingStats: false });
     }
@@ -167,57 +181,56 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   fetchAgents: async () => {
     set({ isLoadingAgents: true });
     try {
-      const agents = await whatsappService.getAgents();
+      const agents = await withRequestTimeout(whatsappService.getAgents());
       set({ agents, isLoadingAgents: false });
     } catch (error) {
-      console.error('Error fetching agents:', error);
+      console.warn('Agents indisponiveis no momento:', error);
       set({ isLoadingAgents: false });
     }
   },
   
   initializeCurrentAgent: async () => {
     try {
-      console.log('🔄 Initializing current agent...');
-      
       // Buscar dados do usuário logado
       const userStr = localStorage.getItem('user');
       if (!userStr) {
-        console.warn('⚠️ No user found in localStorage');
+        console.warn('Usuario nao encontrado no armazenamento local');
         return;
       }
       
       const user = JSON.parse(userStr);
-      console.log('👤 User loaded:', user.email);
       
       // Buscar ou criar agente
-      const agents = await whatsappService.getAgents();
-      console.log('📋 Agents fetched:', agents.length);
+      const agents = await withRequestTimeout(whatsappService.getAgents());
       
-      let currentAgent = agents.find(a => a.user_id === user.id);
-      
-      if (!currentAgent) {
-        console.log('➕ Creating new agent...');
+      const existingAgent = agents.find(a => a.user_id === user.id);
+      let currentAgent: AgentStatus;
+
+      if (existingAgent) {
+        // Atualizar status para online
+        currentAgent = await withRequestTimeout(
+          whatsappService.updateAgent(existingAgent.id, { status: 'online' })
+        );
+      } else {
         // Criar agente se não existir
-        currentAgent = await whatsappService.createAgent({
+        currentAgent = await withRequestTimeout(whatsappService.createAgent({
           name: user.name || user.email,
           email: user.email,
           status: 'online',
           max_concurrent_chats: 5,
           auto_assign: true,
           receive_notifications: true
-        });
-        console.log('✅ Created new agent:', currentAgent.id);
-      } else {
-        console.log('🔄 Updating existing agent to online...');
-        // Atualizar status para online
-        currentAgent = await whatsappService.updateAgent(currentAgent.id, { status: 'online' });
-        console.log('✅ Agent set to online:', currentAgent.id);
+        }));
       }
-      
-      set({ currentAgent });
-      console.log('✅ Current agent initialized');
+
+      set({
+        currentAgent,
+        agents: agents.some(a => a.id === currentAgent.id)
+          ? agents.map(a => (a.id === currentAgent.id ? currentAgent : a))
+          : [...agents, currentAgent]
+      });
     } catch (error) {
-      console.error('❌ Error initializing current agent:', error);
+      console.warn('Nao foi possivel inicializar agente atual:', error);
       // Não bloquear o dashboard se falhar
     }
   },
@@ -245,7 +258,9 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
     try {
       const requestedStatus = status ?? get().filterStatus;
       const apiStatus = requestedStatus === 'my' ? 'active' : requestedStatus;
-      const handoffs = await whatsappService.getHandoffs(apiStatus === 'all' ? undefined : apiStatus);
+      const handoffs = await withRequestTimeout(
+        whatsappService.getHandoffs(apiStatus === 'all' ? undefined : apiStatus)
+      );
 
       if (requestedStatus === 'my') {
         const currentAgentId = get().currentAgent?.id;
@@ -263,7 +278,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
 
       set({ handoffs, isLoadingHandoffs: false });
     } catch (error) {
-      console.error('Error fetching handoffs:', error);
+      console.warn('Fila indisponivel no momento:', error);
       set({ isLoadingHandoffs: false });
     }
   },

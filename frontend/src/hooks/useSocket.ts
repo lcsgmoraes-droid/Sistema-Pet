@@ -176,8 +176,8 @@ function showBrowserNotification(title: string, body: string, priority?: string)
   if (Notification.permission === 'granted') {
     const notification = new Notification(title, {
       body,
-      icon: '/logo192.png',
-      badge: '/logo192.png',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
       tag: 'whatsapp-notification',
       requireInteraction: priority === 'urgent',
       silent: false
@@ -203,15 +203,25 @@ function showBrowserNotification(title: string, body: string, priority?: string)
 // Sound Notifications
 function playNotificationSound(type: 'handoff' | 'message' = 'handoff') {
   try {
-    const audio = new Audio(
-      type === 'handoff' 
-        ? '/sounds/notification-handoff.mp3' 
-        : '/sounds/notification-message.mp3'
-    );
-    audio.volume = 0.5;
-    audio.play().catch((error) => {
-      console.warn('Could not play notification sound:', error);
-    });
+    const audioContext = new (globalThis.AudioContext || (globalThis as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = type === 'handoff' ? 880 : 660;
+    gainNode.gain.value = 0.04;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.12);
+
+    oscillator.onended = () => {
+      audioContext.close().catch(() => {
+        // ignore close errors
+      });
+    };
   } catch (error) {
     console.warn('Error playing sound:', error);
   }

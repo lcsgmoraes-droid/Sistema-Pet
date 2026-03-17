@@ -26,7 +26,7 @@ export const NotificationPermission: React.FC = () => {
         // Show test notification
         new Notification('Notificações Ativadas', {
           body: 'Você receberá alertas de novas conversas',
-          icon: '/logo192.png'
+          icon: '/favicon.svg'
         });
       }
     }

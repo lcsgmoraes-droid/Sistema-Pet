@@ -21,6 +21,7 @@ class NativeWebSocketService {
   private reconnectDelay = 1000;
   private reconnectTimeout: number | null = null;
   private pingInterval: number | null = null; // Keep-alive
+  private isDisconnecting = false;
   private agentId: string | null = null;
   private token: string | null = null;
   private handlers: EventHandlers = {};
@@ -47,6 +48,8 @@ class NativeWebSocketService {
       console.log('WebSocket already connected');
       return;
     }
+
+    this.isDisconnecting = false;
     
     this.token = token;
     this.agentId = agentId;
@@ -66,6 +69,8 @@ class NativeWebSocketService {
   }
   
   disconnect(): void {
+    this.isDisconnecting = true;
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -97,6 +102,7 @@ class NativeWebSocketService {
     this.ws.onopen = () => {
       console.log('✅ WebSocket connected');
       this.reconnectAttempts = 0;
+      this.isDisconnecting = false;
       
       if (this.onConnectionChange) {
         this.onConnectionChange(true);
@@ -120,14 +126,21 @@ class NativeWebSocketService {
         this.onConnectionChange(false);
       }
       
-      // Try to reconnect unless it was a clean close
-      if (event.code !== 1000) {
+      // Try to reconnect unless it was a clean close or intentional disconnect
+      if (event.code !== 1000 && !this.isDisconnecting) {
         this.handleReconnect();
       }
     };
     
     this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      if (this.isDisconnecting) {
+        return;
+      }
+
+      console.warn('WebSocket connection issue. Reconnecting automatically.', {
+        readyState: this.ws?.readyState,
+        error
+      });
     };
     
     this.ws.onmessage = (event) => {
@@ -148,6 +161,9 @@ class NativeWebSocketService {
     switch (event) {
       case 'connected':
         console.log('Connection confirmed:', data);
+        break;
+      case 'pong':
+        // Heartbeat response from server keep-alive.
         break;
         
       case 'new_handoff':

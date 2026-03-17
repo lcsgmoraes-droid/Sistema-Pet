@@ -31,8 +31,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export const WhatsAppDashboard: React.FC = () => {
   const [isInitializing, setIsInitializing] = React.useState(true);
   
-  console.log('🎯 WhatsAppDashboard component rendering...');
-  
   const {
     stats,
     agents,
@@ -48,7 +46,6 @@ export const WhatsAppDashboard: React.FC = () => {
     notifications,
     currentAgent,
     fetchStats,
-    fetchAgents,
     fetchHandoffs,
     initializeCurrentAgent,
     setFilterStatus,
@@ -76,17 +73,12 @@ export const WhatsAppDashboard: React.FC = () => {
       initialized = true;
       
       try {
-        console.log('🚀 Initializing WhatsApp Dashboard...');
-
         try {
           // Garante agente atual antes de buscar fila para evitar estado vazio intermitente.
           await initializeCurrentAgent();
 
           await withTimeout(
-            Promise.all([
-              fetchAgents(),
-              fetchHandoffs(useWhatsAppStore.getState().filterStatus)
-            ]),
+            fetchHandoffs(useWhatsAppStore.getState().filterStatus),
             15000
           );
 
@@ -96,7 +88,6 @@ export const WhatsAppDashboard: React.FC = () => {
           console.warn('⚠️ Initialization timeout, continuing anyway:', timeoutError);
         }
         
-        console.log('✅ Dashboard initialized');
       } catch (error) {
         console.error('❌ Error initializing dashboard:', error);
       } finally {
@@ -113,12 +104,10 @@ export const WhatsAppDashboard: React.FC = () => {
       
       // Não fazer polling se a aba não está ativa (performance)
       if (document.hidden) {
-        console.log('⏸️ Page hidden, skipping refresh');
         return;
       }
       
       isFetching = true;
-      console.log('🔄 Refreshing dashboard data...');
       
       try {
         const currentFilterStatus = useWhatsAppStore.getState().filterStatus;
@@ -141,7 +130,6 @@ export const WhatsAppDashboard: React.FC = () => {
     // Atualizar quando a aba voltar a ficar ativa
     const handleVisibilityChange = () => {
       if (!document.hidden && mounted) {
-        console.log('👁️ Page visible again, refreshing data');
         refreshData();
       }
     };
