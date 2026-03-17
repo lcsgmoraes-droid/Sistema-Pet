@@ -108,6 +108,7 @@ from app.permissions_routes import router as permissions_router
 from app.api.pdv_internal_routes import router as pdv_internal_router
 # [DESATIVADO - PHASE 5] from app.api.opportunity_metrics_routes import router as opportunity_metrics_router
 from app.api.racao_calculadora_routes import router as racao_calculadora_internal_router
+from app.api.whatsapp_orchestrator_internal_routes import router as whatsapp_orchestrator_internal_router
 from app.api.v1.fiscal_sugestao import router as fiscal_sugestao_router
 from app.api.v1.produto_fiscal import router as produto_fiscal_router
 from app.api.v1.pdv_fiscal import router as pdv_fiscal_router
@@ -858,6 +859,7 @@ app.include_router(segmentacao_router, tags=["Segmentação de Clientes"])
 app.include_router(pdv_ai_router, tags=["PDV - IA Contextual"])
 app.include_router(pdv_internal_router, tags=["PDV - Internal API"])
 app.include_router(racao_calculadora_internal_router, tags=["Calculadora de Ração - Internal API"])
+app.include_router(whatsapp_orchestrator_internal_router, tags=["WhatsApp - Internal Orchestrator"])
 app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
 app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])
 app.include_router(pdv_fiscal_router, tags=["PDV - Fiscal em Tempo Real"])

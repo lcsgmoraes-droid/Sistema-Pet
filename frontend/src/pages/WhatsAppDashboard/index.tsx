@@ -12,6 +12,22 @@ import { NotificationToast } from './components/NotificationToast.tsx';
 import { ConnectionStatus } from './components/ConnectionStatus.tsx';
 import { NotificationPermission } from './components/NotificationPermission.tsx';
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Initialization timeout')), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export const WhatsAppDashboard: React.FC = () => {
   const [isInitializing, setIsInitializing] = React.useState(true);
   
@@ -61,22 +77,21 @@ export const WhatsAppDashboard: React.FC = () => {
       
       try {
         console.log('🚀 Initializing WhatsApp Dashboard...');
-        
-        // Initial data fetch with timeout protection (15s)
-        const timeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Initialization timeout')), 15000)
-        );
-        
+
         try {
-          await Promise.race([
+          // Garante agente atual antes de buscar fila para evitar estado vazio intermitente.
+          await initializeCurrentAgent();
+
+          await withTimeout(
             Promise.all([
-              initializeCurrentAgent(),
-              fetchStats(),
               fetchAgents(),
-              fetchHandoffs()
+              fetchHandoffs(useWhatsAppStore.getState().filterStatus)
             ]),
-            timeout
-          ]);
+            15000
+          );
+
+          // Stats é secundário: não deve bloquear a fila e o carregamento principal.
+          void fetchStats();
         } catch (timeoutError) {
           console.warn('⚠️ Initialization timeout, continuing anyway:', timeoutError);
         }
@@ -106,10 +121,11 @@ export const WhatsAppDashboard: React.FC = () => {
       console.log('🔄 Refreshing dashboard data...');
       
       try {
-        await Promise.all([
-          fetchStats(),
-          fetchHandoffs(filterStatus === 'all' ? undefined : filterStatus)
-        ]);
+        const currentFilterStatus = useWhatsAppStore.getState().filterStatus;
+
+        // Atualiza fila mesmo que stats falhe/lentifique.
+        await fetchHandoffs(currentFilterStatus);
+        void fetchStats();
       } catch (error) {
         console.error('Error refreshing data:', error);
       } finally {
@@ -153,7 +169,7 @@ export const WhatsAppDashboard: React.FC = () => {
   
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-gray-50" role="main" aria-label="WhatsApp Dashboard">
+      <main className="flex h-screen bg-gray-50" aria-label="WhatsApp Dashboard">
       {/* Sidebar - Agents & Queue */}
       <div className={`
         transition-all duration-300 ease-in-out
@@ -288,7 +304,7 @@ export const WhatsAppDashboard: React.FC = () => {
           />
         ))}
       </div>
-    </div>
+      </main>
     </ErrorBoundary>
   );
 };

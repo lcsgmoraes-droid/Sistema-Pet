@@ -52,7 +52,7 @@ export const whatsappService = {
   // Handoffs
   async getHandoffs(status?: string): Promise<HandoffItem[]> {
     const params = status ? { status } : {};
-    const response = await api.get(`${BASE_URL}/handoffs/pending`, { params });
+    const response = await api.get(`${BASE_URL}/handoffs`, { params });
     return response.data;
   },
   

@@ -1,0 +1,49 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: petshop-pilot-waha
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WAHA_PRINT_QR=${WAHA_PRINT_QR:-true}
+    networks:
+      - whatsapp-pilot-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: petshop-pilot-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_SECURE_COOKIE=false
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/Sao_Paulo}
+      - WAHA_BASE_URL=${WAHA_BASE_URL:-http://waha:3000}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - BACKEND_INTERNAL_BASE_URL=${BACKEND_INTERNAL_BASE_URL:-http://host.docker.internal:8000}
+      - BACKEND_TENANT_ID=${BACKEND_TENANT_ID}
+      - BACKEND_INTERNAL_TOKEN=${BACKEND_INTERNAL_TOKEN}
+    volumes:
+      - n8n-pilot-data:/home/node/.n8n
+    depends_on:
+      - waha
+    networks:
+      - whatsapp-pilot-network
+
+volumes:
+  n8n-pilot-data:
+    name: petshop-n8n-pilot-data
+
+networks:
+  whatsapp-pilot-network:
+    name: petshop-whatsapp-pilot-network
+    driver: bridge

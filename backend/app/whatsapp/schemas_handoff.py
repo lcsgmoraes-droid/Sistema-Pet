@@ -2,7 +2,7 @@
 Sprint 4 - Human Handoff Schemas
 Pydantic models para validação de requests/responses
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -69,6 +69,8 @@ class WhatsAppHandoffCreate(BaseModel):
 
 class WhatsAppHandoffResponse(BaseModel):
     """Response de handoff"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     tenant_id: str
     session_id: str
@@ -78,7 +80,7 @@ class WhatsAppHandoffResponse(BaseModel):
     reason_details: Optional[str]
     priority: str
     status: str
-    assigned_agent_id: Optional[str]
+    assigned_agent_id: Optional[str] = None
     assigned_at: Optional[datetime]
     resolved_at: Optional[datetime]
     resolution_notes: Optional[str]
@@ -96,26 +98,30 @@ class WhatsAppHandoffResponse(BaseModel):
             return str(v)
         return v
     
-    class Config:
-        from_attributes = True
-
 
 class WhatsAppHandoffAssign(BaseModel):
     """Atribuir handoff a um agente"""
     agent_id: str
 
 
+class WhatsAppHandoffResolve(BaseModel):
+    """Resolver handoff"""
+    resolution_notes: str = Field(..., min_length=1, max_length=2000)
+
+
 # ==================== INTERNAL NOTES ====================
 
 class WhatsAppInternalNoteCreate(BaseModel):
     """Criar nota interna"""
-    author_id: str
+    author_id: Optional[str] = None
     content: str = Field(..., min_length=1, max_length=2000)
     note_type: Optional[str] = Field(default="info", pattern="^(info|warning|follow_up)$")
 
 
 class WhatsAppInternalNoteResponse(BaseModel):
     """Response de nota interna"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     handoff_id: str
     author_id: str
@@ -130,9 +136,6 @@ class WhatsAppInternalNoteResponse(BaseModel):
             return str(v)
         return v
     
-    class Config:
-        from_attributes = True
-
 
 # ==================== DASHBOARD SCHEMAS ====================
 

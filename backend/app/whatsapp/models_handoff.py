@@ -98,6 +98,14 @@ class WhatsAppHandoff(Base):
     agent = relationship("WhatsAppAgent", back_populates="handoffs")
     notes = relationship("WhatsAppInternalNote", back_populates="handoff", cascade="all, delete-orphan")
 
+    @property
+    def assigned_agent_id(self):
+        return self.assigned_to
+
+    @assigned_agent_id.setter
+    def assigned_agent_id(self, value):
+        self.assigned_to = value
+
 
 class WhatsAppInternalNote(Base):
     """Notas internas dos atendentes sobre conversas"""
@@ -119,6 +127,14 @@ class WhatsAppInternalNote(Base):
     handoff = relationship("WhatsAppHandoff", back_populates="notes")
     session = relationship("WhatsAppSession")
     agent = relationship("WhatsAppAgent")
+
+    @property
+    def author_id(self):
+        return self.agent_id
+
+    @property
+    def content(self):
+        return self.note
 
 
 # Adicionar relationships nos models existentes

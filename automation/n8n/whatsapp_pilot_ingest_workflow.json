@@ -1,0 +1,248 @@
+{
+  "name": "Sistema Pet - WhatsApp Pilot Ingest",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "Webhook_WAHA_Inbound",
+      "name": "Webhook WAHA Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "webhookId": "712d586b-aca4-4e25-aff3-c17d0fc1ce3a",
+      "position": [
+        -760,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const event = $json || {};\nconst requestBody = event.body && typeof event.body === \"object\" ? event.body : event;\nconst payload = requestBody.payload && typeof requestBody.payload === \"object\"\n  ? requestBody.payload\n  : requestBody;\n\nconst eventName = String(requestBody.event || payload.event || event.event || \"\").toLowerCase();\nconst rawFrom = payload.from || payload.chatId || payload.phone || payload.sender || \"\";\nconst from = String(rawFrom || \"\").trim();\nconst fromMe = Boolean(payload.fromMe);\nconst source = String(payload.source || \"\").toLowerCase();\n// Para evitar mensagem duplicada, o piloto encaminha apenas o evento \"message\".\nconst isSupportedEvent = eventName === \"message\" || eventName === \"\";\nconst isDirectChat = !!from && !from.endsWith(\"@g.us\") && !from.endsWith(\"@newsletter\") && from !== \"status@broadcast\";\nconst shouldForward = isSupportedEvent && !fromMe && isDirectChat;\n\nconst media = payload.media && typeof payload.media === \"object\" ? payload.media : {};\nconst messageTypeRaw = String(payload.type || payload.message_type || media.mimetype || \"\").toLowerCase();\nconst mimeType = String(media.mimetype || payload.mimetype || \"\").toLowerCase();\n\nlet messageType = \"text\";\nif (messageTypeRaw.includes(\"audio\") || messageTypeRaw.includes(\"voice\") || mimeType.startsWith(\"audio/\") || payload.ptt === true) {\n  messageType = \"audio\";\n} else if (messageTypeRaw.includes(\"image\") || messageTypeRaw.includes(\"photo\") || mimeType.startsWith(\"image/\")) {\n  messageType = \"image\";\n}\n\nconst textValue = payload.text?.body || payload.text || payload.body || payload.message || \"\";\nconst text = typeof textValue === \"string\" ? textValue.trim() : \"\";\nconst captionValue = media.caption || payload.caption || (messageType === \"image\" ? text : \"\");\nconst caption = typeof captionValue === \"string\" ? captionValue.trim() : \"\";\nconst mediaUrl = media.url || media.link || payload.media_url || payload.audio?.url || payload.audio?.link || payload.image?.url || payload.image?.link || \"\";\nconst externalMessageId = payload.id || payload.message_id || payload.external_message_id || requestBody.id || event.id || null;\n\nreturn [{\n  json: {\n    should_forward: shouldForward,\n    skip_reason: shouldForward ? undefined : `Evento ignorado: ${eventName || \"desconhecido\"}${fromMe ? \" (fromMe)\" : \"\"}${from ? \"\" : \" (sem remetente)\"}` ,\n    phone: from || undefined,\n    message_type: messageType,\n    text: text || undefined,\n    caption: caption || undefined,\n    transcription_text: undefined,\n    media_url: mediaUrl ? String(mediaUrl) : undefined,\n    external_message_id: externalMessageId ? String(externalMessageId) : undefined,\n    _meta: {\n      event: eventName || undefined,\n      from_me: fromMe,\n      source: source || undefined\n    },\n    _raw_event: requestBody\n  }\n}];"
+      },
+      "id": "Code_Normalize_Event",
+      "name": "Normalize WAHA Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "should-forward",
+              "leftValue": "={{ $json.should_forward }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "If_Is_Audio",
+      "name": "Should Forward?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -240,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "gpt-4o-mini-transcribe"
+            },
+            {
+              "name": "language",
+              "value": "pt"
+            },
+            {
+              "name": "file",
+              "value": "={{ $binary.data }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "HTTP_Transcribe_Audio",
+      "name": "Transcribe Audio (OpenAI)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        -80
+      ],
+      "notes": "Opcional: requer baixar audio para binary antes. Se nao tiver binary, mantenha desativado.",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payload = { ...$json };\n\nif (payload.message_type === \"audio\") {\n  // Fluxo minimo para piloto: usa texto existente ou marcador, sem travar o pipeline\n  payload.transcription_text = payload.transcription_text || payload.text || \"Cliente enviou audio (sem transcricao no n8n).\";\n}\n\nreturn [{ json: payload }];"
+      },
+      "id": "Code_Prepare_Internal_Payload",
+      "name": "Prepare Internal Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/internal/whatsapp-orchestrator/7be8dad7-8956-4758-b7bc-855a5259fe2b/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Internal-Token",
+              "value": "dev_whatsapp_internal_token"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "HTTP_Send_To_Backend",
+      "name": "Send to Backend Internal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"status\": \"accepted\"\n}",
+        "options": {}
+      },
+      "id": "Respond_OK",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook WAHA Inbound": {
+      "main": [
+        [
+          {
+            "node": "Normalize WAHA Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize WAHA Event": {
+      "main": [
+        [
+          {
+            "node": "Should Forward?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Forward?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Internal Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Internal Payload": {
+      "main": [
+        [
+          {
+            "node": "Send to Backend Internal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Backend Internal": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "whatsapp_pilot_ingest",
+  "tags": []
+}

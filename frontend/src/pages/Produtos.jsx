@@ -611,6 +611,7 @@ export default function Produtos() {
   const [produtosBrutos, setProdutosBrutos] = useState([]); // Dados originais da API
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selecionados, setSelecionados] = useState([]);
   const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
@@ -650,6 +651,7 @@ export default function Produtos() {
     busca: "",
     categoria_id: "",
     marca_id: "",
+    fornecedor_id: "",
     estoque_baixo: false,
     em_promocao: false,
   });
@@ -788,16 +790,17 @@ export default function Produtos() {
     carregarDados();
     carregarCategorias();
     carregarMarcas();
+    carregarFornecedores();
     carregarDepartamentos();
   }, []);
 
-  const carregarDados = async () => {
+  const carregarDados = async (filtrosAtuais = filtros) => {
     try {
       setLoading(true);
       // Remover campos vazios dos filtros
       const filtrosLimpos = {};
-      Object.keys(filtros).forEach((key) => {
-        const valor = filtros[key];
+      Object.keys(filtrosAtuais).forEach((key) => {
+        const valor = filtrosAtuais[key];
         // Só incluir se não for string vazia
         if (valor !== "" && valor !== null && valor !== undefined) {
           filtrosLimpos[key] = valor;
@@ -859,6 +862,21 @@ export default function Produtos() {
     }
   };
 
+  const carregarFornecedores = async () => {
+    try {
+      const response = await api.get(
+        "/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true",
+      );
+      const dados = response.data;
+      const lista = Array.isArray(dados)
+        ? dados
+        : dados.items || dados.clientes || dados.data || [];
+      setFornecedores(lista);
+    } catch (error) {
+      console.error("Erro ao carregar fornecedores:", error);
+    }
+  };
+
   const carregarDepartamentos = async () => {
     try {
       const response = await api.get("/produtos/departamentos");
@@ -870,7 +888,13 @@ export default function Produtos() {
   };
 
   const handleFiltroChange = (campo, valor) => {
-    setFiltros((prev) => ({ ...prev, [campo]: valor }));
+    const proximoFiltro = { ...filtros, [campo]: valor };
+    setFiltros(proximoFiltro);
+
+    // Fornecedor filtra no backend (relacionamento N:N via produto_fornecedores)
+    if (campo === "fornecedor_id") {
+      carregarDados(proximoFiltro);
+    }
   };
 
   const handleSelecionar = (id, event) => {
@@ -1215,7 +1239,7 @@ export default function Produtos() {
         id="tour-produtos-filtros"
         className="bg-white rounded-lg shadow-sm p-4 mb-6"
       >
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           {/* Busca Geral */}
           <div id="tour-produtos-busca" className="md:col-span-2">
             <input
@@ -1257,6 +1281,24 @@ export default function Produtos() {
               {marcas.map((marca) => (
                 <option key={marca.id} value={marca.id}>
                   {marca.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fornecedor */}
+          <div>
+            <select
+              value={filtros.fornecedor_id}
+              onChange={(e) =>
+                handleFiltroChange("fornecedor_id", e.target.value)
+              }
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Todos os Fornecedores</option>
+              {fornecedores.map((fornecedor) => (
+                <option key={fornecedor.id} value={fornecedor.id}>
+                  {fornecedor.nome}
                 </option>
               ))}
             </select>

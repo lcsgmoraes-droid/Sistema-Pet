@@ -20,6 +20,7 @@ from app.ai.context_builder import ContextBuilder
 from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY
 from app.whatsapp.sender import send_whatsapp_message
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric, TenantWhatsAppConfig
+from app.whatsapp.handoff_manager import HandoffManager
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,22 @@ class MessageProcessor:
         self.context_builder = ContextBuilder(db)
         self.llm_client = LLMClient(self.config.openai_api_key)
         self.router = IntentRouter()
+
+    @staticmethod
+    def _is_explicit_human_request(message: str) -> bool:
+        """Detecta pedido explícito de atendimento humano."""
+        text = (message or "").lower()
+        triggers = [
+            "atendente",
+            "atendimento humano",
+            "humano",
+            "falar com pessoa",
+            "falar com humano",
+            "falar com atendente",
+            "quero suporte humano",
+            "transferir para humano",
+        ]
+        return any(trigger in text for trigger in triggers)
     
     async def process_message(
         self,
@@ -103,6 +120,13 @@ class MessageProcessor:
                 self.db.commit()
             
             # 3. Verificar se deve transferir para humano
+            if self._is_explicit_human_request(message_content):
+                return await self._transfer_to_human(
+                    session_id=session_id,
+                    reason="manual_request",
+                    reason_details="Pedido explícito do cliente por atendente humano"
+                )
+
             if self.router.should_transfer_to_human(intent, confidence):
                 return await self._transfer_to_human(session_id, intent)
             
@@ -363,13 +387,35 @@ class MessageProcessor:
             "tokens": tokens_input + tokens_output
         }
     
-    async def _transfer_to_human(self, session_id: str, reason: str) -> Dict[str, Any]:
+    async def _transfer_to_human(
+        self,
+        session_id: str,
+        reason: str,
+        reason_details: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Transfere conversa para atendente humano.
         """
         session = self.db.query(WhatsAppSession).get(session_id)
+        handoff = None
+
         if session:
             session.status = "waiting_human"
+
+            handoff_manager = HandoffManager(self.db, self.tenant_id)
+            existing_handoff = handoff_manager.get_active_handoff(session_id)
+
+            if existing_handoff:
+                handoff = existing_handoff
+            else:
+                handoff = handoff_manager.create_handoff(
+                    session_id=session_id,
+                    phone_number=session.phone_number,
+                    reason=reason,
+                    priority="high" if reason in {"reclamacao", "manual_request"} else "medium",
+                    reason_details=reason_details or f"Transferência automática por intent: {reason}"
+                )
+
             self.db.commit()
         
         # Enviar mensagem de transferência
@@ -382,7 +428,11 @@ class MessageProcessor:
         
         logger.info(f"👤 Transferido para humano: {reason}")
         
-        return {"action": "transferred_to_human", "reason": reason}
+        return {
+            "action": "transferred_to_human",
+            "reason": reason,
+            "handoff_id": str(handoff.id) if handoff else None,
+        }
     
     async def _log_metric(self, metric_type: str, value: float):
         """Registra métrica no banco."""

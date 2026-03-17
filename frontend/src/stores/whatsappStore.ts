@@ -151,17 +151,9 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
     
     console.log('📊 Fetching stats...');
     set({ isLoadingStats: true });
-    
-    // Timeout aumentado para 10 segundos
-    const timeout = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Stats timeout')), 10000)
-    );
-    
+
     try {
-      const stats = await Promise.race([
-        whatsappService.getStats(),
-        timeout
-      ]);
+      const stats = await whatsappService.getStats();
       console.log('✅ Stats received:', stats);
       set({ stats, isLoadingStats: false });
     } catch (error) {
@@ -251,7 +243,24 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   fetchHandoffs: async (status) => {
     set({ isLoadingHandoffs: true });
     try {
-      const handoffs = await whatsappService.getHandoffs(status);
+      const requestedStatus = status ?? get().filterStatus;
+      const apiStatus = requestedStatus === 'my' ? 'active' : requestedStatus;
+      const handoffs = await whatsappService.getHandoffs(apiStatus === 'all' ? undefined : apiStatus);
+
+      if (requestedStatus === 'my') {
+        const currentAgentId = get().currentAgent?.id;
+        if (!currentAgentId) {
+          // Evita sobrescrever a fila com vazio quando o agente ainda está carregando.
+          set({ isLoadingHandoffs: false });
+          return;
+        }
+
+        const myHandoffs = handoffs.filter((h) => h.assigned_agent_id === currentAgentId);
+
+        set({ handoffs: myHandoffs, isLoadingHandoffs: false });
+        return;
+      }
+
       set({ handoffs, isLoadingHandoffs: false });
     } catch (error) {
       console.error('Error fetching handoffs:', error);
@@ -261,13 +270,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   
   setFilterStatus: (filterStatus) => {
     set({ filterStatus });
-    const statusMap = {
-      all: undefined,
-      pending: 'pending',
-      active: 'active',
-      my: 'active' // Will need additional filtering
-    };
-    get().fetchHandoffs(statusMap[filterStatus]);
+    get().fetchHandoffs(filterStatus);
   },
   
   takeHandoff: async (handoffId) => {

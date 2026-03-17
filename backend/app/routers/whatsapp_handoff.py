@@ -12,7 +12,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.db import get_session as get_db
 from app.auth import get_current_user
@@ -24,6 +24,7 @@ from app.whatsapp.schemas_handoff import (
     WhatsAppAgentResponse,
     WhatsAppHandoffResponse,
     WhatsAppHandoffAssign,
+    WhatsAppHandoffResolve,
     WhatsAppInternalNoteCreate,
     WhatsAppInternalNoteResponse,
     HandoffDashboardResponse,
@@ -37,6 +38,43 @@ from app.whatsapp.websocket import (
 )
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Handoff - Sprint 4"])
+
+
+def _uuid_to_str(value):
+    return str(value) if value is not None else None
+
+
+def _serialize_handoff(handoff: WhatsAppHandoff) -> dict:
+    return {
+        "id": _uuid_to_str(handoff.id),
+        "tenant_id": _uuid_to_str(handoff.tenant_id),
+        "session_id": _uuid_to_str(handoff.session_id),
+        "phone_number": handoff.phone_number,
+        "customer_name": handoff.customer_name,
+        "reason": handoff.reason,
+        "reason_details": handoff.reason_details,
+        "priority": handoff.priority,
+        "status": handoff.status,
+        "assigned_agent_id": _uuid_to_str(handoff.assigned_to),
+        "assigned_at": handoff.assigned_at,
+        "resolved_at": handoff.resolved_at,
+        "resolution_notes": handoff.resolution_notes,
+        "rating": handoff.rating,
+        "rating_feedback": handoff.rating_feedback,
+        "created_at": handoff.created_at,
+        "updated_at": handoff.updated_at,
+    }
+
+
+def _serialize_note(note: WhatsAppInternalNote) -> dict:
+    return {
+        "id": _uuid_to_str(note.id),
+        "handoff_id": _uuid_to_str(note.handoff_id),
+        "author_id": _uuid_to_str(note.agent_id),
+        "content": note.note,
+        "note_type": note.note_type,
+        "created_at": note.created_at,
+    }
 
 
 # ========================================
@@ -183,7 +221,7 @@ async def delete_agent(
     # Verificar se tem handoffs ativos
     active_handoffs = db.query(WhatsAppHandoff).filter(
         and_(
-            WhatsAppHandoff.assigned_agent_id == agent_id,
+            WhatsAppHandoff.assigned_to == agent_id,
             WhatsAppHandoff.status.in_(["pending", "active"])
         )
     ).count()
@@ -228,14 +266,14 @@ async def list_handoffs(
         query = query.filter(WhatsAppHandoff.priority == priority)
     
     if agent_id:
-        query = query.filter(WhatsAppHandoff.assigned_agent_id == agent_id)
+        query = query.filter(WhatsAppHandoff.assigned_to == agent_id)
     
     handoffs = query.order_by(
         WhatsAppHandoff.priority.desc(),
         WhatsAppHandoff.created_at.desc()
     ).offset(skip).limit(limit).all()
     
-    return handoffs
+    return [_serialize_handoff(handoff) for handoff in handoffs]
 
 
 @router.get("/handoffs/pending", response_model=List[WhatsAppHandoffResponse])
@@ -258,7 +296,7 @@ async def list_pending_handoffs(
         WhatsAppHandoff.created_at.asc()
     ).offset(skip).limit(limit).all()
     
-    return handoffs
+    return [_serialize_handoff(handoff) for handoff in handoffs]
 
 
 @router.get("/handoffs/{handoff_id}", response_model=WhatsAppHandoffResponse)
@@ -280,7 +318,7 @@ async def get_handoff(
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
     
-    return handoff
+    return _serialize_handoff(handoff)
 
 
 @router.post("/handoffs/{handoff_id}/assign", response_model=WhatsAppHandoffResponse)
@@ -326,7 +364,7 @@ async def assign_handoff(
     # Verificar capacidade do agente
     active_count = db.query(WhatsAppHandoff).filter(
         and_(
-            WhatsAppHandoff.assigned_agent_id == agent.id,
+            WhatsAppHandoff.assigned_to == agent.id,
             WhatsAppHandoff.status == "active"
         )
     ).count()
@@ -338,9 +376,10 @@ async def assign_handoff(
         )
     
     # Atribuir
-    handoff.assigned_agent_id = agent.id
+    handoff.assigned_to = agent.id
     handoff.status = "active"
-    handoff.assigned_at = datetime.utcnow()
+    handoff.assigned_at = datetime.now(UTC)
+    agent.current_chats = active_count + 1
     
     # Atualizar status do agente
     if active_count + 1 >= agent.max_concurrent_chats:
@@ -356,16 +395,17 @@ async def assign_handoff(
         "phone_number": handoff.phone_number,
         "customer_name": handoff.customer_name,
         "status": handoff.status,
-        "assigned_agent_id": str(handoff.assigned_agent_id),
+        "assigned_agent_id": str(handoff.assigned_to),
         "priority": handoff.priority
     }, str(agent.id))
     
-    return handoff
+    return _serialize_handoff(handoff)
 
 
 @router.post("/handoffs/{handoff_id}/resolve", response_model=WhatsAppHandoffResponse)
 async def resolve_handoff(
     handoff_id: str,
+    resolve_data: WhatsAppHandoffResolve,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -383,25 +423,28 @@ async def resolve_handoff(
         raise HTTPException(status_code=404, detail="Handoff not found")
     
     handoff.status = "resolved"
-    handoff.resolved_at = datetime.utcnow()
+    handoff.resolved_at = datetime.now(UTC)
+    handoff.resolution_notes = resolve_data.resolution_notes
     
     # Liberar capacidade do agente
-    if handoff.assigned_agent_id:
+    if handoff.assigned_to:
         agent = db.query(WhatsAppAgent).filter(
-            WhatsAppAgent.id == handoff.assigned_agent_id
+            WhatsAppAgent.id == handoff.assigned_to
         ).first()
         
         if agent:
             active_count = db.query(WhatsAppHandoff).filter(
                 and_(
-                    WhatsAppHandoff.assigned_agent_id == agent.id,
+                    WhatsAppHandoff.assigned_to == agent.id,
                     WhatsAppHandoff.status == "active",
                     WhatsAppHandoff.id != handoff_id
                 )
             ).count()
+
+            agent.current_chats = active_count
             
             if active_count < agent.max_concurrent_chats and agent.status == "busy":
-                agent.status = "available"
+                agent.status = "online"
     
     db.commit()
     db.refresh(handoff)
@@ -409,7 +452,7 @@ async def resolve_handoff(
     # Emit WebSocket event
     await emit_handoff_resolved(handoff_id, db)
     
-    return handoff
+    return _serialize_handoff(handoff)
 
 
 # ========================================
@@ -435,11 +478,23 @@ async def create_note(
     
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
+
+    current_agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.tenant_id == current_user.tenant_id,
+            WhatsAppAgent.user_id == current_user.id
+        )
+    ).first()
+
+    if not current_agent:
+        raise HTTPException(status_code=400, detail="Agente atual não encontrado")
     
     note = WhatsAppInternalNote(
+        tenant_id=current_user.tenant_id,
         handoff_id=handoff_id,
-        author_id=note_data.author_id,
-        content=note_data.content,
+        session_id=handoff.session_id,
+        agent_id=current_agent.id,
+        note=note_data.content,
         note_type=note_data.note_type or "info"
     )
     
@@ -447,7 +502,7 @@ async def create_note(
     db.commit()
     db.refresh(note)
     
-    return note
+    return _serialize_note(note)
 
 
 @router.get("/handoffs/{handoff_id}/notes", response_model=List[WhatsAppInternalNoteResponse])
@@ -474,7 +529,7 @@ async def list_notes(
         WhatsAppInternalNote.handoff_id == handoff_id
     ).order_by(WhatsAppInternalNote.created_at).all()
     
-    return notes
+    return [_serialize_note(note) for note in notes]
 
 
 # ========================================
@@ -524,7 +579,7 @@ async def get_handoff_stats(
     available_agents = db.query(WhatsAppAgent).filter(
         and_(
             WhatsAppAgent.tenant_id == tenant_id,
-            WhatsAppAgent.status == "available"
+            WhatsAppAgent.status == "online"
         )
     ).count()
     
