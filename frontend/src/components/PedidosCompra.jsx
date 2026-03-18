@@ -97,6 +97,27 @@ const PedidosCompra = () => {
     setMostrarSugestoesProduto(false);
   };
 
+  const obterFornecedorPorId = (fornecedorId) =>
+    fornecedores.find((f) => Number(f.id) === Number(fornecedorId));
+
+  const extrairEmailFornecedor = (fornecedor) => {
+    if (!fornecedor) return '';
+
+    const candidatos = [
+      fornecedor.email,
+      fornecedor.email_principal,
+      fornecedor.email_comercial,
+      fornecedor.contato_email,
+      fornecedor?.contato?.email,
+    ];
+
+    const emailValido = candidatos.find(
+      (valor) => typeof valor === 'string' && valor.includes('@'),
+    );
+
+    return (emailValido || '').trim();
+  };
+
   useEffect(() => {
     carregarDados();
   }, []);
@@ -474,11 +495,14 @@ const PedidosCompra = () => {
     }
   };
 
-  const enviarPedido = async (id) => {
+  const enviarPedido = async (pedido) => {
+    const fornecedor = obterFornecedorPorId(pedido.fornecedor_id);
+    const emailFornecedor = extrairEmailFornecedor(fornecedor);
+
     // Abrir modal de envio ao invés de enviar direto
-    setPedidoParaEnviar(id);
+    setPedidoParaEnviar(pedido.id);
     setDadosEnvio({
-      email: '',
+      email: emailFornecedor,
       whatsapp: '',
       formatos: {
         pdf: true,
@@ -605,6 +629,32 @@ const PedidosCompra = () => {
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao reverter status');
+    }
+  };
+
+  const cancelarPedido = async (pedido) => {
+    const acao = pedido.status === 'rascunho' ? 'cancelar/excluir' : 'cancelar';
+    const motivo = window.prompt(
+      `Informe o motivo para ${acao} o pedido ${pedido.numero_pedido}:`,
+      'Cancelado pelo usuário',
+    );
+
+    if (!motivo) return;
+
+    const motivoLimpo = motivo.trim();
+    if (motivoLimpo.length < 10) {
+      toast.error('Informe um motivo com pelo menos 10 caracteres');
+      return;
+    }
+
+    try {
+      await api.post(`/pedidos-compra/${pedido.id}/cancelar`, null, {
+        params: { motivo: motivoLimpo },
+      });
+      toast.success('✅ Pedido cancelado com sucesso');
+      carregarDados();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao cancelar pedido');
     }
   };
 
@@ -760,7 +810,7 @@ const PedidosCompra = () => {
         </div>
         <button
           onClick={() => setMostrarForm(!mostrarForm)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-700 px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
         >
           {mostrarForm ? '❌ Cancelar' : '➕ Novo Pedido'}
         </button>
@@ -1064,7 +1114,7 @@ const PedidosCompra = () => {
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3">{pedido.fornecedor_id}</td>
+                <td className="px-4 py-3">{obterFornecedorPorId(pedido.fornecedor_id)?.nome || pedido.fornecedor_id}</td>
                 <td className="px-4 py-3">{new Date(pedido.data_pedido).toLocaleDateString()}</td>
                 <td className="px-4 py-3 text-right font-semibold">R$ {pedido.valor_final.toFixed(2)}</td>
                 <td className="px-4 py-3 text-center">{getStatusBadge(pedido.status)}</td>
@@ -1073,7 +1123,7 @@ const PedidosCompra = () => {
                     {/* Botão Ver Detalhes */}
                     <button
                       onClick={() => verDetalhes(pedido)}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-xs font-semibold"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-gray-200 bg-white text-gray-700 rounded-md hover:bg-gray-50 text-xs font-semibold"
                       title="Ver detalhes completos do pedido"
                     >
                       🔍 Ver
@@ -1082,14 +1132,14 @@ const PedidosCompra = () => {
                     {/* Botões de exportação - sempre disponíveis */}
                     <button
                       onClick={() => exportarPDF(pedido.id)}
-                      className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-xs font-semibold"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-red-200 bg-white text-red-700 rounded-md hover:bg-red-50 text-xs font-semibold"
                       title="Exportar PDF"
                     >
                       📄 PDF
                     </button>
                     <button
                       onClick={() => exportarExcel(pedido.id)}
-                      className="px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-xs font-semibold"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-emerald-200 bg-white text-emerald-700 rounded-md hover:bg-emerald-50 text-xs font-semibold"
                       title="Exportar Excel"
                     >
                       📊 Excel
@@ -1098,8 +1148,8 @@ const PedidosCompra = () => {
                     {/* Ações por status */}
                     {pedido.status === 'rascunho' && (
                       <button
-                        onClick={() => enviarPedido(pedido.id)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs font-semibold"
+                        onClick={() => enviarPedido(pedido)}
+                        className="inline-flex items-center gap-1 px-3 py-1 border border-blue-200 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-xs font-semibold"
                         title="Enviar pedido ao fornecedor"
                       >
                         📤 Enviar
@@ -1108,7 +1158,7 @@ const PedidosCompra = () => {
                     {pedido.status === 'enviado' && (
                       <button
                         onClick={() => confirmarPedido(pedido.id)}
-                        className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs font-semibold"
+                        className="inline-flex items-center gap-1 px-3 py-1 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 text-xs font-semibold"
                         title="Confirmar recebimento do pedido pelo fornecedor"
                       >
                         ✅ Confirmar
@@ -1117,7 +1167,7 @@ const PedidosCompra = () => {
                     {(pedido.status === 'confirmado' || pedido.status === 'recebido_parcial') && (
                       <button
                         onClick={() => abrirRecebimento(pedido)}
-                        className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs font-semibold"
+                        className="inline-flex items-center gap-1 px-3 py-1 border border-violet-200 bg-violet-50 text-violet-700 rounded-md hover:bg-violet-100 text-xs font-semibold"
                         title="Registrar entrada de produtos no estoque"
                       >
                         📦 Receber
@@ -1128,10 +1178,20 @@ const PedidosCompra = () => {
                     {pedido.status !== 'rascunho' && pedido.status !== 'recebido_total' && (
                       <button
                         onClick={() => reverterStatus(pedido.id)}
-                        className="px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 text-xs font-semibold"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 border border-amber-200 bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 text-xs font-semibold"
                         title="Reverter para status anterior"
                       >
                         ⏪ Reverter
+                      </button>
+                    )}
+
+                    {pedido.status !== 'recebido_total' && pedido.status !== 'cancelado' && (
+                      <button
+                        onClick={() => cancelarPedido(pedido)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-200 bg-rose-50 text-rose-700 rounded-md hover:bg-rose-100 text-xs font-semibold"
+                        title={pedido.status === 'rascunho' ? 'Cancelar/Excluir pedido em rascunho' : 'Cancelar pedido'}
+                      >
+                        🗑️ {pedido.status === 'rascunho' ? 'Excluir' : 'Cancelar'}
                       </button>
                     )}
                   </div>
@@ -1681,7 +1741,7 @@ const ModalEnvioPedido = ({ pedidoId, onClose, onEnviar, onEnvioManual, dadosEnv
           <div className="flex flex-col gap-3 pt-4">
             <button
               onClick={onEnviar}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full border border-blue-200 bg-blue-50 text-blue-700 py-3 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
             >
               📧 Enviar por E-mail
             </button>
@@ -1697,7 +1757,7 @@ const ModalEnvioPedido = ({ pedidoId, onClose, onEnviar, onEnvioManual, dadosEnv
 
             <button
               onClick={onEnvioManual}
-              className="w-full bg-gray-600 text-white py-3 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
+              className="w-full border border-slate-200 bg-slate-50 text-slate-700 py-3 rounded-lg font-semibold hover:bg-slate-100 transition-colors"
             >
               ✅ Já enviei manualmente
             </button>

@@ -111,8 +111,11 @@ class PagarmeConnectClient:
             "closed": False,
             "items": items,
             "customer": customer,
+            "display_name": (metadata or {}).get("external_id", "Pedido POS"),
             "poi_payment_settings": {
-                "terminal_serial_number": serial_number,
+                "devices_serial_number": [serial_number],
+                "visible": True,
+                "print_order_receipt": False,
             },
         }
         if payment_setup:
