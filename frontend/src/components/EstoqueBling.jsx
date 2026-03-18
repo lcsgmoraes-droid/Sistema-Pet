@@ -286,7 +286,7 @@ function EstoqueBling() {
           <button
             onClick={() => runGlobalAction(
               'recentes',
-              () => api.post('/estoque/sync/reconciliar-recentes', { limit: 150, minutes: 30 }),
+              () => api.post('/estoque/sync/reconciliar-recentes', { limit: 150, minutes: 30 }, { timeout: 0 }),
               (response) => `Recentes avaliados: ${response.data?.avaliados || 0} | divergências: ${response.data?.divergencias || 0}`,
             )}
             disabled={runningAction !== ''}
@@ -297,7 +297,7 @@ function EstoqueBling() {
           <button
             onClick={() => runGlobalAction(
               'geral',
-              () => api.post('/estoque/sync/reconciliar-geral', { limit: 500, minutes: 30 }),
+              () => api.post('/estoque/sync/reconciliar-geral', { limit: 500, minutes: 30 }, { timeout: 0 }),
               (response) => `Auditoria geral: ${response.data?.avaliados || 0} itens | divergências: ${response.data?.divergencias || 0}`,
             )}
             disabled={runningAction !== ''}
