@@ -78,6 +78,23 @@ function Get-AlembicHeads {
     return $heads
 }
 
+function Get-DistAssetReferences {
+    $indexPath = Join-Path $root 'frontend/dist/index.html'
+    if (-not (Test-Path $indexPath)) {
+        return @()
+    }
+
+    $content = Get-Content -Path $indexPath -Raw
+    $matches = [regex]::Matches($content, '"/assets/([^"\?]+)')
+
+    $assets = @()
+    foreach ($m in $matches) {
+        $assets += $m.Groups[1].Value
+    }
+
+    return $assets | Sort-Object -Unique
+}
+
 Check-Command 'git'
 
 Write-Section 'Validacao de fluxo DEV -> PROD'
@@ -119,6 +136,29 @@ Write-Host "Heads detectadas: $($heads.Count)"
 if ($heads.Count -gt 1) {
     $heads | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
     Fail 'Multiplas heads de migration detectadas. Unifique antes de subir producao.'
+}
+
+Write-Section '4) Integridade do frontend dist/assets'
+$assetRefs = Get-DistAssetReferences
+Write-Host "Assets referenciados no dist/index.html: $($assetRefs.Count)"
+if ($assetRefs.Count -gt 0) {
+    $missingAssets = @()
+
+    foreach ($asset in $assetRefs) {
+        $relativePath = "frontend/dist/assets/$asset"
+        $fullPath = Join-Path $root $relativePath
+
+        $tracked = (git ls-files -- $relativePath).Trim()
+        if (-not $tracked -or -not (Test-Path $fullPath)) {
+            $missingAssets += $relativePath
+        }
+    }
+
+    if ($missingAssets.Count -gt 0) {
+        Write-Host 'Assets faltando/rastreados incorretamente:' -ForegroundColor Yellow
+        $missingAssets | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        Fail 'dist/index.html referencia assets ausentes no Git. Rode build e inclua frontend/dist/assets no commit.'
+    }
 }
 
 Write-Section 'Resultado'
