@@ -378,11 +378,13 @@ async def webhook_bling(
         logger.info("webhook_bling", f"Dados: {dados}")
         
         # Extrair informações do webhook
-        # Formato esperado: { "topic": "nfe", "id": 123456, "status": "autorizada" }
+        # Formato esperado: { "topic": "nfe_notafiscal", "id": 123456, "status": "autorizada" }
+        # Ou: { "topic": "notas_fiscais", "data": { "id": 123456, "situacao": 1 } }
         topic = dados.get("topic")
-        nfe_id = dados.get("id")
+        nfe_id = dados.get("id") or (dados.get("data", {}).get("id") if dados.get("data") else None)
         
-        if topic not in ["nfe", "nfce"] or not nfe_id:
+        if topic not in ["nfe", "nfce", "nfe_notafiscal", "notas_fiscais"] or not nfe_id:
+            logger.warning("webhook_bling", f"Webhook ignorado: topic={topic}, nfe_id={nfe_id}")
             return {"success": True, "message": "Webhook ignorado"}
         
         # Buscar venda com essa nota
@@ -397,7 +399,7 @@ async def webhook_bling(
         # Consultar status atualizado no Bling
         bling = BlingAPI()
         
-        if topic == "nfce":
+        if topic in ["nfce", "notas_fiscais"]:
             resultado = bling.consultar_nfce(nfe_id)
         else:
             resultado = bling.consultar_nfe(nfe_id)
@@ -427,6 +429,63 @@ async def webhook_bling(
         venda.nfe_status = novo_status
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
         
+        # ✅ NOVO: Se NF foi AUTORIZADA, confirmar o estoque
+        if valor_situacao in [1, 2]:  # 1=Autorizada, 2=Cancelada (para controle)
+            logger.info("webhook_bling", f"✅ NF AUTORIZADA - Confirmando estoque da Venda #{venda.id}")
+            
+            # Buscar movimentações dessa venda que ainda estão 'reservado'
+            from .produtos_models import EstoqueMovimentacao, ProdutoBlingSync
+            
+            movimentacoes = db.query(EstoqueMovimentacao).filter(
+                EstoqueMovimentacao.referencia_id == venda.id,
+                EstoqueMovimentacao.referencia_tipo == 'venda_bling',
+                EstoqueMovimentacao.status == 'reservado'
+            ).all()
+            
+            for mov in movimentacoes:
+                # Marcar como confirmado
+                mov.status = 'confirmado'
+                logger.info("webhook_bling", f"  📦 Movimentação #{mov.id} (Produto {mov.produto_id}) confirmada")
+                
+                # Enviar estoque para Bling (sincronizar)
+                try:
+                    produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
+                    if produto:
+                        sync = db.query(ProdutoBlingSync).filter(
+                            ProdutoBlingSync.produto_id == produto.id,
+                            ProdutoBlingSync.sincronizar == True
+                        ).first()
+                        
+                        if sync and sync.bling_produto_id:
+                            bling.atualizar_estoque_produto(
+                                produto_id=sync.bling_produto_id,
+                                estoque_novo=produto.estoque_atual or 0
+                            )
+                            sync.ultima_sincronizacao = datetime.utcnow()
+                            sync.status = 'ativo'
+                            sync.erro_mensagem = None
+                            logger.info("webhook_bling", f"  ✅ Estoque enviado ao Bling: {produto.codigo} = {produto.estoque_atual}")
+                except Exception as e:
+                    logger.warning("webhook_bling", f"  ⚠️ Erro ao sincronizar com Bling: {e}")
+        
+        # Se NF foi CANCELADA, revert estoque
+        elif valor_situacao == 2:  # 2=Cancelada
+            logger.warning("webhook_bling", f"⚠️ NF CANCELADA - Revertendo estoque da Venda #{venda.id}")
+            
+            movimentacoes = db.query(EstoqueMovimentacao).filter(
+                EstoqueMovimentacao.referencia_id == venda.id,
+                EstoqueMovimentacao.referencia_tipo == 'venda_bling'
+            ).all()
+            
+            for mov in movimentacoes:
+                if mov.status != 'cancelado':
+                    # Revert: adicionar de volta o estoque
+                    produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
+                    if produto:
+                        produto.estoque_atual = (produto.estoque_atual or 0) + mov.quantidade
+                        mov.status = 'cancelado'
+                        logger.info("webhook_bling", f"  ↩️ Estoque revertido: {produto.codigo}")
+        
         db.commit()
         
         logger.info("webhook_bling", f"✅ Status atualizado: Venda #{venda.id} -> {novo_status}")
@@ -440,6 +499,8 @@ async def webhook_bling(
         
     except Exception as e:
         logger.error("webhook_error", f"Erro ao processar webhook: {str(e)}")
+        import traceback
+        logger.error("webhook_error", traceback.format_exc())
         # Retornar 200 mesmo com erro para não ficar reenviando
         return {"success": False, "error": str(e)}
 

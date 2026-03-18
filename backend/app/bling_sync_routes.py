@@ -393,7 +393,7 @@ async def webhook_bling(
                         estoque_anterior = produto.estoque_atual or 0
                         produto.estoque_atual = max(0, estoque_anterior - quantidade)
                         
-                        # Registrar movimentação
+                        # Registrar movimentação com status 'reservado' (pendente de NF confirmada)
                         movimentacao = EstoqueMovimentacao(
                             produto_id=produto.id,
                             tipo='saida',
@@ -402,7 +402,10 @@ async def webhook_bling(
                             quantidade_anterior=estoque_anterior,
                             quantidade_nova=produto.estoque_atual,
                             documento=f"BLING-{venda_id}",
-                            observacao="Venda online via Bling",
+                            referencia_id=venda_id,
+                            referencia_tipo='venda_bling',
+                            status='reservado',  # ← NOVO: Estoque reservado até NF ser autorizada
+                            observacao="Venda online via Bling - Pendente de NF autorizada",
                             user_id=1  # Sistema
                         )
                         db.add(movimentacao)

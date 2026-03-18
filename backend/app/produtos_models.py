@@ -580,6 +580,12 @@ class EstoqueMovimentacao(BaseTenantModel):
     referencia_id = Column(Integer, nullable=True)  # ID da venda, compra, etc
     referencia_tipo = Column(String(20), nullable=True)  # venda, compra, ajuste
     
+    # Status da movimentação
+    # reservado: estoque baixado mas pendente de confirmação (venda em aberto)
+    # confirmado: estoque definitivamente baixado (NF emitida e autorizada)
+    # cancelado: movimentação cancelada (devolução, cancelamento)
+    status = Column(String(20), default='confirmado', nullable=False)  # reservado, confirmado, cancelado
+    
     observacao = Column(Text, nullable=True)
     
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
