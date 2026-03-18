@@ -298,7 +298,11 @@ function EstoqueBling() {
             onClick={() => runGlobalAction(
               'geral',
               () => api.post('/estoque/sync/reconciliar-geral', { limit: 500, minutes: 30 }, { timeout: 0 }),
-              (response) => `Auditoria geral: ${response.data?.avaliados || 0} itens | divergências: ${response.data?.divergencias || 0}`,
+              (response) => {
+                if (response.data?.status === 'started') return 'Auditoria geral iniciada em segundo plano';
+                if (response.data?.status === 'running') return 'Auditoria geral já está em execução';
+                return `Auditoria geral: ${response.data?.avaliados || 0} itens | divergências: ${response.data?.divergencias || 0}`;
+              },
             )}
             disabled={runningAction !== ''}
             className="rounded-lg bg-slate-800 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-gray-400"

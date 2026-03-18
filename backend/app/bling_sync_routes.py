@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 import json
 import asyncio
+import threading
 
 from .db import get_session
 from .auth import get_current_user
@@ -35,6 +36,35 @@ def utc_now() -> datetime:
 
 
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronização Bling"])
+
+_reconciliacao_geral_lock = threading.Lock()
+_reconciliacao_geral_estado = {
+    "running": False,
+    "started_at": None,
+    "finished_at": None,
+    "result": None,
+}
+
+
+def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
+    try:
+        resultado = BlingSyncService.reconcile_all_products(limit=limit)
+        with _reconciliacao_geral_lock:
+            _reconciliacao_geral_estado["result"] = {
+                "ok": True,
+                **resultado,
+            }
+    except Exception as error:
+        logger.exception("❌ Erro na reconciliação geral em background")
+        with _reconciliacao_geral_lock:
+            _reconciliacao_geral_estado["result"] = {
+                "ok": False,
+                "erro": str(error),
+            }
+    finally:
+        with _reconciliacao_geral_lock:
+            _reconciliacao_geral_estado["running"] = False
+            _reconciliacao_geral_estado["finished_at"] = utc_now()
 
 # ============================================================================
 # SCHEMAS
@@ -387,9 +417,50 @@ def reconciliar_geral(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Executa uma auditoria mais ampla dos produtos vinculados ao Bling."""
+    """Inicia auditoria ampla em segundo plano para evitar travamento por timeout."""
     limite = body.limit if body else None
-    return BlingSyncService.reconcile_all_products(limit=limite)
+
+    with _reconciliacao_geral_lock:
+        if _reconciliacao_geral_estado["running"]:
+            return {
+                "status": "running",
+                "message": "Auditoria geral já está em execução",
+                "started_at": _reconciliacao_geral_estado["started_at"],
+            }
+
+        _reconciliacao_geral_estado["running"] = True
+        _reconciliacao_geral_estado["started_at"] = utc_now()
+        _reconciliacao_geral_estado["finished_at"] = None
+        _reconciliacao_geral_estado["result"] = None
+
+    worker = threading.Thread(
+        target=_executar_reconciliacao_geral_em_background,
+        args=(limite,),
+        daemon=True,
+    )
+    worker.start()
+
+    return {
+        "status": "started",
+        "message": "Auditoria geral iniciada em segundo plano",
+        "limit": limite,
+        "started_at": _reconciliacao_geral_estado["started_at"],
+    }
+
+
+@router.get("/reconciliar-geral/status")
+def status_reconciliar_geral(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Retorna status da auditoria geral em background."""
+    with _reconciliacao_geral_lock:
+        return {
+            "running": _reconciliacao_geral_estado["running"],
+            "started_at": _reconciliacao_geral_estado["started_at"],
+            "finished_at": _reconciliacao_geral_estado["finished_at"],
+            "result": _reconciliacao_geral_estado["result"],
+        }
 
 # ============================================================================
 # RECONCILIAR DIVERGÊNCIAS
