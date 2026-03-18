@@ -42,37 +42,57 @@ function EstoqueBling() {
 
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
-    try {
-      const [healthRes, syncRes, productsRes] = await Promise.allSettled([
-        api.get('/estoque/sync/health'),
-        api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} }),
-        api.get('/produtos/'),
-      ]);
 
-      if (healthRes.status === 'fulfilled') {
-        setHealth(healthRes.value.data || { ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
-      } else {
-        setHealth({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
-      }
+    // Produtos são prioridade visual: preencher a tabela sem esperar status/health.
+    const productsRequest = api.get('/produtos/');
+    const healthRequest = api.get('/estoque/sync/health');
+    const syncRequest = api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} });
 
-      if (syncRes.status === 'fulfilled') {
-        setSyncItems(syncRes.value.data || []);
-      } else {
-        setSyncItems([]);
-        toast.error(syncRes.reason?.response?.data?.detail || 'Falha ao carregar status de sincronização');
-      }
+    productsRequest
+      .then((response) => {
+        const payload = response?.data;
 
-      if (productsRes.status === 'fulfilled') {
-        setProducts(productsRes.value.data?.items || []);
-      } else {
+        if (Array.isArray(payload)) {
+          setProducts(payload);
+          return;
+        }
+
+        if (Array.isArray(payload?.items)) {
+          setProducts(payload.items);
+          return;
+        }
+
+        if (Array.isArray(payload?.produtos)) {
+          setProducts(payload.produtos);
+          return;
+        }
+
         setProducts([]);
-        toast.error(productsRes.reason?.response?.data?.detail || 'Falha ao carregar produtos');
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar a sincronização do Bling');
-    } finally {
-      setLoading(false);
-    }
+      })
+      .catch((error) => {
+        setProducts([]);
+        toast.error(error.response?.data?.detail || 'Falha ao carregar produtos');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+
+    healthRequest
+      .then((response) => {
+        setHealth(response?.data || { ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+      })
+      .catch(() => {
+        setHealth({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+      });
+
+    syncRequest
+      .then((response) => {
+        setSyncItems(response?.data || []);
+      })
+      .catch((error) => {
+        setSyncItems([]);
+        toast.error(error.response?.data?.detail || 'Falha ao carregar status de sincronização');
+      });
   };
 
   useEffect(() => {
