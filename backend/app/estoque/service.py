@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> None:
-    """Dispara sync de estoque com o Bling em background (fire-and-forget)."""
+    """Enfileira sync de estoque com o Bling (fila persistente, fire-and-forget)."""
     try:
         from app.bling_estoque_sync import sincronizar_bling_background
         sincronizar_bling_background(produto_id, estoque_novo, motivo)
@@ -32,6 +32,97 @@ def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> Non
 
 class EstoqueService:
     """Service isolado para operações de estoque"""
+
+    @staticmethod
+    def _validar_ou_registrar_estoque_negativo(
+        produto,
+        quantidade: float,
+        estoque_anterior: float,
+        tenant_id: str,
+        referencia_id: int,
+        referencia_tipo: str,
+        documento: Optional[str],
+        db: Session,
+    ) -> None:
+        """Valida regra de estoque negativo e registra alerta quando permitido."""
+        if estoque_anterior >= quantidade:
+            return
+
+        from app.models import Tenant
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+
+        if not tenant or not tenant.permite_estoque_negativo:
+            raise ValueError(
+                f'Estoque insuficiente para produto {produto.nome}. '
+                f'Disponível: {estoque_anterior}, Necessário: {quantidade}'
+            )
+
+        from app.estoque_models import AlertaEstoqueNegativo
+
+        estoque_resultante = estoque_anterior - quantidade
+        alerta = AlertaEstoqueNegativo(
+            tenant_id=tenant_id,
+            produto_id=produto.id,
+            produto_nome=produto.nome,
+            estoque_anterior=estoque_anterior,
+            quantidade_vendida=quantidade,
+            estoque_resultante=estoque_resultante,
+            venda_id=referencia_id if referencia_tipo == 'venda' else None,
+            venda_codigo=documento if referencia_tipo == 'venda' else None,
+            critico=(estoque_resultante < -5),
+            status='pendente'
+        )
+        db.add(alerta)
+        db.flush()
+
+        logger.warning(
+            f'⚠️ ESTOQUE NEGATIVO REGISTRADO [ID: {alerta.id}]: '
+            f'Produto {produto.nome} - '
+            f'Disponível: {estoque_anterior}, Necessário: {quantidade}, '
+            f'Ficará com: {estoque_resultante} '
+            f'{"🔴 CRÍTICO" if alerta.critico else "⚠️ ATENÇÃO"}'
+        )
+
+    @staticmethod
+    def _consumir_lotes_fifo(produto_id: int, quantidade: float, db: Session) -> List[Dict]:
+        """Consome lotes ativos em ordem FIFO e retorna o histórico do consumo."""
+        lotes_consumidos = []
+        lotes_ativos = db.query(ProdutoLote).filter(
+            ProdutoLote.produto_id == produto_id,
+            ProdutoLote.quantidade_disponivel > 0,
+            ProdutoLote.status == 'ativo'
+        ).order_by(ProdutoLote.ordem_entrada).all()
+
+        if not lotes_ativos:
+            return lotes_consumidos
+
+        quantidade_restante = quantidade
+        for lote in lotes_ativos:
+            if quantidade_restante <= 0:
+                break
+
+            saldo_anterior = lote.quantidade_disponivel
+            qtd_consumir = min(lote.quantidade_disponivel, quantidade_restante)
+
+            lote.quantidade_disponivel -= qtd_consumir
+            quantidade_restante -= qtd_consumir
+
+            if lote.quantidade_disponivel == 0:
+                lote.status = 'esgotado'
+
+            lotes_consumidos.append({
+                "lote_id": lote.id,
+                "nome_lote": lote.nome_lote,
+                "quantidade": qtd_consumir,
+                "saldo_anterior": saldo_anterior
+            })
+
+            logger.info(
+                f"Lote consumido: {lote.nome_lote} - "
+                f"Qtd: {qtd_consumir} (Saldo: {lote.quantidade_disponivel})"
+            )
+
+        return lotes_consumidos
     
     @staticmethod
     def validar_disponibilidade(
@@ -127,86 +218,22 @@ class EstoqueService:
         
         estoque_anterior = produto.estoque_atual or 0
         
-        # 🔒 VALIDAR DISPONIBILIDADE DE ESTOQUE (com configuração de estoque negativo)
-        if estoque_anterior < quantidade:
-            # Buscar configuração do tenant
-            from app.models import Tenant
-            tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-            
-            # Se o tenant não permite estoque negativo, bloquear a operação
-            if not tenant or not tenant.permite_estoque_negativo:
-                raise ValueError(
-                    f'Estoque insuficiente para produto {produto.nome}. '
-                    f'Disponível: {estoque_anterior}, Necessário: {quantidade}'
-                )
-            
-            # 🟢 MODELO CONTROLADO: Registrar alerta de estoque negativo
-            from app.estoque_models import AlertaEstoqueNegativo
-            
-            estoque_resultante = estoque_anterior - quantidade
-            
-            # Criar alerta persistente
-            alerta = AlertaEstoqueNegativo(
-                tenant_id=tenant_id,
-                produto_id=produto.id,
-                produto_nome=produto.nome,
-                estoque_anterior=estoque_anterior,
-                quantidade_vendida=quantidade,
-                estoque_resultante=estoque_resultante,
-                venda_id=referencia_id if referencia_tipo == 'venda' else None,
-                venda_codigo=documento if referencia_tipo == 'venda' else None,
-                critico=(estoque_resultante < -5),  # Crítico se < -5 unidades
-                status='pendente'
-            )
-            db.add(alerta)
-            db.flush()  # Garante que foi salvo
-            
-            # Logar aviso detalhado
-            logger.warning(
-                f'⚠️ ESTOQUE NEGATIVO REGISTRADO [ID: {alerta.id}]: '
-                f'Produto {produto.nome} - '
-                f'Disponível: {estoque_anterior}, Necessário: {quantidade}, '
-                f'Ficará com: {estoque_resultante} '
-                f'{"🔴 CRÍTICO" if alerta.critico else "⚠️ ATENÇÃO"}'
-            )
-        
-        # FIFO: Consumir lotes se existirem
-        lotes_consumidos = []
-        lotes_ativos = db.query(ProdutoLote).filter(
-            ProdutoLote.produto_id == produto.id,
-            ProdutoLote.quantidade_disponivel > 0,
-            ProdutoLote.status == 'ativo'
-        ).order_by(ProdutoLote.ordem_entrada).all()
-        
-        if lotes_ativos:
-            quantidade_restante = quantidade
-            
-            for lote in lotes_ativos:
-                if quantidade_restante <= 0:
-                    break
-                
-                saldo_anterior = lote.quantidade_disponivel
-                qtd_consumir = min(lote.quantidade_disponivel, quantidade_restante)
-                
-                # Baixar do lote
-                lote.quantidade_disponivel -= qtd_consumir
-                quantidade_restante -= qtd_consumir
-                
-                # Marcar como esgotado se zerou
-                if lote.quantidade_disponivel == 0:
-                    lote.status = 'esgotado'
-                
-                lotes_consumidos.append({
-                    "lote_id": lote.id,
-                    "nome_lote": lote.nome_lote,
-                    "quantidade": qtd_consumir,
-                    "saldo_anterior": saldo_anterior
-                })
-                
-                logger.info(
-                    f"Lote consumido: {lote.nome_lote} - "
-                    f"Qtd: {qtd_consumir} (Saldo: {lote.quantidade_disponivel})"
-                )
+        EstoqueService._validar_ou_registrar_estoque_negativo(
+            produto=produto,
+            quantidade=quantidade,
+            estoque_anterior=estoque_anterior,
+            tenant_id=tenant_id,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            documento=documento,
+            db=db,
+        )
+
+        lotes_consumidos = EstoqueService._consumir_lotes_fifo(
+            produto_id=produto.id,
+            quantidade=quantidade,
+            db=db,
+        )
         
         # Baixar estoque total do produto
         produto.estoque_atual -= quantidade
@@ -238,7 +265,7 @@ class EstoqueService:
             f"Qtd: {quantidade} ({estoque_anterior} → {estoque_novo})"
         )
 
-        # 🔄 Sincronizar com Bling em background (não bloqueia, não falha a operação)
+        # 🔄 Enfileirar sync com Bling (não bloqueia, não falha a operação)
         _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
 
         return {
@@ -332,7 +359,7 @@ class EstoqueService:
             f"Qtd: +{quantidade} ({estoque_anterior} → {estoque_novo})"
         )
 
-        # 🔄 Sincronizar com Bling em background (não bloqueia, não falha o estorno)
+        # 🔄 Enfileirar sync com Bling (não bloqueia, não falha o estorno)
         _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
 
         return {

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
 from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -226,34 +225,27 @@ class BlingSyncService:
         origem: str = "evento",
         force: bool = False,
     ) -> None:
-        def _run() -> None:
-            db = SessionLocal()
-            try:
-                resultado = BlingSyncService.queue_product_sync(
-                    db,
-                    produto_id=produto_id,
-                    estoque_novo=estoque_novo,
-                    motivo=motivo,
-                    origem=origem,
-                    force=force,
-                )
-                if not resultado.get("ok"):
-                    db.rollback()
-                    return
-
-                BlingSyncService.process_queue_item_by_id(db, resultado["queue_id"])
-                db.commit()
-            except Exception as error:
+        db = SessionLocal()
+        try:
+            resultado = BlingSyncService.queue_product_sync(
+                db,
+                produto_id=produto_id,
+                estoque_novo=estoque_novo,
+                motivo=motivo,
+                origem=origem,
+                force=force,
+            )
+            if not resultado.get("ok"):
                 db.rollback()
-                logger.warning("[BLING SYNC] Falha ao disparar sync em background: %s", error)
-            finally:
-                db.close()
+                return
 
-        threading.Thread(
-            target=_run,
-            daemon=True,
-            name=f"bling-queue-{produto_id}",
-        ).start()
+            # A execução acontece no scheduler (fila persistente), sem thread local.
+            db.commit()
+        except Exception as error:
+            db.rollback()
+            logger.warning("[BLING SYNC] Falha ao enfileirar sync: %s", error)
+        finally:
+            db.close()
 
     @staticmethod
     def force_sync_now(produto_id: int, motivo: str = "forcar_manual") -> Dict[str, Any]:
