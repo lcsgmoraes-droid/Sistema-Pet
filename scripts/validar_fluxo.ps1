@@ -95,6 +95,58 @@ function Get-DistAssetReferences {
     return $assets | Sort-Object -Unique
 }
 
+function Get-AllDistAssetReferences {
+    $distPath = Join-Path $root 'frontend/dist'
+    if (-not (Test-Path $distPath)) {
+        return @()
+    }
+
+    $assetPattern = '/assets/([^"''\s\)\(\?]+(?:\?[^"''\s\)\(]*)?)'
+    $assets = [System.Collections.Generic.HashSet[string]]::new()
+    $visitedFiles = [System.Collections.Generic.HashSet[string]]::new()
+    $pending = [System.Collections.Generic.Queue[string]]::new()
+
+    $pending.Enqueue('frontend/dist/index.html')
+
+    while ($pending.Count -gt 0) {
+        $fileRelative = $pending.Dequeue()
+        if (-not $visitedFiles.Add($fileRelative)) {
+            continue
+        }
+
+        $filePath = Join-Path $root $fileRelative
+        if (-not (Test-Path $filePath)) {
+            continue
+        }
+
+        $content = Get-Content -Path $filePath -Raw
+        $matches = [regex]::Matches($content, $assetPattern)
+
+        foreach ($m in $matches) {
+            $assetWithQuery = $m.Groups[1].Value
+            if (-not $assetWithQuery) {
+                continue
+            }
+
+            $asset = $assetWithQuery.Split('?')[0]
+            if (-not $asset) {
+                continue
+            }
+
+            [void]$assets.Add($asset)
+
+            if ($asset.EndsWith('.js') -or $asset.EndsWith('.css')) {
+                $nextRelative = "frontend/dist/assets/$asset"
+                if (-not $visitedFiles.Contains($nextRelative)) {
+                    $pending.Enqueue($nextRelative)
+                }
+            }
+        }
+    }
+
+    return @($assets | Sort-Object)
+}
+
 Check-Command 'git'
 
 Write-Section 'Validacao de fluxo DEV -> PROD'
@@ -139,8 +191,8 @@ if ($heads.Count -gt 1) {
 }
 
 Write-Section '4) Integridade do frontend dist/assets'
-$assetRefs = Get-DistAssetReferences
-Write-Host "Assets referenciados no dist/index.html: $($assetRefs.Count)"
+$assetRefs = Get-AllDistAssetReferences
+Write-Host "Assets referenciados (index + imports dinamicos): $($assetRefs.Count)"
 if ($assetRefs.Count -gt 0) {
     $missingAssets = @()
 
@@ -148,7 +200,12 @@ if ($assetRefs.Count -gt 0) {
         $relativePath = "frontend/dist/assets/$asset"
         $fullPath = Join-Path $root $relativePath
 
-        $tracked = (git ls-files -- $relativePath).Trim()
+        $trackedOutput = @(git ls-files -- $relativePath)
+        $tracked = ''
+        if ($trackedOutput.Count -gt 0) {
+            $tracked = ($trackedOutput -join "`n").Trim()
+        }
+
         if (-not $tracked -or -not (Test-Path $fullPath)) {
             $missingAssets += $relativePath
         }
@@ -156,8 +213,30 @@ if ($assetRefs.Count -gt 0) {
 
     if ($missingAssets.Count -gt 0) {
         Write-Host 'Assets faltando/rastreados incorretamente:' -ForegroundColor Yellow
-        $missingAssets | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        $missingAssets | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        if ($missingAssets.Count -gt 80) {
+            Write-Host "  ... +$($missingAssets.Count - 80) assets" -ForegroundColor Yellow
+        }
         Fail 'dist/index.html referencia assets ausentes no Git. Rode build e inclua frontend/dist/assets no commit.'
+    }
+}
+
+$distAssetsPath = Join-Path $root 'frontend/dist/assets'
+if (Test-Path $distAssetsPath) {
+    $trackedAssets = @(git ls-files "frontend/dist/assets") | Where-Object { $_ -and $_.Trim().Length -gt 0 }
+    $localAssets = @(Get-ChildItem -Path $distAssetsPath -File | ForEach-Object { "frontend/dist/assets/$($_.Name)" })
+
+    $onlyLocalAssets = @($localAssets | Where-Object { $trackedAssets -notcontains $_ } | Sort-Object -Unique)
+    Write-Host "Assets locais nao rastreados: $($onlyLocalAssets.Count)"
+
+    if ($onlyLocalAssets.Count -gt 0) {
+        Write-Host 'Exemplos de assets locais faltando no Git:' -ForegroundColor Yellow
+        $onlyLocalAssets | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+        if ($onlyLocalAssets.Count -gt 80) {
+            Write-Host "  ... +$($onlyLocalAssets.Count - 80) assets" -ForegroundColor Yellow
+        }
+
+        Fail 'Existem arquivos em frontend/dist/assets que nao estao versionados. Rode build e inclua o dist completo no commit.'
     }
 }
 
