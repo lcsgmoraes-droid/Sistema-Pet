@@ -500,13 +500,14 @@ function App() {
                     }
                   />
                   <Route
-                    path="compras/bling"
+                    path="produtos/sinc-bling"
                     element={
                       <ProtectedRoute permission="compras.gerenciar">
                         <EstoqueBling />
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="compras/bling" element={<Navigate to="/produtos/sinc-bling" replace />} />
                   <Route
                     path="vendas/bling-pedidos"
                     element={

@@ -455,6 +455,11 @@ const Layout = () => {
           label: "Movimentacao Full por NF",
           permission: "produtos.editar",
         },
+        {
+          path: "/produtos/sinc-bling",
+          label: "Sinc. Bling",
+          permission: "compras.sincronizacao_bling",
+        },
       ],
     },
     {
@@ -542,11 +547,6 @@ const Layout = () => {
           path: "/compras/entrada-xml",
           label: "Central NF-e Entradas",
           permission: "compras.entrada_xml",
-        },
-        {
-          path: "/compras/bling",
-          label: "Sinc. Bling",
-          permission: "compras.sincronizacao_bling",
         },
       ],
     },

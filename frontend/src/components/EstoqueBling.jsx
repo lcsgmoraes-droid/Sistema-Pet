@@ -27,12 +27,14 @@ function formatNumber(value) {
 }
 
 function EstoqueBling() {
+  const PRODUCTS_PAGE_SIZE = 99999;
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
   const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const pageSize = 20;
   const [products, setProducts] = useState([]);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [syncItems, setSyncItems] = useState([]);
   const [health, setHealth] = useState({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
   const [blingSearch, setBlingSearch] = useState('');
@@ -44,7 +46,12 @@ function EstoqueBling() {
     setLoading(true);
 
     // Produtos são prioridade visual: preencher a tabela sem esperar status/health.
-    const productsRequest = api.get('/produtos/');
+    const productsRequest = api.get('/produtos/', {
+      params: {
+        page: 1,
+        page_size: PRODUCTS_PAGE_SIZE,
+      },
+    });
     const healthRequest = api.get('/estoque/sync/health');
     const syncRequest = api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} });
 
@@ -54,23 +61,28 @@ function EstoqueBling() {
 
         if (Array.isArray(payload)) {
           setProducts(payload);
+          setTotalProducts(payload.length);
           return;
         }
 
         if (Array.isArray(payload?.items)) {
           setProducts(payload.items);
+          setTotalProducts(Number(payload?.total ?? payload.items.length ?? 0));
           return;
         }
 
         if (Array.isArray(payload?.produtos)) {
           setProducts(payload.produtos);
+          setTotalProducts(Number(payload?.total ?? payload.produtos.length ?? 0));
           return;
         }
 
         setProducts([]);
+        setTotalProducts(0);
       })
       .catch((error) => {
         setProducts([]);
+        setTotalProducts(0);
         toast.error(error.response?.data?.detail || 'Falha ao carregar produtos');
       })
       .finally(() => {
@@ -144,6 +156,7 @@ function EstoqueBling() {
 
       if (!matchesSearch) return false;
       if (statusFilter === 'todos') return true;
+      if (statusFilter === 'vinculado') return row.vinculado;
       if (statusFilter === 'erro') return row.status === 'erro' || row.queueStatus === 'falha_final';
       if (statusFilter === 'pendente') return row.status === 'pendente' || row.queueStatus === 'pendente' || row.queueStatus === 'erro';
       if (statusFilter === 'divergente') return Math.abs(Number(row.divergencia || 0)) >= 0.01;
@@ -261,7 +274,7 @@ function EstoqueBling() {
   };
 
   const stats = {
-    total: products.length,
+    total: totalProducts,
     vinculados: syncItems.length,
     naoVinculados: naoVinculados.length,
     erros: health.erros || 0,
@@ -486,7 +499,7 @@ function EstoqueBling() {
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Produtos e status</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Se você vir um erro em um item, use o botão "Forçar sync" naquela linha.
+              Se você vir um erro em um item, use o botão "Forçar sync" naquela linha. A tabela usa paginação leve de 20 itens para ficar mais fluida.
             </p>
           </div>
           <div className="flex gap-2">
@@ -509,10 +522,11 @@ function EstoqueBling() {
         <div className="flex flex-wrap gap-2">
           {[
             ['todos', 'Todos'],
+            ['vinculado', 'Vinculados'],
+            ['nao_vinculado', 'Não vinculados'],
             ['erro', 'Erro'],
             ['pendente', 'Pendentes'],
             ['divergente', 'Divergentes'],
-            ['nao_vinculado', 'Não vinculados'],
           ].map(([value, label]) => (
             <button
               key={value}

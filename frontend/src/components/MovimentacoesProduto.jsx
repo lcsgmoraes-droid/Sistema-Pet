@@ -575,7 +575,7 @@ export default function MovimentacoesProduto() {
                     </button>
 
                     <button
-                      onClick={() => navigate('/compras/bling')}
+                      onClick={() => navigate('/produtos/sinc-bling')}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
