@@ -519,7 +519,21 @@ const PRODUTOS_COLUNAS = [
         Ações
       </th>
     ),
-    renderCell: (produto, props) => (
+    renderCell: (produto, props) => {
+      let classeMovimentacao =
+        "text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100";
+
+      if (produto.controlar_estoque === true) {
+        if ((produto.estoque_atual || 0) > 0) {
+          classeMovimentacao =
+            "text-green-700 border-green-200 bg-green-50 hover:bg-green-100";
+        } else if ((produto.estoque_atual || 0) === 0) {
+          classeMovimentacao =
+            "text-red-700 border-red-200 bg-red-50 hover:bg-red-100";
+        }
+      }
+
+      return (
       <td
         className="px-4 py-3 text-center"
         onClick={(e) => e.stopPropagation()}
@@ -538,15 +552,7 @@ const PRODUTOS_COLUNAS = [
               );
               props.navigate(`/produtos/${produto.id}/movimentacoes`);
             }}
-            className={`rounded hover:opacity-80 transition-opacity ${
-              produto.controlar_estoque === true &&
-              (produto.estoque_atual || 0) > 0
-                ? "text-green-600 hover:text-green-800"
-                : produto.controlar_estoque === true &&
-                    (produto.estoque_atual || 0) === 0
-                  ? "text-red-600 hover:text-red-800"
-                  : "text-gray-400 hover:text-gray-600"
-            }`}
+            className={`rounded-lg p-1.5 border transition-all duration-200 ${classeMovimentacao}`}
             title="Ver movimentações de estoque"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -558,7 +564,7 @@ const PRODUTOS_COLUNAS = [
               e.stopPropagation();
               props.navigate(`/produtos/${produto.id}/editar`);
             }}
-            className="text-blue-600 hover:text-blue-800 transition-colors"
+            className="rounded-lg p-1.5 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all duration-200"
             title="Editar"
           >
             <svg
@@ -581,7 +587,7 @@ const PRODUTOS_COLUNAS = [
               e.stopPropagation();
               props.handleExcluir(produto.id);
             }}
-            className="text-red-600 hover:text-red-800 transition-colors"
+            className="rounded-lg p-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all duration-200"
             title="Excluir"
           >
             <svg
@@ -601,13 +607,18 @@ const PRODUTOS_COLUNAS = [
           )}
         </div>
       </td>
-    ),
+      );
+    },
   },
 ];
 
 export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
+  const [persistirBusca, setPersistirBusca] = useState(() => {
+    const salvo = localStorage.getItem("produtos_persistir_busca");
+    return salvo === null ? true : salvo === "true";
+  });
   const [produtosBrutos, setProdutosBrutos] = useState([]); // Dados originais da API
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -648,7 +659,10 @@ export default function Produtos() {
 
   // Filtros
   const [filtros, setFiltros] = useState({
-    busca: "",
+    busca: (() => {
+      if (!persistirBusca) return "";
+      return localStorage.getItem("produtos_filtro_busca") || "";
+    })(),
     categoria_id: "",
     marca_id: "",
     fornecedor_id: "",
@@ -793,6 +807,18 @@ export default function Produtos() {
     carregarFornecedores();
     carregarDepartamentos();
   }, []);
+
+  // Persistência opcional da busca para que cada usuário escolha seu comportamento.
+  useEffect(() => {
+    localStorage.setItem("produtos_persistir_busca", String(persistirBusca));
+
+    if (persistirBusca) {
+      localStorage.setItem("produtos_filtro_busca", filtros.busca || "");
+      return;
+    }
+
+    localStorage.removeItem("produtos_filtro_busca");
+  }, [persistirBusca, filtros.busca]);
 
   const carregarDados = async (filtrosAtuais = filtros) => {
     try {
@@ -1166,13 +1192,13 @@ export default function Produtos() {
             <>
               <button
                 onClick={handleAbrirEdicaoLote}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="px-4 py-2 text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all duration-200 border border-emerald-500"
               >
                 ✏️ Editar em Lote ({selecionados.length})
               </button>
               <button
                 onClick={handleExcluirSelecionados}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className="px-4 py-2 text-white rounded-xl bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all duration-200 border border-red-500"
               >
                 Excluir Selecionados ({selecionados.length})
               </button>
@@ -1181,7 +1207,7 @@ export default function Produtos() {
           <button
             id="tour-produtos-importar"
             onClick={() => setModalImportacao(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 text-white rounded-xl bg-sky-600 hover:bg-sky-700 shadow-sm hover:shadow-md transition-all duration-200 border border-sky-500 font-medium flex items-center gap-2"
           >
             <svg
               className="w-5 h-5"
@@ -1200,7 +1226,7 @@ export default function Produtos() {
           </button>
           <button
             onClick={abrirModalColunas}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium flex items-center gap-2"
+            className="px-4 py-2 text-slate-700 rounded-xl bg-white hover:bg-slate-50 shadow-sm hover:shadow-md transition-all duration-200 border border-slate-300 font-medium flex items-center gap-2"
             title="Configurar colunas visíveis"
           >
             <svg
@@ -1227,7 +1253,7 @@ export default function Produtos() {
           <button
             id="tour-produtos-novo"
             onClick={() => navigate("/produtos/novo")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="px-4 py-2 text-white rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all duration-200 border border-blue-500 font-medium"
           >
             + Novo Produto
           </button>
@@ -1305,7 +1331,7 @@ export default function Produtos() {
           </div>
 
           {/* Toggles */}
-          <div className="flex gap-4 items-center">
+          <div className="flex gap-4 items-center flex-wrap">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1328,6 +1354,19 @@ export default function Produtos() {
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">Em Promoção</span>
+            </label>
+
+            <label
+              className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-md border border-gray-200 bg-gray-50"
+              title="Quando ligado, a busca fica salva ao sair e voltar para a lista"
+            >
+              <input
+                type="checkbox"
+                checked={persistirBusca}
+                onChange={(e) => setPersistirBusca(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-700">Persistir pesquisa</span>
             </label>
           </div>
         </div>
