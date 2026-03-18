@@ -126,6 +126,59 @@ def _validar_codigo_barras_unico(db: Session, codigo_barras: str, tenant_id: int
         )
 
 
+def _build_produto_search_order_clause(termo_busca: Optional[str]):
+    """Prioriza cÃ³digo exato e prefixos quando houver busca."""
+    termo = (termo_busca or "").strip()
+    if not termo:
+        return [Produto.created_at.desc()]
+
+    termo_lower = termo.lower()
+    return [
+        case(
+            (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
+            (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 2),
+            (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 3),
+            (Produto.codigo.ilike(f"{termo}%"), 4),
+            (Produto.codigo_barras.ilike(f"{termo}%"), 5),
+            (Produto.nome.ilike(f"{termo}%"), 6),
+            (Produto.codigo.ilike(f"%{termo}%"), 7),
+            (Produto.codigo_barras.ilike(f"%{termo}%"), 8),
+            (Produto.nome.ilike(f"%{termo}%"), 9),
+            else_=10,
+        ),
+        Produto.nome.asc(),
+        Produto.created_at.desc(),
+    ]
+
+
+def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
+    """Bloqueia inativaÃ§Ã£o de produto pai com variaÃ§Ãµes ativas."""
+    if not produto.is_parent:
+        return
+
+    variacoes_ativas = db.query(Produto).filter(
+        Produto.produto_pai_id == produto.id,
+        Produto.tenant_id == tenant_id,
+        Produto.ativo == True
+    ).count()
+
+    if variacoes_ativas > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"âŒ Produto '{produto.nome}' possui {variacoes_ativas} variaÃ§Ã£o(Ãµes) ativa(s) "
+                "e nÃ£o pode ser desativado. Desative primeiro todas as variaÃ§Ãµes."
+            )
+        )
+
+
+def _aplicar_status_ativo_produto(produto: Produto, ativo: bool):
+    """MantÃ©m ativo e situaÃ§Ã£o sincronizados."""
+    produto.ativo = ativo
+    produto.situacao = ativo
+    produto.updated_at = datetime.now()
+
+
 # ==========================================
 # SCHEMAS - CATEGORIAS
 # ==========================================
@@ -415,6 +468,10 @@ class ProdutoUpdate(BaseModel):
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None
     motivo_descontinuacao: Optional[str] = None
+
+
+class ProdutoAtivoUpdate(BaseModel):
+    ativo: bool
 
 
 # ==========================================
@@ -1514,22 +1571,7 @@ def listar_produtos_vendaveis(
     offset = (page - 1) * page_size
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
-    if termo_busca:
-        termo_lower = termo_busca.lower()
-        order_clause = [
-            case(
-                (func.lower(Produto.codigo) == termo_lower, 1),
-                (func.lower(Produto.codigo_barras) == termo_lower, 2),
-                (func.lower(Produto.nome) == termo_lower, 3),
-                (Produto.codigo.ilike(f"{termo_busca}%"), 4),
-                (Produto.codigo_barras.ilike(f"{termo_busca}%"), 5),
-                (Produto.nome.ilike(f"{termo_busca}%"), 6),
-                else_=7,
-            ),
-            Produto.nome
-        ]
-    else:
-        order_clause = [Produto.created_at.desc()]
+    order_clause = _build_produto_search_order_clause(termo_busca)
 
     # QUERY FINAL
     produtos = (
@@ -1693,6 +1735,8 @@ def listar_produtos(
     # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
 
+    order_clause = _build_produto_search_order_clause(busca)
+
     # QUERY FINAL COM RELACIONAMENTOS
     produtos = (
         query
@@ -1702,7 +1746,7 @@ def listar_produtos(
             joinedload(Produto.imagens),
             joinedload(Produto.lotes)
         )
-        .order_by(Produto.created_at.desc())
+        .order_by(*order_clause)
         .offset(offset)
         .limit(page_size)
         .all()
@@ -1896,6 +1940,8 @@ def restaurar_variacao(
     Restaura uma variaÃ§Ã£o excluÃ­da (reativa)
     """
 
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id,
@@ -1909,8 +1955,7 @@ def restaurar_variacao(
         raise HTTPException(status_code=400, detail="VariaÃ§Ã£o jÃ¡ estÃ¡ ativa")
 
     # Restaurar
-    produto.ativo = True
-    produto.updated_at = datetime.utcnow()
+    _aplicar_status_ativo_produto(produto, True)
 
     db.commit()
     db.refresh(produto)
@@ -2352,30 +2397,48 @@ def deletar_produto(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
 
-    # ========================================
-    # ðŸ”’ TRAVA 4 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI COM VARIAÃ‡Ã•ES NÃƒO PODE SER EXCLUÃDO
-    # ========================================
-    if produto.is_parent:
-        # Verificar se existem variaÃ§Ãµes ativas
-        variacoes_ativas = db.query(Produto).filter(
-            Produto.produto_pai_id == produto_id,
-            Produto.tenant_id == tenant_id,
-            Produto.ativo == True
-        ).count()
-
-        if variacoes_ativas > 0:
-            raise HTTPException(
-                status_code=409,
-                detail=f"âŒ Produto '{produto.nome}' possui {variacoes_ativas} variaÃ§Ã£o(Ãµes) ativa(s) e nÃ£o pode ser excluÃ­do. Exclua primeiro todas as variaÃ§Ãµes."
-            )
+    _validar_pode_inativar_produto(db, produto, tenant_id)
 
     # Soft delete
-    produto.ativo = False
-    produto.updated_at = datetime.utcnow()
+    _aplicar_status_ativo_produto(produto, False)
 
     db.commit()
 
     return None
+
+
+@router.patch("/{produto_id}/ativo", response_model=ProdutoResponse)
+@require_permission("produtos.editar")
+def atualizar_status_ativo_produto(
+    produto_id: int,
+    payload: ProdutoAtivoUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Ativa ou desativa produto sem removÃª-lo do sistema."""
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    produto = _obter_produto_ou_404(db, produto_id, tenant_id)
+
+    if payload.ativo == bool(produto.ativo):
+        return produto
+
+    if not payload.ativo:
+        _validar_pode_inativar_produto(db, produto, tenant_id)
+
+    _aplicar_status_ativo_produto(produto, payload.ativo)
+
+    db.commit()
+    db.refresh(produto)
+
+    logger.info(
+        "ðŸ” Produto %s #%s com status alterado para %s",
+        produto.nome,
+        produto.id,
+        "ativo" if payload.ativo else "inativo",
+    )
+
+    return produto
 
 
 @router.post("/gerar-sku")

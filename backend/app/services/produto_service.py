@@ -121,10 +121,11 @@ class ProdutoService:
             db.flush()  # Flush para obter ID sem commit completo
             
             # ========================================
-            # PROCESSAR COMPOSIÇÃO DO KIT (TRANSAÇÃO ATÔMICA)
+            # PROCESSAR COMPOSIÇÃO (KIT e VARIACAO-KIT) - TRANSAÇÃO ATÔMICA
             # ========================================
-            if tipo_produto == 'KIT' and composicao_kit:
-                logger.info(f"🧩 Processando {len(composicao_kit)} componentes do KIT")
+            if dados.get('tipo_kit') and composicao_kit:
+                tipo_desc = f"{tipo_produto}-KIT" if tipo_produto == 'VARIACAO' else tipo_produto
+                logger.info(f"🧩 Processando {len(composicao_kit)} componentes da composição para {tipo_desc}")
                 
                 # Validar composição
                 from .kit_estoque_service import KitEstoqueService
@@ -135,7 +136,7 @@ class ProdutoService:
                 )
                 
                 if not valido:
-                    raise ValueError(f"Composição do KIT inválida: {erro}")
+                    raise ValueError(f"Composição inválida para {tipo_desc}: {erro}")
                 
                 # Criar componentes
                 for comp in composicao_kit:
@@ -148,7 +149,7 @@ class ProdutoService:
                     )
                     db.add(componente)
                 
-                logger.info(f"✅ {len(composicao_kit)} componentes adicionados ao KIT")
+                logger.info(f"✅ {len(composicao_kit)} componentes adicionados para {tipo_desc}")
             
             db.commit()
             db.refresh(novo_produto)

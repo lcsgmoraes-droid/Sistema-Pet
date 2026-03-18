@@ -206,6 +206,13 @@ export const deleteProduto = (id) => {
 };
 
 /**
+ * Ativar ou desativar produto
+ */
+export const toggleProdutoAtivo = (id, ativo) => {
+  return api.patch(`/produtos/${id}/ativo`, { ativo });
+};
+
+/**
  * Gerar SKU automático
  * @param {string} prefixo - Prefixo opcional para o SKU
  */

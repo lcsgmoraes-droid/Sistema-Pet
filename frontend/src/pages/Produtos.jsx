@@ -20,6 +20,7 @@ import {
   getCategorias,
   getMarcas,
   getProdutos,
+  toggleProdutoAtivo,
 } from "../api/produtos";
 import ModalImportacaoProdutos from "../components/ModalImportacaoProdutos";
 import { useTour } from "../hooks/useTour";
@@ -31,6 +32,55 @@ const normalizeSearchText = (value) => {
     .toLowerCase()
     .normalize("NFD")
     .replaceAll(/[\u0300-\u036f]/g, "");
+};
+
+const getProdutoSearchRank = (produto, buscaNormalizada) => {
+  const termo = normalizeSearchText(buscaNormalizada).trim();
+  if (!termo) return 999;
+
+  const codigo = normalizeSearchText(produto.codigo || produto.sku);
+  const codigoBarras = normalizeSearchText(produto.codigo_barras);
+  const nome = normalizeSearchText(produto.nome);
+
+  const regras = [
+    [1, codigo === termo],
+    [2, codigoBarras === termo],
+    [3, nome === termo],
+    [4, codigo?.startsWith(termo)],
+    [5, codigoBarras?.startsWith(termo)],
+    [6, nome?.startsWith(termo)],
+    [7, codigo?.includes(termo)],
+    [8, codigoBarras?.includes(termo)],
+    [9, nome?.includes(termo)],
+  ];
+
+  const match = regras.find(([, condicao]) => Boolean(condicao));
+  return match ? Number(match[0]) : 999;
+};
+
+const compareProdutosByBusca = (produtoA, produtoB, buscaNormalizada) => {
+  const rankA = getProdutoSearchRank(produtoA, buscaNormalizada);
+  const rankB = getProdutoSearchRank(produtoB, buscaNormalizada);
+
+  if (rankA !== rankB) {
+    return rankA - rankB;
+  }
+
+  const codigoA = String(produtoA.codigo || produtoA.sku || "");
+  const codigoB = String(produtoB.codigo || produtoB.sku || "");
+  const codigoCompare = codigoA.localeCompare(codigoB, "pt-BR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+  if (codigoCompare !== 0) {
+    return codigoCompare;
+  }
+
+  return String(produtoA.nome || "").localeCompare(String(produtoB.nome || ""), "pt-BR", {
+    sensitivity: "base",
+    numeric: true,
+  });
 };
 
 // ====================================================
@@ -585,10 +635,14 @@ const PRODUTOS_COLUNAS = [
           <button
             onClick={(e) => {
               e.stopPropagation();
-              props.handleExcluir(produto.id);
+              props.handleToggleAtivo(produto);
             }}
-            className="rounded-lg p-1.5 border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-all duration-200"
-            title="Excluir"
+            className={`rounded-lg p-1.5 border transition-all duration-200 ${
+              produto.ativo === false
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
+            title={produto.ativo === false ? "Ativar" : "Desativar"}
           >
             <svg
               className="w-5 h-5"
@@ -596,12 +650,21 @@ const PRODUTOS_COLUNAS = [
               viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
+              {produto.ativo === false ? (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              ) : (
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v4m0 0l-1.5-1.5M12 13l1.5-1.5M5.636 5.636a9 9 0 1012.728 12.728M9.88 9.88a3 3 0 104.24 4.24"
+                />
+              )}
             </svg>
           </button>
           )}
@@ -663,6 +726,7 @@ export default function Produtos() {
       if (!persistirBusca) return "";
       return localStorage.getItem("produtos_filtro_busca") || "";
     })(),
+    ativo: "ativos",
     categoria_id: "",
     marca_id: "",
     fornecedor_id: "",
@@ -717,11 +781,14 @@ export default function Produtos() {
   // ========================================
   // Aplica filtros de busca, categoria, marca, estoque e promoção
   const produtosFiltrados = useMemo(() => {
-    let produtosTemp = [...produtosOrganizados];
+    const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
+    let produtosTemp = buscaNormalizada
+      ? [...produtosBrutos]
+      : [...produtosOrganizados];
 
     // Filtro de busca inteligente (multi-termo + sem acento)
-    if (filtros.busca.trim()) {
-      const termos = normalizeSearchText(filtros.busca)
+    if (buscaNormalizada) {
+      const termos = buscaNormalizada
         .split(/\s+/)
         .filter(Boolean);
 
@@ -742,6 +809,10 @@ export default function Produtos() {
 
           return termos.every((termo) => searchableText.includes(termo));
         },
+      );
+
+      produtosTemp.sort((produtoA, produtoB) =>
+        compareProdutosByBusca(produtoA, produtoB, buscaNormalizada),
       );
     }
 
@@ -775,7 +846,7 @@ export default function Produtos() {
     }
 
     return produtosTemp;
-  }, [produtosOrganizados, filtros]);
+  }, [produtosBrutos, produtosOrganizados, filtros]);
 
   // Calcular produtos paginados
   const { produtosPaginados, totalPaginas, totalItens } = useMemo(() => {
@@ -827,6 +898,16 @@ export default function Produtos() {
       const filtrosLimpos = {};
       Object.keys(filtrosAtuais).forEach((key) => {
         const valor = filtrosAtuais[key];
+
+        if (key === "ativo") {
+          if (valor === "ativos") {
+            filtrosLimpos[key] = true;
+          } else if (valor === "inativos") {
+            filtrosLimpos[key] = false;
+          }
+          return;
+        }
+
         // Só incluir se não for string vazia
         if (valor !== "" && valor !== null && valor !== undefined) {
           filtrosLimpos[key] = valor;
@@ -918,8 +999,26 @@ export default function Produtos() {
     setFiltros(proximoFiltro);
 
     // Fornecedor filtra no backend (relacionamento N:N via produto_fornecedores)
-    if (campo === "fornecedor_id") {
+    if (campo === "fornecedor_id" || campo === "ativo") {
       carregarDados(proximoFiltro);
+    }
+  };
+
+  const handleToggleAtivo = async (produto) => {
+    const proximoAtivo = produto.ativo === false;
+    const acao = proximoAtivo ? "ativar" : "desativar";
+
+    if (!confirm(`Deseja realmente ${acao} o produto "${produto.nome}"?`)) {
+      return;
+    }
+
+    try {
+      await toggleProdutoAtivo(produto.id, proximoAtivo);
+      toast.success(`Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`);
+      carregarDados();
+    } catch (error) {
+      console.error(`Erro ao ${acao} produto:`, error);
+      alert(`Erro ao ${acao} produto`);
     }
   };
 
@@ -1265,7 +1364,7 @@ export default function Produtos() {
         id="tour-produtos-filtros"
         className="bg-white rounded-lg shadow-sm p-4 mb-6"
       >
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
           {/* Busca Geral */}
           <div id="tour-produtos-busca" className="md:col-span-2">
             <input
@@ -1330,8 +1429,20 @@ export default function Produtos() {
             </select>
           </div>
 
+          <div>
+            <select
+              value={filtros.ativo}
+              onChange={(e) => handleFiltroChange("ativo", e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ativos">Somente Ativos</option>
+              <option value="inativos">Somente Inativos</option>
+              <option value="todos">Ativos e Inativos</option>
+            </select>
+          </div>
+
           {/* Toggles */}
-          <div className="flex gap-4 items-center flex-wrap">
+          <div className="flex gap-4 items-center flex-wrap md:col-span-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -1519,6 +1630,10 @@ export default function Produtos() {
                     <React.Fragment key={produto.id}>
                       <tr
                         className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                          produto.ativo === false
+                            ? "bg-slate-100 opacity-70"
+                            : ""
+                        } ${
                           produto.tipo_produto === "VARIACAO"
                             ? "bg-blue-50/30"
                             : ""
@@ -1550,6 +1665,7 @@ export default function Produtos() {
                                 getCorEstoque,
                                 navigate,
                                 handleExcluir,
+                                handleToggleAtivo,
                               })}
                             </React.Fragment>
                           ),
