@@ -342,22 +342,9 @@ def status_sincronizacao(
             ProdutoBlingSyncQueue.produto_id == produto.id
         ).order_by(ProdutoBlingSyncQueue.updated_at.desc()).first()
 
-        # Consultar estoque no Bling
+        # Usar dados cacheados para manter endpoint rápido e evitar rate-limit/timeout.
         estoque_bling = sync.ultimo_estoque_bling
         divergencia = sync.ultima_divergencia
-        
-        if sync.bling_produto_id:
-            try:
-                if sync.ultima_conferencia_bling is None:
-                    saldo = BlingAPI().consultar_saldo_estoque(sync.bling_produto_id)
-                    if saldo:
-                        estoque_bling = float(saldo.get('saldoFisicoTotal', 0))
-                        divergencia = (produto.estoque_atual or 0) - estoque_bling
-                        sync.ultimo_estoque_bling = estoque_bling
-                        sync.ultima_divergencia = divergencia
-                        sync.ultima_conferencia_bling = utc_now()
-            except Exception as e:
-                logger.error(f"❌ Erro ao consultar Bling: {e}")
         
         # Filtrar divergências se solicitado
         if apenas_divergencias and divergencia is not None and abs(divergencia) < 0.01:
@@ -385,7 +372,6 @@ def status_sincronizacao(
             queue_status=fila.status if fila else None,
         ))
     
-    db.commit()
     logger.info(f"✅ {len(resultados)} produtos em sincronização")
     return resultados
 

@@ -43,15 +43,31 @@ function EstoqueBling() {
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
     try {
-      const [healthRes, syncRes, productsRes] = await Promise.all([
+      const [healthRes, syncRes, productsRes] = await Promise.allSettled([
         api.get('/estoque/sync/health'),
         api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} }),
         api.get('/produtos/'),
       ]);
 
-      setHealth(healthRes.data || { ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
-      setSyncItems(syncRes.data || []);
-      setProducts(productsRes.data?.items || []);
+      if (healthRes.status === 'fulfilled') {
+        setHealth(healthRes.value.data || { ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+      } else {
+        setHealth({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+      }
+
+      if (syncRes.status === 'fulfilled') {
+        setSyncItems(syncRes.value.data || []);
+      } else {
+        setSyncItems([]);
+        toast.error(syncRes.reason?.response?.data?.detail || 'Falha ao carregar status de sincronização');
+      }
+
+      if (productsRes.status === 'fulfilled') {
+        setProducts(productsRes.value.data?.items || []);
+      } else {
+        setProducts([]);
+        toast.error(productsRes.reason?.response?.data?.detail || 'Falha ao carregar produtos');
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao carregar a sincronização do Bling');
     } finally {
