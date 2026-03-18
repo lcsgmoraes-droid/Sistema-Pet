@@ -125,7 +125,7 @@ def configurar_sincronizacao(
             bling = BlingAPI()
             resultado = bling.listar_produtos(
                 codigo=produto.codigo_barras,
-                sku=produto.sku
+                sku=produto.codigo
             )
             
             produtos_bling = resultado.get('data', [])
@@ -301,7 +301,6 @@ def status_sincronizacao(
             or_(
                 Produto.nome.ilike(termo),
                 Produto.codigo.ilike(termo),
-                Produto.sku.ilike(termo),
                 ProdutoBlingSync.bling_produto_id.ilike(termo),
             )
         )
@@ -337,7 +336,7 @@ def status_sincronizacao(
         resultados.append(SyncStatusResponse(
             produto_id=produto.id,
             produto_nome=produto.nome,
-            sku=produto.sku,
+            sku=produto.codigo,
             estoque_sistema=produto.estoque_atual or 0,
             estoque_bling=estoque_bling,
             divergencia=divergencia,
