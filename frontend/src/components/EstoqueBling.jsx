@@ -30,6 +30,8 @@ function EstoqueBling() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   const [products, setProducts] = useState([]);
   const [syncItems, setSyncItems] = useState([]);
   const [health, setHealth] = useState({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
@@ -69,48 +71,69 @@ function EstoqueBling() {
     return map;
   }, [syncItems]);
 
-  const mergedRows = useMemo(() => {
-    return products
-      .map((product) => {
-        const sync = syncMap.get(product.id);
-        return {
-          id: product.id,
-          codigo: product.codigo,
-          nome: product.nome,
-          estoqueAtual: product.estoque_atual ?? 0,
-          sku: product.sku,
-          blingId: sync?.bling_produto_id || '',
-          status: sync?.status || 'nao_vinculado',
-          queueStatus: sync?.queue_status || null,
-          ultimaSincronizacao: sync?.ultima_sincronizacao || null,
-          ultimaTentativa: sync?.ultima_tentativa_sync || null,
-          proximaTentativa: sync?.proxima_tentativa_sync || null,
-          ultimaConferencia: sync?.ultima_conferencia_bling || null,
-          ultimoErro: sync?.ultimo_erro || '',
-          tentativas: sync?.tentativas_sync || 0,
-          estoqueBling: sync?.estoque_bling,
-          divergencia: sync?.divergencia,
-          vinculado: Boolean(sync?.bling_produto_id),
-        };
-      })
-      .filter((row) => {
-        const normalizedSearch = search.trim().toLowerCase();
-        const matchesSearch =
-          !normalizedSearch ||
-          row.nome?.toLowerCase().includes(normalizedSearch) ||
-          row.codigo?.toLowerCase().includes(normalizedSearch) ||
-          row.sku?.toLowerCase().includes(normalizedSearch) ||
-          row.blingId?.toLowerCase().includes(normalizedSearch);
+  const baseRows = useMemo(() => {
+    return products.map((product) => {
+      const sync = syncMap.get(product.id);
+      return {
+        id: product.id,
+        codigo: product.codigo,
+        nome: product.nome,
+        estoqueAtual: product.estoque_atual ?? 0,
+        sku: product.sku,
+        blingId: sync?.bling_produto_id || '',
+        status: sync?.status || 'nao_vinculado',
+        queueStatus: sync?.queue_status || null,
+        ultimaSincronizacao: sync?.ultima_sincronizacao || null,
+        ultimaTentativa: sync?.ultima_tentativa_sync || null,
+        proximaTentativa: sync?.proxima_tentativa_sync || null,
+        ultimaConferencia: sync?.ultima_conferencia_bling || null,
+        ultimoErro: sync?.ultimo_erro || '',
+        tentativas: sync?.tentativas_sync || 0,
+        estoqueBling: sync?.estoque_bling,
+        divergencia: sync?.divergencia,
+        vinculado: Boolean(sync?.bling_produto_id),
+      };
+    });
+  }, [products, syncMap]);
 
-        if (!matchesSearch) return false;
-        if (statusFilter === 'todos') return true;
-        if (statusFilter === 'erro') return row.status === 'erro' || row.queueStatus === 'falha_final';
-        if (statusFilter === 'pendente') return row.status === 'pendente' || row.queueStatus === 'pendente' || row.queueStatus === 'erro';
-        if (statusFilter === 'divergente') return Math.abs(Number(row.divergencia || 0)) >= 0.01;
-        if (statusFilter === 'nao_vinculado') return !row.vinculado;
-        return row.status === statusFilter;
-      });
-  }, [products, search, statusFilter, syncMap]);
+  const mergedRows = useMemo(() => {
+    return baseRows.filter((row) => {
+      const normalizedSearch = search.trim().toLowerCase();
+      const matchesSearch =
+        !normalizedSearch ||
+        row.nome?.toLowerCase().includes(normalizedSearch) ||
+        row.codigo?.toLowerCase().includes(normalizedSearch) ||
+        row.sku?.toLowerCase().includes(normalizedSearch) ||
+        row.blingId?.toLowerCase().includes(normalizedSearch);
+
+      if (!matchesSearch) return false;
+      if (statusFilter === 'todos') return true;
+      if (statusFilter === 'erro') return row.status === 'erro' || row.queueStatus === 'falha_final';
+      if (statusFilter === 'pendente') return row.status === 'pendente' || row.queueStatus === 'pendente' || row.queueStatus === 'erro';
+      if (statusFilter === 'divergente') return Math.abs(Number(row.divergencia || 0)) >= 0.01;
+      if (statusFilter === 'nao_vinculado') return !row.vinculado;
+      return row.status === statusFilter;
+    });
+  }, [baseRows, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(mergedRows.length / pageSize));
+  const pageSafe = Math.min(page, totalPages);
+  const pageStart = (pageSafe - 1) * pageSize;
+  const pageEnd = pageStart + pageSize;
+  const pagedRows = mergedRows.slice(pageStart, pageEnd);
+
+  const naoVinculados = useMemo(
+    () => baseRows.filter((row) => !row.vinculado),
+    [baseRows],
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const runRowAction = async (produtoId, action, successMessage) => {
     setRowActionId(produtoId);
@@ -138,11 +161,12 @@ function EstoqueBling() {
     }
   };
 
-  const searchBlingProducts = async () => {
+  const searchBlingProducts = async (customTerm = '') => {
     setRunningAction('buscar-bling');
     try {
+      const term = (customTerm || blingSearch || '').trim();
       const response = await api.get('/estoque/sync/produtos-bling', {
-        params: blingSearch.trim() ? { busca: blingSearch.trim() } : {},
+        params: term ? { busca: term } : {},
       });
       setBlingProducts(response.data || []);
       toast.success(`Busca concluída: ${(response.data || []).length} item(ns) no Bling`);
@@ -153,9 +177,57 @@ function EstoqueBling() {
     }
   };
 
+  const vincularTodosPorSku = async () => {
+    const confirma = window.confirm('Executar vínculo em massa por SKU agora?');
+    if (!confirma) return;
+
+    await runGlobalAction(
+      'vincular-massa',
+      () => api.post('/estoque/sync/vincular-todos'),
+      (response) => {
+        const data = response.data || {};
+        return `Vínculo em massa concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0}`;
+      },
+    );
+  };
+
+  const sincronizarDivergentes = async () => {
+    const divergentes = baseRows.filter(
+      (row) => row.vinculado && Math.abs(Number(row.divergencia || 0)) >= 0.01,
+    );
+
+    if (divergentes.length === 0) {
+      toast('Não há divergências para sincronizar agora.');
+      return;
+    }
+
+    const confirma = window.confirm(`Sincronizar ${divergentes.length} item(ns) divergente(s) do sistema para o Bling?`);
+    if (!confirma) return;
+
+    setRunningAction('sync-divergentes');
+    let ok = 0;
+    let falhas = 0;
+
+    try {
+      for (const row of divergentes) {
+        try {
+          await api.post(`/estoque/sync/reconciliar/${row.id}?origem=sistema`);
+          ok += 1;
+        } catch (_error) {
+          falhas += 1;
+        }
+      }
+      toast.success(`Sincronização em lote concluída. Sucesso: ${ok} | Falhas: ${falhas}`);
+      await loadPage(search);
+    } finally {
+      setRunningAction('');
+    }
+  };
+
   const stats = {
     total: products.length,
     vinculados: syncItems.length,
+    naoVinculados: naoVinculados.length,
     erros: health.erros || 0,
     divergentes: health.divergentes || 0,
   };
@@ -169,7 +241,7 @@ function EstoqueBling() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-gray-500">Produtos locais</div>
           <div className="mt-2 text-3xl font-semibold text-slate-900">{stats.total}</div>
@@ -177,6 +249,10 @@ function EstoqueBling() {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-gray-500">Vinculados</div>
           <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.vinculados}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Não vinculados</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-800">{stats.naoVinculados}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-gray-500">Com erro</div>
@@ -230,7 +306,77 @@ function EstoqueBling() {
             {runningAction === 'geral' ? 'Processando...' : 'Auditoria geral'}
           </button>
         </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <button
+            onClick={vincularTodosPorSku}
+            disabled={runningAction !== ''}
+            className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            {runningAction === 'vincular-massa' ? 'Vinculando...' : 'Vincular em massa por SKU'}
+          </button>
+          <button
+            onClick={sincronizarDivergentes}
+            disabled={runningAction !== ''}
+            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            {runningAction === 'sync-divergentes' ? 'Sincronizando...' : 'Sincronizar divergentes (sistema -> Bling)'}
+          </button>
+        </div>
       </div>
+
+      {naoVinculados.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Produtos não vinculados</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Mostrando os primeiros 20 para agilizar seu trabalho. Use os botões para filtrar e buscar no Bling.
+              </p>
+            </div>
+            <button
+              onClick={() => setStatusFilter('nao_vinculado')}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Ver todos os não vinculados
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Produto</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Código / SKU</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Estoque</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Ação rápida</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {naoVinculados.slice(0, 20).map((row) => (
+                  <tr key={`nao-vinculado-${row.id}`}>
+                    <td className="px-4 py-3 text-slate-800 font-medium">{row.nome}</td>
+                    <td className="px-4 py-3 text-slate-600">{row.codigo || '-'} / {row.sku || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatNumber(row.estoqueAtual)}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => {
+                          const termo = row.codigo || row.sku || row.nome;
+                          setBlingSearch(termo || '');
+                          searchBlingProducts(termo || '');
+                        }}
+                        disabled={runningAction !== ''}
+                        className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                      >
+                        Buscar no Bling
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <div>
@@ -351,7 +497,7 @@ function EstoqueBling() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {mergedRows.map((row) => {
+              {pagedRows.map((row) => {
                 const statusClass = STATUS_STYLES[row.status] || 'bg-slate-100 text-slate-700';
                 const queueClass = STATUS_STYLES[row.queueStatus] || 'bg-slate-100 text-slate-700';
                 return (
@@ -438,6 +584,31 @@ function EstoqueBling() {
             </tbody>
           </table>
         </div>
+
+        {mergedRows.length > 0 && (
+          <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+            <div>
+              Exibindo {pageStart + 1} a {Math.min(pageEnd, mergedRows.length)} de {mergedRows.length} item(ns)
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={pageSafe === 1}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="px-2">Página {pageSafe} de {totalPages}</span>
+              <button
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={pageSafe === totalPages}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
