@@ -58,6 +58,8 @@ services:
       - GOOGLE_MAPS_API_KEY=AIzaSyClc2jpIcrb2PrCaOBkzQc4XCmEVFlWiO0
       - OPENAI_API_KEY=
       - WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN=${WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN:-dev_whatsapp_internal_token}
+      - WAHA_BASE_URL=http://host.docker.internal:3001
+      - WAHA_API_KEY=51d910cdc9f34f989175cf036f868b18
       - BLING_CLIENT_ID=
       - BLING_CLIENT_SECRET=
       - STONE_CLIENT_ID=sk_cb70739f3d554f57a84db078586f5637
@@ -73,6 +75,7 @@ services:
       - /app/__pycache__
     networks:
       - dev-network
+      - whatsapp-pilot-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,3 +101,6 @@ networks:
   dev-network:
     name: petshop-dev-network
     driver: bridge
+  whatsapp-pilot-network:
+    external: true
+    name: petshop-whatsapp-pilot-network

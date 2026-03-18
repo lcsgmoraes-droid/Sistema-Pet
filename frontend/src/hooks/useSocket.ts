@@ -1,10 +1,11 @@
 // Custom Hook for Native WebSocket Integration (FastAPI)
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { nativeWebSocketService } from '../services/nativeWebSocketService';
 import { useWhatsAppStore } from '../stores/whatsappStore';
 
 export const useSocket = (token: string | null, agentId: string | null) => {
   const [hasInitialized, setHasInitialized] = useState(false);
+  const lastConnectionStateRef = useRef<boolean | null>(null);
   
   const {
     addNotification,
@@ -20,9 +21,28 @@ export const useSocket = (token: string | null, agentId: string | null) => {
     setHasInitialized(true);
     console.log('🔌 useSocket: Initializing WebSocket connection...');
     
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = setTimeout(() => {
+        void fetchHandoffs();
+        void fetchStats();
+      }, 400);
+    };
+
     // Connection change handler
     nativeWebSocketService.onConnectionChange = (connected) => {
       setConnected(connected);
+
+      if (lastConnectionStateRef.current === connected) {
+        return;
+      }
+
+      lastConnectionStateRef.current = connected;
       
       if (connected) {
         addNotification({
@@ -58,10 +78,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
     nativeWebSocketService.registerHandlers({
       // New handoff created
       onNewHandoff: (handoff) => {
-        console.log('🆕 New handoff received:', handoff);
-        
-        // Refresh APENAS handoffs (stats será atualizado pelo polling)
-        fetchHandoffs();
+        scheduleRefresh();
         
         // Show notification
         addNotification({
@@ -86,10 +103,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
       
       // Handoff assigned to agent
       onHandoffAssigned: (handoff) => {
-        console.log('👤 Handoff assigned:', handoff);
-        
-        // Refresh APENAS handoffs
-        fetchHandoffs();
+        scheduleRefresh();
         
         // Notify if assigned to current agent
         if (handoff.assigned_agent_id === agentId) {
@@ -104,11 +118,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
       
       // Handoff resolved
       onHandoffResolved: (handoffId) => {
-        console.log('✅ Handoff resolved:', handoffId);
-        
-        // Refresh data
-        fetchHandoffs();
-        fetchStats();
+        scheduleRefresh();
       },
       
       // New message in conversation
@@ -134,10 +144,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
       
       // Agent status changed
       onAgentStatusChange: (agent) => {
-        console.log('📊 Agent status changed:', agent);
-        
-        // Refresh agents list
-        fetchStats();
+        scheduleRefresh();
       },
       
       // Typing indicator
@@ -152,6 +159,9 @@ export const useSocket = (token: string | null, agentId: string | null) => {
     
     // Cleanup
     return () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
       nativeWebSocketService.disconnect();
     };
   }, [token, agentId]);
@@ -167,7 +177,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
 // Browser Notifications
 function showBrowserNotification(title: string, body: string, priority?: string) {
   // Check if browser supports notifications
-  if (!('Notification' in window)) {
+  if (!('Notification' in globalThis)) {
     console.warn('Browser does not support notifications');
     return;
   }
@@ -184,7 +194,7 @@ function showBrowserNotification(title: string, body: string, priority?: string)
     });
     
     notification.onclick = () => {
-      window.focus();
+      globalThis.focus();
       notification.close();
     };
     

@@ -18,62 +18,52 @@ logger = logging.getLogger(__name__)
 def buscar_produto(
     db: Session,
     tenant_id: int,
-    keywords: List[str],
+    termo: str,
+    keywords: Optional[List[str]] = None,
     categoria: Optional[str] = None,
     limit: int = 10
 ) -> Dict[str, Any]:
     """
-    Busca produtos no estoque com keywords.
-    
+    Busca produtos no estoque por termo de busca.
+
     Args:
-        keywords: Lista de palavras-chave (ex: ["ração", "golden"])
-        categoria: Categoria opcional (ex: "ração")
+        termo: Texto de busca (ex: "ração golden 15kg")
+        keywords: Lista opcional de palavras-chave adicionais
+        categoria: Categoria opcional (ex: "Ração")
         limit: Máximo de resultados
-    
-    Returns:
-        {
-            "found": int,
-            "produtos": [
-                {
-                    "id": int,
-                    "nome": str,
-                    "preco": float,
-                    "estoque": int,
-                    "categoria": str
-                }
-            ]
-        }
     """
-    from app.models import Produto
+    from app.produtos_models import Produto, Categoria
     from sqlalchemy import or_
-    
+
     try:
+        # Combina termo + keywords em uma lista unificada
+        all_keywords: List[str] = [t.strip() for t in termo.split() if t.strip()]
+        if keywords:
+            all_keywords.extend(keywords)
+
         # Query base
         query = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True
+            Produto.situacao == True
         )
-        
-        # Filtrar por categoria
+
+        # Filtrar por categoria (join com tabela Categoria)
         if categoria:
-            query = query.filter(Produto.categoria.ilike(f"%{categoria}%"))
-        
-        # Filtrar por keywords (nome OU descricao)
-        if keywords:
+            query = query.join(Categoria, Produto.categoria_id == Categoria.id, isouter=True).filter(
+                Categoria.nome.ilike(f"%{categoria}%")
+            )
+
+        # Filtrar por keywords (nome OU descricao_curta)
+        if all_keywords:
             filters = []
-            for keyword in keywords:
+            for keyword in all_keywords:
                 filters.append(Produto.nome.ilike(f"%{keyword}%"))
-                filters.append(Produto.descricao.ilike(f"%{keyword}%"))
-            
+                if Produto.descricao_curta is not None:
+                    filters.append(Produto.descricao_curta.ilike(f"%{keyword}%"))
             query = query.filter(or_(*filters))
-        
-        # Ordenar por mais vendidos (se tiver campo vendas_count)
-        # query = query.order_by(Produto.vendas_count.desc())
-        
-        # Limitar resultados
+
         produtos = query.limit(limit).all()
-        
-        # Formatar resposta
+
         result = {
             "found": len(produtos),
             "produtos": [
@@ -82,15 +72,15 @@ def buscar_produto(
                     "nome": p.nome,
                     "preco": float(p.preco_venda) if p.preco_venda else 0.0,
                     "estoque": p.estoque_atual or 0,
-                    "categoria": p.categoria or "Sem categoria",
-                    "descricao": p.descricao or ""
+                    "categoria": p.categoria.nome if p.categoria else "Sem categoria",
+                    "descricao": p.descricao_curta or ""
                 }
                 for p in produtos
             ]
         }
-        
-        logger.info(f"✅ buscar_produto: {len(produtos)} encontrados - keywords={keywords}")
-        
+
+        logger.info(f"✅ buscar_produto: {len(produtos)} encontrados - termo='{termo}'")
+
         return result
         
     except Exception as e:
@@ -121,7 +111,7 @@ def consultar_estoque(
             "status": str  # "disponivel", "baixo", "esgotado"
         }
     """
-    from app.models import Produto
+    from app.produtos_models import Produto
     
     try:
         produto = db.query(Produto).filter(
@@ -275,7 +265,9 @@ def criar_pedido(
             "previsao_entrega": str
         }
     """
-    from app.models import Venda, VendaItem, Produto, Cliente
+    from app.vendas_models import Venda, VendaItem
+    from app.produtos_models import Produto
+    from app.models import Cliente
     from datetime import datetime, timedelta
     
     try:
@@ -502,7 +494,9 @@ def execute_function(
         }
     
     try:
-        raw_result = handler(db=db, tenant_id=tenant_id, **kwargs)
+        # Remover session_id dos kwargs pois nem todos os handlers aceitam
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k != "session_id"}
+        raw_result = handler(db=db, tenant_id=tenant_id, **filtered_kwargs)
         return _normalize_function_result(raw_result)
     except Exception as e:
         logger.error(f"❌ Erro ao executar {function_name}: {e}")

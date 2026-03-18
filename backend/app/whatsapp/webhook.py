@@ -331,12 +331,16 @@ async def process_incoming_message(
 
 def normalize_phone(phone: str) -> str:
     """
-    Normaliza número de telefone.
-    
-    Remove: +, espaços, parênteses, traços
-    Mantém apenas dígitos.
+    Normaliza identificador de telefone/chat do WhatsApp.
+
+    - Para formato @lid (novo identificador interno do WhatsApp):
+      mantém o sufixo @lid, ex: "266915104710838@lid"
+    - Para demais formatos (@c.us, etc.): retorna apenas dígitos.
     """
     import re
+    if "@lid" in phone:
+        digits = re.sub(r'[^\d]', '', phone.split("@")[0])
+        return f"{digits}@lid"
     return re.sub(r'[^\d]', '', phone)
 
 

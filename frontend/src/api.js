@@ -32,6 +32,7 @@ if (isDevelopment && configuredApiUrl && configuredApiUrl !== '/api') {
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -79,11 +80,15 @@ api.interceptors.response.use(
       localStorage.removeItem('access_token');
       localStorage.removeItem('token');
       localStorage.removeItem('tenants');
-      window.location.href = '/login';
+      globalThis.location.href = '/login';
     }
 
     if (status === 403) {
       debugWarn('[API] Acesso negado para este tenant');
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      console.warn('[API] Tempo limite excedido (20s):', error.config?.url);
     }
 
     return Promise.reject(error);

@@ -22,6 +22,10 @@ Definir no container/ambiente do n8n:
 3. BACKEND_INTERNAL_TOKEN
 4. OPENAI_API_KEY (somente se for habilitar transcricao no node desativado)
 
+Observacao importante:
+- No Docker local, use `BACKEND_INTERNAL_BASE_URL=http://petshop-dev-backend:8000`.
+- O backend de desenvolvimento precisa participar da rede `petshop-whatsapp-pilot-network` para o n8n falar com ele diretamente.
+
 ## 3) Como importar
 
 1. Abrir n8n em http://localhost:5678

@@ -8,6 +8,10 @@ services:
     environment:
       - WAHA_API_KEY=${WAHA_API_KEY}
       - WAHA_PRINT_QR=${WAHA_PRINT_QR:-true}
+      - WHATSAPP_HOOK_URL=http://n8n:5678/webhook/waha-inbound
+      - WHATSAPP_HOOK_EVENTS=message.any
+    volumes:
+      - waha-sessions:/app/.sessions
     networks:
       - whatsapp-pilot-network
 
@@ -29,9 +33,10 @@ services:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-America/Sao_Paulo}
       - WAHA_BASE_URL=${WAHA_BASE_URL:-http://waha:3000}
       - WAHA_API_KEY=${WAHA_API_KEY}
-      - BACKEND_INTERNAL_BASE_URL=${BACKEND_INTERNAL_BASE_URL:-http://host.docker.internal:8000}
+      - BACKEND_INTERNAL_BASE_URL=${BACKEND_INTERNAL_BASE_URL:-http://petshop-dev-backend:8000}
       - BACKEND_TENANT_ID=${BACKEND_TENANT_ID}
       - BACKEND_INTERNAL_TOKEN=${BACKEND_INTERNAL_TOKEN}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     volumes:
       - n8n-pilot-data:/home/node/.n8n
     depends_on:
@@ -42,6 +47,8 @@ services:
 volumes:
   n8n-pilot-data:
     name: petshop-n8n-pilot-data
+  waha-sessions:
+    name: petshop-waha-sessions
 
 networks:
   whatsapp-pilot-network:

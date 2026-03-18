@@ -17,14 +17,15 @@ interface EventHandlers {
 class NativeWebSocketService {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private readonly maxReconnectAttempts = 5;
+  private readonly reconnectDelay = 1000;
   private reconnectTimeout: number | null = null;
   private pingInterval: number | null = null; // Keep-alive
   private isDisconnecting = false;
   private agentId: string | null = null;
   private token: string | null = null;
   private handlers: EventHandlers = {};
+  private readonly debugWs = false;
   
   // Callbacks
   public onConnectionChange: ((connected: boolean) => void) | null = null;
@@ -36,15 +37,15 @@ class NativeWebSocketService {
     const isRelative = configuredApiUrl.startsWith('/');
 
     if (isRelative) {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}${configuredApiUrl}`;
+      const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${globalThis.location.host}${configuredApiUrl}`;
     }
 
     return configuredApiUrl.replace('http://', 'ws://').replace('https://', 'wss://');
   }
   
   connect(token: string, agentId: string): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       console.log('WebSocket already connected');
       return;
     }
@@ -103,6 +104,11 @@ class NativeWebSocketService {
       console.log('✅ WebSocket connected');
       this.reconnectAttempts = 0;
       this.isDisconnecting = false;
+
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
       
       if (this.onConnectionChange) {
         this.onConnectionChange(true);
@@ -112,7 +118,7 @@ class NativeWebSocketService {
       this.send({ event: 'join_agent_room' });
       
       // Start keep-alive ping (every 30 seconds)
-      this.pingInterval = window.setInterval(() => {
+      this.pingInterval = globalThis.setInterval(() => {
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.send({ event: 'ping' });
         }
@@ -121,6 +127,13 @@ class NativeWebSocketService {
     
     this.ws.onclose = (event) => {
       console.log('❌ WebSocket disconnected:', event.code, event.reason);
+
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
+
+      this.ws = null;
       
       if (this.onConnectionChange) {
         this.onConnectionChange(false);
@@ -155,55 +168,34 @@ class NativeWebSocketService {
   
   private handleMessage(message: any): void {
     const { event, data } = message;
+
+    if (event === 'pong') {
+      return;
+    }
+
+    if (this.debugWs) {
+      console.log('📩 WebSocket message:', event, data);
+    }
     
-    console.log('📩 WebSocket message:', event, data);
-    
-    switch (event) {
-      case 'connected':
-        console.log('Connection confirmed:', data);
-        break;
-      case 'pong':
-        // Heartbeat response from server keep-alive.
-        break;
-        
-      case 'new_handoff':
-        if (this.handlers.onNewHandoff) {
-          this.handlers.onNewHandoff(data);
+    const eventActions: Record<string, () => void> = {
+      connected: () => {
+        if (this.debugWs) {
+          console.log('Connection confirmed:', data);
         }
-        break;
-        
-      case 'handoff_assigned':
-        if (this.handlers.onHandoffAssigned) {
-          this.handlers.onHandoffAssigned(data);
-        }
-        break;
-        
-      case 'handoff_resolved':
-        if (this.handlers.onHandoffResolved) {
-          this.handlers.onHandoffResolved(data.handoff_id);
-        }
-        break;
-        
-      case 'new_message':
-        if (this.handlers.onNewMessage) {
-          this.handlers.onNewMessage(data.session_id, data.message);
-        }
-        break;
-        
-      case 'agent_status_change':
-        if (this.handlers.onAgentStatusChange) {
-          this.handlers.onAgentStatusChange(data);
-        }
-        break;
-        
-      case 'typing_indicator':
-        if (this.handlers.onTypingIndicator) {
-          this.handlers.onTypingIndicator(data.session_id, data.is_typing);
-        }
-        break;
-        
-      default:
-        console.warn('Unknown WebSocket event:', event);
+      },
+      new_handoff: () => this.handlers.onNewHandoff?.(data),
+      handoff_assigned: () => this.handlers.onHandoffAssigned?.(data),
+      handoff_resolved: () => this.handlers.onHandoffResolved?.(data.handoff_id),
+      new_message: () => this.handlers.onNewMessage?.(data.session_id, data.message),
+      agent_status_change: () => this.handlers.onAgentStatusChange?.(data),
+      typing_indicator: () => this.handlers.onTypingIndicator?.(data.session_id, data.is_typing)
+    };
+
+    const action = eventActions[event];
+    if (action) {
+      action();
+    } else {
+      console.warn('Unknown WebSocket event:', event);
     }
   }
   

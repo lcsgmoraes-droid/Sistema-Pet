@@ -155,6 +155,61 @@ class Dialog360Client:
 
 
 # ============================================================================
+# CLIENT WAHA (piloto local)
+# ============================================================================
+
+import os
+
+class WahaClient:
+    """
+    Cliente HTTP para WAHA (WhatsApp HTTP API - piloto local).
+    """
+
+    def __init__(self, api_key: str, base_url: str, session: str = "default"):
+        self.session = session
+        self.headers = {
+            "X-Api-Key": api_key,
+            "Content-Type": "application/json"
+        }
+        self.base_url = base_url.rstrip("/")
+
+    async def send_text_message(self, to: str, message: str) -> Dict[str, Any]:
+        # WAHA espera número no formato "XXXXXXXXXXX@c.us"
+        chat_id = to if "@" in to else f"{to}@c.us"
+        payload = {
+            "chatId": chat_id,
+            "text": message,
+            "session": self.session,
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/api/sendText",
+                headers=self.headers,
+                json=payload
+            )
+            response.raise_for_status()
+            # WAHA retorna 201 com corpo vazio
+            return response.json() if response.content else {"status": "sent"}
+
+    async def send_image_message(self, to: str, image_url: str, caption: Optional[str] = None) -> Dict[str, Any]:
+        chat_id = to if "@" in to else f"{to}@c.us"
+        payload = {
+            "chatId": chat_id,
+            "file": {"url": image_url},
+            "caption": caption or "",
+            "session": self.session,
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/api/sendImage",
+                headers=self.headers,
+                json=payload
+            )
+            response.raise_for_status()
+            return response.json() if response.content else {"status": "sent"}
+
+
+# ============================================================================
 # SEND MESSAGE (HIGH-LEVEL)
 # ============================================================================
 
@@ -188,9 +243,22 @@ async def send_whatsapp_message(
             TenantWhatsAppConfig.tenant_id == tenant_id
         ).first()
         
-        if not config or not config.api_key:
-            logger.error(f"Tenant {tenant_id} sem API key configurada")
+        if not config:
+            logger.error(f"Tenant {tenant_id} sem configuração WhatsApp")
             return None
+
+        provider = (config.provider or "360dialog").lower()
+
+        # Escolher cliente conforme provider
+        if provider == "waha":
+            waha_url = os.getenv("WAHA_BASE_URL", "http://petshop-pilot-waha:3000")
+            waha_key = os.getenv("WAHA_API_KEY", "")
+            client_obj = WahaClient(api_key=waha_key, base_url=waha_url)
+        else:
+            if not config.api_key:
+                logger.error(f"Tenant {tenant_id} sem API key configurada")
+                return None
+            client_obj = Dialog360Client(api_key=config.api_key)
         
         session = db.query(WhatsAppSession).get(session_id)
         if not session:
@@ -198,16 +266,14 @@ async def send_whatsapp_message(
             return None
         
         # 2. Enviar via API
-        client = Dialog360Client(api_key=config.api_key)
-        
         if message_type == "image" and image_url:
-            response = await client.send_image_message(
+            response = await client_obj.send_image_message(
                 to=session.phone_number,
                 image_url=image_url,
                 caption=message
             )
         else:
-            response = await client.send_text_message(
+            response = await client_obj.send_text_message(
                 to=session.phone_number,
                 message=message
             )

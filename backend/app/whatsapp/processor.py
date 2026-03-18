@@ -10,6 +10,7 @@ Orquestra todo o fluxo de processamento:
 6. Enviar resposta
 7. Registrar métricas
 """
+import json
 import logging
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
@@ -286,6 +287,24 @@ class MessageProcessor:
             })
         
         # Chamar IA novamente com resultados das functions
+        # OBRIGATÓRIO: adicionar primeiro a mensagem do assistente com tool_calls
+        # (a API da OpenAI exige que toda mensagem "tool" seja precedida por
+        #  uma mensagem "assistant" contendo os tool_calls correspondentes)
+        messages.append({
+            "role": "assistant",
+            "content": response.get("content"),
+            "tool_calls": [
+                {
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": tc["function"],
+                        "arguments": json.dumps(tc["arguments"], ensure_ascii=False)
+                    }
+                }
+                for tc in tool_calls
+            ]
+        })
         messages.extend(function_results)
         
         final_response = await self.llm_client.chat_completion(

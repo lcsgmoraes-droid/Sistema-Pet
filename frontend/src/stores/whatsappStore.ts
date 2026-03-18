@@ -117,7 +117,7 @@ interface Notification {
   timestamp: string;
 }
 
-async function withRequestTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
+async function withRequestTimeout<T>(promise: Promise<T>, ms = 30000): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -168,7 +168,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
     set({ isLoadingStats: true });
 
     try {
-      const stats = await withRequestTimeout(whatsappService.getStats());
+      const stats = await withRequestTimeout(whatsappService.getStats(), 30000);
       set({ stats, isLoadingStats: false });
     } catch (error) {
       console.warn('Stats indisponivel no momento:', error);
@@ -181,7 +181,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   fetchAgents: async () => {
     set({ isLoadingAgents: true });
     try {
-      const agents = await withRequestTimeout(whatsappService.getAgents());
+      const agents = await withRequestTimeout(whatsappService.getAgents(), 20000);
       set({ agents, isLoadingAgents: false });
     } catch (error) {
       console.warn('Agents indisponiveis no momento:', error);
@@ -201,7 +201,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
       const user = JSON.parse(userStr);
       
       // Buscar ou criar agente
-      const agents = await withRequestTimeout(whatsappService.getAgents());
+      const agents = await withRequestTimeout(whatsappService.getAgents(), 20000);
       
       const existingAgent = agents.find(a => a.user_id === user.id);
       let currentAgent: AgentStatus;
@@ -209,7 +209,8 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
       if (existingAgent) {
         // Atualizar status para online
         currentAgent = await withRequestTimeout(
-          whatsappService.updateAgent(existingAgent.id, { status: 'online' })
+          whatsappService.updateAgent(existingAgent.id, { status: 'online' }),
+          20000
         );
       } else {
         // Criar agente se não existir
@@ -220,7 +221,7 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
           max_concurrent_chats: 5,
           auto_assign: true,
           receive_notifications: true
-        }));
+        }), 20000);
       }
 
       set({
@@ -254,12 +255,19 @@ export const useWhatsAppStore = create<WhatsAppStore>()((set, get) => ({
   
   // Handoffs Actions
   fetchHandoffs: async (status) => {
+    const state = get();
+
+    if (state.isLoadingHandoffs) {
+      return;
+    }
+
     set({ isLoadingHandoffs: true });
     try {
       const requestedStatus = status ?? get().filterStatus;
       const apiStatus = requestedStatus === 'my' ? 'active' : requestedStatus;
       const handoffs = await withRequestTimeout(
-        whatsappService.getHandoffs(apiStatus === 'all' ? undefined : apiStatus)
+        whatsappService.getHandoffs(apiStatus === 'all' ? undefined : apiStatus),
+        30000
       );
 
       if (requestedStatus === 'my') {

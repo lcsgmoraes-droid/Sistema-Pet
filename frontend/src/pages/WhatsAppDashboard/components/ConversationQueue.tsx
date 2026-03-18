@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo } from 'react';
 import type { HandoffItem } from '../../../stores/whatsappStore';
 import { useWhatsAppStore } from '../../../stores/whatsappStore';
 import { formatDistanceToNow } from 'date-fns';
@@ -16,6 +16,8 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
   isLoading
 }) => {
   const { setActiveHandoff, takeHandoff } = useWhatsAppStore();
+  const visibleHandoffs = handoffs.slice(0, 40);
+  const skeletonKeys = ['q1', 'q2', 'q3', 'q4', 'q5'];
   
   const priorityColors = {
     urgent: 'bg-red-100 text-red-700 border-red-200',
@@ -38,11 +40,11 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
     cancelled: '❌'
   };
   
-  if (isLoading) {
+  if (isLoading && handoffs.length === 0) {
     return (
       <div className="p-4 space-y-3">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="border border-gray-200 rounded-lg p-3 animate-pulse">
+        {skeletonKeys.map((key) => (
+          <div key={key} className="border border-gray-200 rounded-lg p-3 animate-pulse">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
               <div className="flex-1">
@@ -72,19 +74,24 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
   
   return (
     <div className="p-4 space-y-3">
-      {handoffs.map((handoff) => {
+      {isLoading && handoffs.length > 0 && (
+        <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded px-2 py-1">
+          Atualizando fila...
+        </div>
+      )}
+
+      {visibleHandoffs.map((handoff) => {
         const isActive = activeHandoff?.id === handoff.id;
         const isPending = handoff.status === 'pending';
         
         return (
           <div
             key={handoff.id}
-            onClick={() => setActiveHandoff(handoff)}
             className={`
-              border rounded-lg p-3 cursor-pointer transition-all
+              border rounded-lg p-3 transition-all
               ${isActive
                 ? 'border-blue-500 bg-blue-50 shadow-md'
-                : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                : 'border-gray-200 hover:border-gray-300'
               }
             `}
           >
@@ -121,7 +128,7 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
                 </p>
                 
                 {/* Reason */}
-                <p className="text-sm text-gray-700 mb-2 line-clamp-2">
+                <p className="text-sm text-gray-700 mb-2 line-clamp-1">
                   {handoff.reason_details || handoff.reason}
                 </p>
                 
@@ -137,6 +144,16 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
                   
                   {/* Status + Action */}
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveHandoff(handoff);
+                      }}
+                      className="text-xs px-3 py-1 border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Abrir
+                    </button>
+
                     <span className="text-xs text-gray-500">
                       {statusIcons[handoff.status]}
                     </span>
@@ -159,6 +176,12 @@ export const ConversationQueue: React.FC<ConversationQueueProps> = memo(({
           </div>
         );
       })}
+
+      {handoffs.length > visibleHandoffs.length && (
+        <div className="text-xs text-gray-500 text-center py-2">
+          Mostrando {visibleHandoffs.length} de {handoffs.length} conversas para manter a tela leve.
+        </div>
+      )}
     </div>
   );
 });

@@ -12,22 +12,6 @@ import { NotificationToast } from './components/NotificationToast.tsx';
 import { ConnectionStatus } from './components/ConnectionStatus.tsx';
 import { NotificationPermission } from './components/NotificationPermission.tsx';
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('Initialization timeout')), ms);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-  }
-}
-
 export const WhatsAppDashboard: React.FC = () => {
   const [isInitializing, setIsInitializing] = React.useState(true);
   
@@ -61,6 +45,21 @@ export const WhatsAppDashboard: React.FC = () => {
     token,
     currentAgent?.id || null
   );
+
+  const fallbackStats = React.useMemo(() => {
+    const pending = handoffs.filter((h) => h.status === 'pending').length;
+    const active = handoffs.filter((h) => h.status === 'active').length;
+    const resolved = handoffs.filter((h) => h.status === 'resolved').length;
+
+    return {
+      total_handoffs: handoffs.length,
+      pending_count: pending,
+      active_count: active,
+      resolved_count: resolved,
+      available_agents: agents.filter((a) => a.status === 'online').length,
+      avg_response_time_seconds: stats?.avg_response_time_seconds || 0
+    };
+  }, [handoffs, agents, stats?.avg_response_time_seconds]);
   
   useEffect(() => {
     let mounted = true;
@@ -73,20 +72,12 @@ export const WhatsAppDashboard: React.FC = () => {
       initialized = true;
       
       try {
-        try {
-          // Garante agente atual antes de buscar fila para evitar estado vazio intermitente.
-          await initializeCurrentAgent();
+        // Garante agente atual antes de buscar fila para evitar estado vazio intermitente.
+        await initializeCurrentAgent();
+        await fetchHandoffs(useWhatsAppStore.getState().filterStatus);
 
-          await withTimeout(
-            fetchHandoffs(useWhatsAppStore.getState().filterStatus),
-            15000
-          );
-
-          // Stats é secundário: não deve bloquear a fila e o carregamento principal.
-          void fetchStats();
-        } catch (timeoutError) {
-          console.warn('⚠️ Initialization timeout, continuing anyway:', timeoutError);
-        }
+        // Stats é secundário: não deve bloquear a fila e o carregamento principal.
+        void fetchStats();
         
       } catch (error) {
         console.error('❌ Error initializing dashboard:', error);
@@ -124,8 +115,8 @@ export const WhatsAppDashboard: React.FC = () => {
     
     initialize();
     
-    // Refresh a cada 60 segundos (reduzido de 30s para melhor performance)
-    pollingInterval = setInterval(refreshData, 60000);
+    // Refresh moderado para evitar perda de eventos quando websocket oscila.
+    pollingInterval = setInterval(refreshData, 20000);
     
     // Atualizar quando a aba voltar a ficar ativa
     const handleVisibilityChange = () => {
@@ -251,7 +242,7 @@ export const WhatsAppDashboard: React.FC = () => {
         
         {/* Stats Cards */}
         <div className="p-4 bg-white border-b border-gray-200">
-          <StatsCards stats={stats} isLoading={isLoadingStats} />
+          <StatsCards stats={stats} fallbackStats={fallbackStats} isLoading={isLoadingStats} />
         </div>
         
         {/* Chat Area */}

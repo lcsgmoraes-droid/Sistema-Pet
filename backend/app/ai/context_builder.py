@@ -16,7 +16,8 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
-from app.models import Cliente, Produto
+from app.models import Cliente
+from app.produtos_models import Produto
 from app.vendas_models import Venda, VendaItem
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.cache.cache_manager import cache
@@ -214,7 +215,8 @@ class ContextBuilder:
             for keyword in keywords[:3]:  # Máx 3 keywords
                 produtos = produtos.filter(
                     Produto.nome.ilike(f"%{keyword}%") |
-                    Produto.descricao.ilike(f"%{keyword}%")
+                    Produto.descricao_curta.ilike(f"%{keyword}%") |
+                    Produto.descricao_completa.ilike(f"%{keyword}%")
                 )
             
             produtos = produtos.limit(limit).all()
@@ -263,7 +265,7 @@ class ContextBuilder:
         return {
             "id": produto.id,
             "nome": produto.nome,
-            "descricao": produto.descricao or "",
+            "descricao": produto.descricao_curta or produto.descricao_completa or "",
             "preco": float(produto.preco_venda) if produto.preco_venda else 0.0,
             "estoque": int(produto.estoque_atual) if produto.estoque_atual else 0,
             "disponivel": (produto.estoque_atual or 0) > 0,

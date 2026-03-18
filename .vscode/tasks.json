@@ -136,6 +136,51 @@
 			],
 			"isBackground": true,
 			"problemMatcher": []
+		},
+		{
+			"label": "Teste: WhatsApp Handoffs Pending",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"$token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiMjU3NDJiMzYtYzFiNy00ZTM2LWJiZDgtNGQ1YmZmN2VlOWE0IiwidGVuYW50X2lkIjoiN2JlOGRhZDctODk1Ni00NzU4LWI3YmMtODU1YTUyNTlmZTJiIiwiZXhwIjoxNzc0MTU2MDk0fQ.1260p7lID4cF-c2uJ7mC2m8EktoK3Okc7D0mqfVuxoI'; try { $resp = Invoke-WebRequest -Uri 'http://localhost:8000/whatsapp/handoffs/pending' -Headers @{ Authorization = \"Bearer $token\" } -UseBasicParsing -TimeoutSec 15; Write-Output ('STATUS=' + [int]$resp.StatusCode); Write-Output $resp.Content } catch { if ($_.Exception.Response) { Write-Output ('STATUS=' + [int]$_.Exception.Response.StatusCode.value__); $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream()); $reader.ReadToEnd() } else { $_ | Out-String } }"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Teste: WhatsApp Handoffs Pending Curl",
+			"type": "shell",
+			"command": "curl.exe",
+			"args": [
+				"-i",
+				"http://localhost:8000/whatsapp/handoffs/pending",
+				"-H",
+				"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiMjU3NDJiMzYtYzFiNy00ZTM2LWJiZDgtNGQ1YmZmN2VlOWE0IiwidGVuYW50X2lkIjoiN2JlOGRhZDctODk1Ni00NzU4LWI3YmMtODU1YTUyNTlmZTJiIiwiZXhwIjoxNzc0MTU2MDk0fQ.1260p7lID4cF-c2uJ7mC2m8EktoK3Okc7D0mqfVuxoI"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Teste: WhatsApp Handoffs Pending Python",
+			"type": "shell",
+			"command": "c:\\Users\\Lucas\\OneDrive\\Área de Trabalho\\Programa\\Sistema Pet\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import requests; headers={'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiMjU3NDJiMzYtYzFiNy00ZTM2LWJiZDgtNGQ1YmZmN2VlOWE0IiwidGVuYW50X2lkIjoiN2JlOGRhZDctODk1Ni00NzU4LWI3YmMtODU1YTUyNTlmZTJiIiwiZXhwIjoxNzc0MTU2MDk0fQ.1260p7lID4cF-c2uJ7mC2m8EktoK3Okc7D0mqfVuxoI'}; r=requests.get('http://localhost:8000/whatsapp/handoffs/pending', headers=headers, timeout=15); print('STATUS=' + str(r.status_code)); print(r.text)"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "Teste: WhatsApp Handoffs Pending Python 2",
+			"type": "shell",
+			"command": "c:\\Users\\Lucas\\OneDrive\\Área de Trabalho\\Programa\\Sistema Pet\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-c",
+				"import requests; token=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiMjU3NDJiMzYtYzFiNy00ZTM2LWJiZDgtNGQ1YmZmN2VlOWE0IiwidGVuYW50X2lkIjoiN2JlOGRhZDctODk1Ni00NzU4LWI3YmMtODU1YTUyNTlmZTJiIiwiZXhwIjoxNzc0MTU2MDk0fQ.1260p7lID4cF-c2uJ7mC2m8EktoK3Okc7D0mqfVuxoI\"; r=requests.get(\"http://localhost:8000/whatsapp/handoffs/pending\", headers={\"Authorization\": f\"Bearer {token}\"}, timeout=15); print(\"STATUS=\" + str(r.status_code)); print(r.text)"
+			],
+			"isBackground": false
 		}
 	]
 }
