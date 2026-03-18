@@ -1,260 +1,291 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 
-const EstoqueBling = () => {
-  const [produtos, setProdutos] = useState([]);
-  const [produtosBling, setProdutosBling] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [filtro, setFiltro] = useState('todos'); // todos, sincronizados, nao_sincronizados
-  const [buscaBling, setBuscaBling] = useState('');
+import api from '../api';
 
-  const getCategoriaNome = (produto) => {
-    const categoria = produto?.categoria;
-    if (!categoria) return null;
-    if (typeof categoria === 'string') return categoria;
-    if (typeof categoria === 'object') {
-      return categoria.nome || categoria.descricao || `Categoria #${categoria.id ?? ''}`.trim();
+const STATUS_STYLES = {
+  ativo: 'bg-emerald-100 text-emerald-700',
+  pendente: 'bg-amber-100 text-amber-700',
+  erro: 'bg-red-100 text-red-700',
+  falha_final: 'bg-red-100 text-red-700',
+  pausado: 'bg-zinc-200 text-zinc-700',
+};
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('pt-BR');
+}
+
+function formatNumber(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+  return Number(value).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
+  });
+}
+
+function EstoqueBling() {
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('todos');
+  const [products, setProducts] = useState([]);
+  const [syncItems, setSyncItems] = useState([]);
+  const [health, setHealth] = useState({ ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+  const [blingSearch, setBlingSearch] = useState('');
+  const [blingProducts, setBlingProducts] = useState([]);
+  const [runningAction, setRunningAction] = useState('');
+  const [rowActionId, setRowActionId] = useState(null);
+
+  const loadPage = async (currentSearch = search) => {
+    setLoading(true);
+    try {
+      const [healthRes, syncRes, productsRes] = await Promise.all([
+        api.get('/estoque/sync/health'),
+        api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} }),
+        api.get('/produtos/'),
+      ]);
+
+      setHealth(healthRes.data || { ativos: 0, pendentes: 0, erros: 0, divergentes: 0 });
+      setSyncItems(syncRes.data || []);
+      setProducts(productsRes.data?.items || []);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao carregar a sincronização do Bling');
+    } finally {
+      setLoading(false);
     }
-    return String(categoria);
   };
 
   useEffect(() => {
-    carregarProdutos();
+    loadPage('');
   }, []);
 
-  const carregarProdutos = async () => {
-    setLoading(true);
+  const syncMap = useMemo(() => {
+    const map = new Map();
+    for (const item of syncItems) {
+      map.set(item.produto_id, item);
+    }
+    return map;
+  }, [syncItems]);
+
+  const mergedRows = useMemo(() => {
+    return products
+      .map((product) => {
+        const sync = syncMap.get(product.id);
+        return {
+          id: product.id,
+          codigo: product.codigo,
+          nome: product.nome,
+          estoqueAtual: product.estoque_atual ?? 0,
+          sku: product.sku,
+          blingId: sync?.bling_produto_id || '',
+          status: sync?.status || 'nao_vinculado',
+          queueStatus: sync?.queue_status || null,
+          ultimaSincronizacao: sync?.ultima_sincronizacao || null,
+          ultimaTentativa: sync?.ultima_tentativa_sync || null,
+          proximaTentativa: sync?.proxima_tentativa_sync || null,
+          ultimaConferencia: sync?.ultima_conferencia_bling || null,
+          ultimoErro: sync?.ultimo_erro || '',
+          tentativas: sync?.tentativas_sync || 0,
+          estoqueBling: sync?.estoque_bling,
+          divergencia: sync?.divergencia,
+          vinculado: Boolean(sync?.bling_produto_id),
+        };
+      })
+      .filter((row) => {
+        const normalizedSearch = search.trim().toLowerCase();
+        const matchesSearch =
+          !normalizedSearch ||
+          row.nome?.toLowerCase().includes(normalizedSearch) ||
+          row.codigo?.toLowerCase().includes(normalizedSearch) ||
+          row.sku?.toLowerCase().includes(normalizedSearch) ||
+          row.blingId?.toLowerCase().includes(normalizedSearch);
+
+        if (!matchesSearch) return false;
+        if (statusFilter === 'todos') return true;
+        if (statusFilter === 'erro') return row.status === 'erro' || row.queueStatus === 'falha_final';
+        if (statusFilter === 'pendente') return row.status === 'pendente' || row.queueStatus === 'pendente' || row.queueStatus === 'erro';
+        if (statusFilter === 'divergente') return Math.abs(Number(row.divergencia || 0)) >= 0.01;
+        if (statusFilter === 'nao_vinculado') return !row.vinculado;
+        return row.status === statusFilter;
+      });
+  }, [products, search, statusFilter, syncMap]);
+
+  const runRowAction = async (produtoId, action, successMessage) => {
+    setRowActionId(produtoId);
     try {
-            const response = await api.get(`/produtos/`);
-      setProdutos(response.data.items || []);
+      await action();
+      toast.success(successMessage);
+      await loadPage(search);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      toast.error('Erro ao carregar produtos');
-      setProdutos([]);
+      toast.error(error.response?.data?.detail || 'Erro ao executar ação');
     } finally {
-      setLoading(false);
+      setRowActionId(null);
     }
   };
 
-  const buscarProdutosBling = async () => {
-    setLoading(true);
+  const runGlobalAction = async (key, action, successMessage) => {
+    setRunningAction(key);
     try {
-      const params = buscaBling ? { descricao: buscaBling } : {};
-      const response = await api.get(`/bling-sync/produtos`, { params });
-      setProdutosBling(response.data || []);
-      toast.success(`✅ ${(response.data || []).length} produtos encontrados no Bling`);
+      const response = await action();
+      toast.success(successMessage(response));
+      await loadPage(search);
     } catch (error) {
-      console.error('Erro ao buscar no Bling:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao executar ação em lote');
+    } finally {
+      setRunningAction('');
+    }
+  };
+
+  const searchBlingProducts = async () => {
+    setRunningAction('buscar-bling');
+    try {
+      const response = await api.get('/estoque/sync/produtos-bling', {
+        params: blingSearch.trim() ? { busca: blingSearch.trim() } : {},
+      });
+      setBlingProducts(response.data || []);
+      toast.success(`Busca concluída: ${(response.data || []).length} item(ns) no Bling`);
+    } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao buscar produtos no Bling');
-      setProdutosBling([]);
     } finally {
-      setLoading(false);
+      setRunningAction('');
     }
   };
 
-  const vincularProdutoBling = async (produtoId, blingId) => {
-    try {
-      await api.post(
-        `/bling-sync/vincular`,
-        { produto_id: produtoId, bling_id: blingId }
-      );
-      toast.success('✅ Produto vinculado ao Bling com sucesso!');
-      carregarProdutos();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao vincular produto');
-    }
-  };
-
-  const sincronizarEstoque = async (produtoId) => {
-    setSincronizando(true);
-    try {
-      const response = await api.post(
-        `/bling-sync/sincronizar-estoque/${produtoId}`,
-        {}
-      );
-      
-      toast.success(
-        `✅ Estoque sincronizado!\nSistema: ${response.data.estoque_local} → Bling: ${response.data.estoque_bling}`,
-        { duration: 4000 }
-      );
-      
-      carregarProdutos();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao sincronizar estoque');
-    } finally {
-      setSincronizando(false);
-    }
-  };
-
-  const sincronizarTodos = async () => {
-    setSincronizando(true);
-    const produtosVinculados = produtos.filter(p => p.bling_id);
-    
-    if (produtosVinculados.length === 0) {
-      toast.error('Nenhum produto vinculado ao Bling');
-      setSincronizando(false);
-      return;
-    }
-
-    let sucessos = 0;
-    let erros = 0;
-
-    for (const produto of produtosVinculados) {
-      try {
-        await api.post(
-          `/bling-sync/sincronizar-estoque/${produto.id}`,
-          {}
-        );
-        sucessos++;
-      } catch (error) {
-        erros++;
-        console.error(`Erro ao sincronizar produto ${produto.id}:`, error);
-      }
-    }
-
-    toast.success(
-      `✅ Sincronização concluída!\n${sucessos} produtos atualizados${erros > 0 ? `, ${erros} erros` : ''}`,
-      { duration: 5000 }
-    );
-    
-    carregarProdutos();
-    setSincronizando(false);
-  };
-
-  const reconciliarEstoques = async () => {
-    setLoading(true);
-    try {
-            const response = await api.post(
-        `/bling-sync/reconciliar`,
-        {}
-      );
-      
-      toast.success(
-        `✅ Reconciliação concluída!\n${response.data.total_processados} produtos processados\n${response.data.diferencas_encontradas} diferenças encontradas`,
-        { duration: 5000 }
-      );
-      
-      carregarProdutos();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao reconciliar estoques');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const produtosFiltrados = produtos.filter(p => {
-    if (filtro === 'sincronizados') return p.bling_id;
-    if (filtro === 'nao_sincronizados') return !p.bling_id;
-    return true;
-  });
-
-  const estatisticas = {
-    total: produtos.length,
-    sincronizados: produtos.filter(p => p.bling_id).length,
-    naoSincronizados: produtos.filter(p => !p.bling_id).length
+  const stats = {
+    total: products.length,
+    vinculados: syncItems.length,
+    erros: health.erros || 0,
+    divergentes: health.divergentes || 0,
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">🔄 Sincronização Bling</h1>
-        <p className="text-gray-600">Gerencie a integração dos produtos com o Bling ERP</p>
-      </div>
-
-      {/* Estatísticas */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-blue-600">{estatisticas.total}</div>
-          <div className="text-sm text-gray-600">Total de Produtos</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{estatisticas.sincronizados}</div>
-          <div className="text-sm text-gray-600">Vinculados ao Bling</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-orange-600">{estatisticas.naoSincronizados}</div>
-          <div className="text-sm text-gray-600">Não Vinculados</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-purple-600">
-            {estatisticas.total > 0 ? ((estatisticas.sincronizados / estatisticas.total) * 100).toFixed(1) : 0}%
-          </div>
-          <div className="text-sm text-gray-600">Taxa de Sincronização</div>
-        </div>
-      </div>
-
-      {/* Ações Rápidas */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">⚡ Ações Rápidas</h2>
-        <div className="flex gap-4">
-          <button
-            onClick={sincronizarTodos}
-            disabled={sincronizando || estatisticas.sincronizados === 0}
-            className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {sincronizando ? '⏳ Sincronizando...' : `🔄 Sincronizar Todos (${estatisticas.sincronizados})`}
-          </button>
-          <button
-            onClick={reconciliarEstoques}
-            disabled={loading || estatisticas.sincronizados === 0}
-            className="flex-1 bg-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? '⏳ Reconciliando...' : '🔍 Reconciliar Estoques'}
-          </button>
-        </div>
-        <p className="text-sm text-gray-500 mt-3">
-          <strong>Sincronizar:</strong> Atualiza o estoque do Bling com os valores do sistema. 
-          <strong className="ml-4">Reconciliar:</strong> Compara e identifica diferenças entre os estoques.
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Sincronização Bling</h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Aqui você acompanha erros, força uma sincronização por produto e dispara reprocessamentos automáticos.
         </p>
       </div>
 
-      {/* Buscar no Bling */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">🔍 Buscar Produtos no Bling</h2>
-        <div className="flex gap-4">
-          <input
-            type="text"
-            value={buscaBling}
-            onChange={(e) => setBuscaBling(e.target.value)}
-            placeholder="Digite o nome do produto (deixe vazio para buscar todos)"
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            onKeyPress={(e) => e.key === 'Enter' && buscarProdutosBling()}
-          />
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Produtos locais</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-900">{stats.total}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Vinculados</div>
+          <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.vinculados}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Com erro</div>
+          <div className="mt-2 text-3xl font-semibold text-red-700">{stats.erros}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Divergentes</div>
+          <div className="mt-2 text-3xl font-semibold text-amber-700">{stats.divergentes}</div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Ações automáticas</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Use essas ações para destravar fila, revisar itens recentes e rodar uma conferência completa.
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
           <button
-            onClick={buscarProdutosBling}
-            disabled={loading}
-            className="bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
+            onClick={() => runGlobalAction(
+              'reprocessar',
+              () => api.post('/estoque/sync/reprocessar-falhas', { limit: 100 }),
+              (response) => `Falhas reagendadas: ${response.data?.reprocessados || 0}`,
+            )}
+            disabled={runningAction !== ''}
+            className="rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-400"
           >
-            {loading ? '⏳ Buscando...' : '🔍 Buscar'}
+            {runningAction === 'reprocessar' ? 'Processando...' : 'Reprocessar falhas'}
+          </button>
+          <button
+            onClick={() => runGlobalAction(
+              'recentes',
+              () => api.post('/estoque/sync/reconciliar-recentes', { limit: 150, minutes: 30 }),
+              (response) => `Recentes avaliados: ${response.data?.avaliados || 0} | divergências: ${response.data?.divergencias || 0}`,
+            )}
+            disabled={runningAction !== ''}
+            className="rounded-lg bg-amber-600 px-4 py-3 text-sm font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {runningAction === 'recentes' ? 'Processando...' : 'Reconciliar recentes'}
+          </button>
+          <button
+            onClick={() => runGlobalAction(
+              'geral',
+              () => api.post('/estoque/sync/reconciliar-geral', { limit: 500, minutes: 30 }),
+              (response) => `Auditoria geral: ${response.data?.avaliados || 0} itens | divergências: ${response.data?.divergencias || 0}`,
+            )}
+            disabled={runningAction !== ''}
+            className="rounded-lg bg-slate-800 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {runningAction === 'geral' ? 'Processando...' : 'Auditoria geral'}
           </button>
         </div>
+      </div>
 
-        {/* Resultados da Busca */}
-        {produtosBling.length > 0 && (
-          <div className="mt-4 border rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-2 font-semibold border-b">
-              {produtosBling.length} produtos encontrados no Bling
-            </div>
-            <div className="max-h-64 overflow-y-auto">
-              {produtosBling.map(pb => (
-                <div key={pb.id} className="px-4 py-3 border-b hover:bg-gray-50 flex justify-between items-center">
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Vincular produtos ao Bling</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Busque um item no Bling e vincule ao produto local para habilitar a sincronização automática.
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <input
+            value={blingSearch}
+            onChange={(event) => setBlingSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') searchBlingProducts();
+            }}
+            placeholder="Buscar produto no Bling"
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-slate-500 focus:outline-none"
+          />
+          <button
+            onClick={searchBlingProducts}
+            disabled={runningAction !== ''}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {runningAction === 'buscar-bling' ? 'Buscando...' : 'Buscar no Bling'}
+          </button>
+        </div>
+        {blingProducts.length > 0 && (
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <div className="max-h-64 overflow-auto divide-y divide-slate-100">
+              {blingProducts.map((item) => (
+                <div key={item.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="font-semibold">{pb.descricao}</div>
-                    <div className="text-sm text-gray-600">
-                      ID Bling: {pb.id} | Código: {pb.codigo} | Estoque: {pb.estoque}
-                    </div>
+                    <div className="font-medium text-slate-900">{item.descricao}</div>
+                    <div className="text-xs text-gray-500">ID Bling: {item.id} | Código: {item.codigo || '-'} | Estoque: {formatNumber(item.estoque)}</div>
                   </div>
                   <select
-                    onChange={(e) => e.target.value && vincularProdutoBling(parseInt(e.target.value), pb.id)}
-                    className="px-3 py-2 border border-gray-300 rounded text-sm"
+                    defaultValue=""
+                    onChange={(event) => {
+                      const productId = Number(event.target.value);
+                      if (!productId) return;
+                      runGlobalAction(
+                        `vincular-${item.id}`,
+                        () => api.post('/estoque/sync/vincular', { produto_id: productId, bling_id: item.id }),
+                        () => 'Produto vinculado com sucesso',
+                      );
+                    }}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   >
-                    <option value="">Vincular ao produto...</option>
-                    {produtos
-                      .filter(p => !p.bling_id)
-                      .map(p => (
-                        <option key={p.id} value={p.id}>{p.codigo} - {p.nome}</option>
+                    <option value="">Selecionar produto local...</option>
+                    {products
+                      .filter((product) => !syncMap.get(product.id)?.bling_produto_id)
+                      .map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.codigo} - {product.nome}
+                        </option>
                       ))}
                   </select>
                 </div>
@@ -264,131 +295,152 @@ const EstoqueBling = () => {
         )}
       </div>
 
-      {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-        <div className="flex gap-3">
-          <button
-            onClick={() => setFiltro('todos')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-              filtro === 'todos' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Todos ({estatisticas.total})
-          </button>
-          <button
-            onClick={() => setFiltro('sincronizados')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-              filtro === 'sincronizados' 
-                ? 'bg-green-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            ✅ Sincronizados ({estatisticas.sincronizados})
-          </button>
-          <button
-            onClick={() => setFiltro('nao_sincronizados')}
-            className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-              filtro === 'nao_sincronizados' 
-                ? 'bg-orange-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            ⚠️ Não Sincronizados ({estatisticas.naoSincronizados})
-          </button>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Produtos e status</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Se você vir um erro em um item, use o botão "Forçar sync" naquela linha.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar por nome, código, SKU ou ID Bling"
+              className="w-72 rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-slate-500 focus:outline-none"
+            />
+            <button
+              onClick={() => loadPage(search)}
+              disabled={loading}
+              className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+            >
+              {loading ? 'Atualizando...' : 'Atualizar'}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Lista de Produtos */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Código</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Produto</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Estoque Local</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">ID Bling</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && produtosFiltrados.length === 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {[
+            ['todos', 'Todos'],
+            ['erro', 'Erro'],
+            ['pendente', 'Pendentes'],
+            ['divergente', 'Divergentes'],
+            ['nao_vinculado', 'Não vinculados'],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setStatusFilter(value)}
+              className={`rounded-full px-4 py-2 text-sm font-medium ${statusFilter === value ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <thead className="bg-slate-50">
               <tr>
-                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                  ⏳ Carregando produtos...
-                </td>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Produto</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Estoque</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Bling</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Últimos eventos</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-700">Ações</th>
               </tr>
-            ) : produtosFiltrados.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                  Nenhum produto encontrado com os filtros selecionados
-                </td>
-              </tr>
-            ) : (
-              produtosFiltrados.map(produto => (
-                <tr key={produto.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <span className="font-mono text-sm">{produto.codigo}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-semibold">{produto.nome}</div>
-                    {getCategoriaNome(produto) && (
-                      <div className="text-xs text-gray-500">{getCategoriaNome(produto)}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-semibold ${
-                      (produto.estoque_atual || 0) <= (produto.estoque_minimo || 0)
-                        ? 'text-red-600'
-                        : 'text-green-600'
-                    }`}>
-                      {produto.estoque_atual || 0}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {produto.bling_id ? (
-                      <span className="inline-block bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
-                        {produto.bling_id}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {produto.bling_id ? (
-                      <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-semibold">
-                        ✅ VINCULADO
-                      </span>
-                    ) : (
-                      <span className="inline-block bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs font-semibold">
-                        ⚠️ NÃO VINCULADO
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {produto.bling_id ? (
-                      <button
-                        onClick={() => sincronizarEstoque(produto.id)}
-                        disabled={sincronizando}
-                        className="text-blue-600 hover:text-blue-800 font-semibold text-sm disabled:text-gray-400"
-                        title="Sincronizar estoque com Bling"
-                      >
-                        🔄 Sync
-                      </button>
-                    ) : (
-                      <span className="text-gray-400 text-sm">—</span>
-                    )}
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {mergedRows.map((row) => {
+                const statusClass = STATUS_STYLES[row.status] || 'bg-slate-100 text-slate-700';
+                const queueClass = STATUS_STYLES[row.queueStatus] || 'bg-slate-100 text-slate-700';
+                return (
+                  <tr key={row.id} className="align-top">
+                    <td className="px-4 py-4">
+                      <div className="font-semibold text-slate-900">{row.nome}</div>
+                      <div className="text-xs text-gray-500">Código: {row.codigo || '-'} | SKU: {row.sku || '-'}</div>
+                    </td>
+                    <td className="px-4 py-4 text-slate-700">
+                      <div>Sistema: {formatNumber(row.estoqueAtual)}</div>
+                      <div>Bling: {formatNumber(row.estoqueBling)}</div>
+                      <div className={`${Math.abs(Number(row.divergencia || 0)) >= 0.01 ? 'text-amber-700 font-medium' : 'text-gray-500'} text-xs`}>
+                        Divergência: {formatNumber(row.divergencia)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-slate-700">
+                      {row.vinculado ? (
+                        <div>
+                          <div className="font-medium">ID {row.blingId}</div>
+                          <div className="text-xs text-gray-500">Sincronização ativa</div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-500">Sem vínculo</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-2">
+                        <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass}`}>
+                          {row.status}
+                        </span>
+                        {row.queueStatus && (
+                          <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${queueClass}`}>
+                            fila: {row.queueStatus}
+                          </span>
+                        )}
+                        {row.tentativas > 0 && (
+                          <span className="text-xs text-gray-500">Tentativas: {row.tentativas}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-xs text-gray-600">
+                      <div>Última sync: {formatDate(row.ultimaSincronizacao)}</div>
+                      <div>Última tentativa: {formatDate(row.ultimaTentativa)}</div>
+                      <div>Próxima tentativa: {formatDate(row.proximaTentativa)}</div>
+                      <div>Última conferência: {formatDate(row.ultimaConferencia)}</div>
+                      {row.ultimoErro && <div className="mt-2 max-w-xs text-red-700">Erro: {row.ultimoErro}</div>}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => runRowAction(
+                            row.id,
+                            () => api.post(`/estoque/sync/forcar/${row.id}`),
+                            'Sincronização forçada concluída',
+                          )}
+                          disabled={!row.vinculado || rowActionId === row.id}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          {rowActionId === row.id ? 'Processando...' : 'Forçar sync'}
+                        </button>
+                        <button
+                          onClick={() => runRowAction(
+                            row.id,
+                            () => api.post(`/estoque/sync/reconciliar/${row.id}?origem=sistema`),
+                            'Reconciliação solicitada',
+                          )}
+                          disabled={!row.vinculado || rowActionId === row.id}
+                          className="rounded-lg bg-slate-700 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          Reconciliar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && mergedRows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500">
+                    Nenhum produto encontrado com os filtros atuais.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
-};
+}
 
 export default EstoqueBling;

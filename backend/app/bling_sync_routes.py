@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import List, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 import json
 import asyncio
@@ -19,11 +19,20 @@ from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User
-from .produtos_models import Produto, ProdutoBlingSync, EstoqueMovimentacao
+from .produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue, EstoqueMovimentacao
 from .bling_integration import BlingAPI
+from .services.bling_sync_service import BlingSyncService
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+PRODUTO_NAO_ENCONTRADO = "Produto não encontrado"
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
 
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronização Bling"])
 
@@ -49,6 +58,25 @@ class SyncStatusResponse(BaseModel):
     bling_produto_id: Optional[str]
     ultima_sincronizacao: Optional[datetime]
     status: str
+    ultima_tentativa_sync: Optional[datetime] = None
+    proxima_tentativa_sync: Optional[datetime] = None
+    ultima_conferencia_bling: Optional[datetime] = None
+    ultima_sincronizacao_sucesso: Optional[datetime] = None
+    ultimo_estoque_bling: Optional[float] = None
+    tentativas_sync: int = 0
+    ultimo_erro: Optional[str] = None
+    queue_id: Optional[int] = None
+    queue_status: Optional[str] = None
+
+
+class VincularProdutoRequest(BaseModel):
+    produto_id: int
+    bling_id: str
+
+
+class ReconciliarBatchRequest(BaseModel):
+    limit: int = Field(default=100, ge=1, le=1000)
+    minutes: int = Field(default=30, ge=5, le=1440)
 
 # ============================================================================
 # CONFIGURAÇÃO DE SINCRONIZAÇÃO
@@ -72,7 +100,7 @@ def configurar_sincronizacao(
     # Verificar se produto existe
     produto = db.query(Produto).filter(Produto.id == config.produto_id).first()
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
     
     # Buscar ou criar configuração
     sync = db.query(ProdutoBlingSync).filter(
@@ -80,7 +108,7 @@ def configurar_sincronizacao(
     ).first()
     
     if not sync:
-        sync = ProdutoBlingSync(produto_id=config.produto_id)
+        sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=config.produto_id)
         db.add(sync)
     
     # Atualizar configuração
@@ -88,7 +116,7 @@ def configurar_sincronizacao(
     sync.sincronizar = config.sincronizar
     sync.estoque_compartilhado = config.estoque_compartilhado
     sync.status = 'ativo' if config.sincronizar else 'pausado'
-    sync.updated_at = datetime.utcnow()
+    sync.updated_at = utc_now()
     
     # Se não tem bling_produto_id, tentar buscar automaticamente
     if not sync.bling_produto_id and config.sincronizar:
@@ -107,7 +135,7 @@ def configurar_sincronizacao(
             else:
                 sync.status = 'erro'
                 sync.erro_mensagem = "Produto não encontrado no Bling"
-                logger.warning(f"⚠️ Produto não encontrado no Bling")
+                logger.warning("⚠️ Produto não encontrado no Bling")
         except Exception as e:
             logger.error(f"❌ Erro ao buscar produto no Bling: {e}")
             sync.status = 'erro'
@@ -124,6 +152,75 @@ def configurar_sincronizacao(
         "status": sync.status
     }
 
+
+@router.post("/vincular")
+def vincular_produto_bling(
+    body: VincularProdutoRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Vincula manualmente um produto local a um produto do Bling."""
+    produto = db.query(Produto).filter(Produto.id == body.produto_id).first()
+    if not produto:
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
+
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == body.produto_id
+    ).first()
+
+    if not sync:
+        sync = ProdutoBlingSync(
+            tenant_id=produto.tenant_id,
+            produto_id=produto.id,
+        )
+        db.add(sync)
+
+    sync.bling_produto_id = str(body.bling_id)
+    sync.sincronizar = True
+    sync.status = "ativo"
+    sync.erro_mensagem = None
+    sync.updated_at = utc_now()
+
+    db.commit()
+    return {
+        "message": "Produto vinculado com sucesso",
+        "produto_id": produto.id,
+        "bling_produto_id": sync.bling_produto_id,
+    }
+
+
+@router.get("/produtos-bling")
+def listar_produtos_bling(
+    busca: Optional[str] = Query(default=None),
+    pagina: int = Query(default=1, ge=1),
+    limite: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Busca produtos diretamente no Bling para facilitar vínculo manual."""
+    try:
+        resultado = BlingAPI().listar_produtos(nome=busca, pagina=pagina, limite=limite)
+        produtos_bling = []
+        for item in resultado.get("data", []):
+            produtos_bling.append({
+                "id": str(item.get("id")),
+                "descricao": item.get("nome") or item.get("descricao") or "Sem descrição",
+                "codigo": item.get("codigo") or item.get("sku"),
+                "estoque": item.get("estoque") or item.get("saldoFisicoTotal") or 0,
+            })
+        return produtos_bling
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar produtos no Bling: {str(e)}")
+
+
+@router.get("/health")
+def health_sincronizacao(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Resumo operacional da integração com o Bling."""
+    return BlingSyncService.get_health_snapshot(db)
+
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING
 # ============================================================================
@@ -131,6 +228,7 @@ def configurar_sincronizacao(
 @router.post("/enviar/{produto_id}")
 def enviar_estoque_para_bling(
     produto_id: int,
+    force: bool = Query(default=False),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -138,53 +236,38 @@ def enviar_estoque_para_bling(
     Envia estoque atual do produto para o Bling
     Usado após vendas na loja física
     """
-    logger.info(f"📤 Enviando estoque para Bling - Produto {produto_id}")
-    
-    # Buscar produto e configuração
-    produto = db.query(Produto).filter(Produto.id == produto_id).first()
-    if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
-    
-    sync = db.query(ProdutoBlingSync).filter(
-        ProdutoBlingSync.produto_id == produto_id
-    ).first()
-    
-    if not sync or not sync.sincronizar:
-        raise HTTPException(status_code=400, detail="Produto não configurado para sincronização")
-    
-    if not sync.bling_produto_id:
-        raise HTTPException(status_code=400, detail="Produto não vinculado ao Bling")
-    
-    try:
-        # Atualizar estoque no Bling
-        bling = BlingAPI()
-        resultado = bling.atualizar_estoque_produto(
-            produto_id=sync.bling_produto_id,
-            estoque_novo=produto.estoque_atual or 0
-        )
-        
-        # Atualizar última sincronização
-        sync.ultima_sincronizacao = datetime.utcnow()
-        sync.status = 'ativo'
-        sync.erro_mensagem = None
-        db.commit()
-        
-        logger.info(f"✅ Estoque enviado para Bling: {produto.estoque_atual}")
-        
-        return {
-            "message": "Estoque enviado para Bling com sucesso",
-            "produto_id": produto_id,
-            "bling_produto_id": sync.bling_produto_id,
-            "estoque_enviado": produto.estoque_atual,
-            "timestamp": sync.ultima_sincronizacao
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Erro ao enviar estoque para Bling: {e}")
-        sync.status = 'erro'
-        sync.erro_mensagem = str(e)
-        db.commit()
-        raise HTTPException(status_code=500, detail=f"Erro ao sincronizar com Bling: {str(e)}")
+    logger.info(f"📤 Enviando estoque para Bling - Produto {produto_id} (force={force})")
+
+    resultado = BlingSyncService.force_sync_now(
+        produto_id=produto_id,
+        motivo="forcar_manual" if force else "envio_manual",
+    )
+    if not resultado.get("ok"):
+        raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao sincronizar")
+
+    return {
+        "message": "Estoque enviado para Bling com sucesso",
+        "produto_id": produto_id,
+        "bling_produto_id": resultado.get("bling_produto_id"),
+        "estoque_enviado": resultado.get("estoque_enviado"),
+        "queue_id": resultado.get("queue_id"),
+    }
+
+
+@router.post("/forcar/{produto_id}")
+def forcar_sincronizacao_produto(
+    produto_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Força o envio imediato do estoque de um único produto."""
+    resultado = BlingSyncService.force_sync_now(produto_id=produto_id, motivo="botao_forcar_sync")
+    if not resultado.get("ok"):
+        raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao forçar sincronização")
+    return {
+        "message": "Sincronização forçada concluída",
+        **resultado,
+    }
 
 # ============================================================================
 # STATUS DE SINCRONIZAÇÃO
@@ -193,6 +276,7 @@ def enviar_estoque_para_bling(
 @router.get("/status", response_model=List[SyncStatusResponse])
 def status_sincronizacao(
     apenas_divergencias: bool = False,
+    busca: Optional[str] = Query(default=None),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -201,7 +285,7 @@ def status_sincronizacao(
     
     - apenas_divergencias: Se TRUE, mostra apenas produtos com divergência de estoque
     """
-    logger.info(f"📊 Consultando status de sincronização")
+    logger.info("📊 Consultando status de sincronização")
     
     # Buscar produtos com sincronização configurada
     query = db.query(Produto, ProdutoBlingSync).join(
@@ -210,21 +294,39 @@ def status_sincronizacao(
     ).filter(
         ProdutoBlingSync.sincronizar == True
     )
+
+    if busca:
+        termo = f"%{busca}%"
+        query = query.filter(
+            or_(
+                Produto.nome.ilike(termo),
+                Produto.codigo.ilike(termo),
+                Produto.sku.ilike(termo),
+                ProdutoBlingSync.bling_produto_id.ilike(termo),
+            )
+        )
     
     resultados = []
     
     for produto, sync in query.all():
+        fila = db.query(ProdutoBlingSyncQueue).filter(
+            ProdutoBlingSyncQueue.produto_id == produto.id
+        ).order_by(ProdutoBlingSyncQueue.updated_at.desc()).first()
+
         # Consultar estoque no Bling
-        estoque_bling = None
-        divergencia = None
+        estoque_bling = sync.ultimo_estoque_bling
+        divergencia = sync.ultima_divergencia
         
         if sync.bling_produto_id:
             try:
-                bling = BlingAPI()
-                saldo = bling.consultar_saldo_estoque(sync.bling_produto_id)
-                if saldo:
-                    estoque_bling = float(saldo.get('saldoFisicoTotal', 0))
-                    divergencia = (produto.estoque_atual or 0) - estoque_bling
+                if sync.ultima_conferencia_bling is None:
+                    saldo = BlingAPI().consultar_saldo_estoque(sync.bling_produto_id)
+                    if saldo:
+                        estoque_bling = float(saldo.get('saldoFisicoTotal', 0))
+                        divergencia = (produto.estoque_atual or 0) - estoque_bling
+                        sync.ultimo_estoque_bling = estoque_bling
+                        sync.ultima_divergencia = divergencia
+                        sync.ultima_conferencia_bling = utc_now()
             except Exception as e:
                 logger.error(f"❌ Erro ao consultar Bling: {e}")
         
@@ -242,11 +344,53 @@ def status_sincronizacao(
             sincronizado=sync.sincronizar,
             bling_produto_id=sync.bling_produto_id,
             ultima_sincronizacao=sync.ultima_sincronizacao,
-            status=sync.status
+            status=sync.status,
+            ultima_tentativa_sync=sync.ultima_tentativa_sync,
+            proxima_tentativa_sync=sync.proxima_tentativa_sync,
+            ultima_conferencia_bling=sync.ultima_conferencia_bling,
+            ultima_sincronizacao_sucesso=sync.ultima_sincronizacao_sucesso,
+            ultimo_estoque_bling=sync.ultimo_estoque_bling,
+            tentativas_sync=sync.tentativas_sync or 0,
+            ultimo_erro=sync.erro_mensagem or (fila.ultimo_erro if fila else None),
+            queue_id=fila.id if fila else None,
+            queue_status=fila.status if fila else None,
         ))
     
+    db.commit()
     logger.info(f"✅ {len(resultados)} produtos em sincronização")
     return resultados
+
+
+@router.post("/reprocessar-falhas")
+def reprocessar_falhas(
+    body: Optional[ReconciliarBatchRequest] = None,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Reagenda imediatamente os itens com erro para nova tentativa."""
+    limite = body.limit if body else 100
+    return BlingSyncService.reprocess_failed_syncs(limit=limite)
+
+
+@router.post("/reconciliar-recentes")
+def reconciliar_recentes(
+    body: ReconciliarBatchRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Confere novamente produtos alterados recentemente ou com erro."""
+    return BlingSyncService.reconcile_recent_products(minutes=body.minutes, limit=body.limit)
+
+
+@router.post("/reconciliar-geral")
+def reconciliar_geral(
+    body: Optional[ReconciliarBatchRequest] = None,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Executa uma auditoria mais ampla dos produtos vinculados ao Bling."""
+    limite = body.limit if body else None
+    return BlingSyncService.reconcile_all_products(limit=limite)
 
 # ============================================================================
 # RECONCILIAR DIVERGÊNCIAS
@@ -269,11 +413,22 @@ def reconciliar_estoque(
     - origem=manual: Usa valor_manual → atualiza ambos
     """
     logger.info(f"🔄 Reconciliando estoque - Produto {produto_id}, Origem: {origem}")
+
+    current_user, _tenant = user_and_tenant
+
+    if origem == "sistema":
+        resultado = BlingSyncService.reconcile_product(produto_id=produto_id, force_sync=True)
+        if not resultado.get("ok"):
+            raise HTTPException(status_code=400, detail=resultado.get("detail") or "Erro ao reconciliar")
+        return {
+            "message": "Reconciliação executada com sucesso",
+            **resultado,
+        }
     
     # Buscar produto e sync
     produto = db.query(Produto).filter(Produto.id == produto_id).first()
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
     
     sync = db.query(ProdutoBlingSync).filter(
         ProdutoBlingSync.produto_id == produto_id
@@ -327,7 +482,7 @@ def reconciliar_estoque(
             db.add(movimentacao)
         
         # Atualizar sync
-        sync.ultima_sincronizacao = datetime.utcnow()
+        sync.ultima_sincronizacao = utc_now()
         sync.status = 'ativo'
         sync.erro_mensagem = None
         
@@ -411,7 +566,7 @@ async def webhook_bling(
                         db.add(movimentacao)
                         
                         # Atualizar sync
-                        sync.ultima_sincronizacao = datetime.utcnow()
+                        sync.ultima_sincronizacao = utc_now()
                         
                         logger.info(f"✅ Estoque baixado - Produto {produto.id}: {estoque_anterior} → {produto.estoque_atual}")
             
@@ -495,14 +650,14 @@ def vincular_todos_por_sku(
             # Buscar ou criar configuracao
             sync = db.query(ProdutoBlingSync).filter(ProdutoBlingSync.produto_id == produto.id).first()
             if not sync:
-                sync = ProdutoBlingSync(produto_id=produto.id)
+                sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
                 db.add(sync)
 
             sync.bling_produto_id = bling_produto_id
             sync.sincronizar = True
             sync.status = "ativo"
             sync.erro_mensagem = None
-            sync.updated_at = datetime.utcnow()
+            sync.updated_at = utc_now()
 
             vinculados.append({
                 "produto_id": produto.id,

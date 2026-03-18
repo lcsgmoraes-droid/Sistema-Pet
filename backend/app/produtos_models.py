@@ -293,6 +293,7 @@ class Produto(BaseTenantModel):
     listas_preco = relationship("ProdutoListaPreco", back_populates="produto", cascade="all, delete-orphan")
     movimentacoes = relationship("EstoqueMovimentacao", back_populates="produto")
     bling_sync = relationship("ProdutoBlingSync", back_populates="produto", uselist=False)
+    bling_sync_queue_items = relationship("ProdutoBlingSyncQueue", back_populates="produto")
     user = relationship("User")
     
     # ========== PREDECESSOR/SUCESSOR ==========
@@ -609,6 +610,13 @@ class ProdutoBlingSync(BaseTenantModel):
     sincronizar = Column(Boolean, default=True)
     estoque_compartilhado = Column(Boolean, default=True)
     ultima_sincronizacao = Column(DateTime, nullable=True)
+    ultima_conferencia_bling = Column(DateTime, nullable=True)
+    ultima_tentativa_sync = Column(DateTime, nullable=True)
+    proxima_tentativa_sync = Column(DateTime, nullable=True)
+    ultima_sincronizacao_sucesso = Column(DateTime, nullable=True)
+    tentativas_sync = Column(Integer, default=0)
+    ultimo_estoque_bling = Column(Float, nullable=True)
+    ultima_divergencia = Column(Float, nullable=True)
     status = Column(String(20), default='ativo')  # ativo, pausado, erro
     erro_mensagem = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -616,6 +624,32 @@ class ProdutoBlingSync(BaseTenantModel):
     
     # Relationships
     produto = relationship("Produto", back_populates="bling_sync")
+    fila = relationship("ProdutoBlingSyncQueue", back_populates="sync", cascade="all, delete-orphan")
+
+
+class ProdutoBlingSyncQueue(BaseTenantModel):
+    """Fila persistente de sincronização de estoque com o Bling."""
+    __tablename__ = "produto_bling_sync_queue"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True)
+    produto_id = Column(Integer, ForeignKey('produtos.id'), nullable=False, index=True)
+    sync_id = Column(Integer, ForeignKey('produto_bling_sync.id'), nullable=False, index=True)
+    estoque_novo = Column(Float, nullable=False)
+    motivo = Column(String(80), nullable=True)
+    origem = Column(String(30), nullable=True)
+    status = Column(String(20), default='pendente', nullable=False)  # pendente, processando, sucesso, erro, falha_final
+    forcar_sync = Column(Boolean, default=False, nullable=False)
+    tentativas = Column(Integer, default=0, nullable=False)
+    ultima_tentativa_em = Column(DateTime, nullable=True)
+    proxima_tentativa_em = Column(DateTime, nullable=True)
+    processado_em = Column(DateTime, nullable=True)
+    ultimo_erro = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    produto = relationship("Produto", back_populates="bling_sync_queue_items")
+    sync = relationship("ProdutoBlingSync", back_populates="fila")
 
 
 # ============================================================================

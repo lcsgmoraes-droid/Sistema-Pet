@@ -227,6 +227,9 @@ _sefaz_sync_thread: Optional[threading.Thread] = None
 # Campaign Engine — scheduler APScheduler
 _campaign_scheduler = None
 
+# Bling Sync — scheduler APScheduler
+_bling_sync_scheduler = None
+
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
 _BLING_LOCK_FILE = "/tmp/bling_token_renewal.lock"
 _BLING_LAST_RENEWAL_FILE = "/tmp/bling_token_last_renewal.txt"
@@ -1034,6 +1037,16 @@ def on_startup():
         except Exception as e:
             logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
 
+        # Iniciar scheduler de sincronização do Bling
+        try:
+            from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
+            global _bling_sync_scheduler
+            _bling_sync_scheduler = BlingSyncScheduler()
+            _bling_sync_scheduler.start()
+            logger.info("[OK] Bling Sync Scheduler iniciado!")
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao iniciar Bling Sync Scheduler: {str(e)}")
+
         # Iniciar renovação automática de token Bling (a cada 5h)
         global _bling_token_thread
         _bling_token_stop_event.clear()
@@ -1092,6 +1105,14 @@ def on_shutdown():
                 logger.info("[STOP] Campaign Scheduler parado!")
         except Exception as e:
             logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
+
+        try:
+            global _bling_sync_scheduler
+            if _bling_sync_scheduler:
+                _bling_sync_scheduler.shutdown()
+                logger.info("[STOP] Bling Sync Scheduler parado!")
+        except Exception as e:
+            logger.error(f"[ERROR] Erro ao parar Bling Sync Scheduler: {str(e)}")
 
         global _sefaz_sync_thread
         _sefaz_sync_stop_event.set()
