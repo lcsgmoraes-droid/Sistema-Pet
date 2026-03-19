@@ -145,7 +145,8 @@ class ProdutoService:
                         produto_componente_id=comp.get('produto_componente_id'),
                         quantidade=comp.get('quantidade', 1.0),
                         ordem=comp.get('ordem', 0),
-                        opcional=comp.get('opcional', False)
+                        opcional=comp.get('opcional', False),
+                        tenant_id=novo_produto.tenant_id,
                     )
                     db.add(componente)
                 

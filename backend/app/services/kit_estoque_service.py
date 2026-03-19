@@ -64,8 +64,8 @@ class KitEstoqueService:
             logger.warning(f"Produto #{kit_id} não encontrado")
             return 0
         
-        if kit.tipo_produto != 'KIT':
-            raise ValueError(f"Produto #{kit_id} não é do tipo KIT (tipo atual: {kit.tipo_produto})")
+        if kit.tipo_produto not in ('KIT', 'VARIACAO'):
+            raise ValueError(f"Produto #{kit_id} não é KIT/VARIACAO-KIT (tipo atual: {kit.tipo_produto})")
         
         # Se for KIT FÍSICO, retornar estoque próprio
         if kit.tipo_kit == 'FISICO':

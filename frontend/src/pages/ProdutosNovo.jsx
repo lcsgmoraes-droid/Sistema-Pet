@@ -1,7 +1,7 @@
 ﻿/**
  * FormulÃ¡rio de Cadastro/EdiÃ§Ã£o de Produtos - Layout em Abas
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
 import {
@@ -184,6 +184,8 @@ export default function ProdutosNovo() {
   const [produtoKitSelecionado, setProdutoKitSelecionado] = useState('');
   const [quantidadeKit, setQuantidadeKit] = useState('');
   const [estoqueVirtualKit, setEstoqueVirtualKit] = useState(0);
+  const [buscaComponente, setBuscaComponente] = useState('');
+  const [dropdownComponenteVisivel, setDropdownComponenteVisivel] = useState(false);
   
   // Estados para predecessor/sucessor
   const [mostrarBuscaPredecessor, setMostrarBuscaPredecessor] = useState(false);
@@ -912,7 +914,8 @@ export default function ProdutosNovo() {
       const response = await api.get('/produtos/', {
         params: {
           apenas_ativos: true,
-          tipo_produto: 'SIMPLES', // Só produtos simples podem ser componentes
+          tipo_produto: 'SIMPLES',
+          page_size: 2000,
         }
       });
       // Backend retorna objeto paginado: {items: [...], total: 0, page: 1}
@@ -961,6 +964,7 @@ export default function ProdutosNovo() {
     // Limpar seleção
     setProdutoKitSelecionado('');
     setQuantidadeKit('');
+    setBuscaComponente('');
     
     // Recalcular estoque virtual
     calcularEstoqueVirtualKit([...formData.composicao_kit, novoItem]);
@@ -3486,18 +3490,49 @@ export default function ProdutosNovo() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Produto
                     </label>
-                    <select
-                      value={produtoKitSelecionado}
-                      onChange={(e) => setProdutoKitSelecionado(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Selecione um produto...</option>
-                      {produtosDisponiveis.map(produto => (
-                        <option key={produto.id} value={produto.id}>
-                          [{produto.codigo}] {produto.nome} - Estoque: {produto.estoque_atual || 0}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={buscaComponente}
+                        onChange={(e) => {
+                          setBuscaComponente(e.target.value);
+                          setProdutoKitSelecionado('');
+                          setDropdownComponenteVisivel(true);
+                        }}
+                        onFocus={() => setDropdownComponenteVisivel(true)}
+                        onBlur={() => setTimeout(() => setDropdownComponenteVisivel(false), 180)}
+                        placeholder="Buscar por SKU ou nome..."
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        autoComplete="off"
+                      />
+                      {dropdownComponenteVisivel && buscaComponente.length > 0 && (() => {
+                        const termo = buscaComponente.toLowerCase();
+                        const filtrados = produtosDisponiveis
+                          .filter(p =>
+                            (p.codigo && p.codigo.toLowerCase().includes(termo)) ||
+                            (p.nome && p.nome.toLowerCase().includes(termo))
+                          )
+                          .slice(0, 30);
+                        return filtrados.length > 0 ? (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                            {filtrados.map(p => (
+                              <div
+                                key={p.id}
+                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm flex justify-between items-center"
+                                onMouseDown={() => {
+                                  setProdutoKitSelecionado(String(p.id));
+                                  setBuscaComponente(`[${p.codigo}] ${p.nome}`);
+                                  setDropdownComponenteVisivel(false);
+                                }}
+                              >
+                                <span><span className="font-semibold text-blue-700">{p.codigo}</span> – {p.nome}</span>
+                                <span className="text-xs text-gray-400 ml-2 shrink-0">Estoque: {p.estoque_atual || 0}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
                   </div>
                   
                   <div>

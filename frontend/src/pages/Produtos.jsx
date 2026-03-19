@@ -747,27 +747,18 @@ export default function Produtos() {
     if (!produtosBrutos || produtosBrutos.length === 0) return [];
 
     const resultado = [];
+    const variacoes = produtosBrutos.filter((p) => p.tipo_produto === "VARIACAO");
 
-    // Separar produtos por tipo
-    const produtosPai = produtosBrutos.filter((p) => p.tipo_produto === "PAI");
-    const variacoes = produtosBrutos.filter(
-      (p) => p.tipo_produto === "VARIACAO",
-    );
-    const outrosProdutos = produtosBrutos.filter(
-      (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO",
-    );
+    // Manter ordem de entrada do backend (created_at desc).
+    // VARIACAOs só aparecem logo abaixo do seu PAI quando expandido.
+    produtosBrutos.forEach((produto) => {
+      if (produto.tipo_produto === "VARIACAO") return; // pulado aqui, entra via PAI
 
-    // Adicionar produtos não-PAI primeiro (SIMPLES e KIT)
-    resultado.push(...outrosProdutos);
+      resultado.push(produto);
 
-    // Adicionar produtos PAI seguidos de suas variações
-    produtosPai.forEach((pai) => {
-      resultado.push(pai);
-
-      // Se PAI está expandido, adicionar suas variações
-      if (paisExpandidos.includes(pai.id)) {
+      if (produto.tipo_produto === "PAI" && paisExpandidos.includes(produto.id)) {
         const variacoesDoPai = variacoes.filter(
-          (v) => v.produto_pai_id === pai.id,
+          (v) => v.produto_pai_id === produto.id,
         );
         resultado.push(...variacoesDoPai);
       }

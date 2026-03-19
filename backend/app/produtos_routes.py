@@ -2042,9 +2042,9 @@ def obter_produto(
     }
 
     # ========================================
-    # PROCESSAR PRODUTOS DO TIPO KIT
+    # PROCESSAR PRODUTOS DO TIPO KIT ou VARIACAO-KIT
     # ========================================
-    if produto.tipo_produto == 'KIT':
+    if produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit:
         from .services.kit_estoque_service import KitEstoqueService
 
         # Buscar composiÃ§Ã£o do KIT
@@ -2193,7 +2193,7 @@ def atualizar_produto(
     # ========================================
     # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)
     # ========================================
-    if composicao_kit is not None and produto.tipo_produto == 'KIT':
+    if composicao_kit is not None and produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit:
         from .services.kit_estoque_service import KitEstoqueService
 
         # âš ï¸ VALIDAÃ‡ÃƒO OBRIGATÃ“RIA: KIT deve ter pelo menos 1 componente
@@ -2225,7 +2225,8 @@ def atualizar_produto(
                 produto_componente_id=comp.get('produto_componente_id'),
                 quantidade=comp.get('quantidade', 1.0),
                 ordem=comp.get('ordem', 0),
-                opcional=comp.get('opcional', False)
+                opcional=comp.get('opcional', False),
+                tenant_id=produto.tenant_id
             )
             db.add(novo_comp)
 
