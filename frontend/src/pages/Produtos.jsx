@@ -8,7 +8,7 @@
 /**
  * Página de Listagem de Produtos - Estilo Bling
  */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { FiHelpCircle } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
@@ -678,6 +678,7 @@ const PRODUTOS_COLUNAS = [
 export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
+  const linhaProdutoRefs = useRef({});
   const [persistirBusca, setPersistirBusca] = useState(() => {
     const salvo = localStorage.getItem("produtos_persistir_busca");
     return salvo === null ? true : salvo === "true";
@@ -1205,22 +1206,40 @@ export default function Produtos() {
     return <span className={cor}>{formatarData(proximaValidade)}</span>;
   };
 
+  const garantirLinhaVisivel = (produtoId) => {
+    const linha = linhaProdutoRefs.current[produtoId];
+    if (!linha) return;
+    linha.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  };
+
   // Expandir/colapsar KIT
   const toggleKitExpandido = (produtoId) => {
+    const vaiExpandir = !kitsExpandidos.includes(produtoId);
     setKitsExpandidos((prev) =>
       prev.includes(produtoId)
         ? prev.filter((id) => id !== produtoId)
         : [...prev, produtoId],
     );
+    if (vaiExpandir) {
+      setTimeout(() => garantirLinhaVisivel(produtoId), 80);
+    }
   };
 
   // Expandir/colapsar PAI (mostrar variações)
   const togglePaiExpandido = (produtoId) => {
+    const vaiExpandir = !paisExpandidos.includes(produtoId);
     setPaisExpandidos((prev) =>
       prev.includes(produtoId)
         ? prev.filter((id) => id !== produtoId)
         : [...prev, produtoId],
     );
+    if (vaiExpandir) {
+      setTimeout(() => garantirLinhaVisivel(produtoId), 80);
+    }
   };
 
   const abrirModalColunas = () => {
@@ -1620,6 +1639,9 @@ export default function Produtos() {
                   return (
                     <React.Fragment key={produto.id}>
                       <tr
+                        ref={(el) => {
+                          linhaProdutoRefs.current[produto.id] = el;
+                        }}
                         className={`hover:bg-gray-50 transition-colors cursor-pointer ${
                           produto.ativo === false
                             ? "bg-slate-100 opacity-70"
