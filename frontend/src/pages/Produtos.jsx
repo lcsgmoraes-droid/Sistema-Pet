@@ -846,21 +846,46 @@ export default function Produtos() {
     const inicio = (paginaAtual - 1) * itensPorPagina;
     const fim = inicio + itensPorPagina;
     const paginados = produtosFiltrados.slice(inicio, fim);
+    const idsNaPagina = new Set(paginados.map((produto) => produto.id));
+
+    paginados
+      .filter(
+        (produto) =>
+          produto.tipo_produto === "PAI" && paisExpandidos.includes(produto.id),
+      )
+      .forEach((pai) => {
+        produtosFiltrados
+          .filter(
+            (produto) =>
+              produto.tipo_produto === "VARIACAO" &&
+              produto.produto_pai_id === pai.id,
+          )
+          .forEach((variacao) => {
+            if (idsNaPagina.has(variacao.id)) return;
+            paginados.push(variacao);
+            idsNaPagina.add(variacao.id);
+          });
+      });
 
     return {
       produtosPaginados: paginados,
       totalPaginas: total,
       totalItens: produtosFiltrados.length,
     };
-  }, [produtosFiltrados, paginaAtual, itensPorPagina]);
+  }, [produtosFiltrados, paginaAtual, itensPorPagina, paisExpandidos]);
 
   // Alias para manter compatibilidade com o resto do código
   const produtos = produtosPaginados;
+  const produtosVisiveisRef = useRef([]);
 
   // Resetar para página 1 quando filtros mudarem
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtros]);
+
+  useEffect(() => {
+    produtosVisiveisRef.current = produtos;
+  }, [produtos]);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -1216,6 +1241,35 @@ export default function Produtos() {
     });
   };
 
+  const garantirGrupoPaiVisivel = (produtoId) => {
+    const produtosVisiveis = produtosVisiveisRef.current || [];
+    const variacoesVisiveis = produtosVisiveis.filter(
+      (produto) =>
+        produto.tipo_produto === "VARIACAO" && produto.produto_pai_id === produtoId,
+    );
+
+    const ultimoProdutoVisivel =
+      variacoesVisiveis[variacoesVisiveis.length - 1] ||
+      produtosVisiveis.find((produto) => produto.id === produtoId);
+
+    if (!ultimoProdutoVisivel) {
+      garantirLinhaVisivel(produtoId);
+      return;
+    }
+
+    const linha = linhaProdutoRefs.current[ultimoProdutoVisivel.id];
+    if (!linha) {
+      garantirLinhaVisivel(produtoId);
+      return;
+    }
+
+    linha.scrollIntoView({
+      behavior: "smooth",
+      block: variacoesVisiveis.length > 0 ? "end" : "center",
+      inline: "nearest",
+    });
+  };
+
   // Expandir/colapsar KIT
   const toggleKitExpandido = (produtoId) => {
     const vaiExpandir = !kitsExpandidos.includes(produtoId);
@@ -1238,7 +1292,7 @@ export default function Produtos() {
         : [...prev, produtoId],
     );
     if (vaiExpandir) {
-      setTimeout(() => garantirLinhaVisivel(produtoId), 80);
+      setTimeout(() => garantirGrupoPaiVisivel(produtoId), 120);
     }
   };
 
