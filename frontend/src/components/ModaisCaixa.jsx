@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import { X, TrendingUp, TrendingDown, Receipt, ArrowRightLeft, RotateCcw, AlertCircle } from 'lucide-react';
-import { adicionarMovimentacao } from '../api/caixa';
+import { adicionarMovimentacao, obterCaixaAberto } from '../api/caixa';
+
+const validarCaixaAtual = async (caixaIdEsperado) => {
+  const caixaAtual = await obterCaixaAberto();
+
+  if (!caixaAtual) {
+    throw new Error('Seu caixa foi fechado em outra aba. Atualize a página e tente novamente.');
+  }
+
+  if (caixaAtual.id !== caixaIdEsperado) {
+    throw new Error('O caixa ativo mudou em outra aba. Atualize a página e tente novamente.');
+  }
+};
 
 /**
  * Modal de Suprimento - Entrada de valores no caixa
@@ -21,6 +33,7 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
 
     setLoading(true);
     try {
+      await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
         tipo: 'suprimento',
         valor: valorNum,
@@ -30,7 +43,7 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || 'Erro ao adicionar suprimento');
+      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar suprimento');
     } finally {
       setLoading(false);
     }
@@ -131,6 +144,7 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
 
     setLoading(true);
     try {
+      await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
         tipo: 'sangria',
         valor: valorNum,
@@ -140,7 +154,7 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || 'Erro ao adicionar sangria');
+      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar sangria');
     } finally {
       setLoading(false);
     }
@@ -265,6 +279,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
 
     setLoading(true);
     try {
+      await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
         tipo: 'despesa',
         valor: valorNum,
@@ -276,7 +291,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || 'Erro ao adicionar despesa');
+      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar despesa');
     } finally {
       setLoading(false);
     }

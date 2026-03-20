@@ -19,6 +19,19 @@ import ModalFecharCaixa from './ModalFecharCaixa';
 import ModalDevolucao from './ModalDevolucao';
 import ModalMovimentacoesCaixa from './ModalMovimentacoesCaixa';
 
+const CAIXA_SYNC_EVENT_KEY = 'petshop_caixa_sync_event';
+
+const publicarEventoCaixa = (tipo) => {
+  try {
+    localStorage.setItem(
+      CAIXA_SYNC_EVENT_KEY,
+      JSON.stringify({ tipo, timestamp: Date.now() })
+    );
+  } catch {
+    // Se storage falhar, mantém comportamento normal do menu.
+  }
+};
+
 export default function MenuCaixa({ onAbrirCaixa }) {
   const [caixaAberto, setCaixaAberto] = useState(null);
   const [resumo, setResumo] = useState(null);
@@ -34,6 +47,30 @@ export default function MenuCaixa({ onAbrirCaixa }) {
     // Atualizar a cada 30 segundos
     const interval = setInterval(carregarCaixa, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleStorage = (event) => {
+      if (event.key !== CAIXA_SYNC_EVENT_KEY || !event.newValue) {
+        return;
+      }
+
+      carregarCaixa();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        carregarCaixa();
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Fechar olho do topo ao soltar o mouse
@@ -73,11 +110,13 @@ export default function MenuCaixa({ onAbrirCaixa }) {
 
   const handleOperacaoSucesso = () => {
     setModalAtivo(null);
+    publicarEventoCaixa('movimentacao');
     carregarCaixa();
   };
 
   const handleCaixaAberto = async () => {
     await onAbrirCaixa();
+    publicarEventoCaixa('abertura');
     // Aguardar um pouco e recarregar
     setTimeout(carregarCaixa, 500);
   };
@@ -361,6 +400,7 @@ export default function MenuCaixa({ onAbrirCaixa }) {
           onClose={() => setModalAtivo(null)}
           onSuccess={() => {
             setModalAtivo(null);
+            publicarEventoCaixa('fechamento');
             carregarCaixa(); // Recarrega para mostrar que não há mais caixa aberto
           }}
         />
