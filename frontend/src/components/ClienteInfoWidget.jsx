@@ -3,7 +3,7 @@ import {
   FiUser, FiDollarSign, FiShoppingCart, FiAlertCircle, 
   FiTrendingUp, FiClock, FiPhone, FiMail, FiMapPin,
   FiChevronDown, FiChevronUp, FiPackage, FiMessageCircle,
-  FiSend, FiBarChart2, FiLink
+  FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
 } from 'react-icons/fi';
 import api from '../api';
 
@@ -21,7 +21,10 @@ export default function ClienteInfoWidget({ clienteId }) {
   const [conversaChat, setConversaChat] = useState([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const chatEndRef = useRef(null);
-  
+
+  // Copiar dados
+  const [copiado, setCopiado] = useState(null);
+
   // Estados de expansão das seções
   const [expandido, setExpandido] = useState({
     resumo: false,
@@ -105,6 +108,12 @@ export default function ClienteInfoWidget({ clienteId }) {
     }
   };
 
+  const copiarDado = (valor, label) => {
+    navigator.clipboard.writeText(valor);
+    setCopiado(label);
+    setTimeout(() => setCopiado(null), 2000);
+  };
+
   if (!clienteId) {
     return (
       <div className="bg-white rounded-lg shadow-md p-4 text-center text-gray-500">
@@ -157,6 +166,23 @@ export default function ClienteInfoWidget({ clienteId }) {
           <div className="flex-1">
             <h3 className="font-bold text-lg text-gray-800 mb-1">{cliente.nome}</h3>
             <div className="text-sm text-gray-600 space-y-1">
+              {cliente.id && (
+                <p className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-500">Código:</span>
+                  <span className="font-mono font-semibold">{cliente.id}</span>
+                  <button
+                    onClick={() => copiarDado(cliente.id.toString(), 'code')}
+                    className="text-gray-400 hover:text-gray-700 transition ml-1"
+                    title="Copiar código"
+                  >
+                    {copiado === 'code' ? (
+                      <FiCheck className="text-green-600 text-sm" />
+                    ) : (
+                      <FiCopy className="text-sm" />
+                    )}
+                  </button>
+                </p>
+              )}
               {cliente.cpf_cnpj && (
                 <p className="flex items-center gap-1">
                   <FiUser className="text-xs" />
@@ -164,9 +190,20 @@ export default function ClienteInfoWidget({ clienteId }) {
                 </p>
               )}
               {cliente.telefone && (
-                <p className="flex items-center gap-1">
+                <p className="flex items-center gap-2">
                   <FiPhone className="text-xs" />
                   {cliente.telefone}
+                  <button
+                    onClick={() => copiarDado(cliente.telefone, 'phone')}
+                    className="text-gray-400 hover:text-gray-700 transition ml-1"
+                    title="Copiar telefone"
+                  >
+                    {copiado === 'phone' ? (
+                      <FiCheck className="text-green-600 text-sm" />
+                    ) : (
+                      <FiCopy className="text-sm" />
+                    )}
+                  </button>
                 </p>
               )}
               {cliente.email && (
