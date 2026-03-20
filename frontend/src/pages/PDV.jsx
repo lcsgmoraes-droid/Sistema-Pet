@@ -120,6 +120,7 @@ export default function PDV() {
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
     useState(false);
   const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
+  const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
     useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
@@ -1566,6 +1567,13 @@ export default function PDV() {
     setTimeout(() => setCopiadoClienteCampo(""), 2000);
   };
 
+  const copiarCodigoProdutoCarrinho = (codigo, chaveItem) => {
+    if (!codigo) return;
+    navigator.clipboard.writeText(String(codigo));
+    setCopiadoCodigoItem(chaveItem);
+    setTimeout(() => setCopiadoCodigoItem(""), 2000);
+  };
+
   // Selecionar pet
   const selecionarPet = (pet) => {
     setVendaAtual({ ...vendaAtual, pet });
@@ -1613,6 +1621,7 @@ export default function PDV() {
           tipo: "produto",
           produto_id: produto.id,
           produto_nome: produto.nome,
+          produto_codigo: produto.codigo || null,
           quantidade: 1,
           preco_unitario: parseFloat(produto.preco_venda),
           desconto_item: 0,
@@ -3271,6 +3280,9 @@ export default function PDV() {
                     {vendaAtual.itens.map((item, index) => {
                       const isKit = item.tipo_produto === "KIT";
                       const isExpanded = itensKitExpandidos[index];
+                      const codigoProdutoExibicao =
+                        item.produto_codigo || item.codigo || item.sku || "";
+                      const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
                       const hasComposicao =
                         isKit &&
                         item.composicao_kit &&
@@ -3310,6 +3322,28 @@ export default function PDV() {
                                   <div className="font-medium text-gray-900">
                                     {item.produto_nome}
                                   </div>
+                                  {codigoProdutoExibicao && (
+                                    <div className="inline-flex items-center gap-1 text-xs text-gray-500">
+                                      <span>Cod: {codigoProdutoExibicao}</span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          copiarCodigoProdutoCarrinho(
+                                            codigoProdutoExibicao,
+                                            chaveCodigoItem,
+                                          );
+                                        }}
+                                        className="text-gray-400 hover:text-gray-700"
+                                        title="Copiar código do produto"
+                                      >
+                                        {copiadoCodigoItem === chaveCodigoItem ? (
+                                          <Check className="w-3.5 h-3.5 text-green-600" />
+                                        ) : (
+                                          <Copy className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  )}
                                   {/* Botão lista de espera — visível quando estoque zerado */}
                                   {vendaAtual.cliente && (
                                     (item.tipo_produto === 'KIT VIRTUAL'
