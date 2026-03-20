@@ -226,6 +226,10 @@ _reconciliacao_geral_estado = {
     "result": None,
 }
 
+_cobertura_bling_lock = threading.Lock()
+_cobertura_bling_cache: dict[int, dict] = {}
+_COBERTURA_BLG_CACHE_SECONDS = 180
+
 
 def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
     try:
@@ -246,6 +250,140 @@ def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
         with _reconciliacao_geral_lock:
             _reconciliacao_geral_estado["running"] = False
             _reconciliacao_geral_estado["finished_at"] = utc_now()
+
+
+def _chave_codigo_produto(valor: Optional[str]) -> str:
+    return _normalizar_codigo_match(valor)
+
+
+def _extrair_codigos_bling_item(item: dict) -> set[str]:
+    return {
+        chave
+        for chave in [
+            _chave_codigo_produto(item.get("codigo")),
+            _chave_codigo_produto(item.get("sku")),
+            _chave_codigo_produto(item.get("codigoBarras")),
+            _chave_codigo_produto(item.get("gtin")),
+        ]
+        if chave
+    }
+
+
+def _listar_todos_produtos_bling(bling: BlingAPI, limite: int = 100, max_paginas: int = 100) -> tuple[list[dict], bool]:
+    itens: list[dict] = []
+    completo = True
+
+    for pagina in range(1, max_paginas + 1):
+        resultado = bling.listar_produtos(pagina=pagina, limite=limite)
+        pagina_itens = _extrair_lista_produtos_bling(resultado)
+        if not pagina_itens:
+            break
+
+        itens.extend(pagina_itens)
+        if len(pagina_itens) < limite:
+            break
+    else:
+        completo = False
+
+    return itens, completo
+
+
+def _calcular_resumo_cobertura_bling(db: Session, tenant_id: int) -> dict:
+    produtos_locais = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.tipo_produto != "PAI",
+    ).all()
+
+    codigos_para_produto: dict[str, set[int]] = {}
+    for produto in produtos_locais:
+        for chave in [
+            _chave_codigo_produto(produto.codigo),
+            _chave_codigo_produto(produto.codigo_barras),
+            _chave_codigo_produto(produto.gtin_ean),
+            _chave_codigo_produto(produto.gtin_ean_tributario),
+        ]:
+            if not chave:
+                continue
+            codigos_para_produto.setdefault(chave, set()).add(produto.id)
+
+    syncs = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.tenant_id == tenant_id,
+        ProdutoBlingSync.bling_produto_id.isnot(None),
+        ProdutoBlingSync.bling_produto_id != "",
+    ).all()
+    sync_por_produto = {sync.produto_id: sync for sync in syncs}
+
+    bling = BlingAPI()
+    bling_itens, coleta_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
+
+    total_bling = len(bling_itens)
+    ids_locais_com_match: set[int] = set()
+    bling_com_match = 0
+    bling_sync_ok = 0
+
+    for item in bling_itens:
+        codigos_bling = _extrair_codigos_bling_item(item)
+        if not codigos_bling:
+            continue
+
+        candidatos: set[int] = set()
+        for codigo in codigos_bling:
+            candidatos.update(codigos_para_produto.get(codigo, set()))
+
+        if not candidatos:
+            continue
+
+        bling_com_match += 1
+        ids_locais_com_match.update(candidatos)
+
+        bling_id = str(item.get("id") or "").strip()
+        if not bling_id:
+            continue
+
+        for produto_id in candidatos:
+            sync = sync_por_produto.get(produto_id)
+            if not sync:
+                continue
+            if str(sync.bling_produto_id or "").strip() != bling_id:
+                continue
+            if sync.status != "ativo":
+                continue
+            bling_sync_ok += 1
+            break
+
+    total_local = len(produtos_locais)
+    somente_sistema = max(total_local - len(ids_locais_com_match), 0)
+
+    return {
+        "total_bling": total_bling,
+        "bling_com_match_no_sistema": bling_com_match,
+        "bling_sem_match_no_sistema": max(total_bling - bling_com_match, 0),
+        "bling_sync_ok": bling_sync_ok,
+        "bling_com_problema": max(bling_com_match - bling_sync_ok, 0),
+        "total_sistema": total_local,
+        "somente_sistema": somente_sistema,
+        "coleta_bling_completa": coleta_completa,
+        "atualizado_em": utc_now(),
+    }
+
+
+def _get_resumo_cobertura_bling(db: Session, tenant_id: int, force_refresh: bool = False) -> dict:
+    agora = time.monotonic()
+    if not force_refresh:
+        with _cobertura_bling_lock:
+            cache = _cobertura_bling_cache.get(tenant_id)
+            if cache and (agora - cache.get("ts_monotonic", 0)) <= _COBERTURA_BLG_CACHE_SECONDS:
+                return cache.get("payload", {})
+
+    payload = _calcular_resumo_cobertura_bling(db, tenant_id)
+
+    with _cobertura_bling_lock:
+        _cobertura_bling_cache[tenant_id] = {
+            "ts_monotonic": agora,
+            "payload": payload,
+        }
+
+    return payload
 
 # ============================================================================
 # SCHEMAS
@@ -503,6 +641,25 @@ def health_sincronizacao(
     """Resumo operacional da integração com o Bling."""
     _current_user, tenant_id = user_and_tenant
     return BlingSyncService.get_health_snapshot(db, tenant_id=tenant_id)
+
+
+@router.get("/resumo-cobertura")
+def resumo_cobertura_bling(
+    force_refresh: bool = Query(default=False),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """
+    Resumo de cobertura Bling -> Sistema Pet.
+
+    Regra de negócio: o universo principal é o Bling (online/marketplace).
+    """
+    _current_user, tenant_id = user_and_tenant
+    try:
+        return _get_resumo_cobertura_bling(db, tenant_id=tenant_id, force_refresh=force_refresh)
+    except Exception as e:
+        logger.error(f"❌ Erro ao gerar resumo de cobertura Bling: {e}")
+        raise HTTPException(status_code=500, detail="Falha ao gerar resumo de cobertura Bling")
 
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING

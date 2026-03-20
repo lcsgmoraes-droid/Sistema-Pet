@@ -43,6 +43,16 @@ function EstoqueBling() {
   const [runningAction, setRunningAction] = useState('');
   const [rowActionId, setRowActionId] = useState(null);
   const [lastBatchResult, setLastBatchResult] = useState(null);
+  const [cobertura, setCobertura] = useState({
+    total_bling: 0,
+    bling_com_match_no_sistema: 0,
+    bling_sem_match_no_sistema: 0,
+    bling_sync_ok: 0,
+    bling_com_problema: 0,
+    total_sistema: 0,
+    somente_sistema: 0,
+    coleta_bling_completa: true,
+  });
 
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
@@ -56,6 +66,7 @@ function EstoqueBling() {
     });
     const healthRequest = api.get('/estoque/sync/health');
     const syncRequest = api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} });
+    const coberturaRequest = api.get('/estoque/sync/resumo-cobertura');
 
     productsRequest
       .then((response) => {
@@ -106,6 +117,32 @@ function EstoqueBling() {
       .catch((error) => {
         setSyncItems([]);
         toast.error(error.response?.data?.detail || 'Falha ao carregar status de sincronização');
+      });
+
+    coberturaRequest
+      .then((response) => {
+        setCobertura(response?.data || {
+          total_bling: 0,
+          bling_com_match_no_sistema: 0,
+          bling_sem_match_no_sistema: 0,
+          bling_sync_ok: 0,
+          bling_com_problema: 0,
+          total_sistema: 0,
+          somente_sistema: 0,
+          coleta_bling_completa: true,
+        });
+      })
+      .catch(() => {
+        setCobertura({
+          total_bling: 0,
+          bling_com_match_no_sistema: 0,
+          bling_sem_match_no_sistema: 0,
+          bling_sync_ok: 0,
+          bling_com_problema: 0,
+          total_sistema: totalProducts,
+          somente_sistema: 0,
+          coleta_bling_completa: false,
+        });
       });
   };
 
@@ -313,6 +350,13 @@ function EstoqueBling() {
   };
 
   const stats = {
+    totalBling: Number(cobertura.total_bling || 0),
+    blingComMatch: Number(cobertura.bling_com_match_no_sistema || 0),
+    blingSemMatch: Number(cobertura.bling_sem_match_no_sistema || 0),
+    blingSyncOk: Number(cobertura.bling_sync_ok || 0),
+    blingComProblema: Number(cobertura.bling_com_problema || 0),
+    somenteSistema: Number(cobertura.somente_sistema || 0),
+    coletaCompleta: Boolean(cobertura.coleta_bling_completa),
     total: totalProducts,
     vinculados: comMatchNoBling,
     naoVinculados: naoVinculados.length,
@@ -326,37 +370,42 @@ function EstoqueBling() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Sincronização Bling</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Objetivo: manter 100% dos produtos vinculados com o Bling e com sincronização automática + manual funcionando.
+          Objetivo: garantir cobertura do catálogo do Bling no Sistema Pet e manter os itens online sincronizados.
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          Regra dos números: Sistema Pet (total) = Com match no Bling + Faltam vincular.
+          Leitura correta: o foco é o catálogo do Bling (online). Produtos só internos do Sistema Pet não são obrigatórios no Bling.
         </p>
+        {!stats.coletaCompleta && (
+          <p className="text-xs text-amber-700 mt-1">
+            Resumo parcial: o Bling não retornou todas as páginas na última consulta.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Sistema Pet (total)</div>
-          <div className="mt-2 text-3xl font-semibold text-slate-900">{stats.total}</div>
+          <div className="text-sm text-gray-500">Total no Bling</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-900">{stats.totalBling}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Com match no Bling</div>
-          <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.vinculados}</div>
+          <div className="text-sm text-gray-500">Bling com match no Sistema</div>
+          <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.blingComMatch}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Faltam vincular</div>
-          <div className="mt-2 text-3xl font-semibold text-slate-800">{stats.naoVinculados}</div>
+          <div className="text-sm text-gray-500">Bling sem match no Sistema</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-800">{stats.blingSemMatch}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Com match sem sync ok</div>
-          <div className="mt-2 text-3xl font-semibold text-orange-700">{stats.vinculadosSemSync}</div>
+          <div className="text-sm text-gray-500">Bling com sync OK</div>
+          <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.blingSyncOk}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Com erro</div>
-          <div className="mt-2 text-3xl font-semibold text-red-700">{stats.erros}</div>
+          <div className="text-sm text-gray-500">Bling com problema</div>
+          <div className="mt-2 text-3xl font-semibold text-red-700">{stats.blingComProblema}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Divergentes</div>
-          <div className="mt-2 text-3xl font-semibold text-amber-700">{stats.divergentes}</div>
+          <div className="text-sm text-gray-500">Somente no Sistema Pet</div>
+          <div className="mt-2 text-3xl font-semibold text-amber-700">{stats.somenteSistema}</div>
         </div>
       </div>
 
