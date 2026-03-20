@@ -1662,7 +1662,9 @@ def listar_produtos(
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
 
-    # QUERY BASE - Buscar apenas produtos principais (SIMPLES, PAI e KIT)
+    # QUERY BASE
+    # - include_variations=True: inclui PAI para permitir visualização da hierarquia
+    # - include_variations=False: lista apenas produtos normais (SIMPLES e KIT)
     if produto_predecessor_id:
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
@@ -1674,9 +1676,10 @@ def listar_produtos(
             Produto.tipo_produto == tipo_produto
         )
     else:
+        tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES', 'KIT']
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
-            Produto.tipo_produto.in_(['SIMPLES', 'PAI', 'KIT'])
+            Produto.tipo_produto.in_(tipos_base)
         )
 
     # Aplicar filtro de ativo (se especificado)
@@ -1816,7 +1819,8 @@ def listar_produtos(
         produtos_expandidos.append(produto)
 
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
-        if produto.tipo_produto == 'PAI':
+        # apenas quando a tela pedir explicitamente include_variations.
+        if include_variations and produto.tipo_produto == 'PAI':
             variacoes = db.query(Produto).filter(
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',

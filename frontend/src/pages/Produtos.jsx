@@ -747,15 +747,25 @@ export default function Produtos() {
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
 
-    // Filtro de mostrar/ocultar produtos PAI e VARIAÇÃO
+    // No modo padrão, mostrar apenas produtos normais (sem PAI e sem VARIAÇÃO).
     if (!filtros.mostrarPaisVariacoes) {
-      produtosTemp = produtosTemp.filter(
-        (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO"
+      return produtosTemp.filter(
+        (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO",
       );
     }
 
+    // Com "Mostrar Pais e Variações" ativo, exibe as variações
+    // somente quando o respectivo PAI estiver expandido.
+    produtosTemp = produtosTemp.filter((p) => {
+      if (p.tipo_produto !== "VARIACAO") {
+        return true;
+      }
+
+      return paisExpandidos.includes(p.produto_pai_id);
+    });
+
     return produtosTemp;
-  }, [produtosBrutos, filtros.mostrarPaisVariacoes]);
+  }, [produtosBrutos, filtros.mostrarPaisVariacoes, paisExpandidos]);
 
   const produtosPaginados = produtosFiltrados;
   const totalPaginas = Math.max(totalPaginasServidor, 1);
@@ -841,7 +851,7 @@ export default function Produtos() {
 
       filtrosLimpos.page = paginaAtual;
       filtrosLimpos.page_size = itensPorPagina;
-      filtrosLimpos.include_variations = true;
+      filtrosLimpos.include_variations = filtrosAtuais.mostrarPaisVariacoes;
 
       const response = await getProdutos(filtrosLimpos);
 
@@ -944,6 +954,12 @@ export default function Produtos() {
   const handleFiltroChange = (campo, valor) => {
     const proximoFiltro = { ...filtros, [campo]: valor };
     setFiltros(proximoFiltro);
+
+    if (campo === "mostrarPaisVariacoes" && !valor) {
+      // Ao ocultar variações, fecha expansões para manter o estado previsível.
+      setPaisExpandidos([]);
+    }
+
     if (campo !== "mostrarPaisVariacoes") {
       setPaginaAtual(1);
     }
