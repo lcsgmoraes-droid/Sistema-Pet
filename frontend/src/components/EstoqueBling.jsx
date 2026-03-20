@@ -604,10 +604,17 @@ function EstoqueBling() {
                         <button
                           onClick={() => runRowAction(
                             row.id,
-                            () => api.post(`/estoque/sync/forcar/${row.id}`),
-                            'Sincronização forçada concluída',
+                            async () => {
+                              if (!row.vinculado) {
+                                await api.post(`/estoque/sync/vincular-automatico/${row.id}`);
+                              }
+                              await api.post(`/estoque/sync/forcar/${row.id}`);
+                            },
+                            row.vinculado
+                              ? 'Sincronização forçada concluída'
+                              : 'Produto vinculado e sincronizado com sucesso',
                           )}
-                          disabled={!row.vinculado || rowActionId === row.id}
+                          disabled={rowActionId === row.id}
                           className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
                         >
                           {rowActionId === row.id ? 'Processando...' : 'Forçar sync'}

@@ -35,6 +35,29 @@ def utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def _buscar_item_bling_para_vinculo(bling: BlingAPI, codigo_busca: str, nome_busca: str) -> Optional[dict]:
+    resultado = None
+    if codigo_busca:
+        resultado = bling.listar_produtos(codigo=codigo_busca, limite=50)
+
+    itens = (resultado or {}).get("data", [])
+
+    if not itens and nome_busca:
+        resultado = bling.listar_produtos(nome=nome_busca, limite=50)
+        itens = (resultado or {}).get("data", [])
+
+    if not itens:
+        return None
+
+    codigo_local = codigo_busca.lower()
+    for item in itens:
+        codigo_item = str(item.get("codigo") or item.get("sku") or "").strip().lower()
+        if codigo_local and codigo_item == codigo_local:
+            return item
+
+    return itens[0]
+
+
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronização Bling"])
 
 _reconciliacao_geral_lock = threading.Lock()
@@ -216,6 +239,63 @@ def vincular_produto_bling(
         "message": "Produto vinculado com sucesso",
         "produto_id": produto.id,
         "bling_produto_id": sync.bling_produto_id,
+    }
+
+
+@router.post("/vincular-automatico/{produto_id}")
+def vincular_produto_bling_automatico(
+    produto_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Tenta vincular automaticamente um produto local ao Bling pelo código/SKU."""
+    _current_user, tenant_id = user_and_tenant
+
+    produto = db.query(Produto).filter(
+        Produto.id == produto_id,
+        Produto.tenant_id == tenant_id
+    ).first()
+    if not produto:
+        raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
+
+    bling = BlingAPI()
+
+    codigo_busca = (produto.codigo or "").strip()
+    nome_busca = (produto.nome or "").strip()
+
+    item_escolhido = _buscar_item_bling_para_vinculo(bling, codigo_busca, nome_busca)
+
+    if not item_escolhido:
+        raise HTTPException(status_code=404, detail="Produto não encontrado no Bling para vínculo automático")
+
+    bling_id = str(item_escolhido.get("id") or "").strip()
+    if not bling_id:
+        raise HTTPException(status_code=400, detail="Resposta do Bling sem ID de produto")
+
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == produto.id,
+        ProdutoBlingSync.tenant_id == tenant_id
+    ).first()
+
+    if not sync:
+        sync = ProdutoBlingSync(
+            tenant_id=tenant_id,
+            produto_id=produto.id,
+        )
+        db.add(sync)
+
+    sync.bling_produto_id = bling_id
+    sync.sincronizar = True
+    sync.status = "ativo"
+    sync.erro_mensagem = None
+    sync.updated_at = utc_now()
+
+    db.commit()
+
+    return {
+        "message": "Produto vinculado automaticamente com sucesso",
+        "produto_id": produto.id,
+        "bling_produto_id": bling_id,
     }
 
 
