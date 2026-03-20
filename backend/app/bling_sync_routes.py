@@ -37,31 +37,88 @@ def utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def _buscar_item_bling_para_vinculo(bling: BlingAPI, codigo_busca: str, nome_busca: str) -> Optional[dict]:
-    resultado = None
-    if codigo_busca:
-        resultado = bling.listar_produtos(codigo=codigo_busca, limite=50)
+def _normalizar_codigo_match(valor: Optional[str]) -> str:
+    return re.sub(r"[^a-zA-Z0-9]", "", (valor or "").strip()).lower()
 
-    itens = _extrair_lista_produtos_bling(resultado)
 
-    if not itens and codigo_busca:
-        resultado = bling.listar_produtos(sku=codigo_busca, limite=50)
-        itens = _extrair_lista_produtos_bling(resultado)
+def _montar_codigos_busca(codigo_principal: str, codigos_extras: Optional[list[str]] = None) -> list[str]:
+    codigos: list[str] = []
+    vistos: set[str] = set()
 
-    if not itens and nome_busca:
-        resultado = bling.listar_produtos(nome=nome_busca, limite=50)
-        itens = _extrair_lista_produtos_bling(resultado)
+    for bruto in [codigo_principal, *(codigos_extras or [])]:
+        codigo = (bruto or "").strip()
+        if not codigo:
+            continue
 
+        candidatos = [codigo]
+        codigo_normalizado = _normalizar_codigo_match(codigo)
+        if codigo_normalizado and codigo_normalizado != codigo:
+            candidatos.append(codigo_normalizado)
+
+        for candidato in candidatos:
+            chave = candidato.lower()
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            codigos.append(candidato)
+
+    return codigos
+
+
+def _escolher_item_melhor_match(itens: list[dict], codigos_busca: list[str]) -> dict:
     if not itens:
-        return None
+        return {}
 
-    codigo_local = codigo_busca.lower()
+    codigos_normalizados = {
+        _normalizar_codigo_match(codigo)
+        for codigo in codigos_busca
+        if _normalizar_codigo_match(codigo)
+    }
+
+    if not codigos_normalizados:
+        return itens[0]
+
     for item in itens:
-        codigo_item = str(item.get("codigo") or item.get("sku") or "").strip().lower()
-        if codigo_local and codigo_item == codigo_local:
-            return item
+        campos_codigo = [
+            item.get("codigo"),
+            item.get("sku"),
+            item.get("codigoBarras"),
+            item.get("gtin"),
+        ]
+        for campo in campos_codigo:
+            codigo_item = _normalizar_codigo_match(str(campo or ""))
+            if codigo_item and codigo_item in codigos_normalizados:
+                return item
 
     return itens[0]
+
+
+def _buscar_item_bling_para_vinculo(
+    bling: BlingAPI,
+    codigo_busca: str,
+    nome_busca: str,
+    codigos_extras: Optional[list[str]] = None,
+) -> Optional[dict]:
+    codigos_busca = _montar_codigos_busca(codigo_busca, codigos_extras)
+
+    for codigo in codigos_busca:
+        resultado = bling.listar_produtos(codigo=codigo, limite=50)
+        itens = _extrair_lista_produtos_bling(resultado)
+        if itens:
+            return _escolher_item_melhor_match(itens, codigos_busca)
+
+        resultado = bling.listar_produtos(sku=codigo, limite=50)
+        itens = _extrair_lista_produtos_bling(resultado)
+        if itens:
+            return _escolher_item_melhor_match(itens, codigos_busca)
+
+    if nome_busca:
+        resultado = bling.listar_produtos(nome=nome_busca, limite=50)
+        itens = _extrair_lista_produtos_bling(resultado)
+        if itens:
+            return _escolher_item_melhor_match(itens, codigos_busca)
+
+    return None
 
 
 def _normalizar_termo_busca(valor: Optional[str]) -> str:
@@ -114,11 +171,16 @@ def _buscar_produtos_bling_por_termo(bling: BlingAPI, termo: str, pagina: int, l
     return resultados
 
 
-def _buscar_item_bling_com_retry(bling: BlingAPI, codigo_busca: str, nome_busca: str) -> Optional[dict]:
+def _buscar_item_bling_com_retry(
+    bling: BlingAPI,
+    codigo_busca: str,
+    nome_busca: str,
+    codigos_extras: Optional[list[str]] = None,
+) -> Optional[dict]:
     ultima_falha = None
     for tentativa in range(3):
         try:
-            return _buscar_item_bling_para_vinculo(bling, codigo_busca, nome_busca)
+            return _buscar_item_bling_para_vinculo(bling, codigo_busca, nome_busca, codigos_extras=codigos_extras)
         except Exception as e:
             ultima_falha = e
             msg = str(e)
@@ -909,7 +971,17 @@ def vincular_todos_por_sku(
         try:
             codigo_busca = (produto.codigo or "").strip()
             nome_busca = (produto.nome or "").strip()
-            item_escolhido = _buscar_item_bling_com_retry(bling, codigo_busca, nome_busca)
+            codigos_extras = [
+                (produto.codigo_barras or "").strip(),
+                (produto.gtin_ean or "").strip(),
+                (produto.gtin_ean_tributario or "").strip(),
+            ]
+            item_escolhido = _buscar_item_bling_com_retry(
+                bling,
+                codigo_busca,
+                nome_busca,
+                codigos_extras=codigos_extras,
+            )
 
             if not item_escolhido:
                 nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
