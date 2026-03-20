@@ -42,11 +42,15 @@ def _buscar_item_bling_para_vinculo(bling: BlingAPI, codigo_busca: str, nome_bus
     if codigo_busca:
         resultado = bling.listar_produtos(codigo=codigo_busca, limite=50)
 
-    itens = (resultado or {}).get("data", [])
+    itens = _extrair_lista_produtos_bling(resultado)
+
+    if not itens and codigo_busca:
+        resultado = bling.listar_produtos(sku=codigo_busca, limite=50)
+        itens = _extrair_lista_produtos_bling(resultado)
 
     if not itens and nome_busca:
         resultado = bling.listar_produtos(nome=nome_busca, limite=50)
-        itens = (resultado or {}).get("data", [])
+        itens = _extrair_lista_produtos_bling(resultado)
 
     if not itens:
         return None
@@ -435,7 +439,8 @@ def health_sincronizacao(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Resumo operacional da integração com o Bling."""
-    return BlingSyncService.get_health_snapshot(db)
+    _current_user, tenant_id = user_and_tenant
+    return BlingSyncService.get_health_snapshot(db, tenant_id=tenant_id)
 
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING
@@ -528,7 +533,8 @@ def status_sincronizacao(
     
     for produto, sync in query.all():
         fila = db.query(ProdutoBlingSyncQueue).filter(
-            ProdutoBlingSyncQueue.produto_id == produto.id
+            ProdutoBlingSyncQueue.produto_id == produto.id,
+            ProdutoBlingSyncQueue.tenant_id == tenant_id,
         ).order_by(ProdutoBlingSyncQueue.updated_at.desc()).first()
 
         # Usar dados cacheados para manter endpoint rápido e evitar rate-limit/timeout.
@@ -884,6 +890,8 @@ def vincular_todos_por_sku(
     vinculados = []
     nao_encontrados = []
     erros = []
+    sincronizados_sucesso = 0
+    sincronizados_erro = 0
 
     logger.info(f"📦 Processando lote: {total} de {total_sem_vinculo} produtos sem vínculo")
 
@@ -906,11 +914,24 @@ def vincular_todos_por_sku(
 
             _upsert_sync_vinculo(db, tenant_id, produto, bling_produto_id)
 
+            resultado_sync = BlingSyncService.force_sync_now(
+                produto_id=produto.id,
+                motivo="vinculo_massa_forcar_sync",
+            )
+
+            sync_ok = bool(resultado_sync.get("ok"))
+            if sync_ok:
+                sincronizados_sucesso += 1
+            else:
+                sincronizados_erro += 1
+
             vinculados.append({
                 "produto_id": produto.id,
                 "codigo": produto.codigo,
                 "nome": produto.nome,
-                "bling_produto_id": bling_produto_id
+                "bling_produto_id": bling_produto_id,
+                "sync_ok": sync_ok,
+                "sync_detail": resultado_sync.get("detail") or resultado_sync.get("erro"),
             })
 
             logger.info(f"✅ Vinculado: {produto.codigo} → Bling ID {bling_produto_id}")
@@ -932,6 +953,8 @@ def vincular_todos_por_sku(
         "total_processados": total,
         "restantes_para_proximo_lote": restantes,
         "vinculados": len(vinculados),
+        "sincronizados_com_sucesso": sincronizados_sucesso,
+        "sincronizados_com_erro": sincronizados_erro,
         "nao_encontrados_no_bling": len(nao_encontrados),
         "erros": len(erros),
         "detalhes_vinculados": vinculados,

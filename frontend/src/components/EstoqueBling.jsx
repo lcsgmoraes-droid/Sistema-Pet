@@ -42,6 +42,7 @@ function EstoqueBling() {
   const [blingProducts, setBlingProducts] = useState([]);
   const [runningAction, setRunningAction] = useState('');
   const [rowActionId, setRowActionId] = useState(null);
+  const [lastBatchResult, setLastBatchResult] = useState(null);
 
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
@@ -217,14 +218,17 @@ function EstoqueBling() {
     setRunningAction(key);
     try {
       const response = await action();
-      toast.success(successMessage(response));
+      const message = successMessage(response);
+      toast.success(message, { duration: 9000 });
       await loadPage(search);
+      return response;
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
         toast.error('A ação em lote demorou além do tempo limite. Tente novamente ou use menos itens por vez.');
       } else {
         toast.error(error.response?.data?.detail || 'Erro ao executar ação em lote');
       }
+      return null;
     } finally {
       setRunningAction('');
     }
@@ -255,7 +259,7 @@ function EstoqueBling() {
     const confirma = globalThis.confirm(`Executar vínculo em massa por SKU em lote de ${MASS_LINK_BATCH_SIZE} itens agora?`);
     if (!confirma) return;
 
-    await runGlobalAction(
+    const response = await runGlobalAction(
       'vincular-massa',
       () => api.post('/estoque/sync/vincular-todos', {}, {
         timeout: 0,
@@ -266,6 +270,10 @@ function EstoqueBling() {
         return `Lote concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0} | Restantes: ${data.restantes_para_proximo_lote || 0}`;
       },
     );
+
+    if (response?.data) {
+      setLastBatchResult(response.data);
+    }
   };
 
   const sincronizarDivergentes = async () => {
@@ -366,6 +374,17 @@ function EstoqueBling() {
             Use essas ações para destravar fila, revisar itens recentes e rodar uma conferência completa.
           </p>
         </div>
+        {lastBatchResult && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <div className="font-semibold">Último resultado do vínculo em massa</div>
+            <div className="mt-1">
+              Processados: {lastBatchResult.total_processados || 0} | Vinculados: {lastBatchResult.vinculados || 0} | Sync ok: {lastBatchResult.sincronizados_com_sucesso || 0} | Sync erro: {lastBatchResult.sincronizados_com_erro || 0}
+            </div>
+            <div>
+              Não encontrados: {lastBatchResult.nao_encontrados_no_bling || 0} | Erros: {lastBatchResult.erros || 0} | Restantes: {lastBatchResult.restantes_para_proximo_lote || 0}
+            </div>
+          </div>
+        )}
         <div className="grid gap-3 md:grid-cols-3">
           <button
             onClick={() => runGlobalAction(

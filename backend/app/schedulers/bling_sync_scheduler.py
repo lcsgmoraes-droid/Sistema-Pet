@@ -66,5 +66,5 @@ class BlingSyncScheduler:
             logger.info("[BLING SYNC] Reconciliação recente: %s", result)
 
     def reconciliar_geral(self) -> None:
-        result = BlingSyncService.reconcile_all_products()
-        logger.info("[BLING SYNC] Auditoria geral: %s", result)
+        result = BlingSyncService.run_nightly_forced_link_and_sync(link_limit=800, sync_limit=1200)
+        logger.info("[BLING SYNC] Rotina 02:00 (vinculo+sync forcado): %s", result)

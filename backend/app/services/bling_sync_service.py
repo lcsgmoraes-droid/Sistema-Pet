@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
+import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
@@ -17,6 +18,62 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 5
 RETRY_BACKOFF_MINUTES = [1, 5, 15, 30, 60]
 DIVERGENCIA_MINIMA = 0.01
+
+
+def _normalizar_texto(valor: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (valor or "").strip())
+
+
+def _extrair_produtos_bling(resultado: Optional[dict]) -> list[dict]:
+    itens = (resultado or {}).get("data", [])
+    produtos: list[dict] = []
+    for item in itens:
+        if isinstance(item, dict) and isinstance(item.get("produto"), dict):
+            produtos.append(item.get("produto") or {})
+        elif isinstance(item, dict):
+            produtos.append(item)
+    return produtos
+
+
+def _buscar_produtos_bling(bling: BlingAPI, **params) -> list[dict]:
+    try:
+        return _extrair_produtos_bling(bling.listar_produtos(**params))
+    except Exception:
+        return []
+
+
+def _escolher_item_por_codigo(itens: list[dict], codigo_busca: str) -> Optional[dict]:
+    codigo_local = _normalizar_texto(codigo_busca).lower()
+    if not codigo_local:
+        return itens[0] if itens else None
+
+    for item in itens:
+        codigo_item = str(item.get("codigo") or item.get("sku") or "").strip().lower()
+        if codigo_item and codigo_item == codigo_local:
+            return item
+
+    return itens[0] if itens else None
+
+
+def _buscar_item_bling_para_produto(bling: BlingAPI, codigo_busca: str, nome_busca: str) -> Optional[dict]:
+    codigo_busca = _normalizar_texto(codigo_busca)
+    nome_busca = _normalizar_texto(nome_busca)
+
+    consultas = []
+    if codigo_busca:
+        consultas.append({"codigo": codigo_busca, "limite": 50})
+        consultas.append({"sku": codigo_busca, "limite": 50})
+    if nome_busca:
+        consultas.append({"nome": nome_busca, "limite": 50})
+
+    for params in consultas:
+        itens = _buscar_produtos_bling(bling, **params)
+        if not itens:
+            continue
+
+        return _escolher_item_por_codigo(itens, codigo_busca)
+
+    return None
 
 
 def utc_now() -> datetime:
@@ -423,7 +480,7 @@ class BlingSyncService:
         return {"avaliados": len(produto_ids), "divergencias": divergencias}
 
     @staticmethod
-    def reconcile_all_products(limit: Optional[int] = None) -> Dict[str, Any]:
+    def reconcile_all_products(limit: Optional[int] = None, force_sync: bool = False) -> Dict[str, Any]:
         db = SessionLocal()
         try:
             query = db.query(ProdutoBlingSync).filter(
@@ -438,20 +495,115 @@ class BlingSyncService:
 
         divergencias = 0
         for produto_id in produto_ids:
-            result = BlingSyncService.reconcile_product(produto_id)
+            result = BlingSyncService.reconcile_product(produto_id, force_sync=force_sync)
             if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
                 divergencias += 1
 
         return {"avaliados": len(produto_ids), "divergencias": divergencias}
 
     @staticmethod
-    def get_health_snapshot(db: Session) -> Dict[str, Any]:
-        pendentes = db.query(ProdutoBlingSyncQueue).filter(
+    def auto_link_by_sku(limit: int = 500) -> Dict[str, Any]:
+        db = SessionLocal()
+        try:
+            subq_vinculados = (
+                db.query(ProdutoBlingSync.produto_id)
+                .filter(
+                    ProdutoBlingSync.bling_produto_id.isnot(None),
+                    ProdutoBlingSync.bling_produto_id != "",
+                )
+                .subquery()
+            )
+
+            produtos = (
+                db.query(Produto)
+                .filter(
+                    Produto.codigo.isnot(None),
+                    Produto.codigo != "",
+                    Produto.tipo_produto != "PAI",
+                )
+                .filter(Produto.id.notin_(subq_vinculados))
+                .order_by(Produto.id.asc())
+                .limit(limit)
+                .all()
+            )
+
+            bling = BlingAPI()
+            vinculados = 0
+            nao_encontrados = 0
+            erros = 0
+
+            for produto in produtos:
+                try:
+                    item = _buscar_item_bling_para_produto(
+                        bling,
+                        codigo_busca=produto.codigo or "",
+                        nome_busca=produto.nome or "",
+                    )
+                    if not item:
+                        nao_encontrados += 1
+                        continue
+
+                    bling_id = str(item.get("id") or "").strip()
+                    if not bling_id:
+                        nao_encontrados += 1
+                        continue
+
+                    sync = db.query(ProdutoBlingSync).filter(
+                        ProdutoBlingSync.produto_id == produto.id,
+                        ProdutoBlingSync.tenant_id == produto.tenant_id,
+                    ).first()
+                    if not sync:
+                        sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
+                        db.add(sync)
+
+                    sync.bling_produto_id = bling_id
+                    sync.sincronizar = True
+                    sync.status = "ativo"
+                    sync.erro_mensagem = None
+                    sync.updated_at = utc_now()
+                    vinculados += 1
+                except Exception:
+                    erros += 1
+
+            db.commit()
+            return {
+                "processados": len(produtos),
+                "vinculados": vinculados,
+                "nao_encontrados": nao_encontrados,
+                "erros": erros,
+            }
+        except Exception as error:
+            db.rollback()
+            return {"processados": 0, "vinculados": 0, "nao_encontrados": 0, "erros": 1, "detail": str(error)}
+        finally:
+            db.close()
+
+    @staticmethod
+    def run_nightly_forced_link_and_sync(link_limit: int = 500, sync_limit: int = 1000) -> Dict[str, Any]:
+        link_result = BlingSyncService.auto_link_by_sku(limit=link_limit)
+        reconcile_result = BlingSyncService.reconcile_all_products(limit=sync_limit, force_sync=True)
+        queue_result = BlingSyncService.process_pending_queue(limit=sync_limit)
+        return {
+            "link": link_result,
+            "reconcile": reconcile_result,
+            "queue": queue_result,
+        }
+
+    @staticmethod
+    def get_health_snapshot(db: Session, tenant_id: Optional[str] = None) -> Dict[str, Any]:
+        queue_query = db.query(ProdutoBlingSyncQueue)
+        sync_query = db.query(ProdutoBlingSync)
+
+        if tenant_id is not None:
+            queue_query = queue_query.filter(ProdutoBlingSyncQueue.tenant_id == tenant_id)
+            sync_query = sync_query.filter(ProdutoBlingSync.tenant_id == tenant_id)
+
+        pendentes = queue_query.filter(
             ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"])
         ).count()
-        com_erro = db.query(ProdutoBlingSync).filter(ProdutoBlingSync.status == "erro").count()
-        ativos = db.query(ProdutoBlingSync).filter(ProdutoBlingSync.sincronizar == True).count()
-        divergentes = db.query(ProdutoBlingSync).filter(
+        com_erro = sync_query.filter(ProdutoBlingSync.status == "erro").count()
+        ativos = sync_query.filter(ProdutoBlingSync.sincronizar == True).count()
+        divergentes = sync_query.filter(
             ProdutoBlingSync.ultima_divergencia.isnot(None)
         ).filter(
             (ProdutoBlingSync.ultima_divergencia > DIVERGENCIA_MINIMA)
