@@ -739,104 +739,13 @@ export default function Produtos() {
   // Paginação
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [itensPorPagina, setItensPorPagina] = useState(20);
+  const [totalItensServidor, setTotalItensServidor] = useState(0);
+  const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
 
-  // ========================================
-  // ORGANIZAR PRODUTOS HIERARQUICAMENTE (useMemo para performance)
-  // ========================================
-  // Reorganiza produtos sempre que produtosBrutos ou paisExpandidos mudar
-  // SEM fazer nova requisição à API (evita scroll ao topo)
-  const produtosOrganizados = useMemo(() => {
-    if (!produtosBrutos || produtosBrutos.length === 0) return [];
-
-    const resultado = [];
-    const variacoes = produtosBrutos.filter((p) => p.tipo_produto === "VARIACAO");
-
-    // Manter ordem de entrada do backend (created_at desc).
-    // VARIACAOs só aparecem logo abaixo do seu PAI quando expandido.
-    produtosBrutos.forEach((produto) => {
-      if (produto.tipo_produto === "VARIACAO") return; // pulado aqui, entra via PAI
-
-      resultado.push(produto);
-
-      if (produto.tipo_produto === "PAI" && paisExpandidos.includes(produto.id)) {
-        const variacoesDoPai = variacoes.filter(
-          (v) => v.produto_pai_id === produto.id,
-        );
-        resultado.push(...variacoesDoPai);
-      }
-    });
-
-    return resultado;
-  }, [produtosBrutos, paisExpandidos]);
-
-  // ========================================
-  // APLICAR FILTROS (useMemo para performance)
-  // ========================================
-  // Aplica filtros de busca, categoria, marca, estoque e promoção
+  // Aplica apenas filtros locais visuais.
+  // Busca/categoria/marca/fornecedor/estoque/promoção agora são filtrados no backend.
   const produtosFiltrados = useMemo(() => {
-    const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
-    let produtosTemp = buscaNormalizada
-      ? [...produtosBrutos]
-      : [...produtosOrganizados];
-
-    // Filtro de busca inteligente (multi-termo + sem acento)
-    if (buscaNormalizada) {
-      const termos = buscaNormalizada
-        .split(/\s+/)
-        .filter(Boolean);
-
-      produtosTemp = produtosTemp.filter(
-        (p) => {
-          const searchableText = normalizeSearchText(
-            [
-              p.nome,
-              p.codigo,
-              p.codigo_barras,
-              p.sku,
-              p.referencia,
-              p.referencia_sku,
-            ]
-              .filter(Boolean)
-              .join(" "),
-          );
-
-          return termos.every((termo) => searchableText.includes(termo));
-        },
-      );
-
-      produtosTemp.sort((produtoA, produtoB) =>
-        compareProdutosByBusca(produtoA, produtoB, buscaNormalizada),
-      );
-    }
-
-    // Filtro de categoria
-    if (filtros.categoria_id) {
-      produtosTemp = produtosTemp.filter(
-        (p) => p.categoria_id == filtros.categoria_id,
-      );
-    }
-
-    // Filtro de marca
-    if (filtros.marca_id) {
-      produtosTemp = produtosTemp.filter((p) => p.marca_id == filtros.marca_id);
-    }
-
-    // Filtro de estoque baixo
-    if (filtros.estoque_baixo) {
-      produtosTemp = produtosTemp.filter((p) => {
-        const estoque =
-          p.tipo_produto === "KIT" && p.tipo_kit === "VIRTUAL"
-            ? (p.estoque_virtual ?? 0)
-            : p.estoque_atual || 0;
-        const minimo = p.estoque_minimo || 0;
-        return p.controlar_estoque && estoque <= minimo;
-      });
-    }
-
-    // Filtro de em promoção
-    if (filtros.em_promocao) {
-      produtosTemp = produtosTemp.filter((p) => p.promocao_ativa === true);
-    }
+    let produtosTemp = [...produtosBrutos];
 
     // Filtro de mostrar/ocultar produtos PAI e VARIAÇÃO
     if (!filtros.mostrarPaisVariacoes) {
@@ -846,41 +755,11 @@ export default function Produtos() {
     }
 
     return produtosTemp;
-  }, [produtosBrutos, produtosOrganizados, filtros]);
+  }, [produtosBrutos, filtros.mostrarPaisVariacoes]);
 
-  // Calcular produtos paginados
-  const { produtosPaginados, totalPaginas, totalItens } = useMemo(() => {
-    const total = Math.ceil(produtosFiltrados.length / itensPorPagina);
-    const inicio = (paginaAtual - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-    const paginados = produtosFiltrados.slice(inicio, fim);
-    const idsNaPagina = new Set(paginados.map((produto) => produto.id));
-
-    paginados
-      .filter(
-        (produto) =>
-          produto.tipo_produto === "PAI" && paisExpandidos.includes(produto.id),
-      )
-      .forEach((pai) => {
-        produtosFiltrados
-          .filter(
-            (produto) =>
-              produto.tipo_produto === "VARIACAO" &&
-              produto.produto_pai_id === pai.id,
-          )
-          .forEach((variacao) => {
-            if (idsNaPagina.has(variacao.id)) return;
-            paginados.push(variacao);
-            idsNaPagina.add(variacao.id);
-          });
-      });
-
-    return {
-      produtosPaginados: paginados,
-      totalPaginas: total,
-      totalItens: produtosFiltrados.length,
-    };
-  }, [produtosFiltrados, paginaAtual, itensPorPagina, paisExpandidos]);
+  const produtosPaginados = produtosFiltrados;
+  const totalPaginas = Math.max(totalPaginasServidor, 1);
+  const totalItens = totalItensServidor;
 
   // Alias para manter compatibilidade com o resto do código
   const produtos = produtosPaginados;
@@ -897,12 +776,29 @@ export default function Produtos() {
 
   // Carregar dados iniciais
   useEffect(() => {
-    carregarDados();
     carregarCategorias();
     carregarMarcas();
     carregarFornecedores();
     carregarDepartamentos();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      carregarDados();
+    }, filtros.busca ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    paginaAtual,
+    itensPorPagina,
+    filtros.busca,
+    filtros.ativo,
+    filtros.categoria_id,
+    filtros.marca_id,
+    filtros.fornecedor_id,
+    filtros.estoque_baixo,
+    filtros.em_promocao,
+  ]);
 
   // Persistência opcional da busca para que cada usuário escolha seu comportamento.
   useEffect(() => {
@@ -919,10 +815,14 @@ export default function Produtos() {
   const carregarDados = async (filtrosAtuais = filtros) => {
     try {
       setLoading(true);
-      // Remover campos vazios dos filtros
+      // Remover campos vazios dos filtros e montar paginação no backend.
       const filtrosLimpos = {};
       Object.keys(filtrosAtuais).forEach((key) => {
         const valor = filtrosAtuais[key];
+
+        if (key === "mostrarPaisVariacoes") {
+          return;
+        }
 
         if (key === "ativo") {
           if (valor === "ativos") {
@@ -938,18 +838,36 @@ export default function Produtos() {
           filtrosLimpos[key] = valor;
         }
       });
+
+      filtrosLimpos.page = paginaAtual;
+      filtrosLimpos.page_size = itensPorPagina;
+      filtrosLimpos.include_variations = true;
+
       const response = await getProdutos(filtrosLimpos);
 
       // API retorna { itens: [], total: 0, pagina: 1, ... } ou apenas array
       let produtosData;
+      let totalApi = 0;
+      let pagesApi = 1;
       if (Array.isArray(response.data)) {
         produtosData = response.data;
+        totalApi = response.data.length;
       } else if (response.data.itens) {
         produtosData = response.data.itens;
+        totalApi = response.data.total || produtosData.length;
+        pagesApi = response.data.pages || 1;
+      } else if (response.data.items) {
+        produtosData = response.data.items;
+        totalApi = response.data.total || produtosData.length;
+        pagesApi = response.data.pages || 1;
       } else if (response.data.produtos) {
         produtosData = response.data.produtos;
+        totalApi = response.data.total || produtosData.length;
+        pagesApi = response.data.pages || 1;
       } else if (response.data.data) {
         produtosData = response.data.data;
+        totalApi = response.data.total || produtosData.length;
+        pagesApi = response.data.pages || 1;
       } else {
         // Procurar por qualquer propriedade que seja um array
         const arrayKeys = Object.keys(response.data).filter((key) =>
@@ -960,6 +878,8 @@ export default function Produtos() {
         } else {
           produtosData = [];
         }
+        totalApi = response.data.total || produtosData.length;
+        pagesApi = response.data.pages || 1;
       }
 
       // ========================================
@@ -968,6 +888,8 @@ export default function Produtos() {
       // Salvar dados originais sem hierarquia
       // A organização será feita no useMemo abaixo
       setProdutosBrutos(produtosData);
+      setTotalItensServidor(totalApi);
+      setTotalPaginasServidor(Math.max(pagesApi, 1));
     } catch (error) {
       console.error("Erro ao carregar produtos:", error);
       alert("Erro ao carregar produtos");
@@ -1022,10 +944,8 @@ export default function Produtos() {
   const handleFiltroChange = (campo, valor) => {
     const proximoFiltro = { ...filtros, [campo]: valor };
     setFiltros(proximoFiltro);
-
-    // Fornecedor filtra no backend (relacionamento N:N via produto_fornecedores)
-    if (campo === "fornecedor_id" || campo === "ativo") {
-      carregarDados(proximoFiltro);
+    if (campo !== "mostrarPaisVariacoes") {
+      setPaginaAtual(1);
     }
   };
 

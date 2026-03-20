@@ -36,6 +36,8 @@ export default function ProdutosBalanco() {
   const [destacados, setDestacados] = useState({});
   const [paginaAtual, setPaginaAtual] = useState(1);
   const itensPorPagina = 20;
+  const [totalItensServidor, setTotalItensServidor] = useState(0);
+  const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
   const [filtros, setFiltros] = useState({
     busca: "",
     marca_id: "",
@@ -44,64 +46,26 @@ export default function ProdutosBalanco() {
 
   const inputRefs = useRef({});
 
-  const produtosFiltrados = useMemo(() => {
-    const termo = normalizeSearchText(filtros.busca);
-    if (!termo) return produtos;
-
-    const termos = termo
-      .split(/\s+/)
-      .filter(Boolean);
-
-    return produtos.filter((p) => {
-      const searchableText = normalizeSearchText(
-        [
-          p.nome,
-          p.codigo,
-          p.codigo_barras,
-          p.sku,
-          p.referencia,
-          p.referencia_sku,
-          p.marca?.nome,
-        ]
-          .filter(Boolean)
-          .join(" "),
-      );
-      return termos.every((item) => searchableText.includes(item));
-    });
-  }, [produtos, filtros.busca]);
-
-  const { produtosPaginados, totalItens, totalPaginas, inicioItem, fimItem } = useMemo(() => {
-    const total = produtosFiltrados.length;
-    const paginas = Math.max(1, Math.ceil(total / itensPorPagina));
-    const paginaSegura = Math.min(paginaAtual, paginas);
-    const inicio = (paginaSegura - 1) * itensPorPagina;
-    const fim = inicio + itensPorPagina;
-
-    return {
-      produtosPaginados: produtosFiltrados.slice(inicio, fim),
-      totalItens: total,
-      totalPaginas: paginas,
-      inicioItem: total === 0 ? 0 : inicio + 1,
-      fimItem: Math.min(fim, total),
-    };
-  }, [produtosFiltrados, paginaAtual]);
+  const produtosPaginados = produtos;
+  const totalItens = totalItensServidor;
+  const totalPaginas = Math.max(totalPaginasServidor, 1);
+  const inicioItem = totalItens === 0 ? 0 : (paginaAtual - 1) * itensPorPagina + 1;
+  const fimItem = totalItens === 0 ? 0 : Math.min(paginaAtual * itensPorPagina, totalItens);
 
   useEffect(() => {
-    carregarDadosComFiltros(filtros);
-  }, []);
+    carregarDadosComFiltros(filtros, paginaAtual);
+  }, [paginaAtual]);
 
-  useEffect(() => {
-    setPaginaAtual(1);
-  }, [filtros]);
-
-  const carregarDadosComFiltros = async (filtrosAtuais) => {
+  const carregarDadosComFiltros = async (filtrosAtuais, pagina = 1) => {
     try {
       setCarregando(true);
       const params = {
-        page: 1,
-        page_size: 99999,
+        page: pagina,
+        page_size: itensPorPagina,
         include_variations: false,
       };
+
+      if (filtrosAtuais.busca) params.busca = filtrosAtuais.busca;
 
       if (filtrosAtuais.marca_id) params.marca_id = filtrosAtuais.marca_id;
       if (filtrosAtuais.fornecedor_id) params.fornecedor_id = filtrosAtuais.fornecedor_id;
@@ -114,10 +78,15 @@ export default function ProdutosBalanco() {
         }),
       ]);
 
-      setProdutos(prodRes.data?.items || []);
+      const items = prodRes.data?.items || [];
+      const total = prodRes.data?.total || items.length;
+      const pages = prodRes.data?.pages || 1;
+
+      setProdutos(items);
+      setTotalItensServidor(total);
+      setTotalPaginasServidor(Math.max(pages, 1));
       setMarcas(marcasRes.data || []);
       setFornecedores(Array.isArray(cliRes.data) ? cliRes.data : (cliRes.data?.items || []));
-      setPaginaAtual(1);
     } catch (error) {
       console.error("Erro ao carregar balanço:", error);
       toast.error("Erro ao carregar produtos para balanço.");
@@ -132,7 +101,8 @@ export default function ProdutosBalanco() {
 
   const aplicarFiltrosServidor = async () => {
     setDestacados({});
-    await carregarDadosComFiltros(filtros);
+    setPaginaAtual(1);
+    await carregarDadosComFiltros(filtros, 1);
   };
 
   const registrarDestaque = (produtoId, tipo) => {
