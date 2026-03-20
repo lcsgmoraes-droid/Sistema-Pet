@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 import json
 import asyncio
 import threading
+import re
 
 from .db import get_session
 from .auth import get_current_user
@@ -56,6 +57,56 @@ def _buscar_item_bling_para_vinculo(bling: BlingAPI, codigo_busca: str, nome_bus
             return item
 
     return itens[0]
+
+
+def _normalizar_termo_busca(valor: Optional[str]) -> str:
+    return (valor or "").strip()
+
+
+def _limpar_texto_busca(valor: str) -> str:
+    return re.sub(r"\s+", " ", valor).strip()
+
+
+def _extrair_lista_produtos_bling(resultado: Optional[dict]) -> list[dict]:
+    itens = (resultado or {}).get("data", [])
+    produtos: list[dict] = []
+    for item in itens:
+        if isinstance(item, dict) and isinstance(item.get("produto"), dict):
+            produtos.append(item.get("produto") or {})
+        elif isinstance(item, dict):
+            produtos.append(item)
+    return produtos
+
+
+def _buscar_produtos_bling_por_termo(bling: BlingAPI, termo: str, pagina: int, limite: int) -> list[dict]:
+    termo_limpo = _limpar_texto_busca(termo)
+    if not termo_limpo:
+        return _extrair_lista_produtos_bling(bling.listar_produtos(pagina=pagina, limite=limite))
+
+    resultados: list[dict] = []
+    vistos: set[str] = set()
+
+    consultas = [
+        {"codigo": termo_limpo, "pagina": pagina, "limite": limite},
+        {"sku": termo_limpo, "pagina": pagina, "limite": limite},
+        {"nome": termo_limpo, "pagina": pagina, "limite": limite},
+    ]
+
+    for params in consultas:
+        try:
+            itens = _extrair_lista_produtos_bling(bling.listar_produtos(**params))
+        except Exception:
+            # Tenta as outras estratégias de busca para reduzir falhas por filtro específico.
+            continue
+
+        for item in itens:
+            item_id = str(item.get("id") or "").strip()
+            if not item_id or item_id in vistos:
+                continue
+            vistos.add(item_id)
+            resultados.append(item)
+
+    return resultados
 
 
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronização Bling"])
@@ -309,9 +360,17 @@ def listar_produtos_bling(
 ):
     """Busca produtos diretamente no Bling para facilitar vínculo manual."""
     try:
-        resultado = BlingAPI().listar_produtos(nome=busca, pagina=pagina, limite=limite)
+        termo = _normalizar_termo_busca(busca)
+        bling = BlingAPI()
+        itens = _buscar_produtos_bling_por_termo(bling, termo, pagina, limite)
+
+        # Fallback final: para termo vazio ou quando filtros específicos retornam vazio,
+        # faz uma listagem padrão da página para não bloquear a tela.
+        if not itens and not termo:
+            itens = _extrair_lista_produtos_bling(bling.listar_produtos(pagina=pagina, limite=limite))
+
         produtos_bling = []
-        for item in resultado.get("data", []):
+        for item in itens:
             produtos_bling.append({
                 "id": str(item.get("id")),
                 "descricao": item.get("nome") or item.get("descricao") or "Sem descrição",
@@ -320,7 +379,13 @@ def listar_produtos_bling(
             })
         return produtos_bling
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao consultar produtos no Bling: {str(e)}")
+        mensagem = str(e)
+        if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
+            raise HTTPException(
+                status_code=429,
+                detail="Bling com limite temporário de consultas. Aguarde alguns segundos e tente novamente.",
+            )
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar produtos no Bling: {mensagem}")
 
 
 @router.get("/health")

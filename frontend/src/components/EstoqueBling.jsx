@@ -176,6 +176,16 @@ function EstoqueBling() {
     [baseRows],
   );
 
+  const vinculadosSemSync = useMemo(
+    () => baseRows.filter((row) => {
+      if (!row.vinculado) return false;
+      const statusComProblema = row.status !== 'ativo';
+      const filaComProblema = ['pendente', 'erro', 'falha_final'].includes(row.queueStatus);
+      return statusComProblema || filaComProblema;
+    }).length,
+    [baseRows],
+  );
+
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter]);
@@ -220,14 +230,19 @@ function EstoqueBling() {
       setBlingProducts(response.data || []);
       toast.success(`Busca concluída: ${(response.data || []).length} item(ns) no Bling`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao buscar produtos no Bling');
+      const detalhe = error.response?.data?.detail;
+      if (error.response?.status === 429) {
+        toast.error(detalhe || 'Bling está com limite temporário. Aguarde alguns segundos e tente novamente.');
+      } else {
+        toast.error(detalhe || 'Erro ao buscar produtos no Bling');
+      }
     } finally {
       setRunningAction('');
     }
   };
 
   const vincularTodosPorSku = async () => {
-    const confirma = window.confirm('Executar vínculo em massa por SKU agora?');
+    const confirma = globalThis.confirm('Executar vínculo em massa por SKU agora?');
     if (!confirma) return;
 
     await runGlobalAction(
@@ -250,7 +265,7 @@ function EstoqueBling() {
       return;
     }
 
-    const confirma = window.confirm(`Sincronizar ${divergentes.length} item(ns) divergente(s) do sistema para o Bling?`);
+    const confirma = globalThis.confirm(`Sincronizar ${divergentes.length} item(ns) divergente(s) do sistema para o Bling?`);
     if (!confirma) return;
 
     setRunningAction('sync-divergentes');
@@ -262,7 +277,7 @@ function EstoqueBling() {
         try {
           await api.post(`/estoque/sync/reconciliar/${row.id}?origem=sistema`);
           ok += 1;
-        } catch (_error) {
+        } catch {
           falhas += 1;
         }
       }
@@ -277,6 +292,7 @@ function EstoqueBling() {
     total: totalProducts,
     vinculados: syncItems.length,
     naoVinculados: naoVinculados.length,
+    vinculadosSemSync,
     erros: health.erros || 0,
     divergentes: health.divergentes || 0,
   };
@@ -286,22 +302,26 @@ function EstoqueBling() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Sincronização Bling</h1>
         <p className="text-sm text-gray-600 mt-1">
-          Aqui você acompanha erros, força uma sincronização por produto e dispara reprocessamentos automáticos.
+          Objetivo: manter 100% dos produtos vinculados com o Bling e com sincronização automática + manual funcionando.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Produtos locais</div>
+          <div className="text-sm text-gray-500">Sistema Pet (total)</div>
           <div className="mt-2 text-3xl font-semibold text-slate-900">{stats.total}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Vinculados</div>
+          <div className="text-sm text-gray-500">Com match no Bling</div>
           <div className="mt-2 text-3xl font-semibold text-emerald-700">{stats.vinculados}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-sm text-gray-500">Não vinculados</div>
+          <div className="text-sm text-gray-500">Faltam vincular</div>
           <div className="mt-2 text-3xl font-semibold text-slate-800">{stats.naoVinculados}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm text-gray-500">Com match sem sync ok</div>
+          <div className="mt-2 text-3xl font-semibold text-orange-700">{stats.vinculadosSemSync}</div>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-gray-500">Com erro</div>
@@ -310,6 +330,16 @@ function EstoqueBling() {
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-gray-500">Divergentes</div>
           <div className="mt-2 text-3xl font-semibold text-amber-700">{stats.divergentes}</div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-sky-900">Como usar esta tela (guia rápido)</h2>
+        <div className="mt-2 grid gap-2 text-sm text-sky-900 md:grid-cols-2">
+          <div><strong>Buscar no Bling:</strong> procura por código, SKU e nome para encontrar match.</div>
+          <div><strong>Vincular em massa por SKU:</strong> tenta vincular vários itens de uma vez automaticamente.</div>
+          <div><strong>Forçar sync:</strong> envia o estoque agora (se não tiver vínculo, tenta vincular antes).</div>
+          <div><strong>Reconciliar:</strong> compara sistema x Bling e corrige divergência de estoque.</div>
         </div>
       </div>
 
