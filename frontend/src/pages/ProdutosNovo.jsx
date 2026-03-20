@@ -1038,6 +1038,15 @@ export default function ProdutosNovo() {
 
     try {
       setSalvando(true);
+
+      // Normaliza composição do kit para o schema do backend.
+      // O backend exige produto_componente_id, mas ao carregar edição pode vir produto_id.
+      const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
+        produto_componente_id: item.produto_componente_id || item.produto_id,
+        quantidade: item.quantidade ? parseFloat(item.quantidade) : 1,
+        ordem: Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : 0,
+        opcional: Boolean(item.opcional),
+      }));
       
       // Preparar dados para envio
       const dados = {
@@ -1077,7 +1086,7 @@ export default function ProdutosNovo() {
           ? formData.e_kit_fisico 
           : null,
         composicao_kit: (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) 
-          ? formData.composicao_kit 
+          ? composicaoKitNormalizada
           : null,
         // Sistema Predecessor/Sucessor
         produto_predecessor_id: formData.produto_predecessor_id || null,
