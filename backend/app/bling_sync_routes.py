@@ -845,6 +845,7 @@ logger.info("✅ Módulo de sincronização Bling carregado")
 @router.post("/vincular-todos")
 def vincular_todos_por_sku(
     limite: int = Query(default=50, ge=1, le=500),
+    timeout_seconds: int = Query(default=25, ge=5, le=55),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -892,12 +893,19 @@ def vincular_todos_por_sku(
     erros = []
     sincronizados_sucesso = 0
     sincronizados_erro = 0
+    interrompido_por_tempo = False
+    inicio_execucao = time.monotonic()
 
     logger.info(f"📦 Processando lote: {total} de {total_sem_vinculo} produtos sem vínculo")
 
     bling = BlingAPI()
 
     for produto in produtos_sem_vinculo:
+        if (time.monotonic() - inicio_execucao) >= timeout_seconds:
+            interrompido_por_tempo = True
+            logger.warning("⏱️ Vínculo em massa interrompido por limite de tempo (%ss)", timeout_seconds)
+            break
+
         try:
             codigo_busca = (produto.codigo or "").strip()
             nome_busca = (produto.nome or "").strip()
@@ -914,9 +922,13 @@ def vincular_todos_por_sku(
 
             _upsert_sync_vinculo(db, tenant_id, produto, bling_produto_id)
 
-            resultado_sync = BlingSyncService.force_sync_now(
+            resultado_sync = BlingSyncService.queue_product_sync(
+                db,
                 produto_id=produto.id,
+                estoque_novo=float(produto.estoque_atual or 0),
                 motivo="vinculo_massa_forcar_sync",
+                origem="manual",
+                force=True,
             )
 
             sync_ok = bool(resultado_sync.get("ok"))
@@ -949,6 +961,8 @@ def vincular_todos_por_sku(
 
     return {
         "limite_lote": limite,
+        "timeout_seconds": timeout_seconds,
+        "interrompido_por_tempo": interrompido_por_tempo,
         "total_sem_vinculo": total_sem_vinculo,
         "total_processados": total,
         "restantes_para_proximo_lote": restantes,

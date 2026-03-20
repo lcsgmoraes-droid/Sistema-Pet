@@ -225,6 +225,8 @@ function EstoqueBling() {
     } catch (error) {
       if (error.code === 'ECONNABORTED') {
         toast.error('A ação em lote demorou além do tempo limite. Tente novamente ou use menos itens por vez.');
+      } else if (error.response?.status === 504) {
+        toast.error('A ação demorou no servidor (504). Vamos processar em partes menores: clique novamente para continuar.');
       } else {
         toast.error(error.response?.data?.detail || 'Erro ao executar ação em lote');
       }
@@ -263,11 +265,12 @@ function EstoqueBling() {
       'vincular-massa',
       () => api.post('/estoque/sync/vincular-todos', {}, {
         timeout: 0,
-        params: { limite: MASS_LINK_BATCH_SIZE },
+        params: { limite: MASS_LINK_BATCH_SIZE, timeout_seconds: 25 },
       }),
       (response) => {
         const data = response.data || {};
-        return `Lote concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0} | Restantes: ${data.restantes_para_proximo_lote || 0}`;
+        const parcial = data.interrompido_por_tempo ? ' | Parcial por tempo' : '';
+        return `Lote concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0} | Restantes: ${data.restantes_para_proximo_lote || 0}${parcial}`;
       },
     );
 
@@ -383,6 +386,9 @@ function EstoqueBling() {
             <div>
               Não encontrados: {lastBatchResult.nao_encontrados_no_bling || 0} | Erros: {lastBatchResult.erros || 0} | Restantes: {lastBatchResult.restantes_para_proximo_lote || 0}
             </div>
+            {lastBatchResult.interrompido_por_tempo && (
+              <div className="mt-1 font-medium">Processamento parcial por tempo. Clique no botão novamente para continuar do ponto seguinte.</div>
+            )}
           </div>
         )}
         <div className="grid gap-3 md:grid-cols-3">
