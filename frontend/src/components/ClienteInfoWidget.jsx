@@ -166,12 +166,12 @@ export default function ClienteInfoWidget({ clienteId }) {
           <div className="flex-1">
             <h3 className="font-bold text-lg text-gray-800 mb-1">{cliente.nome}</h3>
             <div className="text-sm text-gray-600 space-y-1">
-              {cliente.id && (
+              {cliente.codigo && (
                 <p className="flex items-center gap-2">
                   <span className="text-xs font-medium text-gray-500">Código:</span>
-                  <span className="font-mono font-semibold">{cliente.id}</span>
+                  <span className="font-mono font-semibold">{cliente.codigo}</span>
                   <button
-                    onClick={() => copiarDado(cliente.id.toString(), 'code')}
+                    onClick={() => copiarDado(String(cliente.codigo), 'code')}
                     className="text-gray-400 hover:text-gray-700 transition ml-1"
                     title="Copiar código"
                   >

@@ -14,10 +14,12 @@ import {
   Loader2,
   Send,
   CheckCircle,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Copy,
   CreditCard,
   History,
   Layers,
@@ -117,6 +119,7 @@ export default function PDV() {
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
     useState(false);
+  const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
     useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
@@ -1516,6 +1519,22 @@ export default function PDV() {
     setClientesSugeridos([]);
     setSaldoCampanhas(null);
 
+    // Garante dados completos (telefone/celular/codigo) no card principal do PDV.
+    try {
+      const clienteCompleto = await buscarClientePorId(cliente.id);
+      if (clienteCompleto) {
+        setVendaAtual((prev) => ({
+          ...prev,
+          cliente: {
+            ...prev.cliente,
+            ...clienteCompleto,
+          },
+        }));
+      }
+    } catch (_) {
+      // Segue com os dados resumidos para não travar o fluxo do caixa.
+    }
+
     // Verificar se cliente tem vendas em aberto
     try {
       const response = await api.get(
@@ -1538,6 +1557,13 @@ export default function PDV() {
     } catch (_) {
       // Silencioso — campanhas são opcionais
     }
+  };
+
+  const copiarCampoCliente = (valor, campo) => {
+    if (!valor) return;
+    navigator.clipboard.writeText(String(valor));
+    setCopiadoClienteCampo(campo);
+    setTimeout(() => setCopiadoClienteCampo(""), 2000);
   };
 
   // Selecionar pet
@@ -2863,11 +2889,61 @@ export default function PDV() {
                           <div className="font-semibold text-blue-900">
                             {vendaAtual.cliente.nome}
                           </div>
-                          <div className="text-sm text-blue-700 mt-1">
-                            {vendaAtual.cliente.cpf &&
-                              `CPF: ${vendaAtual.cliente.cpf}`}
-                            {vendaAtual.cliente.telefone &&
-                              ` • Tel: ${vendaAtual.cliente.telefone}`}
+                          <div className="text-sm text-blue-700 mt-1 space-y-1">
+                            <div>
+                              {vendaAtual.cliente.cpf &&
+                                `CPF: ${vendaAtual.cliente.cpf}`}
+                            </div>
+                            {(vendaAtual.cliente.codigo || vendaAtual.cliente.id) && (
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  Código: {vendaAtual.cliente.codigo || vendaAtual.cliente.id}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    copiarCampoCliente(
+                                      vendaAtual.cliente.codigo || vendaAtual.cliente.id,
+                                      "codigo",
+                                    )
+                                  }
+                                  className="text-blue-700 hover:text-blue-900"
+                                  title="Copiar código do cliente"
+                                >
+                                  {copiadoClienteCampo === "codigo" ? (
+                                    <Check className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <Copy className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                            {(vendaAtual.cliente.telefone ||
+                              vendaAtual.cliente.celular ||
+                              vendaAtual.cliente.whatsapp) && (
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  Tel: {vendaAtual.cliente.telefone || vendaAtual.cliente.celular || vendaAtual.cliente.whatsapp}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    copiarCampoCliente(
+                                      vendaAtual.cliente.telefone ||
+                                        vendaAtual.cliente.celular ||
+                                        vendaAtual.cliente.whatsapp,
+                                      "telefone",
+                                    )
+                                  }
+                                  className="text-blue-700 hover:text-blue-900"
+                                  title="Copiar telefone do cliente"
+                                >
+                                  {copiadoClienteCampo === "telefone" ? (
+                                    <Check className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <Copy className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
