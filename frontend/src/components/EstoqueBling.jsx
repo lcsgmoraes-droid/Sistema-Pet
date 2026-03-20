@@ -28,6 +28,7 @@ function formatNumber(value) {
 
 function EstoqueBling() {
   const PRODUCTS_PAGE_SIZE = 99999;
+  const MASS_LINK_BATCH_SIZE = 50;
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -219,7 +220,11 @@ function EstoqueBling() {
       toast.success(successMessage(response));
       await loadPage(search);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao executar ação em lote');
+      if (error.code === 'ECONNABORTED') {
+        toast.error('A ação em lote demorou além do tempo limite. Tente novamente ou use menos itens por vez.');
+      } else {
+        toast.error(error.response?.data?.detail || 'Erro ao executar ação em lote');
+      }
     } finally {
       setRunningAction('');
     }
@@ -247,15 +252,18 @@ function EstoqueBling() {
   };
 
   const vincularTodosPorSku = async () => {
-    const confirma = globalThis.confirm('Executar vínculo em massa por SKU agora?');
+    const confirma = globalThis.confirm(`Executar vínculo em massa por SKU em lote de ${MASS_LINK_BATCH_SIZE} itens agora?`);
     if (!confirma) return;
 
     await runGlobalAction(
       'vincular-massa',
-      () => api.post('/estoque/sync/vincular-todos'),
+      () => api.post('/estoque/sync/vincular-todos', {}, {
+        timeout: 0,
+        params: { limite: MASS_LINK_BATCH_SIZE },
+      }),
       (response) => {
         const data = response.data || {};
-        return `Vínculo em massa concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0}`;
+        return `Lote concluído. Vinculados: ${data.vinculados || 0} | Não encontrados: ${data.nao_encontrados_no_bling || 0} | Erros: ${data.erros || 0} | Restantes: ${data.restantes_para_proximo_lote || 0}`;
       },
     );
   };

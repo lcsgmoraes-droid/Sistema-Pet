@@ -838,6 +838,7 @@ logger.info("✅ Módulo de sincronização Bling carregado")
 
 @router.post("/vincular-todos")
 def vincular_todos_por_sku(
+    limite: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -865,7 +866,7 @@ def vincular_todos_por_sku(
         .subquery()
     )
 
-    produtos_sem_vinculo = (
+    consulta_sem_vinculo = (
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
@@ -874,15 +875,17 @@ def vincular_todos_por_sku(
             Produto.tipo_produto != "PAI"
         )
         .filter(Produto.id.notin_(subq_vinculados))
-        .all()
     )
+
+    total_sem_vinculo = consulta_sem_vinculo.count()
+    produtos_sem_vinculo = consulta_sem_vinculo.limit(limite).all()
 
     total = len(produtos_sem_vinculo)
     vinculados = []
     nao_encontrados = []
     erros = []
 
-    logger.info(f"📦 {total} produtos sem vínculo para processar")
+    logger.info(f"📦 Processando lote: {total} de {total_sem_vinculo} produtos sem vínculo")
 
     bling = BlingAPI()
 
@@ -921,8 +924,13 @@ def vincular_todos_por_sku(
 
     logger.info(f"🔗 Vinculação concluída: {len(vinculados)} vinculados, {len(nao_encontrados)} não encontrados, {len(erros)} erros")
 
+    restantes = max(total_sem_vinculo - total, 0)
+
     return {
+        "limite_lote": limite,
+        "total_sem_vinculo": total_sem_vinculo,
         "total_processados": total,
+        "restantes_para_proximo_lote": restantes,
         "vinculados": len(vinculados),
         "nao_encontrados_no_bling": len(nao_encontrados),
         "erros": len(erros),
