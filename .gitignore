@@ -49,6 +49,7 @@ yarn-error.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.vscode/settings.json
 *.code-workspace
 
 # Logs
@@ -141,3 +142,9 @@ frontend/vite.config.js.timestamp-*.mjs
 
 # MCP Debug Tools (gerado automaticamente pelo VS Code, nunca versionar)
 .mcp-debug-tools/
+
+# Arquivo morto local de materiais externos temporarios
+.arquivo-morto-local/
+
+# Documentos locais do caso Bradesco (uso temporario no DEV, nunca versionar)
+Bradesco Will/
