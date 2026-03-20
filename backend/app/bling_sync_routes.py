@@ -16,6 +16,7 @@ import json
 import asyncio
 import threading
 import re
+import time
 
 from .db import get_session
 from .auth import get_current_user
@@ -107,6 +108,46 @@ def _buscar_produtos_bling_por_termo(bling: BlingAPI, termo: str, pagina: int, l
             resultados.append(item)
 
     return resultados
+
+
+def _buscar_item_bling_com_retry(bling: BlingAPI, codigo_busca: str, nome_busca: str) -> Optional[dict]:
+    ultima_falha = None
+    for tentativa in range(3):
+        try:
+            return _buscar_item_bling_para_vinculo(bling, codigo_busca, nome_busca)
+        except Exception as e:
+            ultima_falha = e
+            msg = str(e)
+            if "429" in msg or "TOO_MANY_REQUESTS" in msg:
+                time.sleep(0.8 + tentativa * 0.6)
+                continue
+            raise
+
+    if ultima_falha:
+        raise ultima_falha
+    return None
+
+
+def _upsert_sync_vinculo(
+    db: Session,
+    tenant_id,
+    produto: Produto,
+    bling_produto_id: str,
+) -> None:
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == produto.id,
+        ProdutoBlingSync.tenant_id == tenant_id
+    ).first()
+
+    if not sync:
+        sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
+        db.add(sync)
+
+    sync.bling_produto_id = bling_produto_id
+    sync.sincronizar = True
+    sync.status = "ativo"
+    sync.erro_mensagem = None
+    sync.updated_at = utc_now()
 
 
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronização Bling"])
@@ -461,12 +502,15 @@ def status_sincronizacao(
     - apenas_divergencias: Se TRUE, mostra apenas produtos com divergência de estoque
     """
     logger.info("📊 Consultando status de sincronização")
+    _current_user, tenant_id = user_and_tenant
     
     # Buscar produtos com sincronização configurada
     query = db.query(Produto, ProdutoBlingSync).join(
         ProdutoBlingSync,
         Produto.id == ProdutoBlingSync.produto_id
     ).filter(
+        Produto.tenant_id == tenant_id,
+        ProdutoBlingSync.tenant_id == tenant_id,
         ProdutoBlingSync.sincronizar == True
     )
 
@@ -808,17 +852,23 @@ def vincular_todos_por_sku(
     Retorna resumo com vinculados, não encontrados e erros.
     """
     logger.info("🔗 Iniciando vinculação em massa por SKU")
+    _current_user, tenant_id = user_and_tenant
 
     # Produtos sem vínculo ou com bling_produto_id vazio
     subq_vinculados = (
         db.query(ProdutoBlingSync.produto_id)
-        .filter(ProdutoBlingSync.bling_produto_id.isnot(None))
+        .filter(
+            ProdutoBlingSync.tenant_id == tenant_id,
+            ProdutoBlingSync.bling_produto_id.isnot(None),
+            ProdutoBlingSync.bling_produto_id != ""
+        )
         .subquery()
     )
 
     produtos_sem_vinculo = (
         db.query(Produto)
         .filter(
+            Produto.tenant_id == tenant_id,
             Produto.codigo.isnot(None),
             Produto.codigo != "",
             Produto.tipo_produto != "PAI"
@@ -838,27 +888,20 @@ def vincular_todos_por_sku(
 
     for produto in produtos_sem_vinculo:
         try:
-            resultado = bling.listar_produtos(codigo=produto.codigo)
-            itens_bling = resultado.get("data", [])
+            codigo_busca = (produto.codigo or "").strip()
+            nome_busca = (produto.nome or "").strip()
+            item_escolhido = _buscar_item_bling_com_retry(bling, codigo_busca, nome_busca)
 
-            if not itens_bling:
+            if not item_escolhido:
                 nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
                 continue
 
-            bling_produto = itens_bling[0]
-            bling_produto_id = str(bling_produto.get("id"))
+            bling_produto_id = str(item_escolhido.get("id") or "").strip()
+            if not bling_produto_id:
+                nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
+                continue
 
-            # Buscar ou criar configuracao
-            sync = db.query(ProdutoBlingSync).filter(ProdutoBlingSync.produto_id == produto.id).first()
-            if not sync:
-                sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
-                db.add(sync)
-
-            sync.bling_produto_id = bling_produto_id
-            sync.sincronizar = True
-            sync.status = "ativo"
-            sync.erro_mensagem = None
-            sync.updated_at = utc_now()
+            _upsert_sync_vinculo(db, tenant_id, produto, bling_produto_id)
 
             vinculados.append({
                 "produto_id": produto.id,
@@ -868,6 +911,7 @@ def vincular_todos_por_sku(
             })
 
             logger.info(f"✅ Vinculado: {produto.codigo} → Bling ID {bling_produto_id}")
+            time.sleep(0.35)
 
         except Exception as e:
             logger.error(f"❌ Erro ao vincular produto {produto.codigo}: {e}")

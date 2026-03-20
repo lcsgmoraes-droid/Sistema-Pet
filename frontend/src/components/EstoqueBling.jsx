@@ -176,6 +176,11 @@ function EstoqueBling() {
     [baseRows],
   );
 
+  const comMatchNoBling = useMemo(
+    () => baseRows.filter((row) => row.vinculado).length,
+    [baseRows],
+  );
+
   const vinculadosSemSync = useMemo(
     () => baseRows.filter((row) => {
       if (!row.vinculado) return false;
@@ -290,7 +295,7 @@ function EstoqueBling() {
 
   const stats = {
     total: totalProducts,
-    vinculados: syncItems.length,
+    vinculados: comMatchNoBling,
     naoVinculados: naoVinculados.length,
     vinculadosSemSync,
     erros: health.erros || 0,
@@ -303,6 +308,9 @@ function EstoqueBling() {
         <h1 className="text-2xl font-bold text-gray-900">Sincronização Bling</h1>
         <p className="text-sm text-gray-600 mt-1">
           Objetivo: manter 100% dos produtos vinculados com o Bling e com sincronização automática + manual funcionando.
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Regra dos números: Sistema Pet (total) = Com match no Bling + Faltam vincular.
         </p>
       </div>
 
