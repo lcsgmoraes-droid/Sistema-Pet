@@ -733,6 +733,7 @@ export default function Produtos() {
     fornecedor_id: "",
     estoque_baixo: false,
     em_promocao: false,
+    mostrarPaisVariacoes: false,
   });
 
   // Paginação
@@ -835,6 +836,13 @@ export default function Produtos() {
     // Filtro de em promoção
     if (filtros.em_promocao) {
       produtosTemp = produtosTemp.filter((p) => p.promocao_ativa === true);
+    }
+
+    // Filtro de mostrar/ocultar produtos PAI e VARIAÇÃO
+    if (!filtros.mostrarPaisVariacoes) {
+      produtosTemp = produtosTemp.filter(
+        (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO"
+      );
     }
 
     return produtosTemp;
@@ -1529,6 +1537,18 @@ export default function Produtos() {
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">Em Promoção</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filtros.mostrarPaisVariacoes}
+                onChange={(e) =>
+                  handleFiltroChange("mostrarPaisVariacoes", e.target.checked)
+                }
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-sm text-gray-700">Mostrar Pais e Variações</span>
             </label>
 
             <label
