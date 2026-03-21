@@ -274,7 +274,27 @@ def _listar_todos_produtos_bling(bling: BlingAPI, limite: int = 100, max_paginas
     completo = True
 
     for pagina in range(1, max_paginas + 1):
-        resultado = bling.listar_produtos(pagina=pagina, limite=limite)
+        resultado = None
+        ultima_falha = None
+        for tentativa in range(3):
+            try:
+                resultado = bling.listar_produtos(pagina=pagina, limite=limite)
+                ultima_falha = None
+                break
+            except Exception as e:
+                ultima_falha = e
+                mensagem = str(e)
+                if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
+                    time.sleep(0.8 + tentativa * 0.7)
+                    continue
+                raise
+
+        if ultima_falha:
+            # Falha após retries: retorna parcial para não derrubar a tela.
+            logger.warning("⚠️ Coleta parcial no Bling (página %s): %s", pagina, ultima_falha)
+            completo = False
+            break
+
         pagina_itens = _extrair_lista_produtos_bling(resultado)
         if not pagina_itens:
             break
@@ -369,13 +389,26 @@ def _calcular_resumo_cobertura_bling(db: Session, tenant_id: int) -> dict:
 
 def _get_resumo_cobertura_bling(db: Session, tenant_id: int, force_refresh: bool = False) -> dict:
     agora = time.monotonic()
-    if not force_refresh:
-        with _cobertura_bling_lock:
-            cache = _cobertura_bling_cache.get(tenant_id)
-            if cache and (agora - cache.get("ts_monotonic", 0)) <= _COBERTURA_BLG_CACHE_SECONDS:
-                return cache.get("payload", {})
+    cache_atual = None
 
-    payload = _calcular_resumo_cobertura_bling(db, tenant_id)
+    with _cobertura_bling_lock:
+        cache_atual = _cobertura_bling_cache.get(tenant_id)
+
+    if not force_refresh:
+        if cache_atual and (agora - cache_atual.get("ts_monotonic", 0)) <= _COBERTURA_BLG_CACHE_SECONDS:
+            return cache_atual.get("payload", {})
+
+    try:
+        payload = _calcular_resumo_cobertura_bling(db, tenant_id)
+    except Exception as e:
+        if cache_atual and cache_atual.get("payload"):
+            payload = dict(cache_atual.get("payload", {}))
+            payload["coleta_bling_completa"] = False
+            payload["cache_utilizado_por_falha"] = True
+            payload["erro_coleta_bling"] = str(e)
+            payload["atualizado_em"] = payload.get("atualizado_em") or utc_now()
+            return payload
+        raise
 
     with _cobertura_bling_lock:
         _cobertura_bling_cache[tenant_id] = {
@@ -659,7 +692,19 @@ def resumo_cobertura_bling(
         return _get_resumo_cobertura_bling(db, tenant_id=tenant_id, force_refresh=force_refresh)
     except Exception as e:
         logger.error(f"❌ Erro ao gerar resumo de cobertura Bling: {e}")
-        raise HTTPException(status_code=500, detail="Falha ao gerar resumo de cobertura Bling")
+        # Não quebrar a tela: retorna payload seguro quando falhar sem cache.
+        return {
+            "total_bling": 0,
+            "bling_com_match_no_sistema": 0,
+            "bling_sem_match_no_sistema": 0,
+            "bling_sync_ok": 0,
+            "bling_com_problema": 0,
+            "total_sistema": db.query(Produto).filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI").count(),
+            "somente_sistema": db.query(Produto).filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI").count(),
+            "coleta_bling_completa": False,
+            "erro_coleta_bling": "Falha temporaria ao consultar Bling",
+            "atualizado_em": utc_now(),
+        }
 
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING
