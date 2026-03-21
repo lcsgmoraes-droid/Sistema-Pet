@@ -1116,7 +1116,7 @@ def vincular_todos_por_sku(
     """
     Vincula automaticamente produtos do sistema com o Bling pelo código (SKU).
 
-    Para cada produto sem vínculo:
+    Para cada produto faltante no recorte Bling-centric (existe no Bling e ainda sem vínculo local):
     - Busca no Bling pelo campo `codigo`
     - Se encontrar, cria ou atualiza ProdutoBlingSync com o ID do Bling
     - Produtos do tipo PAI são ignorados
@@ -1148,8 +1148,50 @@ def vincular_todos_por_sku(
         .filter(Produto.id.notin_(subq_vinculados))
     )
 
-    total_sem_vinculo = consulta_sem_vinculo.count()
-    produtos_sem_vinculo = consulta_sem_vinculo.limit(limite).all()
+    # Universo local ainda sem vínculo (antes do recorte Bling-centric)
+    total_universo_sem_vinculo = consulta_sem_vinculo.count()
+    produtos_sem_vinculo_info = consulta_sem_vinculo.with_entities(
+        Produto.id,
+        Produto.codigo,
+        Produto.codigo_barras,
+        Produto.gtin_ean,
+        Produto.gtin_ean_tributario,
+    ).all()
+
+    codigos_para_produto_sem_vinculo: dict[str, set[int]] = {}
+    for produto_info in produtos_sem_vinculo_info:
+        for chave in [
+            _chave_codigo_produto(produto_info.codigo),
+            _chave_codigo_produto(produto_info.codigo_barras),
+            _chave_codigo_produto(produto_info.gtin_ean),
+            _chave_codigo_produto(produto_info.gtin_ean_tributario),
+        ]:
+            if not chave:
+                continue
+            codigos_para_produto_sem_vinculo.setdefault(chave, set()).add(produto_info.id)
+
+    bling = BlingAPI()
+    bling_itens, coleta_bling_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
+
+    ids_sem_vinculo_com_match_bling: set[int] = set()
+    for item in bling_itens:
+        codigos_bling = _extrair_codigos_bling_item(item)
+        if not codigos_bling:
+            continue
+        for codigo in codigos_bling:
+            ids_sem_vinculo_com_match_bling.update(codigos_para_produto_sem_vinculo.get(codigo, set()))
+
+    total_sem_vinculo = len(ids_sem_vinculo_com_match_bling)
+    if total_sem_vinculo > 0:
+        produtos_sem_vinculo = (
+            consulta_sem_vinculo
+            .filter(Produto.id.in_(ids_sem_vinculo_com_match_bling))
+            .order_by(Produto.id.asc())
+            .limit(limite)
+            .all()
+        )
+    else:
+        produtos_sem_vinculo = []
 
     total = len(produtos_sem_vinculo)
     vinculados = []
@@ -1160,9 +1202,12 @@ def vincular_todos_por_sku(
     interrompido_por_tempo = False
     inicio_execucao = time.monotonic()
 
-    logger.info(f"📦 Processando lote: {total} de {total_sem_vinculo} produtos sem vínculo")
-
-    bling = BlingAPI()
+    logger.info(
+        "📦 Processando lote Bling-centric: %s de %s faltantes (universo local sem vínculo: %s)",
+        total,
+        total_sem_vinculo,
+        total_universo_sem_vinculo,
+    )
 
     for produto in produtos_sem_vinculo:
         if (time.monotonic() - inicio_execucao) >= timeout_seconds:
@@ -1237,6 +1282,9 @@ def vincular_todos_por_sku(
         "limite_lote": limite,
         "timeout_seconds": timeout_seconds,
         "interrompido_por_tempo": interrompido_por_tempo,
+        "total_universo_local_sem_vinculo": total_universo_sem_vinculo,
+        "total_bling_analisado": len(bling_itens),
+        "coleta_bling_completa": coleta_bling_completa,
         "total_sem_vinculo": total_sem_vinculo,
         "total_processados": total,
         "restantes_para_proximo_lote": restantes,
