@@ -27,7 +27,7 @@ function formatNumber(value) {
 }
 
 function EstoqueBling() {
-  const PRODUCTS_PAGE_SIZE = 99999;
+  const UNLINKED_PRODUCTS_LIMIT = 2000;
   const MASS_LINK_BATCH_SIZE = 50;
   const HEAVY_REQUEST_TIMEOUT_MS = 60000;
   const [loading, setLoading] = useState(false);
@@ -44,6 +44,15 @@ function EstoqueBling() {
   const [runningAction, setRunningAction] = useState('');
   const [rowActionId, setRowActionId] = useState(null);
   const [lastBatchResult, setLastBatchResult] = useState(null);
+  const [faltantesBling, setFaltantesBling] = useState([]);
+  const [faltantesMeta, setFaltantesMeta] = useState({
+    total: 0,
+    snapshotDisponivel: false,
+    coletaCompleta: true,
+    atualizadoEm: null,
+    cacheIdadeSegundos: 0,
+    precisaAtualizar: true,
+  });
   const [cobertura, setCobertura] = useState({
     total_bling: 0,
     bling_com_match_no_sistema: 0,
@@ -76,12 +85,12 @@ function EstoqueBling() {
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
 
-    // Produtos são prioridade visual: preencher a tabela sem esperar status/health.
-    const productsRequest = requestWithRetry(() => api.get('/produtos/', {
+    // Produtos sem vínculo em endpoint leve: evita chamar /produtos (rota pesada) ao abrir a tela.
+    const productsRequest = requestWithRetry(() => api.get('/estoque/sync/produtos-sem-vinculo', {
       timeout: HEAVY_REQUEST_TIMEOUT_MS,
       params: {
-        page: 1,
-        page_size: PRODUCTS_PAGE_SIZE,
+        limit: UNLINKED_PRODUCTS_LIMIT,
+        ...(currentSearch ? { busca: currentSearch } : {}),
       },
     }));
     const healthRequest = api.get('/estoque/sync/health');
@@ -95,21 +104,9 @@ function EstoqueBling() {
       .then((response) => {
         const payload = response?.data;
 
-        if (Array.isArray(payload)) {
-          setProducts(payload);
-          setTotalProducts(payload.length);
-          return;
-        }
-
         if (Array.isArray(payload?.items)) {
           setProducts(payload.items);
           setTotalProducts(Number(payload?.total ?? payload.items.length ?? 0));
-          return;
-        }
-
-        if (Array.isArray(payload?.produtos)) {
-          setProducts(payload.produtos);
-          setTotalProducts(Number(payload?.total ?? payload.produtos.length ?? 0));
           return;
         }
 
@@ -190,7 +187,7 @@ function EstoqueBling() {
   }, [syncItems]);
 
   const baseRows = useMemo(() => {
-    return products.map((product) => {
+    const unlinkedRows = products.map((product) => {
       const sync = syncMap.get(product.id);
       return {
         id: product.id,
@@ -212,7 +209,33 @@ function EstoqueBling() {
         vinculado: Boolean(sync?.bling_produto_id),
       };
     });
-  }, [products, syncMap]);
+
+    const unlinkedIds = new Set(products.map((product) => product.id));
+
+    const linkedRows = syncItems
+      .filter((item) => !unlinkedIds.has(item.produto_id))
+      .map((item) => ({
+        id: item.produto_id,
+        codigo: item.sku,
+        nome: item.produto_nome,
+        estoqueAtual: item.estoque_sistema ?? 0,
+        sku: item.sku,
+        blingId: item.bling_produto_id || '',
+        status: item.status || 'pendente',
+        queueStatus: item.queue_status || null,
+        ultimaSincronizacao: item.ultima_sincronizacao || null,
+        ultimaTentativa: item.ultima_tentativa_sync || null,
+        proximaTentativa: item.proxima_tentativa_sync || null,
+        ultimaConferencia: item.ultima_conferencia_bling || null,
+        ultimoErro: item.ultimo_erro || '',
+        tentativas: item.tentativas_sync || 0,
+        estoqueBling: item.estoque_bling,
+        divergencia: item.divergencia,
+        vinculado: Boolean(item.bling_produto_id),
+      }));
+
+    return [...unlinkedRows, ...linkedRows];
+  }, [products, syncMap, syncItems]);
 
   const mergedRows = useMemo(() => {
     return baseRows.filter((row) => {
@@ -320,6 +343,31 @@ function EstoqueBling() {
       } else {
         toast.error(detalhe || 'Erro ao buscar produtos no Bling');
       }
+    } finally {
+      setRunningAction('');
+    }
+  };
+
+  const atualizarFaltantesBling = async () => {
+    setRunningAction('faltantes-bling');
+    try {
+      const response = await api.get('/estoque/sync/faltantes-bling', {
+        timeout: HEAVY_REQUEST_TIMEOUT_MS,
+        params: { force_refresh: true, limit: 100, offset: 0 },
+      });
+      const data = response?.data || {};
+      setFaltantesBling(data.items || []);
+      setFaltantesMeta({
+        total: Number(data.total || 0),
+        snapshotDisponivel: Boolean(data.snapshot_disponivel),
+        coletaCompleta: Boolean(data.coleta_bling_completa),
+        atualizadoEm: data.atualizado_em || null,
+        cacheIdadeSegundos: Number(data.cache_idade_segundos || 0),
+        precisaAtualizar: false,
+      });
+      toast.success(`Snapshot atualizado. Faltantes no Bling: ${Number(data.total || 0)}`);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar faltantes do Bling');
     } finally {
       setRunningAction('');
     }
@@ -471,6 +519,30 @@ function EstoqueBling() {
             )}
           </div>
         )}
+        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 space-y-2">
+          <div className="font-semibold">Snapshot de faltantes no Bling</div>
+          <div>
+            A tela não recalcula tudo automaticamente ao abrir. Atualize só quando precisar.
+          </div>
+          <div>
+            Total faltantes: {faltantesMeta.total} | Atualizado em: {formatDate(faltantesMeta.atualizadoEm)}
+          </div>
+          {!faltantesMeta.coletaCompleta && (
+            <div className="font-medium text-amber-700">Coleta parcial no Bling (limite temporário). Dados podem estar incompletos.</div>
+          )}
+          {faltantesMeta.precisaAtualizar && (
+            <div className="text-slate-700">Ainda sem snapshot nesta sessão. Clique em atualizar faltantes.</div>
+          )}
+          <div>
+            <button
+              onClick={atualizarFaltantesBling}
+              disabled={runningAction !== ''}
+              className="rounded-lg border border-sky-300 bg-white px-4 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+            >
+              {runningAction === 'faltantes-bling' ? 'Atualizando faltantes...' : 'Atualizar faltantes do Bling'}
+            </button>
+          </div>
+        </div>
         <div className="grid gap-3 md:grid-cols-3">
           <button
             onClick={() => runGlobalAction(
@@ -527,6 +599,37 @@ function EstoqueBling() {
           </button>
         </div>
       </div>
+
+      {faltantesBling.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Faltantes no Bling (amostra)</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Mostrando os primeiros 100 itens do snapshot para priorizar cadastro e vínculo no Sistema Pet.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Produto no Bling</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Código</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Estoque</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {faltantesBling.map((item) => (
+                  <tr key={`faltante-bling-${item.id || item.codigo || item.descricao}`}>
+                    <td className="px-4 py-3 text-slate-800 font-medium">{item.descricao}</td>
+                    <td className="px-4 py-3 text-slate-600">{item.codigo || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatNumber(item.estoque)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {naoVinculados.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">

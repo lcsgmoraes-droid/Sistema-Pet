@@ -230,6 +230,10 @@ _cobertura_bling_lock = threading.Lock()
 _cobertura_bling_cache: dict[int, dict] = {}
 _COBERTURA_BLG_CACHE_SECONDS = 180
 
+_faltantes_bling_lock = threading.Lock()
+_faltantes_bling_cache: dict[int, dict] = {}
+_FALTANTES_BLG_CACHE_SECONDS = 300
+
 
 def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
     try:
@@ -417,6 +421,98 @@ def _get_resumo_cobertura_bling(db: Session, tenant_id: int, force_refresh: bool
         }
 
     return payload
+
+
+def _calcular_snapshot_faltantes_bling(db: Session, tenant_id: int) -> dict:
+    produtos_locais = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.tipo_produto != "PAI",
+    ).all()
+
+    codigos_locais: set[str] = set()
+    for produto in produtos_locais:
+        for chave in [
+            _chave_codigo_produto(produto.codigo),
+            _chave_codigo_produto(produto.codigo_barras),
+            _chave_codigo_produto(produto.gtin_ean),
+            _chave_codigo_produto(produto.gtin_ean_tributario),
+        ]:
+            if chave:
+                codigos_locais.add(chave)
+
+    bling = BlingAPI()
+    bling_itens, coleta_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
+
+    faltantes: list[dict] = []
+    ids_ja_adicionados: set[str] = set()
+    for item in bling_itens:
+        codigos_bling = _extrair_codigos_bling_item(item)
+        if codigos_bling and codigos_bling.intersection(codigos_locais):
+            continue
+
+        bling_id = str(item.get("id") or "").strip()
+        if bling_id and bling_id in ids_ja_adicionados:
+            continue
+        if bling_id:
+            ids_ja_adicionados.add(bling_id)
+
+        faltantes.append({
+            "id": bling_id,
+            "descricao": item.get("nome") or item.get("descricao") or "Sem descrição",
+            "codigo": item.get("codigo") or item.get("sku") or "",
+            "estoque": float(item.get("estoque") or item.get("saldoFisicoTotal") or 0),
+        })
+
+    return {
+        "items": faltantes,
+        "total": len(faltantes),
+        "total_bling": len(bling_itens),
+        "coleta_bling_completa": coleta_completa,
+        "atualizado_em": utc_now(),
+    }
+
+
+def _get_snapshot_faltantes_bling(
+    db: Session,
+    tenant_id: int,
+    force_refresh: bool = False,
+) -> dict:
+    agora = time.monotonic()
+    cache_atual = None
+
+    with _faltantes_bling_lock:
+        cache_atual = _faltantes_bling_cache.get(tenant_id)
+
+    if not force_refresh and cache_atual:
+        return {
+            **cache_atual.get("payload", {}),
+            "snapshot_disponivel": True,
+            "cache_idade_segundos": int(max(agora - cache_atual.get("ts_monotonic", 0), 0)),
+        }
+
+    try:
+        payload = _calcular_snapshot_faltantes_bling(db, tenant_id)
+    except Exception as e:
+        if cache_atual and cache_atual.get("payload"):
+            payload = dict(cache_atual.get("payload", {}))
+            payload["snapshot_disponivel"] = True
+            payload["coleta_bling_completa"] = False
+            payload["cache_utilizado_por_falha"] = True
+            payload["erro_coleta_bling"] = str(e)
+            return payload
+        raise
+
+    with _faltantes_bling_lock:
+        _faltantes_bling_cache[tenant_id] = {
+            "ts_monotonic": agora,
+            "payload": payload,
+        }
+
+    return {
+        **payload,
+        "snapshot_disponivel": True,
+        "cache_idade_segundos": 0,
+    }
 
 # ============================================================================
 # SCHEMAS
@@ -676,6 +772,72 @@ def health_sincronizacao(
     return BlingSyncService.get_health_snapshot(db, tenant_id=tenant_id)
 
 
+@router.get("/produtos-sem-vinculo")
+def listar_produtos_sem_vinculo(
+    busca: Optional[str] = Query(default=None),
+    limit: int = Query(default=2000, ge=1, le=5000),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Lista rápida de produtos locais sem vínculo no Bling para a tela operacional."""
+    _current_user, tenant_id = user_and_tenant
+
+    subq_vinculados = (
+        db.query(ProdutoBlingSync.produto_id)
+        .filter(
+            ProdutoBlingSync.tenant_id == tenant_id,
+            ProdutoBlingSync.bling_produto_id.isnot(None),
+            ProdutoBlingSync.bling_produto_id != "",
+        )
+        .subquery()
+    )
+
+    query = (
+        db.query(
+            Produto.id,
+            Produto.nome,
+            Produto.codigo,
+            Produto.estoque_atual,
+        )
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.tipo_produto != "PAI",
+            Produto.codigo.isnot(None),
+            Produto.codigo != "",
+        )
+        .filter(Produto.id.notin_(subq_vinculados))
+    )
+
+    termo = (busca or "").strip()
+    if termo:
+        like = f"%{termo}%"
+        query = query.filter(
+            or_(
+                Produto.nome.ilike(like),
+                Produto.codigo.ilike(like),
+            )
+        )
+
+    total = query.count()
+    itens = query.order_by(Produto.id.asc()).offset(offset).limit(limit).all()
+
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "nome": item.nome,
+                "codigo": item.codigo,
+                "estoque_atual": float(item.estoque_atual or 0),
+            }
+            for item in itens
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+    }
+
+
 @router.get("/resumo-cobertura")
 def resumo_cobertura_bling(
     force_refresh: bool = Query(default=False),
@@ -705,6 +867,73 @@ def resumo_cobertura_bling(
             "erro_coleta_bling": "Falha temporaria ao consultar Bling",
             "atualizado_em": utc_now(),
         }
+
+
+@router.get("/faltantes-bling")
+def listar_faltantes_bling(
+    force_refresh: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Retorna snapshot dos produtos existentes no Bling que não possuem match no Sistema Pet.
+
+    - Sem force_refresh: usa cache para responder rápido.
+    - Com force_refresh: recalcula snapshot sob demanda.
+    """
+    _current_user, tenant_id = user_and_tenant
+
+    with _faltantes_bling_lock:
+        cache_atual = _faltantes_bling_cache.get(tenant_id)
+
+    if not force_refresh and not cache_atual:
+        return {
+            "items": [],
+            "total": 0,
+            "total_bling": 0,
+            "snapshot_disponivel": False,
+            "coleta_bling_completa": False,
+            "precisa_atualizar": True,
+            "message": "Snapshot ainda não gerado. Clique em atualizar faltantes.",
+            "atualizado_em": None,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    try:
+        snapshot = _get_snapshot_faltantes_bling(db, tenant_id=tenant_id, force_refresh=force_refresh)
+    except Exception as e:
+        logger.error(f"❌ Erro ao gerar snapshot de faltantes Bling: {e}")
+        return {
+            "items": [],
+            "total": 0,
+            "total_bling": 0,
+            "snapshot_disponivel": False,
+            "coleta_bling_completa": False,
+            "precisa_atualizar": True,
+            "erro_coleta_bling": "Falha temporária ao consultar o Bling",
+            "atualizado_em": None,
+            "limit": limit,
+            "offset": offset,
+        }
+
+    itens = snapshot.get("items", [])
+    paginados = itens[offset: offset + limit]
+
+    return {
+        "items": paginados,
+        "total": snapshot.get("total", len(itens)),
+        "total_bling": snapshot.get("total_bling", 0),
+        "snapshot_disponivel": snapshot.get("snapshot_disponivel", True),
+        "coleta_bling_completa": snapshot.get("coleta_bling_completa", True),
+        "cache_utilizado_por_falha": snapshot.get("cache_utilizado_por_falha", False),
+        "cache_idade_segundos": snapshot.get("cache_idade_segundos", 0),
+        "atualizado_em": snapshot.get("atualizado_em"),
+        "limit": limit,
+        "offset": offset,
+    }
 
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING
