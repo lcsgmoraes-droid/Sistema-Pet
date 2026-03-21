@@ -635,16 +635,16 @@ function EstoqueBling() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Produtos não vinculados</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Produtos do Sistema Pet sem vínculo (com match no Bling)</h2>
               <p className="text-sm text-gray-500 mt-1">
-                Mostrando os primeiros 20 para agilizar seu trabalho. Use os botões para filtrar e buscar no Bling.
+                Mostrando os primeiros 20 com base no catálogo do Bling para agilizar o vínculo correto.
               </p>
             </div>
             <button
               onClick={() => setStatusFilter('nao_vinculado')}
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Ver todos os não vinculados
+              Ver todos os sem vínculo com match
             </button>
           </div>
 

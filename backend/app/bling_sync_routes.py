@@ -234,6 +234,10 @@ _faltantes_bling_lock = threading.Lock()
 _faltantes_bling_cache: dict[int, dict] = {}
 _FALTANTES_BLG_CACHE_SECONDS = 300
 
+_sem_vinculo_match_bling_lock = threading.Lock()
+_sem_vinculo_match_bling_cache: dict[int, dict] = {}
+_SEM_VINCULO_MATCH_BLG_CACHE_SECONDS = 300
+
 
 def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
     try:
@@ -514,6 +518,125 @@ def _get_snapshot_faltantes_bling(
         "cache_idade_segundos": 0,
     }
 
+
+def _calcular_snapshot_sem_vinculo_com_match_bling(db: Session, tenant_id: int) -> dict:
+    subq_vinculados = (
+        db.query(ProdutoBlingSync.produto_id)
+        .filter(
+            ProdutoBlingSync.tenant_id == tenant_id,
+            ProdutoBlingSync.bling_produto_id.isnot(None),
+            ProdutoBlingSync.bling_produto_id != "",
+        )
+        .subquery()
+    )
+
+    produtos_sem_vinculo = (
+        db.query(
+            Produto.id,
+            Produto.nome,
+            Produto.codigo,
+            Produto.estoque_atual,
+            Produto.codigo_barras,
+            Produto.gtin_ean,
+            Produto.gtin_ean_tributario,
+        )
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.tipo_produto != "PAI",
+            Produto.codigo.isnot(None),
+            Produto.codigo != "",
+        )
+        .filter(Produto.id.notin_(subq_vinculados))
+        .all()
+    )
+
+    codigos_para_ids: dict[str, set[int]] = {}
+    for produto in produtos_sem_vinculo:
+        for chave in [
+            _chave_codigo_produto(produto.codigo),
+            _chave_codigo_produto(produto.codigo_barras),
+            _chave_codigo_produto(produto.gtin_ean),
+            _chave_codigo_produto(produto.gtin_ean_tributario),
+        ]:
+            if not chave:
+                continue
+            codigos_para_ids.setdefault(chave, set()).add(produto.id)
+
+    bling = BlingAPI()
+    bling_itens, coleta_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
+
+    ids_com_match_bling: set[int] = set()
+    for item in bling_itens:
+        codigos_bling = _extrair_codigos_bling_item(item)
+        if not codigos_bling:
+            continue
+        for codigo in codigos_bling:
+            ids_com_match_bling.update(codigos_para_ids.get(codigo, set()))
+
+    itens_match = [
+        {
+            "id": produto.id,
+            "nome": produto.nome,
+            "codigo": produto.codigo,
+            "estoque_atual": float(produto.estoque_atual or 0),
+        }
+        for produto in produtos_sem_vinculo
+        if produto.id in ids_com_match_bling
+    ]
+
+    return {
+        "items": itens_match,
+        "total": len(itens_match),
+        "total_sem_vinculo_universo_local": len(produtos_sem_vinculo),
+        "total_bling": len(bling_itens),
+        "coleta_bling_completa": coleta_completa,
+        "atualizado_em": utc_now(),
+    }
+
+
+def _get_snapshot_sem_vinculo_com_match_bling(
+    db: Session,
+    tenant_id: int,
+    force_refresh: bool = False,
+) -> dict:
+    agora = time.monotonic()
+
+    with _sem_vinculo_match_bling_lock:
+        cache_atual = _sem_vinculo_match_bling_cache.get(tenant_id)
+
+    if (
+        not force_refresh
+        and cache_atual
+        and (agora - cache_atual.get("ts_monotonic", 0)) <= _SEM_VINCULO_MATCH_BLG_CACHE_SECONDS
+    ):
+        return {
+            **cache_atual.get("payload", {}),
+            "cache_idade_segundos": int(max(agora - cache_atual.get("ts_monotonic", 0), 0)),
+        }
+
+    try:
+        payload = _calcular_snapshot_sem_vinculo_com_match_bling(db, tenant_id)
+    except Exception as e:
+        if cache_atual and cache_atual.get("payload"):
+            payload = dict(cache_atual.get("payload", {}))
+            payload["coleta_bling_completa"] = False
+            payload["cache_utilizado_por_falha"] = True
+            payload["erro_coleta_bling"] = str(e)
+            payload["cache_idade_segundos"] = int(max(agora - cache_atual.get("ts_monotonic", 0), 0))
+            return payload
+        raise
+
+    with _sem_vinculo_match_bling_lock:
+        _sem_vinculo_match_bling_cache[tenant_id] = {
+            "ts_monotonic": agora,
+            "payload": payload,
+        }
+
+    return {
+        **payload,
+        "cache_idade_segundos": 0,
+    }
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
@@ -777,10 +900,12 @@ def listar_produtos_sem_vinculo(
     busca: Optional[str] = Query(default=None),
     limit: int = Query(default=2000, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
+    force_refresh: bool = Query(default=False),
+    apenas_com_match_bling: bool = Query(default=True),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
-    """Lista rápida de produtos locais sem vínculo no Bling para a tela operacional."""
+    """Lista rápida de produtos sem vínculo, priorizando base Bling (com match no Bling)."""
     _current_user, tenant_id = user_and_tenant
 
     subq_vinculados = (
@@ -809,7 +934,39 @@ def listar_produtos_sem_vinculo(
         .filter(Produto.id.notin_(subq_vinculados))
     )
 
-    termo = (busca or "").strip()
+    termo = (busca or "").strip().lower()
+
+    if apenas_com_match_bling:
+        snapshot = _get_snapshot_sem_vinculo_com_match_bling(
+            db,
+            tenant_id=tenant_id,
+            force_refresh=force_refresh,
+        )
+        itens_base = snapshot.get("items", [])
+
+        if termo:
+            itens_base = [
+                item
+                for item in itens_base
+                if termo in (item.get("nome") or "").lower() or termo in (item.get("codigo") or "").lower()
+            ]
+
+        paginados = itens_base[offset: offset + limit]
+
+        return {
+            "items": paginados,
+            "total": len(itens_base),
+            "limit": limit,
+            "offset": offset,
+            "apenas_com_match_bling": True,
+            "total_sem_vinculo_universo_local": snapshot.get("total_sem_vinculo_universo_local", 0),
+            "total_bling": snapshot.get("total_bling", 0),
+            "coleta_bling_completa": snapshot.get("coleta_bling_completa", True),
+            "cache_utilizado_por_falha": snapshot.get("cache_utilizado_por_falha", False),
+            "cache_idade_segundos": snapshot.get("cache_idade_segundos", 0),
+            "atualizado_em": snapshot.get("atualizado_em"),
+        }
+
     if termo:
         like = f"%{termo}%"
         query = query.filter(
@@ -835,6 +992,7 @@ def listar_produtos_sem_vinculo(
         "total": total,
         "limit": limit,
         "offset": offset,
+        "apenas_com_match_bling": False,
     }
 
 
