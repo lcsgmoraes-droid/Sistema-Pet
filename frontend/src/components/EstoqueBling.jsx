@@ -29,6 +29,7 @@ function formatNumber(value) {
 function EstoqueBling() {
   const PRODUCTS_PAGE_SIZE = 99999;
   const MASS_LINK_BATCH_SIZE = 50;
+  const HEAVY_REQUEST_TIMEOUT_MS = 60000;
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -54,18 +55,40 @@ function EstoqueBling() {
     coleta_bling_completa: true,
   });
 
+  const isTimeoutError = (error) => error?.code === 'ECONNABORTED';
+
+  const requestWithRetry = async (requestFn, retries = 1, retryDelayMs = 900) => {
+    let lastError = null;
+    for (let tentativa = 0; tentativa <= retries; tentativa += 1) {
+      try {
+        return await requestFn();
+      } catch (error) {
+        lastError = error;
+        if (!isTimeoutError(error) || tentativa === retries) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs + tentativa * 500));
+      }
+    }
+    throw lastError;
+  };
+
   const loadPage = async (currentSearch = search) => {
     setLoading(true);
 
     // Produtos são prioridade visual: preencher a tabela sem esperar status/health.
-    const productsRequest = api.get('/produtos/', {
+    const productsRequest = requestWithRetry(() => api.get('/produtos/', {
+      timeout: HEAVY_REQUEST_TIMEOUT_MS,
       params: {
         page: 1,
         page_size: PRODUCTS_PAGE_SIZE,
       },
-    });
+    }));
     const healthRequest = api.get('/estoque/sync/health');
-    const syncRequest = api.get('/estoque/sync/status', { params: currentSearch ? { busca: currentSearch } : {} });
+    const syncRequest = requestWithRetry(() => api.get('/estoque/sync/status', {
+      timeout: HEAVY_REQUEST_TIMEOUT_MS,
+      params: currentSearch ? { busca: currentSearch } : {},
+    }));
     const coberturaRequest = api.get('/estoque/sync/resumo-cobertura');
 
     productsRequest
@@ -96,6 +119,10 @@ function EstoqueBling() {
       .catch((error) => {
         setProducts([]);
         setTotalProducts(0);
+        if (isTimeoutError(error)) {
+          toast.error('Produtos demoraram para responder. Tente novamente em alguns segundos.');
+          return;
+        }
         toast.error(error.response?.data?.detail || 'Falha ao carregar produtos');
       })
       .finally(() => {
@@ -116,6 +143,10 @@ function EstoqueBling() {
       })
       .catch((error) => {
         setSyncItems([]);
+        if (isTimeoutError(error)) {
+          toast.error('Status de sincronização demorou para responder.');
+          return;
+        }
         toast.error(error.response?.data?.detail || 'Falha ao carregar status de sincronização');
       });
 
