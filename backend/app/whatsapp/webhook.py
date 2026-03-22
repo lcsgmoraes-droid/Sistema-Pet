@@ -364,16 +364,30 @@ def get_or_create_session(
     if session:
         return session
     
-    # Buscar cliente (se identificado)
-    cliente = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.celular == phone
-    ).first()
+    # Buscar cliente (se identificado) sem carregar todas as colunas de `clientes`,
+    # para evitar quebrar em bancos legados com schema parcial.
+    cliente_id = None
+    try:
+        telefone_sufixo = phone[-8:] if phone else ""
+        cliente_row = db.query(Cliente.id).filter(
+            Cliente.tenant_id == tenant_id,
+            (
+                (Cliente.celular == phone) |
+                (Cliente.telefone == phone) |
+                (Cliente.celular.ilike(f"%{telefone_sufixo}%")) |
+                (Cliente.telefone.ilike(f"%{telefone_sufixo}%"))
+            )
+        ).first()
+        if cliente_row:
+            cliente_id = cliente_row[0] if isinstance(cliente_row, tuple) else cliente_row
+    except Exception as cliente_lookup_error:
+        logger.warning(f"Falha ao identificar cliente por telefone: {cliente_lookup_error}")
+        cliente_id = None
     
     # Criar nova sessão
     session = WhatsAppSession(
         tenant_id=tenant_id,
-        cliente_id=cliente.id if cliente else None,
+        cliente_id=cliente_id,
         phone_number=phone,
         status="bot",
         started_at=datetime.utcnow(),
