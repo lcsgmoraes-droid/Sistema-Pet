@@ -793,49 +793,109 @@ const EntradaXML = () => {
       setGerandoRelatorioCustos(true);
       const linhas = await montarDadosRelatorioCustosMaiores();
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      let y = 10;
+      const marginX = 10;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const usableWidth = pageWidth - (marginX * 2);
+      const tableStartY = 30;
+      const rowHeight = 6;
 
-      doc.setFontSize(12);
-      doc.text(`Relatorio de custos maiores - NF ${previewProcessamento?.numero_nota || ''}`, 10, y);
-      y += 6;
-      doc.setFontSize(9);
-      doc.text(`Fornecedor: ${previewProcessamento?.fornecedor_nome || 'Nao informado'}`, 10, y);
-      y += 6;
-      doc.text(`Data de emissao NF atual: ${formatarDataRelatorio(previewProcessamento?.data_emissao)}`, 10, y);
-      y += 8;
+      const colunas = [
+        { key: 'produto_nome', label: 'Produto', width: 46 },
+        { key: 'sku', label: 'SKU', width: 20 },
+        { key: 'ean', label: 'EAN', width: 28 },
+        { key: 'nf_anterior_numero', label: 'NF', width: 14 },
+        { key: 'nf_anterior_data', label: 'Data', width: 18 },
+        { key: 'nf_anterior_custo', label: 'Custo', width: 18 },
+        { key: 'nf_atual_numero', label: 'NF', width: 14 },
+        { key: 'nf_atual_data', label: 'Data', width: 18 },
+        { key: 'nf_atual_custo', label: 'Custo', width: 18 },
+        { key: 'nf_atual_quantidade', label: 'Qtd', width: 12 },
+        { key: 'variacao_percentual', label: 'Var %', width: 12 },
+        { key: 'variacao_absoluta', label: 'Delta R$', width: 15 }
+      ];
 
-      linhas.forEach((linha, index) => {
-        if (y > 185) {
+      const larguraColunas = colunas.reduce((acc, col) => acc + col.width, 0);
+      const escala = larguraColunas > usableWidth ? usableWidth / larguraColunas : 1;
+      colunas.forEach((col) => { col.width = Number((col.width * escala).toFixed(2)); });
+
+      const truncarTexto = (texto, larguraMax) => {
+        const valor = String(texto ?? '');
+        if (!valor) return '';
+        const larguraTexto = doc.getTextWidth(valor);
+        if (larguraTexto <= larguraMax) return valor;
+        let corte = valor;
+        while (corte.length > 1 && doc.getTextWidth(`${corte}...`) > larguraMax) {
+          corte = corte.slice(0, -1);
+        }
+        return `${corte}...`;
+      };
+
+      const renderCabecalhoPagina = () => {
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(12);
+        doc.text(`Relatorio de custos maiores - NF ${previewProcessamento?.numero_nota || ''}`, marginX, 10);
+        doc.setFontSize(9);
+        doc.text(`Fornecedor: ${previewProcessamento?.fornecedor_nome || 'Nao informado'}`, marginX, 16);
+        doc.text(`Data de emissao NF atual: ${formatarDataRelatorio(previewProcessamento?.data_emissao)}`, marginX, 21);
+
+        const xProduto = marginX;
+        const xDadosAnteriores = marginX + colunas.slice(0, 3).reduce((acc, col) => acc + col.width, 0);
+        const xDadosNovos = xDadosAnteriores + colunas.slice(3, 6).reduce((acc, col) => acc + col.width, 0);
+        const xVariacao = xDadosNovos + colunas.slice(6, 10).reduce((acc, col) => acc + col.width, 0);
+
+        doc.setFillColor(241, 245, 249);
+        doc.rect(marginX, tableStartY - 5, usableWidth, 5, 'F');
+        doc.setFontSize(8);
+        doc.text('Produto', xProduto + 1, tableStartY - 1.5);
+        doc.text('Dados Anteriores', xDadosAnteriores + 1, tableStartY - 1.5);
+        doc.text('Dados Novos', xDadosNovos + 1, tableStartY - 1.5);
+        doc.text('Variacao', xVariacao + 1, tableStartY - 1.5);
+
+        let xAtual = marginX;
+        doc.setFillColor(226, 232, 240);
+        doc.rect(marginX, tableStartY, usableWidth, rowHeight, 'F');
+        doc.setDrawColor(203, 213, 225);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(7.8);
+
+        colunas.forEach((coluna) => {
+          doc.rect(xAtual, tableStartY, coluna.width, rowHeight);
+          doc.text(coluna.label, xAtual + 1, tableStartY + 4);
+          xAtual += coluna.width;
+        });
+      };
+
+      renderCabecalhoPagina();
+
+      let y = tableStartY + rowHeight;
+      linhas.forEach((linha) => {
+        if (y > 190) {
           doc.addPage();
-          y = 12;
+          renderCabecalhoPagina();
+          y = tableStartY + rowHeight;
         }
 
-        doc.setFontSize(10);
-        doc.text(`${index + 1}. ${linha.produto_nome}`, 10, y);
-        y += 4.5;
-        doc.setFontSize(8);
-        doc.text(`SKU: ${linha.sku || 'Nao informado'} | EAN: ${linha.ean || 'Nao informado'}`, 10, y);
-        y += 4.5;
-        doc.text(
-          `NF anterior: ${linha.nf_anterior_numero || 'Nao encontrado'} | Data: ${formatarDataRelatorio(linha.nf_anterior_data)} | Custo: R$ ${formatarMoedaRelatorio(linha.nf_anterior_custo)}`,
-          10,
-          y
-        );
-        y += 4.5;
-        doc.text(
-          `NF atual: ${linha.nf_atual_numero || ''} | Data: ${formatarDataRelatorio(linha.nf_atual_data)} | Custo: R$ ${formatarMoedaRelatorio(linha.nf_atual_custo)} | Qtd: ${linha.nf_atual_quantidade}`,
-          10,
-          y
-        );
-        y += 4.5;
-        doc.text(
-          `Variacao: ${linha.variacao_percentual.toFixed(2).replace('.', ',')}% | Delta: R$ ${formatarMoedaRelatorio(linha.variacao_absoluta)}`,
-          10,
-          y
-        );
-        y += 3.5;
-        doc.line(10, y, 287, y);
-        y += 4;
+        let xAtual = marginX;
+        doc.setDrawColor(226, 232, 240);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(7.5);
+
+        colunas.forEach((coluna) => {
+          doc.rect(xAtual, y, coluna.width, rowHeight);
+          let valor = linha[coluna.key];
+
+          if (coluna.key.includes('_data')) valor = formatarDataRelatorio(valor);
+          if (coluna.key.includes('_custo') || coluna.key === 'variacao_absoluta') valor = formatarMoedaRelatorio(valor);
+          if (coluna.key === 'variacao_percentual') valor = `${Number(valor || 0).toFixed(2).replace('.', ',')}%`;
+          if (coluna.key === 'sku' || coluna.key === 'ean') valor = valor || 'Nao informado';
+          if (coluna.key === 'nf_anterior_numero') valor = valor || 'Nao encontrado';
+
+          const texto = truncarTexto(valor, coluna.width - 2);
+          doc.text(texto, xAtual + 1, y + 4);
+          xAtual += coluna.width;
+        });
+
+        y += rowHeight;
       });
 
       doc.save(`relatorio_custos_maiores_nf_${previewProcessamento?.numero_nota || 'nfe'}.pdf`);
@@ -2852,9 +2912,9 @@ const EntradaXML = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6">
-              <h2 className="text-2xl font-bold">💰 Revisão de Preços e Custos</h2>
-              <p className="text-purple-100 mt-1">
+            <div className="bg-slate-900 text-white p-6">
+              <h2 className="text-2xl font-bold">Revisao de Precos e Custos</h2>
+              <p className="text-slate-300 mt-1">
                 NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
               </p>
             </div>
@@ -2886,26 +2946,24 @@ const EntradaXML = () => {
                     <>
                       <button
                         onClick={() => setFiltroCusto('todos')}
-                        className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                        className={`px-3 py-1 rounded-full text-sm font-semibold transition-all ${
                           filtroCusto === 'todos' 
-                            ? 'bg-blue-600 text-white shadow-md' 
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            ? 'bg-slate-800 text-white' 
+                            : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                         }`}
                       >
-                        <span className="text-base">📋</span>
                         Todos ({total})
                       </button>
                       
                       {aumentos > 0 && (
                         <button
                           onClick={() => setFiltroCusto('aumentou')}
-                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                          className={`px-3 py-1 rounded-full text-sm font-semibold transition-all ${
                             filtroCusto === 'aumentou' 
-                              ? 'bg-red-600 text-white shadow-md' 
-                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                              ? 'bg-red-600 text-white' 
+                              : 'bg-white border border-red-200 text-red-700 hover:bg-red-50'
                           }`}
                         >
-                          <span className="text-base">📈</span>
                           {aumentos} custo{aumentos > 1 ? 's' : ''} maior{aumentos > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2913,13 +2971,12 @@ const EntradaXML = () => {
                       {reducoes > 0 && (
                         <button
                           onClick={() => setFiltroCusto('diminuiu')}
-                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                          className={`px-3 py-1 rounded-full text-sm font-semibold transition-all ${
                             filtroCusto === 'diminuiu' 
-                              ? 'bg-green-600 text-white shadow-md' 
-                              : 'bg-green-100 text-green-700 hover:bg-green-200'
+                              ? 'bg-green-700 text-white' 
+                              : 'bg-white border border-green-200 text-green-700 hover:bg-green-50'
                           }`}
                         >
-                          <span className="text-base">📉</span>
                           {reducoes} custo{reducoes > 1 ? 's' : ''} menor{reducoes > 1 ? 'es' : ''}
                         </button>
                       )}
@@ -2927,13 +2984,12 @@ const EntradaXML = () => {
                       {iguais > 0 && (
                         <button
                           onClick={() => setFiltroCusto('igual')}
-                          className={`px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1 transition-all ${
+                          className={`px-3 py-1 rounded-full text-sm font-semibold transition-all ${
                             filtroCusto === 'igual' 
-                              ? 'bg-gray-600 text-white shadow-md' 
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              ? 'bg-gray-700 text-white' 
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'
                           }`}
                         >
-                          <span className="text-base">➡️</span>
                           {iguais} sem alteração
                         </button>
                       )}
@@ -2942,14 +2998,14 @@ const EntradaXML = () => {
                         <button
                           onClick={exportarRelatorioCustosMaioresCSV}
                           disabled={gerandoRelatorioCustos || aumentos === 0}
-                          className="px-3 py-1 rounded text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1 rounded text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar CSV custos maiores'}
                         </button>
                         <button
                           onClick={exportarRelatorioCustosMaioresPDF}
                           disabled={gerandoRelatorioCustos || aumentos === 0}
-                          className="px-3 py-1 rounded text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1 rounded text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar PDF custos maiores'}
                         </button>
@@ -3007,22 +3063,24 @@ const EntradaXML = () => {
                   };
 
                   return (
-                    <div key={item.item_id} className="border-2 border-gray-300 rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all">
+                    <div key={item.item_id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
                       {/* Header com nome do produto e quantidade */}
-                      <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-4">
+                      <div className="bg-gray-100 border-b border-gray-200 p-4">
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
-                            <h3 className="font-bold text-xl mb-1">{produtoVinc.produto_nome}</h3>
-                            <p className="text-sm text-blue-100">SKU: {produtoVinc.produto_codigo}</p>
+                            <h3 className="font-semibold text-xl text-gray-900 mb-1">{produtoVinc.produto_nome}</h3>
+                            <p className="text-sm text-gray-600">
+                              SKU: {produtoVinc.produto_codigo || 'Nao informado'} | EAN: {produtoVinc.produto_ean || 'Nao informado'}
+                            </p>
                           </div>
                           <div className="text-right">
                             <button
                               onClick={() => buscarHistoricoPrecos(produtoVinc.produto_id, produtoVinc.produto_nome)}
-                              className="px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm font-medium transition-colors"
+                              className="px-3 py-1 border border-gray-300 text-gray-700 hover:bg-gray-50 rounded text-sm font-medium transition-colors"
                             >
-                              📊 Histórico
+                              Historico
                             </button>
-                            <div className="mt-1 text-sm">
+                            <div className="mt-1 text-sm text-gray-700">
                               Quantidade <strong>{item.quantidade || item.quantidade_nf || 0}</strong>
                             </div>
                           </div>
@@ -3033,20 +3091,20 @@ const EntradaXML = () => {
                         {/* Comparação de Custos */}
                         <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">💵 Custo Anterior</div>
+                            <div className="text-xs text-gray-500 mb-1">Custo Anterior</div>
                             <div className="text-2xl font-bold text-gray-700">
                               R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">🆕 Custo Novo</div>
-                            <div className="text-2xl font-bold text-blue-600">
+                            <div className="text-xs text-gray-500 mb-1">Custo Novo</div>
+                            <div className="text-2xl font-bold text-gray-900">
                               R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">📊 Variação</div>
-                            <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                            <div className="text-xs text-gray-500 mb-1">Variacao</div>
+                            <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-emerald-700' : 'text-gray-600'}`}>
                               {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
                             </div>
                           </div>
@@ -3056,7 +3114,7 @@ const EntradaXML = () => {
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              💰 Preço de Venda
+                              Preco de Venda
                             </label>
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
@@ -3079,7 +3137,7 @@ const EntradaXML = () => {
 
                           <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
-                              📈 Margem de Lucro
+                              Margem de Lucro
                             </label>
                             <div className="relative">
                               <input
@@ -3102,20 +3160,20 @@ const EntradaXML = () => {
                         </div>
 
                         {/* Análise Comparativa */}
-                        <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                          <h4 className="text-sm font-semibold text-purple-800 mb-3">📊 Análise Comparativa (Valores Anteriores)</h4>
+                        <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">Referencia dos valores anteriores</h4>
                           <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">💵 Custo Anterior</div>
+                              <div className="text-xs text-gray-600 mb-1">Custo Anterior</div>
                               <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">💰 Preço Anterior</div>
-                              <div className="text-lg font-bold text-blue-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
+                              <div className="text-xs text-gray-600 mb-1">Preco Anterior</div>
+                              <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-600 mb-1">📈 Margem Anterior</div>
-                              <div className="text-lg font-bold text-purple-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
+                              <div className="text-xs text-gray-600 mb-1">Margem Anterior</div>
+                              <div className="text-lg font-bold text-gray-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
                             </div>
                           </div>
                         </div>
@@ -3133,9 +3191,9 @@ const EntradaXML = () => {
                   setMostrarRevisaoPrecos(false);
                   setPreviewProcessamento(null);
                 }}
-                className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors"
+                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
               >
-                ❌ Cancelar
+                Cancelar
               </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -3147,9 +3205,9 @@ const EntradaXML = () => {
                 <button
                   onClick={confirmarProcessamento}
                   disabled={loading}
-                  className="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-lg shadow-lg disabled:opacity-50 transition-all"
+                  className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow disabled:opacity-50 transition-all"
                 >
-                  {loading ? '⏳ Processando...' : '✅ Confirmar e Processar Nota'}
+                  {loading ? 'Processando...' : 'Confirmar e Processar Nota'}
                 </button>
               </div>
             </div>
