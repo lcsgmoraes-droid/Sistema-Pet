@@ -15,6 +15,14 @@ function montarNomeXml(dados) {
   return `nfe_${numero || '0'}_${serie || '1'}_${chave || 'xml'}.xml`;
 }
 
+function formatarOpcaoProduto(produto) {
+  const sku = produto?.codigo || 'Sem SKU';
+  const ean = produto?.codigo_barras || produto?.gtin_ean || produto?.gtin_ean_tributario || 'Sem EAN';
+  const nome = produto?.nome || 'Produto sem nome';
+  const estoque = produto?.estoque_atual || 0;
+  return `${sku} | EAN: ${ean} | ${nome} (Est: ${estoque})`;
+}
+
 const EntradaXML = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1777,6 +1785,21 @@ const EntradaXML = () => {
                                     {item.produto_nome}
                                   </div>
 
+                                  <div className="mb-3 rounded border border-green-200 bg-white/80 p-2 text-xs space-y-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold text-gray-600">SKU:</span>
+                                      <span className="font-mono text-gray-900">
+                                        {item.produto_codigo || 'Nao informado'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-semibold text-gray-600">EAN:</span>
+                                      <span className="font-mono text-gray-900">
+                                        {item.produto_ean || 'Nao informado'}
+                                      </span>
+                                    </div>
+                                  </div>
+
                                   <div className="text-xs text-green-700 mb-3 italic">
                                     Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
                                   </div>
@@ -1799,12 +1822,14 @@ const EntradaXML = () => {
                                     }}
                                     className="w-full px-3 py-2 border-2 border-green-400 rounded text-sm focus:ring-2 focus:ring-green-500"
                                   >
-                                    <option value={item.produto_id}>{item.produto_nome}</option>
+                                    <option value={item.produto_id}>
+                                      {`${item.produto_codigo || 'Sem SKU'} | EAN: ${item.produto_ean || 'Sem EAN'} | ${item.produto_nome}`}
+                                    </option>
                                     {(resultadosBuscaProduto[item.id] || [])
                                       .filter(p => p.id !== item.produto_id)
                                       .map(p => (
                                         <option key={p.id} value={p.id}>
-                                          {p.codigo} - {p.nome} (Est: {p.estoque_atual || 0})
+                                          {formatarOpcaoProduto(p)}
                                         </option>
                                       ))}
                                   </select>
@@ -1862,8 +1887,8 @@ const EntradaXML = () => {
                                               }}
                                               className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
                                             >
-                                              {!p.ativo && '[INATIVO] '}{p.codigo} - {p.nome}
-                                              {p.codigo_barras && <span className="text-gray-400 ml-1">({p.codigo_barras})</span>}
+                                              {!p.ativo && '[INATIVO] '}{p.codigo || 'Sem SKU'} - {p.nome}
+                                              <span className="text-gray-500 ml-1">| EAN: {p.codigo_barras || p.gtin_ean || p.gtin_ean_tributario || 'Sem EAN'}</span>
                                               <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
                                             </button>
                                           ));
@@ -3168,6 +3193,4 @@ const EntradaXML = () => {
 };
 
 export default EntradaXML;
-
-
 

@@ -1142,6 +1142,12 @@ def buscar_nota(
             "data_validade": item.data_validade.isoformat() if item.data_validade else None,
             "produto_id": item.produto_id,
             "produto_nome": item.produto.nome if item.produto else None,
+            "produto_codigo": item.produto.codigo if item.produto else None,
+            "produto_ean": (
+                item.produto.codigo_barras
+                or item.produto.gtin_ean
+                or item.produto.gtin_ean_tributario
+            ) if item.produto else None,
             "vinculado": item.vinculado,
             "confianca_vinculo": item.confianca_vinculo,
             "status": item.status,
