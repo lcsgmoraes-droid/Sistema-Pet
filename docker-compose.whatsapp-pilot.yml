@@ -14,6 +14,7 @@ services:
       - waha-sessions:/app/.sessions
     networks:
       - whatsapp-pilot-network
+      - petshop-shared-network
 
   n8n:
     image: n8nio/n8n:latest
@@ -43,6 +44,7 @@ services:
       - waha
     networks:
       - whatsapp-pilot-network
+      - petshop-shared-network
 
 volumes:
   n8n-pilot-data:
@@ -54,3 +56,6 @@ networks:
   whatsapp-pilot-network:
     name: petshop-whatsapp-pilot-network
     driver: bridge
+  petshop-shared-network:
+    external: true
+    name: ${PETSHOP_SHARED_NETWORK_NAME:-petshop-network}
