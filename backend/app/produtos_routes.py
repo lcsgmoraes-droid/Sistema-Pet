@@ -3718,6 +3718,7 @@ class HistoricoPrecoResponse(BaseModel):
     variacao_venda_percentual: Optional[float]
     motivo: str
     nota_numero: Optional[str] = None
+    nota_data_emissao: Optional[datetime] = None
     referencia: Optional[str]
     observacoes: Optional[str]
     usuario: Optional[str]
@@ -3770,6 +3771,7 @@ def listar_historico_precos(
             "variacao_venda_percentual": hist.variacao_venda_percentual,
             "motivo": hist.motivo,
             "nota_numero": hist.nota_entrada.numero_nota if hist.nota_entrada else None,
+            "nota_data_emissao": hist.nota_entrada.data_emissao if hist.nota_entrada else None,
             "referencia": hist.referencia,
             "observacoes": hist.observacoes,
             "usuario": hist.user.email if hist.user else None

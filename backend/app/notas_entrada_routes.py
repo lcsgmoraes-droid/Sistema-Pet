@@ -1719,7 +1719,9 @@ def preview_processamento(
     return {
         "nota_id": nota.id,
         "numero_nota": nota.numero_nota,
+        "data_emissao": nota.data_emissao.isoformat() if nota.data_emissao else None,
         "fornecedor_nome": nota.fornecedor_nome,
+        "fornecedor_cnpj": nota.fornecedor_cnpj,
         "valor_total": nota.valor_total,
         "itens": preview_itens
     }

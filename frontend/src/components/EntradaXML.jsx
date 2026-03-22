@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { formatMoneyBRL } from '../utils/formatters';
+import { jsPDF } from 'jspdf';
 
 function formatarChaveAcesso(valor) {
   return String(valor).replaceAll(/\D/g, '').slice(0, 44);
@@ -50,6 +51,7 @@ const EntradaXML = () => {
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
   const [precosAjustados, setPrecosAjustados] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
+  const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
   
   // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
@@ -625,6 +627,224 @@ const EntradaXML = () => {
         margem: novaMargem
       }
     }));
+  };
+
+  const formatarDataRelatorio = (valor) => {
+    if (!valor) return 'Nao informado';
+    const dt = new Date(valor);
+    if (Number.isNaN(dt.getTime())) return 'Nao informado';
+    return dt.toLocaleDateString('pt-BR');
+  };
+
+  const formatarMoedaRelatorio = (valor) => {
+    const numero = Number(valor || 0);
+    if (Number.isNaN(numero)) return '0,00';
+    return numero.toFixed(2).replace('.', ',');
+  };
+
+  const normalizarProdutoPreview = (item) => item.produto_vinculado || {
+    produto_id: item.produto_id,
+    produto_nome: item.produto_nome,
+    produto_codigo: item.produto_codigo,
+    produto_ean: item.produto_ean,
+    custo_anterior: item.custo_anterior,
+    custo_novo: item.custo_novo,
+    variacao_custo_percentual: item.variacao_custo_percentual
+  };
+
+  const obterHistoricoNfAnterior = (historicos, numeroNotaAtual) => {
+    if (!Array.isArray(historicos) || historicos.length === 0) return null;
+    const numeroAtual = String(numeroNotaAtual || '').trim();
+
+    const candidatoNfeAnterior = historicos.find((hist) => {
+      if (!hist) return false;
+      const ehNfe = hist.motivo === 'nfe_entrada';
+      const temNumero = !!hist.nota_numero;
+      const temCusto = hist.preco_custo_novo !== null && hist.preco_custo_novo !== undefined;
+      const notaDiferente = String(hist.nota_numero || '').trim() !== numeroAtual;
+      return ehNfe && temNumero && temCusto && notaDiferente;
+    });
+
+    if (candidatoNfeAnterior) return candidatoNfeAnterior;
+
+    return historicos.find((hist) =>
+      hist &&
+      hist.preco_custo_novo !== null &&
+      hist.preco_custo_novo !== undefined
+    ) || null;
+  };
+
+  const montarDadosRelatorioCustosMaiores = async () => {
+    const itensAumentaram = (previewProcessamento?.itens || [])
+      .filter((item) => {
+        const produto = normalizarProdutoPreview(item);
+        const variacao = Number(produto.variacao_custo_percentual || 0);
+        return produto.produto_id && variacao > 0;
+      });
+
+    if (itensAumentaram.length === 0) {
+      throw new Error('Nenhum produto com aumento de custo nesta NF.');
+    }
+
+    const linhas = await Promise.all(itensAumentaram.map(async (item) => {
+      const produto = normalizarProdutoPreview(item);
+      let historicos = [];
+
+      try {
+        const historicoRes = await api.get(`/produtos/${produto.produto_id}/historico-precos`, {
+          params: { limit: 100 }
+        });
+        historicos = historicoRes.data || [];
+      } catch (error) {
+        console.warn(`Nao foi possivel buscar historico do produto ${produto.produto_id}`, error);
+      }
+
+      const nfAnterior = obterHistoricoNfAnterior(historicos, previewProcessamento?.numero_nota);
+      const custoAnteriorNf = Number(
+        nfAnterior?.preco_custo_novo ??
+        nfAnterior?.preco_custo_anterior ??
+        produto.custo_anterior ??
+        0
+      );
+      const custoAtualNf = Number(
+        produto.custo_novo ??
+        item.custo_unitario_efetivo_nf ??
+        item.valor_unitario_nf ??
+        0
+      );
+
+      return {
+        produto_nome: produto.produto_nome || 'Produto sem nome',
+        sku: produto.produto_codigo || '',
+        ean: produto.produto_ean || '',
+        fornecedor: previewProcessamento?.fornecedor_nome || '',
+        nf_atual_numero: previewProcessamento?.numero_nota || '',
+        nf_atual_data: previewProcessamento?.data_emissao || null,
+        nf_atual_custo: custoAtualNf,
+        nf_atual_quantidade: Number(item.quantidade_efetiva_nf || item.quantidade_nf || 0),
+        nf_anterior_numero: nfAnterior?.nota_numero || '',
+        nf_anterior_data: nfAnterior?.nota_data_emissao || nfAnterior?.data || null,
+        nf_anterior_custo: custoAnteriorNf,
+        variacao_percentual: Number(produto.variacao_custo_percentual || 0),
+        variacao_absoluta: custoAtualNf - custoAnteriorNf
+      };
+    }));
+
+    return linhas.sort((a, b) => b.variacao_percentual - a.variacao_percentual);
+  };
+
+  const exportarRelatorioCustosMaioresCSV = async () => {
+    try {
+      setGerandoRelatorioCustos(true);
+      const linhas = await montarDadosRelatorioCustosMaiores();
+      const headers = [
+        'Produto',
+        'SKU',
+        'EAN',
+        'Fornecedor',
+        'NF Atual',
+        'Data NF Atual',
+        'Custo NF Atual',
+        'Qtd NF Atual',
+        'NF Anterior',
+        'Data NF Anterior',
+        'Custo NF Anterior',
+        'Variacao %',
+        'Variacao R$'
+      ];
+
+      const escapeCsv = (valor) => `"${String(valor ?? '').replaceAll('"', '""')}"`;
+      const corpo = linhas.map((linha) => [
+        linha.produto_nome,
+        linha.sku || 'Nao informado',
+        linha.ean || 'Nao informado',
+        linha.fornecedor,
+        linha.nf_atual_numero,
+        formatarDataRelatorio(linha.nf_atual_data),
+        formatarMoedaRelatorio(linha.nf_atual_custo),
+        linha.nf_atual_quantidade,
+        linha.nf_anterior_numero || 'Nao encontrado',
+        formatarDataRelatorio(linha.nf_anterior_data),
+        formatarMoedaRelatorio(linha.nf_anterior_custo),
+        `${linha.variacao_percentual.toFixed(2).replace('.', ',')}%`,
+        formatarMoedaRelatorio(linha.variacao_absoluta)
+      ].map(escapeCsv).join(';'));
+
+      const csv = `\uFEFF${headers.join(';')}\n${corpo.join('\n')}`;
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio_custos_maiores_nf_${previewProcessamento?.numero_nota || 'nfe'}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('CSV gerado com sucesso!');
+    } catch (error) {
+      toast.error(error.message || 'Erro ao gerar CSV');
+    } finally {
+      setGerandoRelatorioCustos(false);
+    }
+  };
+
+  const exportarRelatorioCustosMaioresPDF = async () => {
+    try {
+      setGerandoRelatorioCustos(true);
+      const linhas = await montarDadosRelatorioCustosMaiores();
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      let y = 10;
+
+      doc.setFontSize(12);
+      doc.text(`Relatorio de custos maiores - NF ${previewProcessamento?.numero_nota || ''}`, 10, y);
+      y += 6;
+      doc.setFontSize(9);
+      doc.text(`Fornecedor: ${previewProcessamento?.fornecedor_nome || 'Nao informado'}`, 10, y);
+      y += 6;
+      doc.text(`Data de emissao NF atual: ${formatarDataRelatorio(previewProcessamento?.data_emissao)}`, 10, y);
+      y += 8;
+
+      linhas.forEach((linha, index) => {
+        if (y > 185) {
+          doc.addPage();
+          y = 12;
+        }
+
+        doc.setFontSize(10);
+        doc.text(`${index + 1}. ${linha.produto_nome}`, 10, y);
+        y += 4.5;
+        doc.setFontSize(8);
+        doc.text(`SKU: ${linha.sku || 'Nao informado'} | EAN: ${linha.ean || 'Nao informado'}`, 10, y);
+        y += 4.5;
+        doc.text(
+          `NF anterior: ${linha.nf_anterior_numero || 'Nao encontrado'} | Data: ${formatarDataRelatorio(linha.nf_anterior_data)} | Custo: R$ ${formatarMoedaRelatorio(linha.nf_anterior_custo)}`,
+          10,
+          y
+        );
+        y += 4.5;
+        doc.text(
+          `NF atual: ${linha.nf_atual_numero || ''} | Data: ${formatarDataRelatorio(linha.nf_atual_data)} | Custo: R$ ${formatarMoedaRelatorio(linha.nf_atual_custo)} | Qtd: ${linha.nf_atual_quantidade}`,
+          10,
+          y
+        );
+        y += 4.5;
+        doc.text(
+          `Variacao: ${linha.variacao_percentual.toFixed(2).replace('.', ',')}% | Delta: R$ ${formatarMoedaRelatorio(linha.variacao_absoluta)}`,
+          10,
+          y
+        );
+        y += 3.5;
+        doc.line(10, y, 287, y);
+        y += 4;
+      });
+
+      doc.save(`relatorio_custos_maiores_nf_${previewProcessamento?.numero_nota || 'nfe'}.pdf`);
+      toast.success('PDF gerado com sucesso!');
+    } catch (error) {
+      toast.error(error.message || 'Erro ao gerar PDF');
+    } finally {
+      setGerandoRelatorioCustos(false);
+    }
   };
 
   const excluirNota = async (notaId, numeroNota) => {
@@ -2717,6 +2937,23 @@ const EntradaXML = () => {
                           {iguais} sem alteração
                         </button>
                       )}
+
+                      <div className="ml-auto flex items-center gap-2">
+                        <button
+                          onClick={exportarRelatorioCustosMaioresCSV}
+                          disabled={gerandoRelatorioCustos || aumentos === 0}
+                          className="px-3 py-1 rounded text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar CSV custos maiores'}
+                        </button>
+                        <button
+                          onClick={exportarRelatorioCustosMaioresPDF}
+                          disabled={gerandoRelatorioCustos || aumentos === 0}
+                          className="px-3 py-1 rounded text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar PDF custos maiores'}
+                        </button>
+                      </div>
                     </>
                   );
                 })()}
@@ -3193,4 +3430,3 @@ const EntradaXML = () => {
 };
 
 export default EntradaXML;
-
