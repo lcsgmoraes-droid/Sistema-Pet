@@ -1384,6 +1384,14 @@ export default function Produtos() {
     const filtrosLimpos = {};
     Object.entries(baseFiltros || {}).forEach(([key, valor]) => {
       if (key === "mostrarPaisVariacoes") return;
+      if (key === "ativo") {
+        if (valor === "ativos") {
+          filtrosLimpos[key] = true;
+        } else if (valor === "inativos") {
+          filtrosLimpos[key] = false;
+        }
+        return;
+      }
       if (valor === "" || valor === null || valor === undefined) return;
       if (typeof valor === "boolean") {
         if (valor) filtrosLimpos[key] = true;
