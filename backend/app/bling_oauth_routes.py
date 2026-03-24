@@ -84,6 +84,7 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
         headers={
             "Authorization": f"Basic {creds}",
             "Content-Type": "application/x-www-form-urlencoded",
+            "enable-jwt": "1",
         },
         data={
             "grant_type": "authorization_code",

@@ -12,9 +12,11 @@ Orquestra todo o fluxo de processamento:
 """
 import json
 import logging
+import os
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime
+from types import SimpleNamespace
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
 from app.ai.context_builder import ContextBuilder
@@ -36,17 +38,36 @@ class MessageProcessor:
         self.tenant_id = tenant_id
         
         # Buscar config
-        self.config = db.query(TenantWhatsAppConfig).filter(
+        config = db.query(TenantWhatsAppConfig).filter(
             TenantWhatsAppConfig.tenant_id == tenant_id
         ).first()
-        
-        if not self.config or not self.config.openai_api_key:
-            raise ValueError(f"Tenant {tenant_id} sem OpenAI API key")
-        
+
+        fallback_openai_key = os.getenv("OPENAI_API_KEY", "")
+        if not config:
+            logger.warning(
+                "Tenant %s sem tenant_whatsapp_config; aplicando fallback para piloto",
+                tenant_id,
+            )
+            self.config = SimpleNamespace(
+                openai_api_key=fallback_openai_key,
+                auto_response_enabled=True,
+                bot_name="Assistente",
+            )
+        else:
+            self.config = config
+            if not self.config.openai_api_key and fallback_openai_key:
+                self.config = SimpleNamespace(
+                    openai_api_key=fallback_openai_key,
+                    auto_response_enabled=getattr(config, "auto_response_enabled", True),
+                    bot_name=getattr(config, "bot_name", "Assistente"),
+                )
+
+        self.ai_enabled = bool(self.config.openai_api_key)
+
         # Inicializar componentes
-        self.intent_classifier = IntentClassifier(self.config.openai_api_key)
+        self.intent_classifier = IntentClassifier(self.config.openai_api_key) if self.ai_enabled else None
         self.context_builder = ContextBuilder(db)
-        self.llm_client = LLMClient(self.config.openai_api_key)
+        self.llm_client = LLMClient(self.config.openai_api_key) if self.ai_enabled else None
         self.router = IntentRouter()
 
     @staticmethod
@@ -93,32 +114,48 @@ class MessageProcessor:
                 return {"action": "skipped", "reason": "auto_response_disabled"}
             
             # 1. Construir contexto
-            context = await self.context_builder.build_context(
-                tenant_id=self.tenant_id,
-                session_id=session_id,
-                message=message_content
-            )
-            
+            try:
+                context = await self.context_builder.build_context(
+                    tenant_id=self.tenant_id,
+                    session_id=session_id,
+                    message=message_content
+                )
+            except Exception as context_error:
+                logger.warning(f"Falha ao construir contexto, seguindo com contexto mínimo: {context_error}")
+                self.db.rollback()
+                context = {}
+
             # 2. Classificar intenção
-            intent_result = await self.intent_classifier.classify(
-                message=message_content,
-                context=context
-            )
-            
-            intent = intent_result["intent"]
-            confidence = intent_result["confidence"]
+            if self.ai_enabled:
+                intent_result = await self.intent_classifier.classify(
+                    message=message_content,
+                    context=context
+                )
+                intent = intent_result["intent"]
+                confidence = intent_result["confidence"]
+            else:
+                intent = "geral"
+                confidence = 0.6
             
             # Atualizar mensagem com intent detectado
             msg = self.db.query(WhatsAppMessage).get(message_id)
             if msg:
-                msg.intent_detected = intent
-                self.db.commit()
+                try:
+                    msg.intent_detected = intent
+                    self.db.commit()
+                except Exception as intent_save_error:
+                    logger.warning(f"Falha ao salvar intent na mensagem: {intent_save_error}")
+                    self.db.rollback()
             
             # Atualizar sessão com último intent
             session = self.db.query(WhatsAppSession).get(session_id)
             if session:
-                session.last_intent = intent
-                self.db.commit()
+                try:
+                    session.last_intent = intent
+                    self.db.commit()
+                except Exception as session_save_error:
+                    logger.warning(f"Falha ao salvar intent na sessão: {session_save_error}")
+                    self.db.rollback()
             
             # 3. Verificar se deve transferir para humano
             if self._is_explicit_human_request(message_content):
@@ -149,6 +186,20 @@ class MessageProcessor:
                 )
             
             # 5. Processar com IA
+            if not self.ai_enabled:
+                return await self._send_response(
+                    session_id=session_id,
+                    response=(
+                        "Recebi sua mensagem e já vou te ajudar. "
+                        "No momento estou em modo básico e em seguida um atendente assume se necessário."
+                    ),
+                    intent=intent,
+                    model_used="fallback_no_openai",
+                    tokens_input=0,
+                    tokens_output=0,
+                    processing_time_ms=0
+                )
+
             return await self._process_with_ai(
                 session_id=session_id,
                 message_content=message_content,
@@ -158,6 +209,16 @@ class MessageProcessor:
             
         except Exception as e:
             logger.error(f"❌ Erro ao processar mensagem: {e}")
+            self.db.rollback()
+            # Fallback operacional: tenta responder mesmo com erro interno.
+            fallback_message = await send_whatsapp_message(
+                db=self.db,
+                tenant_id=self.tenant_id,
+                session_id=session_id,
+                message="Recebi sua mensagem e já estou te atendendo. Pode me enviar novamente em texto curto?"
+            )
+            if fallback_message:
+                return {"action": "fallback_responded", "error": str(e)}
             return {"action": "error", "error": str(e)}
         
         finally:
@@ -236,6 +297,7 @@ class MessageProcessor:
             
         except Exception as e:
             logger.error(f"Erro no processamento IA: {e}")
+            self.db.rollback()
             # Fallback
             return await self._send_response(
                 session_id=session_id,

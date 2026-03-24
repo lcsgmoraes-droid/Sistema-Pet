@@ -42,7 +42,14 @@ def buscar_produto(
             all_keywords.extend(keywords)
 
         # Query base
-        query = db.query(Produto).filter(
+        query = db.query(
+            Produto.id,
+            Produto.nome,
+            Produto.preco_venda,
+            Produto.estoque_atual,
+            Produto.descricao_curta,
+            Produto.categoria_id,
+        ).filter(
             Produto.tenant_id == tenant_id,
             Produto.situacao == True
         )
@@ -72,7 +79,7 @@ def buscar_produto(
                     "nome": p.nome,
                     "preco": float(p.preco_venda) if p.preco_venda else 0.0,
                     "estoque": p.estoque_atual or 0,
-                    "categoria": p.categoria.nome if p.categoria else "Sem categoria",
+                    "categoria": "Sem categoria",
                     "descricao": p.descricao_curta or ""
                 }
                 for p in produtos
@@ -84,6 +91,7 @@ def buscar_produto(
         return result
         
     except Exception as e:
+        db.rollback()
         logger.error(f"❌ Erro em buscar_produto: {e}")
         return {"found": 0, "produtos": [], "error": str(e)}
 
@@ -114,7 +122,13 @@ def consultar_estoque(
     from app.produtos_models import Produto
     
     try:
-        produto = db.query(Produto).filter(
+        produto = db.query(
+            Produto.id,
+            Produto.nome,
+            Produto.preco_venda,
+            Produto.estoque_atual,
+            Produto.estoque_minimo,
+        ).filter(
             Produto.id == produto_id,
             Produto.tenant_id == tenant_id
         ).first()
@@ -157,6 +171,7 @@ def consultar_estoque(
         return result
         
     except Exception as e:
+        db.rollback()
         logger.error(f"❌ Erro em consultar_estoque: {e}")
         return {"disponivel": False, "quantidade": 0, "error": str(e)}
 

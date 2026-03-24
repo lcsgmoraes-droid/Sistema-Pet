@@ -27,6 +27,7 @@ class BlingAPI:
         self.access_token = os.getenv("BLING_ACCESS_TOKEN")
         self.client_id = os.getenv("BLING_CLIENT_ID")
         self.client_secret = os.getenv("BLING_CLIENT_SECRET")
+        self.enable_jwt = os.getenv("BLING_ENABLE_JWT", "1")
         # Ambiente: 'rascunho', 'homologacao' ou 'producao'
         self.ambiente = os.getenv("BLING_NFE_AMBIENTE", "rascunho")
         
@@ -110,7 +111,8 @@ class BlingAPI:
         return {
             "Authorization": f"Bearer {self.access_token}",
             "Content-Type": "application/json",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "enable-jwt": self.enable_jwt,
         }
     
     def _request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
@@ -568,7 +570,8 @@ class BlingAPI:
         
         headers = {
             'Authorization': f'Basic {encoded}',
-            'Content-Type': 'application/x-www-form-urlencoded'
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'enable-jwt': self.enable_jwt,
         }
         
         data = {

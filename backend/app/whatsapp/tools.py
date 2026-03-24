@@ -345,7 +345,16 @@ class ToolExecutor:
             tokens = [t for t in query_norm.split() if t]
             like_tokens = [f"%{t}%" for t in tokens] or [f"%{query_norm}%"]
 
-            base_query = self.db.query(Produto).filter(
+            base_query = self.db.query(
+                Produto.id,
+                Produto.nome,
+                Produto.codigo,
+                Produto.codigo_barras,
+                Produto.preco_venda,
+                Produto.estoque_atual,
+                Produto.descricao_curta,
+                Produto.categoria_id,
+            ).filter(
                 Produto.tenant_id == self.tenant_id,
                 Produto.situacao == True,
                 Produto.tipo_produto != 'PAI',
@@ -455,6 +464,7 @@ class ToolExecutor:
 
         except Exception as e:
             logger.error(f"Erro ao buscar produtos: {e}")
+            self.db.rollback()
             return {"success": False, "error": str(e)}
 
     def _verificar_horarios_disponiveis(

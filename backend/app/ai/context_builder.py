@@ -77,6 +77,7 @@ class ContextBuilder:
             
         except Exception as e:
             logger.error(f"Erro ao construir contexto: {e}")
+            self.db.rollback()
             return self._get_minimal_context()
     
     # ========================================================================
@@ -206,7 +207,13 @@ class ContextBuilder:
                 return await self._get_produtos_populares(tenant_id, limit)
             
             # Buscar produtos que contenham qualquer keyword
-            produtos = self.db.query(Produto).filter(
+            produtos = self.db.query(
+                Produto.id,
+                Produto.nome,
+                Produto.descricao_curta,
+                Produto.preco_venda,
+                Produto.estoque_atual
+            ).filter(
                 Produto.tenant_id == tenant_id,
                 Produto.ativo == True
             )
@@ -215,8 +222,7 @@ class ContextBuilder:
             for keyword in keywords[:3]:  # Máx 3 keywords
                 produtos = produtos.filter(
                     Produto.nome.ilike(f"%{keyword}%") |
-                    Produto.descricao_curta.ilike(f"%{keyword}%") |
-                    Produto.descricao_completa.ilike(f"%{keyword}%")
+                    Produto.descricao_curta.ilike(f"%{keyword}%")
                 )
             
             produtos = produtos.limit(limit).all()
@@ -225,6 +231,7 @@ class ContextBuilder:
             
         except Exception as e:
             logger.error(f"Erro ao buscar produtos: {e}")
+            self.db.rollback()
             return []
     
     @cache.cached(ttl=600, key_prefix="produtos_populares")
@@ -242,7 +249,11 @@ class ContextBuilder:
         trinta_dias = datetime.now() - timedelta(days=30)
         
         produtos = self.db.query(
-            Produto,
+            Produto.id,
+            Produto.nome,
+            Produto.descricao_curta,
+            Produto.preco_venda,
+            Produto.estoque_atual,
             func.count(VendaItem.id).label("vendas")
         ).join(
             VendaItem, VendaItem.produto_id == Produto.id
@@ -258,19 +269,19 @@ class ContextBuilder:
             desc("vendas")
         ).limit(limit).all()
         
-        return [self._format_produto(p[0]) for p in produtos]
+        return [self._format_produto(p) for p in produtos]
     
-    def _format_produto(self, produto: Produto) -> Dict[str, Any]:
+    def _format_produto(self, produto: Any) -> Dict[str, Any]:
         """Formata produto para contexto."""
         return {
             "id": produto.id,
             "nome": produto.nome,
-            "descricao": produto.descricao_curta or produto.descricao_completa or "",
+            "descricao": getattr(produto, "descricao_curta", "") or "",
             "preco": float(produto.preco_venda) if produto.preco_venda else 0.0,
             "estoque": int(produto.estoque_atual) if produto.estoque_atual else 0,
             "disponivel": (produto.estoque_atual or 0) > 0,
-            "categoria": produto.categoria.nome if hasattr(produto, 'categoria') and produto.categoria else None,
-            "imagem_url": produto.imagem_url if hasattr(produto, 'imagem_url') else None
+            "categoria": None,
+            "imagem_url": None
         }
     
     def _extract_keywords(self, text: str) -> List[str]:

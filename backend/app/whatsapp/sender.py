@@ -244,21 +244,27 @@ async def send_whatsapp_message(
         ).first()
         
         if not config:
-            logger.error(f"Tenant {tenant_id} sem configuração WhatsApp")
-            return None
-
-        provider = (config.provider or "360dialog").lower()
+            fallback_provider = os.getenv("WHATSAPP_DEFAULT_PROVIDER", "waha").lower()
+            logger.warning(
+                "Tenant %s sem configuração WhatsApp; usando fallback provider=%s",
+                tenant_id,
+                fallback_provider,
+            )
+            provider = fallback_provider
+        else:
+            provider = (config.provider or "360dialog").lower()
 
         # Escolher cliente conforme provider
         if provider == "waha":
-            waha_url = os.getenv("WAHA_BASE_URL", "http://petshop-pilot-waha:3000")
+            waha_url = os.getenv("WAHA_BASE_URL", "http://waha:3000")
             waha_key = os.getenv("WAHA_API_KEY", "")
             client_obj = WahaClient(api_key=waha_key, base_url=waha_url)
         else:
-            if not config.api_key:
+            api_key_360 = (config.api_key if config else None) or os.getenv("WHATSAPP_360DIALOG_API_KEY", "")
+            if not api_key_360:
                 logger.error(f"Tenant {tenant_id} sem API key configurada")
                 return None
-            client_obj = Dialog360Client(api_key=config.api_key)
+            client_obj = Dialog360Client(api_key=api_key_360)
         
         session = db.query(WhatsAppSession).get(session_id)
         if not session:
