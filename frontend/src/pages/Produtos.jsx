@@ -675,6 +675,73 @@ const PRODUTOS_COLUNAS = [
   },
 ];
 
+const COLUNAS_RELATORIO_PRODUTOS = [
+  { key: "nome", label: "Nome", value: (p) => p.nome || "" },
+  { key: "codigo", label: "Codigo", value: (p) => p.codigo || p.sku || "" },
+  { key: "codigo_barras", label: "Codigo de Barras", value: (p) => p.codigo_barras || "" },
+  {
+    key: "categoria",
+    label: "Categoria",
+    value: (p) => p.categoria_nome || p.categoria?.nome || "",
+  },
+  {
+    key: "marca",
+    label: "Marca",
+    value: (p) => p.marca_nome || p.marca?.nome || "",
+  },
+  {
+    key: "fornecedor",
+    label: "Fornecedor",
+    value: (p) => p.fornecedor_nome || p.fornecedor?.nome || "",
+  },
+  { key: "unidade", label: "Unidade", value: (p) => p.unidade || "UN" },
+  {
+    key: "estoque",
+    label: "Estoque",
+    value: (p) => Number(p.estoque_atual ?? p.estoque ?? 0),
+  },
+  {
+    key: "estoque_minimo",
+    label: "Estoque Minimo",
+    value: (p) => Number(p.estoque_minimo ?? 0),
+  },
+  {
+    key: "preco_custo",
+    label: "Preco Custo",
+    value: (p) => Number(p.preco_custo ?? 0),
+  },
+  {
+    key: "preco_venda",
+    label: "Preco Venda",
+    value: (p) => Number(p.preco_venda ?? 0),
+  },
+  {
+    key: "margem",
+    label: "Margem %",
+    value: (p) => {
+      const pv = Number(p.preco_venda ?? 0);
+      const pc = Number(p.preco_custo ?? 0);
+      if (!pv) return 0;
+      return Number((((pv - pc) / pv) * 100).toFixed(2));
+    },
+  },
+  {
+    key: "ativo",
+    label: "Ativo",
+    value: (p) => (p.ativo === false ? "Nao" : "Sim"),
+  },
+  {
+    key: "tipo_produto",
+    label: "Tipo",
+    value: (p) => p.tipo_produto || "SIMPLES",
+  },
+  {
+    key: "atualizado_em",
+    label: "Atualizado em",
+    value: (p) => p.updated_at || p.data_atualizacao || p.created_at || "",
+  },
+];
+
 export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
@@ -708,6 +775,21 @@ export default function Produtos() {
   // Modal de configuração de colunas
   const [modalColunas, setModalColunas] = useState(false);
   const [colunasTemporarias, setColunasTemporarias] = useState([]);
+  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
+  const [modalRelatorioPersonalizado, setModalRelatorioPersonalizado] =
+    useState(false);
+  const [colunasRelatorio, setColunasRelatorio] = useState([
+    "nome",
+    "codigo",
+    "categoria",
+    "estoque",
+    "preco_custo",
+    "preco_venda",
+    "margem",
+    "ativo",
+  ]);
+  const [ordenacaoRelatorio, setOrdenacaoRelatorio] = useState("nome_asc");
+  const menuRelatoriosRef = useRef(null);
 
   // Modal de edição em lote
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
@@ -779,6 +861,20 @@ export default function Produtos() {
   useEffect(() => {
     setPaginaAtual(1);
   }, [filtros]);
+
+  useEffect(() => {
+    const handleClickFora = (event) => {
+      if (
+        menuRelatoriosRef.current &&
+        !menuRelatoriosRef.current.contains(event.target)
+      ) {
+        setMenuRelatoriosAberto(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickFora);
+    return () => document.removeEventListener("mousedown", handleClickFora);
+  }, []);
 
   useEffect(() => {
     produtosVisiveisRef.current = produtos;
@@ -1274,6 +1370,225 @@ export default function Produtos() {
     return colunasVisiveis.includes(coluna.key);
   };
 
+  const insightsProdutos = useMemo(() => {
+    const listaBase = (produtosBrutos || []).filter(
+      (produto) => produto?.tipo_produto !== "PAI",
+    );
+
+    const ativos = listaBase.filter((produto) => produto?.ativo !== false);
+
+    const estoqueAtual = (produto) =>
+      Number(produto?.estoque_atual ?? produto?.estoque ?? 0);
+    const estoqueMinimo = (produto) => Number(produto?.estoque_minimo ?? 0);
+
+    const rupturas = ativos.filter((produto) => estoqueAtual(produto) <= 0);
+    const riscoRuptura = ativos.filter((produto) => {
+      const atual = estoqueAtual(produto);
+      const minimo = Math.max(1, estoqueMinimo(produto));
+      return atual > 0 && atual <= minimo;
+    });
+
+    const excessoEstoque = ativos.filter((produto) => {
+      const minimo = estoqueMinimo(produto);
+      if (minimo <= 0) return false;
+      return estoqueAtual(produto) >= minimo * 4;
+    });
+
+    const margemBaixa = ativos
+      .map((produto) => {
+        const precoVenda = Number(produto?.preco_venda ?? 0);
+        const precoCusto = Number(produto?.preco_custo ?? 0);
+        const margem = precoVenda
+          ? Number((((precoVenda - precoCusto) / precoVenda) * 100).toFixed(2))
+          : 0;
+        return { ...produto, margem };
+      })
+      .filter((produto) => produto.margem > 0 && produto.margem < 15)
+      .sort((a, b) => a.margem - b.margem)
+      .slice(0, 5);
+
+    const sugestoesReposicao = riscoRuptura
+      .slice(0, 5)
+      .map((produto) => {
+        const atual = estoqueAtual(produto);
+        const minimo = Math.max(1, estoqueMinimo(produto));
+        return {
+          ...produto,
+          sugestao: Math.max(minimo * 2 - atual, 1),
+        };
+      });
+
+    return {
+      totalAtivos: ativos.length,
+      rupturas,
+      riscoRuptura,
+      excessoEstoque,
+      margemBaixa,
+      sugestoesReposicao,
+    };
+  }, [produtosBrutos]);
+
+  const extrairItensDaRespostaProdutos = (payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.itens)) return payload.itens;
+    if (Array.isArray(payload.items)) return payload.items;
+    if (Array.isArray(payload.produtos)) return payload.produtos;
+    if (Array.isArray(payload.data)) return payload.data;
+    return [];
+  };
+
+  const montarFiltroLimpo = (baseFiltros) => {
+    const filtrosLimpos = {};
+    Object.entries(baseFiltros || {}).forEach(([key, valor]) => {
+      if (key === "mostrarPaisVariacoes") return;
+      if (valor === "" || valor === null || valor === undefined) return;
+      if (typeof valor === "boolean") {
+        if (valor) filtrosLimpos[key] = true;
+        return;
+      }
+      filtrosLimpos[key] = valor;
+    });
+    return filtrosLimpos;
+  };
+
+  const carregarProdutosRelatorio = async (escopo) => {
+    const filtrosBase =
+      escopo === "geral"
+        ? { ativo: "todos", mostrarPaisVariacoes: filtros.mostrarPaisVariacoes }
+        : { ...filtros };
+    const filtrosLimpos = montarFiltroLimpo(filtrosBase);
+    filtrosLimpos.include_variations = Boolean(filtrosBase.mostrarPaisVariacoes);
+
+    const acumulado = [];
+    let pagina = 1;
+    let continuar = true;
+
+    while (continuar && pagina <= 40) {
+      const resposta = await getProdutos({
+        ...filtrosLimpos,
+        page: pagina,
+        page_size: 300,
+      });
+      const itens = extrairItensDaRespostaProdutos(resposta?.data);
+      if (itens.length === 0) {
+        continuar = false;
+      } else {
+        acumulado.push(...itens);
+        if (itens.length < 300) {
+          continuar = false;
+        }
+        pagina += 1;
+      }
+    }
+
+    return acumulado;
+  };
+
+  const ordenarProdutosRelatorio = (lista, ordenacao) => {
+    const copia = [...lista];
+    const porTexto = (a, b, getter, asc = true) => {
+      const va = String(getter(a) || "").toLowerCase();
+      const vb = String(getter(b) || "").toLowerCase();
+      return asc ? va.localeCompare(vb, "pt-BR") : vb.localeCompare(va, "pt-BR");
+    };
+
+    switch (ordenacao) {
+      case "nome_desc":
+        return copia.sort((a, b) => porTexto(a, b, (p) => p.nome, false));
+      case "estoque_asc":
+        return copia.sort(
+          (a, b) => Number(a.estoque_atual ?? a.estoque ?? 0) - Number(b.estoque_atual ?? b.estoque ?? 0),
+        );
+      case "estoque_desc":
+        return copia.sort(
+          (a, b) => Number(b.estoque_atual ?? b.estoque ?? 0) - Number(a.estoque_atual ?? a.estoque ?? 0),
+        );
+      case "preco_asc":
+        return copia.sort((a, b) => Number(a.preco_venda ?? 0) - Number(b.preco_venda ?? 0));
+      case "preco_desc":
+        return copia.sort((a, b) => Number(b.preco_venda ?? 0) - Number(a.preco_venda ?? 0));
+      case "nome_asc":
+      default:
+        return copia.sort((a, b) => porTexto(a, b, (p) => p.nome, true));
+    }
+  };
+
+  const normalizarValorCsv = (valor) => {
+    if (valor === null || valor === undefined) return "";
+    if (typeof valor === "number") return String(valor).replace(".", ",");
+    return String(valor).replaceAll("\"", '""');
+  };
+
+  const baixarCsvProdutos = (nomeArquivo, colunas, dados) => {
+    const cabecalho = colunas.map((coluna) => `"${coluna.label}"`).join(";");
+    const linhas = dados.map((item) => {
+      const valores = colunas.map((coluna) => {
+        const valorBruto = coluna.value(item);
+        const valorFinal = coluna.key === "atualizado_em" ? formatarData(valorBruto) : valorBruto;
+        return `"${normalizarValorCsv(valorFinal)}"`;
+      });
+      return valores.join(";");
+    });
+
+    const csv = [cabecalho, ...linhas].join("\n");
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", nomeArquivo);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const gerarRelatorioProdutos = async ({ escopo, personalizado = false }) => {
+    try {
+      toast.loading("Gerando relatorio...", { id: "relatorio-produtos" });
+      const dados = await carregarProdutosRelatorio(escopo);
+
+      if (!dados.length) {
+        toast.error("Nenhum produto encontrado para este relatorio.", {
+          id: "relatorio-produtos",
+        });
+        return;
+      }
+
+      const ordenados = ordenarProdutosRelatorio(dados, ordenacaoRelatorio);
+      const colunasSelecionadas = new Set(colunasRelatorio.filter(Boolean));
+      const colunas = COLUNAS_RELATORIO_PRODUTOS.filter((coluna) =>
+        colunasSelecionadas.has(coluna.key),
+      );
+
+      if (!colunas.length) {
+        toast.error("Selecione pelo menos uma coluna para gerar o relatorio.", {
+          id: "relatorio-produtos",
+        });
+        return;
+      }
+
+      const sufixo = escopo === "geral" ? "geral" : "filtrado";
+      const dataArquivo = new Date().toISOString().slice(0, 10);
+      baixarCsvProdutos(`produtos_${sufixo}_${dataArquivo}.csv`, colunas, ordenados);
+
+      toast.success(`Relatorio gerado com ${ordenados.length} produto(s).`, {
+        id: "relatorio-produtos",
+      });
+    } catch (error) {
+      console.error("Erro ao gerar relatorio de produtos:", error);
+      toast.error("Nao foi possivel gerar o relatorio de produtos.", {
+        id: "relatorio-produtos",
+      });
+    }
+  };
+
+  const toggleColunaRelatorio = (key) => {
+    setColunasRelatorio((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
+  };
+
   return (
     <div className="p-6">
       {/* Cabeçalho */}
@@ -1357,6 +1672,55 @@ export default function Produtos() {
             </svg>
             Colunas
           </button>
+          <div className="relative" ref={menuRelatoriosRef}>
+            <button
+              onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
+              className="px-4 py-2 text-indigo-700 rounded-xl bg-indigo-50 hover:bg-indigo-100 shadow-sm hover:shadow-md transition-all duration-200 border border-indigo-200 font-medium"
+            >
+              Relatorios
+            </button>
+
+            {menuRelatoriosAberto && (
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+                <button
+                  onClick={() => {
+                    setMenuRelatoriosAberto(false);
+                    gerarRelatorioProdutos({ escopo: "geral" });
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
+                >
+                  Relatorio geral (todos os produtos)
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuRelatoriosAberto(false);
+                    gerarRelatorioProdutos({ escopo: "filtrado" });
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Relatorio do que filtrei
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuRelatoriosAberto(false);
+                    setModalRelatorioPersonalizado(true);
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
+                >
+                  Relatorio personalizado
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuRelatoriosAberto(false);
+                    navigate("/produtos/relatorio");
+                  }}
+                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100 text-indigo-700"
+                >
+                  Abrir analises inteligentes
+                </button>
+              </div>
+            )}
+          </div>
           <button
             id="tour-produtos-novo"
             onClick={() => navigate("/produtos/novo")}
@@ -1364,6 +1728,98 @@ export default function Produtos() {
           >
             + Novo Produto
           </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-indigo-100">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-800">
+            Analises Inteligentes e Alertas Automaticos
+          </h2>
+          <button
+            onClick={() => navigate("/estoque/alertas")}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
+          >
+            Ver central de alertas
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+            <div className="text-xs text-red-700">Ruptura</div>
+            <div className="text-2xl font-bold text-red-700">
+              {insightsProdutos.rupturas.length}
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+            <div className="text-xs text-amber-700">Risco de ruptura</div>
+            <div className="text-2xl font-bold text-amber-700">
+              {insightsProdutos.riscoRuptura.length}
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <div className="text-xs text-blue-700">Excesso de estoque</div>
+            <div className="text-2xl font-bold text-blue-700">
+              {insightsProdutos.excessoEstoque.length}
+            </div>
+          </div>
+          <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+            <div className="text-xs text-purple-700">Ativos monitorados</div>
+            <div className="text-2xl font-bold text-purple-700">
+              {insightsProdutos.totalAtivos}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              Sugestao de reposicao imediata
+            </h3>
+            {insightsProdutos.sugestoesReposicao.length === 0 ? (
+              <p className="text-sm text-gray-500">Nenhuma reposicao urgente agora.</p>
+            ) : (
+              <div className="space-y-2">
+                {insightsProdutos.sugestoesReposicao.map((produto) => (
+                  <div key={produto.id} className="text-sm p-2 rounded bg-gray-50 border border-gray-200">
+                    <span className="font-medium text-gray-800">{produto.nome}</span>
+                    <span className="text-gray-600">
+                      {" - estoque atual "}
+                      {Number(produto.estoque_atual ?? produto.estoque ?? 0)}
+                      {", sugerido comprar "}
+                      <strong>{produto.sugestao}</strong>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              Produtos com margem critica
+            </h3>
+            {insightsProdutos.margemBaixa.length === 0 ? (
+              <p className="text-sm text-gray-500">Nenhum produto com margem abaixo de 15%.</p>
+            ) : (
+              <div className="space-y-2">
+                {insightsProdutos.margemBaixa.map((produto) => (
+                  <div key={produto.id} className="text-sm p-2 rounded bg-red-50 border border-red-100">
+                    <span className="font-medium text-red-800">{produto.nome}</span>
+                    <span className="text-red-700">
+                      {" - margem "}
+                      <strong>{produto.margem.toFixed(2)}%</strong>
+                      {" (custo "}
+                      {formatarMoeda(produto.preco_custo)}
+                      {" / venda "}
+                      {formatarMoeda(produto.preco_venda)}
+                      {")"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2076,6 +2532,100 @@ export default function Produtos() {
                   Salvar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalRelatorioPersonalizado && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Relatorio Personalizado de Produtos
+              </h3>
+              <button
+                onClick={() => setModalRelatorioPersonalizado(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-4">
+              <div>
+                <label
+                  htmlFor="ordenacao-relatorio-produtos"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Ordem do relatorio
+                </label>
+                <select
+                  id="ordenacao-relatorio-produtos"
+                  value={ordenacaoRelatorio}
+                  onChange={(e) => setOrdenacaoRelatorio(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="nome_asc">Nome (A-Z)</option>
+                  <option value="nome_desc">Nome (Z-A)</option>
+                  <option value="estoque_asc">Estoque (menor para maior)</option>
+                  <option value="estoque_desc">Estoque (maior para menor)</option>
+                  <option value="preco_asc">Preco venda (menor para maior)</option>
+                  <option value="preco_desc">Preco venda (maior para menor)</option>
+                </select>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">
+                  Colunas para exibir
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {COLUNAS_RELATORIO_PRODUTOS.map((coluna) => (
+                    <label
+                      key={coluna.key}
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={colunasRelatorio.includes(coluna.key)}
+                        onChange={() => toggleColunaRelatorio(coluna.key)}
+                        className="w-4 h-4 text-indigo-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700">{coluna.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setModalRelatorioPersonalizado(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await gerarRelatorioProdutos({ escopo: "filtrado", personalizado: true });
+                  setModalRelatorioPersonalizado(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+              >
+                Gerar relatorio
+              </button>
             </div>
           </div>
         </div>

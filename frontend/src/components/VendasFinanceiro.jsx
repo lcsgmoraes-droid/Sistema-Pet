@@ -37,6 +37,35 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 
+const COLUNAS_RELATORIO_VENDAS = [
+  { key: "data_venda", label: "Data", value: (v) => v.data_venda || "" },
+  { key: "numero_venda", label: "Codigo", value: (v) => v.numero_venda || "" },
+  { key: "cliente_nome", label: "Cliente", value: (v) => v.cliente_nome || "" },
+  { key: "status", label: "Status", value: (v) => v.status || "" },
+  { key: "venda_bruta", label: "Venda Bruta", value: (v) => Number(v.venda_bruta || 0) },
+  { key: "taxa_loja", label: "Taxa Loja", value: (v) => Number(v.taxa_loja || 0) },
+  { key: "desconto", label: "Desconto", value: (v) => Number(v.desconto || 0) },
+  { key: "taxa_entrega", label: "Taxa Entrega", value: (v) => Number(v.taxa_entrega || 0) },
+  { key: "taxa_operacional", label: "Taxa Operac.", value: (v) => Number(v.taxa_operacional || 0) },
+  { key: "taxa_cartao", label: "Taxa Cartao", value: (v) => Number(v.taxa_cartao || 0) },
+  { key: "comissao", label: "Comissao", value: (v) => Number(v.comissao || 0) },
+  { key: "imposto", label: "Imposto", value: (v) => Number(v.imposto || 0) },
+  { key: "custo_campanha", label: "Custo Campanha", value: (v) => Number(v.custo_campanha || 0) },
+  { key: "venda_liquida", label: "Venda Liquida", value: (v) => Number(v.venda_liquida || 0) },
+  { key: "custo_produtos", label: "Custo Produtos", value: (v) => Number(v.custo_produtos || 0) },
+  { key: "lucro", label: "Lucro", value: (v) => Number(v.lucro || 0) },
+  {
+    key: "margem_sobre_venda",
+    label: "Margem sobre Venda %",
+    value: (v) => Number(v.margem_sobre_venda || 0),
+  },
+  {
+    key: "margem_sobre_custo",
+    label: "Margem sobre Custo %",
+    value: (v) => Number(v.margem_sobre_custo || 0),
+  },
+];
+
 export default function VendasFinanceiro() {
   const { user } = useAuth();
   const userPermissions = user?.permissions || [];
@@ -96,6 +125,22 @@ export default function VendasFinanceiro() {
   const [produtosMaisLucrativos, setProdutosMaisLucrativos] = useState([]);
   const [produtosPorCategoria, setProdutosPorCategoria] = useState({});
   const [produtosAnalise, setProdutosAnalise] = useState([]);
+  const [alertasInteligentesVendas, setAlertasInteligentesVendas] = useState(
+    [],
+  );
+  const [previsaoProximos7Dias, setPrevisaoProximos7Dias] = useState(0);
+  const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
+  const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
+  const [ordenacaoRelatorio, setOrdenacaoRelatorio] = useState("data_desc");
+  const [colunasRelatorio, setColunasRelatorio] = useState([
+    "data_venda",
+    "numero_venda",
+    "cliente_nome",
+    "venda_bruta",
+    "venda_liquida",
+    "lucro",
+    "status",
+  ]);
 
   const toggleVendaExpandida = (vendaId) => {
     const novoSet = new Set(vendasExpandidas);
@@ -119,8 +164,8 @@ export default function VendasFinanceiro() {
     if (
       valor === null ||
       valor === undefined ||
-      isNaN(valor) ||
-      !isFinite(valor)
+      Number.isNaN(Number(valor)) ||
+      !Number.isFinite(Number(valor))
     ) {
       return 0;
     }
@@ -147,14 +192,91 @@ export default function VendasFinanceiro() {
       const data = new Date(dataStr);
 
       // Verificar se é uma data válida
-      if (isNaN(data.getTime())) {
+      if (Number.isNaN(data.getTime())) {
         return "N/A";
       }
 
       return data.toLocaleDateString("pt-BR");
-    } catch (error) {
+    } catch {
       return "N/A";
     }
+  };
+
+  const filtrarVendasParaRelatorio = (escopo) => {
+    if (escopo === "geral") return [...listaVendas];
+
+    return listaVendas.filter((venda) => {
+      const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
+      const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
+      const categoria = String(venda.categoria || "");
+
+      const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
+      const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
+      const okCategoria = !filtroCategoria || categoria === filtroCategoria;
+
+      return okFuncionario && okForma && okCategoria;
+    });
+  };
+
+  const ordenarVendasRelatorio = (lista, ordenacao) => {
+    const copia = [...lista];
+    switch (ordenacao) {
+      case "data_asc":
+        return copia.sort((a, b) => new Date(a.data_venda) - new Date(b.data_venda));
+      case "bruta_desc":
+        return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
+      case "bruta_asc":
+        return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
+      case "lucro_desc":
+        return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
+      case "lucro_asc":
+        return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
+      case "data_desc":
+      default:
+        return copia.sort((a, b) => new Date(b.data_venda) - new Date(a.data_venda));
+    }
+  };
+
+  const exportarRelatorioListaVendas = ({ escopo }) => {
+    const dadosFiltrados = filtrarVendasParaRelatorio(escopo);
+
+    if (!dadosFiltrados.length) {
+      toast.error("Nao ha vendas para exportar neste relatorio.");
+      return;
+    }
+
+    const dadosOrdenados = ordenarVendasRelatorio(dadosFiltrados, ordenacaoRelatorio);
+    const chaves = colunasRelatorio;
+    const colunas = COLUNAS_RELATORIO_VENDAS.filter((coluna) => chaves.includes(coluna.key));
+
+    if (!colunas.length) {
+      toast.error("Selecione pelo menos uma coluna para exportar.");
+      return;
+    }
+
+    const linhas = dadosOrdenados.map((venda) => {
+      const linha = {};
+      colunas.forEach((coluna) => {
+        const bruto = coluna.value(venda);
+        linha[coluna.label] = coluna.key === "data_venda" ? formatarData(bruto) : bruto;
+      });
+      return linha;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lista de Vendas");
+
+    const dataArquivo = new Date().toISOString().slice(0, 10);
+    const sufixo = escopo === "geral" ? "geral" : "filtrado";
+    XLSX.writeFile(wb, `vendas_${sufixo}_${dataArquivo}.xlsx`);
+    toast.success(`Relatorio gerado com ${linhas.length} venda(s).`);
+  };
+
+  const toggleColunaRelatorio = (key) => {
+    setColunasRelatorio((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
   };
 
   const CORES_GRAFICOS = [
@@ -198,7 +320,6 @@ export default function VendasFinanceiro() {
     return dadosFiltrados;
   };
 
-  const vendasPorDataFiltradas = vendasPorData;
   const formasRecebimentoFiltradas = aplicarFiltros(
     formasRecebimento,
     "formaPagamento",
@@ -283,7 +404,7 @@ export default function VendasFinanceiro() {
         },
       );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const url = globalThis.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute(
@@ -369,7 +490,9 @@ export default function VendasFinanceiro() {
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "binary" });
     const buf = new ArrayBuffer(wbout.length);
     const view = new Uint8Array(buf);
-    for (let i = 0; i < wbout.length; i++) view[i] = wbout.charCodeAt(i) & 0xff;
+    for (let i = 0; i < wbout.length; i++) {
+      view[i] = (wbout.codePointAt(i) ?? 0) & 0xff;
+    }
     const fileName = `relatorio_vendas_${dataInicio}_${dataFim}.xlsx`;
     saveAs(new Blob([buf], { type: "application/octet-stream" }), fileName);
   };
@@ -388,7 +511,7 @@ export default function VendasFinanceiro() {
       case "hoje":
         inicio = fim = hoje;
         break;
-      case "ontem":
+      case "ontem": {
         const dataOntem = new Date(agora);
         dataOntem.setDate(agora.getDate() - 1);
         const anoOntem = dataOntem.getFullYear();
@@ -396,7 +519,8 @@ export default function VendasFinanceiro() {
         const diaOntem = String(dataOntem.getDate()).padStart(2, "0");
         inicio = fim = `${anoOntem}-${mesOntem}-${diaOntem}`;
         break;
-      case "esta_semana":
+      }
+      case "esta_semana": {
         const diaSemana = agora.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
         const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1; // Se domingo, volta 6 dias; senão volta (dia-1)
         const primeiroDia = new Date(agora);
@@ -407,11 +531,12 @@ export default function VendasFinanceiro() {
         inicio = `${anoPri}-${mesPri}-${diaPri}`;
         fim = hoje;
         break;
+      }
       case "este_mes":
         inicio = `${ano}-${mes}-01`;
         fim = hoje;
         break;
-      case "mes_anterior":
+      case "mes_anterior": {
         const mesPassado = new Date(
           agora.getFullYear(),
           agora.getMonth() - 1,
@@ -429,7 +554,8 @@ export default function VendasFinanceiro() {
         inicio = `${anoMesPass}-${numeroMesPass}-01`;
         fim = `${anoUltDia}-${mesUltDia}-${diaUltDia}`;
         break;
-      case "ultimos_7_dias":
+      }
+      case "ultimos_7_dias": {
         const sete = new Date(agora);
         sete.setDate(agora.getDate() - 7);
         const anoSete = sete.getFullYear();
@@ -438,7 +564,8 @@ export default function VendasFinanceiro() {
         inicio = `${anoSete}-${mesSete}-${diaSete}`;
         fim = hoje;
         break;
-      case "ultimos_30_dias":
+      }
+      case "ultimos_30_dias": {
         const trinta = new Date(agora);
         trinta.setDate(agora.getDate() - 30);
         const anoTrinta = trinta.getFullYear();
@@ -447,6 +574,7 @@ export default function VendasFinanceiro() {
         inicio = `${anoTrinta}-${mesTrinta}-${diaTrinta}`;
         fim = hoje;
         break;
+      }
       case "este_ano":
         inicio = `${ano}-01-01`;
         fim = hoje;
@@ -514,7 +642,7 @@ export default function VendasFinanceiro() {
       return { valor: 0, percentual: 0 };
     const diff = valorAtual - valorAnterior;
     const perc = ((diff / valorAnterior) * 100).toFixed(1);
-    return { valor: diff, percentual: parseFloat(perc) };
+    return { valor: diff, percentual: Number.parseFloat(perc) };
   };
 
   const carregarDados = async () => {
@@ -575,6 +703,8 @@ export default function VendasFinanceiro() {
     if (!produtosAnalise || produtosAnalise.length === 0) {
       setProdutosMaisLucrativos([]);
       setProdutosPorCategoria({});
+      setAlertasInteligentesVendas([]);
+      setPrevisaoProximos7Dias(0);
       return;
     }
 
@@ -599,9 +729,9 @@ export default function VendasFinanceiro() {
     });
 
     // Ordenar por lucro total decrescente
-    const topProdutos = produtosComMargem
-      .sort((a, b) => b.lucro_total - a.lucro_total)
-      .slice(0, 20);
+    const produtosOrdenadosPorLucro = [...produtosComMargem];
+    produtosOrdenadosPorLucro.sort((a, b) => b.lucro_total - a.lucro_total);
+    const topProdutos = produtosOrdenadosPorLucro.slice(0, 20);
 
     setProdutosMaisLucrativos(topProdutos);
 
@@ -635,6 +765,78 @@ export default function VendasFinanceiro() {
     });
 
     setProdutosPorCategoria(porCategoria);
+
+    const alertas = [];
+
+    const qtdAtual = sanitizarNumero(resumo.quantidade_vendas);
+    const qtdAnterior = sanitizarNumero(resumoComparacao.quantidade_vendas);
+    if (qtdAnterior > 0 && qtdAtual < qtdAnterior) {
+      const queda = Number((((qtdAnterior - qtdAtual) / qtdAnterior) * 100).toFixed(1));
+      alertas.push({
+        id: "queda-vendas",
+        tipo: "critico",
+        titulo: "Queda de volume de vendas",
+        mensagem: `As vendas cairam ${queda}% em relacao ao periodo comparativo.`,
+        recomendacao:
+          "Revise campanhas, produtos de entrada e politica de descontos para recuperar volume.",
+      });
+    }
+
+    const liquidoAtual = sanitizarNumero(resumo.venda_liquida);
+    const emAberto = sanitizarNumero(resumo.em_aberto);
+    if (liquidoAtual > 0) {
+      const percAberto = Number(((emAberto / liquidoAtual) * 100).toFixed(1));
+      if (percAberto >= 20) {
+        alertas.push({
+          id: "recebiveis-abertos",
+          tipo: "atencao",
+          titulo: "Recebimento em aberto elevado",
+          mensagem: `${percAberto}% da venda liquida ainda esta em aberto no periodo.`,
+          recomendacao:
+            "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
+        });
+      }
+    }
+
+    const baixaMargem = produtosComMargem.filter((produto) => produto.margem < 20).length;
+    if (baixaMargem >= 5) {
+      alertas.push({
+        id: "mix-baixa-margem",
+        tipo: "atencao",
+        titulo: "Muitos produtos com baixa margem",
+        mensagem: `${baixaMargem} produtos vendidos estao com margem abaixo de 20%.`,
+        recomendacao:
+          "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
+      });
+    }
+
+    const altaMargemBaixoVolume = produtosComMargem
+      .filter((produto) => produto.margem >= 45 && produto.quantidade <= 3)
+      .slice(0, 3);
+    if (altaMargemBaixoVolume.length > 0) {
+      alertas.push({
+        id: "oportunidade-upsell",
+        tipo: "oportunidade",
+        titulo: "Oportunidade de crescimento",
+        mensagem: `Produtos com alta margem e baixo volume: ${altaMargemBaixoVolume.map((p) => p.nome).join(", ")}.`,
+        recomendacao:
+          "Destacar esses itens no atendimento e criar combo promocional para aumentar giro.",
+      });
+    }
+
+    const basePrevisao = (vendasPorData || []).slice(-14);
+    if (basePrevisao.length > 0) {
+      const mediaDiaria =
+        basePrevisao.reduce(
+          (soma, item) => soma + sanitizarNumero(item.valor_liquido),
+          0,
+        ) / basePrevisao.length;
+      setPrevisaoProximos7Dias(sanitizarNumero(mediaDiaria * 7));
+    } else {
+      setPrevisaoProximos7Dias(0);
+    }
+
+    setAlertasInteligentesVendas(alertas);
   };
 
   // Recalcular análise quando produtos mudarem
@@ -642,7 +844,7 @@ export default function VendasFinanceiro() {
     if (abaAtiva === "analise") {
       calcularAnaliseInteligente();
     }
-  }, [produtosAnalise, abaAtiva]);
+  }, [produtosAnalise, abaAtiva, resumo, resumoComparacao, vendasPorData]);
 
   useEffect(() => {
     if (podeVerFinanceiroCompleto) {
@@ -688,6 +890,47 @@ export default function VendasFinanceiro() {
 
           {podeVerFinanceiroCompleto ? (
             <div className="flex items-center gap-4">
+            <div className="relative">
+              <button
+                onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="font-medium">Relatorios</span>
+              </button>
+
+              {menuRelatoriosAberto && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+                  <button
+                    onClick={() => {
+                      setMenuRelatoriosAberto(false);
+                      exportarRelatorioListaVendas({ escopo: "geral" });
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
+                  >
+                    Relatorio geral da lista de vendas
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuRelatoriosAberto(false);
+                      exportarRelatorioListaVendas({ escopo: "filtrado" });
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
+                  >
+                    Relatorio do que filtrei
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuRelatoriosAberto(false);
+                      setModalRelatorioAberto(true);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
+                  >
+                    Relatorio personalizado
+                  </button>
+                </div>
+              )}
+            </div>
             {/* Botão Exportar PDF */}
             <button
               onClick={exportarParaPDF}
@@ -838,8 +1081,8 @@ export default function VendasFinanceiro() {
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">Todos os funcionários</option>
-            {vendasPorFuncionario.map((f, idx) => (
-              <option key={idx} value={f.funcionario}>
+            {vendasPorFuncionario.map((f) => (
+              <option key={`func-${f.funcionario || "sem-nome"}`} value={f.funcionario}>
                 {f.funcionario}
               </option>
             ))}
@@ -851,8 +1094,8 @@ export default function VendasFinanceiro() {
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">Todas as formas</option>
-            {formasRecebimento.map((f, idx) => (
-              <option key={idx} value={f.forma_pagamento}>
+            {formasRecebimento.map((f) => (
+              <option key={`forma-${f.forma_pagamento || "sem-forma"}`} value={f.forma_pagamento}>
                 {f.forma_pagamento}
               </option>
             ))}
@@ -864,8 +1107,8 @@ export default function VendasFinanceiro() {
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">Todas as categorias</option>
-            {produtosDetalhados.map((cat, idx) => (
-              <option key={idx} value={cat.categoria}>
+            {produtosDetalhados.map((cat) => (
+              <option key={`cat-${cat.categoria || "sem-categoria"}`} value={cat.categoria}>
                 {cat.categoria}
               </option>
             ))}
@@ -1173,7 +1416,7 @@ export default function VendasFinanceiro() {
                     >
                       {formasRecebimentoFiltradas.map((entry, index) => (
                         <Cell
-                          key={`cell-${index}`}
+                          key={`cell-forma-${entry.forma_pagamento || entry.name || index}`}
                           fill={CORES_GRAFICOS[index % CORES_GRAFICOS.length]}
                         />
                       ))}
@@ -1232,7 +1475,7 @@ export default function VendasFinanceiro() {
                 </thead>
                 <tbody>
                   {vendasPorData.map((item, idx) => (
-                    <tr key={idx} className="border-b hover:bg-gray-50">
+                    <tr key={`dia-${item.data || idx}`} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-2">{formatarData(item.data)}</td>
                       <td className="px-4 py-2 text-right">
                         {item.quantidade}
@@ -1363,7 +1606,7 @@ export default function VendasFinanceiro() {
                 </thead>
                 <tbody>
                   {formasRecebimento.map((item, idx) => (
-                    <tr key={idx} className="border-b">
+                    <tr key={`forma-row-${item.forma_pagamento || idx}`} className="border-b">
                       <td className="px-4 py-2">{item.forma_pagamento}</td>
                       <td className="px-4 py-2 text-right">
                         {formatarMoeda(item.valor_total)}
@@ -1410,7 +1653,7 @@ export default function VendasFinanceiro() {
                 </thead>
                 <tbody>
                   {vendasPorFuncionarioFiltradas.map((item, idx) => (
-                    <tr key={idx} className="border-b">
+                    <tr key={`func-row-${item.funcionario || idx}`} className="border-b">
                       <td className="px-4 py-2">{item.funcionario}</td>
                       <td className="px-4 py-2 text-right">
                         {item.quantidade}
@@ -1488,7 +1731,7 @@ export default function VendasFinanceiro() {
                 </thead>
                 <tbody>
                   {vendasPorTipo.map((item, idx) => (
-                    <tr key={idx} className="border-b">
+                    <tr key={`tipo-row-${item.tipo || idx}`} className="border-b">
                       <td className="px-4 py-2">{item.tipo}</td>
                       <td className="px-4 py-2 text-right">
                         {item.quantidade}
@@ -1566,7 +1809,7 @@ export default function VendasFinanceiro() {
                 </thead>
                 <tbody>
                   {vendasPorGrupo.map((item, idx) => (
-                    <tr key={idx} className="border-b">
+                    <tr key={`grupo-row-${item.grupo || idx}`} className="border-b">
                       <td className="px-4 py-2">{item.grupo}</td>
                       <td className="px-4 py-2 text-right">
                         {item.percentual}%
@@ -1620,6 +1863,86 @@ export default function VendasFinanceiro() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalRelatorioAberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Relatorio Personalizado - Lista de Vendas
+              </h3>
+              <button
+                onClick={() => setModalRelatorioAberto(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <span className="text-2xl leading-none">×</span>
+              </button>
+            </div>
+
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-4">
+              <div>
+                <label
+                  htmlFor="ordenacao-relatorio-vendas"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Ordem
+                </label>
+                <select
+                  id="ordenacao-relatorio-vendas"
+                  value={ordenacaoRelatorio}
+                  onChange={(e) => setOrdenacaoRelatorio(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="data_desc">Data (mais recente primeiro)</option>
+                  <option value="data_asc">Data (mais antiga primeiro)</option>
+                  <option value="bruta_desc">Venda bruta (maior para menor)</option>
+                  <option value="bruta_asc">Venda bruta (menor para maior)</option>
+                  <option value="lucro_desc">Lucro (maior para menor)</option>
+                  <option value="lucro_asc">Lucro (menor para maior)</option>
+                </select>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Colunas</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {COLUNAS_RELATORIO_VENDAS.map((coluna) => (
+                    <label
+                      key={coluna.key}
+                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={colunasRelatorio.includes(coluna.key)}
+                        onChange={() => toggleColunaRelatorio(coluna.key)}
+                        className="w-4 h-4 text-indigo-600 rounded"
+                      />
+                      <span className="text-sm text-gray-700">{coluna.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setModalRelatorioAberto(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  exportarRelatorioListaVendas({ escopo: "filtrado" });
+                  setModalRelatorioAberto(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+              >
+                Gerar relatorio
+              </button>
             </div>
           </div>
         </div>
@@ -2005,7 +2328,7 @@ export default function VendasFinanceiro() {
                                 <tbody>
                                   {venda.itens.map((item, idx) => (
                                     <tr
-                                      key={idx}
+                                      key={`${venda.id}-item-${item.produto_id || item.produto_nome || idx}`}
                                       className="border-b border-blue-200 hover:bg-blue-100"
                                     >
                                       <td className="px-1 py-1">
@@ -2098,10 +2421,14 @@ export default function VendasFinanceiro() {
           {/* Filtro de Tipo de Comparação */}
           <div className="bg-white rounded-lg shadow p-4 mb-6">
             <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700">
+              <label
+                htmlFor="tipo-comparacao-vendas"
+                className="text-sm font-medium text-gray-700"
+              >
                 Tipo de Análise:
               </label>
               <select
+                id="tipo-comparacao-vendas"
                 value={tipoComparacao}
                 onChange={(e) => setTipoComparacao(e.target.value)}
                 className="border rounded px-4 py-2 text-sm bg-blue-50 font-medium min-w-[250px]"
@@ -2412,7 +2739,7 @@ export default function VendasFinanceiro() {
                           formaAnt.valor_total,
                         );
                         return (
-                          <tr key={idx} className="border-b hover:bg-gray-50">
+                          <tr key={`comp-forma-${formaAtual.forma_pagamento || idx}`} className="border-b hover:bg-gray-50">
                             <td className="px-4 py-3 font-medium">
                               {formaAtual.forma_pagamento}
                             </td>
@@ -2513,7 +2840,7 @@ export default function VendasFinanceiro() {
                           grupoAnt.valor_liquido,
                         );
                         return (
-                          <tr key={idx} className="border-b hover:bg-gray-50">
+                          <tr key={`comp-grupo-${grupoAtual.grupo || idx}`} className="border-b hover:bg-gray-50">
                             <td className="px-4 py-3 font-medium">
                               {grupoAtual.grupo}
                             </td>
@@ -2575,7 +2902,7 @@ export default function VendasFinanceiro() {
                       >
                         {vendasPorGrupoComparacao.map((entry, index) => (
                           <Cell
-                            key={`cell-${index}`}
+                            key={`cell-grupo-ant-${entry.grupo || index}`}
                             fill={CORES_GRAFICOS[index % CORES_GRAFICOS.length]}
                           />
                         ))}
@@ -2613,7 +2940,7 @@ export default function VendasFinanceiro() {
                       >
                         {vendasPorGrupo.map((entry, index) => (
                           <Cell
-                            key={`cell-${index}`}
+                            key={`cell-grupo-atual-${entry.grupo || index}`}
                             fill={CORES_GRAFICOS[index % CORES_GRAFICOS.length]}
                           />
                         ))}
@@ -2656,7 +2983,7 @@ export default function VendasFinanceiro() {
                           funcAnt.valor_liquido,
                         );
                         return (
-                          <tr key={idx} className="border-b hover:bg-gray-50">
+                          <tr key={`comp-func-${funcAtual.funcionario || idx}`} className="border-b hover:bg-gray-50">
                             <td className="px-4 py-3 font-medium">
                               {funcAtual.funcionario}
                             </td>
@@ -2773,6 +3100,70 @@ export default function VendasFinanceiro() {
                 </p>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg shadow-md p-4 border border-blue-100">
+                  <div className="text-xs text-gray-500 mb-1">Previsao proximos 7 dias</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {formatarMoeda(previsaoProximos7Dias)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Baseado na media diaria dos ultimos dias
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 border border-amber-100">
+                  <div className="text-xs text-gray-500 mb-1">Alertas automaticos</div>
+                  <div className="text-2xl font-bold text-amber-700">
+                    {alertasInteligentesVendas.length}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Atualizados sempre que o periodo ou filtros mudam
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 border border-emerald-100">
+                  <div className="text-xs text-gray-500 mb-1">Ticket medio estimado</div>
+                  <div className="text-2xl font-bold text-emerald-700">
+                    {formatarMoeda(
+                      resumo.quantidade_vendas > 0
+                        ? resumo.venda_liquida / resumo.quantidade_vendas
+                        : 0,
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">Periodo atual</div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  Alertas Inteligentes Automaticos
+                </h3>
+
+                {alertasInteligentesVendas.length === 0 ? (
+                  <div className="p-4 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm">
+                    Nenhum alerta critico no momento. O desempenho esta estavel para o periodo analisado.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {alertasInteligentesVendas.map((alerta) => {
+                      const classes =
+                        alerta.tipo === "critico"
+                          ? "bg-red-50 border-red-200"
+                          : alerta.tipo === "oportunidade"
+                            ? "bg-blue-50 border-blue-200"
+                            : "bg-amber-50 border-amber-200";
+                      return (
+                        <div key={alerta.id} className={`p-4 rounded-lg border ${classes}`}>
+                          <div className="font-semibold text-gray-800">{alerta.titulo}</div>
+                          <div className="text-sm text-gray-700 mt-1">{alerta.mensagem}</div>
+                          <div className="text-sm text-gray-600 mt-2">
+                            <strong>Acao sugerida:</strong> {alerta.recomendacao}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Produtos Mais Lucrativos */}
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -2809,7 +3200,7 @@ export default function VendasFinanceiro() {
                     </thead>
                     <tbody>
                       {produtosMaisLucrativos.map((produto, index) => (
-                        <tr key={index} className="border-b hover:bg-gray-50">
+                        <tr key={`rank-${produto.nome}-${produto.marca || "sem-marca"}`} className="border-b hover:bg-gray-50">
                           <td className="py-3 px-2">
                             <span
                               className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
@@ -2942,7 +3333,7 @@ export default function VendasFinanceiro() {
                       .slice(0, 5)
                       .map((produto, index) => (
                         <div
-                          key={index}
+                          key={`margem-baixa-${produto.nome}-${produto.marca || "sem-marca"}`}
                           className="p-3 bg-red-50 rounded-lg border-l-4 border-red-500"
                         >
                           <div className="font-medium text-sm">
@@ -2995,7 +3386,7 @@ export default function VendasFinanceiro() {
                       .slice(0, 3)
                       .map((produto, index) => (
                         <div
-                          key={index}
+                          key={`oportunidade-${produto.nome}-${produto.marca || "sem-marca"}`}
                           className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500"
                         >
                           <div className="font-medium text-sm">
@@ -3018,7 +3409,7 @@ export default function VendasFinanceiro() {
                       .slice(0, 2)
                       .map((produto, index) => (
                         <div
-                          key={`camp-${index}`}
+                          key={`camp-${produto.nome || index}`}
                           className="p-3 bg-green-50 rounded-lg border-l-4 border-green-500"
                         >
                           <div className="font-medium text-sm">
