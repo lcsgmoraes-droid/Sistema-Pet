@@ -36,6 +36,7 @@ from .models import User
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente
 )
+from .vendas_models import Venda
 from .bling_estoque_sync import sincronizar_bling_background
 import logging
 logger = logging.getLogger(__name__)
@@ -1486,6 +1487,16 @@ def listar_movimentacoes_produto(
             # Atualizar custo anterior apenas se for entrada com custo
             custo_anterior_entrada = mov.custo_unitario
         
+        # Buscar canal da venda quando for movimentação de venda
+        canal_venda = None
+        preco_venda_unitario = None
+        if mov.referencia_tipo == 'venda' and mov.referencia_id:
+            venda = db.query(Venda.canal, Venda.total).filter(Venda.id == mov.referencia_id).first()
+            if venda:
+                canal_venda = venda.canal
+                if mov.quantidade and mov.quantidade > 0:
+                    preco_venda_unitario = float(venda.total) / float(mov.quantidade) if venda.total else None
+
         resultado.append({
             "id": mov.id,
             "tipo": mov.tipo,
@@ -1503,6 +1514,8 @@ def listar_movimentacoes_produto(
             "lote_nome": lote_nome,
             "lote_info": lote_info,
             "variacao_custo": variacao_custo,
+            "canal": canal_venda,
+            "preco_venda_unitario": preco_venda_unitario,
             "created_at": mov.created_at.isoformat() if mov.created_at else None,
             "user_id": mov.user_id
         })

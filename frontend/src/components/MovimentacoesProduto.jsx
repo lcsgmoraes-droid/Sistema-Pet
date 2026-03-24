@@ -2,10 +2,11 @@
  * Página de Movimentações de Estoque por Produto
  * Modelo inspirado no Bling
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
+import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 
 function formatarQuantidade(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
@@ -382,6 +383,32 @@ export default function MovimentacoesProduto() {
     .filter(m => m.tipo === 'saida')
     .reduce((sum, m) => sum + parseFloat(m.quantidade || 0), 0);
 
+  // Resumo de vendas por canal
+  const vendasPorCanal = useMemo(() => {
+    const grupos = {};
+    movimentacoes
+      .filter(m => m.tipo === 'saida' && m.referencia_tipo === 'venda' && m.canal)
+      .forEach(m => {
+        const canal = m.canal;
+        if (!grupos[canal]) grupos[canal] = { qtd: 0, valor: 0, count: 0 };
+        grupos[canal].qtd += parseFloat(m.quantidade || 0);
+        grupos[canal].valor += m.preco_venda_unitario
+          ? parseFloat(m.quantidade || 0) * parseFloat(m.preco_venda_unitario)
+          : 0;
+        grupos[canal].count += 1;
+      });
+    const totalQtd = Object.values(grupos).reduce((s, g) => s + g.qtd, 0);
+    return Object.entries(grupos)
+      .map(([canal, g]) => ({
+        canal,
+        qtd: g.qtd,
+        valor: g.valor,
+        count: g.count,
+        pct: totalQtd > 0 ? (g.qtd / totalQtd) * 100 : 0,
+      }))
+      .sort((a, b) => b.qtd - a.qtd);
+  }, [movimentacoes]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -642,6 +669,70 @@ export default function MovimentacoesProduto() {
         </div>
       </div>
 
+      {/* Painel: Vendas por Canal */}
+      {vendasPorCanal.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+            <svg className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <h2 className="text-base font-bold text-slate-800">Vendas por Canal</h2>
+            <span className="ml-auto text-xs text-slate-400">Apenas saídas vinculadas a vendas</span>
+          </div>
+          <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {vendasPorCanal.map(({ canal, qtd, valor, count, pct }) => {
+              const labelCanal = {
+                loja_fisica: 'Loja Física',
+                mercado_livre: 'Mercado Livre',
+                shopee: 'Shopee',
+                amazon: 'Amazon',
+                site: 'Site',
+                instagram: 'Instagram',
+                whatsapp: 'WhatsApp',
+              }[canal] || canal;
+              const corCanal = {
+                loja_fisica: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                mercado_livre: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+                shopee: 'bg-orange-50 border-orange-200 text-orange-700',
+                amazon: 'bg-sky-50 border-sky-200 text-sky-700',
+                site: 'bg-indigo-50 border-indigo-200 text-indigo-700',
+                instagram: 'bg-pink-50 border-pink-200 text-pink-700',
+                whatsapp: 'bg-green-50 border-green-200 text-green-700',
+              }[canal] || 'bg-slate-50 border-slate-200 text-slate-700';
+              const barColor = {
+                loja_fisica: 'bg-emerald-400',
+                mercado_livre: 'bg-yellow-400',
+                shopee: 'bg-orange-400',
+                amazon: 'bg-sky-400',
+                site: 'bg-indigo-400',
+                instagram: 'bg-pink-400',
+                whatsapp: 'bg-green-400',
+              }[canal] || 'bg-slate-400';
+              return (
+                <div key={canal} className={`rounded-xl border p-4 ${corCanal}`}>
+                  <div className="text-xs font-bold uppercase tracking-wide opacity-70">{labelCanal}</div>
+                  <div className="mt-2 flex items-end justify-between gap-2">
+                    <div>
+                      <div className="text-2xl font-black">{formatBRL(qtd)} un</div>
+                      {valor > 0 && (
+                        <div className="mt-0.5 text-xs font-semibold opacity-80">{formatMoneyBRL(valor)}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold">{pct.toFixed(0)}%</div>
+                      <div className="text-[11px] opacity-60">{count} venda{count !== 1 ? 's' : ''}</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-1.5 rounded-full bg-black/10">
+                    <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tabela de movimentações */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -694,6 +785,9 @@ export default function MovimentacoesProduto() {
                   Origem
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Canal
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Observação
                 </th>
               </tr>
@@ -701,7 +795,7 @@ export default function MovimentacoesProduto() {
             <tbody className="bg-white divide-y divide-gray-200">
               {movimentacoes.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
                     Nenhuma movimentação registrada
                   </td>
                 </tr>
@@ -822,6 +916,30 @@ export default function MovimentacoesProduto() {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        {mov.canal ? (
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            mov.canal === 'loja_fisica' ? 'bg-emerald-100 text-emerald-700' :
+                            mov.canal === 'mercado_livre' ? 'bg-yellow-100 text-yellow-700' :
+                            mov.canal === 'shopee' ? 'bg-orange-100 text-orange-700' :
+                            mov.canal === 'amazon' ? 'bg-sky-100 text-sky-700' :
+                            mov.canal === 'site' ? 'bg-indigo-100 text-indigo-700' :
+                            mov.canal === 'instagram' ? 'bg-pink-100 text-pink-700' :
+                            mov.canal === 'whatsapp' ? 'bg-green-100 text-green-700' :
+                            'bg-slate-100 text-slate-600'
+                          }`}>
+                            {{
+                              loja_fisica: 'Loja Física',
+                              mercado_livre: 'Mercado Livre',
+                              shopee: 'Shopee',
+                              amazon: 'Amazon',
+                              site: 'Site',
+                              instagram: 'Instagram',
+                              whatsapp: 'WhatsApp',
+                            }[mov.canal] || mov.canal}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
