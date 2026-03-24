@@ -1,7 +1,7 @@
 /**
  * Relatório de Movimentações de Estoque
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   getRelatorioMovimentacoes,
@@ -21,6 +21,12 @@ export default function ProdutosRelatorio() {
     totalSaidas: 0,
     valorTotal: 0
   });
+
+  // Busca de produto (autocomplete)
+  const [buscaProduto, setBuscaProduto] = useState('');
+  const [produtoSelecionado, setProdutoSelecionado] = useState(null);
+  const [dropdownAberto, setDropdownAberto] = useState(false);
+  const buscaRef = useRef(null);
 
   // Filtros
   const [filtros, setFiltros] = useState({
@@ -73,12 +79,15 @@ export default function ProdutosRelatorio() {
 
   const carregarProdutos = async () => {
     try {
-      const response = await getProdutos();
+      const response = await getProdutos({ limit: 5000 });
       // Backend retorna objeto paginado {items: [...], total: 124}
       if (response.data && Array.isArray(response.data.items)) {
         setProdutos(response.data.items);
+      } else if (response.data && Array.isArray(response.data.itens)) {
+        setProdutos(response.data.itens);
+      } else if (response.data && Array.isArray(response.data.produtos)) {
+        setProdutos(response.data.produtos);
       } else if (Array.isArray(response.data)) {
-        // Fallback para array direto (retrocompatibilidade)
         setProdutos(response.data);
       } else {
         console.warn('Resposta de produtos não é um array:', response.data);
@@ -86,8 +95,35 @@ export default function ProdutosRelatorio() {
       }
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
-      setProdutos([]); // Garantir array vazio em caso de erro
+      setProdutos([]);
     }
+  };
+
+  // Produtos filtrados pelo texto digitado
+  const produtosFiltrados = buscaProduto.trim().length >= 1
+    ? produtos.filter(p => {
+        const texto = buscaProduto.toLowerCase();
+        return (
+          (p.nome && p.nome.toLowerCase().includes(texto)) ||
+          (p.codigo && p.codigo.toLowerCase().includes(texto)) ||
+          (p.sku && p.sku.toLowerCase().includes(texto)) ||
+          (p.codigo_barras && p.codigo_barras.includes(texto))
+        );
+      }).slice(0, 20)
+    : [];
+
+  const selecionarProduto = (produto) => {
+    setProdutoSelecionado(produto);
+    setBuscaProduto('');
+    setDropdownAberto(false);
+    handleFiltroChange('produto_id', produto.id);
+  };
+
+  const limparProduto = () => {
+    setProdutoSelecionado(null);
+    setBuscaProduto('');
+    setDropdownAberto(false);
+    handleFiltroChange('produto_id', '');
   };
 
   const carregarRelatorio = async () => {
@@ -268,22 +304,63 @@ export default function ProdutosRelatorio() {
               />
             </div>
 
-            <div>
+            <div className="relative" ref={buscaRef}>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Produto
               </label>
-              <select
-                value={filtros.produto_id}
-                onChange={(e) => handleFiltroChange('produto_id', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Todos os Produtos</option>
-                {produtos.map(prod => (
-                  <option key={prod.id} value={prod.id}>
-                    {prod.codigo || prod.sku} - {prod.nome}
-                  </option>
-                ))}
-              </select>
+              {produtoSelecionado ? (
+                <div className="flex items-center gap-2 w-full px-3 py-2 border border-blue-400 rounded-lg bg-blue-50">
+                  <span className="flex-1 text-sm text-gray-800 truncate">
+                    <span className="font-mono text-xs text-gray-500 mr-1">{produtoSelecionado.codigo || produtoSelecionado.sku}</span>
+                    {produtoSelecionado.nome}
+                  </span>
+                  <button
+                    onClick={limparProduto}
+                    className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                    title="Limpar seleção"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar por código, nome ou código de barras..."
+                    value={buscaProduto}
+                    onChange={(e) => { setBuscaProduto(e.target.value); setDropdownAberto(true); }}
+                    onFocus={() => setDropdownAberto(true)}
+                    onBlur={() => setTimeout(() => setDropdownAberto(false), 150)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8"
+                  />
+                  {buscaProduto && (
+                    <button
+                      onClick={limparProduto}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                  {dropdownAberto && produtosFiltrados.length > 0 && (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      {produtosFiltrados.map(prod => (
+                        <button
+                          key={prod.id}
+                          onMouseDown={() => selecionarProduto(prod)}
+                          className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0"
+                        >
+                          <span className="font-mono text-xs text-gray-400 mr-2">{prod.codigo || prod.sku}</span>
+                          <span className="text-sm text-gray-800">{prod.nome}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div>
