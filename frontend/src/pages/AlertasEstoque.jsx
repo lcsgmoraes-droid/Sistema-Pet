@@ -2,7 +2,7 @@
  * 📊 Página de Alertas de Estoque Negativo
  * Sistema de monitoramento e gerenciamento de estoque crítico
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, XCircle, TrendingDown, Package, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -12,6 +12,7 @@ import {
   getDashboardAlertas,
   resolverAlerta
 } from '../api/alertasEstoque';
+import { getProdutos } from '../api/produtos';
 
 export default function AlertasEstoque() {
   const navigate = useNavigate();
@@ -20,10 +21,55 @@ export default function AlertasEstoque() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState('pendentes'); // 'pendentes' | 'historico' | 'dashboard'
+  const [produtosBrutos, setProdutosBrutos] = useState([]);
 
   useEffect(() => {
     carregarDados();
   }, [abaAtiva]);
+
+  useEffect(() => {
+    getProdutos({ limit: 5000, ativo: true })
+      .then(res => {
+        const lista = Array.isArray(res.data) ? res.data
+          : Array.isArray(res.data?.itens) ? res.data.itens
+          : Array.isArray(res.data?.produtos) ? res.data.produtos
+          : [];
+        setProdutosBrutos(lista);
+      })
+      .catch(() => {});
+  }, []);
+
+  const insights = useMemo(() => {
+    const ativos = (produtosBrutos || []).filter(
+      p => p?.ativo !== false && p?.tipo_produto !== 'PAI'
+    );
+    const est = p => Number(p?.estoque_atual ?? p?.estoque ?? 0);
+    const min = p => Number(p?.estoque_minimo ?? 0);
+
+    const rupturas = ativos.filter(p => est(p) <= 0);
+    const riscoRuptura = ativos.filter(p => {
+      const a = est(p); const m = Math.max(1, min(p));
+      return a > 0 && a <= m;
+    });
+    const excessoEstoque = ativos.filter(p => {
+      const m = min(p); return m > 0 && est(p) >= m * 4;
+    });
+    const margemBaixa = ativos
+      .map(p => {
+        const pv = Number(p?.preco_venda ?? 0);
+        const pc = Number(p?.preco_custo ?? 0);
+        const margem = pv ? Number((((pv - pc) / pv) * 100).toFixed(2)) : 0;
+        return { ...p, margem };
+      })
+      .filter(p => p.margem > 0 && p.margem < 15)
+      .sort((a, b) => a.margem - b.margem)
+      .slice(0, 5);
+    const sugestoesReposicao = riscoRuptura.slice(0, 5).map(p => ({
+      ...p,
+      sugestao: Math.max(Math.max(1, min(p)) * 2 - est(p), 1),
+    }));
+    return { totalAtivos: ativos.length, rupturas, riscoRuptura, excessoEstoque, margemBaixa, sugestoesReposicao };
+  }, [produtosBrutos]);
 
   const carregarDados = async () => {
     setLoading(true);
@@ -98,6 +144,77 @@ export default function AlertasEstoque() {
           Monitoramento em tempo real de produtos com estoque crítico
         </p>
       </div>
+
+      {/* Análises Inteligentes */}
+      {produtosBrutos.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-5 mb-6 border border-indigo-100">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Análises Inteligentes</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+              <div className="text-xs text-red-700">Ruptura</div>
+              <div className="text-2xl font-bold text-red-700">{insights.rupturas.length}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <div className="text-xs text-amber-700">Risco de ruptura</div>
+              <div className="text-2xl font-bold text-amber-700">{insights.riscoRuptura.length}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-xs text-blue-700">Excesso de estoque</div>
+              <div className="text-2xl font-bold text-blue-700">{insights.excessoEstoque.length}</div>
+            </div>
+            <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
+              <div className="text-xs text-purple-700">Ativos monitorados</div>
+              <div className="text-2xl font-bold text-purple-700">{insights.totalAtivos}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Sugestão de reposição imediata</h3>
+              {insights.sugestoesReposicao.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhuma reposição urgente agora.</p>
+              ) : (
+                <div className="space-y-2">
+                  {insights.sugestoesReposicao.map(p => (
+                    <div key={p.id} className="text-sm p-2 rounded bg-gray-50 border border-gray-200 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => navigate(`/produtos/${p.id}/movimentacoes`)}
+                        className="font-medium text-gray-800 hover:text-indigo-700 hover:underline text-left"
+                      >
+                        {p.nome}
+                      </button>
+                      <span className="text-gray-600 whitespace-nowrap">
+                        estoque {Number(p.estoque_atual ?? p.estoque ?? 0)} — comprar <strong>{p.sugestao}</strong>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Produtos com margem crítica</h3>
+              {insights.margemBaixa.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum produto com margem abaixo de 15%.</p>
+              ) : (
+                <div className="space-y-2">
+                  {insights.margemBaixa.map(p => (
+                    <div key={p.id} className="text-sm p-2 rounded bg-red-50 border border-red-100 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => navigate(`/produtos/${p.id}/movimentacoes`)}
+                        className="font-medium text-red-800 hover:underline text-left"
+                      >
+                        {p.nome}
+                      </button>
+                      <span className="text-red-700 whitespace-nowrap">
+                        margem <strong>{p.margem.toFixed(1)}%</strong>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-sm mb-6">

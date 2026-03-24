@@ -1370,64 +1370,6 @@ export default function Produtos() {
     return colunasVisiveis.includes(coluna.key);
   };
 
-  const insightsProdutos = useMemo(() => {
-    const listaBase = (produtosBrutos || []).filter(
-      (produto) => produto?.tipo_produto !== "PAI",
-    );
-
-    const ativos = listaBase.filter((produto) => produto?.ativo !== false);
-
-    const estoqueAtual = (produto) =>
-      Number(produto?.estoque_atual ?? produto?.estoque ?? 0);
-    const estoqueMinimo = (produto) => Number(produto?.estoque_minimo ?? 0);
-
-    const rupturas = ativos.filter((produto) => estoqueAtual(produto) <= 0);
-    const riscoRuptura = ativos.filter((produto) => {
-      const atual = estoqueAtual(produto);
-      const minimo = Math.max(1, estoqueMinimo(produto));
-      return atual > 0 && atual <= minimo;
-    });
-
-    const excessoEstoque = ativos.filter((produto) => {
-      const minimo = estoqueMinimo(produto);
-      if (minimo <= 0) return false;
-      return estoqueAtual(produto) >= minimo * 4;
-    });
-
-    const margemBaixa = ativos
-      .map((produto) => {
-        const precoVenda = Number(produto?.preco_venda ?? 0);
-        const precoCusto = Number(produto?.preco_custo ?? 0);
-        const margem = precoVenda
-          ? Number((((precoVenda - precoCusto) / precoVenda) * 100).toFixed(2))
-          : 0;
-        return { ...produto, margem };
-      })
-      .filter((produto) => produto.margem > 0 && produto.margem < 15)
-      .sort((a, b) => a.margem - b.margem)
-      .slice(0, 5);
-
-    const sugestoesReposicao = riscoRuptura
-      .slice(0, 5)
-      .map((produto) => {
-        const atual = estoqueAtual(produto);
-        const minimo = Math.max(1, estoqueMinimo(produto));
-        return {
-          ...produto,
-          sugestao: Math.max(minimo * 2 - atual, 1),
-        };
-      });
-
-    return {
-      totalAtivos: ativos.length,
-      rupturas,
-      riscoRuptura,
-      excessoEstoque,
-      margemBaixa,
-      sugestoesReposicao,
-    };
-  }, [produtosBrutos]);
-
   const extrairItensDaRespostaProdutos = (payload) => {
     if (!payload) return [];
     if (Array.isArray(payload)) return payload;
@@ -1709,15 +1651,6 @@ export default function Produtos() {
                 >
                   Relatorio personalizado
                 </button>
-                <button
-                  onClick={() => {
-                    setMenuRelatoriosAberto(false);
-                    navigate("/produtos/relatorio");
-                  }}
-                  className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100 text-indigo-700"
-                >
-                  Abrir analises inteligentes
-                </button>
               </div>
             )}
           </div>
@@ -1728,98 +1661,6 @@ export default function Produtos() {
           >
             + Novo Produto
           </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-indigo-100">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Analises Inteligentes e Alertas Automaticos
-          </h2>
-          <button
-            onClick={() => navigate("/estoque/alertas")}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors"
-          >
-            Ver central de alertas
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-          <div className="p-3 rounded-lg bg-red-50 border border-red-200">
-            <div className="text-xs text-red-700">Ruptura</div>
-            <div className="text-2xl font-bold text-red-700">
-              {insightsProdutos.rupturas.length}
-            </div>
-          </div>
-          <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-            <div className="text-xs text-amber-700">Risco de ruptura</div>
-            <div className="text-2xl font-bold text-amber-700">
-              {insightsProdutos.riscoRuptura.length}
-            </div>
-          </div>
-          <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-            <div className="text-xs text-blue-700">Excesso de estoque</div>
-            <div className="text-2xl font-bold text-blue-700">
-              {insightsProdutos.excessoEstoque.length}
-            </div>
-          </div>
-          <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
-            <div className="text-xs text-purple-700">Ativos monitorados</div>
-            <div className="text-2xl font-bold text-purple-700">
-              {insightsProdutos.totalAtivos}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Sugestao de reposicao imediata
-            </h3>
-            {insightsProdutos.sugestoesReposicao.length === 0 ? (
-              <p className="text-sm text-gray-500">Nenhuma reposicao urgente agora.</p>
-            ) : (
-              <div className="space-y-2">
-                {insightsProdutos.sugestoesReposicao.map((produto) => (
-                  <div key={produto.id} className="text-sm p-2 rounded bg-gray-50 border border-gray-200">
-                    <span className="font-medium text-gray-800">{produto.nome}</span>
-                    <span className="text-gray-600">
-                      {" - estoque atual "}
-                      {Number(produto.estoque_atual ?? produto.estoque ?? 0)}
-                      {", sugerido comprar "}
-                      <strong>{produto.sugestao}</strong>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">
-              Produtos com margem critica
-            </h3>
-            {insightsProdutos.margemBaixa.length === 0 ? (
-              <p className="text-sm text-gray-500">Nenhum produto com margem abaixo de 15%.</p>
-            ) : (
-              <div className="space-y-2">
-                {insightsProdutos.margemBaixa.map((produto) => (
-                  <div key={produto.id} className="text-sm p-2 rounded bg-red-50 border border-red-100">
-                    <span className="font-medium text-red-800">{produto.nome}</span>
-                    <span className="text-red-700">
-                      {" - margem "}
-                      <strong>{produto.margem.toFixed(2)}%</strong>
-                      {" (custo "}
-                      {formatarMoeda(produto.preco_custo)}
-                      {" / venda "}
-                      {formatarMoeda(produto.preco_venda)}
-                      {")"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
