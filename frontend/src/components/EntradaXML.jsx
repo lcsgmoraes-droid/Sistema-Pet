@@ -2863,7 +2863,7 @@ const EntradaXML = () => {
                         </div>
                       </div>
 
-                            <BlocoComposicaoCusto item={item} />
+                            <CardFiscal nota={notaSelecionada} item={item} composicao={item.composicao_custo} />
 
                       {/* Lote e Validade */}
                       {(item.lote || item.data_validade) && (
