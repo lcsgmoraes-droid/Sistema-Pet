@@ -90,9 +90,20 @@ class ChatIAService:
         conteudo: str,
         tokens_usados: int = 0,
         modelo_usado: str = None,
-        contexto_usado: Dict = None
+        contexto_usado: Dict = None,
+        tenant_id: Optional[str] = None,
     ) -> MensagemChat:
         """Adiciona mensagem à conversa"""
+        conversa = self.db.query(Conversa).filter(Conversa.id == conversa_id).first()
+
+        # MensagemChat exige tenant_id não nulo: prioriza tenant recebido e
+        # usa o tenant da conversa como fallback para manter consistência.
+        tenant_id_resolvido = str(tenant_id) if tenant_id else None
+        if not tenant_id_resolvido and conversa and conversa.tenant_id:
+            tenant_id_resolvido = str(conversa.tenant_id)
+        if not tenant_id_resolvido:
+            raise ValueError("Não foi possível determinar o tenant da mensagem")
+
         mensagem = MensagemChat(
             conversa_id=conversa_id,
             tipo=tipo,
@@ -100,12 +111,12 @@ class ChatIAService:
             tokens_usados=tokens_usados,
             modelo_usado=modelo_usado,
             contexto_usado=contexto_usado,
+            tenant_id=tenant_id_resolvido,
             criado_em=datetime.utcnow()
         )
         self.db.add(mensagem)
         
         # Atualizar última mensagem da conversa
-        conversa = self.db.query(Conversa).filter(Conversa.id == conversa_id).first()
         if conversa:
             conversa.atualizado_em = datetime.utcnow()
             
@@ -656,7 +667,8 @@ class ChatIAService:
         msg_usuario = self.adicionar_mensagem(
             conversa_id=conversa_id,
             tipo="usuario",
-            conteudo=mensagem_usuario
+            conteudo=mensagem_usuario,
+            tenant_id=tenant_id,
         )
         
         # 2. Obter contexto financeiro
@@ -672,7 +684,8 @@ class ChatIAService:
             conteudo=resposta_texto,
             tokens_usados=0,
             modelo_usado="regras_simples",
-            contexto_usado=contexto
+            contexto_usado=contexto,
+            tenant_id=tenant_id,
         )
         
         return {

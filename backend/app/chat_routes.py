@@ -229,13 +229,16 @@ async def enviar_mensagem(
             )
     
     # Gerar resposta normalmente se tiver permissão
-    resultado = enviar_mensagem_service(
-        db,
-        usuario_id,
-        tenant_id,
-        request.conversa_id,
-        request.mensagem
-    )
+    try:
+        resultado = enviar_mensagem_service(
+            db,
+            usuario_id,
+            tenant_id,
+            request.conversa_id,
+            request.mensagem
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     
     return ChatResponse(
         conversa_id=resultado["conversa_id"],
