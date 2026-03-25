@@ -5,6 +5,8 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import { formatMoneyBRL } from '../utils/formatters';
 import { jsPDF } from 'jspdf';
+import CardFiscal from './CardFiscal';
+import TooltipComposicao from './TooltipComposicao';
 
 function formatarChaveAcesso(valor) {
   return String(valor).replaceAll(/\D/g, '').slice(0, 44);
@@ -43,86 +45,6 @@ function obterCustoAquisicaoItem(item) {
     0
   );
 }
-
-function BlocoComposicaoCusto({ item, titulo = 'Composição do custo' }) {
-  const composicao = item?.composicao_custo;
-  if (!composicao) return null;
-
-  const unitario = composicao.componentes_unitario || {};
-  const linhas = [
-    { label: 'Custo bruto', valor: composicao.custo_bruto_unitario || 0 },
-    { label: 'ICMS ST', valor: unitario.valor_icms_st || 0 },
-    { label: 'IPI', valor: unitario.valor_ipi || 0 },
-    { label: 'Frete', valor: unitario.valor_frete || 0 },
-    { label: 'Seguro', valor: unitario.valor_seguro || 0 },
-    { label: 'Outras despesas', valor: unitario.valor_outras_despesas || 0 },
-    { label: 'Desconto', valor: -(unitario.valor_desconto || 0) },
-  ].filter((linha) => Math.abs(Number(linha.valor || 0)) > 0.00001 || linha.label === 'Custo bruto');
-
-  const tributosInfo = [
-    { label: 'ICMS', valor: unitario.valor_icms || 0 },
-    { label: 'PIS', valor: unitario.valor_pis || 0 },
-    { label: 'COFINS', valor: unitario.valor_cofins || 0 },
-  ].filter((linha) => Math.abs(Number(linha.valor || 0)) > 0.00001);
-
-  return (
-    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-semibold">{titulo}</span>
-        <span className="font-bold">R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}</span>
-      </div>
-      <div className="space-y-1">
-        {linhas.map((linha) => {
-          const negativo = Number(linha.valor || 0) < 0;
-          return (
-            <div key={linha.label} className="flex items-center justify-between gap-3">
-              <span className="text-amber-900">{linha.label}</span>
-              <span className={`font-medium ${negativo ? 'text-red-700' : 'text-amber-950'}`}>
-                {negativo ? '- ' : ''}R$ {formatarValorFiscal(Math.abs(Number(linha.valor || 0)), 4)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-2 border-t border-amber-200 pt-2 space-y-1">
-        <div className="flex items-center justify-between gap-3 font-semibold">
-          <span>Custo de aquisição</span>
-          <span>R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}</span>
-        </div>
-        <div className="flex items-center justify-between gap-3 text-[11px] text-amber-800">
-          <span>Total do item</span>
-          <span>{formatMoneyBRL(composicao.custo_aquisicao_total || 0)}</span>
-        </div>
-        {Number(composicao.quantidade_efetiva || 0) > 0 && (
-          <div className="flex items-center justify-between gap-3 text-[11px] text-amber-800">
-            <span>Quantidade efetiva</span>
-            <span>{formatarValorFiscal(composicao.quantidade_efetiva || 0, 0)}</span>
-          </div>
-        )}
-        {composicao.tem_rateio && (
-          <div className="rounded bg-white/70 px-2 py-1 text-[11px] text-amber-900">
-            Rateio proporcional aplicado para valores que vieram só no total da nota.
-          </div>
-        )}
-        {tributosInfo.length > 0 && (
-          <div className="pt-1 text-[11px] text-amber-900">
-            <div className="font-semibold mb-1">Tributos informativos por unidade</div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {tributosInfo.map((tributo) => (
-                <span key={tributo.label}>{tributo.label}: R$ {formatarValorFiscal(tributo.valor, 4)}</span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-BlocoComposicaoCusto.propTypes = {
-  item: PropTypes.object,
-  titulo: PropTypes.string,
-};
 
 const EntradaXML = () => {
   const navigate = useNavigate();
@@ -2098,7 +2020,7 @@ const EntradaXML = () => {
                               </div>
                             )}
 
-                            <BlocoComposicaoCusto item={item} />
+                            <CardFiscal nota={notaSelecionada} item={item} composicao={item.composicao_custo} />
                           </div>
 
                           {/* Lote e Validade */}
@@ -3214,7 +3136,14 @@ const EntradaXML = () => {
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Custo Novo</div>
+                            <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                              <span>Custo Novo</span>
+                              <TooltipComposicao 
+                                custo={produtoVinc.custo_novo} 
+                                composicao={item.composicao_custo}
+                                texto="detalhar"
+                              />
+                            </div>
                             <div className="text-2xl font-bold text-gray-900">
                               R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
                             </div>
