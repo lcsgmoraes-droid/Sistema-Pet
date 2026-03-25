@@ -907,6 +907,8 @@ def listar_produtos_sem_vinculo(
 ):
     """Lista rápida de produtos sem vínculo, priorizando base Bling (com match no Bling)."""
     _current_user, tenant_id = user_and_tenant
+    erro_coleta_bling = None
+    fallback_local = False
 
     subq_vinculados = (
         db.query(ProdutoBlingSync.produto_id)
@@ -937,35 +939,40 @@ def listar_produtos_sem_vinculo(
     termo = (busca or "").strip().lower()
 
     if apenas_com_match_bling:
-        snapshot = _get_snapshot_sem_vinculo_com_match_bling(
-            db,
-            tenant_id=tenant_id,
-            force_refresh=force_refresh,
-        )
-        itens_base = snapshot.get("items", [])
+        try:
+            snapshot = _get_snapshot_sem_vinculo_com_match_bling(
+                db,
+                tenant_id=tenant_id,
+                force_refresh=force_refresh,
+            )
+            itens_base = snapshot.get("items", [])
 
-        if termo:
-            itens_base = [
-                item
-                for item in itens_base
-                if termo in (item.get("nome") or "").lower() or termo in (item.get("codigo") or "").lower()
-            ]
+            if termo:
+                itens_base = [
+                    item
+                    for item in itens_base
+                    if termo in (item.get("nome") or "").lower() or termo in (item.get("codigo") or "").lower()
+                ]
 
-        paginados = itens_base[offset: offset + limit]
+            paginados = itens_base[offset: offset + limit]
 
-        return {
-            "items": paginados,
-            "total": len(itens_base),
-            "limit": limit,
-            "offset": offset,
-            "apenas_com_match_bling": True,
-            "total_sem_vinculo_universo_local": snapshot.get("total_sem_vinculo_universo_local", 0),
-            "total_bling": snapshot.get("total_bling", 0),
-            "coleta_bling_completa": snapshot.get("coleta_bling_completa", True),
-            "cache_utilizado_por_falha": snapshot.get("cache_utilizado_por_falha", False),
-            "cache_idade_segundos": snapshot.get("cache_idade_segundos", 0),
-            "atualizado_em": snapshot.get("atualizado_em"),
-        }
+            return {
+                "items": paginados,
+                "total": len(itens_base),
+                "limit": limit,
+                "offset": offset,
+                "apenas_com_match_bling": True,
+                "total_sem_vinculo_universo_local": snapshot.get("total_sem_vinculo_universo_local", 0),
+                "total_bling": snapshot.get("total_bling", 0),
+                "coleta_bling_completa": snapshot.get("coleta_bling_completa", True),
+                "cache_utilizado_por_falha": snapshot.get("cache_utilizado_por_falha", False),
+                "cache_idade_segundos": snapshot.get("cache_idade_segundos", 0),
+                "atualizado_em": snapshot.get("atualizado_em"),
+            }
+        except Exception as e:
+            fallback_local = True
+            erro_coleta_bling = str(e)
+            logger.warning(f"⚠️ Falha ao montar snapshot de produtos sem vínculo no Bling: {e}. Aplicando fallback local.")
 
     if termo:
         like = f"%{termo}%"
@@ -993,6 +1000,8 @@ def listar_produtos_sem_vinculo(
         "limit": limit,
         "offset": offset,
         "apenas_com_match_bling": False,
+        "fallback_local_por_erro_bling": fallback_local,
+        "erro_coleta_bling": erro_coleta_bling,
     }
 
 
