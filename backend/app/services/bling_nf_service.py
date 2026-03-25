@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -113,6 +114,31 @@ def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sk
     )
 
 
+def _slug_codigo(valor: str) -> str:
+    base = re.sub(r"[^A-Za-z0-9_-]", "", (valor or "").strip())
+    return base[:42] if base else "SKU"
+
+
+def _codigo_ja_existe_global(db: Session, codigo: str) -> bool:
+    return db.query(Produto.id).filter(Produto.codigo == codigo).first() is not None
+
+
+def _gerar_codigo_fallback(db: Session, sku: str, tenant_id) -> str:
+    tenant_tag = str(tenant_id).replace("-", "")[:8] or "TENANT"
+    base = _slug_codigo(sku)
+
+    candidato = f"{base}-{tenant_tag}"[:50]
+    if not _codigo_ja_existe_global(db, candidato):
+        return candidato
+
+    for idx in range(2, 100):
+        candidato = f"{base}-{tenant_tag}-{idx}"[:50]
+        if not _codigo_ja_existe_global(db, candidato):
+            return candidato
+
+    return f"AUTO-{tenant_tag}-{int(datetime.now(timezone.utc).timestamp())}"[:50]
+
+
 def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
     sku_limpo = (sku or "").strip()
     if not sku_limpo:
@@ -138,6 +164,16 @@ def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
         user_id=usuario.id,
         sku_padrao=sku_limpo,
     )
+
+    if _codigo_ja_existe_global(db, novo_produto.codigo):
+        codigo_original = novo_produto.codigo
+        novo_produto.codigo = _gerar_codigo_fallback(db=db, sku=sku_limpo, tenant_id=tenant_id)
+        # Mantém o SKU original indexável para busca e baixa por SKU.
+        if not (novo_produto.codigo_barras or "").strip():
+            novo_produto.codigo_barras = sku_limpo[:20]
+        logger.info(
+            f"[AUTO-BLING-NF] Ajuste de código por colisão global: '{codigo_original}' -> '{novo_produto.codigo}'"
+        )
 
     try:
         with db.begin_nested():
