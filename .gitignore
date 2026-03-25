@@ -25,6 +25,8 @@ backend/.env
 *.env
 .env.local
 .env.*.local
+.env.whatsapp-pilot
+backend/bling_token_control.json
 
 # Uploads (imagens, arquivos grandes)
 backend/uploads/*

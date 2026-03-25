@@ -1,7 +1,7 @@
 ﻿/**
  * FormulÃ¡rio de Cadastro/EdiÃ§Ã£o de Produtos - Layout em Abas
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
 import {
@@ -576,6 +576,12 @@ export default function ProdutosNovo() {
   const handleChange = (campo, valor) => {
     setFormData(prev => {
       const novosDados = { ...prev, [campo]: valor };
+
+      if (campo === 'sku' || campo === 'codigo') {
+        const skuNormalizado = (valor || '').toString().toUpperCase();
+        novosDados.sku = skuNormalizado;
+        novosDados.codigo = skuNormalizado;
+      }
       
       // Calcular markup automaticamente quando mudar preço
       if (campo === 'preco_custo' || campo === 'preco_venda') {
@@ -606,7 +612,11 @@ export default function ProdutosNovo() {
   const handleGerarSKU = async () => {
     try {
       const response = await gerarSKU('PROD');
-      setFormData(prev => ({ ...prev, sku: response.data.sku }));
+      setFormData(prev => ({
+        ...prev,
+        sku: response.data.sku,
+        codigo: response.data.sku,
+      }));
       alert('SKU gerado com sucesso!');
     } catch (error) {
       console.error('Erro ao gerar SKU:', error);
@@ -1038,6 +1048,7 @@ export default function ProdutosNovo() {
 
     try {
       setSalvando(true);
+      const skuNormalizado = (formData.sku || formData.codigo || '').trim().toUpperCase();
 
       // Normaliza composição do kit para o schema do backend.
       // O backend exige produto_componente_id, mas ao carregar edição pode vir produto_id.
@@ -1050,7 +1061,7 @@ export default function ProdutosNovo() {
       
       // Preparar dados para envio
       const dados = {
-        codigo: formData.codigo || formData.sku, // Usar codigo ou sku
+        codigo: skuNormalizado,
         nome: formData.nome,
         descricao_curta: formData.descricao || null,
         codigo_barras: formData.codigo_barras || null,
@@ -1360,6 +1371,10 @@ export default function ProdutosNovo() {
                       Gerar
                     </button>
                   </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Esse valor é salvo como o SKU oficial do produto.
+                    {formData.codigo ? ` Atual: ${formData.codigo}` : ''}
+                  </p>
                 </div>
 
                 <div>

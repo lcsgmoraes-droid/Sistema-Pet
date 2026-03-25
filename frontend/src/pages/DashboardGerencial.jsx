@@ -9,10 +9,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FiAlertTriangle, FiTrendingDown, FiDollarSign, FiHeart,
-  FiMessageCircle, FiTrendingUp, FiUsers, FiAward, FiClock,
+  FiDollarSign, FiHeart,
+  FiMessageCircle, FiTrendingUp, FiAward, FiClock,
   FiRefreshCw, FiArrowRight, FiInfo
 } from 'react-icons/fi';
+import PropTypes from 'prop-types';
 import api from '../api';
 
 /**
@@ -92,8 +93,11 @@ function MetricCard({ tipo, dados, onClick }) {
   const dadosSafe = dados || { quantidade: 0, impacto: null };
   
   return (
-    <div className={`${config.bgLight} border-2 ${config.borderLight} rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer`}
-         onClick={onClick}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${config.bgLight} border-2 ${config.borderLight} rounded-xl p-6 hover:shadow-lg transition-all text-left w-full`}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className={`p-3 bg-gradient-to-br ${config.bgGradient} rounded-lg`}>
           <Icon className="text-white" size={24} />
@@ -124,13 +128,22 @@ function MetricCard({ tipo, dados, onClick }) {
         </div>
       )}
       
-      <button className={`mt-3 w-full py-2 text-sm font-medium ${config.textColor} hover:bg-white rounded-lg transition-colors flex items-center justify-center gap-2`}>
+      <div className={`mt-3 w-full py-2 text-sm font-medium ${config.textColor} hover:bg-white rounded-lg transition-colors flex items-center justify-center gap-2`}>
         Ver detalhes
         <FiArrowRight size={14} />
-      </button>
-    </div>
+      </div>
+    </button>
   );
 }
+
+MetricCard.propTypes = {
+  tipo: PropTypes.string.isRequired,
+  dados: PropTypes.shape({
+    quantidade: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    impacto: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.oneOf([null])]),
+  }),
+  onClick: PropTypes.func.isRequired,
+};
 
 /**
  * Componente principal do Dashboard
@@ -181,13 +194,20 @@ export default function DashboardGerencial() {
   };
 
   const handleCardClick = (tipo) => {
-    // Navegar para lista filtrada de clientes
-    // TODO: Implementar filtros na lista de clientes
+    // Navega para a lista reaproveitando o filtro recebido pela tela de pessoas.
     navigate('/pessoas', { state: { filtro: tipo } });
   };
 
   const handleRefresh = () => {
     carregarDashboard();
+  };
+
+  const abrirAssistenteGestao = () => {
+    navigate('/ia/chat', {
+      state: {
+        perguntaInicial: 'Quero um raio-x do negócio: vendas do mês, margem, DRE e riscos do caixa.',
+      },
+    });
   };
 
   if (loading) {
@@ -216,6 +236,13 @@ export default function DashboardGerencial() {
           </div>
           
           <div className="flex items-center gap-4">
+            <button
+              onClick={abrirAssistenteGestao}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors font-medium"
+            >
+              <FiMessageCircle size={18} />
+              Perguntar para IA
+            </button>
             {ultimaAtualizacao && (
               <div className="text-sm text-gray-500">
                 Atualizado às {ultimaAtualizacao.toLocaleTimeString('pt-BR')}

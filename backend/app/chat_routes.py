@@ -228,6 +228,7 @@ async def enviar_mensagem(
     resultado = enviar_mensagem_service(
         db,
         usuario_id,
+        tenant_id,
         request.conversa_id,
         request.mensagem
     )

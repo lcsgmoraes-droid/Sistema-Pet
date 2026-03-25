@@ -4,18 +4,34 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../../api';
 import { toast } from 'react-hot-toast';
 import { Send, Loader, MessageSquare, Plus, Trash2, Bot, User } from 'lucide-react';
 
 export default function ChatIA() {
+  const location = useLocation();
   const [conversas, setConversas] = useState([]);
   const [conversaAtiva, setConversaAtiva] = useState(null);
   const [mensagens, setMensagens] = useState([]);
   const [mensagemInput, setMensagemInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [perguntaInicialAplicada, setPerguntaInicialAplicada] = useState(false);
   const messagesEndRef = useRef(null);
+
+  const perguntasRapidas = [
+    'Vendas do dia',
+    'Vendas do mês',
+    'Compare este mês com o mês anterior',
+    'Compare por canal este mês com o mês anterior',
+    'Produto mais vendido no mês',
+    'Produtos com melhor margem',
+    'DRE do mês',
+    'Como está meu fluxo de caixa hoje?',
+  ];
+
+  const semConversaAtiva = conversaAtiva === null;
 
   useEffect(() => {
     carregarConversas();
@@ -30,6 +46,14 @@ export default function ChatIA() {
   useEffect(() => {
     scrollToBottom();
   }, [mensagens]);
+
+  useEffect(() => {
+    const perguntaInicial = location?.state?.perguntaInicial;
+    if (perguntaInicial && !perguntaInicialAplicada) {
+      setMensagemInput(perguntaInicial);
+      setPerguntaInicialAplicada(true);
+    }
+  }, [location?.state, perguntaInicialAplicada]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,13 +95,10 @@ export default function ChatIA() {
     }
   };
 
-  const enviarMensagem = async (e) => {
-    e.preventDefault();
-    
-    if (!mensagemInput.trim() || !conversaAtiva) return;
+  const enviarMensagemTexto = async (mensagemTexto) => {
+    if (!mensagemTexto.trim() || !conversaAtiva) return;
 
     setEnviando(true);
-    const mensagemTexto = mensagemInput;
     setMensagemInput('');
 
     try {
@@ -87,8 +108,8 @@ export default function ChatIA() {
       });
 
       // Adicionar ambas mensagens ao estado
-      setMensagens([
-        ...mensagens,
+      setMensagens((prev) => [
+        ...prev,
         {
           id: response.data.mensagem_usuario.id,
           tipo: 'usuario',
@@ -113,6 +134,79 @@ export default function ChatIA() {
       setEnviando(false);
     }
   };
+
+  const enviarMensagem = async (e) => {
+    e.preventDefault();
+    if (!mensagemInput.trim() || !conversaAtiva) return;
+    await enviarMensagemTexto(mensagemInput);
+  };
+
+  const enviarPerguntaRapida = async (pergunta) => {
+    if (!conversaAtiva) {
+      setMensagemInput(pergunta);
+      return;
+    }
+    await enviarMensagemTexto(pergunta);
+  };
+
+  let conteudoMensagens = mensagens.map((msg) => (
+    <div
+      key={msg.id}
+      className={`flex ${msg.tipo === 'usuario' ? 'justify-end' : 'justify-start'}`}
+    >
+      <div
+        className={`flex gap-3 max-w-3xl ${
+          msg.tipo === 'usuario' ? 'flex-row-reverse' : 'flex-row'
+        }`}
+      >
+        <div
+          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+            msg.tipo === 'usuario'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700'
+          }`}
+        >
+          {msg.tipo === 'usuario' ? (
+            <User className="w-5 h-5" />
+          ) : (
+            <Bot className="w-5 h-5" />
+          )}
+        </div>
+        <div
+          className={`px-4 py-3 rounded-lg ${
+            msg.tipo === 'usuario'
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-900 border border-gray-200'
+          }`}
+        >
+          <p className="text-sm whitespace-pre-wrap">{msg.conteudo}</p>
+        </div>
+      </div>
+    </div>
+  ));
+
+  if (loading) {
+    conteudoMensagens = (
+      <div className="flex items-center justify-center h-full">
+        <Loader className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  } else if (mensagens.length === 0) {
+    conteudoMensagens = (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="text-center">
+          <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>Inicie a conversa fazendo uma pergunta</p>
+          <div className="mt-4 text-sm space-y-1">
+            <p className="text-gray-400">Exemplos:</p>
+            <p className="text-blue-600">"Qual é meu saldo atual?"</p>
+            <p className="text-blue-600">"Como está minha situação financeira?"</p>
+            <p className="text-blue-600">"Há algum alerta?"</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const deletarConversa = async (conversaId) => {
     if (!confirm('Deseja deletar esta conversa?')) return;
@@ -180,23 +274,27 @@ export default function ChatIA() {
                 {conversas.map((conversa) => (
                   <div
                     key={conversa.id}
-                    onClick={() => setConversaAtiva(conversa.id)}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors group ${
+                    className={`p-3 rounded-lg transition-colors group ${
                       conversaAtiva === conversa.id
                         ? 'bg-blue-50 border-2 border-blue-200'
                         : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
                     <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setConversaAtiva(conversa.id)}
+                        className="flex-1 min-w-0 text-left"
+                      >
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {conversa.titulo || 'Nova conversa'}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {conversa.total_mensagens} mensagens
                         </p>
-                      </div>
+                      </button>
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           deletarConversa(conversa.id);
@@ -215,7 +313,7 @@ export default function ChatIA() {
 
         {/* Área de chat */}
         <div className="flex-1 flex flex-col bg-gray-50">
-          {!conversaAtiva ? (
+          {semConversaAtiva ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">
               <div className="text-center">
                 <Bot className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -229,65 +327,24 @@ export default function ChatIA() {
             <>
               {/* Mensagens */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {loading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader className="w-8 h-8 animate-spin text-blue-600" />
-                  </div>
-                ) : mensagens.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-500">
-                    <div className="text-center">
-                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p>Inicie a conversa fazendo uma pergunta</p>
-                      <div className="mt-4 text-sm space-y-1">
-                        <p className="text-gray-400">Exemplos:</p>
-                        <p className="text-blue-600">"Qual é meu saldo atual?"</p>
-                        <p className="text-blue-600">"Como está minha situação financeira?"</p>
-                        <p className="text-blue-600">"Há algum alerta?"</p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  mensagens.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.tipo === 'usuario' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`flex gap-3 max-w-3xl ${
-                          msg.tipo === 'usuario' ? 'flex-row-reverse' : 'flex-row'
-                        }`}
-                      >
-                        <div
-                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                            msg.tipo === 'usuario'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-200 text-gray-700'
-                          }`}
-                        >
-                          {msg.tipo === 'usuario' ? (
-                            <User className="w-5 h-5" />
-                          ) : (
-                            <Bot className="w-5 h-5" />
-                          )}
-                        </div>
-                        <div
-                          className={`px-4 py-3 rounded-lg ${
-                            msg.tipo === 'usuario'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white text-gray-900 border border-gray-200'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{msg.conteudo}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                {conteudoMensagens}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
               <div className="border-t border-gray-200 bg-white p-4">
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {perguntasRapidas.map((pergunta) => (
+                    <button
+                      key={pergunta}
+                      type="button"
+                      onClick={() => enviarPerguntaRapida(pergunta)}
+                      className="text-xs px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+                    >
+                      {pergunta}
+                    </button>
+                  ))}
+                </div>
                 <form onSubmit={enviarMensagem} className="flex gap-2">
                   <input
                     type="text"

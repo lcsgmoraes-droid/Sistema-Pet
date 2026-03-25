@@ -3,6 +3,7 @@ import {
   BarChart2,
   DollarSign,
   FileText,
+  MessageCircle,
   ShoppingBag,
   TrendingDown,
   TrendingUp,
@@ -24,6 +25,7 @@ import api from "../api";
 import AlertasIA from "../components/AlertasIA";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
+import { formatMoneyBRL } from "../utils/formatters";
 
 const DashboardFinanceiro = () => {
   const navigate = useNavigate();
@@ -108,6 +110,114 @@ const DashboardFinanceiro = () => {
     ? (resumo.fluxo_periodo.entradas / resumo.fluxo_periodo.saidas) * 100
     : 100;
 
+  const montarInsights = () => {
+    const lucro = Number(resumo.fluxo_periodo.lucro || 0);
+    const faturamento = Number(
+      resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total ?? 0,
+    );
+    const ticketMedio = Number(resumo.vendas_periodo.ticket_medio || 0);
+    const vencidoLiquido = Number(resumo.contas_receber.vencidas || 0) - Number(resumo.contas_pagar.vencidas || 0);
+
+    return [
+      {
+        titulo: "Resultado do período",
+        valor: lucro >= 0 ? formatMoneyBRL(lucro) : `- ${formatMoneyBRL(Math.abs(lucro))}`,
+        descricao: lucro >= 0
+          ? "O período está fechando no azul."
+          : "O período está consumindo caixa e merece atenção.",
+        cor: lucro >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900",
+        pergunta: `Analise o resultado dos últimos ${periodoDias} dias e me diga o que mais impactou o lucro.`,
+      },
+      {
+        titulo: "Cobertura das despesas",
+        valor: `${coberturaPE.toFixed(1)}%`,
+        descricao: coberturaPE >= 100
+          ? "As entradas do período cobriram as saídas."
+          : "As entradas ainda não cobriram todas as saídas.",
+        cor: coberturaPE >= 100 ? "border-blue-200 bg-blue-50 text-blue-900" : "border-orange-200 bg-orange-50 text-orange-900",
+        pergunta: `Explique minha cobertura de despesas nos últimos ${periodoDias} dias e como melhorar.`,
+      },
+      {
+        titulo: "Ritmo comercial",
+        valor: `${resumo.vendas_periodo.quantidade || 0} vendas`,
+        descricao: faturamento > 0
+          ? `Faturamento bruto de ${formatMoneyBRL(faturamento)} no período.`
+          : "Ainda não houve faturamento no período selecionado.",
+        cor: "border-violet-200 bg-violet-50 text-violet-900",
+        pergunta: `Analise meu ritmo comercial nos últimos ${periodoDias} dias, com vendas, ticket e produtos líderes.`,
+      },
+      {
+        titulo: "Pressão de vencidos",
+        valor: ticketMedio > 0 ? `Ticket médio ${formatMoneyBRL(ticketMedio)}` : "Sem ticket médio",
+        descricao: vencidoLiquido >= 0
+          ? "Os recebimentos vencidos superam ou empatam com os pagamentos vencidos."
+          : "Os pagamentos vencidos estão acima dos recebimentos vencidos.",
+        cor: vencidoLiquido >= 0 ? "border-cyan-200 bg-cyan-50 text-cyan-900" : "border-amber-200 bg-amber-50 text-amber-900",
+        pergunta: "Analise minhas contas vencidas e diga a prioridade de cobrança e pagamento.",
+      },
+    ];
+  };
+
+  const insightsPeriodo = montarInsights();
+
+  const abrirPerguntaIA = (perguntaInicial) => {
+    navigate("/ia/chat", {
+      state: {
+        perguntaInicial,
+      },
+    });
+  };
+
+  const abrirAssistenteGestao = () => {
+    const perguntaBase = periodoDias === 1
+      ? "Quero um resumo de vendas do dia, produtos mais vendidos e alertas de caixa."
+      : `Quero um resumo de vendas dos últimos ${periodoDias} dias, margem e DRE simplificada.`;
+
+    abrirPerguntaIA(perguntaBase);
+  };
+
+  let saudeExecutiva = {
+    titulo: "Risco elevado",
+    descricao: "O caixa do período está pressionado e pede ação rápida.",
+    cor: "bg-rose-600 text-white",
+  };
+
+  if (coberturaPE >= 100) {
+    saudeExecutiva = {
+      titulo: "Operação saudável",
+      descricao: "As entradas cobriram as saídas do período.",
+      cor: "bg-emerald-600 text-white",
+    };
+  } else if (coberturaPE >= 70) {
+    saudeExecutiva = {
+      titulo: "Atenção no período",
+      descricao: "Há pressão no caixa, mas ainda com reação possível.",
+      cor: "bg-amber-500 text-white",
+    };
+  }
+
+  let statusPontoEquilibrio = 'Sem despesas registradas';
+  if (resumo.fluxo_periodo.saidas > 0) {
+    if (coberturaPE >= 100) {
+      statusPontoEquilibrio = '✅ Ponto de equilíbrio atingido';
+    } else {
+      statusPontoEquilibrio = `Faltam ${formatarMoeda(resumo.fluxo_periodo.saidas - resumo.fluxo_periodo.entradas)} para atingir o PE`;
+    }
+  }
+
+  let classeBarraCobertura = 'bg-orange-400';
+  if (coberturaPE >= 100) {
+    classeBarraCobertura = 'bg-green-500';
+  } else if (coberturaPE >= 70) {
+    classeBarraCobertura = 'bg-yellow-400';
+  }
+
+  let textoProjecaoPE = '✅ No lucro';
+  if (coberturaPE < 100) {
+    const sufixoPeriodo = periodoDias === 1 ? '' : ' do mês';
+    textoProjecaoPE = `PE no dia ~${Math.ceil(resumo.fluxo_periodo.saidas / (resumo.fluxo_periodo.entradas / periodoDias))}/${sufixoPeriodo}`;
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -118,6 +228,30 @@ const DashboardFinanceiro = () => {
 
   return (
     <div className="p-4 bg-gray-50 min-h-screen">
+      <div className={`mb-4 rounded-2xl p-4 shadow-sm ${saudeExecutiva.cor}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] opacity-80 mb-1">Painel Executivo</p>
+            <h2 className="text-xl font-bold">{saudeExecutiva.titulo}</h2>
+            <p className="text-sm opacity-90">{saudeExecutiva.descricao}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => abrirPerguntaIA("Compare este mês com o mês anterior e me diga onde melhorei ou piorei.")}
+              className="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
+            >
+              Comparar meses
+            </button>
+            <button
+              onClick={() => abrirPerguntaIA("Me dê um raio-x executivo do negócio com vendas, margem, canal e alertas.")}
+              className="px-3 py-2 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-sm font-medium transition-colors"
+            >
+              Raio-x executivo
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Cabeçalho */}
       <div className="mb-4 flex flex-wrap justify-between items-center gap-2">
         <div className="flex items-center gap-2">
@@ -134,6 +268,13 @@ const DashboardFinanceiro = () => {
           </button>
         </div>
         <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={abrirAssistenteGestao}
+            className="mb-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Perguntar para IA de Gestão
+          </button>
           <div className="flex gap-1">
             {[{ v: 1, label: "Hoje" }, { v: 7, label: "7d" }, { v: 15, label: "15d" }, { v: 30, label: "30d" }, { v: 60, label: "60d" }, { v: 90, label: "90d" }].map(({ v, label }) => (
               <button
@@ -158,9 +299,10 @@ const DashboardFinanceiro = () => {
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">📌 Posição atual — não muda com o período</p>
         <div id="tour-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Saldo */}
-        <div
+        <button
+          type="button"
           onClick={() => navigate("/financeiro/fluxo-caixa")}
-          className="bg-blue-600 rounded-xl p-3 text-white cursor-pointer hover:bg-blue-700 transition-colors"
+          className="bg-blue-600 rounded-xl p-3 text-white text-left hover:bg-blue-700 transition-colors"
         >
           <div className="flex justify-between items-start mb-2">
             <DollarSign className="w-4 h-4 opacity-80" />
@@ -168,12 +310,13 @@ const DashboardFinanceiro = () => {
           </div>
           <p className="text-xs opacity-75 mb-0.5">Saldo Estimado</p>
           <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.saldo_atual)}</p>
-        </div>
+        </button>
 
         {/* A Receber */}
-        <div
+        <button
+          type="button"
           onClick={() => navigate("/financeiro/contas-receber")}
-          className="bg-emerald-600 rounded-xl p-3 text-white cursor-pointer hover:bg-emerald-700 transition-colors"
+          className="bg-emerald-600 rounded-xl p-3 text-white text-left hover:bg-emerald-700 transition-colors"
         >
           <div className="flex justify-between items-start mb-2">
             <TrendingUp className="w-4 h-4 opacity-80" />
@@ -186,12 +329,13 @@ const DashboardFinanceiro = () => {
           {resumo.contas_receber.vencidas > 0 && (
             <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_receber.vencidas)} venc.</p>
           )}
-        </div>
+        </button>
 
         {/* A Pagar */}
-        <div
+        <button
+          type="button"
           onClick={() => navigate("/financeiro/contas-pagar")}
-          className="bg-red-500 rounded-xl p-3 text-white cursor-pointer hover:bg-red-600 transition-colors"
+          className="bg-red-500 rounded-xl p-3 text-white text-left hover:bg-red-600 transition-colors"
         >
           <div className="flex justify-between items-start mb-2">
             <TrendingDown className="w-4 h-4 opacity-80" />
@@ -204,7 +348,7 @@ const DashboardFinanceiro = () => {
           {resumo.contas_pagar.vencidas > 0 && (
             <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_pagar.vencidas)} venc.</p>
           )}
-        </div>
+        </button>
         </div>
       </div>
 
@@ -213,9 +357,10 @@ const DashboardFinanceiro = () => {
         <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Faturamento Bruto */}
-          <div
+          <button
+            type="button"
             onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-purple-600 hover:bg-purple-700 rounded-xl p-3 text-white cursor-pointer transition-colors"
+            className="bg-purple-600 hover:bg-purple-700 rounded-xl p-3 text-white text-left transition-colors"
           >
             <div className="flex justify-between items-start mb-2">
               <FileText className="w-4 h-4 opacity-80" />
@@ -225,10 +370,11 @@ const DashboardFinanceiro = () => {
             <p className="text-base font-bold leading-tight">
               {formatarMoeda(resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total)}
             </p>
-          </div>
+          </button>
 
           {/* Lucro do Período */}
-          <div
+          <button
+            type="button"
             onClick={() => navigate("/financeiro/dre")}
             className={`rounded-xl p-3 text-white cursor-pointer transition-colors ${
               resumo.fluxo_periodo.lucro >= 0
@@ -246,12 +392,13 @@ const DashboardFinanceiro = () => {
             <p className="text-base font-bold leading-tight">
               {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
             </p>
-          </div>
+          </button>
 
           {/* Vendas (qtd) */}
-          <div
+          <button
+            type="button"
             onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-cyan-600 rounded-xl p-3 text-white cursor-pointer hover:bg-cyan-700 transition-colors"
+            className="bg-cyan-600 rounded-xl p-3 text-white text-left hover:bg-cyan-700 transition-colors"
           >
             <div className="flex justify-between items-start mb-2">
               <ShoppingBag className="w-4 h-4 opacity-80" />
@@ -264,12 +411,13 @@ const DashboardFinanceiro = () => {
             <p className="text-xs opacity-75 mt-0.5">
               {formatarMoeda(resumo.vendas_periodo.valor_total)}
             </p>
-          </div>
+          </button>
 
           {/* Ticket Médio */}
-          <div
+          <button
+            type="button"
             onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-indigo-500 rounded-xl p-3 text-white cursor-pointer hover:bg-indigo-600 transition-colors"
+            className="bg-indigo-500 rounded-xl p-3 text-white text-left hover:bg-indigo-600 transition-colors"
           >
             <div className="flex justify-between items-start mb-2">
               <BarChart2 className="w-4 h-4 opacity-80" />
@@ -280,7 +428,7 @@ const DashboardFinanceiro = () => {
               {formatarMoeda(resumo.vendas_periodo.ticket_medio || 0)}
             </p>
             <p className="text-xs opacity-75 mt-0.5">por venda</p>
-          </div>
+          </button>
         </div>
 
         {/* Sub-row: Entradas, Saídas, Margem, Finalizadas */}
@@ -306,6 +454,39 @@ const DashboardFinanceiro = () => {
             <p className="text-lg font-bold text-gray-800">{resumo.vendas_periodo.finalizadas || 0}</p>
             <p className="text-xs text-gray-400">de {resumo.vendas_periodo.quantidade || 0} vendas</p>
           </div>
+        </div>
+      </div>
+
+      <div className="mb-4 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-700">Leitura automática do período</h2>
+            <p className="text-xs text-gray-500">
+              Resumo pronto dos últimos sinais financeiros sem precisar abrir o chat.
+            </p>
+          </div>
+          <button
+            onClick={abrirAssistenteGestao}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+            Aprofundar com IA
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {insightsPeriodo.map((insight) => (
+            <button
+              key={insight.titulo}
+              type="button"
+              onClick={() => abrirPerguntaIA(insight.pergunta)}
+              className={`rounded-xl border p-3 text-left transition-transform hover:-translate-y-0.5 ${insight.cor}`}
+            >
+              <p className="text-xs uppercase tracking-wide opacity-70 mb-1">{insight.titulo}</p>
+              <p className="text-lg font-bold mb-1">{insight.valor}</p>
+              <p className="text-sm opacity-80 leading-snug">{insight.descricao}</p>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -407,20 +588,13 @@ const DashboardFinanceiro = () => {
         <div className="mb-1 flex justify-between text-xs text-gray-500">
           <span>0%</span>
           <span className={coberturaPE >= 100 ? 'text-green-600 font-semibold' : 'text-orange-500 font-semibold'}>
-            {resumo.fluxo_periodo.saidas > 0
-              ? coberturaPE >= 100
-                ? '✅ Ponto de equilíbrio atingido'
-                : `Faltam ${formatarMoeda(resumo.fluxo_periodo.saidas - resumo.fluxo_periodo.entradas)} para atingir o PE`
-              : 'Sem despesas registradas'
-            }
+            {statusPontoEquilibrio}
           </span>
           <span>100%</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-5 overflow-hidden">
           <div
-            className={`h-5 rounded-full transition-all duration-500 ${
-              coberturaPE >= 100 ? 'bg-green-500' : coberturaPE >= 70 ? 'bg-yellow-400' : 'bg-orange-400'
-            }`}
+            className={`h-5 rounded-full transition-all duration-500 ${classeBarraCobertura}`}
             style={{ width: `${Math.min(coberturaPE, 100)}%` }}
           />
         </div>
@@ -433,10 +607,7 @@ const DashboardFinanceiro = () => {
             <span className="font-semibold text-red-600">{formatarMoeda((resumo.fluxo_periodo.saidas / periodoDias) * 30)}</span>
             {resumo.fluxo_periodo.saidas > 0 && (
               <span className="ml-2 font-semibold text-blue-700">
-                → {coberturaPE >= 100
-                  ? '✅ No lucro'
-                  : `PE no dia ~${Math.ceil(resumo.fluxo_periodo.saidas / (resumo.fluxo_periodo.entradas / periodoDias))}/${periodoDias === 1 ? '' : ' do mês'}`
-                }
+                → {textoProjecaoPE}
               </span>
             )}
           </div>
