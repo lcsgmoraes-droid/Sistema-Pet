@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
@@ -23,6 +24,105 @@ function formatarOpcaoProduto(produto) {
   const estoque = produto?.estoque_atual || 0;
   return `${sku} | EAN: ${ean} | ${nome} (Est: ${estoque})`;
 }
+
+function formatarValorFiscal(valor, casas = 4) {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas,
+  });
+}
+
+function obterCustoAquisicaoItem(item) {
+  return Number(
+    item?.custo_aquisicao_unitario ??
+    item?.custo_aquisicao_unitario_nf ??
+    item?.composicao_custo?.custo_aquisicao_unitario ??
+    item?.custo_unitario_efetivo ??
+    item?.custo_unitario_efetivo_nf ??
+    item?.valor_unitario ??
+    0
+  );
+}
+
+function BlocoComposicaoCusto({ item, titulo = 'Composição do custo' }) {
+  const composicao = item?.composicao_custo;
+  if (!composicao) return null;
+
+  const unitario = composicao.componentes_unitario || {};
+  const linhas = [
+    { label: 'Custo bruto', valor: composicao.custo_bruto_unitario || 0 },
+    { label: 'ICMS ST', valor: unitario.valor_icms_st || 0 },
+    { label: 'IPI', valor: unitario.valor_ipi || 0 },
+    { label: 'Frete', valor: unitario.valor_frete || 0 },
+    { label: 'Seguro', valor: unitario.valor_seguro || 0 },
+    { label: 'Outras despesas', valor: unitario.valor_outras_despesas || 0 },
+    { label: 'Desconto', valor: -(unitario.valor_desconto || 0) },
+  ].filter((linha) => Math.abs(Number(linha.valor || 0)) > 0.00001 || linha.label === 'Custo bruto');
+
+  const tributosInfo = [
+    { label: 'ICMS', valor: unitario.valor_icms || 0 },
+    { label: 'PIS', valor: unitario.valor_pis || 0 },
+    { label: 'COFINS', valor: unitario.valor_cofins || 0 },
+  ].filter((linha) => Math.abs(Number(linha.valor || 0)) > 0.00001);
+
+  return (
+    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="font-semibold">{titulo}</span>
+        <span className="font-bold">R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}</span>
+      </div>
+      <div className="space-y-1">
+        {linhas.map((linha) => {
+          const negativo = Number(linha.valor || 0) < 0;
+          return (
+            <div key={linha.label} className="flex items-center justify-between gap-3">
+              <span className="text-amber-900">{linha.label}</span>
+              <span className={`font-medium ${negativo ? 'text-red-700' : 'text-amber-950'}`}>
+                {negativo ? '- ' : ''}R$ {formatarValorFiscal(Math.abs(Number(linha.valor || 0)), 4)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 border-t border-amber-200 pt-2 space-y-1">
+        <div className="flex items-center justify-between gap-3 font-semibold">
+          <span>Custo de aquisição</span>
+          <span>R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-[11px] text-amber-800">
+          <span>Total do item</span>
+          <span>{formatMoneyBRL(composicao.custo_aquisicao_total || 0)}</span>
+        </div>
+        {Number(composicao.quantidade_efetiva || 0) > 0 && (
+          <div className="flex items-center justify-between gap-3 text-[11px] text-amber-800">
+            <span>Quantidade efetiva</span>
+            <span>{formatarValorFiscal(composicao.quantidade_efetiva || 0, 0)}</span>
+          </div>
+        )}
+        {composicao.tem_rateio && (
+          <div className="rounded bg-white/70 px-2 py-1 text-[11px] text-amber-900">
+            Rateio proporcional aplicado para valores que vieram só no total da nota.
+          </div>
+        )}
+        {tributosInfo.length > 0 && (
+          <div className="pt-1 text-[11px] text-amber-900">
+            <div className="font-semibold mb-1">Tributos informativos por unidade</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {tributosInfo.map((tributo) => (
+                <span key={tributo.label}>{tributo.label}: R$ {formatarValorFiscal(tributo.valor, 4)}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+BlocoComposicaoCusto.propTypes = {
+  item: PropTypes.object,
+  titulo: PropTypes.string,
+};
 
 const EntradaXML = () => {
   const navigate = useNavigate();
@@ -708,6 +808,7 @@ const EntradaXML = () => {
       );
       const custoAtualNf = Number(
         produto.custo_novo ??
+        item.custo_aquisicao_unitario_nf ??
         item.custo_unitario_efetivo_nf ??
         item.valor_unitario_nf ??
         0
@@ -1117,12 +1218,13 @@ const EntradaXML = () => {
       }
       
       // Preencher formulario com dados do item
+      const custoBase = obterCustoAquisicaoItem(item);
       setFormProduto({
         sku: skuParaUsar,
         nome: item.descricao || item.descricao_produto || 'Produto sem nome',
         descricao: item.descricao || item.descricao_produto || '',
-        preco_custo: item.valor_unitario.toString(),
-        preco_venda: (item.valor_unitario * 1.5).toFixed(2), // Sugestão de 50% de margem
+        preco_custo: custoBase.toString(),
+        preco_venda: (custoBase * 1.5).toFixed(2),
         margem_lucro: '50',
         estoque_minimo: 10,
         estoque_maximo: 100
@@ -1131,7 +1233,7 @@ const EntradaXML = () => {
       console.log('✅ Formulário preenchido:', {
         sku: skuParaUsar,
         nome: item.descricao,
-        preco_custo: item.valor_unitario
+        preco_custo: custoBase
       });
       
     } catch (error) {
@@ -1139,12 +1241,13 @@ const EntradaXML = () => {
       console.error('Erro ao buscar SKU:', error);
       
       // Preencher mesmo com erro
+      const custoBase = obterCustoAquisicaoItem(item);
       setFormProduto({
         sku: item.codigo_produto || 'PROD-' + item.id,
         nome: item.descricao || 'Produto sem nome',
         descricao: item.descricao || '',
-        preco_custo: item.valor_unitario.toString(),
-        preco_venda: (item.valor_unitario * 1.5).toFixed(2),
+        preco_custo: custoBase.toString(),
+        preco_venda: (custoBase * 1.5).toFixed(2),
         margem_lucro: '50',
         estoque_minimo: 10,
         estoque_maximo: 100
@@ -1238,12 +1341,13 @@ const EntradaXML = () => {
           }
           
           // Criar produto com padrões
+          const custoBase = obterCustoAquisicaoItem(item);
           const dadosProduto = {
             sku: skuParaUsar,
             nome: item.descricao || 'Produto sem nome',
             descricao: item.descricao || '',
-            preco_custo: Number.parseFloat(item.valor_unitario) || 0,
-            preco_venda: Number.parseFloat((item.valor_unitario * 1.5).toFixed(2)),
+            preco_custo: custoBase,
+            preco_venda: Number.parseFloat((custoBase * 1.5).toFixed(2)),
             margem_lucro: 50,
             estoque_minimo: 10,
             estoque_maximo: 100
@@ -1940,6 +2044,10 @@ const EntradaXML = () => {
                               <span className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between">
+                              <span className="text-gray-600">Custo Aquisição:</span>
+                              <span className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}</span>
+                            </div>
+                            <div className="flex justify-between">
                               <span className="text-gray-600">Total:</span>
                               <span className="font-semibold text-green-600">R$ {item.valor_total.toFixed(2)}</span>
                             </div>
@@ -1977,7 +2085,7 @@ const EntradaXML = () => {
                                     : (item.pack_multiplicador_detectado || 1);
                                   if (mult > 1) {
                                     const qtdReal = item.quantidade * mult;
-                                    const custoReal = item.valor_total / qtdReal;
+                                    const custoReal = obterCustoAquisicaoItem(item);
                                     return (
                                       <div className="mt-1.5 bg-green-50 border border-green-300 rounded p-2 text-xs text-green-800 space-y-0.5">
                                         <div>🔢 Qtd real: <strong>{qtdReal}</strong> unid. ({item.quantidade} cx × {mult})</div>
@@ -1989,6 +2097,8 @@ const EntradaXML = () => {
                                 })()}
                               </div>
                             )}
+
+                            <BlocoComposicaoCusto item={item} />
                           </div>
 
                           {/* Lote e Validade */}
@@ -2469,7 +2579,8 @@ const EntradaXML = () => {
                       {itemSelecionadoParaCriar.ean && (
                         <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
                       )}
-                      <div><strong>Valor Unitario:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
+                      <div><strong>Valor Unitario NF:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
+                      <div><strong>Custo de Aquisicao:</strong> R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemSelecionadoParaCriar), 4)}</div>
                     </div>
                   </div>
 
@@ -2807,7 +2918,7 @@ const EntradaXML = () => {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-4 gap-3 text-sm mt-3">
+                      <div className="grid grid-cols-5 gap-3 text-sm mt-3">
                         <div>
                           <span className="text-gray-600">Qtd:</span>
                           <div className="font-semibold">{item.quantidade}</div>
@@ -2815,6 +2926,10 @@ const EntradaXML = () => {
                         <div>
                           <span className="text-gray-600">Unit:</span>
                           <div className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Custo Aq.:</span>
+                          <div className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}</div>
                         </div>
                         <div>
                           <span className="text-gray-600">Total:</span>
@@ -2825,6 +2940,8 @@ const EntradaXML = () => {
                           <div className="font-semibold">{item.cfop}</div>
                         </div>
                       </div>
+
+                            <BlocoComposicaoCusto item={item} />
 
                       {/* Lote e Validade */}
                       {(item.lote || item.data_validade) && (
