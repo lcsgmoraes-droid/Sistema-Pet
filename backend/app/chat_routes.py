@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db import get_session as get_db
+from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User, UserTenant, Role, RolePermission, Permission
 from app.ia.aba6_chat_ia import (
