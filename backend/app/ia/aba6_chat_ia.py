@@ -34,10 +34,15 @@ class ChatIAService:
     
     # ==================== CONVERSAS ====================
     
-    def criar_conversa(self, usuario_id: int) -> Conversa:
+    def criar_conversa(self, usuario_id: int, tenant_id: Optional[str] = None) -> Conversa:
         """Cria nova conversa"""
+        tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
+        if not tenant_id_resolvido:
+            raise ValueError("Não foi possível determinar o tenant da conversa")
+
         conversa = Conversa(
             usuario_id=usuario_id,
+            tenant_id=tenant_id_resolvido,
             criado_em=datetime.utcnow()
         )
         self.db.add(conversa)
@@ -916,10 +921,10 @@ class ChatIAService:
 
 
 # Funções auxiliares para endpoints
-def criar_conversa_service(db: Session, usuario_id: int) -> Conversa:
+def criar_conversa_service(db: Session, usuario_id: int, tenant_id: Optional[str] = None) -> Conversa:
     """Helper para criar conversa"""
     service = ChatIAService(db)
-    return service.criar_conversa(usuario_id)
+    return service.criar_conversa(usuario_id, tenant_id=tenant_id)
 
 
 def listar_conversas_service(db: Session, usuario_id: int, limit: int = 20) -> List[Conversa]:

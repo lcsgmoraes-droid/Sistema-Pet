@@ -10,7 +10,6 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db import get_session as get_db
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User, UserTenant, Role, RolePermission, Permission
 from app.ia.aba6_chat_ia import (
@@ -64,13 +63,17 @@ class ChatResponse(BaseModel):
 
 @router.post("/nova-conversa", response_model=ConversaResponse, status_code=status.HTTP_201_CREATED)
 async def criar_nova_conversa(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """Cria uma nova conversa"""
+    current_user, tenant_id = user_and_tenant
     usuario_id = current_user.id
-    
-    conversa = criar_conversa_service(db, usuario_id)
+
+    try:
+        conversa = criar_conversa_service(db, usuario_id, tenant_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     
     return ConversaResponse(
         id=conversa.id,
