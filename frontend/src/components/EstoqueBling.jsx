@@ -63,6 +63,9 @@ function EstoqueBling() {
     somente_sistema: 0,
     coleta_bling_completa: true,
   });
+  const [itensSemProduto, setItensSemProduto] = useState([]);
+  const [totalItensSemProduto, setTotalItensSemProduto] = useState(0);
+  const [loadingItensSemProduto, setLoadingItensSemProduto] = useState(false);
 
   const isTimeoutError = (error) => error?.code === 'ECONNABORTED';
 
@@ -172,6 +175,20 @@ function EstoqueBling() {
           coleta_bling_completa: false,
         });
       });
+
+    // Itens de pedidos Bling cujo SKU não tem produto cadastrado
+    setLoadingItensSemProduto(true);
+    api.get('/integracoes/bling/nf/itens-sem-produto', { params: { por_pagina: 50 } })
+      .then((response) => {
+        const data = response?.data || {};
+        setItensSemProduto(data.items || []);
+        setTotalItensSemProduto(Number(data.total || 0));
+      })
+      .catch(() => {
+        setItensSemProduto([]);
+        setTotalItensSemProduto(0);
+      })
+      .finally(() => setLoadingItensSemProduto(false));
   };
 
   useEffect(() => {
@@ -487,6 +504,78 @@ function EstoqueBling() {
           <div className="mt-2 text-3xl font-semibold text-amber-700">{stats.somenteSistema}</div>
         </div>
       </div>
+
+      {/* ── Painel: SKUs de pedidos Bling sem produto cadastrado ── */}
+      {(loadingItensSemProduto || totalItensSemProduto > 0) && (
+        <div className={`rounded-xl border p-5 shadow-sm space-y-3 ${totalItensSemProduto > 0 ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-amber-900">
+                ⚠️ SKUs de vendas/NF sem produto cadastrado
+              </h2>
+              <p className="text-sm text-amber-800 mt-0.5">
+                Estes itens vieram de pedidos do Bling mas o código (SKU) não foi encontrado em nenhum produto do sistema.
+                A baixa de estoque <strong>não foi realizada</strong> para esses itens.
+              </p>
+            </div>
+            {totalItensSemProduto > 0 && (
+              <span className="rounded-full bg-amber-200 px-3 py-1 text-sm font-bold text-amber-900">
+                {totalItensSemProduto} {totalItensSemProduto === 1 ? 'item' : 'itens'}
+              </span>
+            )}
+          </div>
+
+          {loadingItensSemProduto && (
+            <p className="text-sm text-amber-700 animate-pulse">Verificando SKUs sem produto...</p>
+          )}
+
+          {!loadingItensSemProduto && itensSemProduto.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-amber-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-amber-100 text-amber-900">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold">SKU</th>
+                    <th className="px-3 py-2 text-left font-semibold">Descrição</th>
+                    <th className="px-3 py-2 text-right font-semibold">Qtd</th>
+                    <th className="px-3 py-2 text-left font-semibold">Pedido Bling</th>
+                    <th className="px-3 py-2 text-left font-semibold">Status pedido</th>
+                    <th className="px-3 py-2 text-left font-semibold">Reservado em</th>
+                    <th className="px-3 py-2 text-left font-semibold">Vendido em</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100 bg-white">
+                  {itensSemProduto.map((item) => (
+                    <tr key={item.item_id} className="hover:bg-amber-50">
+                      <td className="px-3 py-2 font-mono font-semibold text-amber-900">{item.sku}</td>
+                      <td className="px-3 py-2 text-gray-700">{item.descricao || '-'}</td>
+                      <td className="px-3 py-2 text-right text-gray-900">{item.quantidade}</td>
+                      <td className="px-3 py-2 text-gray-700">{item.pedido_bling_numero || item.pedido_bling_id || '-'}</td>
+                      <td className="px-3 py-2">
+                        <span className={`rounded px-2 py-0.5 text-xs font-medium ${
+                          item.pedido_status === 'confirmado' ? 'bg-emerald-100 text-emerald-800' :
+                          item.pedido_status === 'cancelado' ? 'bg-red-100 text-red-800' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {item.pedido_status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">{formatDate(item.reservado_em)}</td>
+                      <td className="px-3 py-2 text-gray-500">{formatDate(item.vendido_em) || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!loadingItensSemProduto && itensSemProduto.length > 0 && (
+            <p className="text-xs text-amber-700">
+              Para corrigir: cadastre o produto com o código/SKU correto ou atualize o código do produto existente para bater com o SKU do Bling.
+              {totalItensSemProduto > 50 && ` Mostrando 50 de ${totalItensSemProduto} itens.`}
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="rounded-xl border border-sky-200 bg-sky-50 p-5 shadow-sm">
         <h2 className="text-base font-semibold text-sky-900">Como usar esta tela (guia rápido)</h2>

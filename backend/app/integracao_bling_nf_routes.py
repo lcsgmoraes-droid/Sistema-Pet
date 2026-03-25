@@ -2,15 +2,17 @@
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from sqlalchemy import not_, exists, or_
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.db import get_session
+from app.auth.dependencies import get_current_user_and_tenant
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
-from app.estoque_reserva_service import EstoqueReservaService
+from app.services.bling_nf_service import processar_nf_autorizada, processar_nf_cancelada
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
@@ -29,6 +31,60 @@ _NF_SITUACAO_AUTORIZADA = {2, 9}   # emitida ou autorizada
 _NF_SITUACAO_CANCELADA  = {4, 5}   # cancelada ou denegada
 
 
+def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
+    pedido_bling_id = None
+
+    try:
+        from app.bling_integration import BlingAPI
+
+        nf_completa = BlingAPI().consultar_nfe(int(nf_id))
+        pedido_ref = (
+            nf_completa.get("pedido")
+            or nf_completa.get("pedidoCompra")
+            or nf_completa.get("pedidoVenda")
+        )
+        if isinstance(pedido_ref, dict):
+            pedido_bling_id = str(pedido_ref.get("id", ""))
+        logger.info(f"[BLING NF] NF {nf_id} situacao={situacao_num} pedido_bling={pedido_bling_id}")
+    except Exception as e:
+        logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
+
+    return pedido_bling_id or None
+
+
+def _gerar_provisao_simples_se_aplicavel(db: Session, pedido: PedidoIntegrado, data: dict) -> None:
+    try:
+        valor_total_nf = data.get("valorTotalNf") or data.get("valor_total", 0)
+        data_emissao = data.get("dataEmissao") or data.get("data_emissao")
+
+        if not valor_total_nf or not data_emissao or not pedido.tenant_id:
+            return
+
+        if isinstance(data_emissao, str):
+            from datetime import date
+
+            data_emissao = date.fromisoformat(data_emissao.split("T")[0])
+
+        resultado = gerar_provisao_simples_por_nf(
+            db=db,
+            tenant_id=pedido.tenant_id,
+            valor_nf=Decimal(str(valor_total_nf)),
+            data_emissao=data_emissao,
+            usuario_id=pedido.usuario_id if hasattr(pedido, "usuario_id") else None,
+        )
+
+        if resultado.get("sucesso"):
+            logger.info(
+                f"✅ Provisão Simples: R$ {resultado['valor_provisao']:.2f} "
+                f"(Período {resultado['mes']}/{resultado['ano']})"
+            )
+    except Exception as e:
+        logger.info(f"⚠️  Erro ao gerar provisão Simples Nacional: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
 @router.post("/nf")
 async def receber_nf_bling(request: Request, db: Session = Depends(get_session)):
     """
@@ -45,7 +101,6 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
 
     # Desempacotar envelope Bling (v1)
-    event  = body.get("event", "")   # ex: "invoice.updated"
     data   = body.get("data", body)  # fallback p/ payload legado
 
     nf_id = str(data.get("id", ""))
@@ -63,21 +118,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         return {"status": "ignorado", "motivo": f"situacao_{situacao_num}_nao_tratada"}
 
     # Buscar NF completa na API do Bling para obter o pedido vinculado
-    pedido_bling_id = None
-    try:
-        from app.bling_integration import BlingAPI
-        nf_completa = BlingAPI().consultar_nfe(int(nf_id))
-        # Campo pode estar em 'pedido', 'pedidoCompra', 'pedidoVenda' dependendo da versão
-        pedido_ref = (
-            nf_completa.get("pedido")
-            or nf_completa.get("pedidoCompra")
-            or nf_completa.get("pedidoVenda")
-        )
-        if isinstance(pedido_ref, dict):
-            pedido_bling_id = str(pedido_ref.get("id", ""))
-        logger.info(f"[BLING NF] NF {nf_id} situacao={situacao_num} pedido_bling={pedido_bling_id}")
-    except Exception as e:
-        logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
+    pedido_bling_id = _obter_pedido_bling_id_por_nf(nf_id=nf_id, situacao_num=situacao_num)
 
     if not pedido_bling_id:
         # NF sem pedido vinculado (ex: NF emitida manualmente fora do fluxo)
@@ -98,87 +139,93 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # NF EMITIDA / AUTORIZADA
     # ============================
     if situacao_num in _NF_SITUACAO_AUTORIZADA:
-        pedido.status = "confirmado"
-        pedido.confirmado_em = datetime.utcnow()
+        acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
+        _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=data)
 
-        for item in itens:
-            EstoqueReservaService.confirmar_venda(db, item)
-
-            # Baixar estoque real — busca produto pelo SKU e desconta estoque_atual
-            try:
-                from app.estoque.service import EstoqueService
-                from app.produtos_models import Produto
-
-                produto = db.query(Produto).filter(
-                    Produto.sku == item.sku,
-                    Produto.tenant_id == pedido.tenant_id
-                ).first()
-
-                if produto:
-                    EstoqueService.baixar_estoque(
-                        produto_id=produto.id,
-                        quantidade=float(item.quantidade),
-                        motivo="venda_bling",
-                        referencia_id=pedido.id,
-                        referencia_tipo="pedido_integrado",
-                        user_id=0,  # 0 = sistema / integração automática
-                        db=db,
-                        tenant_id=pedido.tenant_id,
-                        documento=pedido.pedido_bling_numero,
-                        observacao=f"Baixa automática via NF Bling #{nf_id}",
-                    )
-                else:
-                    logger.warning(f"⚠️  Produto com SKU '{item.sku}' não encontrado para baixa de estoque")
-
-            except Exception as e:
-                logger.warning(f"⚠️  Falha ao baixar estoque para SKU {item.sku}: {e}")
-                # Não bloqueia o fluxo — marca vendido_em e segue
-
-        db.add(pedido)
-        db.commit()
-        
-        # 🔹 Gerar provisão de Simples Nacional no DRE
-        try:
-            valor_total_nf = data.get("valorTotalNf") or data.get("valor_total", 0)
-            data_emissao = data.get("dataEmissao") or data.get("data_emissao")
-            
-            if valor_total_nf and data_emissao and pedido.tenant_id:
-                # Converter data_emissao para date
-                if isinstance(data_emissao, str):
-                    from datetime import date
-                    data_emissao = date.fromisoformat(data_emissao.split("T")[0])
-                
-                resultado = gerar_provisao_simples_por_nf(
-                    db=db,
-                    tenant_id=pedido.tenant_id,
-                    valor_nf=Decimal(str(valor_total_nf)),
-                    data_emissao=data_emissao,
-                    usuario_id=pedido.usuario_id if hasattr(pedido, 'usuario_id') else None
-                )
-                
-                if resultado.get("sucesso"):
-                    logger.info(f"✅ Provisão Simples: R$ {resultado['valor_provisao']:.2f} (Período {resultado['mes']}/{resultado['ano']})")
-        except Exception as e:
-            logger.info(f"⚠️  Erro ao gerar provisão Simples Nacional: {e}")
-            import traceback
-            traceback.print_exc()
-            # Não falhar o webhook por conta disso
-
-        return {"status": "ok", "acao": "venda_confirmada"}
+        return {"status": "ok", "acao": acao}
 
     # ============================
     # NF CANCELADA
     # ============================
     if situacao_num in _NF_SITUACAO_CANCELADA:
-        pedido.status = "cancelado"
-        pedido.cancelado_em = datetime.utcnow()
-
-        for item in itens:
-            EstoqueReservaService.liberar(db, item)
-
-        db.add(pedido)
-        db.commit()
-
-        return {"status": "ok", "acao": "venda_cancelada"}
+        acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens)
+        return {"status": "ok", "acao": acao}
 
     return {"status": "ignorado", "motivo": "status_nf_desconhecido"}
+
+
+# ============================================================
+# GET /integracoes/bling/nf/itens-sem-produto
+# Itens de pedidos Bling cujo SKU não existe no cadastro local.
+# Serve como painel de monitoramento para identificar SKUs órfãos.
+# ============================================================
+
+@router.get("/nf/itens-sem-produto")
+def listar_itens_sem_produto(
+    por_pagina: int = Query(50, ge=1, le=200),
+    pagina: int = Query(1, ge=1),
+    db: Session = Depends(get_session),
+    user_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Retorna itens de pedidos integrados (Bling) cujo SKU não encontrou
+    correspondência em nenhum produto cadastrado (codigo ou codigo_barras).
+    Use este endpoint para identificar e corrigir desvinculações de estoque.
+    """
+    from app.produtos_models import Produto
+
+    tenant_id = user_tenant[1]
+
+    # Subquery: existe um produto com este SKU?
+    produto_existe = exists().where(
+        Produto.tenant_id == tenant_id,
+        or_(
+            Produto.codigo == PedidoIntegradoItem.sku,
+            Produto.codigo_barras == PedidoIntegradoItem.sku,
+        ),
+    )
+
+    # Todos os itens deste tenant cujo SKU não tem produto vinculado
+    q = (
+        db.query(PedidoIntegradoItem, PedidoIntegrado)
+        .join(PedidoIntegrado, PedidoIntegrado.id == PedidoIntegradoItem.pedido_integrado_id)
+        .filter(
+            PedidoIntegradoItem.tenant_id == tenant_id,
+            not_(produto_existe),
+        )
+        .order_by(PedidoIntegradoItem.reservado_em.desc())
+    )
+
+    total = q.count()
+    rows = q.offset((pagina - 1) * por_pagina).limit(por_pagina).all()
+
+    def _fmt(dt):
+        if not dt:
+            return None
+        if hasattr(dt, "isoformat"):
+            return dt.isoformat()
+        return str(dt)
+
+    items = [
+        {
+            "item_id": item.id,
+            "sku": item.sku,
+            "descricao": item.descricao,
+            "quantidade": item.quantidade,
+            "reservado_em": _fmt(item.reservado_em),
+            "vendido_em": _fmt(item.vendido_em),
+            "liberado_em": _fmt(item.liberado_em),
+            "pedido_bling_numero": pedido.pedido_bling_numero,
+            "pedido_bling_id": pedido.pedido_bling_id,
+            "pedido_status": pedido.status,
+            "pedido_confirmado_em": _fmt(pedido.confirmado_em),
+        }
+        for item, pedido in rows
+    ]
+
+    return {
+        "total": total,
+        "pagina": pagina,
+        "por_pagina": por_pagina,
+        "items": items,
+    }
