@@ -10,6 +10,9 @@ from app.produtos_models import Produto
 from app.utils.logger import logger
 
 
+AUTO_CADASTRO_BING_TAG = "[AUTO-BLING-NF]"
+
+
 def buscar_produto_do_item(db: Session, tenant_id, sku: str):
     if not sku:
         return None
@@ -103,6 +106,10 @@ def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sk
         estoque_atual=estoque_bling,
         estoque_fisico=estoque_bling,
         estoque_minimo=0,
+        informacoes_adicionais_nf=(
+            f"{AUTO_CADASTRO_BING_TAG} sku={sku_padrao} "
+            f"criado_em={datetime.now(timezone.utc).isoformat()}"
+        ),
     )
 
 

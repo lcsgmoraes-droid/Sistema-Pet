@@ -11,16 +11,35 @@ export default function Lembretes() {
   const [filter, setFilter] = useState("pendente"); // pendente, notificado, completado, todos
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
   const [dresPendentes, setDresPendentes] = useState(0);
+  const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
   const navigate = useNavigate();
 
   useEffect(() => {
     carregarLembretes();
     carregarAlertasCampanhas();
     carregarDresPendentes();
+    carregarAutocadastrosBling();
     // Atualizar a cada 1 minuto
-    const interval = setInterval(carregarLembretes, 60000);
+    const interval = setInterval(() => {
+      carregarLembretes();
+      carregarAutocadastrosBling();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const carregarAutocadastrosBling = async () => {
+    try {
+      const res = await api.get("/integracoes/bling/nf/autocadastros-recentes", {
+        params: { horas: 24, limite: 20 },
+      });
+      setAutocadastrosBling({
+        total: Number(res.data?.total || 0),
+        items: Array.isArray(res.data?.items) ? res.data.items : [],
+      });
+    } catch {
+      setAutocadastrosBling({ total: 0, items: [] });
+    }
+  };
 
   const carregarAlertasCampanhas = async () => {
     try {
@@ -514,6 +533,72 @@ export default function Lembretes() {
                 </p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Aviso 24h: autocadastros criados via NF Bling ── */}
+      {autocadastrosBling.total > 0 && (
+        <div
+          style={{
+            marginBottom: "20px",
+            borderRadius: "12px",
+            border: "1px solid #86efac",
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              background: "#dcfce7",
+              padding: "12px 20px",
+              borderBottom: "1px solid #86efac",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+            }}
+          >
+            <span style={{ fontWeight: "700", color: "#166534", fontSize: "14px" }}>
+              ✅ Auto cadastro Bling (últimas 24h)
+            </span>
+            <span style={{ fontWeight: "700", color: "#166534", fontSize: "14px" }}>
+              {autocadastrosBling.total}
+            </span>
+          </div>
+          <div style={{ padding: "12px 20px" }}>
+            <p style={{ margin: "0 0 8px", color: "#065f46", fontSize: "13px" }}>
+              O sistema já identificou SKU sem cadastro, criou o produto e seguiu com a baixa automaticamente.
+              Este aviso some sozinho após 1 dia.
+            </p>
+            <div style={{ display: "grid", gap: "6px" }}>
+              {autocadastrosBling.items.slice(0, 8).map((item) => (
+                <button
+                  key={item.produto_id}
+                  type="button"
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: "#f0fdf4",
+                    border: "1px solid #bbf7d0",
+                    borderRadius: "8px",
+                    padding: "8px 10px",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  onClick={() => navigate(`/produtos?busca=${encodeURIComponent(item.codigo || "")}`)}
+                >
+                  <span style={{ fontSize: "13px", color: "#14532d" }}>
+                    {item.codigo} - {item.nome}
+                  </span>
+                  <span style={{ fontSize: "12px", color: "#166534" }}>
+                    {item.created_at ? new Date(item.created_at).toLocaleString("pt-BR") : "agora"}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
