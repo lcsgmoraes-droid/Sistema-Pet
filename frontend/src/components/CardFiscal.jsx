@@ -10,7 +10,7 @@ function formatarValorFiscal(valor, casas = 2) {
 }
 
 function CardFiscal({ nota, item, composicao }) {
-  const [expandido, setExpandido] = useState(true);
+  const [expandido, setExpandido] = useState(false);
 
   if (!composicao) return null;
 
@@ -46,20 +46,18 @@ function CardFiscal({ nota, item, composicao }) {
   };
 
   return (
-    <div className="mt-4 rounded-xl border-2 border-gradient bg-gradient-to-br from-slate-50 to-slate-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-      {/* Header com toggle */}
+    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpandido(!expandido)}>
         <div className="flex items-center gap-2">
-          <span className="text-xl">📊</span>
-          <h4 className="font-semibold text-slate-800">Composição Fiscal do Item</h4>
+          <span className="text-base">📊</span>
+          <h4 className="text-sm font-semibold text-slate-800">Composição Fiscal do Item</h4>
         </div>
-        <span className={`text-lg transition-transform ${expandido ? 'rotate-180' : ''}`}>▼</span>
+        <span className={`text-sm text-slate-600 transition-transform ${expandido ? 'rotate-180' : ''}`}>▼</span>
       </div>
 
       {expandido && (
         <>
-          {/* Grid de componentes */}
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {linhas.map((linha) => {
               const colorGradient = colorMap[linha.color] || 'from-slate-50 to-slate-100';
               const textColor = textColorMap[linha.color] || 'text-slate-700';
@@ -68,11 +66,11 @@ function CardFiscal({ nota, item, composicao }) {
               return (
                 <div
                   key={linha.label}
-                  className={`bg-gradient-to-br ${colorGradient} border rounded-lg p-3 text-center transition-transform hover:scale-105`}
+                  className={`bg-gradient-to-br ${colorGradient} border rounded-md p-2 text-center`}
                 >
-                  <div className="text-2xl mb-1">{linha.icon}</div>
-                  <div className={`text-xs font-medium ${textColor} truncate`}>{linha.label}</div>
-                  <div className={`text-sm font-bold mt-1 ${isNegativo ? 'text-red-600' : textColor}`}>
+                  <div className="text-lg mb-0.5">{linha.icon}</div>
+                  <div className={`text-[11px] font-medium ${textColor} truncate`}>{linha.label}</div>
+                  <div className={`text-xs font-bold mt-0.5 ${isNegativo ? 'text-red-600' : textColor}`}>
                     {isNegativo ? '- ' : ''}R$ {formatarValorFiscal(Math.abs(Number(linha.valor)), 2)}
                   </div>
                 </div>
@@ -80,36 +78,33 @@ function CardFiscal({ nota, item, composicao }) {
             })}
           </div>
 
-          {/* Resumo final */}
-          <div className="mt-4 border-t-2 border-slate-300 pt-3">
-            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-emerald-100 border-2 border-emerald-300 rounded-lg p-3">
+          <div className="mt-3 border-t border-slate-300 pt-2">
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-300 rounded-md p-2">
               <div>
-                <span className="text-xs text-emerald-700 font-medium block">Custo de Aquisição por Unidade</span>
-                <span className="text-xs text-emerald-600 mt-1 block">
+                <span className="text-[11px] text-emerald-700 font-medium block">Custo de Aquisição por Unidade</span>
+                <span className="text-[11px] text-emerald-600 mt-0.5 block">
                   Qtd: {formatarValorFiscal(composicao.quantidade_efetiva || 1, 0)} un.
                 </span>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-emerald-700">
+                <div className="text-xl font-bold text-emerald-700">
                   R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}
                 </div>
-                <div className="text-xs text-emerald-600 mt-1">
+                <div className="text-[11px] text-emerald-600 mt-0.5">
                   Total: {formatMoneyBRL(composicao.custo_aquisicao_total || 0)}
                 </div>
               </div>
             </div>
 
-            {/* Info de rateio */}
             {composicao.tem_rateio && (
-              <div className="mt-2 rounded-lg bg-blue-50 border border-blue-200 p-2 text-xs text-blue-800">
+              <div className="mt-2 rounded-md bg-blue-50 border border-blue-200 p-2 text-[11px] text-blue-800">
                 <span className="inline-block mr-1">ℹ️</span>
                 Rateio proporcional aplicado para valores que vieram só no total da nota.
               </div>
             )}
 
-            {/* Tributos informativos */}
             {(componentes.valor_icms > 0 || componentes.valor_pis > 0 || componentes.valor_cofins > 0) && (
-              <div className="mt-2 rounded-lg bg-slate-100 border border-slate-300 p-2 text-xs">
+              <div className="mt-2 rounded-md bg-slate-100 border border-slate-300 p-2 text-[11px]">
                 <div className="font-semibold text-slate-700 mb-1">Tributos Informativos (por unidade):</div>
                 <div className="flex flex-wrap gap-2">
                   {componentes.valor_icms > 0 && (

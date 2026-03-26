@@ -2737,13 +2737,13 @@ const EntradaXML = () => {
       {/* Modal de Visualização da Nota */}
       {mostrarVisualizacao && notaSelecionada && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-lg shadow-2xl w-[96vw] max-w-[1500px] max-h-[94vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
               <div className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-2xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
-                  <p className="text-blue-100 mt-1">Serie: {notaSelecionada.serie}</p>
+                  <h2 className="text-xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
+                  <p className="text-blue-100 text-sm mt-1">Serie: {notaSelecionada.serie}</p>
                 </div>
                 <button
                   onClick={() => {
@@ -2758,12 +2758,12 @@ const EntradaXML = () => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4">
               {/* Informações da Nota */}
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">Dados da Nota</h3>
-                  <div className="space-y-2 text-sm">
+                  <h3 className="font-semibold text-gray-700 mb-2">Dados da Nota</h3>
+                  <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Data Emissao:</span>
                       <span className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString('pt-BR')}</span>
@@ -2780,8 +2780,8 @@ const EntradaXML = () => {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-gray-700 mb-3">Fornecedor</h3>
-                  <div className="space-y-2 text-sm">
+                  <h3 className="font-semibold text-gray-700 mb-2">Fornecedor</h3>
+                  <div className="space-y-1.5 text-sm">
                     <div>
                       <span className="text-gray-600">Nome:</span>
                       <div className="font-semibold">{notaSelecionada.fornecedor_nome}</div>
@@ -2795,36 +2795,36 @@ const EntradaXML = () => {
               </div>
 
               {/* Chave de Acesso */}
-              <div className="mb-6 p-3 bg-gray-50 rounded">
+              <div className="mb-4 p-3 bg-gray-50 rounded">
                 <div className="text-xs text-gray-600 mb-1">Chave de Acesso</div>
                 <div className="font-mono text-xs break-all">{notaSelecionada.chave_acesso}</div>
               </div>
 
               {/* Status de Vinculação */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-600">{notaSelecionada.itens?.length || 0}</div>
-                  <div className="text-sm text-gray-600">Total Itens</div>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-blue-600">{notaSelecionada.itens?.length || 0}</div>
+                  <div className="text-xs text-gray-600">Total Itens</div>
                 </div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-600">{notaSelecionada.produtos_vinculados}</div>
-                  <div className="text-sm text-gray-600">Vinculados</div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-green-600">{notaSelecionada.produtos_vinculados}</div>
+                  <div className="text-xs text-gray-600">Vinculados</div>
                 </div>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-orange-600">{notaSelecionada.produtos_nao_vinculados}</div>
-                  <div className="text-sm text-gray-600">Nao Vinculados</div>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+                  <div className="text-xl font-bold text-orange-600">{notaSelecionada.produtos_nao_vinculados}</div>
+                  <div className="text-xs text-gray-600">Nao Vinculados</div>
                 </div>
               </div>
 
               {/* Itens da Nota */}
               <div>
-                <h3 className="font-semibold text-gray-700 mb-3">Itens da Nota</h3>
-                <div className="space-y-3">
+                <h3 className="font-semibold text-gray-700 mb-2">Itens da Nota</h3>
+                <div className="space-y-2">
                   {notaSelecionada.itens?.map((item, index) => (
-                    <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
+                    <div key={item.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-1.5">
                         <div className="flex-1">
-                          <div className="font-semibold text-gray-800">{item.descricao}</div>
+                          <div className="font-semibold text-gray-800 text-sm">{item.descricao}</div>
                           <div className="text-xs text-gray-500 mt-1">
                             Codigo: {item.codigo_produto} | NCM: {item.ncm}
                           </div>
@@ -2840,7 +2840,7 @@ const EntradaXML = () => {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-5 gap-3 text-sm mt-3">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mt-2">
                         <div>
                           <span className="text-gray-600">Qtd:</span>
                           <div className="font-semibold">{item.quantidade}</div>
@@ -2867,7 +2867,7 @@ const EntradaXML = () => {
 
                       {/* Lote e Validade */}
                       {(item.lote || item.data_validade) && (
-                        <div className="grid grid-cols-2 gap-3 mt-3 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
                           {item.lote && (
                             <div className="bg-purple-50 border border-purple-200 rounded p-2">
                               <span className="text-gray-600">Lote:</span>
@@ -2886,7 +2886,7 @@ const EntradaXML = () => {
                       )}
 
                       {item.vinculado && item.produto_nome && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
+                        <div className="mt-2 pt-2 border-t border-gray-200">
                           <span className="text-xs text-gray-600">→ Produto vinculado: </span>
                           <span className="text-sm font-semibold text-blue-600">{item.produto_nome}</span>
                         </div>

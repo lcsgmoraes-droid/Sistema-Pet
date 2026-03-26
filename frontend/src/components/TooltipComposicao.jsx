@@ -31,10 +31,11 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
     <div className="relative inline-block">
       {/* Botão trigger */}
       <button
-        onMouseEnter={() => setMostrando(true)}
-        onMouseLeave={() => setMostrando(false)}
-        onClick={() => setMostrando(!mostrando)}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors text-xs font-medium group cursor-help"
+        onClick={(e) => {
+          e.stopPropagation();
+          setMostrando(!mostrando);
+        }}
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors text-xs font-medium cursor-pointer"
         title="Clique para ver a composição detalhada do preço"
       >
         <span>ℹ️</span>
@@ -111,10 +112,7 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
             </div>
           )}
 
-          {/* Arrow */}
-          <div className="absolute top-2 right-2 text-xs text-slate-400">
-            (clique em qualquer lugar para fechar)
-          </div>
+          <div className="absolute top-2 right-10 text-xs text-slate-400">clique fora para fechar</div>
         </div>
       )}
 
