@@ -2736,14 +2736,25 @@ const EntradaXML = () => {
 
       {/* Modal de Visualização da Nota */}
       {mostrarVisualizacao && notaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-[96vw] max-w-[1500px] max-h-[94vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/50">
+          <div className="bg-white w-full h-full overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
-                  <p className="text-blue-100 text-sm mt-1">Serie: {notaSelecionada.serie}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setMostrarVisualizacao(false);
+                      setNotaSelecionada(null);
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-white/15 hover:bg-white/25 text-sm font-semibold transition-colors"
+                  >
+                    ← Voltar
+                  </button>
+                  <div>
+                    <h2 className="text-xl font-bold">NF-e {notaSelecionada.numero_nota}</h2>
+                    <p className="text-blue-100 text-sm mt-1">Serie: {notaSelecionada.serie}</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -2751,6 +2762,7 @@ const EntradaXML = () => {
                     setNotaSelecionada(null);
                   }}
                   className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+                  title="Fechar"
                 >
                   X
                 </button>
@@ -2898,7 +2910,7 @@ const EntradaXML = () => {
             </div>
 
             {/* Footer */}
-            <div className="border-t p-6 bg-gray-50 flex justify-between items-center">
+            <div className="border-t p-4 md:p-6 bg-gray-50 flex flex-wrap justify-between items-center gap-3">
               <div className="text-sm text-gray-600">
                 {notaSelecionada.entrada_estoque_realizada ? (
                   <span className="text-green-600 font-semibold">✅ Entrada realizada no estoque</span>
@@ -2906,7 +2918,7 @@ const EntradaXML = () => {
                   <span className="text-orange-600 font-semibold">⚠️ Entrada ainda nao processada</span>
                 )}
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2">
                 {notaSelecionada.status === 'pendente' && notaSelecionada.produtos_vinculados > 0 && !notaSelecionada.entrada_estoque_realizada && (
                   <>
                     <button
@@ -2914,7 +2926,7 @@ const EntradaXML = () => {
                         setMostrarVisualizacao(false);
                         processarNota(notaSelecionada.id);
                       }}
-                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                     >
                       💰 Revisar Precos e Processar
                     </button>
@@ -2926,7 +2938,7 @@ const EntradaXML = () => {
                       setMostrarVisualizacao(false);
                       abrirDetalhes(notaSelecionada.id);
                     }}
-                    className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"
                   >
                     🔗 Vincular Produtos
                   </button>
@@ -2936,9 +2948,9 @@ const EntradaXML = () => {
                     setMostrarVisualizacao(false);
                     setNotaSelecionada(null);
                   }}
-                  className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
                 >
-                  Fechar
+                  Voltar
                 </button>
               </div>
             </div>
@@ -2948,18 +2960,36 @@ const EntradaXML = () => {
 
       {/* Modal de Revisão de Preços */}
       {mostrarRevisaoPrecos && previewProcessamento && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-black/50">
+          <div className="bg-white w-full h-full overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="bg-slate-900 text-white p-6">
-              <h2 className="text-2xl font-bold">Revisao de Precos e Custos</h2>
-              <p className="text-slate-300 mt-1">
-                NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
-              </p>
+            <div className="bg-slate-900 text-white p-4 md:p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      setMostrarRevisaoPrecos(false);
+                      setPreviewProcessamento(null);
+                      if (notaSelecionada) {
+                        setMostrarVisualizacao(true);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/20 text-sm font-semibold transition-colors"
+                  >
+                    ← Voltar
+                  </button>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-bold">Revisao de Precos e Custos</h2>
+                    <p className="text-slate-300 mt-1 text-sm">
+                      NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Resumo de Alterações */}
-            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
+            <div className="px-4 md:px-6 py-3 bg-gray-50 border-b border-gray-200">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-semibold text-gray-700">Filtrar:</span>
                 {(() => {
@@ -3056,7 +3086,7 @@ const EntradaXML = () => {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
               <div className="space-y-6">
                 {previewProcessamento.itens
                   .filter(item => {
@@ -3231,15 +3261,18 @@ const EntradaXML = () => {
             </div>
 
             {/* Footer */}
-            <div className="border-t border-gray-200 p-6 bg-gray-50 flex justify-between items-center">
+            <div className="border-t border-gray-200 p-4 md:p-6 bg-gray-50 flex flex-wrap justify-between items-center gap-3">
               <button
                 onClick={() => {
                   setMostrarRevisaoPrecos(false);
                   setPreviewProcessamento(null);
+                  if (notaSelecionada) {
+                    setMostrarVisualizacao(true);
+                  }
                 }}
-                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
               >
-                Cancelar
+                Voltar
               </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">

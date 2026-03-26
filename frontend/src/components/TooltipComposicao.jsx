@@ -45,7 +45,7 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
       {/* Tooltip */}
       {mostrando && (
         <div
-          className="fixed z-50 w-80 bg-white rounded-xl shadow-2xl border border-slate-200 p-4"
+          className="fixed z-[70] w-80 bg-white rounded-xl shadow-2xl border border-slate-200 p-4"
           style={{
             top: '50%',
             left: '50%',
@@ -119,7 +119,7 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
       {/* Backdrop para fechar ao clicar fora */}
       {mostrando && (
         <div
-          className="fixed inset-0 z-40"
+          className="fixed inset-0 z-[60]"
           onClick={() => setMostrando(false)}
         />
       )}
