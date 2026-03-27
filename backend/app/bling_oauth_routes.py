@@ -6,6 +6,7 @@ import base64
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 import requests
 from fastapi import APIRouter, Request
@@ -160,6 +161,7 @@ async def gerar_link_autorizacao(request: Request):
         f"https://www.bling.com.br/Api/v3/oauth/authorize"
         f"?response_type=code"
         f"&client_id={client_id}"
+        f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&state={state}"
     )
 

@@ -71,25 +71,46 @@ async def testar_conexao(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Testa a conexão com a API do Bling
+    Testa a conexão com a API do Bling e retorna status + info de renovação
     """
+    from datetime import datetime
+    from pathlib import Path
+    import json
+    
     try:
+        # Tentar conectar
         bling = BlingAPI()
-        # Tentar listar naturezas como teste
         resultado = bling.listar_naturezas_operacoes()
         
+        # Carregar info de controle de token
+        token_control_file = Path("bling_token_control.json")
+        token_info = {
+            "ultima_renovacao": None,
+            "proxima_renovacao": None,
+            "renovacoes_automaticas": 0
+        }
+        
+        if token_control_file.exists():
+            with open(token_control_file, 'r') as f:
+                token_info = json.load(f)
+        
         return {
-            "success": True,
-            "message": "Conexão com Bling OK!",
-            "naturezas_encontradas": len(resultado.get('data', []))
+            "conectado": True,
+            "message": "✅ Conexão com Bling OK!",
+            "total_produtos_bling": resultado.get('data', []) and len(resultado.get('data', [])) or 0,
+            "ultima_renovacao": token_info.get('ultima_renovacao'),
+            "proxima_renovacao": token_info.get('proxima_renovacao'),
+            "renovacoes_automaticas": token_info.get('renovacoes_automaticas', 0),
+            "temp_acesso_horas": 6
         }
     except Exception as e:
         # Verificar se é erro de token expirado
-        if "401" in str(e) or "Unauthorized" in str(e):
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg or "invalid_token" in error_msg:
             return {
-                "success": False,
-                "error": "Token expirado",
-                "message": "Use o endpoint POST /bling/renovar-token para renovar",
-                "detail": str(e)
+                "conectado": False,
+                "message": "❌ Token expirado",
+                "error": "Token expirado ou inválido",
+                "detail": "Use o botão 'Renovar Token' para reconectar"
             }
-        raise HTTPException(status_code=500, detail=f"Erro na conexão: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro na conexão: {error_msg}")
