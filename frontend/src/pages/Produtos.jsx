@@ -19,6 +19,7 @@ import {
   formatarMoeda,
   getCategorias,
   getMarcas,
+  getProdutoVariacoes,
   getProdutos,
   toggleProdutoAtivo,
 } from "../api/produtos";
@@ -800,6 +801,17 @@ export default function Produtos() {
   });
   const [departamentos, setDepartamentos] = useState([]);
 
+  // Modal de resolucao rapida para conflitos de exclusao (409)
+  const [modalConflitoExclusao, setModalConflitoExclusao] = useState(false);
+  const [bloqueiosExclusao, setBloqueiosExclusao] = useState([]);
+  const [variacoesSelecionadasConflito, setVariacoesSelecionadasConflito] =
+    useState([]);
+  const [resolvendoConflitoExclusao, setResolvendoConflitoExclusao] =
+    useState(false);
+  const [autoSelecionarConflito, setAutoSelecionarConflito] = useState(true);
+  const [pularConfirmacaoConflito, setPularConfirmacaoConflito] =
+    useState(false);
+
   // Modal de importação
   const [modalImportacao, setModalImportacao] = useState(false);
 
@@ -1121,16 +1133,198 @@ export default function Produtos() {
     }
   };
 
+  const obterNomeProduto = (id) => {
+    const produto = produtosBrutos.find((item) => item.id === id);
+    return produto?.nome || `Produto #${id}`;
+  };
+
+  const extrairErroExclusao = (error) => {
+    const statusCode = error?.response?.status;
+    const detalheServidor = error?.response?.data?.detail;
+
+    if (statusCode === 409) {
+      return {
+        statusCode,
+        mensagem:
+          detalheServidor ||
+          "Nao foi possivel excluir porque este produto possui vinculos ativos.",
+      };
+    }
+
+    if (statusCode === 404) {
+      return {
+        statusCode,
+        mensagem: "Produto nao encontrado. Atualize a tela e tente novamente.",
+      };
+    }
+
+    return {
+      statusCode,
+      mensagem:
+        detalheServidor ||
+        "Erro ao excluir produto. Tente novamente em instantes.",
+    };
+  };
+
+  const abrirModalConflitoExclusao = async (falhas) => {
+    const falhasConflito = falhas.filter((falha) => falha.statusCode === 409);
+
+    if (falhasConflito.length === 0) {
+      return false;
+    }
+
+    const paisComConflito = [...new Set(falhasConflito.map((falha) => falha.id))];
+    const bloqueios = [];
+
+    for (const parentId of paisComConflito) {
+      const falhaPai = falhasConflito.find((falha) => falha.id === parentId);
+      let variacoes = [];
+
+      try {
+        const response = await getProdutoVariacoes(parentId);
+        variacoes = (response?.data || []).filter((item) => item.ativo !== false);
+      } catch (error) {
+        console.error(
+          `Erro ao buscar variacoes do produto ${parentId} para resolver conflito:`,
+          error,
+        );
+      }
+
+      bloqueios.push({
+        parentId,
+        parentNome: obterNomeProduto(parentId),
+        mensagem: falhaPai?.mensagem || "Produto com bloqueio para exclusao.",
+        variacoes,
+      });
+    }
+
+    setBloqueiosExclusao(bloqueios);
+    const todasVariacoes = bloqueios.flatMap((bloqueio) =>
+      bloqueio.variacoes.map((variacao) => variacao.id),
+    );
+    setVariacoesSelecionadasConflito(autoSelecionarConflito ? todasVariacoes : []);
+    setModalConflitoExclusao(true);
+    return true;
+  };
+
+  const handleSelecionarVariacaoConflito = (variacaoId, checked) => {
+    setVariacoesSelecionadasConflito((prev) => {
+      if (checked) {
+        if (prev.includes(variacaoId)) return prev;
+        return [...prev, variacaoId];
+      }
+
+      return prev.filter((id) => id !== variacaoId);
+    });
+  };
+
+  const handleSelecionarTodasVariacoesDoPai = (parentId, checked) => {
+    const idsDoPai = (bloqueiosExclusao.find((item) => item.parentId === parentId)
+      ?.variacoes || []
+    ).map((variacao) => variacao.id);
+
+    setVariacoesSelecionadasConflito((prev) => {
+      if (checked) {
+        const conjunto = new Set([...prev, ...idsDoPai]);
+        return Array.from(conjunto);
+      }
+
+      return prev.filter((id) => !idsDoPai.includes(id));
+    });
+  };
+
+  const handleResolverConflitosExclusao = async () => {
+    if (bloqueiosExclusao.length === 0) {
+      setModalConflitoExclusao(false);
+      return;
+    }
+
+    if (!pularConfirmacaoConflito) {
+      const confirma = confirm(
+        "Confirmar resolucao rapida? O sistema vai desativar as variacoes selecionadas e tentar excluir os produtos pai.",
+      );
+      if (!confirma) return;
+    }
+
+    setResolvendoConflitoExclusao(true);
+
+    const paisExcluidos = [];
+    const paisComFalha = [];
+
+    for (const bloqueio of bloqueiosExclusao) {
+      const variacoesSelecionadas = bloqueio.variacoes.filter((variacao) =>
+        variacoesSelecionadasConflito.includes(variacao.id),
+      );
+
+      const resultadosVariacoes = await Promise.allSettled(
+        variacoesSelecionadas.map((variacao) => deleteProduto(variacao.id)),
+      );
+
+      const falhasVariacao = resultadosVariacoes
+        .filter((resultado) => resultado.status === "rejected")
+        .map((resultado) => extrairErroExclusao(resultado.reason));
+
+      try {
+        await deleteProduto(bloqueio.parentId);
+        paisExcluidos.push(bloqueio);
+      } catch (error) {
+        const erroPai = extrairErroExclusao(error);
+        paisComFalha.push({
+          ...bloqueio,
+          mensagem:
+            falhasVariacao[0]?.mensagem || erroPai.mensagem || bloqueio.mensagem,
+        });
+      }
+    }
+
+    setResolvendoConflitoExclusao(false);
+    setModalConflitoExclusao(false);
+
+    if (paisExcluidos.length > 0) {
+      toast.success(
+        `${paisExcluidos.length} produto(s) pai excluido(s) apos resolver variacoes.`,
+      );
+    }
+
+    if (paisComFalha.length > 0) {
+      const detalhes = paisComFalha
+        .slice(0, 3)
+        .map((item) => `${item.parentNome}: ${item.mensagem}`)
+        .join("\n");
+      const sufixo =
+        paisComFalha.length > 3 ? "\n...e outros produtos continuam bloqueados." : "";
+
+      alert(
+        `Ainda nao foi possivel excluir ${paisComFalha.length} produto(s):\n\n${detalhes}${sufixo}`,
+      );
+      setSelecionados(paisComFalha.map((item) => item.parentId));
+    } else {
+      setSelecionados([]);
+    }
+
+    setBloqueiosExclusao([]);
+    await carregarDados();
+  };
+
   const handleExcluir = async (id) => {
     if (!confirm("Deseja realmente excluir este produto?")) return;
 
     try {
       await deleteProduto(id);
-      alert("Produto excluído com sucesso!");
+      toast.success("Produto excluido com sucesso!");
       carregarDados();
     } catch (error) {
       console.error("Erro ao excluir produto:", error);
-      alert("Erro ao excluir produto");
+      const erro = extrairErroExclusao(error);
+
+      if (erro.statusCode === 409) {
+        const abriuModal = await abrirModalConflitoExclusao([{ id, ...erro }]);
+        if (abriuModal) {
+          return;
+        }
+      }
+
+      alert(erro.mensagem);
     }
   };
 
@@ -1138,15 +1332,55 @@ export default function Produtos() {
     if (!confirm(`Deseja realmente excluir ${selecionados.length} produtos?`))
       return;
 
-    try {
-      await Promise.all(selecionados.map((id) => deleteProduto(id)));
-      alert("Produtos excluídos com sucesso!");
-      setSelecionados([]);
+    const resultados = await Promise.allSettled(
+      selecionados.map((id) => deleteProduto(id)),
+    );
+
+    const idsExcluidos = [];
+    const falhas = [];
+
+    resultados.forEach((resultado, index) => {
+      const id = selecionados[index];
+
+      if (resultado.status === "fulfilled") {
+        idsExcluidos.push(id);
+        return;
+      }
+
+      const erro = extrairErroExclusao(resultado.reason);
+      falhas.push({ id, ...erro });
+      console.error(`Erro ao excluir produto ${id}:`, resultado.reason);
+    });
+
+    if (idsExcluidos.length > 0) {
+      toast.success(
+        `${idsExcluidos.length} produto(s) excluido(s) com sucesso!`,
+      );
       carregarDados();
-    } catch (error) {
-      console.error("Erro ao excluir produtos:", error);
-      alert("Erro ao excluir produtos");
     }
+
+    if (falhas.length > 0) {
+      const abriuModal = await abrirModalConflitoExclusao(falhas);
+      if (abriuModal) {
+        setSelecionados(falhas.map((falha) => falha.id));
+        return;
+      }
+
+      const mensagens = falhas.slice(0, 3).map((falha) => {
+        return `ID ${falha.id}: ${falha.mensagem}`;
+      });
+      const sufixo =
+        falhas.length > 3 ? "\n...e outros produtos com erro." : "";
+
+      alert(
+        `Nao foi possivel excluir ${falhas.length} produto(s):\n\n${mensagens.join("\n")}${sufixo}`,
+      );
+
+      setSelecionados(falhas.map((falha) => falha.id));
+      return;
+    }
+
+    setSelecionados([]);
   };
 
   const copiarTexto = (texto, tipo) => {
@@ -2177,6 +2411,182 @@ export default function Produtos() {
           </div>
         )}
       </div>
+
+      {/* Modal de resolucao rapida para conflitos de exclusao */}
+      {modalConflitoExclusao && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Produtos com bloqueio para exclusao
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Selecione as variacoes que deseja desativar agora para o sistema tentar excluir os produtos pai automaticamente.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (resolvendoConflitoExclusao) return;
+                  setModalConflitoExclusao(false);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="border border-blue-100 bg-blue-50 rounded-lg p-3">
+                <label className="flex items-center gap-2 text-sm text-blue-900">
+                  <input
+                    type="checkbox"
+                    checked={autoSelecionarConflito}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setAutoSelecionarConflito(checked);
+
+                      if (checked) {
+                        setVariacoesSelecionadasConflito(
+                          bloqueiosExclusao.flatMap((bloqueio) =>
+                            bloqueio.variacoes.map((variacao) => variacao.id),
+                          ),
+                        );
+                      }
+                    }}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  Selecionar tudo automaticamente
+                </label>
+                <label className="flex items-center gap-2 text-sm text-blue-900 mt-2">
+                  <input
+                    type="checkbox"
+                    checked={pularConfirmacaoConflito}
+                    onChange={(e) => setPularConfirmacaoConflito(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  Nao pedir confirmacao de novo nesta sessao
+                </label>
+              </div>
+
+              {bloqueiosExclusao.map((bloqueio) => {
+                const idsDoPai = bloqueio.variacoes.map((item) => item.id);
+                const qtdSelecionada = idsDoPai.filter((id) =>
+                  variacoesSelecionadasConflito.includes(id),
+                ).length;
+
+                return (
+                  <div
+                    key={bloqueio.parentId}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {bloqueio.parentNome}
+                        </h3>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {bloqueio.mensagem}
+                        </p>
+                      </div>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        {qtdSelecionada}/{bloqueio.variacoes.length} selecionadas
+                      </span>
+                    </div>
+
+                    {bloqueio.variacoes.length > 0 ? (
+                      <>
+                        <label className="inline-flex items-center gap-2 text-sm text-gray-700 mb-3">
+                          <input
+                            type="checkbox"
+                            checked={
+                              idsDoPai.length > 0 && qtdSelecionada === idsDoPai.length
+                            }
+                            onChange={(e) =>
+                              handleSelecionarTodasVariacoesDoPai(
+                                bloqueio.parentId,
+                                e.target.checked,
+                              )
+                            }
+                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                          />
+                          Selecionar todas variacoes deste produto
+                        </label>
+
+                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                          {bloqueio.variacoes.map((variacao) => (
+                            <label
+                              key={variacao.id}
+                              className="flex items-center justify-between gap-3 border border-gray-100 rounded px-3 py-2 hover:bg-gray-50"
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={variacoesSelecionadasConflito.includes(
+                                    variacao.id,
+                                  )}
+                                  onChange={(e) =>
+                                    handleSelecionarVariacaoConflito(
+                                      variacao.id,
+                                      e.target.checked,
+                                    )
+                                  }
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                />
+                                <span className="text-sm text-gray-800">
+                                  {variacao.nome || `Variacao #${variacao.id}`}
+                                </span>
+                              </div>
+                              <span className="text-xs text-gray-500 font-mono">
+                                {variacao.codigo || variacao.sku || `ID ${variacao.id}`}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                        Nao foi possivel listar variacoes automaticamente para este item. Tente atualizar a tela e repetir.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setModalConflitoExclusao(false)}
+                disabled={resolvendoConflitoExclusao}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResolverConflitosExclusao}
+                disabled={resolvendoConflitoExclusao}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+              >
+                {resolvendoConflitoExclusao
+                  ? "Aplicando resolucao..."
+                  : "Resolver rapido e excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Edição em Lote */}
       {modalEdicaoLote && (
