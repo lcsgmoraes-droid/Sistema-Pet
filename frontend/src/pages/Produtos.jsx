@@ -903,9 +903,7 @@ export default function Produtos() {
 
     // No modo padrão, mostrar apenas produtos normais (sem PAI e sem VARIAÇÃO).
     if (!filtros.mostrarPaisVariacoes) {
-      return produtosTemp.filter(
-        (p) => p.tipo_produto !== "PAI" && p.tipo_produto !== "VARIACAO",
-      );
+      return produtosTemp.filter((p) => (p.tipo_produto || "SIMPLES") === "SIMPLES");
     }
 
     // Com "Mostrar Pais e Variações" ativo, exibe as variações

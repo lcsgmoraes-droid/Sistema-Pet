@@ -1685,7 +1685,8 @@ def listar_produtos(
         if include_variations and termo_busca:
             tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO']
         else:
-            tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES', 'KIT']
+            # Checkbox desmarcado: mostrar apenas produtos simples.
+            tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES']
 
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
