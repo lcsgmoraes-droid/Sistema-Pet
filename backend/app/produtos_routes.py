@@ -1698,6 +1698,13 @@ def listar_produtos(
     # FILTROS OPCIONAIS
     termo_busca = (busca or "").strip()
 
+    # Se ha termo de busca, VARIACAO também deve aparecer mesmo sem include_variations
+    # Isso permite buscar por SKU de variacao diretamente
+    if termo_busca and not include_variations and not tipo_produto and not produto_predecessor_id:
+        query = query.filter(
+            (Produto.tipo_produto.in_(['SIMPLES', 'PAI', 'KIT', 'VARIACAO']))
+        )
+
     if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
@@ -1801,26 +1808,36 @@ def listar_produtos(
             ).scalar()
             produto.total_variacoes = total_variacoes or 0
 
-        # Se for KIT, processar composiÃ§Ã£o e estoque
+        # Se for KIT, processar composição e estoque
         if produto.tipo_produto == 'KIT':
             try:
-                # âš ï¸ TEMPORÃRIO: Desabilitado para evitar timeout
-                # Carregar composiÃ§Ã£o do KIT
-                # composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
-                produto.composicao_kit = []
+                from app.services.kit_estoque_service import KitEstoqueService
+                
+                # Carregar composição do KIT
+                composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
+                # Formatar para o esperado pelo frontend
+                produto.composicao_kit = [
+                    {
+                        'quantidade': comp['quantidade'],
+                        'produto_nome': comp['produto_nome'],
+                        'produto_id': comp['produto_id'],
+                        'produto_estoque': comp['estoque_componente'],
+                        'componente_id': comp['id'],
+                    }
+                    for comp in composicao
+                ]
 
                 # Calcular estoque virtual (apenas para KIT VIRTUAL)
                 if produto.tipo_kit == 'VIRTUAL':
-                    # estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id)
-                    # produto.estoque_virtual = estoque_virtual
-                    produto.estoque_virtual = 0  # TemporÃ¡rio
+                    estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id)
+                    produto.estoque_virtual = estoque_virtual
                 else:
-                    # KIT FÃSICO usa estoque prÃ³prio
+                    # KIT FÍSICO usa estoque próprio
                     produto.estoque_virtual = int(produto.estoque_atual or 0)
             except Exception as e:
                 logger.warning(f"Erro ao processar kit {produto.id}: {e}")
                 produto.composicao_kit = []
-                produto.estoque_virtual = 0
+                produto.estoque_virtual = int(produto.estoque_atual or 0)
 
         produto.estoque_reservado = float(reservas_v2.get(produto.codigo, 0))
         # Marcar produto como de parceiro se pertencer a outro tenant
