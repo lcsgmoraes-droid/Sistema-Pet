@@ -64,16 +64,34 @@ export default function BlingIntegracao() {
     setRenovando(true);
     try {
       const resp = await api.post("/bling/renovar-token");
-      
       mostrarMensagem(
         "sucesso",
         `✅ Token renovado! Válido por ${resp.data.expires_in_hours?.toFixed(1) || 6} horas.`
       );
-      
-      // Recarrega status
       setTimeout(() => carregarStatus(), 1000);
     } catch (e) {
-      const erro = e.response?.data?.detail || e.message || "Erro ao renovar token";
+      // Se o refresh token expirou, redireciona para autorização OAuth
+      const detail = e.response?.data?.detail || "";
+      const isInvalidGrant =
+        detail.includes("invalid_grant") ||
+        detail.includes("Invalid refresh token") ||
+        e.response?.status === 400;
+
+      if (isInvalidGrant) {
+        mostrarMensagem("info", "⏳ Abrindo autorização no Bling...");
+        try {
+          const linkResp = await api.get("/auth/bling/link-autorizacao");
+          const url = linkResp.data?.url_autorizacao || linkResp.data?.url || linkResp.data?.link;
+          if (url) {
+            window.location.href = url;
+            return;
+          }
+        } catch {
+          // fallback abaixo
+        }
+      }
+
+      const erro = detail || e.message || "Erro ao renovar token";
       mostrarMensagem("erro", `❌ ${erro}`);
     } finally {
       setRenovando(false);
