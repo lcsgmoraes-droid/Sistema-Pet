@@ -899,6 +899,7 @@ export default function Produtos() {
   // Busca/categoria/marca/fornecedor/estoque/promoção agora são filtrados no backend.
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
+    const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
 
     // No modo padrão, mostrar apenas produtos normais (sem PAI e sem VARIAÇÃO).
     if (!filtros.mostrarPaisVariacoes) {
@@ -914,11 +915,24 @@ export default function Produtos() {
         return true;
       }
 
+      // Se há busca ativa, mostrar a variação diretamente quando ela própria
+      // corresponder ao termo, sem exigir expansão do PAI.
+      if (buscaNormalizada) {
+        const codigo = normalizeSearchText(p.codigo || p.sku || "");
+        const nome = normalizeSearchText(p.nome || "");
+        return codigo.includes(buscaNormalizada) || nome.includes(buscaNormalizada);
+      }
+
       return paisExpandidos.includes(p.produto_pai_id);
     });
 
     return produtosTemp;
-  }, [produtosBrutos, filtros.mostrarPaisVariacoes, paisExpandidos]);
+  }, [
+    produtosBrutos,
+    filtros.busca,
+    filtros.mostrarPaisVariacoes,
+    paisExpandidos,
+  ]);
 
   const produtosPaginados = produtosFiltrados;
   const totalPaginas = Math.max(totalPaginasServidor, 1);

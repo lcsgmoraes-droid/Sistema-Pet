@@ -1661,6 +1661,7 @@ def listar_produtos(
     - Produtos VARIACAO aparecem apenas dentro do grupo do PAI
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    termo_busca = (busca or "").strip()
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
@@ -1679,7 +1680,13 @@ def listar_produtos(
             Produto.tipo_produto == tipo_produto
         )
     else:
-        tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO'] if include_variations else ['SIMPLES', 'KIT']
+        # Quando houver busca com include_variations, incluir VARIACAO para permitir
+        # pesquisa direta por SKU/nome da variação.
+        if include_variations and termo_busca:
+            tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO']
+        else:
+            tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES', 'KIT']
+
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
             Produto.tipo_produto.in_(tipos_base)
@@ -1696,7 +1703,6 @@ def listar_produtos(
             query = query.filter(Produto.ativo.is_(False))
 
     # FILTROS OPCIONAIS
-    termo_busca = (busca or "").strip()
 
     if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
@@ -1844,7 +1850,7 @@ def listar_produtos(
 
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
         # apenas quando a tela pedir explicitamente include_variations.
-        if include_variations and produto.tipo_produto == 'PAI':
+        if include_variations and not termo_busca and produto.tipo_produto == 'PAI':
             variacoes = db.query(Produto).filter(
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
