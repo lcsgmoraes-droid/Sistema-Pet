@@ -35,6 +35,18 @@ const normalizeSearchText = (value) => {
     .replaceAll(/[\u0300-\u036f]/g, "");
 };
 
+const corrigirTextoQuebrado = (value) => {
+  if (value === null || value === undefined) return "";
+
+  const texto = String(value);
+  try {
+    // Corrige texto UTF-8 exibido como Latin-1 (ex.: "variaÃ§Ãµes" -> "variações").
+    return decodeURIComponent(escape(texto));
+  } catch {
+    return texto;
+  }
+};
+
 const getProdutoSearchRank = (produto, buscaNormalizada) => {
   const termo = normalizeSearchText(buscaNormalizada).trim();
   if (!termo) return 999;
@@ -1135,12 +1147,12 @@ export default function Produtos() {
 
   const obterNomeProduto = (id) => {
     const produto = produtosBrutos.find((item) => item.id === id);
-    return produto?.nome || `Produto #${id}`;
+    return corrigirTextoQuebrado(produto?.nome || `Produto #${id}`);
   };
 
   const extrairErroExclusao = (error) => {
     const statusCode = error?.response?.status;
-    const detalheServidor = error?.response?.data?.detail;
+    const detalheServidor = corrigirTextoQuebrado(error?.response?.data?.detail);
 
     if (statusCode === 409) {
       return {
@@ -1193,7 +1205,9 @@ export default function Produtos() {
       bloqueios.push({
         parentId,
         parentNome: obterNomeProduto(parentId),
-        mensagem: falhaPai?.mensagem || "Produto com bloqueio para exclusao.",
+        mensagem: corrigirTextoQuebrado(
+          falhaPai?.mensagem || "Produto com bloqueio para exclusao.",
+        ),
         variacoes,
       });
     }
@@ -2495,10 +2509,10 @@ export default function Produtos() {
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <div>
                         <h3 className="font-semibold text-gray-900">
-                          {bloqueio.parentNome}
+                          {corrigirTextoQuebrado(bloqueio.parentNome)}
                         </h3>
                         <p className="text-xs text-gray-600 mt-1">
-                          {bloqueio.mensagem}
+                          {corrigirTextoQuebrado(bloqueio.mensagem)}
                         </p>
                       </div>
                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
@@ -2546,7 +2560,9 @@ export default function Produtos() {
                                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-800">
-                                  {variacao.nome || `Variacao #${variacao.id}`}
+                                  {corrigirTextoQuebrado(
+                                    variacao.nome || `Variacao #${variacao.id}`,
+                                  )}
                                 </span>
                               </div>
                               <span className="text-xs text-gray-500 font-mono">
