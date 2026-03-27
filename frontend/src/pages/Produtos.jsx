@@ -38,13 +38,51 @@ const normalizeSearchText = (value) => {
 const corrigirTextoQuebrado = (value) => {
   if (value === null || value === undefined) return "";
 
-  const texto = String(value);
-  try {
-    // Corrige texto UTF-8 exibido como Latin-1 (ex.: "variaÃ§Ãµes" -> "variações").
-    return decodeURIComponent(escape(texto));
-  } catch {
-    return texto;
+  const textoOriginal = String(value);
+  const scoreQuebrado = (texto) => (texto.match(/[ÃÂâ�]/g) || []).length;
+
+  const tentarTextDecoderUtf8 = (texto) => {
+    try {
+      const bytes = Uint8Array.from(
+        texto,
+        (char) => (char.codePointAt(0) ?? 0) & 0xff,
+      );
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch {
+      return texto;
+    }
+  };
+
+  const candidatos = [
+    textoOriginal,
+    tentarTextDecoderUtf8(textoOriginal),
+    tentarTextDecoderUtf8(tentarTextDecoderUtf8(textoOriginal)),
+  ];
+
+  let melhor = candidatos[0];
+  let melhorScore = scoreQuebrado(melhor);
+
+  for (const candidato of candidatos) {
+    const score = scoreQuebrado(candidato);
+    if (score < melhorScore) {
+      melhor = candidato;
+      melhorScore = score;
+    }
   }
+
+  return melhor
+    .replaceAll("âŒ", "❌")
+    .replaceAll("Ã§", "ç")
+    .replaceAll("Ã£", "ã")
+    .replaceAll("Ãµ", "õ")
+    .replaceAll("Ã¡", "á")
+    .replaceAll("Ã©", "é")
+    .replaceAll("Ãª", "ê")
+    .replaceAll("Ã­", "í")
+    .replaceAll("Ã³", "ó")
+    .replaceAll("Ãº", "ú")
+    .replaceAll("â€“", "-")
+    .replaceAll("Â", "");
 };
 
 const getProdutoSearchRank = (produto, buscaNormalizada) => {
