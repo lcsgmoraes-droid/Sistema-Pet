@@ -1808,14 +1808,19 @@ def listar_produtos(
                 
                 # Carregar composição do KIT
                 composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
-                # Formatar para o esperado pelo frontend
+                # Formatar para o esperado pelo frontend (todos os campos do KitComponenteResponse)
                 produto.composicao_kit = [
                     {
-                        'quantidade': comp['quantidade'],
-                        'produto_nome': comp['produto_nome'],
+                        'id': comp['id'],
                         'produto_id': comp['produto_id'],
-                        'produto_estoque': comp['estoque_componente'],
-                        'componente_id': comp['id'],
+                        'produto_nome': comp['produto_nome'],
+                        'produto_sku': comp['produto_sku'],
+                        'produto_tipo': comp['produto_tipo'],
+                        'quantidade': comp['quantidade'],
+                        'estoque_componente': comp['estoque_componente'],
+                        'kits_possiveis': comp['kits_possiveis'],
+                        'ordem': comp['ordem'],
+                        'opcional': comp['opcional'],
                     }
                     for comp in composicao
                 ]
