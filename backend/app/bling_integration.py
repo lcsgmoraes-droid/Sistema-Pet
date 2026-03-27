@@ -13,7 +13,7 @@ from pathlib import Path
 from app.utils.logger import logger
 
 # Configurações da API Bling
-BLING_API_BASE_URL = "https://www.bling.com.br/Api/v3"
+BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
 
 # Arquivo para controle de expiração do token
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
@@ -75,7 +75,7 @@ class BlingAPI:
             control_data = {
                 'ultima_renovacao': agora.isoformat(),
                 'proxima_renovacao': proxima_renovacao.isoformat(),
-                'renovacoes_automaticas': control_data.get('renovacoes_automaticas', 0) + 1 if TOKEN_CONTROL_FILE.exists() else 1
+                'renovacoes_automaticas': 1
             }
             
             # Ler dados existentes se houver

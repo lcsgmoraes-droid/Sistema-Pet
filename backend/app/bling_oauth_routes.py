@@ -185,8 +185,8 @@ async def status_token():
     # Testar token fazendo uma chamada simples
     try:
         r = requests.get(
-            "https://www.bling.com.br/Api/v3/situacoes/modulos",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+            "https://api.bling.com.br/Api/v3/situacoes/modulos",
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json", "enable-jwt": "1"},
             timeout=10,
         )
         if r.status_code == 200:
