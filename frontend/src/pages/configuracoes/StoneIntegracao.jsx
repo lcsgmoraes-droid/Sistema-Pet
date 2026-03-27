@@ -171,9 +171,30 @@ export default function StoneIntegracao() {
       mostrarMensagem("sucesso", "Token do Bling renovado com sucesso.");
       await testarConexaoBling();
     } catch (e) {
+      // Se o refresh token expirou, redireciona para autorização OAuth
+      const detail = e.response?.data?.detail || "";
+      const isInvalidGrant =
+        detail.includes("invalid_grant") ||
+        detail.includes("Invalid refresh token") ||
+        e.response?.status === 400;
+
+      if (isInvalidGrant) {
+        mostrarMensagem("info", "Abrindo autorização no Bling...");
+        try {
+          const linkResp = await api.get("/auth/bling/link-autorizacao");
+          const url = linkResp.data?.url_autorizacao || linkResp.data?.url;
+          if (url) {
+            window.location.href = url;
+            return;
+          }
+        } catch {
+          // fallback abaixo
+        }
+      }
+
       mostrarMensagem(
         "erro",
-        e.response?.data?.detail || "Não foi possível renovar o token do Bling.",
+        detail || "Não foi possível renovar o token do Bling.",
       );
     } finally {
       setRenovandoBling(false);
