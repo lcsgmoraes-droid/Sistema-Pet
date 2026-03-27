@@ -975,6 +975,7 @@ export default function Produtos() {
     filtros.fornecedor_id,
     filtros.estoque_baixo,
     filtros.em_promocao,
+    filtros.mostrarPaisVariacoes,
   ]);
 
   // Persistência opcional da busca para que cada usuário escolha seu comportamento.
