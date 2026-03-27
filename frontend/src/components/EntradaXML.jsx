@@ -46,6 +46,72 @@ function obterCustoAquisicaoItem(item) {
   );
 }
 
+function aplicarOverridesPackNoPreview(preview, multiplicadoresOverride = {}) {
+  if (!preview || !Array.isArray(preview.itens)) {
+    return preview;
+  }
+
+  const itensAjustados = preview.itens.map((item) => {
+    const overrideRaw = multiplicadoresOverride[item.item_id] ?? multiplicadoresOverride[String(item.item_id)];
+    const override = Number.parseInt(overrideRaw, 10);
+    const multiplicador = Number.isInteger(override) && override > 1 ? override : (item.pack_multiplicador_detectado || 1);
+
+    if (multiplicador <= 1) {
+      return {
+        ...item,
+        pack_multiplicador_usado: item.pack_multiplicador_detectado || 1,
+      };
+    }
+
+    const quantidadeNF = Number(item.quantidade_nf ?? item.quantidade ?? 0);
+    const quantidadeEfetiva = quantidadeNF * multiplicador;
+    const custoTotal = Number(
+      item.custo_aquisicao_total_nf ??
+      item.composicao_custo?.custo_aquisicao_total ??
+      item.valor_total_nf ??
+      item.valor_total ??
+      0,
+    );
+
+    const custoUnitarioEfetivo = quantidadeEfetiva > 0
+      ? (custoTotal / quantidadeEfetiva)
+      : Number(item.custo_aquisicao_unitario_nf ?? item.custo_unitario_efetivo_nf ?? 0);
+
+    let produtoVinculadoAjustado = item.produto_vinculado;
+    if (item.produto_vinculado) {
+      const custoAnterior = Number(item.produto_vinculado.custo_anterior || 0);
+      const variacaoCusto = custoAnterior > 0
+        ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100
+        : 0;
+      const precoVendaAtual = Number(item.produto_vinculado.preco_venda_atual || 0);
+      const margemAtual = precoVendaAtual > 0
+        ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100
+        : 0;
+
+      produtoVinculadoAjustado = {
+        ...item.produto_vinculado,
+        custo_novo: custoUnitarioEfetivo,
+        variacao_custo_percentual: Number(variacaoCusto.toFixed(2)),
+        margem_atual: Number(margemAtual.toFixed(2)),
+      };
+    }
+
+    return {
+      ...item,
+      pack_multiplicador_usado: multiplicador,
+      quantidade_efetiva_nf: quantidadeEfetiva,
+      custo_unitario_efetivo_nf: custoUnitarioEfetivo,
+      custo_aquisicao_unitario_nf: custoUnitarioEfetivo,
+      produto_vinculado: produtoVinculadoAjustado,
+    };
+  });
+
+  return {
+    ...preview,
+    itens: itensAjustados,
+  };
+}
+
 const EntradaXML = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -538,8 +604,10 @@ const EntradaXML = () => {
       const response = await api.get(
         `/notas-entrada/${notaId}/preview-processamento`
       );
-      
-      setPreviewProcessamento(response.data);
+
+      const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
+
+      setPreviewProcessamento(previewComOverrides);
       setMostrarRevisaoPrecos(true);
       
                       // FECHAR o modal de detalhes quando abrir o de revisão
@@ -547,7 +615,7 @@ const EntradaXML = () => {
       
       // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
       const precosIniciais = {};
-      response.data.itens.forEach(item => {
+      previewComOverrides.itens.forEach(item => {
         if (item.produto_vinculado) {
           precosIniciais[item.produto_vinculado.produto_id] = {
             preco_venda: item.produto_vinculado.preco_venda_atual,
@@ -1041,13 +1109,27 @@ const EntradaXML = () => {
         .toLowerCase();
 
     const normalizarPesoToken = (pesoToken) => {
-      const match = String(pesoToken || '').match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l|un|und|unid)/i);
+      const match = String(pesoToken || '').match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gr|mg|ml|l|un|und|unid)/i);
       if (!match) return null;
       const valor = Number.parseFloat(match[1].replace(',', '.'));
       if (Number.isNaN(valor)) return null;
       const unidade = match[2].toLowerCase();
-      const valorNormalizado = Number.parseFloat(valor.toFixed(3));
-      return `${valorNormalizado}${unidade}`;
+
+      if (['kg', 'g', 'gr', 'mg'].includes(unidade)) {
+        const emGramas = unidade === 'kg'
+          ? valor * 1000
+          : unidade === 'mg'
+            ? valor / 1000
+            : valor;
+        return { grupo: 'massa', valorBase: emGramas, texto: `${valor}${unidade}` };
+      }
+
+      if (['l', 'ml'].includes(unidade)) {
+        const emMl = unidade === 'l' ? valor * 1000 : valor;
+        return { grupo: 'volume', valorBase: emMl, texto: `${valor}${unidade}` };
+      }
+
+      return { grupo: 'unidade', valorBase: valor, texto: `${valor}${unidade}` };
     };
 
     const detectarEspecie = (txt) => {
@@ -1068,8 +1150,15 @@ const EntradaXML = () => {
     if (pesosNF.length > 0 && pesosProd.length > 0) {
       const pesoNF = normalizarPesoToken(pesosNF[0][0]);
       const pesoProd = normalizarPesoToken(pesosProd[0][0]);
-      if (pesoNF !== pesoProd) {
-        divergencias.push(`Peso/Tamanho diferente: NF="${pesoNF}" vs Produto="${pesoProd}"`);
+
+      if (pesoNF && pesoProd) {
+        const mesmaCategoria = pesoNF.grupo === pesoProd.grupo;
+        const tolerancia = pesoNF.grupo === 'unidade' ? 0.01 : 0.5;
+        const diferente = !mesmaCategoria || Math.abs(pesoNF.valorBase - pesoProd.valorBase) > tolerancia;
+
+        if (diferente) {
+          divergencias.push(`Peso/Tamanho diferente: NF="${pesoNF.texto}" vs Produto="${pesoProd.texto}"`);
+        }
       }
     }
     
@@ -3150,7 +3239,7 @@ const EntradaXML = () => {
                               Historico
                             </button>
                             <div className="mt-1 text-sm text-gray-700">
-                              Quantidade <strong>{item.quantidade || item.quantidade_nf || 0}</strong>
+                              Quantidade <strong>{item.quantidade_efetiva_nf || item.quantidade || item.quantidade_nf || 0}</strong>
                             </div>
                           </div>
                         </div>

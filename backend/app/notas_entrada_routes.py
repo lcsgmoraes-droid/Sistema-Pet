@@ -92,8 +92,11 @@ def detectar_multiplicador_pack(descricao: str) -> int:
     texto = str(descricao).upper()
 
     padroes = [
-        re.compile(r'(?<!\d)(\d{1,3})\s*[X]\s*(\d+(?:[\.,]\d+)?)(?:\s*(KG|G|GR|ML|L|MG|UN|UND|PCT|PC|SACHE|SACHES|SACHÊ))?'),
-        re.compile(r'(?<!\d)(\d{1,3})\s*[X]\s*(\d{1,3})(?!\d)')
+        # Ex.: 4x1.8kg | 12*0,5kg | 6×3
+        re.compile(r'(?<!\d)(\d{1,3})\s*[X\*×]\s*(\d+(?:[\.,]\d+)?)(?:\s*(KG|G|GR|ML|L|MG|UN|UND|PCT|PC|SACHE|SACHES|SACHÊ))?'),
+        # Ex.: CX 12 UN | CAIXA C/ 12
+        re.compile(r'\b(?:CX|CAIXA)\s*(?:C\/)?\s*(\d{1,3})\s*(?:UN|UND|UNID)?\b'),
+        re.compile(r'(?<!\d)(\d{1,3})\s*[X\*×]\s*(\d{1,3})(?!\d)')
     ]
 
     for padrao in padroes:

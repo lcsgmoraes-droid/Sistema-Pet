@@ -158,6 +158,8 @@ export default function ProdutosBalanco() {
 
     try {
       const estoqueAtual = Number(produto.estoque_atual || 0);
+      const numeroLote = String(inputs?.[produto.id]?.lote || "").trim();
+      const dataValidade = String(inputs?.[produto.id]?.validade || "").trim();
 
       if (campo === "entrada") {
         await api.post("/estoque/entrada", {
@@ -165,6 +167,8 @@ export default function ProdutosBalanco() {
           quantidade: qtd,
           motivo: "balanco",
           observacao: "Lançamento rápido pela tela de Balanço",
+          numero_lote: numeroLote || undefined,
+          data_validade: dataValidade || undefined,
         });
         atualizarEstoqueLocal(produto.id, estoqueAtual + qtd);
       }
@@ -192,12 +196,19 @@ export default function ProdutosBalanco() {
         }
 
         const endpoint = diferenca > 0 ? "/estoque/entrada" : "/estoque/saida";
-        await api.post(endpoint, {
+        const payload = {
           produto_id: produto.id,
           quantidade: Math.abs(diferenca),
           motivo: "balanco",
           observacao: `Balanço rápido: estoque ajustado para ${qtd}`,
-        });
+        };
+
+        if (diferenca > 0) {
+          payload.numero_lote = numeroLote || undefined;
+          payload.data_validade = dataValidade || undefined;
+        }
+
+        await api.post(endpoint, payload);
 
         atualizarEstoqueLocal(produto.id, qtd);
       }
@@ -271,6 +282,12 @@ export default function ProdutosBalanco() {
             type="text"
             value={filtros.busca}
             onChange={(e) => atualizarFiltro("busca", e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                aplicarFiltrosServidor();
+              }
+            }}
             placeholder="Buscar por nome, código, código de barras..."
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           />
@@ -319,7 +336,7 @@ export default function ProdutosBalanco() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
-        <table className="w-full min-w-[1100px]">
+        <table className="w-full min-w-[1300px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imagem</th>
@@ -330,6 +347,8 @@ export default function ProdutosBalanco() {
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Entrada</th>
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saída</th>
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Balanço</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validade</th>
             </tr>
           </thead>
           <tbody>
@@ -389,13 +408,40 @@ export default function ProdutosBalanco() {
                       />
                     </td>
                   ))}
+
+                  <td className="px-3 py-3">
+                    <input
+                      ref={(el) => {
+                        inputRefs.current[`${produto.id}-lote`] = el;
+                      }}
+                      type="text"
+                      value={inputs?.[produto.id]?.lote ?? ""}
+                      onChange={(e) => atualizarInput(produto.id, "lote", e.target.value)}
+                      placeholder="Ex: LOTE-001"
+                      disabled={Boolean(submetendo[produto.id])}
+                      className="w-40 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                  </td>
+
+                  <td className="px-3 py-3">
+                    <input
+                      ref={(el) => {
+                        inputRefs.current[`${produto.id}-validade`] = el;
+                      }}
+                      type="date"
+                      value={inputs?.[produto.id]?.validade ?? ""}
+                      onChange={(e) => atualizarInput(produto.id, "validade", e.target.value)}
+                      disabled={Boolean(submetendo[produto.id])}
+                      className="w-40 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                  </td>
                 </tr>
               );
             })}
 
             {produtosPaginados.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-sm text-gray-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-sm text-gray-500">
                   Nenhum produto encontrado com os filtros atuais.
                 </td>
               </tr>
