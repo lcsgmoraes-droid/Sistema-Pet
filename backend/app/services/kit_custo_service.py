@@ -1,14 +1,11 @@
 """
-Service de Cálculo de Custo de Produto KIT
+Service de Cálculo de Custo de Produto Composto
 
 Responsabilidades:
-- Calcular custo de KIT VIRTUAL (soma dos componentes)
-- Retornar custo de KIT FÍSICO (custo próprio)
-- Validar estrutura do KIT
-- Não gerar efeitos colaterais (apenas leitura)
-
-Autor: Sistema
-Data: 2026-01-24
+- Calcular custo por soma dos componentes para KIT e VARIACAO-KIT
+- Sincronizar preco_custo persistido de produtos compostos
+- Recalcular produtos compostos afetados quando um componente muda de custo
+- Validar estrutura do produto composto
 """
 
 from decimal import Decimal
@@ -24,31 +21,37 @@ logger = logging.getLogger(__name__)
 
 class KitCustoService:
     """
-    Service para cálculo de custo de produtos KIT
+    Service para cálculo de custo de produtos compostos
     
     Implementa lógica de domínio pura para cálculo de custo,
-    considerando KIT VIRTUAL e KIT FÍSICO.
+    considerando qualquer produto com composição (KIT e VARIACAO-KIT).
     
     ⚠️ IMPORTANTE:
-    - Apenas LEITURA
-    - Não persiste dados
-    - Não gera movimentações
-    - Não altera produtos
+    A regra operacional do sistema é simples:
+    - Se o produto tem composição de kit, o custo vem da soma dos componentes
+    - O valor manual em preco_custo não prevalece sobre a composição
     """
+
+    @staticmethod
+    def produto_usa_custo_por_componentes(produto: Optional[Produto]) -> bool:
+        if not produto:
+            return False
+
+        return produto.tipo_produto in ('KIT', 'VARIACAO') and bool(produto.tipo_kit)
     
     @staticmethod
     def calcular_custo_kit(
         kit_id: int,
         db: Session,
-        user_id: int
+        user_id: Optional[int] = None
     ) -> Decimal:
         """
-        Calcula o custo de um produto KIT
+        Calcula o custo de um produto composto
         
         Args:
-            kit_id: ID do produto KIT
+            kit_id: ID do produto composto
             db: Sessão do banco de dados
-            user_id: ID do usuário (tenant isolation)
+            user_id: parâmetro legado, mantido por compatibilidade
             
         Returns:
             Decimal: Custo total do KIT
@@ -57,17 +60,11 @@ class KitCustoService:
             ValueError: Se validações falharem
             
         Regras:
-        1. KIT FÍSICO → retorna preco_custo do KIT (0 se NULL)
-        2. KIT VIRTUAL → soma (preco_custo × quantidade) dos componentes
-        3. Componentes não podem ser KIT ou PAI
-        4. Se componente não tem custo, considera 0
+        1. Produto composto → soma (preco_custo × quantidade) dos componentes
+        2. Componentes não podem ser KIT nem PAI
+        3. Se componente não tem custo, considera 0
         
         Exemplos:
-            >>> # KIT FÍSICO
-            >>> custo = KitCustoService.calcular_custo_kit(kit_id=10, db=db, user_id=1)
-            >>> # Retorna: Decimal('150.00')  # preco_custo do próprio KIT
-            
-            >>> # KIT VIRTUAL
             >>> custo = KitCustoService.calcular_custo_kit(kit_id=20, db=db, user_id=1)
             >>> # Retorna: Decimal('85.50')  # soma dos componentes
         """
@@ -77,43 +74,21 @@ class KitCustoService:
             # PASSO 1: BUSCAR E VALIDAR KIT
             # ========================================
             
-            kit = db.query(Produto).filter(
-                Produto.id == kit_id,
-                Produto.user_id == user_id
-            ).first()
+            kit = db.query(Produto).filter(Produto.id == kit_id).first()
             
             if not kit:
                 raise ValueError(f"Produto ID {kit_id} não encontrado")
             
-            if kit.tipo_produto != 'KIT':
+            if not KitCustoService.produto_usa_custo_por_componentes(kit):
                 raise ValueError(
-                    f"Produto '{kit.nome}' não é um KIT (tipo: {kit.tipo_produto}). "
-                    f"Apenas produtos tipo='KIT' podem usar este serviço."
+                    f"Produto '{kit.nome}' não usa custo por composição "
+                    f"(tipo: {kit.tipo_produto}, tipo_kit: {kit.tipo_kit})."
                 )
             
             logger.info(
-                f"📦 Calculando custo do KIT: {kit.nome} "
+                f"📦 Calculando custo do produto composto: {kit.nome} "
                 f"(ID: {kit_id}, tipo_kit: {kit.tipo_kit or 'VIRTUAL'})"
             )
-            
-            # ========================================
-            # PASSO 2: KIT FÍSICO → CUSTO PRÓPRIO
-            # ========================================
-            
-            tipo_kit = kit.tipo_kit or 'VIRTUAL'  # Default VIRTUAL
-            
-            if tipo_kit == 'FISICO':
-                custo_proprio = Decimal(str(kit.preco_custo or 0))
-                
-                logger.info(
-                    f"💰 KIT FÍSICO: custo próprio = R$ {custo_proprio:.2f}"
-                )
-                
-                return custo_proprio
-            
-            # ========================================
-            # PASSO 3: KIT VIRTUAL → SOMA COMPONENTES
-            # ========================================
             
             # Buscar componentes do KIT
             componentes = db.query(ProdutoKitComponente).filter(
@@ -137,8 +112,7 @@ class KitCustoService:
             for componente in componentes:
                 # Buscar produto componente
                 produto_comp = db.query(Produto).filter(
-                    Produto.id == componente.produto_componente_id,
-                    Produto.user_id == user_id
+                    Produto.id == componente.produto_componente_id
                 ).first()
                 
                 if not produto_comp:
@@ -171,7 +145,7 @@ class KitCustoService:
                 )
             
             logger.info(
-                f"✅ Custo total do KIT VIRTUAL: R$ {custo_total:.2f}"
+                f"✅ Custo total do produto composto: R$ {custo_total:.2f}"
             )
             
             return custo_total
@@ -195,6 +169,53 @@ class KitCustoService:
             )
     
     
+    @staticmethod
+    def sincronizar_custo_kit(db: Session, kit_id: int) -> Decimal:
+        """
+        Recalcula e persiste o preco_custo de um produto composto.
+
+        Não faz commit. Usa flush para permitir composição com a transação atual.
+        """
+        kit = db.query(Produto).filter(Produto.id == kit_id).first()
+
+        if not kit:
+            raise ValueError(f"Produto ID {kit_id} não encontrado")
+
+        if not KitCustoService.produto_usa_custo_por_componentes(kit):
+            return Decimal(str(kit.preco_custo or 0))
+
+        custo_total = KitCustoService.calcular_custo_kit(kit_id=kit_id, db=db)
+        kit.preco_custo = float(custo_total)
+        db.flush()
+
+        logger.info(
+            f"💰 Produto composto #{kit.id} sincronizado com preco_custo=R$ {custo_total:.2f}"
+        )
+
+        return custo_total
+
+    @staticmethod
+    def recalcular_kits_que_usam_produto(db: Session, produto_id: int) -> dict[int, Decimal]:
+        """
+        Recalcula o custo de todos os produtos compostos que usam um produto como componente.
+
+        Não faz commit. Deixa a transação com o chamador.
+        """
+        componentes_kits = db.query(ProdutoKitComponente).filter(
+            ProdutoKitComponente.produto_componente_id == produto_id
+        ).all()
+
+        resultado: dict[int, Decimal] = {}
+
+        for comp in componentes_kits:
+            kit = db.query(Produto).filter(Produto.id == comp.kit_id).first()
+            if not KitCustoService.produto_usa_custo_por_componentes(kit):
+                continue
+
+            resultado[comp.kit_id] = KitCustoService.sincronizar_custo_kit(db, comp.kit_id)
+
+        return resultado
+
     @staticmethod
     def validar_componentes_kit(
         kit_id: int,

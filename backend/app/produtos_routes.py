@@ -1595,16 +1595,19 @@ def listar_produtos_vendaveis(
     import logging
     logger = logging.getLogger(__name__)
 
+    from app.services.kit_custo_service import KitCustoService
+
     for produto in produtos:
         # ðŸ†• Adicionar categoria_nome para facilitar frontend
         if produto.categoria:
             produto.categoria_nome = produto.categoria.nome
 
-        if produto.tipo_produto == 'KIT':
+        if produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit:
             try:
                 # Carregar composiÃ§Ã£o do KIT
                 composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
                 produto.composicao_kit = composicao
+                produto.preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
 
                 # Calcular estoque virtual (apenas para KIT VIRTUAL)
                 if produto.tipo_kit == 'VIRTUAL':
@@ -2056,10 +2059,12 @@ def obter_produto(
     # ========================================
     if produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit:
         from .services.kit_estoque_service import KitEstoqueService
+        from .services.kit_custo_service import KitCustoService
 
         # Buscar composiÃ§Ã£o do KIT
         composicao = KitEstoqueService.obter_detalhes_composicao(db, produto_id)
         response_data['composicao_kit'] = composicao
+        response_data['preco_custo'] = float(KitCustoService.calcular_custo_kit(produto_id, db))
 
         # Calcular estoque virtual (se for KIT VIRTUAL)
         if produto.tipo_kit == 'VIRTUAL':
@@ -2201,9 +2206,20 @@ def atualizar_produto(
             )
 
     # ========================================
+    # PROCESSAR e_kit_fisico -> tipo_kit
+    # ========================================
+    if 'e_kit_fisico' in dados_recebidos:
+        e_kit_fisico = dados_recebidos.pop('e_kit_fisico')
+        dados_recebidos['tipo_kit'] = 'FISICO' if e_kit_fisico else 'VIRTUAL'
+
+    tipo_produto_final = dados_recebidos.get('tipo_produto', produto.tipo_produto)
+    tipo_kit_final = dados_recebidos.get('tipo_kit', produto.tipo_kit)
+    produto_sera_composto = tipo_produto_final in ('KIT', 'VARIACAO') and bool(tipo_kit_final)
+
+    # ========================================
     # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)
     # ========================================
-    if composicao_kit is not None and produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit:
+    if composicao_kit is not None and produto_sera_composto:
         from .services.kit_estoque_service import KitEstoqueService
 
         # âš ï¸ VALIDAÃ‡ÃƒO OBRIGATÃ“RIA: KIT deve ter pelo menos 1 componente
@@ -2243,21 +2259,26 @@ def atualizar_produto(
         logger.info(f"ðŸ§© ComposiÃ§Ã£o do Kit #{produto_id} atualizada: {len(composicao_kit)} componentes")
 
     # ========================================
-    # PROCESSAR e_kit_fisico -> tipo_kit
-    # ========================================
-    if 'e_kit_fisico' in dados_recebidos:
-        e_kit_fisico = dados_recebidos.pop('e_kit_fisico')
-        dados_recebidos['tipo_kit'] = 'FISICO' if e_kit_fisico else 'VIRTUAL'
-
-    # ========================================
     # ATUALIZAR CAMPOS DO PRODUTO
     # ========================================
+    custo_componente_alterado = 'preco_custo' in dados_recebidos
+
     for key, value in dados_recebidos.items():
         setattr(produto, key, value)
 
     produto.updated_at = datetime.utcnow()
 
     try:
+        from .services.kit_custo_service import KitCustoService
+
+        db.flush()
+
+        if KitCustoService.produto_usa_custo_por_componentes(produto):
+            KitCustoService.sincronizar_custo_kit(db, produto.id)
+
+        if custo_componente_alterado:
+            KitCustoService.recalcular_kits_que_usam_produto(db, produto.id)
+
         db.commit()
         db.refresh(produto)
         logger.info(f"âœ… Produto #{produto_id} atualizado com sucesso")

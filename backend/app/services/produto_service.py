@@ -151,6 +151,9 @@ class ProdutoService:
                     db.add(componente)
                 
                 logger.info(f"✅ {len(composicao_kit)} componentes adicionados para {tipo_desc}")
+
+                from .kit_custo_service import KitCustoService
+                KitCustoService.sincronizar_custo_kit(db, novo_produto.id)
             
             db.commit()
             db.refresh(novo_produto)
