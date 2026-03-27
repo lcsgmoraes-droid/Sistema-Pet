@@ -89,6 +89,11 @@ const PedidosCompra = () => {
     setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
     setProdutoTexto('');
     setMostrarSugestoesFornecedor(false);
+    // Limpar sugestões do fornecedor anterior
+    setSugestoes([]);
+    setProdutosSelecionados([]);
+    setQuantidadesEditadas({});
+    setFiltroSugestao('');
     carregarProdutosFornecedor(fornecedor.id);
   };
 
@@ -313,7 +318,8 @@ const PedidosCompra = () => {
             dias_cobertura: diasCobertura,
             apenas_criticos: apenasCriticos,
             incluir_alerta: incluirAlerta
-          }
+          },
+          timeout: 60000
         }
       );
 

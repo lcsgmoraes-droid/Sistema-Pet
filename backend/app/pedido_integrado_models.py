@@ -29,5 +29,5 @@ class PedidoIntegrado(BaseTenantModel):
     payload = Column(JSON, nullable=False)
 
     @staticmethod
-    def calcular_expiracao(horas=48):
-        return datetime.utcnow() + timedelta(hours=horas)
+    def calcular_expiracao(dias=15):
+        return datetime.utcnow() + timedelta(days=dias)

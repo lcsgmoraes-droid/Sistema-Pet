@@ -123,106 +123,141 @@ async def listar_nfes(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Lista todas as NF-e/NFC-e emitidas"""
+    """Lista todas as NF-e/NFC-e emitidas — busca direto do Bling (inclui marketplace)"""
     current_user, tenant_id = user_and_tenant
+
+    _STATUS_MAP = {
+        0: "Pendente",
+        1: "Autorizada",
+        2: "Cancelada",
+        3: "Erro",
+        4: "Denegada",
+        5: "Inutilizada",
+        6: "Rejeitada",
+    }
+
+    def _situacao_num(val):
+        """Extrai inteiro da situação — Bling pode retornar int ou {'id': X}"""
+        if isinstance(val, dict):
+            val = val.get("id", 0)
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return 0
+
+    def _normalizar_nota_bling(item: dict, modelo: int) -> dict:
+        sit_num = _situacao_num(item.get("situacao"))
+        status_txt = _STATUS_MAP.get(sit_num, "Pendente")
+        contato = item.get("contato") or {}
+        return {
+            "id": str(item.get("id", "")),
+            "venda_id": None,
+            "numero": str(item.get("numero", "")),
+            "serie": str(item.get("serie", "")),
+            "tipo": 1 if modelo == 65 else 0,
+            "modelo": modelo,
+            "chave": item.get("chaveAcesso") or "",
+            "status": status_txt,
+            "data_emissao": item.get("dataEmissao") or item.get("data_emissao"),
+            "valor": float(item.get("valorTotal") or item.get("total") or 0),
+            "cliente": {
+                "id": contato.get("id"),
+                "nome": contato.get("nome") or contato.get("descricao"),
+                "cpf_cnpj": contato.get("cpf") or contato.get("cnpj") or contato.get("cpfCnpj"),
+            },
+            "origem": "bling",
+        }
+
+    notas: list[dict] = []
+    bling_ok = False
+
+    # ── 1. Buscar do Bling (NF-e modelo 55) ──────────────────────────────────
     try:
-        logger.info("listar_nfes", f"\n=== LISTANDO NF-es ===")
-        logger.info("listar_nfes", f"User ID: {current_user.id}, Tenant ID: {tenant_id}")
-        
-        # Buscar vendas com NF emitida do tenant
+        bling = BlingAPI()
+        resp_nfe = bling.listar_nfes(
+            data_inicial=data_inicial,
+            data_final=data_final,
+        )
+        for item in (resp_nfe.get("data") or []):
+            nota = _normalizar_nota_bling(item, modelo=55)
+            if situacao and nota["status"].lower() != situacao.lower():
+                continue
+            notas.append(nota)
+        bling_ok = True
+    except Exception as e:
+        logger.warning("listar_nfes", f"Bling NF-e não disponível: {e}")
+
+    # ── 2. Buscar do Bling (NFC-e modelo 65) ─────────────────────────────────
+    try:
+        if not bling_ok:
+            bling = BlingAPI()
+            bling_ok = True
+        resp_nfce = bling.listar_nfces(
+            data_inicial=data_inicial,
+            data_final=data_final,
+        )
+        ids_ja_adicionados = {n["id"] for n in notas}
+        for item in (resp_nfce.get("data") or []):
+            nota = _normalizar_nota_bling(item, modelo=65)
+            if str(nota["id"]) in ids_ja_adicionados:
+                continue
+            if situacao and nota["status"].lower() != situacao.lower():
+                continue
+            notas.append(nota)
+    except Exception as e:
+        logger.warning("listar_nfes", f"Bling NFC-e não disponível: {e}")
+
+    # ── 3. Fallback / complemento: NFs emitidas via PDV local ────────────────
+    # Só incluídas se Bling não respondeu OU se têm ID que não veio do Bling
+    try:
         query = db.query(Venda).filter(
             Venda.tenant_id == tenant_id,
-            Venda.nfe_bling_id.isnot(None)
+            Venda.nfe_bling_id.isnot(None),
         )
-        
-        # Aplicar filtros
         if situacao:
             query = query.filter(Venda.nfe_status == situacao)
-        
         if data_inicial:
             query = query.filter(Venda.nfe_data_emissao >= data_inicial)
-        
         if data_final:
             query = query.filter(Venda.nfe_data_emissao <= data_final)
-        
-        vendas = query.order_by(Venda.nfe_data_emissao.desc()).all()
-        
-        logger.info("listar_nfes", f"Vendas encontradas: {len(vendas)}")
-        
-        # Sincronizar status com Bling para manter atualizado (somente se houver vendas)
-        if vendas:
-            try:
-                bling = BlingAPI()
-                for venda in vendas:
-                    try:
-                        # ✅ Usar tipo correto: 1=NFC-e, 0=NF-e (INTEGER)
-                        if venda.nfe_tipo == 1:  # NFC-e
-                            nota = bling.consultar_nfce(venda.nfe_bling_id)
-                        elif venda.nfe_tipo == 0:  # NF-e
-                            nota = bling.consultar_nfe(venda.nfe_bling_id)
-                        else:
-                            # Tipo inválido (string antiga), tentar deduzir pelo modelo
-                            if venda.nfe_modelo == 65:
-                                nota = bling.consultar_nfce(venda.nfe_bling_id)
-                                venda.nfe_tipo = 1  # Corrigir
-                            else:
-                                nota = bling.consultar_nfe(venda.nfe_bling_id)
-                                venda.nfe_tipo = 0  # Corrigir
-                        
-                        # Mapear situacao do Bling para status
-                        situacao = nota.get("situacao", 0)
-                        status_map = {
-                            0: "Pendente",
-                            1: "Autorizada",
-                            2: "Cancelada",
-                            3: "Erro",
-                            4: "Denegada",
-                            5: "Inutilizada",
-                            6: "Rejeitada"
-                        }
-                        novo_status = status_map.get(situacao, "Pendente")
-                        
-                        # Atualizar se mudou
-                        if venda.nfe_status != novo_status:
-                            logger.info("sincronizar_status", f"🔄 Atualizando NF {venda.nfe_numero}: {venda.nfe_status} → {novo_status}")
-                            venda.nfe_status = novo_status
-                            db.commit()
-                            
-                    except Exception as e:
-                        logger.warning("sincronizar_status", f"⚠️ Erro ao sincronizar NF {venda.nfe_numero}: {e}")
-                        continue
-            except Exception as e:
-                # Se Bling não estiver configurado, apenas ignora a sincronização
-                logger.warning("listar_nfes", f"Bling não configurado ou erro ao conectar: {e}")
-        
-        # Formatar resposta
-        notas = []
-        for venda in vendas:
+
+        ids_bling = {n["id"] for n in notas}
+        for venda in query.order_by(Venda.nfe_data_emissao.desc()).all():
+            if str(venda.nfe_bling_id) in ids_bling:
+                continue  # já veio do Bling
             notas.append({
-                "id": venda.nfe_bling_id,
+                "id": str(venda.nfe_bling_id),
                 "venda_id": venda.id,
                 "numero": venda.nfe_numero,
                 "serie": venda.nfe_serie,
                 "tipo": venda.nfe_tipo,
                 "modelo": venda.nfe_modelo,
                 "chave": venda.nfe_chave,
-                "status": venda.nfe_status,
+                "status": venda.nfe_status or "Pendente",
                 "data_emissao": venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None,
-                "valor": float(venda.total),
+                "valor": float(venda.total or 0),
                 "cliente": {
                     "id": venda.cliente.id if venda.cliente else None,
                     "nome": venda.cliente.nome if venda.cliente else None,
-                    "cpf_cnpj": venda.cliente.cpf or venda.cliente.cnpj if venda.cliente else None
-                }
+                    "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None,
+                },
+                "origem": "local",
             })
-        
-        return {
-            "success": True,
-            "total": len(notas),
-            "notas": notas
-        }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao listar NF-es: {str(e)}")
+        logger.warning("listar_nfes", f"Erro ao consultar NFs locais: {e}")
+
+    # Ordenar por data (mais recente primeiro)
+    def _key_data(n):
+        return n.get("data_emissao") or ""
+
+    notas.sort(key=_key_data, reverse=True)
+
+    return {
+        "success": True,
+        "total": len(notas),
+        "notas": notas,
+        "fonte": "bling" if bling_ok else "local",
+    }
 
 
 @router.get("/{nfe_id}")

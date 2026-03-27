@@ -422,7 +422,7 @@ class BlingAPI:
             raise Exception(f"Erro ao baixar DANFE: {str(e)}")
     
     def listar_nfes(self, data_inicial: str = None, data_final: str = None, situacao: str = None) -> Dict:
-        """Lista NF-es com filtros"""
+        """Lista NF-es (modelo 55) com filtros"""
         params = {}
         if data_inicial:
             params["dataInicial"] = data_inicial
@@ -430,8 +430,20 @@ class BlingAPI:
             params["dataFinal"] = data_final
         if situacao:
             params["situacao"] = situacao
-        
+
         return self._request("GET", "/nfe", data=params)
+
+    def listar_nfces(self, data_inicial: str = None, data_final: str = None, situacao: str = None) -> Dict:
+        """Lista NFC-es (modelo 65) com filtros"""
+        params = {}
+        if data_inicial:
+            params["dataInicial"] = data_inicial
+        if data_final:
+            params["dataFinal"] = data_final
+        if situacao:
+            params["situacao"] = situacao
+
+        return self._request("GET", "/nfce", data=params)
     
     # ============================================================================
     # GESTÃO DE PRODUTOS E ESTOQUE

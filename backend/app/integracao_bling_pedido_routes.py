@@ -1,5 +1,6 @@
 
 import os
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
@@ -216,6 +217,86 @@ def cancelar_pedido_manual(
     return {"status": "ok", "pedido_id": pedido.id}
 
 
+# ============================================================
+# POST /integracoes/bling/pedidos/reprocessar-sem-itens
+# ============================================================
+
+@router.post("/pedidos/reprocessar-sem-itens")
+def reprocessar_pedidos_sem_itens(
+    limite: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Re-busca os itens no Bling para pedidos que chegaram com 0 itens.
+    Útil para corrigir pedidos que falharam na busca inicial de itens.
+    """
+    tenant_id = user_tenant[1]
+
+    # Pedidos abertos sem nenhum item registrado
+    subq_com_itens = (
+        db.query(PedidoIntegradoItem.pedido_integrado_id)
+        .distinct()
+        .subquery()
+    )
+    pedidos_sem_itens = (
+        db.query(PedidoIntegrado)
+        .filter(
+            PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.status.in_(["aberto", "expirado"]),
+            PedidoIntegrado.id.notin_(subq_com_itens),
+        )
+        .limit(limite)
+        .all()
+    )
+
+    if not pedidos_sem_itens:
+        return {"reprocessados": 0, "message": "Nenhum pedido sem itens encontrado"}
+
+    from app.bling_integration import BlingAPI
+    _bling_api = BlingAPI()
+
+    reprocessados = 0
+    erros = []
+
+    for pedido in pedidos_sem_itens:
+        try:
+            pedido_completo = _bling_api.consultar_pedido(pedido.pedido_bling_id)
+            itens_bling = pedido_completo.get("itens", [])
+            if not itens_bling:
+                continue
+
+            for item in itens_bling:
+                sku = item.get("codigo") or item.get("sku")
+                descricao = item.get("descricao")
+                quantidade = int(float(item.get("quantidade", 0)))
+                if not sku or quantidade <= 0:
+                    continue
+                item_pedido = PedidoIntegradoItem(
+                    tenant_id=pedido.tenant_id,
+                    pedido_integrado_id=pedido.id,
+                    sku=sku,
+                    descricao=descricao,
+                    quantidade=quantidade,
+                )
+                try:
+                    EstoqueReservaService.reservar(db, item_pedido)
+                except ValueError:
+                    pass
+                db.add(item_pedido)
+
+            db.commit()
+            reprocessados += 1
+        except Exception as e:
+            erros.append({"pedido_bling_id": pedido.pedido_bling_id, "erro": str(e)[:120]})
+
+    return {
+        "reprocessados": reprocessados,
+        "total_sem_itens": len(pedidos_sem_itens),
+        "erros": erros,
+    }
+
+
 # Situações do pedido Bling — referência API v3
 # https://developer.bling.com.br/referencia#/Pedidos%20de%20Venda/get_pedidos__idPedido_
 _SITUACOES_PEDIDO_CANCELADO = {
@@ -247,6 +328,79 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"
     data = body.get("data", body)  # fallback p/ payload legado sem envelope
+
+    # ========================
+    # EVENTO: NOTA FISCAL EMITIDA
+    # Quando o Bling gera uma NF vinculada a um pedido de marketplace,
+    # confirmar o pedido e baixar o estoque imediatamente.
+    # ========================
+    if "notafiscal" in event.lower() or "nota_fiscal" in event.lower() or event.startswith("nfe.") or event.startswith("nfce."):
+        nf_data = data or {}
+        # O pedido pode vir na chave "pedido" ou "pedidoVenda" do payload da NF
+        pedido_ref = nf_data.get("pedido") or nf_data.get("pedidoVenda") or {}
+        pedido_numero_nf = str(pedido_ref.get("numero") or pedido_ref.get("id") or "").strip()
+        nf_id_bling = str(nf_data.get("id") or "").strip()
+
+        if pedido_numero_nf or nf_id_bling:
+            pedido = None
+            # Buscar pelo número do pedido Bling (campo pedido_bling_numero)
+            if pedido_numero_nf:
+                pedido = db.query(PedidoIntegrado).filter(
+                    PedidoIntegrado.pedido_bling_numero == pedido_numero_nf
+                ).first()
+            # Fallback: buscar pela chave do pedido se vier como ID
+            if not pedido and pedido_numero_nf:
+                pedido = db.query(PedidoIntegrado).filter(
+                    PedidoIntegrado.pedido_bling_id == pedido_numero_nf
+                ).first()
+
+            if pedido and pedido.status not in ("confirmado", "cancelado"):
+                tenant_id_nf = pedido.tenant_id
+                itens = db.query(PedidoIntegradoItem).filter(
+                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
+                ).all()
+                for item in itens:
+                    if item.vendido_em:
+                        continue
+                    EstoqueReservaService.confirmar_venda(db, item)
+                    try:
+                        from app.estoque.service import EstoqueService
+                        from app.produtos_models import Produto
+                        produto = db.query(Produto).filter(
+                            Produto.codigo == item.sku,
+                            Produto.tenant_id == tenant_id_nf,
+                        ).first()
+                        if produto:
+                            EstoqueService.baixar_estoque(
+                                produto_id=produto.id,
+                                quantidade=float(item.quantidade),
+                                motivo="venda_bling_nf",
+                                referencia_id=pedido.id,
+                                referencia_tipo="pedido_integrado",
+                                user_id=0,
+                                db=db,
+                                tenant_id=tenant_id_nf,
+                                documento=pedido.pedido_bling_numero,
+                                observacao=f"Baixa automática — NF Bling emitida (evento {event})",
+                            )
+                        else:
+                            logger.warning(
+                                f"[BLING NF WEBHOOK] Produto não encontrado p/ baixa — SKU {item.sku}"
+                            )
+                    except Exception as _e:
+                        logger.warning(
+                            f"[BLING NF WEBHOOK] Erro ao baixar estoque SKU {item.sku}: {_e}"
+                        )
+                pedido.status = "confirmado"
+                pedido.confirmado_em = datetime.utcnow()
+                db.add(pedido)
+                db.commit()
+                logger.info(
+                    f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} confirmado via evento NF ({event})"
+                )
+                return {"status": "ok", "acao": "confirmado_por_nf"}
+
+        return {"status": "ignorado", "motivo": f"evento_nf_sem_pedido_correspondente ({event})"}
 
     pedido_bling_id = str(data.get("id", ""))
     if not pedido_bling_id or pedido_bling_id == "None":
@@ -396,13 +550,27 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     loja_nome = loja_data.get("nome", "")
     canal = loja_nome or (str(loja_id) if loja_id else "online")
 
-    # O webhook NÃO inclui itens — buscar na API do Bling
+    # O webhook NÃO inclui itens — buscar na API do Bling (com retry para evitar 0 itens)
     pedido_completo = {}
     itens_bling = []
     try:
         from app.bling_integration import BlingAPI
-        pedido_completo = BlingAPI().consultar_pedido(pedido_bling_id)
-        itens_bling = pedido_completo.get("itens", [])
+        _bling_api = BlingAPI()
+        for _tentativa in range(3):
+            try:
+                pedido_completo = _bling_api.consultar_pedido(pedido_bling_id)
+                itens_bling = pedido_completo.get("itens", [])
+                if itens_bling:
+                    break
+                # Bling pode ainda não ter os itens indexados — aguardar e tentar de novo
+                if _tentativa < 2:
+                    time.sleep(2.0)
+            except Exception as _e:
+                if _tentativa == 2:
+                    raise
+                time.sleep(2.0)
+        if not itens_bling:
+            logger.warning(f"[BLING WEBHOOK] Pedido {pedido_bling_id}: itens vazios após 3 tentativas")
     except Exception as e:
         logger.warning(f"[BLING WEBHOOK] Falha ao buscar itens do pedido {pedido_bling_id}: {e}")
 
@@ -464,4 +632,50 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         db.add(item_pedido)
 
     db.commit()
+
+    # Se o pedido já nasceu "confirmado" (NF emitida no Bling antes do webhook order.updated),
+    # deduzir estoque imediatamente — sem essa baixa, o estoque nunca seria ajustado.
+    if status_inicial == "confirmado":
+        itens_salvos = db.query(PedidoIntegradoItem).filter(
+            PedidoIntegradoItem.pedido_integrado_id == pedido.id
+        ).all()
+        for _item in itens_salvos:
+            if _item.vendido_em:
+                continue
+            EstoqueReservaService.confirmar_venda(db, _item)
+            try:
+                from app.estoque.service import EstoqueService
+                from app.produtos_models import Produto as _Produto
+                _produto = db.query(_Produto).filter(
+                    _Produto.codigo == _item.sku,
+                    _Produto.tenant_id == _tenant_uuid,
+                ).first()
+                if _produto:
+                    EstoqueService.baixar_estoque(
+                        produto_id=_produto.id,
+                        quantidade=float(_item.quantidade),
+                        motivo="venda_bling_webhook",
+                        referencia_id=pedido.id,
+                        referencia_tipo="pedido_integrado",
+                        user_id=0,
+                        db=db,
+                        tenant_id=_tenant_uuid,
+                        documento=pedido.pedido_bling_numero,
+                        observacao="Baixa automática order.created (já Atendido no Bling)",
+                    )
+                else:
+                    logger.warning(
+                        f"[BLING WEBHOOK] order.created confirmado — produto não encontrado p/ baixa, SKU {_item.sku}"
+                    )
+            except Exception as _e:
+                logger.warning(
+                    f"[BLING WEBHOOK] order.created confirmado — erro ao baixar estoque SKU {_item.sku}: {_e}"
+                )
+        pedido.confirmado_em = datetime.utcnow()
+        db.add(pedido)
+        db.commit()
+        logger.info(
+            f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created já Atendido) — estoque baixado imediatamente"
+        )
+
     return {"status": "ok", "pedido_id": pedido.id}

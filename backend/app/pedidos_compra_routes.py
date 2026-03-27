@@ -1125,38 +1125,60 @@ def sugerir_pedido_inteligente(
     total_criticos = 0
     total_alerta = 0
     valor_total = 0
-    
-    for produto, produto_fornecedor in produtos_fornecedor:
-        # Calcular vendas no período
-        vendas_periodo = db.query(
-            func.sum(VendaItem.quantidade).label('total_vendido')
-        ).join(
-            VendaItem.venda
-        ).filter(
-            VendaItem.produto_id == produto.id,
+
+    # Bulk queries de vendas — 2 queries no total em vez de N queries individuais
+    ids_produtos = [p.id for p, _pf in produtos_fornecedor]
+
+    vendas_bulk = dict(
+        db.query(VendaItem.produto_id, func.sum(VendaItem.quantidade))
+        .join(VendaItem.venda)
+        .filter(
+            VendaItem.produto_id.in_(ids_produtos),
             VendaItem.tenant_id == tenant_id,
-            VendaItem.venda.has(Venda.data_venda >= data_inicio)
-        ).scalar() or 0
-        
+            Venda.data_venda >= data_inicio,
+        )
+        .group_by(VendaItem.produto_id)
+        .all()
+    )
+
+    vendas_recentes_bulk: dict = {}
+    if periodo_dias >= 60:
+        data_recente = datetime.now() - timedelta(days=30)
+        vendas_recentes_bulk = dict(
+            db.query(VendaItem.produto_id, func.sum(VendaItem.quantidade))
+            .join(VendaItem.venda)
+            .filter(
+                VendaItem.produto_id.in_(ids_produtos),
+                VendaItem.tenant_id == tenant_id,
+                Venda.data_venda >= data_recente,
+            )
+            .group_by(VendaItem.produto_id)
+            .all()
+        )
+
+    for produto, produto_fornecedor in produtos_fornecedor:
+        # Consumo no período — lookup em vez de query individual
+        vendas_periodo = float(vendas_bulk.get(produto.id) or 0)
+
         # Consumo médio diário
-        consumo_diario = float(vendas_periodo) / periodo_dias if vendas_periodo > 0 else 0
-        
+        consumo_diario = vendas_periodo / periodo_dias if vendas_periodo > 0 else 0
+
         # Estoque atual
         estoque_atual = float(produto.estoque_atual or 0)
         estoque_minimo = float(produto.estoque_minimo or 0)
-        
+
         # Dias de estoque restante
         dias_estoque = (estoque_atual / consumo_diario) if consumo_diario > 0 else 999
-        
+
         # Lead time do fornecedor (padrão 7 dias se não configurado)
         lead_time = produto_fornecedor.prazo_entrega or 7
-        
+
         # Calcular quantidade sugerida
         # Cobrir: lead_time + dias_cobertura (escolhido pelo usuário) + margem de segurança (7 dias)
         dias_total_cobertura = lead_time + dias_cobertura + 7
         quantidade_ideal = consumo_diario * dias_total_cobertura
         quantidade_sugerida = max(0, quantidade_ideal - estoque_atual)
-        
+
         # Classificação de prioridade
         if dias_estoque < 7:
             prioridade = "CRÍTICO"
@@ -1168,22 +1190,12 @@ def sugerir_pedido_inteligente(
             prioridade = "ATENÇÃO"
         else:
             prioridade = "NORMAL"
-        
-        # Tendência de vendas (comparar últimos 30 dias vs período todo)
+
+        # Tendência de vendas — lookup em vez de query individual
         if periodo_dias >= 60:
-            data_recente = datetime.now() - timedelta(days=30)
-            vendas_recentes = db.query(
-                func.sum(VendaItem.quantidade).label('total_vendido')
-            ).join(
-                VendaItem.venda
-            ).filter(
-                VendaItem.produto_id == produto.id,
-                VendaItem.tenant_id == tenant_id,
-                VendaItem.venda.has(Venda.data_venda >= data_recente)
-            ).scalar() or 0
-            
-            consumo_recente = float(vendas_recentes) / 30
-            
+            vendas_recentes = float(vendas_recentes_bulk.get(produto.id) or 0)
+            consumo_recente = vendas_recentes / 30
+
             if consumo_recente > consumo_diario * 1.2:
                 tendencia = "CRESCIMENTO"
             elif consumo_recente < consumo_diario * 0.8:
@@ -1192,11 +1204,11 @@ def sugerir_pedido_inteligente(
                 tendencia = "ESTÁVEL"
         else:
             tendencia = "N/A"
-        
+
         # Preço unitário
         preco_unitario = float(produto_fornecedor.preco_custo or produto.preco_custo or 0)
         valor_sugestao = quantidade_sugerida * preco_unitario
-        
+
         # Aplicar filtros
         incluir_produto = True
         
