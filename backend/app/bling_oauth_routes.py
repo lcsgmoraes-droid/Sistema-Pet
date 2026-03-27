@@ -218,13 +218,30 @@ def _html_sucesso(expira_em: datetime, token: str) -> str:
     .box{{background:white;padding:40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center;max-width:480px}}
     h1{{color:#2e7d32;font-size:2em}}p{{color:#555;line-height:1.6}}
     .badge{{background:#e8f5e9;color:#2e7d32;padding:8px 16px;border-radius:20px;font-weight:bold;display:inline-block;margin:10px 0}}
+        .btn{{display:inline-block;margin-top:14px;background:#1976d2;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600}}
     </style></head>
     <body><div class="box">
     <h1>✅ Bling Autorizado!</h1>
     <p>O token foi salvo com sucesso no sistema.</p>
     <div class="badge">Token expira em: {expira_em.strftime('%d/%m/%Y às %H:%M')}</div>
-    <p style="margin-top:20px">Você já pode fechar esta janela.<br>O sistema vai renovar o token automaticamente.</p>
-    </div></body></html>
+        <p style="margin-top:20px">Redirecionando para o sistema em <span id="contador">3</span> segundos...</p>
+        <a class="btn" href="/configuracoes/integracoes">Voltar agora</a>
+        </div>
+        <script>
+            (function() {{
+                var segundos = 3;
+                var el = document.getElementById('contador');
+                var timer = setInterval(function() {{
+                    segundos -= 1;
+                    if (el && segundos >= 0) el.textContent = String(segundos);
+                    if (segundos <= 0) {{
+                        clearInterval(timer);
+                        window.location.href = '/configuracoes/integracoes';
+                    }}
+                }}, 1000);
+            }})();
+        </script>
+        </body></html>
     """
 
 
