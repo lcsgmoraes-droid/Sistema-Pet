@@ -10,6 +10,7 @@ import {
   FiFileText,
   FiGrid,
   FiMail,
+  FiPackage,
   FiRefreshCw,
   FiSave,
   FiX,
@@ -38,10 +39,19 @@ export default function StoneIntegracao() {
   const [mostrarChave, setMostrarChave] = useState(false);
   const [modalAtivo, setModalAtivo] = useState(null);
   const [msg, setMsg] = useState(null); // { tipo: 'sucesso'|'erro', texto: '' }
+  const [renovandoBling, setRenovandoBling] = useState(false);
+  const [testandoBling, setTestandoBling] = useState(false);
   const [sefazStatus, setSefazStatus] = useState({
     enabled: false,
     cert_ok: false,
     mensagem: "",
+  });
+  const [blingStatus, setBlingStatus] = useState({
+    conectado: false,
+    mensagem: "Configuração pendente",
+    detalhe: "Token não validado",
+    renovacoes_automaticas: 0,
+    proxima_renovacao: null,
   });
 
   const [config, setConfig] = useState({
@@ -67,11 +77,19 @@ export default function StoneIntegracao() {
     carregarConfig();
   }, []);
 
+  function formatarDataHora(value) {
+    if (!value) return "-";
+    const data = new Date(value);
+    if (Number.isNaN(data.getTime())) return "-";
+    return data.toLocaleString("pt-BR");
+  }
+
   async function carregarConfig() {
     try {
-      const [stoneResp, sefazResp] = await Promise.all([
+      const [stoneResp, sefazResp, blingResp] = await Promise.all([
         api.get("/stone/config"),
         api.get("/sefaz/config").catch(() => null),
+        api.get("/bling/teste-conexao").catch(() => null),
       ]);
 
       const { data } = stoneResp;
@@ -88,6 +106,21 @@ export default function StoneIntegracao() {
           mensagem: sefazResp.data.mensagem || "",
         });
       }
+
+      if (blingResp?.data) {
+        const conectado = Boolean(blingResp.data.conectado || blingResp.data.success);
+        const proximaRenovacao = blingResp.data.proxima_renovacao || null;
+
+        setBlingStatus({
+          conectado,
+          mensagem: blingResp.data.message || (conectado ? "Conexão ativa" : "Token expirado"),
+          detalhe: conectado
+            ? `Próxima renovação: ${formatarDataHora(proximaRenovacao)}`
+            : (blingResp.data.detail || "Token expirado ou inválido"),
+          renovacoes_automaticas: blingResp.data.renovacoes_automaticas || 0,
+          proxima_renovacao: proximaRenovacao,
+        });
+      }
     } catch (e) {
       if (e.response?.status !== 404) {
         mostrarMensagem("erro", "Erro ao carregar configuração.");
@@ -101,6 +134,50 @@ export default function StoneIntegracao() {
   function mostrarMensagem(tipo, texto) {
     setMsg({ tipo, texto });
     setTimeout(() => setMsg(null), 6000);
+  }
+
+  async function testarConexaoBling() {
+    setTestandoBling(true);
+    try {
+      const resp = await api.get("/bling/teste-conexao");
+      const conectado = Boolean(resp.data.conectado || resp.data.success);
+      const proximaRenovacao = resp.data.proxima_renovacao || null;
+
+      setBlingStatus({
+        conectado,
+        mensagem: resp.data.message || (conectado ? "Conexão ativa" : "Token expirado"),
+        detalhe: conectado
+          ? `Próxima renovação: ${formatarDataHora(proximaRenovacao)}`
+          : (resp.data.detail || "Token expirado ou inválido"),
+        renovacoes_automaticas: resp.data.renovacoes_automaticas || 0,
+        proxima_renovacao: proximaRenovacao,
+      });
+
+      mostrarMensagem(
+        conectado ? "sucesso" : "erro",
+        conectado ? "Bling conectado com sucesso." : "Bling desconectado. Renove o token.",
+      );
+    } catch (e) {
+      mostrarMensagem("erro", "Erro ao testar conexão do Bling.");
+    } finally {
+      setTestandoBling(false);
+    }
+  }
+
+  async function renovarTokenBling() {
+    setRenovandoBling(true);
+    try {
+      await api.post("/bling/renovar-token");
+      mostrarMensagem("sucesso", "Token do Bling renovado com sucesso.");
+      await testarConexaoBling();
+    } catch (e) {
+      mostrarMensagem(
+        "erro",
+        e.response?.data?.detail || "Não foi possível renovar o token do Bling.",
+      );
+    } finally {
+      setRenovandoBling(false);
+    }
   }
 
   async function salvarConfiguracaoConnect(e) {
@@ -413,6 +490,46 @@ export default function StoneIntegracao() {
       return <SefazIntegracaoCard modoModal onStatusChange={setSefazStatus} />;
     }
 
+    if (modalAtivo === "bling") {
+      return (
+        <div className="space-y-4">
+          <div className={`rounded-lg border p-4 text-sm ${
+            blingStatus.conectado
+              ? "bg-green-50 border-green-200 text-green-800"
+              : "bg-amber-50 border-amber-200 text-amber-800"
+          }`}>
+            <p className="font-medium">{blingStatus.conectado ? "Bling conectado" : "Bling precisa de renovação"}</p>
+            <p className="mt-1">{blingStatus.detalhe}</p>
+            {blingStatus.renovacoes_automaticas > 0 && (
+              <p className="mt-1">Renovações automáticas: {blingStatus.renovacoes_automaticas}</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={testarConexaoBling}
+              disabled={testandoBling}
+              className="flex items-center gap-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            >
+              {testandoBling ? <FiRefreshCw className="animate-spin" /> : <FiClock />}
+              Testar conexão
+            </button>
+
+            <button
+              type="button"
+              onClick={renovarTokenBling}
+              disabled={renovandoBling}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+            >
+              {renovandoBling ? <FiRefreshCw className="animate-spin" /> : <FiRefreshCw />}
+              Renovar token
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return null;
   }
 
@@ -420,6 +537,7 @@ export default function StoneIntegracao() {
     if (modalAtivo === "stone-connect") return "Configurar Stone Connect";
     if (modalAtivo === "stone-conciliacao") return "Configurar Stone Conciliação";
     if (modalAtivo === "sefaz") return "Configurar SEFAZ";
+    if (modalAtivo === "bling") return "Configurar Bling";
     return "Configurar Integração";
   }
 
@@ -486,6 +604,17 @@ export default function StoneIntegracao() {
           acaoTexto="Configurar"
           onAcao={() => abrirModal("sefaz")}
           tema="violet"
+        />
+
+        <IntegracaoCard
+          icon={FiPackage}
+          titulo="Bling"
+          descricao="Sincronização de estoque e autorização OAuth."
+          detalhe={blingStatus.conectado ? (blingStatus.detalhe || "Token ativo") : "Token expirado ou não configurado"}
+          status={blingStatus.conectado ? "conectado" : "desconectado"}
+          acaoTexto={blingStatus.conectado ? "Ver detalhes" : "Conectar"}
+          onAcao={() => abrirModal("bling")}
+          tema="sky"
         />
       </div>
 
