@@ -1679,7 +1679,7 @@ def listar_produtos(
             Produto.tipo_produto == tipo_produto
         )
     else:
-        tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES', 'KIT']
+        tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO'] if include_variations else ['SIMPLES', 'KIT']
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
             Produto.tipo_produto.in_(tipos_base)
@@ -1697,13 +1697,6 @@ def listar_produtos(
 
     # FILTROS OPCIONAIS
     termo_busca = (busca or "").strip()
-
-    # Se ha termo de busca, VARIACAO também deve aparecer mesmo sem include_variations
-    # Isso permite buscar por SKU de variacao diretamente
-    if termo_busca and not include_variations and not tipo_produto and not produto_predecessor_id:
-        query = query.filter(
-            (Produto.tipo_produto.in_(['SIMPLES', 'PAI', 'KIT', 'VARIACAO']))
-        )
 
     if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
