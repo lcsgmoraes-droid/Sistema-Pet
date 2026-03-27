@@ -85,6 +85,15 @@ const corrigirTextoQuebrado = (value) => {
     .replaceAll("Â", "");
 };
 
+const montarMensagemConflitoExclusao = (nomeProduto, detalheServidor) => {
+  const detalheLimpo = corrigirTextoQuebrado(detalheServidor || "");
+  const correspondenciaQuantidade = detalheLimpo.match(/possui\s+(\d+)/i);
+  const quantidadeVariacoes = correspondenciaQuantidade?.[1] || "1";
+  const nomeLimpo = corrigirTextoQuebrado(nomeProduto || "Produto");
+
+  return `Produto '${nomeLimpo}' possui ${quantidadeVariacoes} variacao(oes) ativa(s) e nao pode ser desativado. Desative primeiro todas as variacoes.`;
+};
+
 const getProdutoSearchRank = (produto, buscaNormalizada) => {
   const termo = normalizeSearchText(buscaNormalizada).trim();
   if (!termo) return 999;
@@ -1195,9 +1204,7 @@ export default function Produtos() {
     if (statusCode === 409) {
       return {
         statusCode,
-        mensagem:
-          detalheServidor ||
-          "Nao foi possivel excluir porque este produto possui vinculos ativos.",
+        mensagem: detalheServidor || "Nao foi possivel excluir porque este produto possui vinculos ativos.",
       };
     }
 
@@ -1228,6 +1235,7 @@ export default function Produtos() {
 
     for (const parentId of paisComConflito) {
       const falhaPai = falhasConflito.find((falha) => falha.id === parentId);
+      const parentNome = obterNomeProduto(parentId);
       let variacoes = [];
 
       try {
@@ -1242,10 +1250,8 @@ export default function Produtos() {
 
       bloqueios.push({
         parentId,
-        parentNome: obterNomeProduto(parentId),
-        mensagem: corrigirTextoQuebrado(
-          falhaPai?.mensagem || "Produto com bloqueio para exclusao.",
-        ),
+        parentNome,
+        mensagem: montarMensagemConflitoExclusao(parentNome, falhaPai?.mensagem),
         variacoes,
       });
     }
