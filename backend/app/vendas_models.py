@@ -3,7 +3,7 @@
 Models para o módulo de Vendas (PDV)
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -102,7 +102,7 @@ class Venda(BaseTenantModel):
     nfe_data_emissao = Column(DateTime, nullable=True)
     nfe_data_autorizacao = Column(DateTime, nullable=True)
     nfe_motivo_rejeicao = Column(Text, nullable=True)
-    nfe_bling_id = Column(Integer, nullable=True)  # ID no Bling
+    nfe_bling_id = Column(BigInteger, nullable=True)  # ID no Bling (pode exceder INTEGER)
     
     # Multi-tenant
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)

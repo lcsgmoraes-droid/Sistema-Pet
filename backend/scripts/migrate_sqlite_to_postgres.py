@@ -258,12 +258,12 @@ def convert_value_for_postgres(value: Any, column_type: str, column_name: str = 
     if value is None:
         return None
     
-    # CORREÇÃO #1: nfe_bling_id muito grande para INTEGER
-    # PostgreSQL INTEGER: máx 2,147,483,647 (10 dígitos)
+    # CORREÇÃO #1: nfe_bling_id muito grande para BIGINT
+    # PostgreSQL BIGINT: máx 9,223,372,036,854,775,807
     # Converter para NULL se exceder limite
     if column_name == 'nfe_bling_id' and isinstance(value, (int, float)):
-        if value > 2147483647:
-            return None  # Ou considerar converter coluna para BIGINT
+        if value > 9223372036854775807:
+            return None
     
     # CORREÇÃO #2: status muito longo para VARCHAR(20)
     # Truncar strings que excedem limite
