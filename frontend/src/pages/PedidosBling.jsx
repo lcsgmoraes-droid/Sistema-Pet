@@ -3,10 +3,10 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 
 const STATUS_CONFIG = {
-  aberto:     { label: 'Aberto',     cor: 'bg-blue-100 text-blue-800',   dot: 'bg-blue-500' },
+  aberto: { label: 'Aberto', cor: 'bg-blue-100 text-blue-800', dot: 'bg-blue-500' },
   confirmado: { label: 'Confirmado', cor: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
-  expirado:   { label: 'Expirado',   cor: 'bg-yellow-100 text-yellow-800', dot: 'bg-yellow-500' },
-  cancelado:  { label: 'Cancelado',  cor: 'bg-red-100 text-red-800',     dot: 'bg-red-500' },
+  expirado: { label: 'Expirado', cor: 'bg-yellow-100 text-yellow-800', dot: 'bg-yellow-500' },
+  cancelado: { label: 'Cancelado', cor: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
 };
 
 function BadgeStatus({ status }) {
@@ -19,24 +19,61 @@ function BadgeStatus({ status }) {
   );
 }
 
+function formatarDataHora(iso) {
+  if (!iso) return '-';
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '-';
+  return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function formatarMoeda(valor) {
+  if (valor == null || Number.isNaN(Number(valor))) return '-';
+  return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function CampoInfo({ label, valor }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="text-sm text-gray-700 break-words">{valor || '-'}</p>
+    </div>
+  );
+}
+
 function LinhaItem({ item }) {
   const reservado = !item.liberado_em && !item.vendido_em;
   const confirmado = !!item.vendido_em;
   const liberado = !!item.liberado_em;
 
   return (
-    <div className="flex items-center justify-between py-1 text-sm">
-      <span className="font-mono text-gray-600 mr-2 min-w-[90px]">{item.sku}</span>
-      <span className="flex-1 text-gray-800 truncate">{item.descricao || '—'}</span>
-      <span className="ml-4 font-semibold text-gray-700">× {item.quantidade}</span>
-      <span className={`ml-3 text-xs px-2 py-0.5 rounded-full font-medium ${
-        confirmado ? 'bg-green-50 text-green-700'
-        : liberado  ? 'bg-gray-100 text-gray-500'
-        : reservado ? 'bg-blue-50 text-blue-700'
-        : 'bg-gray-100 text-gray-500'
-      }`}>
-        {confirmado ? 'Baixado' : liberado ? 'Liberado' : 'Reservado'}
-      </span>
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs text-gray-500">{item.sku || 'SEM-SKU'}</span>
+            {item.produto_bling_id && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                Produto Bling #{item.produto_bling_id}
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-medium text-gray-900 mt-1">{item.descricao || '-'}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mt-1">
+            <span>Qtd: {item.quantidade}</span>
+            <span>Unitario: {formatarMoeda(item.valor_unitario)}</span>
+            <span>Total: {formatarMoeda(item.total)}</span>
+            {item.desconto != null && <span>Desconto: {formatarMoeda(item.desconto)}</span>}
+          </div>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          confirmado ? 'bg-green-50 text-green-700'
+          : liberado ? 'bg-gray-100 text-gray-500'
+          : reservado ? 'bg-blue-50 text-blue-700'
+          : 'bg-gray-100 text-gray-500'
+        }`}>
+          {confirmado ? 'Baixado' : liberado ? 'Liberado' : 'Reservado'}
+        </span>
+      </div>
     </div>
   );
 }
@@ -47,17 +84,24 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
 
   const podeConfirmar = pedido.status === 'aberto' || pedido.status === 'expirado';
   const podeCancelar = pedido.status === 'aberto' || pedido.status === 'expirado';
+  const expirado = pedido.status === 'aberto' && new Date(pedido.expira_em) < new Date();
+  const canalLabel = pedido.canal_label || pedido.canal_origem || pedido.canal || 'Bling';
+  const clienteNome = pedido.cliente?.nome || 'Cliente nao informado';
+  const totalPedido = pedido.financeiro?.total;
+  const notaFiscal = pedido.nota_fiscal || {};
+  const situacaoBling = pedido.situacao_bling || {};
 
   async function handleConfirmar() {
-    if (!window.confirm(`Confirmar pedido Bling #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?\nIsso vai baixar o estoque dos itens manualmente.`)) return;
+    if (!window.confirm(`Confirmar pedido Bling #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?
+Isso vai baixar o estoque dos itens manualmente.`)) return;
     setAcao(true);
     try {
       const res = await api.post(`/integracoes/bling/pedidos/${pedido.id}/confirmar-manual`);
       if (res.data.erros_estoque?.length > 0) {
-        toast.success('✅ Pedido confirmado com avisos');
-        toast.error('Alguns SKUs não baixaram: ' + res.data.erros_estoque.join(', '), { duration: 8000 });
+        toast.success('Pedido confirmado com avisos');
+        toast.error(`Alguns SKUs nao baixaram: ${res.data.erros_estoque.join(', ')}`, { duration: 8000 });
       } else {
-        toast.success('✅ Pedido confirmado e estoque baixado!');
+        toast.success('Pedido confirmado e estoque baixado');
       }
       onConfirmar();
     } catch (e) {
@@ -68,7 +112,8 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
   }
 
   async function handleCancelar() {
-    if (!window.confirm(`Cancelar pedido #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?\nAs reservas de estoque serão liberadas.`)) return;
+    if (!window.confirm(`Cancelar pedido #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?
+As reservas de estoque serao liberadas.`)) return;
     setAcao(true);
     try {
       await api.post(`/integracoes/bling/pedidos/${pedido.id}/cancelar`);
@@ -81,41 +126,37 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
     }
   }
 
-  const formatarData = (iso) => {
-    if (!iso) return '—';
-    return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-  };
-
-  const expirado = pedido.status === 'aberto' && new Date(pedido.expira_em) < new Date();
-
   return (
     <div className={`bg-white rounded-xl border shadow-sm overflow-hidden ${expirado ? 'border-yellow-300' : 'border-gray-200'}`}>
-      {/* Cabeçalho */}
       <div
         className="flex items-center gap-3 p-4 cursor-pointer select-none hover:bg-gray-50 transition"
-        onClick={() => setExpandido(v => !v)}
+        onClick={() => setExpandido((v) => !v)}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-gray-900">
-              #{pedido.pedido_bling_numero || pedido.pedido_bling_id}
-            </span>
+            <span className="font-bold text-gray-900">#{pedido.pedido_bling_numero || pedido.pedido_bling_id}</span>
             <BadgeStatus status={expirado && pedido.status === 'aberto' ? 'expirado' : pedido.status} />
-            <span className="text-xs text-gray-400 capitalize">{/^\d+$/.test(pedido.canal) || pedido.canal === 'online' ? 'Bling' : pedido.canal}</span>
-          </div>
-          <div className="text-xs text-gray-500 mt-0.5">
-            Criado em {formatarData(pedido.criado_em)}
-            {pedido.status === 'aberto' && (
-              <span className={`ml-2 ${expirado ? 'text-yellow-600 font-semibold' : ''}`}>
-                · Expira {formatarData(pedido.expira_em)}
+            <span className="text-xs text-gray-500">{canalLabel}</span>
+            {notaFiscal?.id && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                NF #{notaFiscal.numero || notaFiscal.id}
               </span>
             )}
-            {pedido.confirmado_em && (
-              <span className="ml-2 text-green-600">· Confirmado {formatarData(pedido.confirmado_em)}</span>
+          </div>
+          <div className="text-sm text-gray-700 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+            <span>{clienteNome}</span>
+            <span className="text-gray-300">|</span>
+            <span>{formatarMoeda(totalPedido)}</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Criado em {formatarDataHora(pedido.criado_em)}
+            {pedido.status === 'aberto' && (
+              <span className={`ml-2 ${expirado ? 'text-yellow-600 font-semibold' : ''}`}>
+                | Expira {formatarDataHora(pedido.expira_em)}
+              </span>
             )}
-            {pedido.cancelado_em && (
-              <span className="ml-2 text-red-500">· Cancelado {formatarData(pedido.cancelado_em)}</span>
-            )}
+            {pedido.confirmado_em && <span className="ml-2 text-green-600">| Confirmado {formatarDataHora(pedido.confirmado_em)}</span>}
+            {pedido.cancelado_em && <span className="ml-2 text-red-500">| Cancelado {formatarDataHora(pedido.cancelado_em)}</span>}
           </div>
         </div>
 
@@ -124,35 +165,75 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
 
           {podeConfirmar && (
             <button
-              onClick={e => { e.stopPropagation(); handleConfirmar(); }}
+              onClick={(e) => { e.stopPropagation(); handleConfirmar(); }}
               disabled={acao}
               className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
             >
-              ✅ Confirmar
+              Confirmar
             </button>
           )}
           {podeCancelar && (
             <button
-              onClick={e => { e.stopPropagation(); handleCancelar(); }}
+              onClick={(e) => { e.stopPropagation(); handleCancelar(); }}
               disabled={acao}
               className="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
             >
-              ✕ Cancelar
+              Cancelar
             </button>
           )}
 
-          <span className="text-gray-400 text-sm">{expandido ? '▲' : '▼'}</span>
+          <span className="text-gray-400 text-sm">{expandido ? '^' : 'v'}</span>
         </div>
       </div>
 
-      {/* Itens */}
       {expandido && (
-        <div className="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-0.5">
-          {pedido.itens.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">Sem itens registrados</p>
-          ) : (
-            pedido.itens.map(it => <LinhaItem key={it.id} item={it} />)
+        <div className="border-t border-gray-100 px-4 py-4 bg-gray-50 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <CampoInfo label="Pedido na loja" valor={pedido.numero_pedido_loja} />
+            <CampoInfo label="Pedido no canal" valor={pedido.numero_pedido_canal} />
+            <CampoInfo label="Situacao Bling" valor={situacaoBling?.descricao || situacaoBling?.codigo} />
+            <CampoInfo label="Loja Bling" valor={pedido.loja?.nome} />
+            <CampoInfo label="Cliente" valor={pedido.cliente?.nome} />
+            <CampoInfo label="Documento" valor={pedido.cliente?.documento} />
+            <CampoInfo label="Telefone" valor={pedido.cliente?.telefone} />
+            <CampoInfo label="Email" valor={pedido.cliente?.email} />
+            <CampoInfo label="Data do pedido" valor={formatarDataHora(pedido.data_pedido)} />
+            <CampoInfo label="Total" valor={formatarMoeda(pedido.financeiro?.total)} />
+            <CampoInfo label="Desconto" valor={formatarMoeda(pedido.financeiro?.desconto)} />
+            <CampoInfo label="Frete" valor={formatarMoeda(pedido.financeiro?.frete)} />
+          </div>
+
+          {(notaFiscal?.id || notaFiscal?.numero || notaFiscal?.chave) && (
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">NF vinculada</p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
+                <CampoInfo label="NF Bling ID" valor={notaFiscal.id} />
+                <CampoInfo label="Numero / serie" valor={[notaFiscal.numero, notaFiscal.serie].filter(Boolean).join(' / ')} />
+                <CampoInfo label="Situacao NF" valor={notaFiscal.situacao} />
+                <CampoInfo label="Chave" valor={notaFiscal.chave} />
+              </div>
+            </div>
           )}
+
+          {pedido.observacoes && (
+            <div className="rounded-lg border border-gray-200 bg-white px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Observacoes</p>
+              <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{pedido.observacoes}</p>
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Itens do pedido</p>
+            {pedido.itens.length === 0 ? (
+              <p className="text-sm text-gray-400 italic">Sem itens registrados</p>
+            ) : (
+              <div className="space-y-2">
+                {pedido.itens.map((it, index) => (
+                  <LinhaItem key={it.id || `${pedido.id}-${it.sku || index}`} item={it} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -168,11 +249,11 @@ export default function PedidosBling() {
   const [carregando, setCarregando] = useState(false);
 
   const ABAS = [
-    { valor: '',           label: 'Todos' },
-    { valor: 'aberto',     label: 'Abertos' },
+    { valor: '', label: 'Todos' },
+    { valor: 'aberto', label: 'Abertos' },
     { valor: 'confirmado', label: 'Confirmados' },
-    { valor: 'expirado',   label: 'Expirados' },
-    { valor: 'cancelado',  label: 'Cancelados' },
+    { valor: 'expirado', label: 'Expirados' },
+    { valor: 'cancelado', label: 'Cancelados' },
   ];
 
   const carregar = useCallback(async () => {
@@ -191,7 +272,9 @@ export default function PedidosBling() {
     }
   }, [pagina, statusFiltro]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   function mudarStatus(novoStatus) {
     setStatusFiltro(novoStatus);
@@ -199,25 +282,21 @@ export default function PedidosBling() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Título */}
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pedidos Bling</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Pedidos recebidos via webhook do Bling. Confirme manualmente se a nota fiscal não chegou automaticamente.
+          Pedidos recebidos via Bling com canal, referencias, cliente, financeiro, itens e vinculo com NF quando disponivel.
         </p>
       </div>
 
-      {/* Abas de status */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-        {ABAS.map(aba => (
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit flex-wrap">
+        {ABAS.map((aba) => (
           <button
             key={aba.valor}
             onClick={() => mudarStatus(aba.valor)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              statusFiltro === aba.valor
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              statusFiltro === aba.valor ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             {aba.label}
@@ -225,26 +304,24 @@ export default function PedidosBling() {
         ))}
       </div>
 
-      {/* Contagem */}
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-gray-500">
-          {carregando ? 'Carregando…' : `${total} pedido${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
+          {carregando ? 'Carregando...' : `${total} pedido${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
         </p>
         <button
           onClick={carregar}
           disabled={carregando}
           className="text-xs text-blue-600 hover:underline disabled:opacity-50"
         >
-          ↻ Atualizar
+          Atualizar
         </button>
       </div>
 
-      {/* Lista */}
       {carregando ? (
-        <div className="text-center py-16 text-gray-400">Carregando pedidos…</div>
+        <div className="text-center py-16 text-gray-400">Carregando pedidos...</div>
       ) : pedidos.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-5xl mb-3">📭</div>
+          <div className="text-5xl mb-3">PED</div>
           <p className="text-gray-500 font-medium">Nenhum pedido encontrado</p>
           <p className="text-sm text-gray-400 mt-1">
             {statusFiltro
@@ -254,36 +331,30 @@ export default function PedidosBling() {
         </div>
       ) : (
         <div className="space-y-3">
-          {pedidos.map(p => (
-            <CardPedido
-              key={p.id}
-              pedido={p}
-              onConfirmar={carregar}
-              onCancelar={carregar}
-            />
+          {pedidos.map((p) => (
+            <CardPedido key={p.id} pedido={p} onConfirmar={carregar} onCancelar={carregar} />
           ))}
         </div>
       )}
 
-      {/* Paginação */}
       {paginas > 1 && (
         <div className="flex items-center justify-center gap-2 mt-6">
           <button
-            onClick={() => setPagina(v => Math.max(1, v - 1))}
+            onClick={() => setPagina((v) => Math.max(1, v - 1))}
             disabled={pagina === 1}
             className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50 transition"
           >
-            ← Anterior
+            Anterior
           </button>
           <span className="text-sm text-gray-600">
-            Página {pagina} de {paginas}
+            Pagina {pagina} de {paginas}
           </span>
           <button
-            onClick={() => setPagina(v => Math.min(paginas, v + 1))}
+            onClick={() => setPagina((v) => Math.min(paginas, v + 1))}
             disabled={pagina === paginas}
             className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-40 hover:bg-gray-50 transition"
           >
-            Próxima →
+            Proxima
           </button>
         </div>
       )}

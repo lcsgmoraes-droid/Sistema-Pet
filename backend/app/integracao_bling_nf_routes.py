@@ -18,6 +18,7 @@ from app.services.bling_nf_service import (
     criar_produto_automatico_do_bling,
     AUTO_CADASTRO_BING_TAG,
 )
+from app.services.bling_flow_monitor_service import abrir_incidente, registrar_evento
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
@@ -31,9 +32,9 @@ router = APIRouter(
 )
 
 # Situações de NF no Bling (campo situacao é um número)
-# 1=Pendente, 2=Emitida, 4=Cancelada, 5=Denegada, 9=Autorizado pelo SEFAZ
-_NF_SITUACAO_AUTORIZADA = {2, 9}   # emitida ou autorizada
-_NF_SITUACAO_CANCELADA  = {4, 5}   # cancelada ou denegada
+# 1=Pendente, 2=Emitida DANFE, 4=Cancelada, 5=Autorizada, 9=Autorizada
+_NF_SITUACAO_AUTORIZADA = {2, 5, 9}
+_NF_SITUACAO_CANCELADA  = {4}
 
 
 def _query_itens_sem_produto(db: Session, tenant_id):
@@ -125,7 +126,17 @@ def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
     try:
         from app.bling_integration import BlingAPI
 
-        nf_completa = BlingAPI().consultar_nfe(int(nf_id))
+        bling = BlingAPI()
+        ultima_falha = None
+        nf_completa = {}
+
+        for consulta in (bling.consultar_nfe, bling.consultar_nfce):
+            try:
+                nf_completa = consulta(int(nf_id))
+                break
+            except Exception as e:
+                ultima_falha = e
+
         pedido_ref = (
             nf_completa.get("pedido")
             or nf_completa.get("pedidoCompra")
@@ -134,10 +145,34 @@ def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
         if isinstance(pedido_ref, dict):
             pedido_bling_id = str(pedido_ref.get("id", ""))
         logger.info(f"[BLING NF] NF {nf_id} situacao={situacao_num} pedido_bling={pedido_bling_id}")
+
+        if not pedido_bling_id and ultima_falha:
+            raise ultima_falha
     except Exception as e:
         logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
 
     return pedido_bling_id or None
+
+
+def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, situacao_num: int) -> None:
+    payload_atual = pedido.payload if isinstance(pedido.payload, dict) else {}
+    pedido.payload = {
+        **payload_atual,
+        "ultima_nf": {
+            "id": nf_id,
+            "numero": data.get("numero"),
+            "serie": data.get("serie"),
+            "situacao": data.get("situacao"),
+            "situacao_codigo": situacao_num,
+            "chave": data.get("chaveAcesso") or data.get("chave"),
+            "valor_total": (
+                data.get("valorNota")
+                or data.get("valorTotalNf")
+                or data.get("valor_total")
+                or data.get("valorTotal")
+            ),
+        },
+    }
 
 
 def _gerar_provisao_simples_se_aplicavel(db: Session, pedido: PedidoIntegrado, data: dict) -> None:
@@ -179,12 +214,13 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     Recebe webhooks de NF-e e NF-e de consumidor do Bling.
     Formato envelope v1:
       { eventId, date, version, event: 'invoice.created'|'invoice.updated', data: {...} }
-    O campo data.situacao é um NÚMERO: 2=Emitida, 9=Autorizada, 4=Cancelada.
+    O campo data.situacao é um NÚMERO: 2=Emitida, 5/9=Autorizada, 4=Cancelada.
     O payload do webhook NÃO inclui o pedido vinculado — precisa chamar a API.
     """
     body = await request.json()
 
     # Injetar tenant no contexto (webhook chega sem JWT)
+    tenant_id_monitor = UUID(_BLING_WEBHOOK_TENANT_ID) if _BLING_WEBHOOK_TENANT_ID else None
     if _BLING_WEBHOOK_TENANT_ID:
         set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
 
@@ -208,8 +244,35 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # Buscar NF completa na API do Bling para obter o pedido vinculado
     pedido_bling_id = _obter_pedido_bling_id_por_nf(nf_id=nf_id, situacao_num=situacao_num)
 
+    if tenant_id_monitor:
+        registrar_evento(
+            tenant_id=tenant_id_monitor,
+            source="webhook",
+            event_type="invoice.updated",
+            entity_type="nf",
+            status="received",
+            severity="info",
+            message="Webhook de NF recebido",
+            pedido_bling_id=pedido_bling_id,
+            nf_bling_id=nf_id,
+            payload=data,
+        )
+
     if not pedido_bling_id:
         # NF sem pedido vinculado (ex: NF emitida manualmente fora do fluxo)
+        if tenant_id_monitor:
+            abrir_incidente(
+                tenant_id=tenant_id_monitor,
+                code="NF_SEM_PEDIDO_VINCULADO",
+                severity="high",
+                title="NF sem pedido vinculado",
+                message="A NF recebida do Bling nao retornou nenhum pedido vinculado na consulta da API.",
+                suggested_action="Revisar a origem da NF no Bling e vincular manualmente ao pedido correto, se existir.",
+                auto_fixable=False,
+                nf_bling_id=nf_id,
+                details={"situacao_num": situacao_num},
+                source="runtime",
+            )
         return {"status": "ignorado", "motivo": "nf_sem_pedido_vinculado"}
 
     pedido = db.query(PedidoIntegrado).filter(
@@ -217,7 +280,23 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     ).first()
 
     if not pedido:
+        if tenant_id_monitor:
+            abrir_incidente(
+                tenant_id=tenant_id_monitor,
+                code="NF_SEM_PEDIDO_LOCAL",
+                severity="critical",
+                title="NF vinculada a pedido inexistente localmente",
+                message="A NF referencia um pedido do Bling que ainda nao existe ou nao foi encontrado no sistema.",
+                suggested_action="Importar/reprocessar o pedido correspondente antes de consolidar a NF.",
+                auto_fixable=False,
+                pedido_bling_id=pedido_bling_id,
+                nf_bling_id=nf_id,
+                details={"situacao_num": situacao_num},
+                source="runtime",
+            )
         return {"status": "ignorado", "motivo": "pedido_nao_encontrado_no_sistema"}
+
+    _registrar_nf_no_pedido(pedido=pedido, data=data, nf_id=nf_id, situacao_num=situacao_num)
 
     itens = db.query(PedidoIntegradoItem).filter(
         PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -229,6 +308,18 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     if situacao_num in _NF_SITUACAO_AUTORIZADA:
         acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=data)
+        registrar_evento(
+            tenant_id=pedido.tenant_id,
+            source="webhook",
+            event_type="invoice.authorized",
+            entity_type="nf",
+            status="ok",
+            severity="info",
+            message="NF autorizada processada e pedido reconciliado",
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido.pedido_bling_id,
+            nf_bling_id=nf_id,
+        )
 
         return {"status": "ok", "acao": acao}
 
@@ -237,6 +328,18 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     if situacao_num in _NF_SITUACAO_CANCELADA:
         acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens)
+        registrar_evento(
+            tenant_id=pedido.tenant_id,
+            source="webhook",
+            event_type="invoice.cancelled",
+            entity_type="nf",
+            status="ok",
+            severity="info",
+            message="NF cancelada processada",
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido.pedido_bling_id,
+            nf_bling_id=nf_id,
+        )
         return {"status": "ok", "acao": acao}
 
     return {"status": "ignorado", "motivo": "status_nf_desconhecido"}

@@ -17,6 +17,7 @@ import json
 import logging
 
 from app.produtos_models import Produto, ProdutoLote, EstoqueMovimentacao
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,33 @@ def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> Non
 
 class EstoqueService:
     """Service isolado para operações de estoque"""
+
+    @staticmethod
+    def _resolver_user_id_operacao(db: Session, tenant_id: str, user_id: int | None) -> int:
+        """
+        Resolve um usuário válido para operações automáticas.
+
+        Alguns fluxos automáticos antigos usavam `0` como marcador, mas a FK da
+        movimentação exige um usuário real. Nesses casos, usamos o primeiro
+        usuário ativo do tenant.
+        """
+        if user_id and user_id > 0:
+            usuario = db.query(User).filter(User.id == user_id).first()
+            if usuario:
+                return usuario.id
+
+        usuario_tenant = (
+            db.query(User)
+            .filter(User.tenant_id == str(tenant_id), User.is_active == True)  # noqa: E712
+            .order_by(User.id.asc())
+            .first()
+        )
+        if usuario_tenant:
+            return usuario_tenant.id
+
+        raise ValueError(
+            f"Nenhum usuario ativo encontrado para registrar a movimentacao de estoque do tenant {tenant_id}"
+        )
 
     @staticmethod
     def _validar_ou_registrar_estoque_negativo(
@@ -239,6 +267,12 @@ class EstoqueService:
         produto.estoque_atual -= quantidade
         estoque_novo = produto.estoque_atual
         
+        user_id_movimentacao = EstoqueService._resolver_user_id_operacao(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
+
         # Criar movimentação de estoque
         movimentacao = EstoqueMovimentacao(
             produto_id=produto.id,
@@ -254,7 +288,7 @@ class EstoqueService:
             referencia_id=referencia_id,
             referencia_tipo=referencia_tipo,
             observacao=observacao,
-            user_id=user_id,
+            user_id=user_id_movimentacao,
             tenant_id=tenant_id
         )
         db.add(movimentacao)

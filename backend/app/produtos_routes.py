@@ -1777,11 +1777,22 @@ def listar_produtos(
     # Reservas ativas por SKU (pedidos Bling em aberto)
     try:
         from app.pedido_integrado_item_models import PedidoIntegradoItem
-        skus_v2 = [p.codigo for p in produtos if p.codigo]
+        aliases_reserva = {}
+        skus_v2 = []
+        for produto in produtos:
+            aliases = []
+            for codigo in (produto.codigo, produto.codigo_barras):
+                texto = (codigo or "").strip() if isinstance(codigo, str) else codigo
+                if texto and texto not in aliases:
+                    aliases.append(texto)
+            aliases_reserva[produto.id] = aliases
+            skus_v2.extend(aliases)
+        skus_v2 = list(dict.fromkeys(skus_v2))
         if skus_v2:
             reservas_v2 = dict(
                 db.query(PedidoIntegradoItem.sku, func.coalesce(func.sum(PedidoIntegradoItem.quantidade), 0))
                 .filter(
+                    PedidoIntegradoItem.tenant_id == tenant_id,
                     PedidoIntegradoItem.sku.in_(skus_v2),
                     PedidoIntegradoItem.liberado_em.is_(None),
                     PedidoIntegradoItem.vendido_em.is_(None)
@@ -1794,6 +1805,7 @@ def listar_produtos(
     except Exception:
         db.rollback()
         reservas_v2 = {}
+        aliases_reserva = {}
 
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
@@ -1844,7 +1856,8 @@ def listar_produtos(
                 produto.composicao_kit = []
                 produto.estoque_virtual = int(produto.estoque_atual or 0)
 
-        produto.estoque_reservado = float(reservas_v2.get(produto.codigo, 0))
+        aliases_produto = aliases_reserva.get(produto.id, [codigo for codigo in [produto.codigo, produto.codigo_barras] if codigo])
+        produto.estoque_reservado = float(sum(float(reservas_v2.get(sku, 0) or 0) for sku in aliases_produto))
         # Marcar produto como de parceiro se pertencer a outro tenant
         produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
         produtos_expandidos.append(produto)
@@ -2103,9 +2116,12 @@ def obter_produto(
     # Calcular estoque reservado (pedidos Bling em aberto)
     try:
         from app.pedido_integrado_item_models import PedidoIntegradoItem
-        if produto.codigo:
+        if produto.codigo or produto.codigo_barras:
             reservado = db.query(func.coalesce(func.sum(PedidoIntegradoItem.quantidade), 0)).filter(
-                PedidoIntegradoItem.sku == produto.codigo,
+                PedidoIntegradoItem.tenant_id == tenant_id,
+                PedidoIntegradoItem.sku.in_(
+                    [codigo for codigo in [produto.codigo, produto.codigo_barras] if codigo]
+                ),
                 PedidoIntegradoItem.liberado_em.is_(None),
                 PedidoIntegradoItem.vendido_em.is_(None)
             ).scalar()

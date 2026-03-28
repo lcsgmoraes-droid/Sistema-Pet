@@ -131,6 +131,7 @@ simplesvet/
 
 # CSVs grandes de comparação (apenas local)
 Comparação*.csv
+produtos_estrutura_*.csv
 
 # Certificados locais gerados automaticamente (NUNCA versionar)
 nginx/ssl/*.pem

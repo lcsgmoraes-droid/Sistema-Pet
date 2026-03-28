@@ -11,6 +11,7 @@ import psutil
 import time
 
 from app.db import get_session
+from app.services.bling_flow_monitor_service import obter_resumo_monitoramento
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage
 
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
@@ -296,3 +297,14 @@ system_disk_usage_percent {psutil.disk_usage('/').percent}
             status_code=500,
             detail=f"Failed to generate Prometheus metrics: {str(e)}"
         )
+
+
+@router.get("/bling-flow")
+async def bling_flow_health(db: Session = Depends(get_session)) -> Dict[str, Any]:
+    resumo = obter_resumo_monitoramento(db)
+    return {
+        "status": resumo["status"],
+        "incidentes_abertos": resumo["incidentes_abertos"],
+        "por_severidade": resumo["por_severidade"],
+        "por_codigo": resumo["por_codigo"],
+    }

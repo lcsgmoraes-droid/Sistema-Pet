@@ -8,6 +8,7 @@ from app.estoque_reserva_service import EstoqueReservaService
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto
+from app.services.bling_flow_monitor_service import abrir_incidente, registrar_evento
 from app.utils.logger import logger
 
 
@@ -192,6 +193,8 @@ def processar_nf_autorizada(
     itens: list[PedidoIntegradoItem],
     nf_id: str,
 ) -> str:
+    pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
+
     if pedido.status == "confirmado" and all(item.vendido_em for item in itens):
         return "venda_ja_confirmada"
 
@@ -235,12 +238,82 @@ def processar_nf_autorizada(
                 )
             else:
                 logger.warning(f"⚠️  Produto com código/SKU '{item.sku}' não encontrado para baixa de estoque")
+                registrar_evento(
+                    tenant_id=pedido.tenant_id,
+                    source="runtime",
+                    event_type="nf.baixa_estoque",
+                    entity_type="nf",
+                    status="error",
+                    severity="critical",
+                    message="Produto nao encontrado para baixa via NF",
+                    error_message=f"SKU {item.sku} sem produto local",
+                    pedido_integrado_id=pedido.id,
+                    pedido_bling_id=pedido_bling_id,
+                    nf_bling_id=nf_id,
+                    sku=item.sku,
+                )
+                abrir_incidente(
+                    tenant_id=pedido.tenant_id,
+                    code="SKU_SEM_PRODUTO_LOCAL",
+                    severity="critical",
+                    title="SKU sem produto local",
+                    message=f"O SKU '{item.sku}' nao foi encontrado ao processar a NF autorizada.",
+                    suggested_action="Autocadastrar o produto pelo Bling e reconciliar a baixa pendente.",
+                    auto_fixable=True,
+                    pedido_integrado_id=pedido.id,
+                    pedido_bling_id=pedido_bling_id,
+                    nf_bling_id=nf_id,
+                    sku=item.sku,
+                    details={"origem": "nf_autorizada"},
+                    source="runtime",
+                )
 
         except Exception as e:
             logger.warning(f"⚠️  Falha ao baixar estoque para SKU {item.sku}: {e}")
+            registrar_evento(
+                tenant_id=pedido.tenant_id,
+                source="runtime",
+                event_type="nf.baixa_estoque",
+                entity_type="nf",
+                status="error",
+                severity="critical",
+                message="Falha ao baixar estoque via NF autorizada",
+                error_message=str(e),
+                pedido_integrado_id=pedido.id,
+                pedido_bling_id=pedido_bling_id,
+                nf_bling_id=nf_id,
+                sku=item.sku,
+            )
+            abrir_incidente(
+                tenant_id=pedido.tenant_id,
+                code="PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
+                severity="critical",
+                title="Falha na baixa do estoque por NF",
+                message=f"A NF autorizada nao conseguiu baixar o estoque do SKU '{item.sku}'.",
+                suggested_action="Reconciliar o pedido confirmado e reaplicar a baixa faltante.",
+                auto_fixable=True,
+                pedido_integrado_id=pedido.id,
+                pedido_bling_id=pedido_bling_id,
+                nf_bling_id=nf_id,
+                sku=item.sku,
+                details={"erro": str(e)},
+                source="runtime",
+            )
 
     db.add(pedido)
     db.commit()
+    registrar_evento(
+        tenant_id=pedido.tenant_id,
+        source="runtime",
+        event_type="nf.processada",
+        entity_type="nf",
+        status="ok",
+        severity="info",
+        message="NF autorizada processada com reconciliacao de estoque",
+        pedido_integrado_id=pedido.id,
+        pedido_bling_id=pedido_bling_id,
+        nf_bling_id=nf_id,
+    )
     return "venda_confirmada"
 
 
