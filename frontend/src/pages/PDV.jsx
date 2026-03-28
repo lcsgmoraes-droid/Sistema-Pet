@@ -21,6 +21,7 @@ import {
   Clock,
   Copy,
   CreditCard,
+  FileText,
   History,
   Layers,
   Minus,
@@ -2397,6 +2398,39 @@ export default function PDV() {
     }
   };
 
+  const emitirNotaVendaFinalizada = async () => {
+    if (!vendaAtual.id) return;
+
+    let tipoNota = "nfce";
+    if (vendaAtual.cliente?.cnpj) {
+      const emitirNfe = window.confirm(
+        "Cliente tem CNPJ.\n\nClique OK para emitir NF-e (Empresa)\nClique Cancelar para emitir NFC-e (Cupom).",
+      );
+      tipoNota = emitirNfe ? "nfe" : "nfce";
+    }
+
+    const confirmar = window.confirm(
+      `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
+    );
+    if (!confirmar) return;
+
+    try {
+      setLoading(true);
+      await api.post("/nfe/emitir", {
+        venda_id: vendaAtual.id,
+        tipo_nota: tipoNota,
+      });
+
+      await carregarVendaEspecifica(vendaAtual.id);
+      toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} emitida com sucesso!`);
+    } catch (error) {
+      console.error("Erro ao emitir nota da venda finalizada:", error);
+      alert(error.response?.data?.detail || "Erro ao emitir nota fiscal");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       {/* 🚗 Drive Alert — aparece quando cliente chegou no estacionamento */}
@@ -2759,6 +2793,17 @@ export default function PDV() {
                   </button>
 
                   {/* Botão Reabrir: aparece para vendas finalizadas ou parcialmente pagas */}
+                  {(vendaAtual.status === "finalizada" ||
+                    vendaAtual.status === "baixa_parcial") && (
+                    <button
+                      onClick={emitirNotaVendaFinalizada}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Emitir NF
+                    </button>
+                  )}
+
                   {(vendaAtual.status === "finalizada" ||
                     vendaAtual.status === "baixa_parcial") && (
                     <button
