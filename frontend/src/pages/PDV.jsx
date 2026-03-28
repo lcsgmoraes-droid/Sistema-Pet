@@ -2711,7 +2711,7 @@ export default function PDV() {
           {vendaAtual.id && vendaAtual.numero_venda && (
             <div className="bg-blue-50 border-b border-blue-200 px-4 py-1.5">
               <div className="flex items-center justify-between max-w-5xl mx-auto">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-medium text-blue-800">
                     Venda:
                   </span>
@@ -2786,7 +2786,7 @@ export default function PDV() {
                       setModoVisualizacao(false);
                       limparVenda();
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
+                    className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500 bg-slate-600 text-white font-semibold shadow-sm hover:bg-slate-700 hover:shadow-md transition-all duration-200"
                   >
                     <X className="w-4 h-4" />
                     Voltar
@@ -2797,7 +2797,7 @@ export default function PDV() {
                     vendaAtual.status === "baixa_parcial") && (
                     <button
                       onClick={emitirNotaVendaFinalizada}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500 bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all duration-200"
                     >
                       <FileText className="w-4 h-4" />
                       Emitir NF
@@ -2808,7 +2808,7 @@ export default function PDV() {
                     vendaAtual.status === "baixa_parcial") && (
                     <button
                       onClick={mudarStatusParaAberta}
-                      className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-orange-500 bg-orange-600 text-white font-semibold shadow-sm hover:bg-orange-700 hover:shadow-md transition-all duration-200"
                     >
                       <AlertCircle className="w-4 h-4" />
                       Reabrir Venda
@@ -2819,7 +2819,7 @@ export default function PDV() {
                   {vendaAtual.status === "aberta" && (
                     <button
                       onClick={habilitarEdicao}
-                      className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors"
+                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center rounded-xl border border-amber-500 bg-amber-600 text-white font-semibold shadow-sm hover:bg-amber-700 hover:shadow-md transition-all duration-200"
                     >
                       Editar
                     </button>
