@@ -34,6 +34,12 @@ _STATUS_MAP = {
     9: "Autorizada",
 }
 
+_LOJA_ID_CANAL_MAP = {
+    "204647675": "mercado_livre",
+    "205367939": "shopee",
+    "205639810": "amazon",
+}
+
 
 def _coerce_int(value, default: int = 0) -> int:
     try:
@@ -58,7 +64,7 @@ def _texto(value) -> str | None:
     return texto or None
 
 
-def _texto_relacionado(value, *keys: str) -> str | None:
+def _texto_relacionado(value, *keys: str, fallback_to_id: bool = True) -> str | None:
     if value is None:
         return None
     if isinstance(value, dict):
@@ -79,7 +85,7 @@ def _texto_relacionado(value, *keys: str) -> str | None:
             if texto:
                 return texto
         identificador = _texto(value.get("id"))
-        if identificador and identificador != "0":
+        if fallback_to_id and identificador and identificador != "0":
             return f"ID {identificador}"
         return None
     if isinstance(value, list):
@@ -171,6 +177,10 @@ def _inferir_canal_por_numero(numero) -> str | None:
     return None
 
 
+def _inferir_canal_por_loja_id(loja_id) -> str | None:
+    return _LOJA_ID_CANAL_MAP.get(_texto(loja_id) or "")
+
+
 def _formatar_endereco(value) -> str | None:
     if isinstance(value, dict):
         logradouro = _texto(_primeiro_preenchido(value.get("endereco"), value.get("logradouro"), value.get("descricao"), value.get("nome")))
@@ -189,6 +199,23 @@ def _formatar_endereco(value) -> str | None:
         return " - ".join(partes) or None
 
     return _texto(value)
+
+
+def _texto_generico_baixo_valor(value) -> bool:
+    texto = _texto(value)
+    if not texto:
+        return True
+    texto_norm = texto.strip().lower()
+    return texto_norm in {
+        "outros",
+        "outro",
+        "online",
+        "marketplace",
+        "loja virtual",
+        "e-commerce",
+        "ecommerce",
+        "id",
+    } or texto_norm.startswith("id ")
 
 
 def _formatar_data_iso(valor) -> str | None:
@@ -244,6 +271,8 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
     info_adicionais = _dict(item.get("informacoesAdicionais"))
     intermediador = _dict(item.get("intermediador"))
     pedido_ref = _dict(_primeiro_preenchido(item.get("pedido"), item.get("pedidoVenda"), item.get("pedidoCompra")))
+    loja_nome = _texto_relacionado(loja, fallback_to_id=False)
+    unidade_negocio_nome = _texto_relacionado(unidade_negocio, fallback_to_id=False)
     info_complementares = _texto(_primeiro_preenchido(
         info_adicionais.get("informacoesComplementares"),
         item.get("informacoesComplementares"),
@@ -265,27 +294,37 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
         info_adicionais.get("numeroPedidoLoja"),
         numero_extraido_texto,
     ))
-    canal_inferido = _inferir_canal_por_numero(numero_loja_virtual)
+    canal_inferido = _primeiro_preenchido(
+        _inferir_canal_por_numero(numero_loja_virtual),
+        _inferir_canal_por_loja_id(loja.get("id")),
+    )
+    canal_inferido_label = _canal_label(canal_inferido)
     origem_loja_virtual = _texto(_primeiro_preenchido(
         item.get("origemLojaVirtual"),
         marketplace.get("nome"),
         marketplace.get("descricao"),
         info_adicionais.get("origemLojaVirtual"),
-        _texto_relacionado(loja),
-        _canal_label(canal_inferido),
+        canal_inferido_label,
+        loja_nome,
     ))
+    if _texto_generico_baixo_valor(origem_loja_virtual) and canal_inferido_label:
+        origem_loja_virtual = canal_inferido_label
+
     origem_canal_venda = _texto(_primeiro_preenchido(
         item.get("origemCanalVenda"),
         info_adicionais.get("origemCanalVenda"),
         venda.canal if venda else None,
-        _canal_label(canal_inferido) if canal_inferido == "mercado_livre" else None,
+        canal_inferido_label,
     ))
+    if _texto_generico_baixo_valor(origem_canal_venda) and canal_inferido_label:
+        origem_canal_venda = canal_inferido_label
+
     canal_base = _primeiro_preenchido(
-        origem_loja_virtual,
         origem_canal_venda,
-        _texto_relacionado(loja),
+        origem_loja_virtual,
+        canal_inferido_label,
+        loja_nome,
         venda.canal if venda else None,
-        _canal_label(canal_inferido),
     )
     canal = _canal_slug(canal_base)
     canal_label = _canal_label(canal, canal_base)
@@ -295,11 +334,11 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
         "canal_label": canal_label,
         "loja": {
             "id": loja.get("id"),
-            "nome": _texto_relacionado(loja) or _texto(venda.loja_origem if venda else None),
+            "nome": loja_nome or _texto(venda.loja_origem if venda else None),
         },
         "unidade_negocio": {
             "id": unidade_negocio.get("id"),
-            "nome": _texto_relacionado(unidade_negocio),
+            "nome": unidade_negocio_nome,
         },
         "numero_loja_virtual": numero_loja_virtual,
         "origem_loja_virtual": origem_loja_virtual,
@@ -694,12 +733,13 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
     pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
     loja = _dict(pedido_payload.get("loja"))
     marketplace = _dict(pedido_payload.get("marketplace"))
+    loja_nome = _texto_relacionado(loja, fallback_to_id=False)
     canal_base = _primeiro_preenchido(
         pedido_payload.get("canal"),
         pedido_payload.get("origem"),
         marketplace.get("nome"),
         marketplace.get("descricao"),
-        loja.get("nome"),
+        loja_nome,
         pedido.canal,
     )
     canal = _canal_slug(canal_base)
@@ -708,7 +748,7 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
         "canal_label": _canal_label(canal, canal_base),
         "loja": {
             "id": loja.get("id"),
-            "nome": _texto_relacionado(loja),
+            "nome": loja_nome,
         },
         "numero_loja_virtual": _texto(_primeiro_preenchido(
             pedido_payload.get("numeroPedidoLoja"),
@@ -726,7 +766,7 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
             pedido_payload.get("origemLojaVirtual"),
             marketplace.get("nome"),
             marketplace.get("descricao"),
-            loja.get("nome"),
+            loja_nome,
         )),
         "origem_canal_venda": _texto(_primeiro_preenchido(
             pedido_payload.get("origemCanalVenda"),

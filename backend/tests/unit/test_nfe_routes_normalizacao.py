@@ -108,6 +108,34 @@ def test_normalizar_resumo_canal_infere_marketplace_pelo_numero_loja_virtual():
     assert resumo["origem_loja_virtual"] == "Amazon"
 
 
+def test_normalizar_resumo_canal_nao_promove_id_da_loja_a_canal():
+    resumo = _normalizar_resumo_canal(
+        {
+            "loja": {"id": 205367939},
+            "numeroLojaVirtual": "260329CJYQJRA2",
+        }
+    )
+
+    assert resumo["canal"] == "shopee"
+    assert resumo["canal_label"] == "Shopee"
+    assert resumo["origem_loja_virtual"] == "Shopee"
+    assert resumo["origem_canal_venda"] == "Shopee"
+    assert resumo["loja"]["nome"] is None
+
+
+def test_normalizar_resumo_canal_mapeia_loja_id_conhecida_para_mercado_livre():
+    resumo = _normalizar_resumo_canal(
+        {
+            "loja": {"id": 204647675},
+            "numeroLojaVirtual": "2000015737461914",
+        }
+    )
+
+    assert resumo["canal"] == "mercado_livre"
+    assert resumo["canal_label"] == "Mercado Livre"
+    assert resumo["origem_loja_virtual"] == "Mercado Livre"
+
+
 def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
     venda = SimpleNamespace(
         id=123,
