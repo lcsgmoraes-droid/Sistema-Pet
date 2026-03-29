@@ -3,6 +3,26 @@ import { toast } from 'react-hot-toast';
 
 import api from '../api';
 
+const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+const EVENT_LABELS = {
+  'order.created': 'Pedido criado/importado',
+  'order.updated': 'Atualizacao do pedido recebida',
+  'invoice.updated': 'NF recebida do Bling',
+  'invoice.linked_to_order': 'NF vinculada ao pedido',
+  'invoice.authorized': 'NF autorizada e processada',
+  'invoice.cancelled': 'NF cancelada processada',
+  'pedido.confirmado': 'Pedido confirmado no sistema',
+  'pedido.cancelado': 'Pedido cancelado no sistema',
+  'pedido.confirmacao.baixa': 'Baixa de estoque do pedido',
+  'nf.processada': 'NF processada com reconciliacao',
+  'nf.baixa_estoque': 'Baixa de estoque via NF',
+};
+const LINK_SOURCE_LABELS = {
+  'nf.webhook': 'webhook da NF',
+  'pedido.webhook': 'webhook do pedido',
+  auditoria: 'auditoria automatica',
+};
+
 function Badge({ children, tone = 'slate' }) {
   const tones = {
     slate: 'bg-slate-100 text-slate-700',
@@ -27,11 +47,72 @@ function toneFromSeverity(severity) {
   return 'slate';
 }
 
+function toneFromStatus(status) {
+  if (status === 'ok') return 'green';
+  if (status === 'received') return 'blue';
+  if (status === 'warning') return 'yellow';
+  if (status === 'error') return 'red';
+  return 'slate';
+}
+
+function statusLabel(status) {
+  if (status === 'ok') return 'ok';
+  if (status === 'received') return 'recebido';
+  if (status === 'warning') return 'pendencia';
+  if (status === 'error') return 'erro';
+  return status || '-';
+}
+
+function normalizeUtcDateInput(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  if (/z$/i.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) return raw;
+
+  const base = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  return `${base}Z`;
+}
+
 function formatDate(value) {
-  if (!value) return '-';
-  const date = new Date(value);
+  const normalized = normalizeUtcDateInput(value);
+  if (!normalized) return '-';
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return `${date.toLocaleString('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: BRASILIA_TIMEZONE,
+  })} BRT`;
+}
+
+function displayValue(value) {
+  if (value === null || value === undefined) return '-';
+  if (value === '') return '-';
+  return String(value);
+}
+
+function InfoHint({ text }) {
+  if (!text) return null;
+  return (
+    <span
+      title={text}
+      className="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-slate-300 text-[10px] font-bold text-slate-400"
+    >
+      ?
+    </span>
+  );
+}
+
+function DetailField({ label, value, hint, mono = false }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        <span>{label}</span>
+        <InfoHint text={hint} />
+      </div>
+      <p className={`mt-1 break-all text-sm text-slate-700 ${mono ? 'font-mono' : ''}`}>{displayValue(value)}</p>
+    </div>
+  );
 }
 
 function SummaryCard({ title, value, hint }) {
@@ -88,6 +169,93 @@ function formatAutofixDetails(details) {
   return '';
 }
 
+function eventLabel(eventType) {
+  return EVENT_LABELS[eventType] || eventType || 'Evento do monitor';
+}
+
+function buildEventResult(evento) {
+  const erros = Array.isArray(evento?.payload?.erros_estoque) ? evento.payload.erros_estoque.filter(Boolean) : [];
+  const errorDetail = friendlyErrorMessage(evento?.error_message || erros.join(' | '));
+
+  if (evento?.event_type === 'invoice.authorized' && evento?.payload?.acao === 'venda_ja_confirmada') {
+    return 'A NF foi processada e o pedido ja estava conciliado anteriormente.';
+  }
+  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'ok') {
+    return 'Pedido confirmado e estoque baixado sem pendencias.';
+  }
+  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'warning') {
+    return errorDetail || 'Pedido confirmado, mas a baixa de estoque ficou com pendencias.';
+  }
+  if (evento?.status === 'ok') return 'Tudo certo nesta etapa.';
+  if (evento?.status === 'received') return 'Evento recebido; os proximos cards mostram o processamento e o resultado.';
+  if (evento?.status === 'warning') return errorDetail || 'A etapa foi concluida com pendencias.';
+  if (evento?.status === 'error') return errorDetail || 'A etapa falhou e precisa de revisao.';
+  return errorDetail || evento?.message || '-';
+}
+
+function buildEventNarrative(evento) {
+  const pedidoLabel = evento.pedido_bling_numero || evento.pedido_bling_id;
+  const nfLabel = evento.nf_numero || evento.nf_bling_id;
+  const linkSource = LINK_SOURCE_LABELS[evento?.payload?.link_source] || '';
+
+  switch (evento.event_type) {
+    case 'order.created':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'O pedido entrou no sistema a partir do webhook do Bling e ficou pronto para acompanhar NF, reserva e baixa.',
+        result: buildEventResult(evento),
+      };
+    case 'order.updated':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'O Bling enviou uma atualizacao do pedido e o sistema reavaliou o status do fluxo.',
+        result: buildEventResult(evento),
+      };
+    case 'invoice.updated':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'A NF chegou do Bling e o sistema iniciou a localizacao do pedido para atualizar o vinculo da nota.',
+        result: buildEventResult(evento),
+      };
+    case 'invoice.linked_to_order':
+      return {
+        title: eventLabel(evento.event_type),
+        what: `${nfLabel ? `A NF ${nfLabel}` : 'A NF recebida'} foi vinculada ao ${pedidoLabel ? `pedido ${pedidoLabel}` : 'pedido correspondente'}${linkSource ? ` via ${linkSource}` : ''}.`,
+        result: 'O vinculo pedido/NF ficou salvo para as proximas etapas do fluxo.',
+      };
+    case 'invoice.authorized':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'Com a NF autorizada, o sistema consolidou o pedido e executou a reconciliacao do estoque.',
+        result: buildEventResult(evento),
+      };
+    case 'invoice.cancelled':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'A NF cancelada foi processada e o pedido foi ajustado de acordo com o evento recebido.',
+        result: buildEventResult(evento),
+      };
+    case 'pedido.confirmado':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'O pedido foi consolidado no sistema depois da atualizacao recebida do Bling.',
+        result: buildEventResult(evento),
+      };
+    case 'pedido.cancelado':
+      return {
+        title: eventLabel(evento.event_type),
+        what: 'O pedido foi cancelado no sistema e as reservas logicas foram liberadas.',
+        result: buildEventResult(evento),
+      };
+    default:
+      return {
+        title: eventLabel(evento.event_type),
+        what: evento.message || 'Evento registrado no monitor do fluxo Bling.',
+        result: buildEventResult(evento),
+      };
+  }
+}
+
 function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
   const pedidoLabel = incidente.pedido_bling_numero || incidente.pedido_bling_id || '-';
   const autoFixDetalhe = formatAutofixDetails(incidente.details);
@@ -110,11 +278,13 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500 md:grid-cols-2">
-        <p>Pedido Bling: {pedidoLabel}</p>
-        <p>ID interno: {incidente.pedido_bling_id || '-'}</p>
-        <p>NF Bling: {incidente.nf_bling_id || '-'}</p>
-        <p>SKU: {incidente.sku || '-'}</p>
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+        <DetailField label="Pedido Bling" value={pedidoLabel} hint="Numero visivel do pedido no Bling." />
+        <DetailField label="ID interno" value={incidente.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
+        <DetailField label="Pedido loja" value={incidente.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
+        <DetailField label="NF numero" value={incidente.nf_numero} hint="Numero humano da NF vinculada a este fluxo." />
+        <DetailField label="NF Bling" value={incidente.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
+        <DetailField label="SKU" value={incidente.sku} hint="SKU do item impactado pelo incidente." mono />
       </div>
 
       {incidente.suggested_action && (
@@ -156,6 +326,85 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
             Marcar como resolvido
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function EventCard({ evento }) {
+  const copy = buildEventNarrative(evento);
+  const hasReferences = Boolean(
+    evento.pedido_bling_numero ||
+      evento.pedido_bling_id ||
+      evento.pedido_integrado_id ||
+      evento.numero_pedido_loja ||
+      evento.nf_numero ||
+      evento.nf_bling_id ||
+      evento.sku
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={toneFromSeverity(evento.severity)}>{evento.severity}</Badge>
+            <Badge tone={toneFromStatus(evento.status)}>{statusLabel(evento.status)}</Badge>
+            <span className="text-[11px] uppercase tracking-wide text-slate-400">{evento.source || 'runtime'}</span>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-slate-900">{copy.title}</p>
+          <p className="mt-1 text-xs font-mono text-slate-400">{evento.event_type}</p>
+        </div>
+        <span
+          title="Horario exibido em Brasilia."
+          className="shrink-0 text-right text-xs text-slate-500"
+        >
+          {formatDate(evento.processed_at)}
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+        <div>
+          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <span>O que aconteceu</span>
+            <InfoHint text="Resumo do passo do fluxo que acabou de acontecer." />
+          </div>
+          <p className="mt-1 text-sm text-slate-700">{copy.what}</p>
+        </div>
+        <div>
+          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <span>Resultado</span>
+            <InfoHint text="Mostra se a etapa terminou bem, com pendencia ou com erro." />
+          </div>
+          <p className={`mt-1 text-sm ${evento.status === 'error' ? 'text-rose-700' : evento.status === 'warning' ? 'text-amber-700' : 'text-slate-700'}`}>
+            {copy.result}
+          </p>
+        </div>
+      </div>
+
+      {hasReferences && (
+        <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+            <span>Referencias do evento</span>
+            <InfoHint text="Aqui ficam os identificadores usados para ligar pedido, NF e item dentro do fluxo." />
+          </div>
+          <p className="mt-1 text-sm text-emerald-800">
+            {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || '-')}
+            {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ''}
+            {evento.nf_numero || evento.nf_bling_id ? ` | NF ${evento.nf_numero || evento.nf_bling_id}` : ''}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+        <DetailField label="Pedido Bling" value={evento.pedido_bling_numero} hint="Numero visivel do pedido no Bling." />
+        <DetailField label="ID Bling" value={evento.pedido_bling_id} hint="Identificador tecnico do pedido recebido do Bling." mono />
+        <DetailField label="ID interno" value={evento.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
+        <DetailField label="Pedido loja" value={evento.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
+        <DetailField label="NF numero" value={evento.nf_numero} hint="Numero humano da nota fiscal associada ao evento." />
+        <DetailField label="NF Bling" value={evento.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
+        <DetailField label="Status atual" value={evento.pedido_status_atual} hint="Status mais recente conhecido do pedido local." />
+        <DetailField label="SKU" value={evento.sku} hint="SKU do item impactado por esta etapa." mono />
       </div>
     </div>
   );
@@ -248,6 +497,12 @@ export default function BlingFlowMonitor() {
           <p className="mt-1 text-sm text-slate-500">
             Auditoria do fluxo pedido, NF, reserva e baixa de estoque.
           </p>
+          <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <InfoHint text="Os horarios abaixo sao renderizados sempre em America/Sao_Paulo, mesmo quando o evento chegou em UTC." />
+            <p>
+              Horarios exibidos em Brasilia. Cada evento mostra o recebimento, o vinculo pedido/NF e o resultado da etapa.
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -312,27 +567,7 @@ export default function BlingFlowMonitor() {
 
           <div className="space-y-3">
             {eventos.map((evento) => (
-              <div key={evento.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={toneFromSeverity(evento.severity)}>{evento.severity}</Badge>
-                      <Badge tone={evento.status === 'ok' ? 'green' : evento.status === 'received' ? 'blue' : 'yellow'}>
-                        {evento.status}
-                      </Badge>
-                    </div>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">{evento.event_type}</p>
-                    <p className="mt-1 text-sm text-slate-600">{evento.message || '-'}</p>
-                  </div>
-                  <span className="text-xs text-slate-500">{formatDate(evento.processed_at)}</span>
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-500">
-                  <p>Pedido Bling: {evento.pedido_bling_numero || evento.pedido_bling_id || '-'}</p>
-                  <p>ID interno: {evento.pedido_bling_id || '-'}</p>
-                  <p>NF Bling: {evento.nf_bling_id || '-'}</p>
-                  <p>SKU: {evento.sku || '-'}</p>
-                </div>
-              </div>
+              <EventCard key={evento.id} evento={evento} />
             ))}
           </div>
         </section>

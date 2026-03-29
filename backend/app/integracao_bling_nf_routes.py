@@ -19,7 +19,11 @@ from app.services.bling_nf_service import (
     criar_produto_automatico_do_bling,
     AUTO_CADASTRO_BING_TAG,
 )
-from app.services.bling_flow_monitor_service import abrir_incidente, registrar_evento
+from app.services.bling_flow_monitor_service import (
+    abrir_incidente,
+    registrar_evento,
+    registrar_vinculo_nf_pedido,
+)
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
@@ -341,7 +345,9 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
 
     # Desempacotar envelope Bling (v1)
-    data   = body.get("data", body)  # fallback p/ payload legado
+    event = body.get("event", "invoice.updated")
+    event_date = body.get("date")
+    data = body.get("data", body)  # fallback p/ payload legado
 
     nf_id = str(data.get("id", ""))
     if not nf_id or nf_id == "None":
@@ -367,14 +373,19 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         registrar_evento(
             tenant_id=tenant_id_monitor,
             source="webhook",
-            event_type="invoice.updated",
+            event_type=event or "invoice.updated",
             entity_type="nf",
             status="received",
             severity="info",
-            message="Webhook de NF recebido",
+            message="Webhook de NF recebido; o sistema vai localizar o pedido e atualizar o vinculo da nota.",
             pedido_bling_id=pedido_bling_id,
             nf_bling_id=nf_id,
-            payload=data,
+            payload={
+                **_dict(data),
+                "pedido_bling_numero": pedido_bling_numero,
+                "numero_pedido_loja": numero_pedido_loja,
+            },
+            processed_at=event_date,
         )
 
     pedido = None
@@ -448,6 +459,22 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         nf_id=nf_id,
         situacao_num=situacao_num,
     )
+    nf_dados = nf_relacao.get("nf_completa") or data
+    nf_numero = str(_dict(nf_dados).get("numero") or "").strip() or None
+    registrar_vinculo_nf_pedido(
+        pedido=pedido,
+        source="webhook",
+        nf_bling_id=nf_id,
+        nf_numero=nf_numero,
+        message="NF localizada no webhook e vinculada ao pedido correspondente.",
+        payload={
+            "link_source": "nf.webhook",
+            "pedido_status_antes": pedido.status,
+            "numero_pedido_loja": numero_pedido_loja,
+        },
+        processed_at=event_date,
+        db=db,
+    )
 
     itens = db.query(PedidoIntegradoItem).filter(
         PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -466,10 +493,21 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             entity_type="nf",
             status="ok",
             severity="info",
-            message="NF autorizada processada e pedido reconciliado",
+            message=(
+                "NF autorizada processada, pedido vinculado e estoque reconciliado."
+                if acao == "venda_confirmada"
+                else "NF autorizada processada; o pedido ja estava conciliado anteriormente."
+            ),
             pedido_integrado_id=pedido.id,
             pedido_bling_id=pedido.pedido_bling_id,
             nf_bling_id=nf_id,
+            payload={
+                "acao": acao,
+                "nf_numero": nf_numero,
+                "numero_pedido_loja": numero_pedido_loja,
+                "pedido_status_atual": pedido.status,
+            },
+            processed_at=event_date,
         )
 
         return {"status": "ok", "acao": acao}
@@ -486,10 +524,17 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             entity_type="nf",
             status="ok",
             severity="info",
-            message="NF cancelada processada",
+            message="NF cancelada processada e pedido atualizado conforme o evento recebido.",
             pedido_integrado_id=pedido.id,
             pedido_bling_id=pedido.pedido_bling_id,
             nf_bling_id=nf_id,
+            payload={
+                "acao": acao,
+                "nf_numero": nf_numero,
+                "numero_pedido_loja": numero_pedido_loja,
+                "pedido_status_atual": pedido.status,
+            },
+            processed_at=event_date,
         )
         return {"status": "ok", "acao": acao}
 

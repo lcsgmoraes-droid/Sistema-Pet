@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from time import monotonic, sleep
 from typing import Any, Optional
 
@@ -51,6 +51,37 @@ def _utcnow() -> datetime:
     return datetime.utcnow()
 
 
+def normalizar_data_evento_monitor(value: Any) -> datetime | None:
+    if value is None:
+        return None
+
+    dt: datetime | None = None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        texto = _text(value)
+        if not texto:
+            return None
+        texto = texto.replace("Z", "+00:00")
+        if "T" not in texto and " " in texto:
+            texto = texto.replace(" ", "T", 1)
+        try:
+            dt = datetime.fromisoformat(texto)
+        except ValueError:
+            return None
+
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def serializar_data_evento_monitor(value: datetime | None) -> str | None:
+    dt = normalizar_data_evento_monitor(value)
+    if not dt:
+        return None
+    return dt.replace(tzinfo=timezone.utc).isoformat()
+
+
 def _text(value: Any) -> Optional[str]:
     if value is None:
         return None
@@ -91,6 +122,46 @@ def _json_safe(value: Any) -> Any:
         except Exception:
             return None
     return value
+
+
+def registrar_vinculo_nf_pedido(
+    *,
+    pedido: PedidoIntegrado,
+    source: str,
+    nf_bling_id: str | None = None,
+    nf_numero: str | None = None,
+    status: str = "ok",
+    severity: str = "info",
+    message: str | None = None,
+    payload: dict | None = None,
+    processed_at: Any = None,
+    db: Session | None = None,
+    auto_fix_applied: bool = False,
+) -> int | None:
+    payload_extra = _dict(_json_safe(payload or {}))
+    nf_contexto = _ultima_nf(getattr(pedido, "payload", None))
+    payload_base = {
+        "pedido_bling_numero": _text(getattr(pedido, "pedido_bling_numero", None)),
+        "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
+        "pedido_status_atual": _text(getattr(pedido, "status", None)),
+        "nf_numero": _text(nf_numero) or _text(nf_contexto.get("numero")),
+    }
+    return registrar_evento(
+        tenant_id=pedido.tenant_id,
+        source=source,
+        event_type="invoice.linked_to_order",
+        entity_type="nf",
+        status=status,
+        severity=severity,
+        message=message or "NF vinculada ao pedido durante o processamento do evento",
+        pedido_integrado_id=pedido.id,
+        pedido_bling_id=pedido.pedido_bling_id,
+        nf_bling_id=_text(nf_bling_id) or _text(nf_contexto.get("id")),
+        payload={**payload_base, **payload_extra},
+        processed_at=processed_at,
+        db=db,
+        auto_fix_applied=auto_fix_applied,
+    )
 
 
 def _build_incident_key(
@@ -736,20 +807,14 @@ def _vincular_nf_detectada_ao_pedido(
         elif situacao_num == 4:
             acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens)
 
-        registrar_evento(
-            tenant_id=pedido.tenant_id,
+        registrar_vinculo_nf_pedido(
+            pedido=pedido,
             source="autofix",
-            event_type="invoice.detected_linked",
-            entity_type="nf",
-            status="ok",
-            severity="info",
-            message="NF detectada pelo auditor foi vinculada ao pedido automaticamente",
-            pedido_integrado_id=pedido.id,
-            pedido_bling_id=pedido.pedido_bling_id,
             nf_bling_id=nf_id,
+            nf_numero=_text(dados_nf.get("numero")) or _text(nf_detectada.get("numero")),
+            message="NF detectada pela auditoria foi vinculada automaticamente ao pedido",
             payload={
-                "pedido_bling_numero": pedido.pedido_bling_numero,
-                "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
+                "link_source": "auditoria",
                 "nf": _json_safe(nf_detectada),
                 "acao": _json_safe(acao),
             },
@@ -784,6 +849,7 @@ def registrar_evento(
     sku: str | None = None,
     payload: dict | None = None,
     auto_fix_applied: bool = False,
+    processed_at: Any = None,
     db: Session | None = None,
 ) -> int | None:
     own_session = db is None
@@ -805,7 +871,7 @@ def registrar_evento(
             sku=_text(sku),
             payload=_json_safe(payload or {}),
             auto_fix_applied=auto_fix_applied,
-            processed_at=_utcnow(),
+            processed_at=normalizar_data_evento_monitor(processed_at) or _utcnow(),
         )
         session.add(evento)
         if own_session:
@@ -1429,7 +1495,7 @@ def obter_resumo_monitoramento(db: Session, *, tenant_id=None) -> dict:
                 "pedido_bling_id": evento.pedido_bling_id,
                 "nf_bling_id": evento.nf_bling_id,
                 "sku": evento.sku,
-                "processed_at": evento.processed_at.isoformat() if evento.processed_at else None,
+                "processed_at": serializar_data_evento_monitor(evento.processed_at),
             }
             for evento in eventos_recentes
         ],

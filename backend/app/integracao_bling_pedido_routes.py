@@ -14,7 +14,11 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
-from app.services.bling_flow_monitor_service import abrir_incidente, registrar_evento
+from app.services.bling_flow_monitor_service import (
+    abrir_incidente,
+    registrar_evento,
+    registrar_vinculo_nf_pedido,
+)
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
 
@@ -408,7 +412,16 @@ def _baixar_item_pedido(db: Session, pedido: PedidoIntegrado, item: PedidoIntegr
     return None
 
 
-def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem], *, motivo: str, observacao: str, user_id: int = 0) -> list[str]:
+def _confirmar_pedido(
+    db: Session,
+    pedido: PedidoIntegrado,
+    itens: list[PedidoIntegradoItem],
+    *,
+    motivo: str,
+    observacao: str,
+    user_id: int = 0,
+    processed_at=None,
+) -> list[str]:
     erros: list[str] = []
 
     for item in itens:
@@ -438,6 +451,7 @@ def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIn
                     pedido_integrado_id=pedido.id,
                     pedido_bling_id=pedido.pedido_bling_id,
                     sku=item.sku,
+                    processed_at=processed_at,
                 )
                 abrir_incidente(
                     tenant_id=pedido.tenant_id,
@@ -470,6 +484,7 @@ def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIn
                 pedido_integrado_id=pedido.id,
                 pedido_bling_id=pedido.pedido_bling_id,
                 sku=item.sku,
+                processed_at=processed_at,
             )
             abrir_incidente(
                 tenant_id=pedido.tenant_id,
@@ -496,16 +511,27 @@ def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIn
         entity_type="pedido",
         status="ok" if not erros else "warning",
         severity="info" if not erros else "high",
-        message="Pedido confirmado e reconciliado com estoque" if not erros else "Pedido confirmado com pendencias de estoque",
+        message=(
+            "Pedido confirmado e todas as baixas de estoque foram aplicadas."
+            if not erros
+            else "Pedido confirmado, mas algumas baixas de estoque ficaram pendentes."
+        ),
         error_message=", ".join(erros) if erros else None,
         pedido_integrado_id=pedido.id,
         pedido_bling_id=pedido.pedido_bling_id,
-        payload={"erros_estoque": erros},
+        payload={
+            "motivo": motivo,
+            "observacao": observacao,
+            "itens_total": len(itens),
+            "erros_estoque": erros,
+            "baixa_estoque_status": "ok" if not erros else "warning",
+        },
+        processed_at=processed_at,
     )
     return erros
 
 
-def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]) -> None:
+def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem], *, processed_at=None) -> None:
     for item in itens:
         if not item.liberado_em and not item.vendido_em:
             EstoqueReservaService.liberar(db, item)
@@ -524,6 +550,7 @@ def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoInt
         message="Pedido cancelado e reservas liberadas",
         pedido_integrado_id=pedido.id,
         pedido_bling_id=pedido.pedido_bling_id,
+        processed_at=processed_at,
     )
 
 
@@ -780,6 +807,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"
+    event_date = body.get("date")
     data = body.get("data", body)  # fallback p/ payload legado sem envelope
 
     # ========================
@@ -808,6 +836,13 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 ).first()
 
             if pedido and pedido.status not in ("confirmado", "cancelado"):
+                status_anterior = pedido.status
+                nf_resumo = _resumir_ultima_nf_webhook(
+                    {
+                        **_dict(nf_data),
+                        "id": nf_id_bling or _dict(nf_data).get("id"),
+                    }
+                )
                 registrar_evento(
                     tenant_id=pedido.tenant_id,
                     source="webhook",
@@ -820,6 +855,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     pedido_bling_id=pedido.pedido_bling_id,
                     nf_bling_id=nf_id_bling,
                     payload=nf_data,
+                    processed_at=event_date,
                 )
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -828,12 +864,21 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     webhook_data=_dict((pedido.payload or {})).get("webhook"),
                     pedido_completo=_payload_principal(pedido.payload),
                     payload_atual=pedido.payload,
-                    ultima_nf=_resumir_ultima_nf_webhook(
-                        {
-                            **_dict(nf_data),
-                            "id": nf_id_bling or _dict(nf_data).get("id"),
-                        }
-                    ),
+                    ultima_nf=nf_resumo,
+                )
+                registrar_vinculo_nf_pedido(
+                    pedido=pedido,
+                    source="webhook",
+                    nf_bling_id=nf_id_bling,
+                    nf_numero=nf_resumo.get("numero"),
+                    message="NF recebida no endpoint de pedidos e vinculada ao pedido local.",
+                    payload={
+                        "link_source": "pedido.webhook",
+                        "pedido_status_antes": status_anterior,
+                        "pedido_status_atual": pedido.status,
+                    },
+                    processed_at=event_date,
+                    db=db,
                 )
                 erros_estoque = _confirmar_pedido(
                     db=db,
@@ -841,6 +886,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     itens=itens,
                     motivo="venda_bling_nf",
                     observacao=f"Baixa automatica - NF Bling emitida (evento {event})",
+                    processed_at=event_date,
                 )
                 logger.info(
                     f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} confirmado via evento NF ({event})"
@@ -858,6 +904,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 message="Evento de NF recebido sem pedido correspondente no fluxo de pedidos",
                 nf_bling_id=nf_id_bling,
                 payload=nf_data,
+                processed_at=event_date,
             )
         return {"status": "ignorado", "motivo": f"evento_nf_sem_pedido_correspondente ({event})"}
 
@@ -873,9 +920,10 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             entity_type="pedido",
             status="received",
             severity="info",
-            message="Webhook de pedido recebido",
+            message="Webhook de pedido recebido; o sistema vai analisar o status e aplicar os proximos passos.",
             pedido_bling_id=pedido_bling_id,
             payload=data,
+            processed_at=event_date,
         )
 
     # ========================
@@ -889,7 +937,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             itens = db.query(PedidoIntegradoItem).filter(
                 PedidoIntegradoItem.pedido_integrado_id == pedido.id
             ).all()
-            _cancelar_pedido(db=db, pedido=pedido, itens=itens)
+            _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
 
         return {"status": "ok", "acao": "cancelado"}
 
@@ -907,7 +955,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
-                _cancelar_pedido(db=db, pedido=pedido, itens=itens)
+                _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})")
 
             return {"status": "ok", "acao": "cancelado_por_situacao"}
@@ -926,6 +974,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     itens=itens,
                     motivo="venda_bling_webhook",
                     observacao="Baixa automatica via webhook Bling (Atendido)",
+                    processed_at=event_date,
                 )
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado e estoque baixado (situacao_id={situacao_id})")
 
@@ -953,7 +1002,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
                 )
-                _cancelar_pedido(db=db, pedido=pedido, itens=itens)
+                _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})")
 
             return {"status": "ok", "acao": "cancelado_via_consulta_api"}
@@ -977,6 +1026,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     itens=itens,
                     motivo="venda_bling_webhook",
                     observacao="Baixa automatica via consulta API do Bling (Atendido)",
+                    processed_at=event_date,
                 )
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API (situacao_id={situacao_id_api})")
 
@@ -1111,10 +1161,20 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         entity_type="pedido",
         status="ok",
         severity="info",
-        message="Pedido Bling criado/importado no sistema",
+        message="Pedido Bling criado/importado no sistema e pronto para acompanhar o fluxo de NF e estoque.",
         pedido_integrado_id=pedido.id,
         pedido_bling_id=pedido.pedido_bling_id,
-        payload={"status_inicial": status_inicial, "itens_importados": len(itens_bling)},
+        payload={
+            "status_inicial": status_inicial,
+            "itens_importados": len(itens_bling),
+            "numero_pedido_loja": _texto(
+                _primeiro_preenchido(
+                    _payload_principal(payload_pedido).get("numeroPedidoLoja"),
+                    _payload_principal(payload_pedido).get("numeroLoja"),
+                )
+            ),
+        },
+        processed_at=event_date,
     )
 
     # Se o pedido já nasceu "confirmado" (NF emitida no Bling antes do webhook order.updated),
@@ -1129,6 +1189,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             itens=itens_salvos,
             motivo="venda_bling_webhook",
             observacao="Baixa automatica order.created (ja Atendido no Bling)",
+            processed_at=event_date,
         )
         logger.info(
             f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created ja Atendido) - estoque baixado imediatamente"

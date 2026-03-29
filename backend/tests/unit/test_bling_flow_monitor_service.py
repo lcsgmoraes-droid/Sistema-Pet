@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -7,6 +8,9 @@ from app.services.bling_flow_monitor_service import (
     _reconciliar_pedido_confirmado,
     diagnosticar_pedido_integrado,
     _nf_recentes_cache,
+    normalizar_data_evento_monitor,
+    registrar_vinculo_nf_pedido,
+    serializar_data_evento_monitor,
 )
 
 
@@ -173,6 +177,57 @@ def test_obter_nfs_recentes_bling_enriquece_resumo_quando_lista_nao_traz_pedido_
     assert notas[0]["numero_pedido_loja"] == "2000015749248294"
     assert notas[0]["pedido_bling_numero"] == "11600"
     assert notas[0]["canal"] == "mercado_livre"
+
+
+def test_normalizar_data_evento_monitor_converte_iso_utc_em_datetime_naive():
+    data = normalizar_data_evento_monitor("2026-03-29T18:35:00+00:00")
+
+    assert data == datetime(2026, 3, 29, 18, 35, 0)
+    assert data.tzinfo is None
+
+
+def test_serializar_data_evento_monitor_assume_naive_como_utc():
+    texto = serializar_data_evento_monitor(datetime(2026, 3, 29, 18, 35, 0))
+
+    assert texto == "2026-03-29T18:35:00+00:00"
+
+
+def test_registrar_vinculo_nf_pedido_monta_payload_com_relacao(monkeypatch):
+    capturado = {}
+
+    def _fake_registrar_evento(**kwargs):
+        capturado.update(kwargs)
+        return 77
+
+    monkeypatch.setattr("app.services.bling_flow_monitor_service.registrar_evento", _fake_registrar_evento)
+    pedido = SimpleNamespace(
+        id=15,
+        tenant_id="tenant-1",
+        pedido_bling_id="25430581957",
+        pedido_bling_numero="11601",
+        status="aberto",
+        payload={
+            "pedido": {"numeroLoja": "260329D3XB4GMW"},
+            "ultima_nf": {"id": "25427303470", "numero": "010984"},
+        },
+    )
+
+    resultado = registrar_vinculo_nf_pedido(
+        pedido=pedido,
+        source="webhook",
+        nf_bling_id="25427303470",
+        nf_numero="010984",
+        payload={"link_source": "nf.webhook"},
+        processed_at="2026-03-29T18:35:00+00:00",
+    )
+
+    assert resultado == 77
+    assert capturado["event_type"] == "invoice.linked_to_order"
+    assert capturado["processed_at"] == "2026-03-29T18:35:00+00:00"
+    assert capturado["payload"]["pedido_bling_numero"] == "11601"
+    assert capturado["payload"]["numero_pedido_loja"] == "260329D3XB4GMW"
+    assert capturado["payload"]["nf_numero"] == "010984"
+    assert capturado["payload"]["link_source"] == "nf.webhook"
 
 
 def test_reconciliar_pedido_confirmado_so_confirma_item_apos_baixa(monkeypatch):

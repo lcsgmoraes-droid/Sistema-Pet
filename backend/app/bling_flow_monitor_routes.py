@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -16,7 +18,99 @@ from app.services.bling_flow_monitor_service import (
 router = APIRouter(prefix="/integracoes/bling/monitor", tags=["Integracao Bling - Monitor"])
 
 
-def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict[tuple[int | None, str | None], str | None]:
+def _texto(value):
+    if value is None:
+        return None
+    texto = str(value).strip()
+    return texto or None
+
+
+def _dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _primeiro_preenchido(*values):
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+def _serializar_data_monitor(dt):
+    if not dt:
+        return None
+    if getattr(dt, "tzinfo", None) is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.isoformat()
+
+
+def _numero_pedido_loja_pedido(pedido: PedidoIntegrado) -> str | None:
+    payload = _dict(getattr(pedido, "payload", None))
+    pedido_payload = _dict(payload.get("pedido"))
+    webhook_payload = _dict(payload.get("webhook"))
+
+    return _texto(
+        _primeiro_preenchido(
+            pedido_payload.get("numeroLoja"),
+            pedido_payload.get("numeroPedidoLoja"),
+            pedido_payload.get("numeroPedido"),
+            webhook_payload.get("numeroLoja"),
+            webhook_payload.get("numeroPedidoLoja"),
+            payload.get("numeroLoja"),
+            payload.get("numeroPedidoLoja"),
+        )
+    )
+
+
+def _nf_numero_pedido(pedido: PedidoIntegrado) -> str | None:
+    payload = _dict(getattr(pedido, "payload", None))
+    ultima_nf = _dict(
+        payload.get("ultima_nf")
+        or _dict(payload.get("pedido")).get("notaFiscal")
+        or _dict(payload.get("pedido")).get("nota")
+        or _dict(payload.get("pedido")).get("nfe")
+    )
+    return _texto(ultima_nf.get("numero"))
+
+
+def _numero_pedido_loja_payload(payload: dict | None) -> str | None:
+    payload = _dict(payload)
+    pedido_payload = _dict(payload.get("pedido"))
+    webhook_payload = _dict(payload.get("webhook"))
+    nf_payload = _dict(payload.get("nf"))
+
+    return _texto(
+        _primeiro_preenchido(
+            payload.get("numero_pedido_loja"),
+            _dict(payload.get("nf_detectada")).get("numero_pedido_loja"),
+            nf_payload.get("numero_pedido_loja"),
+            pedido_payload.get("numeroLoja"),
+            pedido_payload.get("numeroPedidoLoja"),
+            pedido_payload.get("numeroPedido"),
+            webhook_payload.get("numeroLoja"),
+            webhook_payload.get("numeroPedidoLoja"),
+        )
+    )
+
+
+def _nf_numero_payload(payload: dict | None) -> str | None:
+    payload = _dict(payload)
+    return _texto(
+        _primeiro_preenchido(
+            payload.get("nf_numero"),
+            _dict(payload.get("ultima_nf")).get("numero"),
+            _dict(payload.get("nf")).get("numero"),
+            _dict(payload.get("nf_detectada")).get("numero"),
+        )
+    )
+
+
+def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict[tuple[int | None, str | None], dict[str, str | None]]:
     pedido_ids = {registro.get("pedido_integrado_id") for registro in registros if registro.get("pedido_integrado_id")}
     pedido_bling_ids = {registro.get("pedido_bling_id") for registro in registros if registro.get("pedido_bling_id")}
 
@@ -31,12 +125,17 @@ def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict
     else:
         query = query.filter(PedidoIntegrado.pedido_bling_id.in_(pedido_bling_ids))
 
-    mapa: dict[tuple[int | None, str | None], str | None] = {}
+    mapa: dict[tuple[int | None, str | None], dict[str, str | None]] = {}
     for pedido in query.all():
-        numero = pedido.pedido_bling_numero or pedido.pedido_bling_id
-        mapa[(pedido.id, pedido.pedido_bling_id)] = numero
-        mapa[(pedido.id, None)] = numero
-        mapa[(None, pedido.pedido_bling_id)] = numero
+        info = {
+            "pedido_bling_numero": pedido.pedido_bling_numero or pedido.pedido_bling_id,
+            "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
+            "nf_numero": _nf_numero_pedido(pedido),
+            "pedido_status_atual": _texto(getattr(pedido, "status", None)),
+        }
+        mapa[(pedido.id, pedido.pedido_bling_id)] = info
+        mapa[(pedido.id, None)] = info
+        mapa[(None, pedido.pedido_bling_id)] = info
     return mapa
 
 
@@ -85,20 +184,34 @@ def listar_incidentes(
             "nf_bling_id": incidente.nf_bling_id,
             "sku": incidente.sku,
             "occurrences": incidente.occurrences,
-            "first_seen_em": incidente.first_seen_em.isoformat() if incidente.first_seen_em else None,
-            "last_seen_em": incidente.last_seen_em.isoformat() if incidente.last_seen_em else None,
-            "resolved_em": incidente.resolved_em.isoformat() if incidente.resolved_em else None,
+            "first_seen_em": _serializar_data_monitor(incidente.first_seen_em),
+            "last_seen_em": _serializar_data_monitor(incidente.last_seen_em),
+            "resolved_em": _serializar_data_monitor(incidente.resolved_em),
             "details": incidente.details or {},
         }
         for incidente in incidentes
     ]
     mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
     for registro in registros:
-        registro["pedido_bling_numero"] = mapa_numeros.get(
+        info = mapa_numeros.get(
             (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
         ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
             (None, registro.get("pedido_bling_id"))
         )
+        detalhes = _dict(registro.get("details"))
+        registro["pedido_bling_numero"] = (
+            _dict(info).get("pedido_bling_numero")
+            or _texto(_primeiro_preenchido(detalhes.get("pedido_bling_numero"), _dict(detalhes.get("nf_detectada")).get("pedido_bling_numero")))
+        )
+        registro["numero_pedido_loja"] = (
+            _dict(info).get("numero_pedido_loja")
+            or _texto(_primeiro_preenchido(detalhes.get("numero_pedido_loja"), _dict(detalhes.get("nf_detectada")).get("numero_pedido_loja")))
+        )
+        registro["nf_numero"] = (
+            _dict(info).get("nf_numero")
+            or _texto(_primeiro_preenchido(detalhes.get("nf_numero"), _dict(detalhes.get("nf_detectada")).get("numero")))
+        )
+        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual")
     return registros
 
 
@@ -134,18 +247,26 @@ def listar_eventos(
             "nf_bling_id": evento.nf_bling_id,
             "sku": evento.sku,
             "auto_fix_applied": evento.auto_fix_applied,
-            "processed_at": evento.processed_at.isoformat() if evento.processed_at else None,
+            "processed_at": _serializar_data_monitor(evento.processed_at),
             "payload": evento.payload or {},
         }
         for evento in eventos
     ]
     mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
     for registro in registros:
-        registro["pedido_bling_numero"] = mapa_numeros.get(
+        info = mapa_numeros.get(
             (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
         ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
             (None, registro.get("pedido_bling_id"))
         )
+        payload = _dict(registro.get("payload"))
+        registro["pedido_bling_numero"] = (
+            _dict(info).get("pedido_bling_numero")
+            or _texto(_primeiro_preenchido(payload.get("pedido_bling_numero"), _dict(payload.get("pedido")).get("numero")))
+        )
+        registro["numero_pedido_loja"] = _dict(info).get("numero_pedido_loja") or _numero_pedido_loja_payload(payload)
+        registro["nf_numero"] = _dict(info).get("nf_numero") or _nf_numero_payload(payload)
+        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
     return registros
 
 
@@ -199,5 +320,5 @@ def resolver_incidente(
     return {
         "status": "ok",
         "incidente_id": incidente.id,
-        "resolved_em": incidente.resolved_em.isoformat() if incidente.resolved_em else None,
+        "resolved_em": _serializar_data_monitor(incidente.resolved_em),
     }
