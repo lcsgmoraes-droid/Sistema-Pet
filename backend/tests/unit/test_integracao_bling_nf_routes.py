@@ -3,11 +3,19 @@ from unittest.mock import Mock
 
 import pytest
 
+from app.integracao_bling_nf_routes import (
+    _localizar_pedido_local_por_numero_bling,
+    _localizar_pedido_local_por_numero_loja,
+)
 from app.services.bling_nf_service import processar_nf_autorizada
 
 
 def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     db = Mock()
+    db.query.return_value.filter.return_value.all.side_effect = [
+        [],
+        [SimpleNamespace(produto_id=12)],
+    ]
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,
@@ -16,7 +24,7 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
         pedido_bling_numero="#11397",
     )
     item = SimpleNamespace(sku="026209.1", quantidade=1, vendido_em=None)
-    produto = SimpleNamespace(id=12)
+    produto = SimpleNamespace(id=12, tipo_kit=None, tipo_produto="SIMPLES")
     chamadas_baixa = []
 
     def fake_confirmar_venda(db_arg, item_arg):
@@ -26,9 +34,9 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
         assert kwargs["sku"] == "026209.1"
         return produto
 
-    def fake_baixar_estoque(**kwargs):
+    def fake_baixar_item(**kwargs):
         chamadas_baixa.append(kwargs)
-        return {"sucesso": True}
+        return {"movimentos": [{"produto_id": 12, "quantidade": 1.0}]}
 
     monkeypatch.setattr(
         "app.services.bling_nf_service.buscar_produto_do_item",
@@ -39,9 +47,19 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
         fake_confirmar_venda,
     )
     monkeypatch.setattr(
-        "app.estoque.service.EstoqueService.baixar_estoque",
-        fake_baixar_estoque,
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=99),
     )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda **kwargs: [12],
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.baixar_estoque_item_integrado",
+        fake_baixar_item,
+    )
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
 
     resposta_1 = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="98765")
     resposta_2 = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="98765")
@@ -51,15 +69,15 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     assert pedido.status == "confirmado"
     assert item.vendido_em is not None
     assert len(chamadas_baixa) == 1
-    assert chamadas_baixa[0]["produto_id"] == 12
+    assert chamadas_baixa[0]["produto"].id == 12
     assert chamadas_baixa[0]["documento"] == "#11397"
     assert chamadas_baixa[0]["motivo"] == "venda_bling"
-    assert db.add.call_count == 1
-    assert db.commit.call_count == 1
+    assert chamadas_baixa[0]["user_id"] == 99
 
 
 def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
     db = Mock()
+    db.query.return_value.filter.return_value.all.return_value = []
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,
@@ -68,7 +86,7 @@ def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
         pedido_bling_numero="#22001",
     )
     item = SimpleNamespace(sku="SKU-NOVO-001", quantidade=2, vendido_em=None)
-    produto_autocriado = SimpleNamespace(id=345)
+    produto_autocriado = SimpleNamespace(id=345, tipo_kit=None, tipo_produto="SIMPLES")
     chamadas_baixa = []
 
     def fake_confirmar_venda(db_arg, item_arg):
@@ -81,9 +99,9 @@ def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
         assert kwargs["sku"] == "SKU-NOVO-001"
         return produto_autocriado
 
-    def fake_baixar_estoque(**kwargs):
+    def fake_baixar_item(**kwargs):
         chamadas_baixa.append(kwargs)
-        return {"sucesso": True}
+        return {"movimentos": [{"produto_id": 345, "quantidade": 2.0}]}
 
     monkeypatch.setattr(
         "app.services.bling_nf_service.buscar_produto_do_item",
@@ -98,13 +116,108 @@ def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
         fake_confirmar_venda,
     )
     monkeypatch.setattr(
-        "app.estoque.service.EstoqueService.baixar_estoque",
-        fake_baixar_estoque,
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=77),
     )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda **kwargs: [345],
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.baixar_estoque_item_integrado",
+        fake_baixar_item,
+    )
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
 
     resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="99100")
 
     assert resposta == "venda_confirmada"
     assert len(chamadas_baixa) == 1
-    assert chamadas_baixa[0]["produto_id"] == 345
+    assert chamadas_baixa[0]["produto"].id == 345
     assert chamadas_baixa[0]["quantidade"] == pytest.approx(2.0)
+
+
+def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
+    db = Mock()
+    db.query.return_value.filter.return_value.all.return_value = []
+    pedido = SimpleNamespace(
+        status="aberto",
+        confirmado_em=None,
+        tenant_id="tenant-1",
+        id=1088,
+        pedido_bling_numero="#11595",
+    )
+    item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
+    produto_composto = SimpleNamespace(id=6814, tipo_kit="VIRTUAL", tipo_produto="VARIACAO")
+    chamadas_baixa = []
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.buscar_produto_do_item",
+        lambda **kwargs: produto_composto,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=15),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
+        lambda db_arg, item_arg: setattr(item_arg, "vendido_em", "2026-03-28T22:03:22Z"),
+    )
+
+    def fake_baixar_item(**kwargs):
+        chamadas_baixa.append(kwargs)
+        return {
+            "movimentos": [
+                {"produto_id": 6401, "quantidade": 2.0, "kit_origem_id": 6814},
+            ]
+        }
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.baixar_estoque_item_integrado",
+        fake_baixar_item,
+    )
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+
+    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="25428294101")
+
+    assert resposta == "venda_confirmada"
+    assert len(chamadas_baixa) == 1
+    assert chamadas_baixa[0]["produto"].id == 6814
+    assert chamadas_baixa[0]["user_id"] == 15
+
+
+def test_localiza_pedido_por_numero_loja_em_payload_do_bling():
+    db = Mock()
+    pedido = SimpleNamespace(
+        payload={
+            "pedido": {"numeroLoja": "260329CXSEF6VM"},
+            "webhook": {"numeroLoja": "260329CXSEF6VM"},
+        }
+    )
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+        pedido
+    ]
+
+    encontrado = _localizar_pedido_local_por_numero_loja(
+        db,
+        tenant_id="tenant-1",
+        numero_pedido_loja="260329CXSEF6VM",
+    )
+
+    assert encontrado is pedido
+
+
+def test_localiza_pedido_por_numero_bling():
+    db = Mock()
+    pedido = SimpleNamespace(id=55, pedido_bling_numero="11598")
+    db.query.return_value.filter.return_value.first.return_value = pedido
+
+    encontrado = _localizar_pedido_local_por_numero_bling(
+        db,
+        tenant_id="tenant-1",
+        pedido_bling_numero="11598",
+    )
+
+    assert encontrado is pedido

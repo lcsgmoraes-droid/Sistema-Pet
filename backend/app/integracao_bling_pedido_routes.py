@@ -38,6 +38,12 @@ _CANAL_LABELS = {
     "online": "Online",
 }
 
+_LOJA_ID_CANAL_MAP = {
+    "204647675": "mercado_livre",
+    "205367939": "shopee",
+    "205639810": "amazon",
+}
+
 
 def _coerce_int(valor, default: int | None = None) -> int | None:
     try:
@@ -113,6 +119,23 @@ def _normalizar_canal(valor):
     return canal, _CANAL_LABELS.get(canal, texto), texto
 
 
+def _inferir_canal_por_numero_pedido_loja(valor):
+    texto = _texto(valor)
+    if not texto:
+        return None
+    if re.fullmatch(r"\d{3}-\d{7}-\d{7}", texto):
+        return "amazon"
+    if texto.isdigit() and len(texto) >= 14:
+        return "mercado_livre"
+    if re.search(r"[A-Za-z]", texto) and re.search(r"\d", texto):
+        return "shopee"
+    return None
+
+
+def _inferir_canal_por_loja_id(loja_id):
+    return _LOJA_ID_CANAL_MAP.get(_texto(loja_id) or "")
+
+
 def _payload_principal(payload: dict | None) -> dict:
     payload = _dict(payload)
     if isinstance(payload.get("pedido"), dict):
@@ -131,21 +154,76 @@ def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | No
     return payload
 
 
+def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
+    nf_data = _dict(nf_data)
+    situacao_nf = _dict(nf_data.get("situacao"))
+    return {
+        "id": _texto(nf_data.get("id")),
+        "numero": _texto(nf_data.get("numero")),
+        "serie": _texto(nf_data.get("serie")),
+        "situacao": _texto(
+            _primeiro_preenchido(
+                situacao_nf.get("descricao"),
+                situacao_nf.get("nome"),
+                nf_data.get("status"),
+            )
+        ),
+        "situacao_codigo": _situacao_codigo_bling(
+            _primeiro_preenchido(
+                situacao_nf.get("valor"),
+                situacao_nf.get("id"),
+                nf_data.get("situacao"),
+            )
+        ),
+        "chave": _texto(_primeiro_preenchido(nf_data.get("chaveAcesso"), nf_data.get("chave"))),
+        "valor_total": _coerce_float(
+            _primeiro_preenchido(
+                nf_data.get("valorNota"),
+                nf_data.get("valorTotalNf"),
+                nf_data.get("valor_total"),
+                nf_data.get("valorTotal"),
+            )
+        ),
+    }
+
+
 def _resolver_canal_pedido(payload: dict | None, canal_salvo: str | None):
     pedido_payload = _payload_principal(payload)
     marketplace = _dict(pedido_payload.get("marketplace"))
-    loja = _dict(pedido_payload.get("loja"))
+    loja = _dict(_primeiro_preenchido(pedido_payload.get("loja"), pedido_payload.get("lojaVirtual")))
+    numero_pedido_loja = _texto(_primeiro_preenchido(
+        pedido_payload.get("numeroPedidoLoja"),
+        pedido_payload.get("numeroLoja"),
+        pedido_payload.get("numeroPedido"),
+        pedido_payload.get("numero"),
+    ))
 
-    canal_bruto = _primeiro_preenchido(
+    candidatos = [
         pedido_payload.get("canal"),
         pedido_payload.get("origem"),
         pedido_payload.get("tipoOrigem"),
+        pedido_payload.get("origemLojaVirtual"),
         marketplace.get("nome"),
         marketplace.get("descricao"),
         loja.get("nome"),
+        loja.get("descricao"),
+        _inferir_canal_por_loja_id(loja.get("id")),
+        _inferir_canal_por_numero_pedido_loja(numero_pedido_loja),
         canal_salvo,
-    )
-    return _normalizar_canal(canal_bruto)
+    ]
+
+    fallback = None
+    for candidato in candidatos:
+        texto = _texto(candidato)
+        if not texto:
+            continue
+        normalizado = _normalizar_canal(texto)
+        if fallback is None:
+            fallback = normalizado
+        if normalizado[0] != "bling":
+            return normalizado
+
+    return fallback or _normalizar_canal(canal_salvo)
 
 
 def _normalizar_item_payload(item_payload: dict) -> dict:
@@ -305,21 +383,25 @@ def _resolver_produto_local(db: Session, pedido: PedidoIntegrado, item: PedidoIn
 
 
 def _baixar_item_pedido(db: Session, pedido: PedidoIntegrado, item: PedidoIntegradoItem, *, motivo: str, observacao: str, user_id: int = 0) -> str | None:
-    from app.estoque.service import EstoqueService
+    from app.services.bling_nf_service import baixar_estoque_item_integrado, _obter_usuario_padrao_tenant
 
     produto = _resolver_produto_local(db=db, pedido=pedido, item=item)
     if not produto:
         return f"SKU '{item.sku}' nao encontrado"
 
-    EstoqueService.baixar_estoque(
-        produto_id=produto.id,
+    user_id_execucao = user_id or getattr(_obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id), "id", None)
+    if not user_id_execucao:
+        return "Nenhum usuario valido encontrado para registrar a baixa automatica"
+
+    baixar_estoque_item_integrado(
+        db=db,
+        tenant_id=pedido.tenant_id,
+        produto=produto,
         quantidade=float(item.quantidade),
         motivo=motivo,
         referencia_id=pedido.id,
         referencia_tipo="pedido_integrado",
-        user_id=user_id,
-        db=db,
-        tenant_id=pedido.tenant_id,
+        user_id=user_id_execucao,
         documento=pedido.pedido_bling_numero,
         observacao=observacao,
     )
@@ -332,8 +414,6 @@ def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIn
     for item in itens:
         if item.vendido_em:
             continue
-
-        EstoqueReservaService.confirmar_venda(db, item)
 
         try:
             erro = _baixar_item_pedido(
@@ -372,6 +452,9 @@ def _confirmar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIn
                     sku=item.sku,
                     details={"motivo": motivo, "observacao": observacao},
                 )
+                continue
+
+            EstoqueReservaService.confirmar_venda(db, item)
         except Exception as e:
             erros.append(f"SKU '{item.sku}': {str(e)[:80]}")
             logger.warning(f"[BLING PEDIDO] Erro ao baixar estoque SKU {item.sku}: {e}")
@@ -451,6 +534,7 @@ def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoInt
 @router.get("/pedidos")
 def listar_pedidos_bling(
     status: Optional[str] = Query(None, description="aberto|confirmado|expirado|cancelado"),
+    busca: Optional[str] = Query(None, description="Numero interno do pedido Bling ou ID do pedido"),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
@@ -462,6 +546,16 @@ def listar_pedidos_bling(
 
     if status:
         q = q.filter(PedidoIntegrado.status == status)
+
+    busca_texto = str(busca or "").strip()
+    if busca_texto:
+        termo = f"%{busca_texto}%"
+        q = q.filter(
+            or_(
+                PedidoIntegrado.pedido_bling_numero.ilike(termo),
+                PedidoIntegrado.pedido_bling_id.ilike(termo),
+            )
+        )
 
     total = q.count()
     pedidos = (
@@ -730,18 +824,16 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
-                situacao_nf = _dict(nf_data.get("situacao"))
                 pedido.payload = _montar_payload_pedido(
                     webhook_data=_dict((pedido.payload or {})).get("webhook"),
                     pedido_completo=_payload_principal(pedido.payload),
                     payload_atual=pedido.payload,
-                    ultima_nf={
-                        "id": nf_id_bling,
-                        "numero": _texto(nf_data.get("numero")),
-                        "serie": _texto(nf_data.get("serie")),
-                        "situacao": _texto(_primeiro_preenchido(situacao_nf.get("descricao"), situacao_nf.get("nome"), nf_data.get("status"))),
-                        "chave": _texto(_primeiro_preenchido(nf_data.get("chaveAcesso"), nf_data.get("chave"))),
-                    },
+                    ultima_nf=_resumir_ultima_nf_webhook(
+                        {
+                            **_dict(nf_data),
+                            "id": nf_id_bling or _dict(nf_data).get("id"),
+                        }
+                    ),
                 )
                 erros_estoque = _confirmar_pedido(
                     db=db,

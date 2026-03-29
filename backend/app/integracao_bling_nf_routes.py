@@ -1,5 +1,6 @@
 
 import os
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
@@ -121,7 +122,111 @@ def _serializar_itens_sem_produto(rows):
 
 
 def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
+    return (_consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num) or {}).get("pedido_bling_id")
+
+
+def _extrair_numero_pedido_loja_nf(data: dict | None) -> str | None:
+    data = data or {}
+    info_adicionais = data.get("informacoesAdicionais") if isinstance(data.get("informacoesAdicionais"), dict) else {}
+    texto_complementar = (
+        info_adicionais.get("informacoesComplementares")
+        or data.get("informacoesComplementares")
+        or data.get("observacoes")
+        or ""
+    )
+
+    candidatos = [
+        data.get("numeroPedidoLoja"),
+        data.get("numeroLojaVirtual"),
+        data.get("numeroLoja"),
+        info_adicionais.get("numeroPedidoLoja"),
+        info_adicionais.get("numeroLojaVirtual"),
+        info_adicionais.get("numeroLoja"),
+    ]
+
+    for candidato in candidatos:
+        texto = str(candidato or "").strip()
+        if texto:
+            return texto
+
+    match = re.search(
+        r"n[ºo°]?\s*pedido(?:\s*na\s*loja|\s*loja)?\s*:\s*([^\r\n|]+)",
+        str(texto_complementar or ""),
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    if match:
+        return str(match.group(1) or "").strip() or None
+    return None
+
+
+def _numero_pedido_loja_do_payload(pedido: PedidoIntegrado) -> str | None:
+    payload = pedido.payload if isinstance(pedido.payload, dict) else {}
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    webhook_payload = payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
+
+    for candidato in (
+        pedido_payload.get("numeroLoja"),
+        pedido_payload.get("numeroPedidoLoja"),
+        pedido_payload.get("numeroPedido"),
+        webhook_payload.get("numeroLoja"),
+        webhook_payload.get("numeroPedidoLoja"),
+        payload.get("numeroLoja"),
+        payload.get("numeroPedidoLoja"),
+    ):
+        texto = str(candidato or "").strip()
+        if texto:
+            return texto
+    return None
+
+
+def _localizar_pedido_local_por_numero_bling(
+    db: Session,
+    *,
+    tenant_id,
+    pedido_bling_numero: str | None,
+) -> PedidoIntegrado | None:
+    numero = str(pedido_bling_numero or "").strip()
+    if not numero:
+        return None
+
+    return (
+        db.query(PedidoIntegrado)
+        .filter(
+            PedidoIntegrado.tenant_id == tenant_id,
+            PedidoIntegrado.pedido_bling_numero == numero,
+        )
+        .first()
+    )
+
+
+def _localizar_pedido_local_por_numero_loja(
+    db: Session,
+    *,
+    tenant_id,
+    numero_pedido_loja: str | None,
+    limite_scan: int = 2000,
+) -> PedidoIntegrado | None:
+    numero = str(numero_pedido_loja or "").strip()
+    if not numero:
+        return None
+
+    pedidos = (
+        db.query(PedidoIntegrado)
+        .filter(PedidoIntegrado.tenant_id == tenant_id)
+        .order_by(PedidoIntegrado.created_at.desc())
+        .limit(limite_scan)
+        .all()
+    )
+    for pedido in pedidos:
+        if _numero_pedido_loja_do_payload(pedido) == numero:
+            return pedido
+    return None
+
+
+def _consultar_relacao_nf_bling(nf_id: str, situacao_num: int) -> dict:
     pedido_bling_id = None
+    pedido_bling_numero = None
+    numero_pedido_loja = None
 
     try:
         from app.bling_integration import BlingAPI
@@ -143,15 +248,26 @@ def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
             or nf_completa.get("pedidoVenda")
         )
         if isinstance(pedido_ref, dict):
-            pedido_bling_id = str(pedido_ref.get("id", ""))
-        logger.info(f"[BLING NF] NF {nf_id} situacao={situacao_num} pedido_bling={pedido_bling_id}")
+            pedido_bling_id = str(pedido_ref.get("id", "")).strip() or None
+            pedido_bling_numero = str(pedido_ref.get("numero", "")).strip() or None
+        numero_pedido_loja = _extrair_numero_pedido_loja_nf(nf_completa)
+        logger.info(
+            f"[BLING NF] NF {nf_id} situacao={situacao_num} "
+            f"pedido_bling_id={pedido_bling_id} pedido_bling_numero={pedido_bling_numero} "
+            f"numero_pedido_loja={numero_pedido_loja}"
+        )
 
-        if not pedido_bling_id and ultima_falha:
+        if not pedido_bling_id and not pedido_bling_numero and not numero_pedido_loja and ultima_falha:
             raise ultima_falha
     except Exception as e:
         logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
 
-    return pedido_bling_id or None
+    return {
+        "pedido_bling_id": pedido_bling_id or None,
+        "pedido_bling_numero": pedido_bling_numero or None,
+        "numero_pedido_loja": numero_pedido_loja or None,
+        "nf_completa": nf_completa,
+    }
 
 
 def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, situacao_num: int) -> None:
@@ -242,7 +358,10 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         return {"status": "ignorado", "motivo": f"situacao_{situacao_num}_nao_tratada"}
 
     # Buscar NF completa na API do Bling para obter o pedido vinculado
-    pedido_bling_id = _obter_pedido_bling_id_por_nf(nf_id=nf_id, situacao_num=situacao_num)
+    nf_relacao = _consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num)
+    pedido_bling_id = nf_relacao.get("pedido_bling_id")
+    pedido_bling_numero = nf_relacao.get("pedido_bling_numero")
+    numero_pedido_loja = nf_relacao.get("numero_pedido_loja")
 
     if tenant_id_monitor:
         registrar_evento(
@@ -258,7 +377,30 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             payload=data,
         )
 
-    if not pedido_bling_id:
+    pedido = None
+    if pedido_bling_id:
+        query = db.query(PedidoIntegrado).filter(PedidoIntegrado.pedido_bling_id == pedido_bling_id)
+        if tenant_id_monitor:
+            query = query.filter(PedidoIntegrado.tenant_id == tenant_id_monitor)
+        pedido = query.first()
+    if not pedido and tenant_id_monitor and pedido_bling_numero:
+        pedido = _localizar_pedido_local_por_numero_bling(
+            db,
+            tenant_id=tenant_id_monitor,
+            pedido_bling_numero=pedido_bling_numero,
+        )
+        if pedido:
+            pedido_bling_id = pedido.pedido_bling_id
+    if not pedido and tenant_id_monitor and numero_pedido_loja:
+        pedido = _localizar_pedido_local_por_numero_loja(
+            db,
+            tenant_id=tenant_id_monitor,
+            numero_pedido_loja=numero_pedido_loja,
+        )
+        if pedido:
+            pedido_bling_id = pedido.pedido_bling_id
+
+    if not pedido and not pedido_bling_id and not pedido_bling_numero:
         # NF sem pedido vinculado (ex: NF emitida manualmente fora do fluxo)
         if tenant_id_monitor:
             abrir_incidente(
@@ -270,14 +412,14 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 suggested_action="Revisar a origem da NF no Bling e vincular manualmente ao pedido correto, se existir.",
                 auto_fixable=False,
                 nf_bling_id=nf_id,
-                details={"situacao_num": situacao_num},
+                details={
+                    "situacao_num": situacao_num,
+                    "pedido_bling_numero": pedido_bling_numero,
+                    "numero_pedido_loja": numero_pedido_loja,
+                },
                 source="runtime",
             )
         return {"status": "ignorado", "motivo": "nf_sem_pedido_vinculado"}
-
-    pedido = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.pedido_bling_id == pedido_bling_id
-    ).first()
 
     if not pedido:
         if tenant_id_monitor:
@@ -291,12 +433,21 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 auto_fixable=False,
                 pedido_bling_id=pedido_bling_id,
                 nf_bling_id=nf_id,
-                details={"situacao_num": situacao_num},
+                details={
+                    "situacao_num": situacao_num,
+                    "pedido_bling_numero": pedido_bling_numero,
+                    "numero_pedido_loja": numero_pedido_loja,
+                },
                 source="runtime",
             )
         return {"status": "ignorado", "motivo": "pedido_nao_encontrado_no_sistema"}
 
-    _registrar_nf_no_pedido(pedido=pedido, data=data, nf_id=nf_id, situacao_num=situacao_num)
+    _registrar_nf_no_pedido(
+        pedido=pedido,
+        data=nf_relacao.get("nf_completa") or data,
+        nf_id=nf_id,
+        situacao_num=situacao_num,
+    )
 
     itens = db.query(PedidoIntegradoItem).filter(
         PedidoIntegradoItem.pedido_integrado_id == pedido.id

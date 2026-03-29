@@ -75,17 +75,26 @@ class ProdutoService:
         # REGRA 4: KIT/VARIACAO-KIT - Processar tipo_kit e composição
         # REGRA OFICIAL: Variação vendável PODE ser marcada como KIT
         # ========================================
-        composicao_kit = dados.pop('composicao_kit', [])  # Extrair composição antes de criar produto
-        
-        # Mapear e_kit_fisico (boolean) para tipo_kit (enum)
-        if dados.get('e_kit_fisico') is not None:
-            e_kit_fisico = dados.get('e_kit_fisico', False)
-            dados['tipo_kit'] = 'FISICO' if e_kit_fisico else 'VIRTUAL'
-        
+        composicao_kit = dados.pop('composicao_kit', None)  # Extrair composição antes de criar produto
+
+        tipo_kit_informado = dados.get('tipo_kit')
+        e_kit_fisico = dados.pop('e_kit_fisico', None)
+
+        if tipo_produto in ('KIT', 'VARIACAO'):
+            if tipo_kit_informado:
+                tipo_kit_normalizado = str(tipo_kit_informado).upper()
+                dados['tipo_kit'] = 'FISICO' if e_kit_fisico else tipo_kit_normalizado
+            elif tipo_produto == 'KIT' and e_kit_fisico is not None:
+                dados['tipo_kit'] = 'FISICO' if e_kit_fisico else 'VIRTUAL'
+            else:
+                dados['tipo_kit'] = None
+        else:
+            dados['tipo_kit'] = None
+
         # Se tem tipo_kit definido (KIT ou VARIACAO-KIT), validar composição
         if dados.get('tipo_kit'):
-            # ⚠️ VALIDAÇÃO OBRIGATÓRIA: KIT deve ter pelo menos 1 componente
-            if not composicao_kit or len(composicao_kit) == 0:
+            precisa_componentes_agora = tipo_produto != 'VARIACAO'
+            if precisa_componentes_agora and (not composicao_kit or len(composicao_kit) == 0):
                 tipo_desc = f"{tipo_produto}-KIT" if tipo_produto == 'VARIACAO' else tipo_produto
                 raise ValueError(
                     f"Produto do tipo {tipo_desc} deve ter pelo menos 1 componente na composição. "
@@ -104,9 +113,6 @@ class ProdutoService:
             k: v for k, v in dados.items() 
             if v is not None or k in ['preco_custo', 'estoque_minimo']
         }
-        
-        # Remover campo e_kit_fisico (já foi mapeado para tipo_kit)
-        dados_limpos.pop('e_kit_fisico', None)
         
         # 🔒 ISOLAMENTO MULTI-TENANT: Adicionar tenant_id obrigatório
         dados_limpos['tenant_id'] = tenant_id

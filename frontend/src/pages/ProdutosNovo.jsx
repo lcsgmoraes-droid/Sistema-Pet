@@ -1143,7 +1143,7 @@ export default function ProdutosNovo() {
         // Se for produto PAI, redirecionar para edição (aba de variações)
         if (formData.tipo_produto === 'PAI') {
           alert('Produto PAI criado com sucesso! Agora cadastre as variações.');
-          navigate(`/produtos/${produtoId}/editar?aba=variacoes`);
+          navigate(`/produtos/${produtoId}/editar?aba=8`);
         } else {
           alert('Produto cadastrado com sucesso!');
           navigate('/produtos');
@@ -3255,11 +3255,17 @@ export default function ProdutosNovo() {
                                 if (novaVariacao.e_kit) {
                                   dadosVariacao.tipo_kit = 'VIRTUAL'; // Padrão: virtual (será configurado depois na aba composição)
                                   dadosVariacao.e_kit_fisico = false;
-                                  dadosVariacao.composicao_kit = [];
                                 }
                                 
-                                await createProduto(dadosVariacao);
-                                
+                                const respostaCriacao = await createProduto(dadosVariacao);
+                                const variacaoCriada = respostaCriacao?.data;
+
+                                if (novaVariacao.e_kit && variacaoCriada?.id) {
+                                  alert('Variação-kit cadastrada com sucesso! Agora defina a composição.');
+                                  navigate(`/produtos/${variacaoCriada.id}/editar?aba=9`);
+                                  return;
+                                }
+
                                 alert('Variação cadastrada com sucesso!');
                                 setMostrarFormVariacao(false);
                                 setNovaVariacao({

@@ -27,6 +27,9 @@ export default function MovimentacoesProduto() {
   const [editingMovimentacao, setEditingMovimentacao] = useState(null);
   const [syncProduto, setSyncProduto] = useState(null);
   const [forcandoSync, setForcandoSync] = useState(false);
+  const [showReservasModal, setShowReservasModal] = useState(false);
+  const [loadingReservas, setLoadingReservas] = useState(false);
+  const [reservasAtivas, setReservasAtivas] = useState([]);
   
   // Modal de lançamento
   const [tipoLancamento, setTipoLancamento] = useState('entrada'); // entrada, saida, balanco
@@ -91,6 +94,31 @@ export default function MovimentacoesProduto() {
     } finally {
       setForcandoSync(false);
     }
+  };
+
+  const abrirModalReservas = async () => {
+    if (!produto || Number(produto.estoque_reservado || 0) <= 0) {
+      return;
+    }
+
+    try {
+      setLoadingReservas(true);
+      const res = await api.get(`/estoque/produto/${id}/reservas-ativas`);
+      setReservasAtivas(res.data?.pedidos || []);
+      setShowReservasModal(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao carregar pedidos reservados');
+    } finally {
+      setLoadingReservas(false);
+    }
+  };
+
+  const abrirPedidoReservado = (pedido) => {
+    const numeroPedido = pedido?.pedido_bling_numero || pedido?.pedido_bling_id;
+    const destino = numeroPedido
+      ? `/vendas/bling-pedidos?pedido=${encodeURIComponent(numeroPedido)}`
+      : '/vendas/bling-pedidos';
+    window.open(destino, '_blank', 'noopener,noreferrer');
   };
 
   const abrirModal = (tipo, movimentacao = null) => {
@@ -352,6 +380,15 @@ export default function MovimentacoesProduto() {
       return { texto: `Pedido #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600', link: `/pdv?venda=${mov.referencia_id}` };
     }
     // Se for balanço
+    if (mov.referencia_tipo === 'pedido_integrado') {
+      if (mov.nf_numero) {
+        return { texto: `NF ${mov.nf_numero}`, icone: 'nf-venda', cor: 'text-red-600', link: null };
+      }
+      if (mov.documento) {
+        return { texto: `Pedido Bling #${mov.documento}`, icone: 'pedido', cor: 'text-orange-600', link: null };
+      }
+      return { texto: `Pedido Bling #${mov.referencia_id}`, icone: 'pedido', cor: 'text-orange-600', link: null };
+    }
     if (mov.motivo === 'balanco') {
       return { texto: 'Balanço', icone: 'balanco', cor: 'text-blue-600', link: null };
     }
@@ -637,9 +674,16 @@ export default function MovimentacoesProduto() {
               <div className="mt-1 text-[11px] text-slate-500">{unidade}</div>
             </div>
 
-            <div className={`rounded-xl border p-3 shadow-sm ${
-              estoqueReservado > 0 ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-white' : 'border-slate-200 bg-gradient-to-br from-slate-50 to-white'
-            }`}>
+            <button
+              type="button"
+              onClick={abrirModalReservas}
+              disabled={estoqueReservado <= 0 || loadingReservas}
+              className={`rounded-xl border p-3 shadow-sm text-left ${
+                estoqueReservado > 0
+                  ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-white transition hover:border-amber-300 hover:shadow-md'
+                  : 'border-slate-200 bg-gradient-to-br from-slate-50 to-white cursor-default'
+              } ${estoqueReservado > 0 ? 'cursor-pointer' : ''}`}
+            >
               <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${
                 estoqueReservado > 0 ? 'text-amber-600' : 'text-slate-500'
               }`}>Reservado</div>
@@ -648,8 +692,12 @@ export default function MovimentacoesProduto() {
               }`}>
                 {formatarQuantidade(estoqueReservado)}
               </div>
-              <div className="mt-1 text-[11px] text-slate-500">{estoqueReservado > 0 ? 'Pedidos em aberto' : unidade}</div>
-            </div>
+              <div className="mt-1 text-[11px] text-slate-500">
+                {estoqueReservado > 0
+                  ? (loadingReservas ? 'Carregando pedidos...' : 'Pedidos em aberto')
+                  : unidade}
+              </div>
+            </button>
 
             <div className={`rounded-xl border p-3 shadow-sm sm:col-span-2 ${saldoDisponivelCardClass}`}>
               <div className="flex items-start justify-between gap-4">
@@ -840,7 +888,9 @@ export default function MovimentacoesProduto() {
                         ) : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                        {produto.preco_venda ? `R$ ${produto.preco_venda.toFixed(2)}` : '-'}
+                        {mov.preco_venda_unitario !== null && mov.preco_venda_unitario !== undefined
+                          ? `R$ ${Number(mov.preco_venda_unitario).toFixed(2)}`
+                          : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
                         {mov.custo_unitario ? (
@@ -929,7 +979,7 @@ export default function MovimentacoesProduto() {
                             mov.canal === 'whatsapp' ? 'bg-green-100 text-green-700' :
                             'bg-slate-100 text-slate-600'
                           }`}>
-                            {{
+                            {mov.canal_label || {
                               loja_fisica: 'Loja Física',
                               mercado_livre: 'Mercado Livre',
                               shopee: 'Shopee',
@@ -943,12 +993,12 @@ export default function MovimentacoesProduto() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
-                          {mov.motivo && mov.motivo !== 'compra' && mov.motivo !== 'venda' && (
+                          {mov.motivo && mov.motivo !== 'compra' && !String(mov.motivo).startsWith('venda') && (
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                               {getMotivoLabel(mov.motivo)}
                             </span>
                           )}
-                          {mov.observacao}
+                          {mov.observacao_exibicao || mov.observacao}
                         </div>
                       </td>
                     </tr>
@@ -959,6 +1009,115 @@ export default function MovimentacoesProduto() {
           </table>
         </div>
       </div>
+
+      {showReservasModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Pedidos com reserva ativa</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {reservasAtivas.length} pedido{reservasAtivas.length !== 1 ? 's' : ''} segurando este produto.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReservasModal(false)}
+                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
+              {reservasAtivas.length === 0 ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                  Nenhum pedido em aberto foi encontrado para esta reserva.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reservasAtivas.map((pedido) => (
+                    <div key={pedido.pedido_integrado_id} className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <button
+                            type="button"
+                            onClick={() => abrirPedidoReservado(pedido)}
+                            className="text-left text-base font-bold text-blue-600 hover:underline"
+                          >
+                            #{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.pedido_integrado_id}
+                          </button>
+                          <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                            {pedido.canal_label && (
+                              <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">
+                                {pedido.canal_label}
+                              </span>
+                            )}
+                            {pedido.status && (
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
+                                {pedido.status}
+                              </span>
+                            )}
+                            {pedido.nf_numero && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
+                                NF {pedido.nf_numero}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[11px] uppercase tracking-wide text-slate-400">Reservado neste produto</div>
+                          <div className="mt-1 text-lg font-black text-amber-700">
+                            {formatarQuantidade(pedido.quantidade_reservada)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+                        <div>
+                          <span className="font-medium text-slate-800">Pedido na loja:</span>{' '}
+                          {pedido.numero_pedido_loja || '-'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-800">Criado em:</span>{' '}
+                          {pedido.criado_em ? new Date(pedido.criado_em).toLocaleString('pt-BR') : '-'}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-800">Expira em:</span>{' '}
+                          {pedido.expira_em ? new Date(pedido.expira_em).toLocaleString('pt-BR') : '-'}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {Array.isArray(pedido.itens) && pedido.itens.map((item) => (
+                          <div key={`${pedido.pedido_integrado_id}-${item.item_id}-${item.sku}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="font-mono text-xs text-slate-500">{item.sku || 'SEM-SKU'}</span>
+                              <span>{item.descricao || '-'}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                              <span>Qtd pedido: {formatarQuantidade(item.quantidade_item)}</span>
+                              <span>Reserva neste produto: {formatarQuantidade(item.quantidade_reservada_produto)}</span>
+                              {item.origem_reserva === 'componente_kit_virtual' && (
+                                <span>
+                                  Origem: componente do kit {item.kit_origem_sku || item.kit_origem_nome || '-'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Lançamento */}
       {showModal && (

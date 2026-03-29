@@ -143,6 +143,28 @@ const compareProdutosByBusca = (produtoA, produtoB, buscaNormalizada) => {
   });
 };
 
+const isKitVirtualProduto = (produto) => {
+  const tipoProduto = String(produto?.tipo_produto || "").toUpperCase();
+  const tipoKit = String(produto?.tipo_kit || "").toUpperCase();
+  return (tipoProduto === "KIT" || tipoProduto === "VARIACAO") && tipoKit === "VIRTUAL";
+};
+
+const isKitFisicoProduto = (produto) => {
+  const tipoProduto = String(produto?.tipo_produto || "").toUpperCase();
+  const tipoKit = String(produto?.tipo_kit || "").toUpperCase();
+  return (tipoProduto === "KIT" || tipoProduto === "VARIACAO") && tipoKit === "FISICO";
+};
+
+const isProdutoComComposicao = (produto) =>
+  isKitVirtualProduto(produto) || isKitFisicoProduto(produto);
+
+const obterEstoqueVisualProduto = (produto) => {
+  if (isKitVirtualProduto(produto)) {
+    return Number(produto?.estoque_virtual ?? produto?.estoque_atual ?? produto?.estoque ?? 0);
+  }
+  return Number(produto?.estoque_atual ?? produto?.estoque ?? 0);
+};
+
 // ====================================================
 // DEFINIÇÃO DE COLUNAS DA LISTAGEM
 // ====================================================
@@ -240,7 +262,7 @@ const PRODUTOS_COLUNAS = [
     renderCell: (produto, props) => {
       const isVariacao = produto.tipo_produto === "VARIACAO";
       const isPai = produto.tipo_produto === "PAI";
-      const isKit = produto.tipo_produto === "KIT";
+      const isKit = isProdutoComComposicao(produto);
       const isKitExpandido = (props.kitsExpandidos || []).includes(produto.id);
       const isPaiExpandido = (props.paisExpandidos || []).includes(produto.id);
 
@@ -329,12 +351,12 @@ const PRODUTOS_COLUNAS = [
                       (Pai {produto.total_variacoes || 0})
                     </span>
                   )}
-                  {isKit && produto.tipo_kit === "VIRTUAL" && (
+                  {isKitVirtualProduto(produto) && (
                     <span className="ml-2 text-xs text-indigo-600">
                       (Kit • Virtual)
                     </span>
                   )}
-                  {isKit && produto.tipo_kit === "FISICO" && (
+                  {isKitFisicoProduto(produto) && (
                     <span className="ml-2 text-xs text-green-600">
                       (Kit • Físico)
                     </span>
@@ -584,11 +606,8 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => {
-      const isKitVirtual =
-        produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL";
-      const estoqueAtual = isKitVirtual
-        ? (produto.estoque_virtual ?? 0)
-        : produto.estoque_atual || 0;
+      const isKitVirtual = isKitVirtualProduto(produto);
+      const estoqueAtual = obterEstoqueVisualProduto(produto);
       const reservado = produto.estoque_reservado || 0;
       const estoqueDisponivel = estoqueAtual - reservado;
 
@@ -630,14 +649,15 @@ const PRODUTOS_COLUNAS = [
       </th>
     ),
     renderCell: (produto, props) => {
+      const estoqueVisual = obterEstoqueVisualProduto(produto);
       let classeMovimentacao =
         "text-gray-500 border-gray-200 bg-gray-50 hover:bg-gray-100";
 
       if (produto.controlar_estoque === true) {
-        if ((produto.estoque_atual || 0) > 0) {
+        if (estoqueVisual > 0) {
           classeMovimentacao =
             "text-green-700 border-green-200 bg-green-50 hover:bg-green-100";
-        } else if ((produto.estoque_atual || 0) === 0) {
+        } else if (estoqueVisual === 0) {
           classeMovimentacao =
             "text-red-700 border-red-200 bg-red-50 hover:bg-red-100";
         }
@@ -658,7 +678,7 @@ const PRODUTOS_COLUNAS = [
                 "Controla estoque:",
                 produto.controlar_estoque,
                 "Estoque atual:",
-                produto.estoque_atual,
+                estoqueVisual,
               );
               props.navigate(`/produtos/${produto.id}/movimentacoes`);
             }}
@@ -758,7 +778,7 @@ const COLUNAS_RELATORIO_PRODUTOS = [
   {
     key: "estoque",
     label: "Estoque",
-    value: (p) => Number(p.estoque_atual ?? p.estoque ?? 0),
+    value: (p) => obterEstoqueVisualProduto(p),
   },
   {
     key: "estoque_minimo",
@@ -1534,11 +1554,7 @@ export default function Produtos() {
   const getCorEstoque = (produto) => {
     if (!produto.controlar_estoque) return "text-gray-500";
 
-    // KIT virtual usa estoque_virtual, outros usam estoque_atual
-    const estoque =
-      produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
-        ? (produto.estoque_virtual ?? 0)
-        : produto.estoque_atual || 0;
+    const estoque = obterEstoqueVisualProduto(produto);
     const minimo = produto.estoque_minimo || 0;
 
     // Estoque zerado
@@ -1753,11 +1769,11 @@ export default function Produtos() {
         return copia.sort((a, b) => porTexto(a, b, (p) => p.nome, false));
       case "estoque_asc":
         return copia.sort(
-          (a, b) => Number(a.estoque_atual ?? a.estoque ?? 0) - Number(b.estoque_atual ?? b.estoque ?? 0),
+          (a, b) => obterEstoqueVisualProduto(a) - obterEstoqueVisualProduto(b),
         );
       case "estoque_desc":
         return copia.sort(
-          (a, b) => Number(b.estoque_atual ?? b.estoque ?? 0) - Number(a.estoque_atual ?? a.estoque ?? 0),
+          (a, b) => obterEstoqueVisualProduto(b) - obterEstoqueVisualProduto(a),
         );
       case "preco_asc":
         return copia.sort((a, b) => Number(a.preco_venda ?? 0) - Number(b.preco_venda ?? 0));
@@ -2253,7 +2269,7 @@ export default function Produtos() {
                     return null;
                   }
 
-                  const isKit = produto.tipo_produto === "KIT";
+                  const isKit = isProdutoComComposicao(produto);
                   const isKitExpandido = kitsExpandidos.includes(produto.id);
 
                   return (

@@ -1,6 +1,9 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 from app.nfe_routes import (
+    _enriquecer_notas_com_pedidos_integrados,
+    _extrair_campos_fiscais_do_xml,
     _extrair_valor_nota,
     _normalizar_detalhe_nota_bling,
     _normalizar_nota_bling,
@@ -282,3 +285,133 @@ def test_normalizar_detalhe_nota_bling_formata_objetos_aninhados_sem_exibir_dict
     assert detalhe["cliente"]["vendedor"] is None
     assert detalhe["totais"]["valor_total"] == 134.97
     assert detalhe["canal_label"] == "Shopee"
+
+
+def test_extrair_campos_fiscais_do_xml_preenche_horas_e_rotulos():
+    campos = _extrair_campos_fiscais_do_xml(
+        """<?xml version="1.0" encoding="UTF-8"?>
+        <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+          <NFe>
+            <infNFe>
+              <ide>
+                <natOp>Venda de mercadoria com ST</natOp>
+                <dhEmi>2026-03-28T22:03:22-03:00</dhEmi>
+                <dhSaiEnt>2026-03-28T22:03:22-03:00</dhSaiEnt>
+                <finNFe>1</finNFe>
+                <indPres>9</indPres>
+              </ide>
+              <emit>
+                <CRT>1</CRT>
+              </emit>
+            </infNFe>
+          </NFe>
+        </nfeProc>"""
+    )
+
+    assert campos["data_emissao"] == "2026-03-28"
+    assert campos["hora_emissao"] == "22:03:22"
+    assert campos["data_saida"] == "2026-03-28"
+    assert campos["hora_saida"] == "22:03:22"
+    assert campos["natureza_operacao"] == "Venda de mercadoria com ST"
+    assert campos["codigo_regime_tributario"] == "Simples Nacional"
+    assert campos["finalidade"] == "NF-e normal"
+    assert campos["indicador_presenca"] == "9 - Operacao nao presencial, outros"
+
+
+def test_normalizar_detalhe_nota_bling_extrai_hora_de_timestamp_compacto():
+    detalhe = _normalizar_detalhe_nota_bling(
+        {
+            "id": 25428294101,
+            "numero": "010980",
+            "situacao": 5,
+            "dataEmissao": "2026-03-28 22:03:22",
+            "dataOperacao": "2026-03-28 22:03:22",
+            "contato": {"nome": "Maria Carolina Silveira Silva"},
+        },
+        55,
+    )
+
+    assert detalhe["data_emissao"] == "2026-03-28"
+    assert detalhe["hora_emissao"] == "22:03:22"
+    assert detalhe["data_saida"] == "2026-03-28"
+    assert detalhe["hora_saida"] == "22:03:22"
+
+
+def test_enriquecer_notas_com_pedidos_integrados_preenche_valor_total_do_pedido():
+    db = Mock()
+    pedido = SimpleNamespace(
+        tenant_id="tenant-1",
+        pedido_bling_id="25428293804",
+        pedido_bling_numero="11595",
+        canal="shopee",
+        payload={
+            "pedido": {
+                "numeroLoja": "260329CXSEF6VM",
+                "origemLojaVirtual": "Shopee",
+                "total": 158.74,
+            },
+            "ultima_nf": {
+                "id": "25428294101",
+                "numero": "010980",
+            },
+        },
+        created_at="2026-03-28T22:03:22",
+    )
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [pedido]
+    notas = [
+        {
+            "id": "25428294101",
+            "numero": "010980",
+            "valor": 0.0,
+            "canal": None,
+            "canal_label": None,
+            "numero_pedido_loja": "260329CXSEF6VM",
+            "loja": {"id": None, "nome": None},
+        }
+    ]
+
+    _enriquecer_notas_com_pedidos_integrados(db, "tenant-1", notas)
+
+    assert notas[0]["valor"] == 158.74
+    assert notas[0]["canal_label"] == "Shopee"
+    assert notas[0]["origem_loja_virtual"] == "Shopee"
+
+
+def test_enriquecer_notas_com_pedidos_integrados_relaciona_por_id_da_nf_quando_resumo_nao_tem_pedido():
+    db = Mock()
+    pedido = SimpleNamespace(
+        tenant_id="tenant-1",
+        pedido_bling_id="2539990001",
+        pedido_bling_numero="11601",
+        canal="mercado_livre",
+        payload={
+            "pedido": {
+                "origemLojaVirtual": "Mercado Livre",
+                "total": 490.99,
+            },
+            "ultima_nf": {
+                "id": "25428517969",
+                "numero": "010977",
+            },
+        },
+        created_at="2026-03-28T22:12:52",
+    )
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [pedido]
+    notas = [
+        {
+            "id": "25428517969",
+            "numero": "010977",
+            "valor": 0.0,
+            "canal": None,
+            "canal_label": None,
+            "numero_pedido_loja": None,
+            "numero_loja_virtual": None,
+            "loja": {"id": None, "nome": None},
+        }
+    ]
+
+    _enriquecer_notas_com_pedidos_integrados(db, "tenant-1", notas)
+
+    assert notas[0]["valor"] == 490.99
+    assert notas[0]["canal_label"] == "Mercado Livre"
+    assert notas[0]["origem_loja_virtual"] == "Mercado Livre"

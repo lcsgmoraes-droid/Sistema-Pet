@@ -3,8 +3,12 @@ Rotas para gerenciamento de Notas Fiscais Eletrônicas
 """
 
 import re
+import xml.etree.ElementTree as ET
+from copy import deepcopy
+from time import monotonic, sleep
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+import requests
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -40,12 +44,76 @@ _LOJA_ID_CANAL_MAP = {
     "205639810": "amazon",
 }
 
+_REGIME_TRIBUTARIO_MAP = {
+    "1": "Simples Nacional",
+    "2": "Simples Nacional - excesso de sublimite",
+    "3": "Regime Normal",
+}
+
+_FINALIDADE_MAP = {
+    "1": "NF-e normal",
+    "2": "NF-e complementar",
+    "3": "NF-e de ajuste",
+    "4": "Devolucao / Retorno",
+}
+
+_INDICADOR_PRESENCA_MAP = {
+    "0": "0 - Nao se aplica",
+    "1": "1 - Operacao presencial",
+    "2": "2 - Operacao nao presencial, internet",
+    "3": "3 - Operacao nao presencial, teleatendimento",
+    "4": "4 - NFC-e em operacao com entrega em domicilio",
+    "5": "5 - Operacao presencial, fora do estabelecimento",
+    "9": "9 - Operacao nao presencial, outros",
+}
+
+_XML_NS = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+_NFE_LIST_CACHE_SECONDS = 45
+_NFE_DETAIL_CACHE_SECONDS = 600
+_nfe_list_cache: dict[tuple[str, str, str, str], dict] = {}
+_nfe_detail_cache: dict[tuple[str, str, str], dict] = {}
+
 
 def _coerce_int(value, default: int = 0) -> int:
     try:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _cache_key_listar_nfes(tenant_id, data_inicial: str | None, data_final: str | None, situacao: str | None) -> tuple[str, str, str, str]:
+    return (
+        str(tenant_id or ""),
+        str(data_inicial or ""),
+        str(data_final or ""),
+        str((situacao or "")).strip().lower(),
+    )
+
+
+def _cache_key_detalhe_nfe(tenant_id, nfe_id: int, modelo: int | None = None) -> tuple[str, str, str]:
+    return (
+        str(tenant_id or ""),
+        str(nfe_id or ""),
+        str(modelo or ""),
+    )
+
+
+def _obter_detalhe_nfe_cache(tenant_id, nfe_id: int, modelo: int | None = None):
+    cache_key = _cache_key_detalhe_nfe(tenant_id, nfe_id, modelo)
+    cache_atual = _nfe_detail_cache.get(cache_key)
+    if not cache_atual:
+        return None
+    if (monotonic() - cache_atual.get("ts_monotonic", 0)) > _NFE_DETAIL_CACHE_SECONDS:
+        _nfe_detail_cache.pop(cache_key, None)
+        return None
+    return deepcopy(cache_atual.get("payload"))
+
+
+def _salvar_detalhe_nfe_cache(tenant_id, nfe_id: int, modelo: int | None, payload: dict) -> None:
+    _nfe_detail_cache[_cache_key_detalhe_nfe(tenant_id, nfe_id, modelo)] = {
+        "ts_monotonic": monotonic(),
+        "payload": deepcopy(payload),
+    }
 
 
 def _coerce_float(value, default: float = 0.0) -> float:
@@ -260,6 +328,107 @@ def _tipo_pessoa_label(value, cpf_cnpj: str | None = None) -> str | None:
     return None
 
 
+def _separar_data_hora(valor) -> tuple[str | None, str | None]:
+    texto = _texto(valor)
+    if not texto:
+        return None, None
+
+    texto_normalizado = texto
+    if re.match(r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", texto):
+        texto_normalizado = texto.replace(" ", "T", 1)
+
+    try:
+        dt = datetime.fromisoformat(texto_normalizado)
+        return dt.date().isoformat(), dt.strftime("%H:%M:%S")
+    except ValueError:
+        pass
+
+    match = re.match(r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})", texto)
+    if match:
+        return match.group(1), match.group(2)
+
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", texto):
+        return texto, None
+    if re.fullmatch(r"\d{2}:\d{2}:\d{2}", texto):
+        return None, texto
+    return _formatar_data_iso(texto), None
+
+
+def _label_codigo(mapa: dict[str, str], valor) -> str | None:
+    texto = _texto_relacionado(valor, "descricao", "nome", "label", fallback_to_id=False)
+    if texto:
+        return texto
+    codigo = _texto(_primeiro_preenchido(_dict(valor).get("valor") if isinstance(valor, dict) else None, valor))
+    if not codigo:
+        return None
+    return mapa.get(codigo, codigo)
+
+
+def _extrair_campos_fiscais_do_xml(xml_texto: str | None) -> dict:
+    if not _texto(xml_texto):
+        return {}
+
+    root = ET.fromstring(xml_texto)
+    ide = root.find(".//nfe:ide", _XML_NS)
+    emit = root.find(".//nfe:emit", _XML_NS)
+
+    if ide is None:
+        return {}
+
+    data_emissao, hora_emissao = _separar_data_hora(ide.findtext("nfe:dhEmi", default="", namespaces=_XML_NS))
+    data_saida, hora_saida = _separar_data_hora(ide.findtext("nfe:dhSaiEnt", default="", namespaces=_XML_NS))
+
+    return {
+        "data_emissao": data_emissao,
+        "hora_emissao": hora_emissao,
+        "data_saida": data_saida,
+        "hora_saida": hora_saida,
+        "natureza_operacao": _texto(ide.findtext("nfe:natOp", default="", namespaces=_XML_NS)),
+        "codigo_regime_tributario": _REGIME_TRIBUTARIO_MAP.get(
+            _texto(emit.findtext("nfe:CRT", default="", namespaces=_XML_NS)) or "",
+        ),
+        "finalidade": _FINALIDADE_MAP.get(
+            _texto(ide.findtext("nfe:finNFe", default="", namespaces=_XML_NS)) or "",
+        ),
+        "indicador_presenca": _INDICADOR_PRESENCA_MAP.get(
+            _texto(ide.findtext("nfe:indPres", default="", namespaces=_XML_NS)) or "",
+        ),
+    }
+
+
+def _consultar_campos_fiscais_no_xml(xml_url: str | None) -> dict:
+    if not _texto(xml_url):
+        return {}
+    response = requests.get(xml_url, timeout=20)
+    response.raise_for_status()
+    return _extrair_campos_fiscais_do_xml(response.text)
+
+
+def _enriquecer_detalhe_com_xml_link(item: dict, detalhe: dict) -> None:
+    xml_url = _texto(_primeiro_preenchido(item.get("xml"), item.get("urlXml"), item.get("xmlUrl")))
+    if not xml_url:
+        return
+
+    try:
+        campos_xml = _consultar_campos_fiscais_no_xml(xml_url)
+    except Exception as exc:
+        logger.warning("consultar_nfe", f"Falha ao enriquecer NF via XML: {exc}")
+        return
+
+    for campo in ("data_emissao", "hora_emissao", "data_saida", "hora_saida"):
+        if campos_xml.get(campo):
+            detalhe[campo] = campos_xml[campo]
+
+    if campos_xml.get("natureza_operacao") and (
+        not detalhe.get("natureza_operacao") or str(detalhe.get("natureza_operacao", "")).startswith("ID ")
+    ):
+        detalhe["natureza_operacao"] = campos_xml["natureza_operacao"]
+
+    for campo in ("codigo_regime_tributario", "finalidade", "indicador_presenca"):
+        if campos_xml.get(campo) and not detalhe.get(campo):
+            detalhe[campo] = campos_xml[campo]
+
+
 def _tipo_nota_label(modelo: int | str | None) -> str:
     return "NFC-e" if str(modelo or "") == "65" else "NF-e"
 
@@ -376,7 +545,7 @@ def _normalizar_item_nota(item: dict) -> dict:
         "quantidade": _coerce_float(item.get("quantidade"), 0.0),
         "valor_unitario": _coerce_float(_primeiro_preenchido(item.get("valor"), item.get("valorUnitario"), item.get("preco"), item.get("precoUnitario")), 0.0),
         "valor_total": _coerce_float(_primeiro_preenchido(item.get("total"), item.get("valorTotal")), 0.0),
-        "ncm": _texto(_primeiro_preenchido(item.get("ncm"), produto.get("ncm"))),
+        "ncm": _texto(_primeiro_preenchido(item.get("ncm"), item.get("classificacaoFiscal"), produto.get("ncm"))),
     }
 
 
@@ -417,6 +586,11 @@ def _normalizar_detalhe_nota_bling(item: dict, modelo: int, venda: Venda | None 
 
     itens = [_normalizar_item_nota(item_nota) for item_nota in _list(item.get("itens"))]
 
+    data_emissao_raw = _primeiro_preenchido(item.get("dataEmissao"), item.get("data_emissao"))
+    data_saida_raw = _primeiro_preenchido(item.get("dataSaida"), item.get("dataOperacao"), item.get("data_saida"))
+    data_emissao, hora_emissao_extra = _separar_data_hora(data_emissao_raw)
+    data_saida, hora_saida_extra = _separar_data_hora(data_saida_raw)
+
     consumidor_final = _primeiro_preenchido(
         item.get("consumidorFinal"),
         contato.get("consumidorFinal"),
@@ -450,17 +624,26 @@ def _normalizar_detalhe_nota_bling(item: dict, modelo: int, venda: Venda | None 
         "tipo_label": _tipo_nota_label(modelo),
         "chave": _texto(_primeiro_preenchido(item.get("chaveAcesso"), item.get("chave"))),
         "status": _status_nota_bling(item),
-        "data_emissao": _formatar_data_iso(_primeiro_preenchido(item.get("dataEmissao"), item.get("data_emissao"))),
-        "hora_emissao": _texto(_primeiro_preenchido(item.get("horaEmissao"), item.get("hora_emissao"))),
-        "data_saida": _formatar_data_iso(_primeiro_preenchido(item.get("dataSaida"), item.get("dataOperacao"), item.get("data_saida"))),
-        "hora_saida": _texto(_primeiro_preenchido(item.get("horaSaida"), item.get("horaOperacao"), item.get("hora_saida"))),
+        "data_emissao": data_emissao or _formatar_data_iso(data_emissao_raw),
+        "hora_emissao": _texto(_primeiro_preenchido(item.get("horaEmissao"), item.get("hora_emissao"), hora_emissao_extra)),
+        "data_saida": data_saida or _formatar_data_iso(data_saida_raw),
+        "hora_saida": _texto(_primeiro_preenchido(item.get("horaSaida"), item.get("horaOperacao"), item.get("hora_saida"), hora_saida_extra)),
         "natureza_operacao": _texto(_primeiro_preenchido(
             _texto_relacionado(item.get("naturezaOperacao"), "nome", "descricao", "descricaoPadrao"),
             item.get("naturezaOperacaoDescricao"),
         )),
-        "codigo_regime_tributario": _texto(_primeiro_preenchido(_texto_relacionado(item.get("codigoRegimeTributario")), _texto_relacionado(item.get("regimeTributario")))),
-        "finalidade": _texto(_primeiro_preenchido(_texto_relacionado(item.get("finalidade"), "descricao", "nome", "label"), item.get("finalidade"))),
-        "indicador_presenca": _texto(_primeiro_preenchido(_texto_relacionado(item.get("indicadorPresenca"), "descricao", "nome", "label"), item.get("indicadorPresenca"))),
+        "codigo_regime_tributario": _texto(_primeiro_preenchido(
+            _label_codigo(_REGIME_TRIBUTARIO_MAP, item.get("codigoRegimeTributario")),
+            _label_codigo(_REGIME_TRIBUTARIO_MAP, item.get("regimeTributario")),
+        )),
+        "finalidade": _texto(_primeiro_preenchido(
+            _label_codigo(_FINALIDADE_MAP, item.get("finalidade")),
+            item.get("finalidade"),
+        )),
+        "indicador_presenca": _texto(_primeiro_preenchido(
+            _label_codigo(_INDICADOR_PRESENCA_MAP, item.get("indicadorPresenca")),
+            item.get("indicadorPresenca"),
+        )),
         "cliente": cliente,
         "itens": itens,
         "totais": {
@@ -562,9 +745,13 @@ def _consultar_detalhe_nota_bling(
         if modelo_atual in usados:
             continue
         usados.add(modelo_atual)
+        detalhe_cache = _obter_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual)
+        if _detalhe_nota_valido(detalhe_cache):
+            return detalhe_cache, modelo_atual, venda
         try:
             detalhe = bling.consultar_nfce(nfe_id) if modelo_atual == 65 else bling.consultar_nfe(nfe_id)
             if _detalhe_nota_valido(detalhe):
+                _salvar_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual, detalhe)
                 return detalhe, modelo_atual, venda
         except Exception as exc:
             erros.append(str(exc))
@@ -715,6 +902,7 @@ def _extrair_valor_nota(item: dict) -> float:
 def _identificadores_pedido_integrado(pedido: PedidoIntegrado) -> set[str]:
     payload = _dict(pedido.payload)
     pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
+    ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
     identificadores = {
         _texto(pedido.pedido_bling_id),
         _texto(pedido.pedido_bling_numero),
@@ -724,8 +912,88 @@ def _identificadores_pedido_integrado(pedido: PedidoIntegrado) -> set[str]:
             pedido_payload.get("numeroPedido"),
             pedido_payload.get("numero"),
         )),
+        _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))),
+        _texto(ultima_nf.get("numero")),
     }
     return {identificador for identificador in identificadores if identificador}
+
+
+def _extrair_total_pedido_integrado(pedido: PedidoIntegrado) -> float:
+    payload = _dict(pedido.payload)
+    pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
+    ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
+    totais = _dict(_primeiro_preenchido(pedido_payload.get("totais"), pedido_payload.get("financeiro"), payload.get("totais")))
+
+    valor_total = _extrair_valor_nota(ultima_nf)
+    if valor_total > 0:
+        return valor_total
+
+    valor_total = _coerce_float(
+        _primeiro_preenchido(
+            pedido_payload.get("total"),
+            pedido_payload.get("valorTotal"),
+            pedido_payload.get("valor_total"),
+            totais.get("valorTotal"),
+            totais.get("total"),
+        ),
+        0.0,
+    )
+    if valor_total > 0:
+        return valor_total
+
+    itens = _list(_primeiro_preenchido(pedido_payload.get("itens"), payload.get("itens")))
+    total_itens = 0.0
+    encontrou_item = False
+    for item in itens:
+        item_dict = _dict(_primeiro_preenchido(item.get("item"), item))
+        quantidade = _coerce_float(_primeiro_preenchido(item_dict.get("quantidade"), item.get("quantidade")), 0.0)
+        total_item = _coerce_float(
+            _primeiro_preenchido(
+                item_dict.get("total"),
+                item_dict.get("valorTotal"),
+                item.get("total"),
+                item.get("valorTotal"),
+            ),
+            None,
+        )
+        if total_item is None:
+            valor_unitario = _coerce_float(
+                _primeiro_preenchido(
+                    item_dict.get("valor"),
+                    item_dict.get("preco"),
+                    item.get("valor"),
+                    item.get("preco"),
+                ),
+                0.0,
+            )
+            desconto_item = _coerce_float(
+                _primeiro_preenchido(
+                    item_dict.get("desconto"),
+                    item.get("desconto"),
+                    item_dict.get("valorDesconto"),
+                    item.get("valorDesconto"),
+                ),
+                0.0,
+            )
+            total_item = max((valor_unitario * quantidade) - desconto_item, 0.0)
+        if total_item > 0:
+            encontrou_item = True
+            total_itens += total_item
+
+    if encontrou_item:
+        frete = _coerce_float(_primeiro_preenchido(
+            pedido_payload.get("frete"),
+            _dict(pedido_payload.get("transporte")).get("frete"),
+            totais.get("valorFrete"),
+        ), 0.0)
+        desconto = _coerce_float(_primeiro_preenchido(
+            pedido_payload.get("desconto"),
+            pedido_payload.get("valorDesconto"),
+            totais.get("valorDesconto"),
+        ), 0.0)
+        return max(total_itens + frete - desconto, 0.0)
+
+    return 0.0
 
 
 def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
@@ -746,6 +1014,7 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
     return {
         "canal": canal or _texto(pedido.canal),
         "canal_label": _canal_label(canal, canal_base),
+        "valor_total": _extrair_total_pedido_integrado(pedido),
         "loja": {
             "id": loja.get("id"),
             "nome": loja_nome,
@@ -784,6 +1053,8 @@ def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list
             _texto(nota.get("pedido_bling_id_ref")),
             _texto(nota.get("numero_pedido_loja")),
             _texto(nota.get("numero_loja_virtual")),
+            _texto(nota.get("id")),
+            _texto(nota.get("numero")),
         ):
             if identificador:
                 identificadores_desejados.add(identificador)
@@ -811,6 +1082,8 @@ def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list
             _texto(nota.get("pedido_bling_id_ref")),
             _texto(nota.get("numero_pedido_loja")),
             _texto(nota.get("numero_loja_virtual")),
+            _texto(nota.get("id")),
+            _texto(nota.get("numero")),
         ]
         contexto = next((mapa_identificadores.get(candidato) for candidato in candidatos if candidato and mapa_identificadores.get(candidato)), None)
         if not contexto:
@@ -821,6 +1094,8 @@ def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list
         loja_atual = nota.get("loja") if isinstance(nota.get("loja"), dict) else {}
         if not loja_atual.get("nome"):
             nota["loja"] = contexto.get("loja")
+        if not nota.get("valor") and contexto.get("valor_total"):
+            nota["valor"] = float(contexto.get("valor_total") or 0)
         nota["numero_loja_virtual"] = nota.get("numero_loja_virtual") or contexto.get("numero_loja_virtual")
         nota["origem_loja_virtual"] = nota.get("origem_loja_virtual") or contexto.get("origem_loja_virtual")
         nota["origem_canal_venda"] = nota.get("origem_canal_venda") or contexto.get("origem_canal_venda")
@@ -907,8 +1182,9 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
             }
 
 
-def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, notas: list[dict], limite_consultas: int = 120) -> None:
+def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, tenant_id, notas: list[dict], limite_consultas: int = 120) -> None:
     consultas = 0
+    ultima_consulta_ts = 0.0
 
     for nota in notas:
         if consultas >= limite_consultas:
@@ -936,7 +1212,19 @@ def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, notas: list[dict], lim
             continue
 
         try:
-            detalhe = bling.consultar_nfce(nota_id) if nota.get("modelo") == 65 else bling.consultar_nfe(nota_id)
+            modelo_nota = _coerce_int(nota.get("modelo"), 55)
+            detalhe = _obter_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota)
+            fetched_remotamente = False
+            if not _detalhe_nota_valido(detalhe):
+                if ultima_consulta_ts:
+                    intervalo = monotonic() - ultima_consulta_ts
+                    if intervalo < 0.36:
+                        sleep(0.36 - intervalo)
+                detalhe = bling.consultar_nfce(nota_id) if modelo_nota == 65 else bling.consultar_nfe(nota_id)
+                ultima_consulta_ts = monotonic()
+                if _detalhe_nota_valido(detalhe):
+                    _salvar_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota, detalhe)
+                    fetched_remotamente = True
             if not _detalhe_nota_valido(detalhe):
                 continue
             nota["valor"] = _extrair_valor_nota(detalhe) or nota.get("valor") or 0.0
@@ -964,9 +1252,13 @@ def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, notas: list[dict], lim
             nota["origem_canal_venda"] = nota.get("origem_canal_venda") or resumo_canal.get("origem_canal_venda")
             nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or resumo_canal.get("numero_pedido_loja")
             nota["pedido_bling_id_ref"] = nota.get("pedido_bling_id_ref") or resumo_canal.get("pedido_bling_id_ref")
-            consultas += 1
+            if fetched_remotamente:
+                consultas += 1
         except Exception as e:
             logger.warning("listar_nfes", f"Falha ao enriquecer NF {nota_id} via detalhe do Bling: {e}")
+            mensagem = str(e).upper()
+            if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
+                break
 
 
 class EmitirNFeRequest(BaseModel):
@@ -1066,11 +1358,25 @@ async def listar_nfes(
     data_inicial: Optional[str] = None,
     data_final: Optional[str] = None,
     situacao: Optional[str] = None,
+    force_refresh: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Lista todas as NF-e/NFC-e emitidas — busca direto do Bling (inclui marketplace)"""
     current_user, tenant_id = user_and_tenant
+    cache_key = _cache_key_listar_nfes(tenant_id, data_inicial, data_final, situacao)
+    cache_atual = _nfe_list_cache.get(cache_key)
+    agora_cache = monotonic()
+
+    if (
+        not force_refresh
+        and cache_atual
+        and (agora_cache - cache_atual.get("ts_monotonic", 0)) <= _NFE_LIST_CACHE_SECONDS
+    ):
+        payload_cache = deepcopy(cache_atual.get("payload", {}))
+        payload_cache["cache_utilizado"] = True
+        payload_cache["cache_idade_segundos"] = int(max(agora_cache - cache_atual.get("ts_monotonic", 0), 0))
+        return payload_cache
 
     notas: list[dict] = []
     bling_ok = False
@@ -1175,16 +1481,23 @@ async def listar_nfes(
 
     notas.sort(key=_key_data, reverse=True)
 
-    if bling_ok:
-        _enriquecer_notas_com_detalhes_bling(bling, notas)
     _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas)
+    if bling_ok:
+        _enriquecer_notas_com_detalhes_bling(bling, tenant_id, notas[:20], limite_consultas=8)
 
-    return {
+    payload = {
         "success": True,
         "total": len(notas),
         "notas": notas,
         "fonte": "bling" if bling_ok else "local",
+        "cache_utilizado": False,
+        "cache_idade_segundos": 0,
     }
+    _nfe_list_cache[cache_key] = {
+        "ts_monotonic": monotonic(),
+        "payload": deepcopy(payload),
+    }
+    return payload
 
 
 @router.get("/{nfe_id}")
@@ -1206,6 +1519,7 @@ async def consultar_nfe(
             modelo=modelo,
         )
         detalhe_normalizado = _normalizar_detalhe_nota_bling(detalhe, modelo_resolvido, venda=venda)
+        _enriquecer_detalhe_com_xml_link(detalhe, detalhe_normalizado)
         _enriquecer_notas_com_pedidos_integrados(db, tenant_id, [detalhe_normalizado])
         return detalhe_normalizado
     except HTTPException:

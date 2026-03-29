@@ -116,7 +116,7 @@ class Produto(BaseTenantModel):
     # tipo_kit: Define como o custo/estoque do KIT � tratado
     # - VIRTUAL: Custo = soma dos componentes, estoque = menor dispon�vel dos componentes
     # - FISICO: Custo pr�prio, estoque pr�prio (KIT j� montado/pr�-embalado)
-    tipo_kit = Column(String(20), default='VIRTUAL', nullable=True)  # VIRTUAL, FISICO (s� para tipo_produto=KIT)
+    tipo_kit = Column(String(20), nullable=True)  # VIRTUAL, FISICO (somente quando produto possui composicao)
     
     descricao_curta = Column(Text, nullable=True)
     descricao_completa = Column(Text, nullable=True)

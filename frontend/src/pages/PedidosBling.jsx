@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 
@@ -241,12 +242,14 @@ As reservas de estoque serao liberadas.`)) return;
 }
 
 export default function PedidosBling() {
+  const [searchParams] = useSearchParams();
   const [pedidos, setPedidos] = useState([]);
   const [total, setTotal] = useState(0);
   const [paginas, setPaginas] = useState(1);
   const [pagina, setPagina] = useState(1);
   const [statusFiltro, setStatusFiltro] = useState('');
   const [carregando, setCarregando] = useState(false);
+  const buscaPedido = useMemo(() => (searchParams.get('pedido') || '').trim(), [searchParams]);
 
   const ABAS = [
     { valor: '', label: 'Todos' },
@@ -261,6 +264,7 @@ export default function PedidosBling() {
     try {
       const params = { pagina, por_pagina: 20 };
       if (statusFiltro) params.status = statusFiltro;
+      if (buscaPedido) params.busca = buscaPedido;
       const res = await api.get('/integracoes/bling/pedidos', { params });
       setPedidos(res.data.pedidos || []);
       setTotal(res.data.total || 0);
@@ -270,11 +274,15 @@ export default function PedidosBling() {
     } finally {
       setCarregando(false);
     }
-  }, [pagina, statusFiltro]);
+  }, [pagina, statusFiltro, buscaPedido]);
 
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    setPagina(1);
+  }, [buscaPedido]);
 
   function mudarStatus(novoStatus) {
     setStatusFiltro(novoStatus);
@@ -303,6 +311,12 @@ export default function PedidosBling() {
           </button>
         ))}
       </div>
+
+      {buscaPedido && (
+        <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+          Filtrado pelo pedido <span className="font-semibold">#{buscaPedido}</span>.
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-gray-500">

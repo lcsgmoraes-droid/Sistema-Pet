@@ -81,6 +81,8 @@ $RECYCLE.BIN/
 
 # IDEs
 .idea/
+.claude/
+.gemini/
 *.iml
 *.iws
 *.ipr

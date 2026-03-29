@@ -4,6 +4,9 @@ Testes unitários da regra de custo automático para produtos compostos.
 from decimal import Decimal
 from types import SimpleNamespace
 
+from app import dre_plano_contas_models  # noqa: F401
+from app import financeiro_models  # noqa: F401
+from app.ia import aba7_extrato_models  # noqa: F401
 from app.produtos_models import Produto, ProdutoKitComponente
 from app.services.kit_custo_service import KitCustoService
 from app.services.produto_service import ProdutoService
@@ -117,6 +120,53 @@ def test_produto_service_cria_kit_e_sincroniza_custo(monkeypatch):
 
     assert produto.id == 1
     assert chamadas == [1]
+    assert db.commit_count == 1
+
+
+def test_produto_service_nao_transforma_variacao_comum_em_variacao_kit():
+    db = FakeDB()
+
+    produto = ProdutoService.create_produto(
+        dados={
+            'codigo': 'VAR-001',
+            'nome': 'Variacao simples',
+            'tipo_produto': 'VARIACAO',
+            'produto_pai_id': 10,
+            'preco_custo': 5,
+            'preco_venda': 20,
+            'user_id': 1,
+            'e_kit_fisico': False,
+        },
+        db=db,
+        tenant_id='tenant-teste',
+    )
+
+    assert produto.id == 1
+    assert produto.tipo_kit is None
+    assert db.commit_count == 1
+
+
+def test_produto_service_permita_criar_variacao_kit_sem_componentes_para_configurar_depois():
+    db = FakeDB()
+
+    produto = ProdutoService.create_produto(
+        dados={
+            'codigo': 'VAR-KIT-001',
+            'nome': 'Variacao kit',
+            'tipo_produto': 'VARIACAO',
+            'produto_pai_id': 10,
+            'tipo_kit': 'VIRTUAL',
+            'e_kit_fisico': False,
+            'preco_custo': 5,
+            'preco_venda': 20,
+            'user_id': 1,
+        },
+        db=db,
+        tenant_id='tenant-teste',
+    )
+
+    assert produto.id == 1
+    assert produto.tipo_kit == 'VIRTUAL'
     assert db.commit_count == 1
 
 

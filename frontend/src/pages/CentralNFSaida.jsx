@@ -188,6 +188,7 @@ export default function CentralNFSaida() {
   const [modalCancelar, setModalCancelar] = useState(null);
   const [justificativa, setJustificativa] = useState('');
   const [cancelando, setCancelando] = useState(false);
+  const detalhesNotasCacheRef = useRef(new Map());
 
   const SITUACOES = [
     { value: '', label: 'Todas' },
@@ -226,7 +227,7 @@ export default function CentralNFSaida() {
   // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    carregarNotas();
+    carregarNotas(false);
   }, [filtroSituacao, dataInicial, dataFinal]);
 
   useEffect(() => {
@@ -242,14 +243,18 @@ export default function CentralNFSaida() {
 
   // ── Bling ─────────────────────────────────────────────────────────────────
 
-  async function carregarNotas() {
+  async function carregarNotas(forceRefresh = false) {
     try {
       setLoading(true);
       setErro('');
+      if (forceRefresh) {
+        detalhesNotasCacheRef.current.clear();
+      }
       const params = new URLSearchParams();
       if (filtroSituacao) params.append('situacao', filtroSituacao);
       if (dataInicial) params.append('data_inicial', dataInicial);
       if (dataFinal) params.append('data_final', dataFinal);
+      if (forceRefresh) params.append('force_refresh', 'true');
       const response = await api.get(`/nfe/?${params.toString()}`);
       setNotas(response.data.notas || []);
     } catch (error) {
@@ -296,9 +301,16 @@ export default function CentralNFSaida() {
     setErroDetalhe('');
     try {
       setCarregandoDetalhe(true);
+      const cacheKey = `${nota.id}:${nota.modelo || ''}`;
+      const detalheCache = detalhesNotasCacheRef.current.get(cacheKey);
+      if (detalheCache) {
+        setDetalheNota(detalheCache);
+        return;
+      }
       const response = await api.get(`/nfe/${nota.id}`, {
         params: { modelo: nota.modelo },
       });
+      detalhesNotasCacheRef.current.set(cacheKey, response.data);
       setDetalheNota(response.data);
     } catch (error) {
       setErroDetalhe(error.response?.data?.detail || 'Nao foi possivel carregar todos os detalhes desta nota.');
@@ -325,7 +337,7 @@ export default function CentralNFSaida() {
       alert('Nota fiscal cancelada com sucesso!');
       setModalCancelar(null);
       setJustificativa('');
-      carregarNotas();
+      carregarNotas(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Erro ao cancelar nota fiscal');
     } finally {
@@ -338,7 +350,7 @@ export default function CentralNFSaida() {
     try {
       await api.delete(`/nfe/${venda_id}`);
       alert('Nota fiscal excluída com sucesso!');
-      carregarNotas();
+      carregarNotas(true);
     } catch (error) {
       alert(error.response?.data?.detail || 'Erro ao excluir nota fiscal');
     }
@@ -685,7 +697,7 @@ export default function CentralNFSaida() {
           </div>
           <button
             type="button"
-            onClick={carregarNotas}
+            onClick={() => carregarNotas(true)}
             disabled={loading}
             className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
