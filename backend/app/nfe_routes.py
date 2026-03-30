@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 from time import monotonic, sleep
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 import requests
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ from app.services.nfe_cache_service import (
     obter_estado_cache_notas,
     upsert_nota_cache,
 )
+from app.services.nfe_pending_reconciliation_service import reconciliar_nfes_pendentes_recentes
 from app.vendas_models import Venda
 from app.bling_integration import BlingAPI
 from app.utils.logger import logger
@@ -1917,6 +1918,30 @@ async def listar_nfes(
         "payload": deepcopy(payload),
     }
     return payload
+
+
+@router.post("/reconciliar-pendentes")
+async def reconciliar_pendentes_nfe(
+    dias: int = Query(default=3, ge=1, le=15),
+    limite_notas: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = user_and_tenant
+    try:
+        resultado = reconciliar_nfes_pendentes_recentes(
+            db,
+            tenant_id,
+            dias=dias,
+            limite_notas=limite_notas,
+        )
+        return {
+            "success": True,
+            **resultado,
+        }
+    except Exception as exc:
+        logger.warning("reconciliar_pendentes_nfe", f"Falha ao reconciliar NFs pendentes: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar NFs pendentes: {exc}")
 
     notas: list[dict] = []
     bling_ok = False

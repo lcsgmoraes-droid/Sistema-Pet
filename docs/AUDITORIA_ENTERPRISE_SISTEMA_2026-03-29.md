@@ -530,6 +530,11 @@ Itens executados nesta etapa:
   - entrada de estoque via balanco passa a ativar `controle_lote` automaticamente
   - lote existente recebe atualizacao de quantidade inicial, quantidade disponivel, custo e validade
   - a tela de edicao do produto passa a carregar os lotes mesmo em cadastros antigos onde o flag ainda estava desligado
+- [x] criar reconciliacao automatica para NFs recentes ainda pendentes:
+  - o botao `Atualizar` continua forçando `force_refresh=true` na tela de NF de saida
+  - o cliente do Bling passa a renovar o token e repetir a consulta automaticamente em caso de `401 invalid_token`
+  - o backend agora roda um job periodico para revisar NFs recentes em `Pendente` ou `Emitida DANFE`
+  - foi criado um endpoint manual de reconciliacao para diagnostico operacional rapido
 
 Itens deliberadamente adiados por agora:
 

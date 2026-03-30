@@ -6,6 +6,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 import logging
 
 from app.services.bling_sync_service import BlingSyncService
+from app.services.nfe_pending_reconciliation_service import executar_reconciliacao_automatica_nfes_pendentes
+from app.db import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,13 @@ class BlingSyncScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            func=self.reconciliar_nfes_pendentes,
+            trigger=IntervalTrigger(minutes=15),
+            id="bling_nfe_pending_reconcile",
+            name="Bling NF Pending Reconcile",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             func=self.reconciliar_geral,
             trigger=CronTrigger(hour=2, minute=0),
             id="bling_sync_full_reconcile",
@@ -43,6 +52,7 @@ class BlingSyncScheduler:
         logger.info("[BLING SYNC] Jobs configurados:")
         logger.info("   - Fila pendente: a cada 1 minuto")
         logger.info("   - Reconciliação recente: a cada 15 minutos")
+        logger.info("   - NFs pendentes recentes: a cada 15 minutos")
         logger.info("   - Auditoria geral: diariamente às 02:00")
 
     def start(self) -> None:
@@ -64,6 +74,19 @@ class BlingSyncScheduler:
         result = BlingSyncService.reconcile_recent_products(minutes=30, limit=150)
         if result.get("avaliados"):
             logger.info("[BLING SYNC] Reconciliação recente: %s", result)
+
+    def reconciliar_nfes_pendentes(self) -> None:
+        db = SessionLocal()
+        try:
+            result = executar_reconciliacao_automatica_nfes_pendentes(
+                db,
+                dias=3,
+                limite_notas_por_tenant=200,
+            )
+            if result.get("tenants_com_pendencias"):
+                logger.info("[BLING SYNC] Reconciliação automática de NFs pendentes: %s", result)
+        finally:
+            db.close()
 
     def reconciliar_geral(self) -> None:
         result = BlingSyncService.run_nightly_forced_link_and_sync(link_limit=800, sync_limit=1200)
