@@ -91,6 +91,26 @@ function displayValue(value) {
   return String(value);
 }
 
+const MONITOR_BASES = ['/integracoes/bling/monitor', '/bling/monitor'];
+
+async function monitorRequest(method, path, config) {
+  let ultimoErro = null;
+
+  for (const base of MONITOR_BASES) {
+    try {
+      if (method === 'get') return await api.get(`${base}${path}`, config);
+      return await api.post(`${base}${path}`, config?.data, config);
+    } catch (error) {
+      ultimoErro = error;
+      if (error?.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw ultimoErro;
+}
+
 function InfoHint({ text }) {
   if (!text) return null;
   return (
@@ -422,9 +442,9 @@ export default function BlingFlowMonitor() {
     setCarregando(true);
     try {
       const [resumoRes, incidentesRes, eventosRes] = await Promise.all([
-        api.get('/integracoes/bling/monitor/resumo'),
-        api.get('/integracoes/bling/monitor/incidentes', { params: { status: 'open', limite: 50 } }),
-        api.get('/integracoes/bling/monitor/eventos', { params: { limite: 30 } }),
+        monitorRequest('get', '/resumo'),
+        monitorRequest('get', '/incidentes', { params: { status: 'open', limite: 50 } }),
+        monitorRequest('get', '/eventos', { params: { limite: 30 } }),
       ]);
       setResumo(resumoRes.data);
       setIncidentes(incidentesRes.data || []);
@@ -443,7 +463,7 @@ export default function BlingFlowMonitor() {
   async function executarAuditoria() {
     setRodandoAuditoria(true);
     try {
-      const response = await api.post('/integracoes/bling/monitor/auditar?dias=7&limite=300&auto_fix=true');
+      const response = await monitorRequest('post', '/auditar?dias=7&limite=300&auto_fix=true');
       const data = response.data || {};
       toast.success(`Auditoria concluida: ${data.incidentes_detectados || 0} incidente(s), ${data.auto_fix_sucessos || 0} correcao(oes).`);
       await carregar();
@@ -457,7 +477,7 @@ export default function BlingFlowMonitor() {
   async function corrigirIncidente(incidente) {
     setAcaoId(`corrigir-${incidente.id}`);
     try {
-      const response = await api.post(`/integracoes/bling/monitor/incidentes/${incidente.id}/corrigir`);
+      const response = await monitorRequest('post', `/incidentes/${incidente.id}/corrigir`);
       const detalhe =
         response.data?.details?.error ||
         response.data?.details?.motivo ||
@@ -479,7 +499,7 @@ export default function BlingFlowMonitor() {
   async function resolverIncidente(incidente) {
     setAcaoId(`resolver-${incidente.id}`);
     try {
-      await api.post(`/integracoes/bling/monitor/incidentes/${incidente.id}/resolver`);
+      await monitorRequest('post', `/incidentes/${incidente.id}/resolver`);
       toast.success('Incidente marcado como resolvido manualmente.');
       await carregar();
     } catch (error) {
