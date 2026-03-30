@@ -8,16 +8,13 @@
 import {
   AlertCircle,
   AlertTriangle,
-  Bell,
   BookmarkPlus,
-  Bot,
   CheckCircle,
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
   CreditCard,
-  FileText,
   History,
   Layers,
   Minus,
@@ -26,12 +23,8 @@ import {
   Plus,
   Save,
   Search,
-  ShoppingCart,
-  Star,
   Tag,
-  Trash2,
   User,
-  Wallet,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -42,8 +35,6 @@ import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
 import { buscarVenda, criarVenda, listarVendas } from "../api/vendas";
 import AnaliseVendaDrawer from "../components/AnaliseVendaDrawer";
-import ImprimirCupom from "../components/ImprimirCupom";
-import MenuCaixa from "../components/MenuCaixa";
 import ModalAbrirCaixa from "../components/ModalAbrirCaixa";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalPagamento from "../components/ModalPagamento";
@@ -52,6 +43,7 @@ import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteSidebar from "../components/pdv/PDVClienteSidebar";
 import ModalCadastroCliente from "../components/pdv/ModalCadastroCliente";
 import ModalCalculadoraRacaoPDV from "../components/pdv/ModalCalculadoraRacaoPDV";
+import PDVModoVisualizacaoBanner from "../components/pdv/PDVModoVisualizacaoBanner";
 import ModalPendenciasEstoque from "../components/pdv/ModalPendenciasEstoque";
 import PDVOportunidadesSidebar from "../components/pdv/PDVOportunidadesSidebar";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
@@ -2756,76 +2748,17 @@ export default function PDV() {
             </div>
           )}
 
-          {/* Alerta de Modo Visualização */}
-          {modoVisualizacao && (
-            <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
-              <div className="flex items-center justify-between max-w-5xl mx-auto">
-                <div className="flex items-center space-x-2 text-yellow-800">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-medium">
-                    Modo Visualização - Venda{" "}
-                    {vendaAtual.status === "finalizada"
-                      ? "Finalizada"
-                      : vendaAtual.status === "baixa_parcial"
-                        ? "com Baixa Parcial"
-                        : "Aberta"}
-                  </span>
-                  <span className="text-sm">
-                    (Clique em Editar para modificar)
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Botão Imprimir (sempre visível em modo visualização) */}
-                  <ImprimirCupom venda={vendaAtual} />
-
-                  {/* Botão Voltar - Fecha a visualização sem salvar */}
-                  <button
-                    onClick={() => {
-                      setModoVisualizacao(false);
-                      limparVenda();
-                    }}
-                    className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500 bg-slate-600 text-white font-semibold shadow-sm hover:bg-slate-700 hover:shadow-md transition-all duration-200"
-                  >
-                    <X className="w-4 h-4" />
-                    Voltar
-                  </button>
-
-                  {/* Botão Reabrir: aparece para vendas finalizadas ou parcialmente pagas */}
-                  {(vendaAtual.status === "finalizada" ||
-                    vendaAtual.status === "baixa_parcial") && (
-                    <button
-                      onClick={emitirNotaVendaFinalizada}
-                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500 bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all duration-200"
-                    >
-                      <FileText className="w-4 h-4" />
-                      Emitir NF
-                    </button>
-                  )}
-
-                  {(vendaAtual.status === "finalizada" ||
-                    vendaAtual.status === "baixa_parcial") && (
-                    <button
-                      onClick={mudarStatusParaAberta}
-                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-orange-500 bg-orange-600 text-white font-semibold shadow-sm hover:bg-orange-700 hover:shadow-md transition-all duration-200"
-                    >
-                      <AlertCircle className="w-4 h-4" />
-                      Reabrir Venda
-                    </button>
-                  )}
-
-                  {/* Botão Editar: SÓ para vendas abertas */}
-                  {vendaAtual.status === "aberta" && (
-                    <button
-                      onClick={habilitarEdicao}
-                      className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center rounded-xl border border-amber-500 bg-amber-600 text-white font-semibold shadow-sm hover:bg-amber-700 hover:shadow-md transition-all duration-200"
-                    >
-                      Editar
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          <PDVModoVisualizacaoBanner
+            ativo={modoVisualizacao}
+            vendaAtual={vendaAtual}
+            onVoltar={() => {
+              setModoVisualizacao(false);
+              limparVenda();
+            }}
+            emitirNotaVendaFinalizada={emitirNotaVendaFinalizada}
+            mudarStatusParaAberta={mudarStatusParaAberta}
+            habilitarEdicao={habilitarEdicao}
+          />
 
           {/* Conteúdo Principal */}
           <div className="flex-1 overflow-y-auto p-4">

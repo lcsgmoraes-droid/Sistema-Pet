@@ -486,6 +486,9 @@ Itens executados nesta etapa:
 - [x] avancar na decomposicao do `PDV.jsx` sem alterar a interface:
   - painel do assistente movido para `frontend/src/components/pdv/PDVAssistenteSidebar.jsx`
   - `PDV.jsx` ficou responsavel apenas por passar o estado da conversa e o handler de envio
+- [x] seguir limpando o `PDV.jsx` sem alterar a interface:
+  - faixa de modo visualizacao movida para `frontend/src/components/pdv/PDVModoVisualizacaoBanner.jsx`
+  - `PDV.jsx` ficou responsavel apenas pelos handlers de voltar, emitir NF, reabrir e editar
 
 Itens deliberadamente adiados por agora:
 
