@@ -94,7 +94,7 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
 
   async function handleConfirmar() {
     if (!window.confirm(`Confirmar pedido Bling #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?
-Isso vai baixar o estoque dos itens manualmente.`)) return;
+Isso vai apenas confirmar o pedido no sistema. A venda sera consolidada somente quando houver NF.`)) return;
     setAcao(true);
     try {
       const res = await api.post(`/integracoes/bling/pedidos/${pedido.id}/confirmar-manual`);
@@ -102,7 +102,7 @@ Isso vai baixar o estoque dos itens manualmente.`)) return;
         toast.success('Pedido confirmado com avisos');
         toast.error(`Alguns SKUs nao baixaram: ${res.data.erros_estoque.join(', ')}`, { duration: 8000 });
       } else {
-        toast.success('Pedido confirmado e estoque baixado');
+        toast.success('Pedido confirmado. Estoque aguardando NF.');
       }
       onConfirmar();
     } catch (e) {

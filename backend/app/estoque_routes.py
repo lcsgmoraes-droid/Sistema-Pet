@@ -35,6 +35,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .estoque_reserva_service import EstoqueReservaService
 from .pedido_integrado_item_models import PedidoIntegradoItem
+from .nfe_cache_models import BlingNotaFiscalCache
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente
 )
@@ -50,6 +51,8 @@ except Exception:
     pdfplumber = None
 
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
+
+_NF_STATUS_AUTORIZADA_CODES = {2, 5, 9}
 
 _CANAL_LABELS = {
     "mercado_livre": "Mercado Livre",
@@ -125,6 +128,116 @@ def _numero_pedido_loja_integrado(pedido: PedidoIntegrado | None) -> str | None:
         if texto:
             return texto
     return None
+
+
+def _nf_status_autorizado(*, situacao_codigo=None, situacao: str | None = None) -> bool:
+    try:
+        if situacao_codigo is not None and int(situacao_codigo) in _NF_STATUS_AUTORIZADA_CODES:
+            return True
+    except (TypeError, ValueError):
+        pass
+
+    texto = _texto_limpo(situacao)
+    if not texto:
+        return False
+
+    texto_lower = texto.lower()
+    return any(token in texto_lower for token in ("autoriz", "emitida", "emitido"))
+
+
+def _obter_cache_nf_pedido_integrado(
+    db: Session,
+    pedido: PedidoIntegrado | None,
+    resumo_nf: dict,
+) -> BlingNotaFiscalCache | None:
+    if not pedido:
+        return None
+
+    nf_id = _texto_limpo(resumo_nf.get("id") or resumo_nf.get("nfe_id"))
+    if nf_id and nf_id not in {"0", "-1"}:
+        query = db.query(BlingNotaFiscalCache).filter(
+            BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+            BlingNotaFiscalCache.bling_id == nf_id,
+        )
+        if hasattr(query, "order_by"):
+            query = query.order_by(
+                BlingNotaFiscalCache.detalhada_em.desc().nullslast(),
+                BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                BlingNotaFiscalCache.id.desc(),
+            )
+        registro = query.first()
+        if registro:
+            return registro
+
+    pedido_bling_id = _texto_limpo(getattr(pedido, "pedido_bling_id", None))
+    if pedido_bling_id:
+        query = db.query(BlingNotaFiscalCache).filter(
+            BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+            BlingNotaFiscalCache.pedido_bling_id_ref == pedido_bling_id,
+        )
+        if hasattr(query, "order_by"):
+            query = query.order_by(
+                BlingNotaFiscalCache.data_emissao.desc().nullslast(),
+                BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                BlingNotaFiscalCache.id.desc(),
+            )
+        registro = query.first()
+        if registro:
+            return registro
+
+    numero_pedido_loja = _numero_pedido_loja_integrado(pedido)
+    if numero_pedido_loja:
+        query = db.query(BlingNotaFiscalCache).filter(
+            BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+            BlingNotaFiscalCache.numero_pedido_loja == numero_pedido_loja,
+        )
+        if hasattr(query, "order_by"):
+            query = query.order_by(
+                BlingNotaFiscalCache.data_emissao.desc().nullslast(),
+                BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                BlingNotaFiscalCache.id.desc(),
+            )
+        return query.first()
+
+    return None
+
+
+def _contexto_nf_pedido_integrado(db: Session, pedido: PedidoIntegrado | None) -> dict:
+    resumo_nf = dict(_resumo_nf_pedido_integrado(pedido))
+    registro = _obter_cache_nf_pedido_integrado(db, pedido, resumo_nf)
+
+    if registro and (
+        getattr(registro, "bling_id", None)
+        or getattr(registro, "numero", None)
+        or getattr(registro, "status", None)
+    ):
+        resumo_nf.setdefault("id", _texto_limpo(getattr(registro, "bling_id", None)))
+        resumo_nf.setdefault("nfe_id", _texto_limpo(getattr(registro, "bling_id", None)))
+        resumo_nf.setdefault("numero", _texto_limpo(getattr(registro, "numero", None)))
+        resumo_nf.setdefault("serie", _texto_limpo(getattr(registro, "serie", None)))
+        resumo_nf.setdefault("situacao", _texto_limpo(getattr(registro, "status", None)))
+        resumo_nf.setdefault("status", _texto_limpo(getattr(registro, "status", None)))
+        resumo_nf.setdefault("modelo", getattr(registro, "modelo", None))
+
+    nf_id = _texto_limpo(resumo_nf.get("id") or resumo_nf.get("nfe_id"))
+    nf_numero = _texto_limpo(resumo_nf.get("numero"))
+    situacao_codigo = resumo_nf.get("situacao_codigo")
+    situacao = _texto_limpo(
+        resumo_nf.get("situacao")
+        or resumo_nf.get("status")
+    )
+
+    return {
+        "id": nf_id,
+        "numero": nf_numero,
+        "serie": _texto_limpo(resumo_nf.get("serie")),
+        "situacao": situacao,
+        "situacao_codigo": situacao_codigo,
+        "autorizada": _nf_status_autorizado(
+            situacao_codigo=situacao_codigo,
+            situacao=situacao,
+        ),
+    }
 
 
 def _canal_pedido_integrado(pedido: PedidoIntegrado | None) -> str | None:
@@ -397,12 +510,16 @@ def _contexto_venda_pedido_integrado(
     pedido: PedidoIntegrado | None,
     produto_id: int,
 ) -> dict:
+    nf_contexto = _contexto_nf_pedido_integrado(db, pedido)
     contexto = {
         "canal": _canal_pedido_integrado(pedido),
-        "nf_numero": _numero_nf_pedido_integrado(pedido),
+        "nf_numero": nf_contexto.get("numero"),
         "preco_venda_unitario": None,
     }
     if not pedido:
+        return contexto
+
+    if not nf_contexto.get("numero"):
         return contexto
 
     try:
@@ -2099,6 +2216,8 @@ def listar_movimentacoes_produto(
                 contexto_venda = _contexto_venda_pedido_integrado(db, pedido_integrado, produto_id)
                 canal_venda = contexto_venda.get("canal")
                 nf_numero = contexto_venda.get("nf_numero")
+                if not nf_numero:
+                    continue
                 preco_venda_unitario = contexto_venda.get("preco_venda_unitario")
                 documento_exibicao = nf_numero or mov.documento
                 observacao_exibicao = _observacao_exibicao_movimentacao_bling(

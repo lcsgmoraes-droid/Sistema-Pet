@@ -232,73 +232,64 @@ def test_registrar_vinculo_nf_pedido_monta_payload_com_relacao(monkeypatch):
 
 def test_reconciliar_pedido_confirmado_so_confirma_item_apos_baixa(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.return_value = []
     pedido = SimpleNamespace(
         id=1088,
         tenant_id="tenant-1",
         pedido_bling_numero="11598",
         status="aberto",
         confirmado_em=None,
+        payload={"ultima_nf": {"id": "NF-11598", "situacao_codigo": 5}},
     )
     item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
-    produto = SimpleNamespace(id=6814, tipo_kit="VIRTUAL", tipo_produto="VARIACAO")
 
-    monkeypatch.setattr("app.services.bling_nf_service.buscar_produto_do_item", lambda **kwargs: produto)
     monkeypatch.setattr(
-        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
-        lambda **kwargs: SimpleNamespace(id=9),
-    )
-    monkeypatch.setattr("app.services.bling_nf_service.produto_ids_estoque_afetados", lambda **kwargs: [6401])
-    monkeypatch.setattr(
-        "app.services.bling_nf_service.consumir_movimentacoes_esperadas",
-        lambda *args, **kwargs: False,
-    )
-    monkeypatch.setattr(
-        "app.services.bling_nf_service.baixar_estoque_item_integrado",
-        lambda **kwargs: {"movimentos": [{"produto_id": 6401, "quantidade": 2.0}]},
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        lambda **kwargs: "venda_confirmada",
     )
 
     sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, [item])
 
     assert sucesso is True
-    assert item.vendido_em is not None
-    assert detalhes["itens_confirmados"] == 1
-    assert detalhes["baixas_criadas"] == 1
+    assert detalhes["acao"] == "venda_confirmada"
+    assert detalhes["nf_id"] == "NF-11598"
 
 
 def test_reconciliar_pedido_confirmado_nao_confirma_item_quando_baixa_falha(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.return_value = []
     pedido = SimpleNamespace(
         id=1088,
         tenant_id="tenant-1",
         pedido_bling_numero="11598",
         status="aberto",
         confirmado_em=None,
+        payload={"ultima_nf": {"id": "NF-11598", "situacao_codigo": 5}},
     )
     item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
-    produto = SimpleNamespace(id=6814, tipo_kit="VIRTUAL", tipo_produto="VARIACAO")
-
-    monkeypatch.setattr("app.services.bling_nf_service.buscar_produto_do_item", lambda **kwargs: produto)
     monkeypatch.setattr(
-        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
-        lambda **kwargs: SimpleNamespace(id=9),
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        lambda **kwargs: "erro",
     )
-    monkeypatch.setattr("app.services.bling_nf_service.produto_ids_estoque_afetados", lambda **kwargs: [6401])
-    monkeypatch.setattr(
-        "app.services.bling_nf_service.consumir_movimentacoes_esperadas",
-        lambda *args, **kwargs: False,
-    )
-
-    def _falhar_baixa(**kwargs):
-        raise RuntimeError("estoque indisponivel")
-
-    monkeypatch.setattr("app.services.bling_nf_service.baixar_estoque_item_integrado", _falhar_baixa)
 
     sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, [item])
 
     assert sucesso is False
     assert item.vendido_em is None
-    assert detalhes["itens_confirmados"] == 0
-    assert detalhes["baixas_criadas"] == 0
-    assert detalhes["erros"]
+    assert detalhes["acao"] == "erro"
+
+
+def test_reconciliar_pedido_confirmado_sem_nf_deterministica_nao_aplica_baixa():
+    db = Mock()
+    pedido = SimpleNamespace(
+        id=1088,
+        tenant_id="tenant-1",
+        pedido_bling_numero="11598",
+        status="aberto",
+        confirmado_em=None,
+        payload={"ultima_nf": {"id": "-1"}},
+    )
+    item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
+
+    sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, [item])
+
+    assert sucesso is False
+    assert detalhes["motivo"] == "nf_ausente_ou_nao_autorizada"

@@ -601,7 +601,7 @@ def diagnosticar_pedido_integrado(
 
     itens_vendidos = [item for item in itens if getattr(item, "vendido_em", None)]
 
-    if pedido.status == "confirmado":
+    if pedido.status == "confirmado" and _nf_contexto_autorizado(nf):
         for item in itens:
             if not getattr(item, "vendido_em", None):
                 incidentes.append(
@@ -1099,89 +1099,25 @@ def _liberar_reservas_pedido_finalizado(db: Session, pedido: PedidoIntegrado, it
 
 
 def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]) -> tuple[bool, dict]:
-    from app.services.bling_nf_service import (
-        _obter_usuario_padrao_tenant,
-        baixar_estoque_item_integrado,
-        buscar_produto_do_item,
-        consumir_movimentacoes_esperadas,
-        criar_produto_automatico_do_bling,
-        produto_ids_estoque_afetados,
+    from app.services.bling_nf_service import processar_nf_autorizada
+
+    nf = _ultima_nf(getattr(pedido, "payload", None))
+    nf_id = _text(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+    if not _nf_contexto_autorizado(nf) or not nf_id or nf_id in {"0", "-1"}:
+        return False, {
+            "motivo": "nf_ausente_ou_nao_autorizada",
+            "nf_id": nf_id,
+        }
+
+    acao = processar_nf_autorizada(
+        db=db,
+        pedido=pedido,
+        itens=itens,
+        nf_id=nf_id,
     )
-
-    movimentos = db.query(EstoqueMovimentacao).filter(
-        EstoqueMovimentacao.tenant_id == pedido.tenant_id,
-        EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-        EstoqueMovimentacao.referencia_id == pedido.id,
-        EstoqueMovimentacao.tipo == "saida",
-    ).all()
-    movimentos_por_produto = Counter(mov.produto_id for mov in movimentos if mov.produto_id)
-    movimentos_consumidos = Counter()
-
-    itens_confirmados = 0
-    baixas_criadas = 0
-    erros: list[str] = []
-    agora = _utcnow()
-    usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
-    user_id_execucao = getattr(usuario_padrao, "id", None)
-
-    for item in itens:
-        produto = buscar_produto_do_item(db=db, tenant_id=pedido.tenant_id, sku=item.sku)
-        if not produto:
-            produto = criar_produto_automatico_do_bling(db=db, tenant_id=pedido.tenant_id, sku=item.sku)
-        if not produto:
-            erros.append(f"produto_nao_encontrado:{item.sku}")
-            continue
-
-        ids_esperados = produto_ids_estoque_afetados(db=db, produto=produto)
-        if consumir_movimentacoes_esperadas(
-            ids_esperados,
-            movimentos_por_produto,
-            movimentos_consumidos,
-        ):
-            if not item.vendido_em:
-                item.vendido_em = agora
-                db.add(item)
-                itens_confirmados += 1
-            continue
-
-        try:
-            resultado_baixa = baixar_estoque_item_integrado(
-                db=db,
-                tenant_id=pedido.tenant_id,
-                produto=produto,
-                quantidade=float(item.quantidade),
-                motivo="venda_bling_auditoria",
-                referencia_id=pedido.id,
-                referencia_tipo="pedido_integrado",
-                user_id=user_id_execucao,
-                documento=pedido.pedido_bling_numero,
-                observacao="Correcao automatica via auditoria do fluxo Bling",
-            )
-            movimentos_gerados = resultado_baixa.get("movimentos") or []
-            if movimentos_gerados:
-                for movimento in movimentos_gerados:
-                    produto_id_mov = movimento.get("produto_id")
-                    if produto_id_mov:
-                        movimentos_consumidos[int(produto_id_mov)] += 1
-                baixas_criadas += len(movimentos_gerados)
-            else:
-                baixas_criadas += 1
-
-            if not item.vendido_em:
-                item.vendido_em = agora
-                db.add(item)
-                itens_confirmados += 1
-        except Exception as exc:
-            erros.append(f"baixa_falhou:{item.sku}:{str(exc)[:120]}")
-
-    pedido.status = "confirmado"
-    pedido.confirmado_em = pedido.confirmado_em or agora
-    db.add(pedido)
-
-    return (itens_confirmados > 0 or baixas_criadas > 0) and not erros, {
-        "itens_confirmados": itens_confirmados,
-        "baixas_criadas": baixas_criadas,
-        "erros": erros,
+    return acao in {"venda_confirmada", "venda_ja_confirmada"}, {
+        "acao": acao,
+        "nf_id": nf_id,
     }
 
 

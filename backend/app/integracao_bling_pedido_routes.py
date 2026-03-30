@@ -243,6 +243,22 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None) -> dict | No
     return resumo_nf if resumo_nf.get("id") else None
 
 
+def _pedido_tem_nf_deterministica(payload: dict | None) -> bool:
+    payload = _dict(payload)
+    pedido_payload = _payload_principal(payload)
+    ultima_nf = _dict(
+        _primeiro_preenchido(
+            payload.get("ultima_nf"),
+            pedido_payload.get("notaFiscal"),
+            pedido_payload.get("nota"),
+            pedido_payload.get("nfe"),
+        )
+    )
+    nf_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
+    nf_numero = _texto(ultima_nf.get("numero"))
+    return bool(nf_numero or (nf_id and nf_id not in {"0", "-1"}))
+
+
 def _sincronizar_nf_do_pedido(
     *,
     db: Session,
@@ -521,8 +537,36 @@ def _confirmar_pedido(
     observacao: str,
     user_id: int = 0,
     processed_at=None,
+    aplicar_baixa_estoque: bool = False,
 ) -> list[str]:
     erros: list[str] = []
+
+    if not aplicar_baixa_estoque:
+        pedido.status = "confirmado"
+        pedido.confirmado_em = pedido.confirmado_em or datetime.utcnow()
+        db.add(pedido)
+        db.commit()
+        registrar_evento(
+            tenant_id=pedido.tenant_id,
+            source="runtime",
+            event_type="pedido.confirmado",
+            entity_type="pedido",
+            status="ok",
+            severity="info",
+            message="Pedido confirmado no Bling; a venda aguardara a NF para consolidar o estoque.",
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido.pedido_bling_id,
+            payload={
+                "motivo": motivo,
+                "observacao": observacao,
+                "itens_total": len(itens),
+                "erros_estoque": [],
+                "baixa_estoque_status": "nf_pendente",
+                "fonte_confirmacao": "pedido",
+            },
+            processed_at=processed_at,
+        )
+        return erros
 
     for item in itens:
         if item.vendido_em:
@@ -662,6 +706,7 @@ def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoInt
 def listar_pedidos_bling(
     status: Optional[str] = Query(None, description="aberto|confirmado|expirado|cancelado"),
     busca: Optional[str] = Query(None, description="Numero interno do pedido Bling ou ID do pedido"),
+    pedido: Optional[str] = Query(None, alias="pedido", description="Alias legado para o filtro de busca"),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
@@ -674,7 +719,7 @@ def listar_pedidos_bling(
     if status:
         q = q.filter(PedidoIntegrado.status == status)
 
-    busca_texto = str(busca or "").strip()
+    busca_texto = str(busca or pedido or "").strip()
     if busca_texto:
         termo = f"%{busca_texto}%"
         q = q.filter(
@@ -697,7 +742,16 @@ def listar_pedidos_bling(
         itens = db.query(PedidoIntegradoItem).filter(
             PedidoIntegradoItem.pedido_integrado_id == p.id
         ).all()
-        result.append(_serializar_pedido_bling(p, itens))
+        try:
+            result.append(_serializar_pedido_bling(p, itens))
+        except Exception as exc:
+            logger.exception(
+                "[BLING PEDIDOS] Falha ao serializar pedido local id=%s bling_id=%s numero=%s: %s",
+                getattr(p, "id", None),
+                getattr(p, "pedido_bling_id", None),
+                getattr(p, "pedido_bling_numero", None),
+                exc,
+            )
 
     return {
         "total": total,
@@ -744,14 +798,16 @@ def confirmar_pedido_manual(
         pedido=pedido,
         itens=itens,
         motivo="venda_bling_manual",
-        observacao="Baixa manual via tela Pedidos Bling",
+        observacao="Confirmacao manual do pedido; venda aguardando NF",
         user_id=getattr(user, "id", 0),
+        aplicar_baixa_estoque=False,
     )
 
     return {
         "status": "ok",
         "pedido_id": pedido.id,
         "erros_estoque": erros_estoque,
+        "estoque_movimentado": False,
     }
 
 
@@ -980,18 +1036,33 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     processed_at=event_date,
                     db=db,
                 )
-                erros_estoque = _confirmar_pedido(
+                if nf_id_bling and nf_id_bling not in {"0", "-1"}:
+                    from app.services.bling_nf_service import processar_nf_autorizada
+
+                    acao = processar_nf_autorizada(
+                        db=db,
+                        pedido=pedido,
+                        itens=itens,
+                        nf_id=nf_id_bling,
+                    )
+                    logger.info(
+                        f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} consolidado via NF ({event})"
+                    )
+                    return {"status": "ok", "acao": acao, "erros_estoque": []}
+
+                _confirmar_pedido(
                     db=db,
                     pedido=pedido,
                     itens=itens,
-                    motivo="venda_bling_nf",
-                    observacao=f"Baixa automatica - NF Bling emitida (evento {event})",
+                    motivo="pedido_com_nf_sem_id",
+                    observacao=f"Pedido confirmado por evento NF sem identificador deterministico ({event})",
                     processed_at=event_date,
+                    aplicar_baixa_estoque=False,
                 )
-                logger.info(
-                    f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} confirmado via evento NF ({event})"
+                logger.warning(
+                    f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} recebeu evento NF sem id deterministico; estoque mantido aguardando reconciliação"
                 )
-                return {"status": "ok", "acao": "confirmado_por_nf", "erros_estoque": erros_estoque}
+                return {"status": "ok", "acao": "aguardando_nf_deterministica", "erros_estoque": []}
 
         if _tenant_uuid:
             registrar_evento(
@@ -1104,10 +1175,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     pedido=pedido,
                     itens=itens,
                     motivo="venda_bling_webhook",
-                    observacao="Baixa automatica via webhook Bling (Atendido)",
+                    observacao="Pedido atendido no Bling; venda aguardando NF",
                     processed_at=event_date,
+                    aplicar_baixa_estoque=False,
                 )
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado e estoque baixado (situacao_id={situacao_id})")
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado sem baixa de estoque; aguardando NF (situacao_id={situacao_id})")
 
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
@@ -1169,10 +1241,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     pedido=pedido,
                     itens=itens,
                     motivo="venda_bling_webhook",
-                    observacao="Baixa automatica via consulta API do Bling (Atendido)",
+                    observacao="Pedido atendido via API do Bling; venda aguardando NF",
                     processed_at=event_date,
+                    aplicar_baixa_estoque=False,
                 )
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API (situacao_id={situacao_id_api})")
+                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})")
 
             return {"status": "ok", "acao": "confirmado_via_consulta_api"}
 
@@ -1351,11 +1424,12 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             pedido=pedido,
             itens=itens_salvos,
             motivo="venda_bling_webhook",
-            observacao="Baixa automatica order.created (ja Atendido no Bling)",
+            observacao="Pedido criado ja atendido no Bling; venda aguardando NF",
             processed_at=event_date,
+            aplicar_baixa_estoque=False,
         )
         logger.info(
-            f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created ja Atendido) - estoque baixado imediatamente"
+            f"[BLING WEBHOOK] Pedido {pedido_bling_id} (order.created ja Atendido) confirmado sem baixa; aguardando NF"
         )
 
     return {"status": "ok", "pedido_id": pedido.id}

@@ -207,6 +207,7 @@ def test_confirmar_pedido_so_marca_item_vendido_apos_baixa(monkeypatch):
         itens=[item],
         motivo="teste",
         observacao="teste",
+        aplicar_baixa_estoque=True,
     )
 
     assert erros == []
@@ -243,8 +244,51 @@ def test_confirmar_pedido_mantem_reserva_quando_baixa_falha(monkeypatch):
         itens=[item],
         motivo="teste",
         observacao="teste",
+        aplicar_baixa_estoque=True,
     )
 
     assert erros == ["falha baixa"]
     assert confirmados == []
     assert item.vendido_em is None
+
+
+def test_confirmar_pedido_sem_nf_nao_baixa_estoque_nem_marca_item(monkeypatch):
+    db = Mock()
+    pedido = SimpleNamespace(
+        id=10,
+        tenant_id="tenant-1",
+        pedido_bling_id="987",
+        status="aberto",
+        confirmado_em=None,
+    )
+    item = SimpleNamespace(sku="KIT-1", quantidade=1, vendido_em=None)
+    baixas = []
+    confirmados = []
+    eventos = []
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._baixar_item_pedido",
+        lambda **kwargs: baixas.append(kwargs),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.EstoqueReservaService.confirmar_venda",
+        lambda db_arg, item_arg: confirmados.append(item_arg.sku),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: eventos.append(kwargs),
+    )
+
+    erros = _confirmar_pedido(
+        db=db,
+        pedido=pedido,
+        itens=[item],
+        motivo="teste",
+        observacao="teste",
+    )
+
+    assert erros == []
+    assert baixas == []
+    assert confirmados == []
+    assert item.vendido_em is None
+    assert eventos[0]["payload"]["baixa_estoque_status"] == "nf_pendente"

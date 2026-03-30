@@ -536,6 +536,16 @@ Itens executados nesta etapa:
   - o backend agora roda um job periodico para revisar NFs recentes em `Pendente` ou `Emitida DANFE`
   - foi criado um endpoint manual de reconciliacao para diagnostico operacional rapido
 
+- [x] tornar a integracao de venda Bling estritamente dependente da NF:
+  - confirmacao de pedido via webhook ou pela tela deixa de baixar estoque e deixa de marcar item como vendido
+  - a consolidacao da venda passa a acontecer apenas quando a NF chega e e processada como fonte deterministica
+  - a auditoria do fluxo deixa de reaplicar baixa de estoque em pedido confirmado quando ainda nao existe NF valida
+  - a tela de movimentacoes do produto oculta saidas de `pedido_integrado` que nao tenham NF resolvida
+- [x] endurecer a listagem de `Pedidos Bling` para evitar quebra operacional:
+  - a rota passa a aceitar o alias `pedido` na URL alem de `busca`
+  - um pedido com payload ruim nao derruba mais a listagem inteira durante a serializacao
+  - a interface de confirmacao manual passa a explicar corretamente que o estoque aguardara a NF
+
 Itens deliberadamente adiados por agora:
 
 - [ ] Sentry

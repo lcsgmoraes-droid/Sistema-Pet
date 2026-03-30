@@ -204,6 +204,9 @@ function buildEventResult(evento) {
   if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'ok') {
     return 'Pedido confirmado e estoque baixado sem pendencias.';
   }
+  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'nf_pendente') {
+    return 'Pedido confirmado no Bling; a venda segue aguardando a NF para consolidar o estoque.';
+  }
   if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'warning') {
     return errorDetail || 'Pedido confirmado, mas a baixa de estoque ficou com pendencias.';
   }

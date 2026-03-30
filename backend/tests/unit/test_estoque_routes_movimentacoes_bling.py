@@ -349,3 +349,71 @@ def test_contexto_venda_pedido_integrado_usa_itens_salvos_quando_payload_nao_tem
     assert contexto["canal"] == "mercado_livre"
     assert contexto["nf_numero"] == "010984"
     assert contexto["preco_venda_unitario"] == 166.90
+
+
+def test_contexto_venda_pedido_integrado_resolve_nf_pelo_cache_do_pedido(monkeypatch):
+    class FakeQuery:
+        def __init__(self, *, produto=None, cache=None):
+            self.produto = produto
+            self.cache = cache
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.cache if self.cache is not None else self.produto
+
+    class FakeDB:
+        def __init__(self, produto, cache):
+            self.produto = produto
+            self.cache = cache
+
+        def query(self, model):
+            if getattr(model, "__name__", "") == "BlingNotaFiscalCache":
+                return FakeQuery(cache=self.cache)
+            return FakeQuery(produto=self.produto)
+
+    produto = SimpleNamespace(id=6398, tenant_id="tenant-1", codigo="SKU-TESTE", codigo_barras=None)
+    cache = SimpleNamespace(
+        bling_id="25441572688",
+        numero="011087",
+        serie="2",
+        status="Autorizada",
+        modelo=55,
+        detalhada_em=None,
+        last_synced_at=None,
+        id=1,
+    )
+    pedido = SimpleNamespace(
+        tenant_id="tenant-1",
+        pedido_bling_id="25441515111",
+        canal="bling",
+        payload={
+            "pedido": {
+                "loja": {"id": 205367939},
+                "itens": [
+                    {
+                        "codigo": "SKU-TESTE",
+                        "descricao": "Produto de teste",
+                        "quantidade": 1,
+                        "valor": 68.93,
+                        "total": 68.93,
+                    }
+                ],
+            },
+            "ultima_nf": {"id": "0"},
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda db, produto: [6398],
+    )
+
+    contexto = _contexto_venda_pedido_integrado(FakeDB(produto, cache), pedido, 6398)
+
+    assert contexto["canal"] == "shopee"
+    assert contexto["nf_numero"] == "011087"
