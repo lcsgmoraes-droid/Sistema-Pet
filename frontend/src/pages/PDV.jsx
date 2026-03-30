@@ -53,12 +53,14 @@ import ModalAbrirCaixa from "../components/ModalAbrirCaixa";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalPagamento from "../components/ModalPagamento";
 import HistoricoCliente from "../components/pdv/HistoricoCliente";
+import ModalCadastroCliente from "../components/pdv/ModalCadastroCliente";
 import ModalCalculadoraRacaoPDV from "../components/pdv/ModalCalculadoraRacaoPDV";
 import ModalPendenciasEstoque from "../components/pdv/ModalPendenciasEstoque";
 import VendasEmAberto from "../components/pdv/VendasEmAberto";
 import QuantidadeInput from "../components/QuantidadeInput";
 import SubtotalInput from "../components/SubtotalInput";
 import { useAuth } from "../contexts/AuthContext";
+import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
@@ -216,15 +218,11 @@ export default function PDV() {
   const [driveAlertVisible, setDriveAlertVisible] = useState(false);
 
   // Estados de controle de painéis laterais (UX - FASE 1)
-  const [painelVendasAberto, setPainelVendasAberto] = useState(() => {
-    const saved = localStorage.getItem("pdv_painel_vendas_aberto");
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [painelVendasAberto, setPainelVendasAberto] =
+    usePersistentBooleanState("pdv_painel_vendas_aberto", false);
 
-  const [painelClienteAberto, setPainelClienteAberto] = useState(() => {
-    const saved = localStorage.getItem("pdv_painel_cliente_aberto");
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [painelClienteAberto, setPainelClienteAberto] =
+    usePersistentBooleanState("pdv_painel_cliente_aberto", false);
 
   // Estado de Oportunidades Inteligentes (D4 - Backend Integration)
   // ✅ RULE: Oportunidades só aparecem com cliente selecionado
@@ -258,14 +256,6 @@ export default function PDV() {
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
   const buscaProdutoAtualRef = useRef("");
-
-  // Persistir estado dos painéis no localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "pdv_painel_vendas_aberto",
-      JSON.stringify(painelVendasAberto),
-    );
-  }, [painelVendasAberto]);
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -314,13 +304,6 @@ export default function PDV() {
       sessionStorage.removeItem("pdv_calculadora_data");
     }
   }, [vendaAtual.itens, vendaAtual.cliente]);
-
-  useEffect(() => {
-    localStorage.setItem(
-      "pdv_painel_cliente_aberto",
-      JSON.stringify(painelClienteAberto),
-    );
-  }, [painelClienteAberto]);
 
   // Verificar se há caixa aberto
   useEffect(() => {
@@ -5940,174 +5923,6 @@ export default function PDV() {
         )}
       </div>
     </>
-  );
-}
-
-// Modal simples de cadastro de cliente
-function ModalCadastroCliente({ onClose, onClienteCriado }) {
-  const [formData, setFormData] = useState({
-    nome: "",
-    data_nascimento: "",
-    telefone: "",
-    cpf: "",
-    email: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!formData.nome || !formData.telefone) {
-      setErro("Nome e telefone são obrigatórios");
-      return;
-    }
-
-    setLoading(true);
-    setErro("");
-
-    try {
-      const response = await api.post("/clientes", {
-        ...formData,
-        data_nascimento: formData.data_nascimento || null,
-        tipo_cadastro: "cliente",
-        tipo_pessoa: "PF",
-      });
-
-      onClienteCriado(response.data);
-    } catch (error) {
-      console.error("Erro:", error);
-      setErro("Erro ao cadastrar cliente");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-bold text-gray-900">Cadastro Rápido</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {erro && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {erro}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nome *
-            </label>
-            <input
-              type="text"
-              value={formData.nome}
-              onChange={(e) =>
-                setFormData({ ...formData, nome: e.target.value })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Telefone *
-            </label>
-            <input
-              type="tel"
-              value={formData.telefone}
-              onChange={(e) =>
-                setFormData({ ...formData, telefone: e.target.value })
-              }
-              placeholder="(00) 00000-0000"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CPF
-            </label>
-            <input
-              type="text"
-              value={formData.cpf}
-              onChange={(e) =>
-                setFormData({ ...formData, cpf: e.target.value })
-              }
-              placeholder="000.000.000-00"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data de nascimento
-            </label>
-            <input
-              type="date"
-              value={formData.data_nascimento || ""}
-              onChange={(e) =>
-                setFormData({ ...formData, data_nascimento: e.target.value })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
-              placeholder="cliente@email.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          <div className="flex items-center justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center space-x-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Cadastrando...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Cadastrar</span>
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
 

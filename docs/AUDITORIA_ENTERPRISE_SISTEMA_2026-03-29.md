@@ -472,6 +472,10 @@ Itens executados nesta etapa:
   - `ProdutosNovo.jsx`
   - `Campanhas.jsx` revisado sem necessidade de troca nesta etapa
   - helper central `frontend/src/utils/debug.js` criado para manter logs so em ambiente de desenvolvimento ou com `VITE_DEBUG_UI=true`
+- [x] iniciar a decomposicao do `PDV.jsx` com uma extracao segura:
+  - modal de cadastro rapido movido para `frontend/src/components/pdv/ModalCadastroCliente.jsx`
+  - persistencia de paineis movida para `frontend/src/hooks/usePersistentBooleanState.js`
+  - `PDV.jsx` reduzido sem alterar o fluxo principal de venda
 
 Itens deliberadamente adiados por agora:
 
@@ -481,7 +485,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] quebrar `PDV.jsx` em subcomponentes e hooks por fluxo
+- [ ] continuar quebrando `PDV.jsx` em subcomponentes e hooks por fluxo
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
