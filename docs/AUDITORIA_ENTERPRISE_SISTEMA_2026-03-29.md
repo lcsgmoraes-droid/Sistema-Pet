@@ -497,6 +497,9 @@ Itens executados nesta etapa:
 - [x] avancar no corpo principal do `PDV.jsx` sem alterar a interface:
   - card de cliente movido para `frontend/src/components/pdv/PDVClienteCard.jsx`
   - `PDV.jsx` ficou responsavel apenas por passar o estado, os handlers e as acoes desse fluxo
+- [x] seguir reduzindo o corpo principal do `PDV.jsx` sem alterar a interface:
+  - card de produtos/carrinho movido para `frontend/src/components/pdv/PDVProdutosCard.jsx`
+  - `PDV.jsx` ficou mais focado em estado, callbacks e orquestracao do fluxo de itens
 
 Itens deliberadamente adiados por agora:
 

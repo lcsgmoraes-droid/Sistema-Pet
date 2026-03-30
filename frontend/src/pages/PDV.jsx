@@ -8,18 +8,10 @@
 import {
   AlertCircle,
   Bell,
-  BookmarkPlus,
   Bot,
   CheckCircle,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
   CreditCard,
   History,
-  Layers,
-  Minus,
-  Package,
   Percent,
   Plus,
   Save,
@@ -55,10 +47,9 @@ import PDVEnderecoModal from "../components/pdv/PDVEnderecoModal";
 import PDVModoVisualizacaoBanner from "../components/pdv/PDVModoVisualizacaoBanner";
 import ModalPendenciasEstoque from "../components/pdv/ModalPendenciasEstoque";
 import PDVOportunidadesSidebar from "../components/pdv/PDVOportunidadesSidebar";
+import PDVProdutosCard from "../components/pdv/PDVProdutosCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import VendasEmAberto from "../components/pdv/VendasEmAberto";
-import QuantidadeInput from "../components/QuantidadeInput";
-import SubtotalInput from "../components/SubtotalInput";
 import { useAuth } from "../contexts/AuthContext";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -67,7 +58,6 @@ import { tourPDV } from "../tours/tourDefinitions";
 import { debugLog, debugWarn } from "../utils/debug";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
-import { formatarVariacao } from "../utils/variacoes";
 
 export default function PDV() {
   const navigate = useNavigate();
@@ -1583,6 +1573,37 @@ export default function PDV() {
     setTimeout(() => setCopiadoCodigoItem(""), 2000);
   };
 
+  const handleBuscarProdutoChange = (valor) => {
+    setBuscarProduto(valor);
+    if (!String(valor || "").trim()) {
+      setProdutosSugeridos([]);
+      setMostrarSugestoesProduto(false);
+    }
+  };
+
+  const handleBuscarProdutoFocus = () => {
+    if (
+      String(buscarProduto || "").trim().length >= 2 &&
+      produtosSugeridos.length > 0
+    ) {
+      setMostrarSugestoesProduto(true);
+    }
+  };
+
+  const handleBuscarProdutoKeyDown = async (e) => {
+    registrarPossivelLeituraScanner(e);
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      await adicionarProdutoViaEnter();
+    }
+  };
+
+  const selecionarProdutoSugerido = (produto) => {
+    adicionarProduto(produto);
+    setMostrarSugestoesProduto(false);
+  };
+
   // Selecionar pet
   const selecionarPet = (pet) => {
     setVendaAtual({ ...vendaAtual, pet });
@@ -1696,6 +1717,50 @@ export default function PDV() {
       return item;
     });
     recalcularTotais(novosItens);
+  };
+
+  const atualizarQuantidadeItem = (index, novaQuantidade) => {
+    const novosItens = vendaAtual.itens.map((it, i) => {
+      if (i === index) {
+        const subtotalSemDesconto = novaQuantidade * it.preco_unitario;
+        let novoDescontoValor = it.desconto_valor || 0;
+
+        if (
+          it.tipo_desconto_aplicado === "percentual" &&
+          it.desconto_percentual > 0
+        ) {
+          novoDescontoValor =
+            (subtotalSemDesconto * it.desconto_percentual) / 100;
+        }
+
+        return {
+          ...it,
+          quantidade: novaQuantidade,
+          desconto_valor: novoDescontoValor,
+          subtotal: subtotalSemDesconto - novoDescontoValor,
+        };
+      }
+      return it;
+    });
+
+    recalcularTotais(novosItens);
+  };
+
+  const atualizarPetDoItem = (index, petId) => {
+    const novosItens = vendaAtual.itens.map((it, i) => {
+      if (i === index) {
+        return {
+          ...it,
+          pet_id: petId,
+        };
+      }
+      return it;
+    });
+
+    setVendaAtual({
+      ...vendaAtual,
+      itens: novosItens,
+    });
   };
 
   // 🥫 Abrir modal de calculadora de ração manualmente (via botão flutuante)
@@ -2821,467 +2886,30 @@ export default function PDV() {
                 vendasEmAbertoInfo={vendasEmAbertoInfo}
               />
 
-              {/* Card Produtos */}
-              <div
-                id="tour-pdv-carrinho"
-                className="bg-white rounded-lg shadow-sm border p-4"
-              >
-                <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-                  <Package className="w-5 h-5 mr-2 text-blue-600" />
-                  Produtos e Serviços
-                </h2>
-
-                {/* Buscar produto */}
-                <div id="tour-pdv-busca" ref={buscaProdutoContainerRef} className="relative mb-4">
-                  <div className="flex items-center">
-                    <input
-                      ref={inputProdutoRef}
-                      type="text"
-                      value={buscarProduto}
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        setBuscarProduto(valor);
-                        if (!String(valor || "").trim()) {
-                          setProdutosSugeridos([]);
-                          setMostrarSugestoesProduto(false);
-                        }
-                      }}
-                      onFocus={() => {
-                        if (String(buscarProduto || "").trim().length >= 2 && produtosSugeridos.length > 0) {
-                          setMostrarSugestoesProduto(true);
-                        }
-                      }}
-                      onKeyDown={async (e) => {
-                        registrarPossivelLeituraScanner(e);
-
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          await adicionarProdutoViaEnter();
-                        }
-                      }}
-                      placeholder="Digite o nome do produto, código de barras ou serviço..."
-                      disabled={modoVisualizacao}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                      autoFocus={!modoVisualizacao}
-                    />
-                    <Search className="w-5 h-5 text-gray-400 absolute right-3" />
-                  </div>
-
-                  {/* Sugestões de produtos */}
-                  {mostrarSugestoesProduto && String(buscarProduto || "").trim().length >= 2 && produtosSugeridos.length > 0 && (
-                    <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {produtosSugeridos.map((produto) => {
-                        const estoqueZerado =
-                          produto.tipo_produto === "KIT" &&
-                          produto.tipo_kit === "VIRTUAL"
-                            ? produto.estoque_virtual !== undefined &&
-                              Math.floor(produto.estoque_virtual) <= 0
-                            : produto.estoque_atual !== undefined &&
-                              Math.floor(produto.estoque_atual) <= 0;
-
-                        return (
-                        <button
-                          key={produto.id}
-                          onClick={() => {
-                            adicionarProduto(produto);
-                            setMostrarSugestoesProduto(false);
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              {/* 🔒 SPRINT 2: Exibir variações formatadas */}
-                              <div className="flex items-center gap-1.5 font-medium text-gray-900">
-                                {produto.nome}
-                                {estoqueZerado && vendaAtual.cliente && (
-                                  <span
-                                    onClick={(e) =>
-                                      adicionarNaListaEsperaRapido(produto, e)
-                                    }
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 rounded text-xs font-medium transition-colors cursor-pointer"
-                                    title="Sem estoque — clique para adicionar à lista de espera"
-                                  >
-                                    <BookmarkPlus className="w-3 h-3" />
-                                    <span>Lista de espera</span>
-                                  </span>
-                                )}
-                              </div>
-                              {produto.tipo_produto === "VARIACAO" &&
-                                formatarVariacao(produto) && (
-                                  <div className="text-xs text-blue-600 font-medium mt-0.5">
-                                    🔹 {formatarVariacao(produto)}
-                                  </div>
-                                )}
-                              <div className="text-sm text-gray-500">
-                                {produto.codigo && `Cód: ${produto.codigo}`}
-                                {/* KIT VIRTUAL usa estoque_virtual, outros usam estoque_atual */}
-                                {produto.tipo_produto === "KIT" &&
-                                produto.tipo_kit === "VIRTUAL"
-                                  ? produto.estoque_virtual !== undefined &&
-                                    ` • Estoque: ${Math.floor(produto.estoque_virtual)}`
-                                  : produto.estoque_atual !== undefined &&
-                                    ` • Estoque: ${Math.floor(produto.estoque_atual)}`}
-                              </div>
-                            </div>
-                            <div className="text-lg font-semibold text-green-600">
-                              {formatMoneyBRL(produto.preco_venda)}
-                            </div>
-                          </div>
-                        </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Lista de itens */}
-                {vendaAtual.itens.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Nenhum item adicionado</p>
-                    <p className="text-sm mt-1">
-                      Busque e adicione produtos ou serviços
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {vendaAtual.itens.map((item, index) => {
-                      const isKit = item.tipo_produto === "KIT";
-                      const isExpanded = itensKitExpandidos[index];
-                      const codigoProdutoExibicao =
-                        item.produto_codigo || item.codigo || item.sku || "";
-                      const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
-                      const hasComposicao =
-                        isKit &&
-                        item.composicao_kit &&
-                        item.composicao_kit.length > 0;
-
-                      return (
-                        <div
-                          key={index}
-                          className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-400 space-y-3 transition-colors"
-                        >
-                          <div
-                            className="flex items-center justify-between cursor-pointer"
-                            onClick={() =>
-                              !modoVisualizacao && abrirModalDescontoItem(item)
-                            }
-                          >
-                            <div className="flex-1 flex items-start gap-2">
-                              {/* Ícone de expansão para KIT */}
-                              {hasComposicao && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleKitExpansion(index);
-                                  }}
-                                  className="mt-1 text-gray-500 hover:text-blue-600 transition-colors"
-                                >
-                                  {isExpanded ? (
-                                    <ChevronDown className="w-5 h-5" />
-                                  ) : (
-                                    <ChevronRight className="w-5 h-5" />
-                                  )}
-                                </button>
-                              )}
-
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="font-medium text-gray-900">
-                                    {item.produto_nome}
-                                  </div>
-                                  {codigoProdutoExibicao && (
-                                    <div className="inline-flex items-center gap-1 text-xs text-gray-500">
-                                      <span>Cod: {codigoProdutoExibicao}</span>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          copiarCodigoProdutoCarrinho(
-                                            codigoProdutoExibicao,
-                                            chaveCodigoItem,
-                                          );
-                                        }}
-                                        className="text-gray-400 hover:text-gray-700"
-                                        title="Copiar código do produto"
-                                      >
-                                        {copiadoCodigoItem === chaveCodigoItem ? (
-                                          <Check className="w-3.5 h-3.5 text-green-600" />
-                                        ) : (
-                                          <Copy className="w-3.5 h-3.5" />
-                                        )}
-                                      </button>
-                                    </div>
-                                  )}
-                                  {/* Botão lista de espera — visível quando estoque zerado */}
-                                  {vendaAtual.cliente && (
-                                    (item.tipo_produto === 'KIT VIRTUAL'
-                                      ? (item.estoque_virtual !== undefined && Math.floor(item.estoque_virtual) <= 0)
-                                      : (item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0)
-                                    )) && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!pendenciasProdutoIds.includes(item.produto_id)) {
-                                          adicionarNaListaEsperaRapido({ id: item.produto_id, nome: item.produto_nome }, e);
-                                        }
-                                      }}
-                                      title={pendenciasProdutoIds.includes(item.produto_id) ? "Já na lista de espera" : "Adicionar à lista de espera"}
-                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
-                                        pendenciasProdutoIds.includes(item.produto_id)
-                                          ? "bg-orange-100 text-orange-600 cursor-default"
-                                          : "bg-gray-100 text-gray-400 hover:bg-orange-100 hover:text-orange-500 cursor-pointer"
-                                      }`}
-                                    >
-                                      <BookmarkPlus className="w-3 h-3" />
-                                      {pendenciasProdutoIds.includes(item.produto_id) ? "Espera" : "Espera"}
-                                    </button>
-                                  )}
-                                  {/* Badge KIT */}
-                                  {isKit && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
-                                      <Layers className="w-3 h-3" />
-                                      KIT
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {item.quantidade} Unidade
-                                  {item.quantidade !== 1 ? "s" : ""} x{" "}
-                                  {formatMoneyBRL(item.preco_unitario)}
-                                  {item.desconto_valor > 0 && (
-                                    <span className="text-orange-600 ml-1">
-                                      com {formatMoneyBRL(item.desconto_valor)}{" "}
-                                      de desconto
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* 🆕 Impostos do item (PDV-UX-01) - OCULTO: Cálculos continuam no backend para o cupom fiscal */}
-                                {/* {fiscalItens[item.produto_id] && (
-                                <div className="mt-2 p-2 bg-blue-50 rounded text-xs space-y-1">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">ICMS:</span>
-                                    <span className="font-medium">R$ {fiscalItens[item.produto_id].icms}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">ICMS ST:</span>
-                                    <span className="font-medium">R$ {fiscalItens[item.produto_id].icms_st}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">PIS:</span>
-                                    <span className="font-medium">R$ {fiscalItens[item.produto_id].pis}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-600">COFINS:</span>
-                                    <span className="font-medium">R$ {fiscalItens[item.produto_id].cofins}</span>
-                                  </div>
-                                  <div className="flex justify-between pt-1 border-t border-blue-200">
-                                    <span className="text-gray-700 font-semibold">Total Impostos:</span>
-                                    <span className="font-semibold text-blue-700">R$ {fiscalItens[item.produto_id].total_impostos}</span>
-                                  </div>
-                                </div>
-                              )} */}
-                              </div>
-                            </div>
-
-                            <div
-                              className="flex items-center space-x-4"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {/* Controle de quantidade */}
-                              <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg">
-                                <button
-                                  onClick={() => alterarQuantidade(index, -1)}
-                                  disabled={modoVisualizacao}
-                                  className="p-2 hover:bg-gray-100 rounded-l-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <Minus className="w-4 h-4" />
-                                </button>
-                                <QuantidadeInput
-                                  value={item.quantidade}
-                                  onChange={(novaQuantidade) => {
-                                    const novosItens = vendaAtual.itens.map(
-                                      (it, i) => {
-                                        if (i === index) {
-                                          const subtotalSemDesconto =
-                                            novaQuantidade * it.preco_unitario;
-
-                                          let novoDescontoValor =
-                                            it.desconto_valor || 0;
-
-                                          // Só recalcula se foi desconto PERCENTUAL
-                                          if (
-                                            it.tipo_desconto_aplicado ===
-                                              "percentual" &&
-                                            it.desconto_percentual > 0
-                                          ) {
-                                            novoDescontoValor =
-                                              (subtotalSemDesconto *
-                                                it.desconto_percentual) /
-                                              100;
-                                          }
-                                          // Se foi desconto em VALOR: mantém o desconto_valor fixo
-
-                                          const subtotalComDesconto =
-                                            subtotalSemDesconto -
-                                            novoDescontoValor;
-
-                                          return {
-                                            ...it,
-                                            quantidade: novaQuantidade,
-                                            desconto_valor: novoDescontoValor,
-                                            subtotal: subtotalComDesconto,
-                                          };
-                                        }
-                                        return it;
-                                      },
-                                    );
-                                    recalcularTotais(novosItens);
-                                  }}
-                                  disabled={modoVisualizacao}
-                                  className="w-20 px-2 py-1 text-center font-medium border-none focus:ring-0 disabled:bg-gray-50"
-                                />
-                                <button
-                                  onClick={() => alterarQuantidade(index, 1)}
-                                  disabled={modoVisualizacao}
-                                  className="p-2 hover:bg-gray-100 rounded-r-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                </button>
-                              </div>
-
-                              {/* Subtotal — clique para digitar o valor total e calcular a quantidade */}
-                              <SubtotalInput
-                                subtotal={item.subtotal}
-                                precoUnitario={item.preco_unitario}
-                                disabled={modoVisualizacao}
-                                onQuantidadeChange={(novaQuantidade) => {
-                                  const novosItens = vendaAtual.itens.map(
-                                    (it, i) => {
-                                      if (i === index) {
-                                        const subtotalSemDesconto =
-                                          novaQuantidade * it.preco_unitario;
-                                        let novoDescontoValor =
-                                          it.desconto_valor || 0;
-                                        if (
-                                          it.tipo_desconto_aplicado ===
-                                            "percentual" &&
-                                          it.desconto_percentual > 0
-                                        ) {
-                                          novoDescontoValor =
-                                            (subtotalSemDesconto *
-                                              it.desconto_percentual) /
-                                            100;
-                                        }
-                                        const subtotalComDesconto =
-                                          subtotalSemDesconto -
-                                          novoDescontoValor;
-                                        return {
-                                          ...it,
-                                          quantidade: novaQuantidade,
-                                          desconto_valor: novoDescontoValor,
-                                          subtotal: subtotalComDesconto,
-                                        };
-                                      }
-                                      return it;
-                                    },
-                                  );
-                                  recalcularTotais(novosItens);
-                                }}
-                              />
-
-                              {/* Remover */}
-                              <button
-                                onClick={() => removerItem(index)}
-                                disabled={modoVisualizacao}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Composição do KIT (expandível) */}
-                          {hasComposicao && isExpanded && (
-                            <div className="ml-7 mt-3 p-3 bg-white rounded-lg border border-gray-200">
-                              <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
-                                Composição do KIT
-                              </div>
-                              <div className="space-y-1.5">
-                                {item.composicao_kit.map(
-                                  (componente, compIndex) => (
-                                    <div
-                                      key={compIndex}
-                                      className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-gray-50"
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <Package className="w-4 h-4 text-gray-400" />
-                                        <span className="text-gray-700">
-                                          {componente.produto_nome}
-                                        </span>
-                                      </div>
-                                      <span className="text-gray-500 font-medium">
-                                        {componente.quantidade}x
-                                      </span>
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                              <div className="mt-2 text-xs text-gray-500 italic">
-                                Componentes apenas informativos (não editáveis)
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Seleção de Pet por item */}
-                          {vendaAtual.cliente?.pets &&
-                            vendaAtual.cliente.pets.length > 0 && (
-                              <div
-                                className="flex items-center space-x-2"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <label className="text-sm font-medium text-gray-600 w-16">
-                                  Pet:
-                                </label>
-                                <select
-                                  value={item.pet_id || ""}
-                                  onChange={(e) => {
-                                    const novosItens = vendaAtual.itens.map(
-                                      (it, i) => {
-                                        if (i === index) {
-                                          return {
-                                            ...it,
-                                            pet_id: e.target.value
-                                              ? parseInt(e.target.value)
-                                              : null,
-                                          };
-                                        }
-                                        return it;
-                                      },
-                                    );
-                                    setVendaAtual({
-                                      ...vendaAtual,
-                                      itens: novosItens,
-                                    });
-                                  }}
-                                  disabled={modoVisualizacao}
-                                  className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                                >
-                                  <option value="">Não especificado</option>
-                                  {vendaAtual.cliente.pets.map((pet) => (
-                                    <option key={pet.id} value={pet.id}>
-                                      {pet.codigo} - {pet.nome}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <PDVProdutosCard
+                buscaProduto={buscarProduto}
+                buscaProdutoContainerRef={buscaProdutoContainerRef}
+                copiadoCodigoItem={copiadoCodigoItem}
+                inputProdutoRef={inputProdutoRef}
+                itensKitExpandidos={itensKitExpandidos}
+                modoVisualizacao={modoVisualizacao}
+                mostrarSugestoesProduto={mostrarSugestoesProduto}
+                onAbrirModalDescontoItem={abrirModalDescontoItem}
+                onAdicionarNaListaEsperaRapido={adicionarNaListaEsperaRapido}
+                onAlterarQuantidade={alterarQuantidade}
+                onAtualizarPetItem={atualizarPetDoItem}
+                onAtualizarQuantidadeItem={atualizarQuantidadeItem}
+                onBuscarProdutoChange={handleBuscarProdutoChange}
+                onBuscarProdutoFocus={handleBuscarProdutoFocus}
+                onBuscarProdutoKeyDown={handleBuscarProdutoKeyDown}
+                onCopiarCodigoProdutoCarrinho={copiarCodigoProdutoCarrinho}
+                onRemoverItem={removerItem}
+                onSelecionarProdutoSugerido={selecionarProdutoSugerido}
+                onToggleKitExpansion={toggleKitExpansion}
+                pendenciasProdutoIds={pendenciasProdutoIds}
+                produtosSugeridos={produtosSugeridos}
+                vendaAtual={vendaAtual}
+              />
 
               {/* Card Observações */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
