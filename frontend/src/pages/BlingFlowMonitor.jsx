@@ -22,6 +22,7 @@ const LINK_SOURCE_LABELS = {
   'pedido.webhook': 'webhook do pedido',
   auditoria: 'auditoria automatica',
 };
+const RECENT_EVENTS_LIMIT = 3;
 
 function Badge({ children, tone = 'slate' }) {
   const tones = {
@@ -400,19 +401,19 @@ function EventCard({ evento, defaultExpanded = false }) {
     evento.status === 'error' ? 'red' : evento.status === 'warning' ? 'yellow' : evento.status === 'received' ? 'blue' : 'green';
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={toneFromSeverity(evento.severity)}>{evento.severity}</Badge>
             <Badge tone={toneFromStatus(evento.status)}>{statusLabel(evento.status)}</Badge>
             <span className="text-[11px] uppercase tracking-wide text-slate-400">{evento.source || 'runtime'}</span>
-            <span className="text-[11px] font-mono text-slate-400">{evento.event_type}</span>
+            {expanded && <span className="text-[11px] font-mono text-slate-400">{evento.event_type}</span>}
           </div>
           <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-slate-900">{copy.title}</p>
-              <p className="mt-1 text-sm text-slate-600">{copy.result}</p>
+              <p className="mt-1 text-sm text-slate-600 line-clamp-2">{copy.result}</p>
               {referenceSummary && (
                 <p className="mt-1 text-xs text-slate-500">{referenceSummary}</p>
               )}
@@ -431,7 +432,7 @@ function EventCard({ evento, defaultExpanded = false }) {
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
-          className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
         >
           {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
         </button>
@@ -495,6 +496,7 @@ export default function BlingFlowMonitor() {
   const [carregando, setCarregando] = useState(false);
   const [rodandoAuditoria, setRodandoAuditoria] = useState(false);
   const [acaoId, setAcaoId] = useState('');
+  const [mostrarTodosEventos, setMostrarTodosEventos] = useState(false);
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
   const carregar = useCallback(async () => {
@@ -569,6 +571,10 @@ export default function BlingFlowMonitor() {
   }
 
   const { timeline: eventosTimeline, history: eventosHistorico } = splitEventBuckets(eventos);
+  const eventosRecentesVisiveis = mostrarTodosEventos
+    ? eventosTimeline
+    : eventosTimeline.slice(0, RECENT_EVENTS_LIMIT);
+  const eventosRecentesOcultos = Math.max(eventosTimeline.length - RECENT_EVENTS_LIMIT, 0);
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -647,21 +653,33 @@ export default function BlingFlowMonitor() {
           </div>
 
           <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="blue">{eventosTimeline.length} em foco</Badge>
-              {eventosHistorico.length > 0 && <Badge tone="slate">{eventosHistorico.length} no historico</Badge>}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="blue">{eventosTimeline.length} em foco</Badge>
+                <Badge tone="green">mostrando {eventosRecentesVisiveis.length}</Badge>
+                {eventosHistorico.length > 0 && <Badge tone="slate">{eventosHistorico.length} no historico</Badge>}
+              </div>
+              {eventosTimeline.length > RECENT_EVENTS_LIMIT && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarTodosEventos((current) => !current)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  {mostrarTodosEventos ? `Mostrar so os ${RECENT_EVENTS_LIMIT} ultimos` : `Mostrar mais ${eventosRecentesOcultos}`}
+                </button>
+              )}
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              Eventos de rotina mais antigos ficam recolhidos no historico para a tela nao crescer demais. Avisos importantes continuam no topo.
+              A coluna mostra so os {RECENT_EVENTS_LIMIT} eventos mais recentes por padrao. O restante pode ser aberto sob demanda, e a rotina antiga continua no historico.
             </p>
           </div>
 
           <div className="space-y-3">
-            {eventosTimeline.map((evento, index) => (
+            {eventosRecentesVisiveis.map((evento) => (
               <EventCard
                 key={evento.id}
                 evento={evento}
-                defaultExpanded={index === 0 || ['warning', 'error'].includes(evento.status)}
+                defaultExpanded={['warning', 'error'].includes(evento.status)}
               />
             ))}
           </div>
