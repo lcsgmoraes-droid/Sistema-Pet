@@ -489,6 +489,11 @@ Itens executados nesta etapa:
 - [x] seguir limpando o `PDV.jsx` sem alterar a interface:
   - faixa de modo visualizacao movida para `frontend/src/components/pdv/PDVModoVisualizacaoBanner.jsx`
   - `PDV.jsx` ficou responsavel apenas pelos handlers de voltar, emitir NF, reabrir e editar
+- [x] continuar a decomposicao do `PDV.jsx` sem alterar a interface:
+  - modal de endereco movido para `frontend/src/components/pdv/PDVEnderecoModal.jsx`
+  - modal de desconto por item movido para `frontend/src/components/pdv/PDVDescontoItemModal.jsx`
+  - modal de desconto total movido para `frontend/src/components/pdv/PDVDescontoTotalModal.jsx`
+  - `PDV.jsx` ficou mais focado na orquestracao do estado e dos callbacks desses modais
 
 Itens deliberadamente adiados por agora:
 
