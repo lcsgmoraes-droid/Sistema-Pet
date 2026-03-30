@@ -91,7 +91,7 @@ function displayValue(value) {
   return String(value);
 }
 
-const MONITOR_BASES = ['/integracoes/bling/monitor', '/bling/monitor'];
+const MONITOR_BASES = ['/bling/monitor', '/integracoes/bling/monitor'];
 
 async function monitorRequest(method, path, config) {
   let ultimoErro = null;
