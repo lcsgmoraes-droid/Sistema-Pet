@@ -483,6 +483,9 @@ Itens executados nesta etapa:
   - painel lateral do cliente movido para `frontend/src/components/pdv/PDVClienteSidebar.jsx`
   - painel de oportunidades movido para `frontend/src/components/pdv/PDVOportunidadesSidebar.jsx`
   - `PDV.jsx` ficou mais focado na orquestracao dos estados e callbacks desses paineis
+- [x] avancar na decomposicao do `PDV.jsx` sem alterar a interface:
+  - painel do assistente movido para `frontend/src/components/pdv/PDVAssistenteSidebar.jsx`
+  - `PDV.jsx` ficou responsavel apenas por passar o estado da conversa e o handler de envio
 
 Itens deliberadamente adiados por agora:
 
