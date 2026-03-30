@@ -507,6 +507,9 @@ Itens executados nesta etapa:
   - card de comissao movido para `frontend/src/components/pdv/PDVComissaoCard.jsx`
   - bloco final de acoes movido para `frontend/src/components/pdv/PDVAcoesFooterCard.jsx`
   - `PDV.jsx` ficou mais focado na orquestracao dos handlers desses fluxos
+- [x] continuar a reducao do corpo principal do `PDV.jsx` sem alterar a interface:
+  - card de entrega movido para `frontend/src/components/pdv/PDVEntregaCard.jsx`
+  - `PDV.jsx` ficou responsavel pelos handlers de endereco, entregador e taxas, sem manter o JSX detalhado desse fluxo
 
 Itens deliberadamente adiados por agora:
 
