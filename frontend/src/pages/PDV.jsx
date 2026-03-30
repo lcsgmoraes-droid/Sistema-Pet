@@ -38,7 +38,9 @@ import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
 import PDVClienteSidebar from "../components/pdv/PDVClienteSidebar";
 import ModalCadastroCliente from "../components/pdv/ModalCadastroCliente";
+import PDVAcoesFooterCard from "../components/pdv/PDVAcoesFooterCard";
 import ModalCalculadoraRacaoPDV from "../components/pdv/ModalCalculadoraRacaoPDV";
+import PDVComissaoCard from "../components/pdv/PDVComissaoCard";
 import PDVDescontoItemModal from "../components/pdv/PDVDescontoItemModal";
 import PDVDescontoTotalModal from "../components/pdv/PDVDescontoTotalModal";
 import PDVEnderecoModal from "../components/pdv/PDVEnderecoModal";
@@ -1025,6 +1027,61 @@ export default function PDV() {
   const handleCodigoCupomKeyDown = (e) => {
     if (e.key === "Enter") {
       aplicarCupom();
+    }
+  };
+
+  const carregarFuncionariosComissao = async (busca = "") => {
+    try {
+      const response = await api.get("/comissoes/configuracoes/funcionarios");
+      const funcionarios = response.data.data || [];
+      const termo = String(busca || "").trim().toLowerCase();
+      const filtrados = termo
+        ? funcionarios.filter((f) => f.nome.toLowerCase().includes(termo))
+        : funcionarios;
+
+      setFuncionariosSugeridos(filtrados);
+      return filtrados;
+    } catch (error) {
+      console.error("Erro ao buscar funcionários:", error);
+      setFuncionariosSugeridos([]);
+      return [];
+    }
+  };
+
+  const handleToggleVendaComissionada = (checked) => {
+    setVendaComissionada(checked);
+    if (!checked) {
+      setFuncionarioComissao(null);
+      setBuscaFuncionario("");
+      setFuncionariosSugeridos([]);
+    }
+  };
+
+  const handleBuscaFuncionarioFocus = async () => {
+    if (!modoVisualizacao) {
+      await carregarFuncionariosComissao();
+    }
+  };
+
+  const handleBuscaFuncionarioChange = async (valor) => {
+    setBuscaFuncionario(valor);
+    await carregarFuncionariosComissao(valor);
+  };
+
+  const handleSelecionarFuncionarioComissao = (func) => {
+    setFuncionarioComissao(func);
+    setFuncionariosSugeridos([]);
+    setBuscaFuncionario("");
+  };
+
+  const handleRemoverFuncionarioComissao = () => {
+    setFuncionarioComissao(null);
+    setBuscaFuncionario("");
+  };
+
+  const handleNovaVenda = () => {
+    if (window.confirm("Descartar venda atual sem salvar?")) {
+      limparVenda();
     }
   };
 
@@ -3365,228 +3422,31 @@ export default function PDV() {
                 vendaAtual={vendaAtual}
               />
 
-              {/* Card Comissão */}
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Comissão
-                  </h2>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={vendaComissionada}
-                      onChange={(e) => {
-                        setVendaComissionada(e.target.checked);
-                        if (!e.target.checked) {
-                          setFuncionarioComissao(null);
-                        }
-                      }}
-                      disabled={modoVisualizacao}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
-                    />
-                    <span className="text-sm font-medium text-gray-700">
-                      Venda comissionada?
-                    </span>
-                  </label>
-                </div>
-
-                {vendaComissionada && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Funcionário/Veterinário *{" "}
-                      <span className="text-xs text-gray-500">
-                        (apenas com comissão configurada)
-                      </span>
-                    </label>
-
-                    {!funcionarioComissao ? (
-                      <>
-                        <input
-                          type="text"
-                          value={buscaFuncionario}
-                          placeholder="Buscar funcionário ou veterinário..."
-                          disabled={modoVisualizacao}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                          onFocus={async () => {
-                            // Ao focar, mostrar todos os funcionários com comissão
-                            if (!modoVisualizacao) {
-                              try {
-                                const response = await api.get(
-                                  "/comissoes/configuracoes/funcionarios",
-                                );
-                                setFuncionariosSugeridos(
-                                  response.data.data || [],
-                                );
-                              } catch (error) {
-                                console.error(
-                                  "Erro ao buscar funcionários:",
-                                  error,
-                                );
-                              }
-                            }
-                          }}
-                          onChange={async (e) => {
-                            const busca = e.target.value;
-                            setBuscaFuncionario(busca);
-
-                            try {
-                              // Buscar apenas funcionários/veterinários com comissão configurada
-                              const response = await api.get(
-                                "/comissoes/configuracoes/funcionarios",
-                              );
-                              const funcionarios = response.data.data || [];
-
-                              // Filtrar por nome se houver busca
-                              const filtrados = busca
-                                ? funcionarios.filter((f) =>
-                                    f.nome
-                                      .toLowerCase()
-                                      .includes(busca.toLowerCase()),
-                                  )
-                                : funcionarios;
-
-                              setFuncionariosSugeridos(filtrados);
-                            } catch (error) {
-                              console.error(
-                                "Erro ao buscar funcionários:",
-                                error,
-                              );
-                            }
-                          }}
-                        />
-
-                        {funcionariosSugeridos.length > 0 && (
-                          <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                            {funcionariosSugeridos.map((func) => (
-                              <button
-                                key={func.id}
-                                onClick={() => {
-                                  setFuncionarioComissao(func);
-                                  setFuncionariosSugeridos([]);
-                                  setBuscaFuncionario(""); // Limpar busca
-                                }}
-                                className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b last:border-b-0"
-                              >
-                                <div className="font-medium">{func.nome}</div>
-                                <div className="text-xs text-gray-500 capitalize">
-                                  {func.cargo}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">
-                            {funcionarioComissao.nome.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <div className="font-semibold text-green-900">
-                              {funcionarioComissao.nome}
-                            </div>
-                            <div className="text-sm text-green-700 capitalize">
-                              {funcionarioComissao.cargo}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setFuncionarioComissao(null);
-                            setBuscaFuncionario("");
-                          }}
-                          disabled={modoVisualizacao}
-                          className="p-2 text-green-600 hover:bg-green-100 rounded-lg transition-colors disabled:cursor-not-allowed"
-                          title="Remover seleção"
-                        >
-                          <X size={20} />
-                        </button>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-gray-500 mt-2">
-                      ℹ️ A comissão será calculada automaticamente conforme
-                      configurado no módulo de comissões
-                    </p>
-                  </div>
-                )}
-              </div>
+              <PDVComissaoCard
+                buscaFuncionario={buscaFuncionario}
+                funcionarioComissao={funcionarioComissao}
+                funcionariosSugeridos={funcionariosSugeridos}
+                modoVisualizacao={modoVisualizacao}
+                onBuscaFuncionarioChange={handleBuscaFuncionarioChange}
+                onBuscaFuncionarioFocus={handleBuscaFuncionarioFocus}
+                onRemoverFuncionario={handleRemoverFuncionarioComissao}
+                onSelecionarFuncionario={handleSelecionarFuncionarioComissao}
+                onToggleVendaComissionada={handleToggleVendaComissionada}
+                vendaComissionada={vendaComissionada}
+              />
             </div>
 
-            {/* Botões de Ação - Duplicados no final para facilitar acesso */}
-            {vendaAtual.itens.length > 0 && (
-              <div
-                id="tour-pdv-resumo"
-                className="bg-white rounded-lg shadow-sm border p-6"
-              >
-                {!temCaixaAberto && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
-                    <div className="flex items-center space-x-2 text-red-700">
-                      <AlertCircle className="w-5 h-5" />
-                      <span className="text-sm font-medium">
-                        🔒 Caixa fechado - Use o botão "Abrir Caixa" no topo da
-                        página para continuar
-                      </span>
-                    </div>
-                  </div>
-                )}
-                <div className="flex items-center justify-end gap-3">
-                  {/* Botão Nova Venda - Limpar sem salvar */}
-                  {vendaAtual.itens.length > 0 && !vendaAtual.id && (
-                    <button
-                      onClick={() => {
-                        if (
-                          window.confirm("Descartar venda atual sem salvar?")
-                        ) {
-                          limparVenda();
-                        }
-                      }}
-                      disabled={loading || modoVisualizacao}
-                      className="flex items-center space-x-2 px-4 py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-red-200"
-                      title="Descartar venda atual e começar uma nova"
-                    >
-                      <X className="w-5 h-5" />
-                      <span className="font-medium">Nova Venda</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={salvarVenda}
-                    disabled={loading || modoVisualizacao || !temCaixaAberto}
-                    className="flex items-center space-x-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={
-                      !temCaixaAberto
-                        ? "🔒 Caixa fechado - Abra o caixa para salvar vendas"
-                        : "Salvar venda atual"
-                    }
-                  >
-                    <Save className="w-5 h-5" />
-                    <span className="font-medium">Salvar Venda</span>
-                    {!temCaixaAberto && <span className="text-xs">🔒</span>}
-                  </button>
-                  <button
-                    onClick={abrirModalPagamento}
-                    disabled={
-                      loading ||
-                      vendaAtual.status === "finalizada" ||
-                      vendaAtual.status === "pago_nf" ||
-                      !temCaixaAberto
-                    }
-                    className="flex items-center space-x-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={
-                      !temCaixaAberto
-                        ? "🔒 Caixa fechado - Abra o caixa para registrar recebimentos"
-                        : "Registrar pagamento da venda"
-                    }
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    <span>Registrar Recebimento</span>
-                    {!temCaixaAberto && <span className="text-xs">🔒</span>}
-                  </button>
-                </div>
-              </div>
-            )}
+            <PDVAcoesFooterCard
+              itensCount={vendaAtual.itens.length}
+              loading={loading}
+              modoVisualizacao={modoVisualizacao}
+              onAbrirModalPagamento={abrirModalPagamento}
+              onNovaVenda={handleNovaVenda}
+              onSalvarVenda={salvarVenda}
+              statusVenda={vendaAtual.status}
+              temCaixaAberto={temCaixaAberto}
+              vendaId={vendaAtual.id}
+            />
           </div>
         </div>
 

@@ -503,6 +503,10 @@ Itens executados nesta etapa:
 - [x] continuar a reducao do corpo principal do `PDV.jsx` sem alterar a interface:
   - resumo financeiro do carrinho movido para `frontend/src/components/pdv/PDVResumoFinanceiroCard.jsx`
   - `PDV.jsx` ficou responsavel apenas pelos estados e handlers de cupom, desconto e totais
+- [x] seguir reduzindo o corpo principal do `PDV.jsx` sem alterar a interface:
+  - card de comissao movido para `frontend/src/components/pdv/PDVComissaoCard.jsx`
+  - bloco final de acoes movido para `frontend/src/components/pdv/PDVAcoesFooterCard.jsx`
+  - `PDV.jsx` ficou mais focado na orquestracao dos handlers desses fluxos
 
 Itens deliberadamente adiados por agora:
 
