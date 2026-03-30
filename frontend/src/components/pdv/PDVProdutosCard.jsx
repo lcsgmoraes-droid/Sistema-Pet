@@ -59,7 +59,7 @@ export default function PDVProdutosCard({
           <input
             ref={inputProdutoRef}
             type="text"
-            value={buscarProduto}
+            value={buscaProduto}
             onChange={(e) => onBuscarProdutoChange(e.target.value)}
             onFocus={onBuscarProdutoFocus}
             onKeyDown={onBuscarProdutoKeyDown}
@@ -72,7 +72,7 @@ export default function PDVProdutosCard({
         </div>
 
         {mostrarSugestoesProduto &&
-          String(buscarProduto || "").trim().length >= 2 &&
+          String(buscaProduto || "").trim().length >= 2 &&
           produtosSugeridos.length > 0 && (
             <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {produtosSugeridos.map((produto) => {
