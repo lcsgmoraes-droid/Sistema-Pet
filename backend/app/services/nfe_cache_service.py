@@ -210,15 +210,28 @@ def upsert_nota_cache(
     if modelo not in {55, 65}:
         modelo = 55
 
-    registro = (
-        db.query(BlingNotaFiscalCache)
-        .filter(
-            BlingNotaFiscalCache.tenant_id == tenant_id,
-            BlingNotaFiscalCache.bling_id == bling_id,
-            BlingNotaFiscalCache.modelo == modelo,
+    registro = None
+    for pendente in getattr(db, "new", ()):
+        if not isinstance(pendente, BlingNotaFiscalCache):
+            continue
+        if (
+            getattr(pendente, "tenant_id", None) == tenant_id
+            and getattr(pendente, "bling_id", None) == bling_id
+            and getattr(pendente, "modelo", None) == modelo
+        ):
+            registro = pendente
+            break
+
+    if not registro:
+        registro = (
+            db.query(BlingNotaFiscalCache)
+            .filter(
+                BlingNotaFiscalCache.tenant_id == tenant_id,
+                BlingNotaFiscalCache.bling_id == bling_id,
+                BlingNotaFiscalCache.modelo == modelo,
+            )
+            .first()
         )
-        .first()
-    )
 
     if not registro:
         registro = BlingNotaFiscalCache(
