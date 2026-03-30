@@ -114,37 +114,70 @@ class BlingAPI:
             "Accept": "application/json",
             "enable-jwt": self.enable_jwt,
         }
+
+    def _deve_renovar_token_apos_erro(self, error: requests.exceptions.HTTPError) -> bool:
+        response = getattr(error, "response", None)
+        if response is None or response.status_code != 401:
+            return False
+
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+
+        error_data = payload.get("error") if isinstance(payload, dict) else {}
+        error_type = str((error_data or {}).get("type") or "").strip().lower()
+        mensagem = " ".join(
+            str(parte or "").strip().lower()
+            for parte in (
+                error_type,
+                (error_data or {}).get("message"),
+                (error_data or {}).get("description"),
+                getattr(response, "text", ""),
+            )
+            if str(parte or "").strip()
+        )
+        return "invalid_token" in mensagem or "unauthorized" in mensagem
     
     def _request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """Faz requisição para API do Bling"""
         url = f"{self.base_url}{endpoint}"
-        headers = self._get_headers()
-        
-        try:
-            if method == "GET":
-                response = requests.get(url, headers=headers, params=data)
-            elif method == "POST":
-                response = requests.post(url, headers=headers, json=data)
-            elif method == "PUT":
-                response = requests.put(url, headers=headers, json=data)
-            elif method == "DELETE":
-                response = requests.delete(url, headers=headers)
-            else:
-                raise ValueError(f"Método HTTP inválido: {method}")
-            
-            response.raise_for_status()
-            return response.json()
-            
-        except requests.exceptions.HTTPError as e:
-            error_msg = f"Erro na API Bling: {e}"
+
+        for tentativa in range(2):
+            headers = self._get_headers()
+
             try:
-                error_data = e.response.json()
-                error_msg = f"{error_msg} - {error_data}"
-            except:
-                error_msg = f"{error_msg} - {e.response.text}"
-            raise Exception(error_msg)
-        except Exception as e:
-            raise Exception(f"Erro ao comunicar com Bling: {str(e)}")
+                if method == "GET":
+                    response = requests.get(url, headers=headers, params=data, timeout=30)
+                elif method == "POST":
+                    response = requests.post(url, headers=headers, json=data, timeout=30)
+                elif method == "PUT":
+                    response = requests.put(url, headers=headers, json=data, timeout=30)
+                elif method == "DELETE":
+                    response = requests.delete(url, headers=headers, timeout=30)
+                else:
+                    raise ValueError(f"Método HTTP inválido: {method}")
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.HTTPError as e:
+                if tentativa == 0 and self._deve_renovar_token_apos_erro(e):
+                    logger.warning("Bling retornou token invalido ao consultar %s. Tentando renovar e repetir.", endpoint)
+                    if self._renovar_token_automatico():
+                        continue
+
+                error_msg = f"Erro na API Bling: {e}"
+                try:
+                    error_data = e.response.json()
+                    error_msg = f"{error_msg} - {error_data}"
+                except Exception:
+                    error_msg = f"{error_msg} - {e.response.text}"
+                raise Exception(error_msg)
+            except Exception as e:
+                raise Exception(f"Erro ao comunicar com Bling: {str(e)}")
+
+        raise Exception("Erro ao comunicar com Bling: tentativa de renovacao nao retornou resposta valida")
     
     def validar_conexao(self) -> bool:
         """Testa se a conexão com Bling está funcionando"""
