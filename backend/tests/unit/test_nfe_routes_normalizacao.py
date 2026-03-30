@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
+from datetime import datetime
 
 from app.nfe_routes import (
     _normalizar_nota_pedido_integrado,
@@ -9,6 +10,7 @@ from app.nfe_routes import (
     _normalizar_detalhe_nota_bling,
     _normalizar_nota_bling,
     _normalizar_resumo_canal,
+    _planejar_sincronizacao_bling_nfes,
     _situacao_num,
     _status_nota_bling,
 )
@@ -457,3 +459,57 @@ def test_enriquecer_notas_com_pedidos_integrados_relaciona_por_id_da_nf_quando_r
     assert notas[0]["valor"] == 490.99
     assert notas[0]["canal_label"] == "Mercado Livre"
     assert notas[0]["origem_loja_virtual"] == "Mercado Livre"
+
+
+def test_planejar_sincronizacao_bling_nfes_faz_bootstrap_quando_cache_esta_vazio():
+    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
+        force_refresh=False,
+        data_inicial=None,
+        data_final=None,
+        cache_total=0,
+        cache_intervalo_tem_dados=False,
+        ultimo_sync=None,
+        ultima_data_emissao=None,
+        agora=datetime(2026, 3, 30, 9, 0, 0),
+    )
+
+    assert deve_sincronizar is True
+    assert data_inicial == "2026-03-23"
+    assert data_final == "2026-03-30"
+    assert estrategia == "bootstrap_cache_vazio"
+
+
+def test_planejar_sincronizacao_bling_nfes_reduz_para_janela_incremental_quando_cache_existe():
+    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
+        force_refresh=False,
+        data_inicial=None,
+        data_final=None,
+        cache_total=18,
+        cache_intervalo_tem_dados=True,
+        ultimo_sync=datetime(2026, 3, 30, 8, 45, 0),
+        ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
+        agora=datetime(2026, 3, 30, 9, 0, 0),
+    )
+
+    assert deve_sincronizar is True
+    assert data_inicial == "2026-03-27"
+    assert data_final == "2026-03-30"
+    assert estrategia == "janela_incremental_recente"
+
+
+def test_planejar_sincronizacao_bling_nfes_nao_reconsulta_intervalo_quando_cache_esta_recente():
+    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
+        force_refresh=False,
+        data_inicial="2026-03-28",
+        data_final="2026-03-30",
+        cache_total=18,
+        cache_intervalo_tem_dados=True,
+        ultimo_sync=datetime(2026, 3, 30, 8, 58, 0),
+        ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
+        agora=datetime(2026, 3, 30, 9, 0, 0),
+    )
+
+    assert deve_sincronizar is False
+    assert data_inicial is None
+    assert data_final is None
+    assert estrategia == "cache_intervalo_recente"

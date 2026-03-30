@@ -9,10 +9,11 @@ from time import monotonic, sleep
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 import requests
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.db import get_session
 from app.auth import get_current_user
@@ -21,6 +22,13 @@ from app.models import User
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.services.bling_sync_service import BlingSyncService
+from app.services.nfe_cache_service import (
+    existe_nota_cache_no_intervalo,
+    listar_notas_cache,
+    obter_detalhe_nota_cache,
+    obter_estado_cache_notas,
+    upsert_nota_cache,
+)
 from app.vendas_models import Venda
 from app.bling_integration import BlingAPI
 from app.utils.logger import logger
@@ -70,6 +78,9 @@ _INDICADOR_PRESENCA_MAP = {
 _XML_NS = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
 _NFE_LIST_CACHE_SECONDS = 45
 _NFE_DETAIL_CACHE_SECONDS = 600
+_NFE_SYNC_CACHE_TTL_SECONDS = 300
+_NFE_SYNC_DEFAULT_LOOKBACK_DAYS = 7
+_NFE_SYNC_SAFETY_LOOKBACK_DAYS = 2
 _nfe_list_cache: dict[tuple[str, str, str, str], dict] = {}
 _nfe_detail_cache: dict[tuple[str, str, str], dict] = {}
 
@@ -746,12 +757,28 @@ def _consultar_detalhe_nota_bling(
             continue
         usados.add(modelo_atual)
         detalhe_cache = _obter_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual)
+        if not _detalhe_nota_valido(detalhe_cache):
+            detalhe_cache = obter_detalhe_nota_cache(
+                db=db,
+                tenant_id=tenant_id,
+                nfe_id=nfe_id,
+                modelo=modelo_atual,
+            )
         if _detalhe_nota_valido(detalhe_cache):
             return detalhe_cache, modelo_atual, venda
         try:
             detalhe = bling.consultar_nfce(nfe_id) if modelo_atual == 65 else bling.consultar_nfe(nfe_id)
             if _detalhe_nota_valido(detalhe):
                 _salvar_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual, detalhe)
+                upsert_nota_cache(
+                    db,
+                    tenant_id,
+                    _normalizar_nota_bling(detalhe, modelo_atual),
+                    source="bling_detail",
+                    resumo_payload=detalhe,
+                    detalhe_payload=detalhe,
+                )
+                db.commit()
                 return detalhe, modelo_atual, venda
         except Exception as exc:
             erros.append(str(exc))
@@ -1070,6 +1097,55 @@ def _parse_data_referencia(value) -> datetime | None:
     return None
 
 
+def _formatar_data_param_bling(value) -> str | None:
+    data_ref = _parse_data_referencia(value)
+    return data_ref.date().isoformat() if data_ref else None
+
+
+def _planejar_sincronizacao_bling_nfes(
+    *,
+    force_refresh: bool,
+    data_inicial: str | None,
+    data_final: str | None,
+    cache_total: int,
+    cache_intervalo_tem_dados: bool,
+    ultimo_sync: datetime | None,
+    ultima_data_emissao: datetime | None,
+    agora: datetime | None = None,
+) -> tuple[bool, str | None, str | None, str]:
+    agora_ref = agora or datetime.now()
+    data_final_sync = _formatar_data_param_bling(data_final) or agora_ref.date().isoformat()
+    data_inicial_sync = _formatar_data_param_bling(data_inicial)
+    cache_stale = (
+        force_refresh
+        or not ultimo_sync
+        or (agora_ref - ultimo_sync).total_seconds() > _NFE_SYNC_CACHE_TTL_SECONDS
+    )
+
+    if data_inicial or data_final:
+        if force_refresh or not cache_intervalo_tem_dados or cache_stale:
+            return True, data_inicial_sync, data_final_sync, "intervalo_especifico"
+        return False, None, None, "cache_intervalo_recente"
+
+    if cache_total <= 0:
+        return (
+            True,
+            (agora_ref - timedelta(days=_NFE_SYNC_DEFAULT_LOOKBACK_DAYS)).date().isoformat(),
+            data_final_sync,
+            "bootstrap_cache_vazio",
+        )
+
+    if not cache_stale:
+        return False, None, None, "cache_global_recente"
+
+    base_data = ultima_data_emissao or agora_ref
+    janela_inicial = max(
+        (base_data - timedelta(days=_NFE_SYNC_SAFETY_LOOKBACK_DAYS)).date(),
+        (agora_ref - timedelta(days=_NFE_SYNC_DEFAULT_LOOKBACK_DAYS)).date(),
+    )
+    return True, janela_inicial.isoformat(), data_final_sync, "janela_incremental_recente"
+
+
 def _status_local_ultima_nf(ultima_nf: dict) -> str:
     situacao_textual = _texto(_primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status")))
     if situacao_textual:
@@ -1287,6 +1363,115 @@ def _normalizar_nota_bling(item: dict, modelo: int) -> dict:
     }
 
 
+def _normalizar_nota_venda_local(venda: Venda) -> dict:
+    canal_slug = _canal_slug(venda.canal)
+    return {
+        "id": str(venda.nfe_bling_id),
+        "venda_id": venda.id,
+        "numero": venda.nfe_numero,
+        "serie": venda.nfe_serie,
+        "tipo": "nfce" if _venda_usa_nfce(venda) else "nfe",
+        "tipo_codigo": 1 if _venda_usa_nfce(venda) else 0,
+        "modelo": _coerce_int(venda.nfe_modelo, 65 if _venda_usa_nfce(venda) else 55),
+        "chave": venda.nfe_chave,
+        "status": venda.nfe_status or "Pendente",
+        "data_emissao": venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None,
+        "valor": float(venda.total or 0),
+        "cliente": {
+            "id": venda.cliente.id if venda.cliente else None,
+            "nome": venda.cliente.nome if venda.cliente else None,
+            "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None,
+        },
+        "canal": _texto(venda.canal),
+        "canal_label": _canal_label(canal_slug, venda.canal),
+        "loja": {
+            "id": None,
+            "nome": _texto(venda.loja_origem),
+        },
+        "unidade_negocio": {
+            "id": None,
+            "nome": None,
+        },
+        "numero_loja_virtual": None,
+        "origem_loja_virtual": None,
+        "origem_canal_venda": _texto(venda.canal),
+        "numero_pedido_loja": _texto(venda.numero_venda),
+        "origem": "local",
+    }
+
+
+def _sincronizar_vendas_em_cache(
+    db: Session,
+    tenant_id,
+    *,
+    desde: datetime | None = None,
+) -> None:
+    query = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.nfe_bling_id.isnot(None),
+    )
+    if desde:
+        query = query.filter(
+            or_(
+                Venda.updated_at >= desde,
+                Venda.nfe_data_emissao >= desde,
+            )
+        )
+
+    for venda in query.order_by(Venda.updated_at.desc(), Venda.nfe_data_emissao.desc()).all():
+        upsert_nota_cache(
+            db,
+            tenant_id,
+            _normalizar_nota_venda_local(venda),
+            source="local_venda",
+        )
+
+
+def _sincronizar_pedidos_integrados_em_cache(
+    db: Session,
+    tenant_id,
+    *,
+    desde: datetime | None = None,
+    limite_scan: int = 2000,
+) -> None:
+    query = db.query(PedidoIntegrado).filter(PedidoIntegrado.tenant_id == tenant_id)
+    if desde:
+        query = query.filter(PedidoIntegrado.updated_at >= desde)
+
+    pedidos = (
+        query.order_by(PedidoIntegrado.updated_at.desc(), PedidoIntegrado.created_at.desc())
+        .limit(limite_scan)
+        .all()
+    )
+    for pedido in pedidos:
+        nota = _normalizar_nota_pedido_integrado(pedido)
+        if not nota or not _texto(nota.get("id")):
+            continue
+        upsert_nota_cache(
+            db,
+            tenant_id,
+            nota,
+            source="pedido_integrado",
+            resumo_payload=_dict(pedido.payload),
+        )
+
+
+def _sincronizar_fontes_locais_nfe_em_cache(
+    db: Session,
+    tenant_id,
+    *,
+    estado_cache: dict | None = None,
+    force_refresh: bool = False,
+) -> None:
+    estado = estado_cache or obter_estado_cache_notas(db, tenant_id)
+    desde = None
+    if estado.get("total") and not force_refresh and isinstance(estado.get("ultimo_sync"), datetime):
+        desde = estado["ultimo_sync"] - timedelta(hours=6)
+
+    _sincronizar_vendas_em_cache(db, tenant_id, desde=desde)
+    _sincronizar_pedidos_integrados_em_cache(db, tenant_id, desde=desde)
+
+
 def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> None:
     ids_bling = {
         _coerce_int(nota.get("id"), 0)
@@ -1334,7 +1519,13 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
             }
 
 
-def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, tenant_id, notas: list[dict], limite_consultas: int = 120) -> None:
+def _enriquecer_notas_com_detalhes_bling(
+    bling: BlingAPI,
+    db: Session,
+    tenant_id,
+    notas: list[dict],
+    limite_consultas: int = 120,
+) -> None:
     consultas = 0
     ultima_consulta_ts = 0.0
 
@@ -1366,6 +1557,13 @@ def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, tenant_id, notas: list
         try:
             modelo_nota = _coerce_int(nota.get("modelo"), 55)
             detalhe = _obter_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota)
+            if not _detalhe_nota_valido(detalhe):
+                detalhe = obter_detalhe_nota_cache(
+                    db=db,
+                    tenant_id=tenant_id,
+                    nfe_id=nota_id,
+                    modelo=modelo_nota,
+                )
             fetched_remotamente = False
             if not _detalhe_nota_valido(detalhe):
                 if ultima_consulta_ts:
@@ -1405,12 +1603,94 @@ def _enriquecer_notas_com_detalhes_bling(bling: BlingAPI, tenant_id, notas: list
             nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or resumo_canal.get("numero_pedido_loja")
             nota["pedido_bling_id_ref"] = nota.get("pedido_bling_id_ref") or resumo_canal.get("pedido_bling_id_ref")
             if fetched_remotamente:
+                upsert_nota_cache(
+                    db,
+                    tenant_id,
+                    nota,
+                    source="bling_detail",
+                    resumo_payload=nota,
+                    detalhe_payload=detalhe,
+                )
+            if fetched_remotamente:
                 consultas += 1
         except Exception as e:
             logger.warning("listar_nfes", f"Falha ao enriquecer NF {nota_id} via detalhe do Bling: {e}")
             mensagem = str(e).upper()
             if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
                 break
+
+
+def _sincronizar_cache_nfes_com_bling(
+    db: Session,
+    tenant_id,
+    *,
+    data_inicial: str | None = None,
+    data_final: str | None = None,
+    situacao: str | None = None,
+) -> tuple[bool, list[dict]]:
+    notas_sincronizadas: list[dict] = []
+    bling_ok = False
+    try:
+        bling = BlingAPI()
+    except Exception as e:
+        logger.warning("listar_nfes", f"Bling indisponivel para sincronizacao incremental: {e}")
+        return False, []
+
+    try:
+        resp_nfe = bling.listar_nfes(
+            data_inicial=data_inicial,
+            data_final=data_final,
+            situacao=situacao,
+        )
+        for item in (resp_nfe.get("data") or []):
+            notas_sincronizadas.append(_normalizar_nota_bling(item, modelo=55))
+        bling_ok = True
+    except Exception as e:
+        logger.warning("listar_nfes", f"Bling NF-e nao disponivel para sincronizacao incremental: {e}")
+
+    try:
+        resp_nfce = bling.listar_nfces(
+            data_inicial=data_inicial,
+            data_final=data_final,
+            situacao=situacao,
+        )
+        ids_ja_adicionados = {
+            (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 55))
+            for nota in notas_sincronizadas
+        }
+        for item in (resp_nfce.get("data") or []):
+            nota = _normalizar_nota_bling(item, modelo=65)
+            chave = (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 65))
+            if chave in ids_ja_adicionados:
+                continue
+            notas_sincronizadas.append(nota)
+            ids_ja_adicionados.add(chave)
+        bling_ok = True
+    except Exception as e:
+        logger.warning("listar_nfes", f"Bling NFC-e nao disponivel para sincronizacao incremental: {e}")
+
+    if not notas_sincronizadas:
+        return bling_ok, []
+
+    _enriquecer_notas_com_vendas(db, tenant_id, notas_sincronizadas)
+    _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas_sincronizadas)
+    _enriquecer_notas_com_detalhes_bling(
+        bling,
+        db,
+        tenant_id,
+        notas_sincronizadas[:20],
+        limite_consultas=8,
+    )
+    for nota in notas_sincronizadas:
+        upsert_nota_cache(
+            db,
+            tenant_id,
+            nota,
+            source="bling_api",
+            resumo_payload=nota,
+        )
+    db.commit()
+    return bling_ok, notas_sincronizadas
 
 
 class EmitirNFeRequest(BaseModel):
@@ -1529,6 +1809,91 @@ async def listar_nfes(
         payload_cache["cache_utilizado"] = True
         payload_cache["cache_idade_segundos"] = int(max(agora_cache - cache_atual.get("ts_monotonic", 0), 0))
         return payload_cache
+
+    estado_cache = obter_estado_cache_notas(db, tenant_id)
+    _sincronizar_fontes_locais_nfe_em_cache(
+        db,
+        tenant_id,
+        estado_cache=estado_cache,
+        force_refresh=force_refresh,
+    )
+    db.commit()
+
+    cache_intervalo_tem_dados = existe_nota_cache_no_intervalo(
+        db,
+        tenant_id,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        situacao=situacao,
+    )
+    estado_cache = obter_estado_cache_notas(db, tenant_id)
+
+    deve_sincronizar_bling, sync_data_inicial, sync_data_final, estrategia_sync = _planejar_sincronizacao_bling_nfes(
+        force_refresh=force_refresh,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        cache_total=estado_cache.get("total", 0),
+        cache_intervalo_tem_dados=cache_intervalo_tem_dados,
+        ultimo_sync=estado_cache.get("ultimo_sync"),
+        ultima_data_emissao=estado_cache.get("ultima_data_emissao"),
+    )
+
+    bling_ok = False
+    if deve_sincronizar_bling:
+        bling_ok, _ = _sincronizar_cache_nfes_com_bling(
+            db,
+            tenant_id,
+            data_inicial=sync_data_inicial,
+            data_final=sync_data_final,
+            situacao=situacao,
+        )
+
+    notas = listar_notas_cache(
+        db,
+        tenant_id,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        situacao=situacao,
+    )
+
+    if not notas:
+        try:
+            _adicionar_notas_de_pedidos_integrados(
+                db,
+                tenant_id,
+                notas,
+                situacao=situacao,
+                data_inicial=data_inicial,
+                data_final=data_final,
+            )
+        except Exception as e:
+            logger.warning("listar_nfes", f"Erro ao complementar NFs via pedidos integrados: {e}")
+
+    _enriquecer_notas_com_vendas(db, tenant_id, notas)
+    _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas)
+    notas.sort(key=lambda nota: nota.get("data_emissao") or "", reverse=True)
+
+    payload = {
+        "success": True,
+        "total": len(notas),
+        "notas": notas,
+        "fonte": "bling_cache_incremental" if bling_ok else "cache_local",
+        "cache_utilizado": False,
+        "cache_idade_segundos": 0,
+        "sincronizacao": {
+            "executada": deve_sincronizar_bling,
+            "estrategia": estrategia_sync,
+            "janela": {
+                "data_inicial": sync_data_inicial,
+                "data_final": sync_data_final,
+            },
+        },
+    }
+    _nfe_list_cache[cache_key] = {
+        "ts_monotonic": monotonic(),
+        "payload": deepcopy(payload),
+    }
+    return payload
 
     notas: list[dict] = []
     bling_ok = False

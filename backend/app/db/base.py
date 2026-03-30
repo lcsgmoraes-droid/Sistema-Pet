@@ -30,6 +30,7 @@ from app import rotas_entrega_models  # noqa
 from app import opportunities_models  # noqa
 from app import opportunity_events_models  # noqa
 from app import dre_plano_contas_models  # noqa
+from app import nfe_cache_models  # noqa
 from app.ia import aba7_models  # noqa
 # DESABILITADO TEMPORARIAMENTE: aba7_extrato_models tem dependências circulares
 # from app.ia import aba7_extrato_models  # noqa

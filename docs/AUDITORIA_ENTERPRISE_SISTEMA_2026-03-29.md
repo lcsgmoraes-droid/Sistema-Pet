@@ -510,6 +510,10 @@ Itens executados nesta etapa:
 - [x] continuar a reducao do corpo principal do `PDV.jsx` sem alterar a interface:
   - card de entrega movido para `frontend/src/components/pdv/PDVEntregaCard.jsx`
   - `PDV.jsx` ficou responsavel pelos handlers de endereco, entregador e taxas, sem manter o JSX detalhado desse fluxo
+- [x] persistir a listagem de NF do Bling em cache local no banco:
+  - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
+  - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
+  - NFs ja vinculadas em `vendas` e `pedidos_integrados` passam a alimentar o cache para evitar depender de trazer tudo do Bling a cada carregamento
 
 Itens deliberadamente adiados por agora:
 
