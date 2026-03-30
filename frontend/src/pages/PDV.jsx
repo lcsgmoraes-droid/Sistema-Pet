@@ -8,7 +8,9 @@
 import {
   AlertCircle,
   AlertTriangle,
+  Bell,
   BookmarkPlus,
+  Bot,
   CheckCircle,
   Check,
   ChevronDown,
@@ -23,8 +25,12 @@ import {
   Plus,
   Save,
   Search,
+  ShoppingCart,
+  Star,
   Tag,
+  Trash2,
   User,
+  Wallet,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +41,7 @@ import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
 import { buscarVenda, criarVenda, listarVendas } from "../api/vendas";
 import AnaliseVendaDrawer from "../components/AnaliseVendaDrawer";
+import MenuCaixa from "../components/MenuCaixa";
 import ModalAbrirCaixa from "../components/ModalAbrirCaixa";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalPagamento from "../components/ModalPagamento";
