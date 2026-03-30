@@ -31,6 +31,7 @@ import ExtratoCredito from "../components/ExtratoCredito";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalImportacaoPessoas from "../components/ModalImportacaoPessoas";
 import ModalRemoverCredito from "../components/ModalRemoverCredito";
+import { debugLog } from "../utils/debug";
 import { formatBRL } from "../utils/formatters";
 
 const Pessoas = () => {
@@ -493,10 +494,10 @@ const Pessoas = () => {
       }
 
       // 🐛 DEBUG: Verificar entregador_padrao
-      // console.log('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
-      // console.log('🐛 is_entregador:', clienteData.is_entregador);
+      // debugLog('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
+      // debugLog('🐛 is_entregador:', clienteData.is_entregador);
 
-      // console.log('Dados enviados:', clienteData);
+      // debugLog('Dados enviados:', clienteData);
 
       let clienteId;
 
@@ -541,11 +542,11 @@ const Pessoas = () => {
 
         if (petId) {
           // Atualizar pet existente
-          console.log(`Atualizando pet ${petId}:`, petData);
+          debugLog(`Atualizando pet ${petId}:`, petData);
           await api.put(`/clientes/pets/${petId}`, petData);
         } else {
           // Criar novo pet
-          console.log("Criando novo pet:", petData);
+          debugLog("Criando novo pet:", petData);
           await api.post(`/clientes/${clienteId}/pets`, petData);
         }
       }
@@ -634,9 +635,9 @@ const Pessoas = () => {
     if (!confirm("Tem certeza que deseja excluir este cliente?")) return;
 
     try {
-      console.log("Excluindo cliente ID:", id);
+      debugLog("Excluindo cliente ID:", id);
       const response = await api.delete(`/clientes/${id}`);
-      console.log("Cliente excluído com sucesso:", response);
+      debugLog("Cliente excluído com sucesso:", response);
       await loadClientes();
     } catch (err) {
       console.error("Erro ao excluir cliente:", err);
@@ -649,16 +650,16 @@ const Pessoas = () => {
     if (!confirm("Tem certeza que deseja excluir este pet?")) return;
 
     try {
-      console.log("Excluindo pet ID:", petId);
+      debugLog("Excluindo pet ID:", petId);
       await api.delete(`/clientes/pets/${petId}`);
-      console.log("Pet excluído com sucesso");
+      debugLog("Pet excluído com sucesso");
 
       // Limpar estado de expansão para forçar re-render
       setExpandedPets({});
 
       // Atualizar lista de clientes
       await loadClientes();
-      console.log("Lista de clientes atualizada");
+      debugLog("Lista de clientes atualizada");
     } catch (err) {
       console.error("Erro ao excluir pet:", err);
       alert(err.response?.data?.detail || "Erro ao excluir pet");
@@ -716,7 +717,7 @@ const Pessoas = () => {
       setEditingCliente(cliente);
 
       // 🐛 DEBUG: Verificar o que vem do backend
-      console.log("🐛 Cliente carregado do backend:", {
+      debugLog("🐛 Cliente carregado do backend:", {
         id: cliente.id,
         nome: cliente.nome,
         is_entregador: cliente.is_entregador,
@@ -4194,3 +4195,4 @@ const Pessoas = () => {
 };
 
 export default Pessoas;
+

@@ -62,6 +62,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
+import { debugLog, debugWarn } from "../utils/debug";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 import { formatarVariacao } from "../utils/variacoes";
@@ -190,7 +191,7 @@ export default function PDV() {
       return;
     }
 
-    console.log("🔄 Sincronizando entregador_id:", novoEntregadorId);
+    debugLog("🔄 Sincronizando entregador_id:", novoEntregadorId);
     setVendaAtual((prev) => {
       if (prev.entregador_id === novoEntregadorId) {
         return prev;
@@ -344,14 +345,14 @@ export default function PDV() {
 
   // 🚚 Carregar entregadores disponíveis ao iniciar
   useEffect(() => {
-    // console.log('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
+    // debugLog('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
     carregarEntregadores();
   }, []);
 
   const carregarEntregadores = async () => {
-    // console.log('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
+    // debugLog('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
     try {
-      // console.log('📦 Fazendo request para /clientes...');
+      // debugLog('📦 Fazendo request para /clientes...');
       const response = await api.get("/clientes/", {
         params: {
           is_entregador: true,
@@ -360,7 +361,7 @@ export default function PDV() {
         },
       });
 
-      // console.log('✅ Response recebido:', response.data);
+      // debugLog('✅ Response recebido:', response.data);
       // A API retorna um objeto paginado: {items: Array, total: number, skip: number, limit: number}
       let entregadoresList =
         response.data.items || response.data.clientes || response.data || [];
@@ -371,24 +372,24 @@ export default function PDV() {
         entregadoresList = [];
       }
 
-      // console.log('📋 Total de entregadores carregados:', entregadoresList.length);
-      // console.log('📋 Lista completa:', entregadoresList);
+      // debugLog('📋 Total de entregadores carregados:', entregadoresList.length);
+      // debugLog('📋 Lista completa:', entregadoresList);
       setEntregadores(entregadoresList);
 
       // Pré-selecionar entregador padrão
       const entregadorPadrao = entregadoresList.find((e) => {
-        // console.log('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
+        // debugLog('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
         return e.entregador_padrao === true;
       });
 
-      // console.log('🔍 Resultado da busca do padrão:', entregadorPadrao);
+      // debugLog('🔍 Resultado da busca do padrão:', entregadorPadrao);
 
       if (entregadorPadrao) {
-        // console.log('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
+        // debugLog('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
         setEntregadorSelecionado(entregadorPadrao);
         // ✅ Setar IMEDIATAMENTE no vendaAtual também (evitar race condition)
         setVendaAtual((prev) => {
-          // console.log('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
+          // debugLog('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
           return {
             ...prev,
             entregador_id: entregadorPadrao.id,
@@ -428,7 +429,7 @@ export default function PDV() {
       // TODO: Integrar com cálculo de distância da API de mapas
       // Por enquanto, assumir 0 ou usar valor fixo como fallback
       custo = 0;
-      // console.log('⚠️ Modelo por KM requer cálculo de distância');
+      // debugLog('⚠️ Modelo por KM requer cálculo de distância');
     }
     // Modelo 3: Rateio RH (buscar do backend)
     else if (
@@ -1070,7 +1071,7 @@ export default function PDV() {
         }
       }
 
-      console.log("📊 Parâmetros de busca de vendas:", params);
+      debugLog("📊 Parâmetros de busca de vendas:", params);
       const resultado = await listarVendas(params);
 
       setVendasRecentes(resultado.vendas || []);
@@ -1134,7 +1135,7 @@ export default function PDV() {
       }
 
       // 🆕 CARREGAR DADOS DE COMISSÃO se existir funcionario_id
-      console.log("🔍 Venda carregada - funcionario_id:", venda.funcionario_id);
+      debugLog("🔍 Venda carregada - funcionario_id:", venda.funcionario_id);
       let funcionarioCarregado = null;
       if (venda.funcionario_id) {
         try {
@@ -1143,7 +1144,7 @@ export default function PDV() {
             "/comissoes/configuracoes/funcionarios",
           );
           const funcionarios = responseFuncionarios.data?.data || [];
-          console.log("📋 Funcionários disponíveis:", funcionarios);
+          debugLog("📋 Funcionários disponíveis:", funcionarios);
           funcionarioCarregado = funcionarios.find(
             (f) => f.id === venda.funcionario_id,
           );
@@ -1151,12 +1152,12 @@ export default function PDV() {
           if (funcionarioCarregado) {
             setVendaComissionada(true);
             setFuncionarioComissao(funcionarioCarregado);
-            console.log(
+            debugLog(
               "✅ Funcionário comissão carregado:",
               funcionarioCarregado,
             );
           } else {
-            console.warn(
+            debugWarn(
               "⚠️ Funcionário ID",
               venda.funcionario_id,
               "não encontrado na lista",
@@ -1166,7 +1167,7 @@ export default function PDV() {
           console.error("Erro ao carregar funcionário de comissão:", error);
         }
       } else {
-        console.log(
+        debugLog(
           "ℹ️ Venda sem funcionario_id - limpando estados de comissão",
         );
         // Se não tem funcionario_id, limpar estados de comissão
@@ -1208,7 +1209,7 @@ export default function PDV() {
 
       // 🚚 Sincronizar entregador selecionado se a venda tem entregador
       if (venda.entregador_id) {
-        console.log("🔍 Venda tem entregador_id:", venda.entregador_id);
+        debugLog("🔍 Venda tem entregador_id:", venda.entregador_id);
         try {
           // Buscar entregador direto da API (evita race condition com array entregadores)
           const responseEntregador = await api.get(
@@ -1217,11 +1218,11 @@ export default function PDV() {
           const entregadorCarregado = responseEntregador.data;
 
           if (entregadorCarregado && entregadorCarregado.is_entregador) {
-            console.log("✅ Entregador carregado:", entregadorCarregado.nome);
+            debugLog("✅ Entregador carregado:", entregadorCarregado.nome);
             setEntregadorSelecionado(entregadorCarregado);
             calcularCustoOperacional(entregadorCarregado);
           } else {
-            console.warn(
+            debugWarn(
               "⚠️ Cliente ID",
               venda.entregador_id,
               "não é um entregador válido",
@@ -1234,7 +1235,7 @@ export default function PDV() {
             (e) => e.id === venda.entregador_id,
           );
           if (entregador) {
-            console.log(
+            debugLog(
               "✅ Entregador encontrado no array (fallback):",
               entregador.nome,
             );
@@ -1243,7 +1244,7 @@ export default function PDV() {
           }
         }
       } else {
-        console.log(
+        debugLog(
           "ℹ️ Venda sem entregador_id - limpando entregadorSelecionado",
         );
         setEntregadorSelecionado(null);
@@ -1285,7 +1286,7 @@ export default function PDV() {
         return;
       }
 
-      console.log("🔍 Buscando venda com número:", numeroLimpo);
+      debugLog("🔍 Buscando venda com número:", numeroLimpo);
 
       // Buscar diretamente usando o parâmetro 'busca' do backend
       const resultado = await listarVendas({
@@ -1293,7 +1294,7 @@ export default function PDV() {
         per_page: 50,
       });
 
-      console.log("📊 Vendas encontradas:", resultado.vendas?.length);
+      debugLog("📊 Vendas encontradas:", resultado.vendas?.length);
 
       if (!resultado.vendas || resultado.vendas.length === 0) {
         alert(`Nenhuma venda encontrada com "${numeroLimpo}"`);
@@ -1590,7 +1591,7 @@ export default function PDV() {
       return;
     }
 
-    console.log("🛒 Produto sendo adicionado:", {
+    debugLog("🛒 Produto sendo adicionado:", {
       nome: produto.nome,
       categoria_id: produto.categoria_id,
       categoria_nome: produto.categoria_nome,
@@ -1692,20 +1693,20 @@ export default function PDV() {
 
   // 🥫 Abrir modal de calculadora de ração manualmente (via botão flutuante)
   const abrirCalculadoraRacao = () => {
-    console.log("🔍 Debug - Itens no carrinho:", vendaAtual.itens);
-    console.log("🔍 Debug - Verificando rações...");
+    debugLog("🔍 Debug - Itens no carrinho:", vendaAtual.itens);
+    debugLog("🔍 Debug - Verificando rações...");
 
     vendaAtual.itens.forEach((item, index) => {
-      console.log(`  Item ${index + 1}: ${item.produto_nome}`);
-      console.log(`    - peso_embalagem: ${item.peso_embalagem}`);
-      console.log(`    - classificacao_racao: ${item.classificacao_racao}`);
-      console.log(`    - categoria_id: ${item.categoria_id}`);
-      console.log(`    - categoria_nome: ${item.categoria_nome}`);
-      console.log(`    - É ração?: ${ehRacao(item)}`);
+      debugLog(`  Item ${index + 1}: ${item.produto_nome}`);
+      debugLog(`    - peso_embalagem: ${item.peso_embalagem}`);
+      debugLog(`    - classificacao_racao: ${item.classificacao_racao}`);
+      debugLog(`    - categoria_id: ${item.categoria_id}`);
+      debugLog(`    - categoria_nome: ${item.categoria_nome}`);
+      debugLog(`    - É ração?: ${ehRacao(item)}`);
     });
 
     const racoes = contarRacoes(vendaAtual.itens);
-    console.log(`📊 Total de rações encontradas: ${racoes}`);
+    debugLog(`📊 Total de rações encontradas: ${racoes}`);
 
     if (racoes === 0) {
       toast.error("Nenhuma ração no carrinho");
@@ -1814,7 +1815,7 @@ export default function PDV() {
           entregador_id: entregadorIdResolvido,
         });
 
-        console.log("🚨 DEBUG - Payload sendo enviado:", {
+        debugLog("🚨 DEBUG - Payload sendo enviado:", {
           tem_entrega: vendaAtual.tem_entrega,
           entregador_id: entregadorIdResolvido,
           vendaAtual_completo: vendaAtual,
@@ -1846,7 +1847,7 @@ export default function PDV() {
           await api.patch(`/vendas/${vendaAtual.id}/status`, {
             status: novoStatus,
           });
-          console.log(
+          debugLog(
             `✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`,
           );
         }
@@ -1857,12 +1858,12 @@ export default function PDV() {
         limparVenda();
       } else {
         // Criar nova venda
-        console.log("🚀 CRIANDO VENDA - Versão 2.0 - DESCONTOS ZERADOS");
-        console.log("Desconto valor:", 0);
-        console.log("Desconto percentual:", 0);
-        console.log("✅ Checkbox Venda Comissionada:", vendaComissionada);
-        console.log("💼 Funcionário Comissão:", funcionarioComissao);
-        console.log(
+        debugLog("🚀 CRIANDO VENDA - Versão 2.0 - DESCONTOS ZERADOS");
+        debugLog("Desconto valor:", 0);
+        debugLog("Desconto percentual:", 0);
+        debugLog("✅ Checkbox Venda Comissionada:", vendaComissionada);
+        debugLog("💼 Funcionário Comissão:", funcionarioComissao);
+        debugLog(
           "📋 Funcionário ID enviado:",
           funcionarioComissao?.id || null,
         );
@@ -1911,17 +1912,17 @@ export default function PDV() {
           entregador_id: entregadorIdResolvido,
         };
 
-        console.log(
+        debugLog(
           "📦 PAYLOAD COMPLETO antes de enviar:",
           JSON.stringify(payloadVenda, null, 2),
         );
-        console.log("🚚 Dados de entrega:", {
+        debugLog("🚚 Dados de entrega:", {
           tem_entrega: vendaAtual.tem_entrega,
           entregador_id: entregadorIdResolvido,
           entregadorSelecionado: entregadorSelecionado?.id,
           vendaAtual_completo: vendaAtual,
         });
-        console.log("💰 Percentuais calculados:", {
+        debugLog("💰 Percentuais calculados:", {
           taxaTotal,
           taxaLoja,
           taxaEntregador,
@@ -2024,13 +2025,13 @@ export default function PDV() {
 
   // Analisar venda com múltiplas formas de pagamento (do modal)
   const analisarVendaComFormasPagamento = async (formasPagamento) => {
-    console.log("🔍 DEBUG formasPagamento recebidas:", formasPagamento);
+    debugLog("🔍 DEBUG formasPagamento recebidas:", formasPagamento);
 
     setCarregandoAnalise(true);
     setMostrarAnaliseVenda(true);
 
     try {
-      console.log("💰 Enviando análise com múltiplas formas:", formasPagamento);
+      debugLog("💰 Enviando análise com múltiplas formas:", formasPagamento);
 
       // Fazer análise com os dados da venda atual E MÚLTIPLAS FORMAS
       const response = await api.post("/formas-pagamento/analisar-venda", {
@@ -2046,7 +2047,7 @@ export default function PDV() {
         vendedor_id: vendaAtual.funcionario_id, // Single source of truth
       });
 
-      console.log("✅ Resposta da análise:", response.data);
+      debugLog("✅ Resposta da análise:", response.data);
       setDadosAnalise(response.data);
     } catch (error) {
       console.error("Erro ao buscar análise:", error);
@@ -2129,7 +2130,7 @@ export default function PDV() {
       }
 
       // 🆕 CARREGAR DADOS DE COMISSÃO se existir funcionario_id
-      console.log(
+      debugLog(
         "🔍 Venda carregada - funcionario_id:",
         vendaCompleta.funcionario_id,
       );
@@ -2146,12 +2147,12 @@ export default function PDV() {
           if (funcionarioCarregado) {
             setVendaComissionada(true);
             setFuncionarioComissao(funcionarioCarregado);
-            console.log(
+            debugLog(
               "✅ Funcionário comissão carregado:",
               funcionarioCarregado,
             );
           } else {
-            console.warn(
+            debugWarn(
               "⚠️ Funcionário ID",
               vendaCompleta.funcionario_id,
               "não encontrado na lista",
@@ -2161,7 +2162,7 @@ export default function PDV() {
           console.error("Erro ao carregar funcionário de comissão:", error);
         }
       } else {
-        console.log(
+        debugLog(
           "ℹ️ Venda sem funcionario_id - limpando estados de comissão",
         );
         setVendaComissionada(false);
@@ -2242,7 +2243,7 @@ export default function PDV() {
           status: statusOriginalVenda,
         });
 
-        console.log(
+        debugLog(
           `✅ Status restaurado para: ${statusOriginalVenda} (alterações descartadas)`,
         );
       } catch (error) {
@@ -4926,7 +4927,7 @@ export default function PDV() {
                             opp,
                           );
                           // TODO: Adicionar produto ao carrinho
-                          console.log("Adicionar ao carrinho:", opp.id);
+                          debugLog("Adicionar ao carrinho:", opp.id);
                         }}
                         className="flex items-center gap-1 text-green-500 hover:text-green-600 transition-colors whitespace-nowrap font-medium"
                         title="Adicionar ao carrinho"
@@ -4942,7 +4943,7 @@ export default function PDV() {
                             opp,
                           );
                           // TODO: Mostrar alternativas
-                          console.log("Buscar alternativa:", opp.id);
+                          debugLog("Buscar alternativa:", opp.id);
                         }}
                         className="text-orange-600 hover:text-orange-700 transition-colors whitespace-nowrap flex-1 text-center font-medium"
                         title="Ver alternativa"
@@ -5151,7 +5152,7 @@ export default function PDV() {
                     total_pago: totalPago,
                   });
 
-                  console.log("✅ Venda recarregada:", vendaAtualizada);
+                  debugLog("✅ Venda recarregada:", vendaAtualizada);
                 } catch (error) {
                   console.error("Erro ao recarregar venda:", error);
                 }
@@ -6109,3 +6110,4 @@ function ModalCadastroCliente({ onClose, onClienteCriado }) {
     </div>
   );
 }
+

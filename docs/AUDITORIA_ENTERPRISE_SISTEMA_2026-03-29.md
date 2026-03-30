@@ -466,6 +466,12 @@ Itens executados nesta etapa:
   - link de "pular para o conteudo"
   - `robots.txt` valido
   - `sitemap.xml` inicial
+- [x] reduzir logs de debug em producao nos modulos criticos do frontend:
+  - `PDV.jsx`
+  - `ClientesNovo.jsx`
+  - `ProdutosNovo.jsx`
+  - `Campanhas.jsx` revisado sem necessidade de troca nesta etapa
+  - helper central `frontend/src/utils/debug.js` criado para manter logs so em ambiente de desenvolvimento ou com `VITE_DEBUG_UI=true`
 
 Itens deliberadamente adiados por agora:
 
@@ -475,7 +481,6 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] reduzir `console.log` e logs de debug em producao nos modulos criticos (`PDV`, `ClientesNovo`, `ProdutosNovo`, `Campanhas`)
 - [ ] quebrar `PDV.jsx` em subcomponentes e hooks por fluxo
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios

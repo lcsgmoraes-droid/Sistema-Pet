@@ -31,6 +31,7 @@ import {
   formatarData,
 } from '../api/produtos';
 import api from '../api';
+import { debugLog } from '../utils/debug';
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
@@ -1127,7 +1128,7 @@ export default function ProdutosNovo() {
         apresentacao_peso_id: formData.apresentacao_peso_id ? parseInt(formData.apresentacao_peso_id) : null,
       };
       
-      console.log('ðŸ“¤ Enviando dados para API:', dados);
+      debugLog('ðŸ“¤ Enviando dados para API:', dados);
 
       if (isEdicao) {
         // 💾 FISCAL V2: Salvar dados fiscais ANTES de atualizar produto
