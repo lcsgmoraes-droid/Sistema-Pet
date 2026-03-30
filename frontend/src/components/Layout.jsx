@@ -527,10 +527,22 @@ const Layout = () => {
       ],
     }, // Vinculado a vendas
     {
-      path: "/vendas/bling-pedidos",
+      path: "/vendas/bling",
       icon: FiShoppingBag,
       label: "Pedidos Bling",
       permission: "compras.sincronizacao_bling",
+      submenu: [
+        {
+          path: "/vendas/bling-pedidos",
+          label: "Pedidos Bling",
+          permission: "compras.sincronizacao_bling",
+        },
+        {
+          path: "/vendas/bling-monitor",
+          label: "Monitor Bling",
+          permission: "compras.sincronizacao_bling",
+        },
+      ],
     },
     {
       path: "/compras",
@@ -827,6 +839,26 @@ const Layout = () => {
     // Verifica se usuário tem a permissão do menu principal
     return hasPermission(item.permission);
   });
+
+  useEffect(() => {
+    setSubmenusOpen((prev) => {
+      let mudou = false;
+      const proximo = { ...prev };
+
+      menuItems.forEach((item) => {
+        if (!Array.isArray(item.submenu) || item.submenu.length === 0) return;
+        const possuiRotaAtiva = item.submenu.some((subitem) =>
+          location.pathname.startsWith(subitem.path),
+        );
+        if (possuiRotaAtiva && !proximo[item.path]) {
+          proximo[item.path] = true;
+          mudou = true;
+        }
+      });
+
+      return mudou ? proximo : prev;
+    });
+  }, [location.pathname, menuItems]);
 
   const isActive = (path) => location.pathname === path;
 

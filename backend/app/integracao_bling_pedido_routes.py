@@ -95,7 +95,7 @@ def _dt_iso(dt):
 
 def _situacao_codigo_bling(valor) -> int | None:
     if isinstance(valor, dict):
-        return _coerce_int(_primeiro_preenchido(valor.get("valor"), valor.get("id")))
+        return _coerce_int(_primeiro_preenchido(valor.get("id"), valor.get("valor")))
     return _coerce_int(valor)
 
 
@@ -189,6 +189,91 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
             )
         ),
     }
+
+
+def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None) -> dict | None:
+    pedido_payload = _dict(pedido_payload)
+    nota_ref = _dict(
+        _primeiro_preenchido(
+            pedido_payload.get("notaFiscal"),
+            pedido_payload.get("nota"),
+            pedido_payload.get("nfe"),
+        )
+    )
+    nf_id = _texto(_primeiro_preenchido(nota_ref.get("id"), nota_ref.get("nfe_id")))
+    if not nf_id:
+        return None
+
+    resumo_nf = _resumir_ultima_nf_webhook({**nota_ref, "id": nf_id})
+    if resumo_nf.get("numero") and resumo_nf.get("valor_total") is not None:
+        return resumo_nf
+
+    try:
+        from app.bling_integration import BlingAPI
+
+        bling = BlingAPI()
+        ultima_falha = None
+        for consulta in (bling.consultar_nfe, bling.consultar_nfce):
+            try:
+                nf_completa = consulta(int(nf_id))
+                return _resumir_ultima_nf_webhook({**_dict(nf_completa), "id": nf_id})
+            except Exception as exc:
+                ultima_falha = exc
+
+        if ultima_falha:
+            logger.warning(f"[BLING PEDIDO] Falha ao consultar NF {nf_id} vinculada ao pedido: {ultima_falha}")
+    except Exception as exc:
+        logger.warning(f"[BLING PEDIDO] Falha ao enriquecer resumo da NF {nf_id}: {exc}")
+
+    return resumo_nf if resumo_nf.get("id") else None
+
+
+def _sincronizar_nf_do_pedido(
+    *,
+    db: Session,
+    pedido: PedidoIntegrado,
+    pedido_payload: dict | None,
+    webhook_data: dict | None,
+    processed_at,
+    source: str,
+    message: str,
+    link_source: str,
+) -> dict | None:
+    resumo_nf = _resumir_ultima_nf_do_pedido_bling(pedido_payload)
+    if not resumo_nf:
+        return None
+
+    payload_atual = _dict(pedido.payload)
+    ultima_nf_atual = _dict(payload_atual.get("ultima_nf"))
+    mesma_nf = (
+        _texto(ultima_nf_atual.get("id")) == _texto(resumo_nf.get("id"))
+        and _texto(ultima_nf_atual.get("numero")) == _texto(resumo_nf.get("numero"))
+    )
+
+    pedido.payload = _montar_payload_pedido(
+        webhook_data=webhook_data,
+        pedido_completo=pedido_payload,
+        payload_atual=pedido.payload,
+        ultima_nf=resumo_nf,
+    )
+    db.add(pedido)
+
+    if not mesma_nf:
+        registrar_vinculo_nf_pedido(
+            pedido=pedido,
+            source=source,
+            nf_bling_id=resumo_nf.get("id"),
+            nf_numero=resumo_nf.get("numero"),
+            message=message,
+            payload={
+                "link_source": link_source,
+                "pedido_status_atual": pedido.status,
+            },
+            processed_at=processed_at,
+            db=db,
+        )
+
+    return resumo_nf
 
 
 def _resolver_canal_pedido(payload: dict | None, canal_salvo: str | None):
@@ -946,6 +1031,17 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     # ========================
     if event.endswith(".updated"):
         situacao_id = _situacao_codigo_bling(data.get("situacao"))
+        pedido_api = None
+        situacao_id_api = None
+
+        if (situacao_id and situacao_id in (_SITUACOES_PEDIDO_CANCELADO | _SITUACOES_PEDIDO_ATENDIDO)) or not situacao_id:
+            try:
+                from app.bling_integration import BlingAPI
+
+                pedido_api = BlingAPI().consultar_pedido(pedido_bling_id)
+                situacao_id_api = _situacao_codigo_bling(pedido_api.get("situacao"))
+            except Exception as e:
+                logger.warning(f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}")
 
         if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
             pedido = db.query(PedidoIntegrado).filter(
@@ -955,6 +1051,16 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
+                _sincronizar_nf_do_pedido(
+                    db=db,
+                    pedido=pedido,
+                    pedido_payload=pedido_api or data,
+                    webhook_data=data,
+                    processed_at=event_date,
+                    source="webhook",
+                    message="NF identificada no pedido atualizado e vinculada localmente.",
+                    link_source="pedido.updated",
+                )
                 _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})")
 
@@ -968,6 +1074,16 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
+                _sincronizar_nf_do_pedido(
+                    db=db,
+                    pedido=pedido,
+                    pedido_payload=pedido_api or data,
+                    webhook_data=data,
+                    processed_at=event_date,
+                    source="webhook",
+                    message="NF identificada no pedido atualizado e vinculada localmente.",
+                    link_source="pedido.updated",
+                )
                 erros_estoque = _confirmar_pedido(
                     db=db,
                     pedido=pedido,
@@ -980,15 +1096,6 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
 
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
-        # updated sem situação relevante no payload — consultar API do Bling para verificar
-        try:
-            from app.bling_integration import BlingAPI
-            pedido_api = BlingAPI().consultar_pedido(pedido_bling_id)
-            situacao_id_api = _situacao_codigo_bling(pedido_api.get("situacao"))
-        except Exception as e:
-            logger.warning(f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}")
-            situacao_id_api = None
-
         if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_CANCELADO:
             pedido = db.query(PedidoIntegrado).filter(
                 PedidoIntegrado.pedido_bling_id == pedido_bling_id
@@ -997,10 +1104,21 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
+                _sincronizar_nf_do_pedido(
+                    db=db,
+                    pedido=pedido,
+                    pedido_payload=pedido_api,
+                    webhook_data=data,
+                    processed_at=event_date,
+                    source="webhook",
+                    message="NF identificada via consulta da API do Bling e vinculada localmente.",
+                    link_source="pedido.updated.api",
+                )
                 pedido.payload = _montar_payload_pedido(
-                    webhook_data=_dict((pedido.payload or {})).get("webhook"),
+                    webhook_data=data,
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
+                    ultima_nf=_dict(_dict(pedido.payload).get("ultima_nf")) or None,
                 )
                 _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})")
@@ -1015,10 +1133,21 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
+                _sincronizar_nf_do_pedido(
+                    db=db,
+                    pedido=pedido,
+                    pedido_payload=pedido_api,
+                    webhook_data=data,
+                    processed_at=event_date,
+                    source="webhook",
+                    message="NF identificada via consulta da API do Bling e vinculada localmente.",
+                    link_source="pedido.updated.api",
+                )
                 pedido.payload = _montar_payload_pedido(
-                    webhook_data=_dict((pedido.payload or {})).get("webhook"),
+                    webhook_data=data,
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
+                    ultima_nf=_dict(_dict(pedido.payload).get("ultima_nf")) or None,
                 )
                 erros_estoque = _confirmar_pedido(
                     db=db,
@@ -1098,7 +1227,12 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         return {"status": "ignorado", "motivo": "order_created_ja_cancelado"}
 
     status_inicial = "confirmado" if (situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO) else "aberto"
-    payload_pedido = _montar_payload_pedido(webhook_data=data, pedido_completo=pedido_completo or data)
+    resumo_nf_pedido = _resumir_ultima_nf_do_pedido_bling(pedido_completo or data)
+    payload_pedido = _montar_payload_pedido(
+        webhook_data=data,
+        pedido_completo=pedido_completo or data,
+        ultima_nf=resumo_nf_pedido,
+    )
     canal, _, _ = _resolver_canal_pedido(payload_pedido, canal_bruto)
 
     pedido = PedidoIntegrado(
@@ -1180,6 +1314,20 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     # Se o pedido já nasceu "confirmado" (NF emitida no Bling antes do webhook order.updated),
     # deduzir estoque imediatamente — sem essa baixa, o estoque nunca seria ajustado.
     if status_inicial == "confirmado":
+        if resumo_nf_pedido:
+            registrar_vinculo_nf_pedido(
+                pedido=pedido,
+                source="webhook",
+                nf_bling_id=resumo_nf_pedido.get("id"),
+                nf_numero=resumo_nf_pedido.get("numero"),
+                message="Pedido criado ja com NF no Bling; vinculo consolidado no primeiro processamento.",
+                payload={
+                    "link_source": "pedido.created",
+                    "pedido_status_atual": pedido.status,
+                },
+                processed_at=event_date,
+                db=db,
+            )
         itens_salvos = db.query(PedidoIntegradoItem).filter(
             PedidoIntegradoItem.pedido_integrado_id == pedido.id
         ).all()

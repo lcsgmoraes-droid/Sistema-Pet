@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from app.integracao_bling_pedido_routes import (
     _confirmar_pedido,
     _normalizar_canal,
+    _resumir_ultima_nf_do_pedido_bling,
     _resumir_ultima_nf_webhook,
     _resolver_canal_pedido,
     _serializar_pedido_bling,
@@ -11,8 +12,12 @@ from app.integracao_bling_pedido_routes import (
 )
 
 
-def test_situacao_codigo_bling_prioriza_valor():
-    assert _situacao_codigo_bling({"id": 5, "valor": 9}) == 9
+def test_situacao_codigo_bling_prioriza_id():
+    assert _situacao_codigo_bling({"id": 9, "valor": 1}) == 9
+
+
+def test_situacao_codigo_bling_faz_fallback_para_valor():
+    assert _situacao_codigo_bling({"valor": 5}) == 5
 
 
 def test_normalizar_canal_marketplace():
@@ -40,6 +45,32 @@ def test_resumir_ultima_nf_webhook_captura_valor_total_da_nota():
     assert resumo["situacao"] == "Autorizada"
     assert resumo["situacao_codigo"] == 5
     assert resumo["valor_total"] == 166.90
+
+
+def test_resumir_ultima_nf_do_pedido_bling_enriquece_detalhes_via_api(monkeypatch):
+    class FakeBling:
+        def consultar_nfe(self, nf_id):
+            assert nf_id == 25431833504
+            return {
+                "id": 25431833504,
+                "numero": "010985",
+                "serie": 2,
+                "situacao": 5,
+                "valorNota": 440.13,
+                "chaveAcesso": "CHAVE-10985",
+            }
+
+        def consultar_nfce(self, nf_id):
+            raise AssertionError("nao deveria consultar NFC-e quando NFe ja respondeu")
+
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+
+    resumo = _resumir_ultima_nf_do_pedido_bling({"notaFiscal": {"id": "25431833504"}})
+
+    assert resumo["id"] == "25431833504"
+    assert resumo["numero"] == "010985"
+    assert resumo["valor_total"] == 440.13
+    assert resumo["chave"] == "CHAVE-10985"
 
 
 def test_resolver_canal_pedido_prioriza_loja_id_quando_canal_salvo_era_bling():
