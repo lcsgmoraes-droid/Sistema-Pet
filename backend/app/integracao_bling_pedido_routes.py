@@ -5,6 +5,7 @@ import time
 from uuid import UUID
 
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
