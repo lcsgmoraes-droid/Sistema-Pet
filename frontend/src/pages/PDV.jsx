@@ -44,16 +44,17 @@ import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
 import { buscarVenda, criarVenda, listarVendas } from "../api/vendas";
 import AnaliseVendaDrawer from "../components/AnaliseVendaDrawer";
-import ClienteInfoWidget from "../components/ClienteInfoWidget";
 import ImprimirCupom from "../components/ImprimirCupom";
 import MenuCaixa from "../components/MenuCaixa";
 import ModalAbrirCaixa from "../components/ModalAbrirCaixa";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalPagamento from "../components/ModalPagamento";
 import HistoricoCliente from "../components/pdv/HistoricoCliente";
+import PDVClienteSidebar from "../components/pdv/PDVClienteSidebar";
 import ModalCadastroCliente from "../components/pdv/ModalCadastroCliente";
 import ModalCalculadoraRacaoPDV from "../components/pdv/ModalCalculadoraRacaoPDV";
 import ModalPendenciasEstoque from "../components/pdv/ModalPendenciasEstoque";
+import PDVOportunidadesSidebar from "../components/pdv/PDVOportunidadesSidebar";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import VendasEmAberto from "../components/pdv/VendasEmAberto";
 import QuantidadeInput from "../components/QuantidadeInput";
@@ -638,6 +639,21 @@ export default function PDV() {
       // Fail-safe: erro silencioso
     }
   };
+
+  function adicionarOportunidadeAoCarrinho(oportunidade) {
+    registrarEventoOportunidade("oportunidade_convertida", oportunidade);
+    debugLog("Adicionar ao carrinho:", oportunidade.id);
+  }
+
+  function buscarAlternativaOportunidade(oportunidade) {
+    registrarEventoOportunidade("oportunidade_refinada", oportunidade);
+    debugLog("Buscar alternativa:", oportunidade.id);
+  }
+
+  function ignorarOportunidade(oportunidade) {
+    registrarEventoOportunidade("oportunidade_rejeitada", oportunidade);
+    setOpportunities((prev) => prev.filter((item) => item.id !== oportunidade.id));
+  }
 
   // 🆕 Função para calcular fiscal de um item (PDV-UX-01)
   async function calcularFiscalItem(item) {
@@ -4530,32 +4546,11 @@ export default function PDV() {
           </div>
         </div>
 
-        {/* Widget de Informações do Cliente */}
-        {vendaAtual.cliente && painelClienteAberto && (
-          <div className="w-80 bg-gray-50 border-l flex flex-col overflow-hidden">
-            <ClienteInfoWidget clienteId={vendaAtual.cliente.id} />
-          </div>
-        )}
-
-        {/* Botão para expandir/recolher painel do cliente */}
-        {vendaAtual.cliente && (
-          <button
-            onClick={() => setPainelClienteAberto(!painelClienteAberto)}
-            className="fixed right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-l-lg shadow-lg transition-all z-10"
-            style={{ right: painelClienteAberto ? "320px" : "0" }}
-            title={
-              painelClienteAberto
-                ? "Recolher informações do cliente"
-                : "Expandir informações do cliente"
-            }
-          >
-            {painelClienteAberto ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <User className="w-5 h-5" />
-            )}
-          </button>
-        )}
+        <PDVClienteSidebar
+          clienteId={vendaAtual.cliente?.id}
+          painelClienteAberto={painelClienteAberto}
+          setPainelClienteAberto={setPainelClienteAberto}
+        />
 
         <PDVVendasRecentesSidebar
           painelVendasAberto={painelVendasAberto}
@@ -4576,115 +4571,14 @@ export default function PDV() {
           setConfirmandoRetirada={setConfirmandoRetirada}
         />
 
-        {/* Painel de Oportunidades Inteligentes - D4 Backend Integration */}
-        {/* ✅ RULE: Painel só aparece se cliente selecionado */}
-        {painelOportunidadesAberto && vendaAtual.cliente && (
-          <div className="fixed inset-0 z-40">
-            {/* Sidebar direita - sem overlay */}
-            <div className="absolute top-0 right-0 w-80 h-full bg-gray-50 border-l border-gray-300 shadow-lg flex flex-col animate-in slide-in-from-right duration-200">
-              {/* Header - discreto */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-300 bg-white">
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-gray-600" />
-                  <h2 className="text-sm font-medium text-gray-700">
-                    Oportunidades
-                  </h2>
-                </div>
-                <button
-                  onClick={() => setPainelOportunidadesAberto(false)}
-                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                >
-                  <X className="w-4 h-4 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Conteúdo - estilo lista discreta */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {opportunities.slice(0, 5).map((opp) => (
-                  <div
-                    key={opp.id}
-                    className="p-3 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
-                  >
-                    <h3 className="text-xs font-medium text-gray-900 mb-1">
-                      {opp.titulo}
-                    </h3>
-                    <p className="text-xs text-gray-700 mb-2 leading-relaxed">
-                      {opp.descricao_curta}
-                    </p>
-
-                    {/* Ações discretas - 3 colunas - D5: Event Tracking */}
-                    <div className="flex items-center justify-between gap-2 text-xs mt-2">
-                      <button
-                        onClick={() => {
-                          // D5: Registrar evento CONVERTIDA (fire-and-forget)
-                          registrarEventoOportunidade(
-                            "oportunidade_convertida",
-                            opp,
-                          );
-                          // TODO: Adicionar produto ao carrinho
-                          debugLog("Adicionar ao carrinho:", opp.id);
-                        }}
-                        className="flex items-center gap-1 text-green-500 hover:text-green-600 transition-colors whitespace-nowrap font-medium"
-                        title="Adicionar ao carrinho"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Adicionar</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          // D5: Registrar evento REFINADA (fire-and-forget)
-                          registrarEventoOportunidade(
-                            "oportunidade_refinada",
-                            opp,
-                          );
-                          // TODO: Mostrar alternativas
-                          debugLog("Buscar alternativa:", opp.id);
-                        }}
-                        className="text-orange-600 hover:text-orange-700 transition-colors whitespace-nowrap flex-1 text-center font-medium"
-                        title="Ver alternativa"
-                      >
-                        Alternativa
-                      </button>
-                      <button
-                        onClick={() => {
-                          // D5: Registrar evento REJEITADA (fire-and-forget)
-                          registrarEventoOportunidade(
-                            "oportunidade_rejeitada",
-                            opp,
-                          );
-                          // Remover da lista local
-                          setOpportunities((prev) =>
-                            prev.filter((o) => o.id !== opp.id),
-                          );
-                        }}
-                        className="flex items-center gap-1 text-red-500 hover:text-red-600 transition-colors whitespace-nowrap font-medium"
-                        title="Ignorar sugestão"
-                      >
-                        <span>Ignorar</span>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {opportunities.length === 0 && (
-                  <div className="flex items-center justify-center py-8 text-gray-400">
-                    <p className="text-xs">Nenhuma oportunidade disponível</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer - Info discreto */}
-              <div className="px-4 py-2 border-t border-gray-200 bg-white">
-                <p className="text-[10px] text-gray-400 text-center">
-                  {opportunities.length > 0
-                    ? `${Math.min(opportunities.length, 6)} oportunidades`
-                    : ""}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        <PDVOportunidadesSidebar
+          aberto={painelOportunidadesAberto && !!vendaAtual.cliente}
+          opportunities={opportunities}
+          onClose={() => setPainelOportunidadesAberto(false)}
+          onAdicionar={adicionarOportunidadeAoCarrinho}
+          onAlternativa={buscarAlternativaOportunidade}
+          onIgnorar={ignorarOportunidade}
+        />
 
         {/* Painel Assistente IA do PDV */}
         {painelAssistenteAberto && vendaAtual.cliente && (

@@ -479,6 +479,10 @@ Itens executados nesta etapa:
 - [x] continuar a decomposicao do `PDV.jsx` sem alterar a interface:
   - sidebar de vendas recentes movida para `frontend/src/components/pdv/PDVVendasRecentesSidebar.jsx`
   - `PDV.jsx` ficou responsavel apenas pelo estado e pelos handlers da sidebar
+- [x] seguir a decomposicao do `PDV.jsx` sem alterar a interface:
+  - painel lateral do cliente movido para `frontend/src/components/pdv/PDVClienteSidebar.jsx`
+  - painel de oportunidades movido para `frontend/src/components/pdv/PDVOportunidadesSidebar.jsx`
+  - `PDV.jsx` ficou mais focado na orquestracao dos estados e callbacks desses paineis
 
 Itens deliberadamente adiados por agora:
 
