@@ -438,6 +438,49 @@ Para Bling especificamente:
 - introduzir validação de performance e budget de bundles no CI
 - separar storefront e painel administrativo em fronteiras mais claras
 
+### 8.4 Plano vivo de execucao
+
+Status desta trilha: em andamento
+
+Itens ja executados:
+
+- [x] corrigir timezone do Monitor Bling para exibir horario de Brasilia
+- [x] explicar melhor os eventos do monitor com resultado, referencias e tooltips
+- [x] registrar o vinculo pedido/NF no momento do evento com `invoice.linked_to_order`
+- [x] restaurar rota e item de menu do Monitor Bling na sidebar
+- [x] compactar a coluna de eventos recentes para mostrar so os 3 ultimos por padrao
+- [x] corrigir a confirmacao do pedido Bling que impedia a baixa automatica de estoque em casos como a NF `010985`
+
+Itens executados nesta etapa:
+
+- [x] remover arquivos backup/legado da arvore principal:
+  - `frontend/src/components/DRE.jsx.backup`
+  - `frontend/src/components/DRE.jsx.original`
+  - `frontend/src/components/DRE_temp.jsx`
+  - `frontend/src/pages/ConciliacaoCartoes_backup_pre_6ajustes.jsx`
+  - `backend/app/conciliacao_routes_old.py`
+  - `backend/app/notas_entrada_routes_backup_20260205_181349.py`
+- [x] melhorar a landing publica com:
+  - `meta description`
+  - landmark `main`
+  - link de "pular para o conteudo"
+  - `robots.txt` valido
+  - `sitemap.xml` inicial
+
+Itens deliberadamente adiados por agora:
+
+- [ ] Sentry
+- [ ] OpenTelemetry
+- [ ] Loki/Grafana
+
+Proximas tarefas sugeridas para execucao continua:
+
+- [ ] reduzir `console.log` e logs de debug em producao nos modulos criticos (`PDV`, `ClientesNovo`, `ProdutosNovo`, `Campanhas`)
+- [ ] quebrar `PDV.jsx` em subcomponentes e hooks por fluxo
+- [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
+- [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
+- [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
+
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
 ### 9.1 Observabilidade e produção

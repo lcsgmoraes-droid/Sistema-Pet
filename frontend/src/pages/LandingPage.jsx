@@ -133,8 +133,44 @@ export default function LandingPage() {
     }
   }, [isAuthenticated, navigate]);
 
+  useEffect(() => {
+    const previousTitle = document.title;
+    const existingMetaDescription = document.querySelector('meta[name="description"]');
+    const previousDescription = existingMetaDescription?.getAttribute("content") || "";
+    const metaDescription = existingMetaDescription || document.createElement("meta");
+
+    if (!existingMetaDescription) {
+      metaDescription.setAttribute("name", "description");
+      document.head.appendChild(metaDescription);
+    }
+
+    document.title =
+      "Pet Shop Pro | ERP para pet shop com PDV, estoque, NF, Bling e veterinario";
+    metaDescription.setAttribute(
+      "content",
+      "Sistema de gestao para pet shop com PDV, estoque, notas fiscais, integracao com Bling, e-commerce, entregas e modulo veterinario."
+    );
+
+    return () => {
+      document.title = previousTitle;
+
+      if (existingMetaDescription) {
+        existingMetaDescription.setAttribute("content", previousDescription);
+      } else {
+        metaDescription.remove();
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-white font-sans text-gray-800">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-purple-700 focus:shadow-lg"
+      >
+        Pular para o conteudo principal
+      </a>
+
       {/* ============ NAVBAR ============ */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -183,6 +219,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
+      <main id="main-content">
       {/* ============ HERO ============ */}
       <section className="pt-16 min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 flex items-center">
         <div className="max-w-6xl mx-auto px-4 py-24 grid md:grid-cols-2 gap-12 items-center">
@@ -467,6 +504,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      </main>
 
       {/* ============ FOOTER ============ */}
       <footer className="bg-gray-900 text-gray-400 py-10">
