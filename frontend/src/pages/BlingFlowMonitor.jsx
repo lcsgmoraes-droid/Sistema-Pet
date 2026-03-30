@@ -276,6 +276,38 @@ function buildEventNarrative(evento) {
   }
 }
 
+function buildEventReferenceSummary(evento) {
+  const partes = [];
+
+  const pedido = evento.pedido_bling_numero || evento.pedido_bling_id;
+  if (pedido) partes.push(`Pedido ${pedido}`);
+  if (evento.numero_pedido_loja) partes.push(`Loja ${evento.numero_pedido_loja}`);
+  if (evento.nf_numero || evento.nf_bling_id) partes.push(`NF ${evento.nf_numero || evento.nf_bling_id}`);
+  if (evento.sku) partes.push(`SKU ${evento.sku}`);
+
+  return partes.join(' | ');
+}
+
+function isRoutineEvent(evento) {
+  return evento?.severity === 'info' && ['ok', 'received'].includes(evento?.status);
+}
+
+function splitEventBuckets(eventos) {
+  const timeline = [];
+  const history = [];
+
+  eventos.forEach((evento, index) => {
+    const destaque = index < 6 || !isRoutineEvent(evento) || ['warning', 'error'].includes(evento?.status);
+    if (destaque) {
+      timeline.push(evento);
+      return;
+    }
+    history.push(evento);
+  });
+
+  return { timeline, history };
+}
+
 function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
   const pedidoLabel = incidente.pedido_bling_numero || incidente.pedido_bling_id || '-';
   const autoFixDetalhe = formatAutofixDetails(incidente.details);
@@ -351,8 +383,9 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
   );
 }
 
-function EventCard({ evento }) {
+function EventCard({ evento, defaultExpanded = false }) {
   const copy = buildEventNarrative(evento);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const hasReferences = Boolean(
     evento.pedido_bling_numero ||
       evento.pedido_bling_id ||
@@ -362,70 +395,95 @@ function EventCard({ evento }) {
       evento.nf_bling_id ||
       evento.sku
   );
+  const referenceSummary = buildEventReferenceSummary(evento);
+  const statusTone =
+    evento.status === 'error' ? 'red' : evento.status === 'warning' ? 'yellow' : evento.status === 'received' ? 'blue' : 'green';
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={toneFromSeverity(evento.severity)}>{evento.severity}</Badge>
             <Badge tone={toneFromStatus(evento.status)}>{statusLabel(evento.status)}</Badge>
             <span className="text-[11px] uppercase tracking-wide text-slate-400">{evento.source || 'runtime'}</span>
+            <span className="text-[11px] font-mono text-slate-400">{evento.event_type}</span>
           </div>
-          <p className="mt-2 text-sm font-semibold text-slate-900">{copy.title}</p>
-          <p className="mt-1 text-xs font-mono text-slate-400">{evento.event_type}</p>
+          <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{copy.title}</p>
+              <p className="mt-1 text-sm text-slate-600">{copy.result}</p>
+              {referenceSummary && (
+                <p className="mt-1 text-xs text-slate-500">{referenceSummary}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 md:ml-4 md:flex-col md:items-end">
+              <Badge tone={statusTone}>{evento.status === 'ok' ? 'sem pendencia' : statusLabel(evento.status)}</Badge>
+              <span
+                title="Horario exibido em Brasilia."
+                className="shrink-0 text-right text-xs text-slate-500"
+              >
+                {formatDate(evento.processed_at)}
+              </span>
+            </div>
+          </div>
         </div>
-        <span
-          title="Horario exibido em Brasilia."
-          className="shrink-0 text-right text-xs text-slate-500"
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
         >
-          {formatDate(evento.processed_at)}
-        </span>
+          {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+        </button>
       </div>
 
-      <div className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-        <div>
-          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            <span>O que aconteceu</span>
-            <InfoHint text="Resumo do passo do fluxo que acabou de acontecer." />
+      {expanded && (
+        <>
+          <div className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <div>
+              <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <span>O que aconteceu</span>
+                <InfoHint text="Resumo do passo do fluxo que acabou de acontecer." />
+              </div>
+              <p className="mt-1 text-sm text-slate-700">{copy.what}</p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                <span>Resultado</span>
+                <InfoHint text="Mostra se a etapa terminou bem, com pendencia ou com erro." />
+              </div>
+              <p className={`mt-1 text-sm ${evento.status === 'error' ? 'text-rose-700' : evento.status === 'warning' ? 'text-amber-700' : 'text-slate-700'}`}>
+                {copy.result}
+              </p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-slate-700">{copy.what}</p>
-        </div>
-        <div>
-          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            <span>Resultado</span>
-            <InfoHint text="Mostra se a etapa terminou bem, com pendencia ou com erro." />
-          </div>
-          <p className={`mt-1 text-sm ${evento.status === 'error' ? 'text-rose-700' : evento.status === 'warning' ? 'text-amber-700' : 'text-slate-700'}`}>
-            {copy.result}
-          </p>
-        </div>
-      </div>
 
-      {hasReferences && (
-        <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
-          <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
-            <span>Referencias do evento</span>
-            <InfoHint text="Aqui ficam os identificadores usados para ligar pedido, NF e item dentro do fluxo." />
+          {hasReferences && (
+            <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+              <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                <span>Referencias do evento</span>
+                <InfoHint text="Aqui ficam os identificadores usados para ligar pedido, NF e item dentro do fluxo." />
+              </div>
+              <p className="mt-1 text-sm text-emerald-800">
+                {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || '-')}
+                {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ''}
+                {evento.nf_numero || evento.nf_bling_id ? ` | NF ${evento.nf_numero || evento.nf_bling_id}` : ''}
+              </p>
+            </div>
+          )}
+
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            <DetailField label="Pedido Bling" value={evento.pedido_bling_numero} hint="Numero visivel do pedido no Bling." />
+            <DetailField label="ID Bling" value={evento.pedido_bling_id} hint="Identificador tecnico do pedido recebido do Bling." mono />
+            <DetailField label="ID interno" value={evento.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
+            <DetailField label="Pedido loja" value={evento.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
+            <DetailField label="NF numero" value={evento.nf_numero} hint="Numero humano da nota fiscal associada ao evento." />
+            <DetailField label="NF Bling" value={evento.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
+            <DetailField label="Status atual" value={evento.pedido_status_atual} hint="Status mais recente conhecido do pedido local." />
+            <DetailField label="SKU" value={evento.sku} hint="SKU do item impactado por esta etapa." mono />
           </div>
-          <p className="mt-1 text-sm text-emerald-800">
-            {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || '-')}
-            {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ''}
-            {evento.nf_numero || evento.nf_bling_id ? ` | NF ${evento.nf_numero || evento.nf_bling_id}` : ''}
-          </p>
-        </div>
+        </>
       )}
-
-      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-        <DetailField label="Pedido Bling" value={evento.pedido_bling_numero} hint="Numero visivel do pedido no Bling." />
-        <DetailField label="ID Bling" value={evento.pedido_bling_id} hint="Identificador tecnico do pedido recebido do Bling." mono />
-        <DetailField label="ID interno" value={evento.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
-        <DetailField label="Pedido loja" value={evento.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
-        <DetailField label="NF numero" value={evento.nf_numero} hint="Numero humano da nota fiscal associada ao evento." />
-        <DetailField label="NF Bling" value={evento.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
-        <DetailField label="Status atual" value={evento.pedido_status_atual} hint="Status mais recente conhecido do pedido local." />
-        <DetailField label="SKU" value={evento.sku} hint="SKU do item impactado por esta etapa." mono />
-      </div>
     </div>
   );
 }
@@ -437,6 +495,7 @@ export default function BlingFlowMonitor() {
   const [carregando, setCarregando] = useState(false);
   const [rodandoAuditoria, setRodandoAuditoria] = useState(false);
   const [acaoId, setAcaoId] = useState('');
+  const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -508,6 +567,8 @@ export default function BlingFlowMonitor() {
       setAcaoId('');
     }
   }
+
+  const { timeline: eventosTimeline, history: eventosHistorico } = splitEventBuckets(eventos);
 
   return (
     <div className="mx-auto max-w-7xl p-6">
@@ -585,11 +646,53 @@ export default function BlingFlowMonitor() {
             <span className="text-sm text-slate-500">{eventos.length} item(ns)</span>
           </div>
 
+          <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="blue">{eventosTimeline.length} em foco</Badge>
+              {eventosHistorico.length > 0 && <Badge tone="slate">{eventosHistorico.length} no historico</Badge>}
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Eventos de rotina mais antigos ficam recolhidos no historico para a tela nao crescer demais. Avisos importantes continuam no topo.
+            </p>
+          </div>
+
           <div className="space-y-3">
-            {eventos.map((evento) => (
-              <EventCard key={evento.id} evento={evento} />
+            {eventosTimeline.map((evento, index) => (
+              <EventCard
+                key={evento.id}
+                evento={evento}
+                defaultExpanded={index === 0 || ['warning', 'error'].includes(evento.status)}
+              />
             ))}
           </div>
+
+          {eventosHistorico.length > 0 && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Historico de rotina</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Eventos informativos antigos continuam disponiveis aqui, sem poluir a leitura principal.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMostrarHistorico((current) => !current)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  {mostrarHistorico ? 'Ocultar historico' : `Mostrar historico (${eventosHistorico.length})`}
+                </button>
+              </div>
+
+              {mostrarHistorico && (
+                <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                  {eventosHistorico.map((evento) => (
+                    <EventCard key={evento.id} evento={evento} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>

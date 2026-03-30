@@ -2,6 +2,7 @@ import { PawPrint, Stethoscope } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
+  FiActivity,
   FiBell,
   FiBox,
   FiBriefcase,
@@ -39,6 +40,7 @@ import TooltipPremium from "./TooltipPremium";
 
 const Layout = () => {
   const location = useLocation();
+  const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
   const {
     moduloAtivo,
@@ -119,6 +121,7 @@ const Layout = () => {
     const saved = localStorage.getItem("sidebar_visible");
     return saved !== null ? JSON.parse(saved) : true;
   });
+  const effectiveSidebarVisible = !isBradescoOrganizerRoute && sidebarVisible;
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
@@ -321,9 +324,21 @@ const Layout = () => {
   useEffect(() => {
     const fetchLembretesCount = async () => {
       try {
-        const response = await api.get("/lembretes/pendentes");
-        const lembretes = response.data || [];
-        setLembretesCount(Array.isArray(lembretes) ? lembretes.length : 0);
+        const [pendentesResp, autoResp] = await Promise.all([
+          api.get("/lembretes/pendentes"),
+          api.get("/integracoes/bling/nf/autocadastros-recentes", {
+            params: { horas: 24, resumo: true },
+          }),
+        ]);
+
+        const pendentesPayload = pendentesResp?.data || {};
+        const pendentes = Number(
+          pendentesPayload?.total
+            ?? (Array.isArray(pendentesPayload?.lembretes) ? pendentesPayload.lembretes.length : 0),
+        );
+        const autocadastros24h = Number(autoResp?.data?.total || 0);
+
+        setLembretesCount(Math.max(0, pendentes + autocadastros24h));
       } catch {
         // Silencioso — não bloqueia o layout
       }
@@ -518,15 +533,6 @@ const Layout = () => {
       ],
     },
     {
-      path: "/notas-fiscais",
-      icon: FiFileText,
-      label: "Notas Fiscais",
-      permission: "vendas.visualizar",
-      submenu: [
-        { path: "/notas-fiscais/saida", label: "📤 NF de Saída", permission: "vendas.visualizar" },
-      ],
-    }, // Vinculado a vendas
-    {
       path: "/vendas/bling-pedidos",
       icon: FiShoppingBag,
       label: "Pedidos Bling",
@@ -534,9 +540,15 @@ const Layout = () => {
     },
     {
       path: "/vendas/bling-monitor",
-      icon: FiTrendingUp,
+      icon: FiActivity,
       label: "Monitor Bling",
       permission: "compras.sincronizacao_bling",
+    },
+    {
+      path: "/notas-fiscais/saida",
+      icon: FiFileText,
+      label: "NF de Saída",
+      permission: "vendas.visualizar",
     },
     {
       path: "/compras",
@@ -859,7 +871,7 @@ const Layout = () => {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Backdrop para mobile */}
-      {isMobile && sidebarOpen && sidebarVisible && (
+      {isMobile && sidebarOpen && effectiveSidebarVisible && (
         <div
           className="fixed inset-0 bg-transparent z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
@@ -867,7 +879,7 @@ const Layout = () => {
       )}
 
       {/* Sidebar */}
-      {sidebarVisible && (
+      {effectiveSidebarVisible && (
         <aside
           className={`${
             isMobile
@@ -1179,7 +1191,7 @@ const Layout = () => {
       )}
 
       {/* Botão flutuante para mostrar sidebar quando escondida (apenas desktop) */}
-      {!sidebarVisible && !isMobile && (
+      {!effectiveSidebarVisible && !isMobile && !isBradescoOrganizerRoute && (
         <button
           onClick={() => setSidebarVisible(true)}
           className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-r-xl shadow-lg transition-all"
@@ -1194,7 +1206,7 @@ const Layout = () => {
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
           {/* Menu Hamburguer (Mobile) */}
-          {isMobile && sidebarVisible && (
+          {isMobile && effectiveSidebarVisible && (
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors md:hidden"
@@ -1205,7 +1217,7 @@ const Layout = () => {
           )}
 
           {/* Botão Patinha Mobile - Mostrar menu quando escondido */}
-          {isMobile && !sidebarVisible && (
+          {isMobile && !effectiveSidebarVisible && !isBradescoOrganizerRoute && (
             <button
               onClick={() => setSidebarVisible(true)}
               className="p-2 rounded-lg hover:bg-indigo-100 transition-colors md:hidden"
@@ -1231,7 +1243,7 @@ const Layout = () => {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-3 md:p-6">
+        <main className={`flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : "p-3 md:p-6"}`}>
           <Outlet />
         </main>
       </div>
