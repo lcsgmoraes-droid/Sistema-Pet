@@ -626,6 +626,89 @@ class SaidaFullNFRequest(BaseModel):
     itens: List[SaidaFullNFItemRequest]
 
 
+def _parse_data_lote(valor: Optional[str]) -> Optional[datetime]:
+    texto = str(valor or "").strip()
+    if not texto:
+        return None
+
+    candidatos = [
+        texto,
+        texto.replace("Z", "+00:00"),
+        texto.replace(" ", "T"),
+        texto.split("T")[0],
+    ]
+    for candidato in candidatos:
+        try:
+            dt = datetime.fromisoformat(candidato)
+            return dt.replace(tzinfo=None) if dt.tzinfo else dt
+        except ValueError:
+            continue
+
+    for formato in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(texto[:10], formato)
+        except ValueError:
+            continue
+    return None
+
+
+def _registrar_lote_entrada(
+    *,
+    db: Session,
+    produto: Produto,
+    quantidade: float,
+    custo_unitario: Optional[float],
+    numero_lote: Optional[str],
+    data_fabricacao: Optional[str],
+    data_validade: Optional[str],
+) -> tuple[ProdutoLote | None, int | None]:
+    lote = None
+    lote_id = None
+    if not (numero_lote or data_validade):
+        return lote, lote_id
+
+    nome_lote = numero_lote or f"{produto.sku or produto.codigo}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    produto.controle_lote = True
+
+    lote = db.query(ProdutoLote).filter(
+        ProdutoLote.produto_id == produto.id,
+        ProdutoLote.nome_lote == nome_lote,
+    ).first()
+
+    data_val = _parse_data_lote(data_validade)
+    data_fab = _parse_data_lote(data_fabricacao)
+
+    if lote:
+        lote.quantidade_inicial = float(lote.quantidade_inicial or 0) + quantidade
+        lote.quantidade_disponivel = float(lote.quantidade_disponivel or 0) + quantidade
+        lote.quantidade_reservada = float(lote.quantidade_reservada or 0)
+        lote.data_fabricacao = data_fab or lote.data_fabricacao
+        lote.data_validade = data_val or lote.data_validade
+        if custo_unitario and custo_unitario > 0:
+            lote.custo_unitario = custo_unitario
+        lote.status = "ativo"
+        logger.info(f"📦 Adicionado ao lote existente: {nome_lote} (+{quantidade})")
+    else:
+        lote = ProdutoLote(
+            produto_id=produto.id,
+            nome_lote=nome_lote,
+            quantidade_inicial=quantidade,
+            quantidade_disponivel=quantidade,
+            quantidade_reservada=0,
+            data_fabricacao=data_fab,
+            data_validade=data_val,
+            custo_unitario=custo_unitario or produto.preco_custo,
+            ordem_entrada=int(datetime.now().timestamp()),
+            status="ativo",
+        )
+        db.add(lote)
+        db.flush()
+        logger.info(f"📦 Lote criado: {nome_lote}")
+
+    lote_id = lote.id
+    return lote, lote_id
+
+
 def _resolver_produto_full_nf(db: Session, tenant_id: int, item: SaidaFullNFItemRequest) -> Optional[Produto]:
     if item.produto_id:
         return db.query(Produto).filter(
@@ -896,58 +979,17 @@ def entrada_estoque(
         )
     
     estoque_anterior = produto.estoque_atual or 0
-    
-    # Controle de Lotes (OPCIONAL - só se informar número do lote)
-    lote = None
-    lote_id = None
-    
-    if entrada.numero_lote or entrada.data_validade:
-        # Se informou lote OU validade, trabalhar com controle de lote
-        nome_lote = entrada.numero_lote or f"{produto.sku or produto.codigo}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        
-        # Buscar se já existe esse lote
-        lote = db.query(ProdutoLote).filter(
-            ProdutoLote.produto_id == produto.id,
-            ProdutoLote.nome_lote == nome_lote
-        ).first()
-        
-        if lote:
-            # Lote existente: adicionar quantidade
-            lote.quantidade_disponivel += entrada.quantidade
-            logger.info(f"📦 Adicionado ao lote existente: {nome_lote} (+{entrada.quantidade})")
-        else:
-            # Criar novo lote
-            data_val = None
-            if entrada.data_validade:
-                try:
-                    data_val = datetime.strptime(entrada.data_validade, "%Y-%m-%d")
-                except:
-                    data_val = datetime.strptime(entrada.data_validade, "%d/%m/%Y")
-            
-            data_fab = None
-            if entrada.data_fabricacao:
-                try:
-                    data_fab = datetime.strptime(entrada.data_fabricacao, "%Y-%m-%d")
-                except:
-                    data_fab = datetime.strptime(entrada.data_fabricacao, "%d/%m/%Y")
-            
-            lote = ProdutoLote(
-                produto_id=produto.id,
-                nome_lote=nome_lote,
-                quantidade_inicial=entrada.quantidade,
-                quantidade_disponivel=entrada.quantidade,
-                quantidade_reservada=0,
-                data_fabricacao=data_fab,
-                data_validade=data_val,
-                custo_unitario=entrada.custo_unitario or produto.preco_custo,
-                ordem_entrada=int(datetime.now().timestamp()),
-                status='ativo'
-            )
-            db.add(lote)
-            db.flush()  # Para pegar o ID
-            logger.info(f"📦 Lote criado: {nome_lote}")
-        
-        lote_id = lote.id
+
+    # Controle de lotes: se informar lote ou validade, persiste no produto
+    lote, lote_id = _registrar_lote_entrada(
+        db=db,
+        produto=produto,
+        quantidade=entrada.quantidade,
+        custo_unitario=entrada.custo_unitario,
+        numero_lote=entrada.numero_lote,
+        data_fabricacao=entrada.data_fabricacao,
+        data_validade=entrada.data_validade,
+    )
     
     # Atualizar estoque do produto
     produto.estoque_atual = estoque_anterior + entrada.quantidade

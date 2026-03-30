@@ -514,6 +514,22 @@ Itens executados nesta etapa:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
   - NFs ja vinculadas em `vendas` e `pedidos_integrados` passam a alimentar o cache para evitar depender de trazer tudo do Bling a cada carregamento
+- [x] acompanhar a mudanca de status das NFs do Bling sem engessar o fluxo:
+  - o webhook de NF deixa de ignorar status intermediarios e passa a registrar `invoice.status_updated`
+  - o cache local da NF passa a ser atualizado mesmo quando a nota ainda nao esta em status final
+  - o pedido continua vinculado a NF ao longo da evolucao do status, e nao apenas no momento final
+- [x] parar de perder dados da NF quando o payload do Bling chega incompleto:
+  - `ultima_nf` passa a ser mesclada em vez de sobrescrita, preservando `numero`, `serie`, `chave` e `data_emissao`
+  - a reconciliacao via detalhe da NF agora preenche `numero`, `serie` e `data_emissao` no cache local
+  - notas que antes apareciam sem numero passam a ser corrigidas na proxima reconciliacao
+- [x] tratar cancelamento de NF com efeito real no estoque:
+  - cancelamento agora estorna a baixa de estoque ja feita para `pedido_integrado`
+  - lotes consumidos por FIFO sao reabertos no cancelamento, devolvendo a quantidade ao lote correto
+  - movimentacoes antigas ficam marcadas como `cancelado`, evitando estorno duplicado
+- [x] fazer lote e validade do balanco refletirem no cadastro do produto:
+  - entrada de estoque via balanco passa a ativar `controle_lote` automaticamente
+  - lote existente recebe atualizacao de quantidade inicial, quantidade disponivel, custo e validade
+  - a tela de edicao do produto passa a carregar os lotes mesmo em cadastros antigos onde o flag ainda estava desligado
 
 Itens deliberadamente adiados por agora:
 
@@ -527,6 +543,7 @@ Proximas tarefas sugeridas para execucao continua:
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
+- [ ] revisar a politica de cancelamento de NF por canal para os casos em que o produto nao deve voltar automaticamente ao estoque
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

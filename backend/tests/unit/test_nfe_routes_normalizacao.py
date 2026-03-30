@@ -5,6 +5,7 @@ from datetime import datetime
 from app.nfe_routes import (
     _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
+    _enriquecer_notas_com_detalhes_bling,
     _extrair_campos_fiscais_do_xml,
     _extrair_valor_nota,
     _normalizar_detalhe_nota_bling,
@@ -211,6 +212,57 @@ def test_normalizar_nota_pedido_integrado_descarta_id_zero_da_nf():
     assert nota is not None
     assert nota["id"] == ""
     assert nota["numero"] == "011009"
+
+
+def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_incompleto(monkeypatch):
+    class FakeBling:
+        pass
+
+    notas = [
+        {
+            "id": "25432772133",
+            "numero": "",
+            "serie": "",
+            "modelo": 55,
+            "status": "Pendente",
+            "valor": 0,
+            "canal_label": None,
+            "loja": {"id": None, "nome": None},
+            "origem_loja_virtual": None,
+            "numero_pedido_loja": None,
+            "chave": "",
+            "cliente": {},
+        }
+    ]
+    detalhe = {
+        "id": 25432772133,
+        "numero": "011008",
+        "serie": 2,
+        "situacao": 5,
+        "valorNota": 440.13,
+        "chaveAcesso": "CHAVE-123",
+        "contato": {"nome": "Leonardo"},
+        "numeroPedidoLoja": "2000015755197092",
+    }
+    upserts = []
+
+    monkeypatch.setattr("app.nfe_routes._obter_detalhe_nfe_cache", lambda tenant_id, nfe_id, modelo=None: detalhe)
+    monkeypatch.setattr("app.nfe_routes.obter_detalhe_nota_cache", lambda **kwargs: detalhe)
+    monkeypatch.setattr("app.nfe_routes.upsert_nota_cache", lambda *args, **kwargs: upserts.append(kwargs))
+
+    _enriquecer_notas_com_detalhes_bling(
+        FakeBling(),
+        db=Mock(),
+        tenant_id="tenant-1",
+        notas=notas,
+        limite_consultas=10,
+    )
+
+    assert notas[0]["numero"] == "011008"
+    assert notas[0]["serie"] == "2"
+    assert notas[0]["status"] == "Autorizada"
+    assert notas[0]["chave"] == "CHAVE-123"
+    assert upserts
 
 
 def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():

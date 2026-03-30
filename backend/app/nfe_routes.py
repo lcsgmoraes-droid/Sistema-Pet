@@ -1538,6 +1538,10 @@ def _enriquecer_notas_com_detalhes_bling(
         except (TypeError, ValueError):
             valor_atual = 0.0
 
+        status_atual = _texto(nota.get("status")).lower()
+        precisa_numero = not _texto(nota.get("numero"))
+        precisa_chave = not _texto(nota.get("chave"))
+        precisa_reconciliar_status = status_atual in {"pendente", "emitida danfe"}
         precisa_resumo_canal = not any(
             (
                 nota.get("canal_label"),
@@ -1547,7 +1551,13 @@ def _enriquecer_notas_com_detalhes_bling(
             )
         )
 
-        if valor_atual > 0 and not precisa_resumo_canal:
+        if (
+            valor_atual > 0
+            and not precisa_resumo_canal
+            and not precisa_numero
+            and not precisa_chave
+            and not precisa_reconciliar_status
+        ):
             continue
 
         nota_id = _coerce_int(nota.get("id"), 0)
@@ -1577,6 +1587,13 @@ def _enriquecer_notas_com_detalhes_bling(
                     fetched_remotamente = True
             if not _detalhe_nota_valido(detalhe):
                 continue
+            nota["numero"] = _texto(_primeiro_preenchido(detalhe.get("numero"), nota.get("numero"))) or ""
+            nota["serie"] = _texto(_primeiro_preenchido(detalhe.get("serie"), nota.get("serie"))) or ""
+            nota["data_emissao"] = _primeiro_preenchido(
+                detalhe.get("dataEmissao"),
+                detalhe.get("data_emissao"),
+                nota.get("data_emissao"),
+            )
             nota["valor"] = _extrair_valor_nota(detalhe) or nota.get("valor") or 0.0
             nota["status"] = _status_nota_bling(detalhe)
             nota["chave"] = detalhe.get("chaveAcesso") or nota.get("chave") or ""
@@ -1602,7 +1619,13 @@ def _enriquecer_notas_com_detalhes_bling(
             nota["origem_canal_venda"] = nota.get("origem_canal_venda") or resumo_canal.get("origem_canal_venda")
             nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or resumo_canal.get("numero_pedido_loja")
             nota["pedido_bling_id_ref"] = nota.get("pedido_bling_id_ref") or resumo_canal.get("pedido_bling_id_ref")
-            if fetched_remotamente:
+            if (
+                fetched_remotamente
+                or precisa_numero
+                or precisa_chave
+                or precisa_resumo_canal
+                or precisa_reconciliar_status
+            ):
                 upsert_nota_cache(
                     db,
                     tenant_id,

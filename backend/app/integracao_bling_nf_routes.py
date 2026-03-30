@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
+from app.services.nfe_cache_service import upsert_nota_cache
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.services.bling_nf_service import (
@@ -44,6 +45,91 @@ _NF_SITUACAO_CANCELADA  = {4}
 
 def _dict(value) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _texto(value) -> str | None:
+    if value is None:
+        return None
+    texto = str(value).strip()
+    return texto or None
+
+
+def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
+    atual = _dict(atual)
+    nova = _dict(nova)
+    mesclada = dict(atual)
+    for chave, valor in nova.items():
+        if valor in (None, "", [], {}):
+            continue
+        mesclada[chave] = valor
+    return mesclada
+
+
+def _modelo_nota_bling(nf_data: dict | None) -> int:
+    nf_data = _dict(nf_data)
+    for candidato in (
+        nf_data.get("modelo"),
+        nf_data.get("modeloDocumento"),
+        nf_data.get("modelo_nf"),
+    ):
+        texto = _texto(candidato)
+        if texto in {"55", "65"}:
+            return int(texto)
+
+    tipo = (_texto(nf_data.get("tipo")) or "").lower()
+    if "nfce" in tipo:
+        return 65
+    return 55
+
+
+def _status_nota_webhook(nf_data: dict | None, situacao_num: int | None = None) -> str | None:
+    nf_data = _dict(nf_data)
+    try:
+        from app.nfe_routes import _status_nota_bling
+
+        if nf_data:
+            return _status_nota_bling(nf_data)
+        if situacao_num is not None:
+            return _status_nota_bling({"situacao": situacao_num})
+    except Exception:
+        pass
+
+    if situacao_num in _NF_SITUACAO_CANCELADA:
+        return "Cancelada"
+    if situacao_num in _NF_SITUACAO_AUTORIZADA:
+        return "Autorizada"
+    if situacao_num == 1:
+        return "Pendente"
+    return _texto(_dict(nf_data.get("situacao")).get("descricao")) or _texto(nf_data.get("status")) or "Pendente"
+
+
+def _atualizar_cache_nota_webhook(
+    *,
+    db: Session,
+    tenant_id,
+    nf_data: dict | None,
+    source: str,
+) -> None:
+    nf_data = _dict(nf_data)
+    nf_id = _texto(nf_data.get("id"))
+    if not tenant_id or not nf_id:
+        return
+
+    try:
+        from app.nfe_routes import _normalizar_nota_bling
+
+        modelo = _modelo_nota_bling(nf_data)
+        nota = _normalizar_nota_bling({**nf_data, "id": nf_id}, modelo=modelo)
+        upsert_nota_cache(
+            db,
+            tenant_id,
+            nota,
+            source=source,
+            resumo_payload=nf_data,
+            detalhe_payload=nf_data,
+        )
+    except Exception as exc:
+        logger.warning(f"[BLING NF] Falha ao atualizar cache local da NF {nf_id}: {exc}")
 
 
 def _query_itens_sem_produto(db: Session, tenant_id):
@@ -280,23 +366,30 @@ def _consultar_relacao_nf_bling(nf_id: str, situacao_num: int) -> dict:
 
 def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, situacao_num: int) -> None:
     payload_atual = pedido.payload if isinstance(pedido.payload, dict) else {}
+    ultima_nf_atual = _dict(payload_atual.get("ultima_nf"))
+    status_nf = _status_nota_webhook(data, situacao_num)
     pedido.payload = {
         **payload_atual,
-        "ultima_nf": {
-            "id": nf_id,
-            "numero": data.get("numero"),
-            "serie": data.get("serie"),
-            "situacao": data.get("situacao"),
-            "situacao_codigo": situacao_num,
-            "chave": data.get("chaveAcesso") or data.get("chave"),
-            "data_emissao": data.get("dataEmissao") or data.get("data_emissao"),
-            "valor_total": (
-                data.get("valorNota")
-                or data.get("valorTotalNf")
-                or data.get("valor_total")
-                or data.get("valorTotal")
-            ),
-        },
+        "ultima_nf": _mesclar_ultima_nf(
+            ultima_nf_atual,
+            {
+                "id": nf_id,
+                "numero": data.get("numero"),
+                "serie": data.get("serie"),
+                "situacao": status_nf,
+                "situacao_codigo": situacao_num,
+                "chave": data.get("chaveAcesso") or data.get("chave"),
+                "data_emissao": data.get("dataEmissao") or data.get("data_emissao"),
+                "valor_total": (
+                    data.get("valorNota")
+                    or data.get("valorTotalNf")
+                    or data.get("valor_total")
+                    or data.get("valorTotal")
+                ),
+                "modelo": _modelo_nota_bling(data),
+                "tipo": "nfce" if _modelo_nota_bling(data) == 65 else "nfe",
+            },
+        ),
     }
 
 
@@ -377,29 +470,20 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     except (TypeError, ValueError):
         situacao_num = 0
 
-    # Ignorar eventos que não são emissão ou cancelamento
-    if situacao_num not in _NF_SITUACAO_AUTORIZADA and situacao_num not in _NF_SITUACAO_CANCELADA:
-        if tenant_id_monitor:
-            registrar_evento(
-                tenant_id=tenant_id_monitor,
-                source="webhook",
-                event_type=event or "invoice.updated",
-                entity_type="nf",
-                status="ignored",
-                severity="info",
-                message=f"Webhook de NF ignorado porque a situacao {situacao_num} nao exige processamento local.",
-                nf_bling_id=nf_id,
-                payload=_dict(data),
-                processed_at=event_date,
-            )
-        logger.info(f"[BLING NF] Webhook ignorado para NF {nf_id} com situacao={situacao_num}")
-        return {"status": "ignorado", "motivo": f"situacao_{situacao_num}_nao_tratada"}
-
     # Buscar NF completa na API do Bling para obter o pedido vinculado
     nf_relacao = _consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num)
+    nf_dados = _dict(nf_relacao.get("nf_completa")) or _dict(data)
     pedido_bling_id = nf_relacao.get("pedido_bling_id")
     pedido_bling_numero = nf_relacao.get("pedido_bling_numero")
     numero_pedido_loja = nf_relacao.get("numero_pedido_loja")
+
+    if tenant_id_monitor:
+        _atualizar_cache_nota_webhook(
+            db=db,
+            tenant_id=tenant_id_monitor,
+            nf_data=nf_dados,
+            source="bling_webhook_nf",
+        )
 
     if tenant_id_monitor:
         registrar_evento(
@@ -414,6 +498,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             nf_bling_id=nf_id,
             payload={
                 **_dict(data),
+                "status_nf": _status_nota_webhook(nf_dados, situacao_num),
                 "pedido_bling_numero": pedido_bling_numero,
                 "numero_pedido_loja": numero_pedido_loja,
             },
@@ -462,7 +547,11 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 },
                 source="runtime",
             )
-        return {"status": "ignorado", "motivo": "nf_sem_pedido_vinculado"}
+        return {
+            "status": "ok",
+            "acao": "nf_registrada_sem_pedido_vinculado",
+            "situacao": _status_nota_webhook(nf_dados, situacao_num),
+        }
 
     if not pedido:
         if tenant_id_monitor:
@@ -483,15 +572,26 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 },
                 source="runtime",
             )
-        return {"status": "ignorado", "motivo": "pedido_nao_encontrado_no_sistema"}
+        return {
+            "status": "ok",
+            "acao": "nf_registrada_sem_pedido_local",
+            "situacao": _status_nota_webhook(nf_dados, situacao_num),
+        }
+
+    if pedido.tenant_id != tenant_id_monitor:
+        _atualizar_cache_nota_webhook(
+            db=db,
+            tenant_id=pedido.tenant_id,
+            nf_data=nf_dados,
+            source="bling_webhook_nf",
+        )
 
     _registrar_nf_no_pedido(
         pedido=pedido,
-        data=nf_relacao.get("nf_completa") or data,
+        data=nf_dados,
         nf_id=nf_id,
         situacao_num=situacao_num,
     )
-    nf_dados = nf_relacao.get("nf_completa") or data
     nf_numero = str(_dict(nf_dados).get("numero") or "").strip() or None
     registrar_vinculo_nf_pedido(
         pedido=pedido,
@@ -517,7 +617,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     if situacao_num in _NF_SITUACAO_AUTORIZADA:
         acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
-        _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=data)
+        _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=nf_dados)
         registrar_evento(
             tenant_id=pedido.tenant_id,
             source="webhook",
@@ -548,7 +648,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # NF CANCELADA
     # ============================
     if situacao_num in _NF_SITUACAO_CANCELADA:
-        acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens)
+        acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         registrar_evento(
             tenant_id=pedido.tenant_id,
             source="webhook",
@@ -570,7 +670,35 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         )
         return {"status": "ok", "acao": acao}
 
-    return {"status": "ignorado", "motivo": "status_nf_desconhecido"}
+    db.add(pedido)
+    db.commit()
+
+    status_nf = _status_nota_webhook(nf_dados, situacao_num) or "Pendente"
+    registrar_evento(
+        tenant_id=pedido.tenant_id,
+        source="webhook",
+        event_type="invoice.status_updated",
+        entity_type="nf",
+        status="ok",
+        severity="info",
+        message="Status da NF atualizado e vinculo com o pedido mantido no sistema.",
+        pedido_integrado_id=pedido.id,
+        pedido_bling_id=pedido.pedido_bling_id,
+        nf_bling_id=nf_id,
+        payload={
+            "acao": "status_nf_atualizado",
+            "status_nf": status_nf,
+            "nf_numero": nf_numero,
+            "numero_pedido_loja": numero_pedido_loja,
+            "pedido_status_atual": pedido.status,
+        },
+        processed_at=event_date,
+    )
+    return {
+        "status": "ok",
+        "acao": "status_nf_atualizado",
+        "situacao": status_nf,
+    }
 
 
 # ============================================================

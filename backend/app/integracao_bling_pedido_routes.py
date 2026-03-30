@@ -147,6 +147,20 @@ def _payload_principal(payload: dict | None) -> dict:
     return payload
 
 
+def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
+    atual = _dict(atual)
+    nova = _dict(nova)
+    if not atual and not nova:
+        return None
+
+    mesclada = dict(atual)
+    for chave, valor in nova.items():
+        if valor in (None, "", [], {}):
+            continue
+        mesclada[chave] = valor
+    return mesclada
+
+
 def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | None, payload_atual: dict | None = None, ultima_nf: dict | None = None) -> dict:
     payload = dict(_dict(payload_atual))
     if isinstance(webhook_data, dict) and webhook_data:
@@ -154,7 +168,7 @@ def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | No
     pedido_base = pedido_completo if isinstance(pedido_completo, dict) and pedido_completo else _payload_principal(payload) or _dict(webhook_data)
     payload["pedido"] = pedido_base
     if ultima_nf:
-        payload["ultima_nf"] = ultima_nf
+        payload["ultima_nf"] = _mesclar_ultima_nf(payload.get("ultima_nf"), ultima_nf)
     return payload
 
 

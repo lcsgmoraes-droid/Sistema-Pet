@@ -503,10 +503,17 @@ export default function ProdutosNovo() {
         setImagens([]);
       }
 
-      // Carregar lotes
-      if (produto.controle_lote) {
+      // Carregar lotes mesmo se o flag antigo ainda estiver desligado.
+      try {
         const lotesRes = await getLotes(id);
-        setLotes(lotesRes.data);
+        const lotesCarregados = lotesRes.data || [];
+        setLotes(lotesCarregados);
+        if (lotesCarregados.length > 0 && !produto.controle_lote) {
+          setFormData(prev => ({ ...prev, controle_lote: true }));
+        }
+      } catch (error) {
+        console.error('Erro ao carregar lotes:', error);
+        setLotes([]);
       }
 
       // Carregar fornecedores
