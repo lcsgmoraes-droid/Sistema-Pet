@@ -494,6 +494,9 @@ Itens executados nesta etapa:
   - modal de desconto por item movido para `frontend/src/components/pdv/PDVDescontoItemModal.jsx`
   - modal de desconto total movido para `frontend/src/components/pdv/PDVDescontoTotalModal.jsx`
   - `PDV.jsx` ficou mais focado na orquestracao do estado e dos callbacks desses modais
+- [x] avancar no corpo principal do `PDV.jsx` sem alterar a interface:
+  - card de cliente movido para `frontend/src/components/pdv/PDVClienteCard.jsx`
+  - `PDV.jsx` ficou responsavel apenas por passar o estado, os handlers e as acoes desse fluxo
 
 Itens deliberadamente adiados por agora:
 
