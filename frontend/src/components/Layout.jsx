@@ -527,22 +527,16 @@ const Layout = () => {
       ],
     }, // Vinculado a vendas
     {
-      path: "/vendas/bling",
+      path: "/vendas/bling-pedidos",
       icon: FiShoppingBag,
       label: "Pedidos Bling",
       permission: "compras.sincronizacao_bling",
-      submenu: [
-        {
-          path: "/vendas/bling-pedidos",
-          label: "Pedidos Bling",
-          permission: "compras.sincronizacao_bling",
-        },
-        {
-          path: "/vendas/bling-monitor",
-          label: "Monitor Bling",
-          permission: "compras.sincronizacao_bling",
-        },
-      ],
+    },
+    {
+      path: "/vendas/bling-monitor",
+      icon: FiTrendingUp,
+      label: "Monitor Bling",
+      permission: "compras.sincronizacao_bling",
     },
     {
       path: "/compras",
