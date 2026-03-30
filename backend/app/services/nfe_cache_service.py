@@ -203,7 +203,7 @@ def upsert_nota_cache(
     detalhe_payload: dict | None = None,
 ) -> BlingNotaFiscalCache | None:
     bling_id = _texto(nota.get("id"))
-    if not bling_id:
+    if not bling_id or bling_id in {"0", "-1"}:
         return None
 
     modelo = _coerce_int(nota.get("modelo"), 55)

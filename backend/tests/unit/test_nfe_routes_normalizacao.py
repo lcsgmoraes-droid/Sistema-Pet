@@ -183,6 +183,36 @@ def test_normalizar_nota_pedido_integrado_usa_ultima_nf_salva_no_payload():
     assert nota["cliente"]["nome"] == "Leonardo Marcal Valles"
 
 
+def test_normalizar_nota_pedido_integrado_descarta_id_zero_da_nf():
+    pedido = SimpleNamespace(
+        id=124,
+        tenant_id="tenant-1",
+        pedido_bling_id="25432947366",
+        pedido_bling_numero="11610",
+        canal="shopee",
+        created_at=None,
+        updated_at=None,
+        payload={
+            "pedido": {
+                "numeroPedidoLoja": "260329CBKA46J1",
+                "contato": {"nome": "Cliente Teste"},
+            },
+            "ultima_nf": {
+                "id": "0",
+                "numero": "011009",
+                "situacao_codigo": 9,
+                "valor_total": 36.10,
+            },
+        },
+    )
+
+    nota = _normalizar_nota_pedido_integrado(pedido)
+
+    assert nota is not None
+    assert nota["id"] == ""
+    assert nota["numero"] == "011009"
+
+
 def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
     venda = SimpleNamespace(
         id=123,

@@ -1172,7 +1172,7 @@ def _normalizar_nota_pedido_integrado(pedido: PedidoIntegrado) -> dict | None:
     contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
 
     nf_bling_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
-    if nf_bling_id == "-1":
+    if nf_bling_id in {"-1", "0"}:
         nf_bling_id = None
     nf_numero = _texto(ultima_nf.get("numero"))
 
