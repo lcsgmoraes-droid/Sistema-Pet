@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.integracao_bling_nf_routes import (
+    _registrar_nf_no_pedido,
     _localizar_pedido_local_por_numero_bling,
     _localizar_pedido_local_por_numero_loja,
 )
@@ -221,3 +222,25 @@ def test_localiza_pedido_por_numero_bling():
     )
 
     assert encontrado is pedido
+
+
+def test_registrar_nf_no_pedido_salva_data_emissao():
+    pedido = SimpleNamespace(payload={})
+
+    _registrar_nf_no_pedido(
+        pedido=pedido,
+        data={
+            "numero": "011008",
+            "serie": "2",
+            "situacao": 5,
+            "chaveAcesso": "CHAVE-TESTE",
+            "valorTotalNf": 440.13,
+            "dataEmissao": "2026-03-30",
+        },
+        nf_id="25432772133",
+        situacao_num=5,
+    )
+
+    assert pedido.payload["ultima_nf"]["id"] == "25432772133"
+    assert pedido.payload["ultima_nf"]["numero"] == "011008"
+    assert pedido.payload["ultima_nf"]["data_emissao"] == "2026-03-30"

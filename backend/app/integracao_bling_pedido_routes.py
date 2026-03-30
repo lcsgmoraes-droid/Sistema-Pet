@@ -165,6 +165,7 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
         "id": _texto(nf_data.get("id")),
         "numero": _texto(nf_data.get("numero")),
         "serie": _texto(nf_data.get("serie")),
+        "data_emissao": _texto(_primeiro_preenchido(nf_data.get("dataEmissao"), nf_data.get("data_emissao"))),
         "situacao": _texto(
             _primeiro_preenchido(
                 situacao_nf.get("descricao"),

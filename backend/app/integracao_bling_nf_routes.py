@@ -42,6 +42,10 @@ _NF_SITUACAO_AUTORIZADA = {2, 5, 9}
 _NF_SITUACAO_CANCELADA  = {4}
 
 
+def _dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
 def _query_itens_sem_produto(db: Session, tenant_id):
     from app.produtos_models import Produto
 
@@ -285,6 +289,7 @@ def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, sit
             "situacao": data.get("situacao"),
             "situacao_codigo": situacao_num,
             "chave": data.get("chaveAcesso") or data.get("chave"),
+            "data_emissao": data.get("dataEmissao") or data.get("data_emissao"),
             "valor_total": (
                 data.get("valorNota")
                 or data.get("valorTotalNf")
@@ -351,6 +356,19 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
 
     nf_id = str(data.get("id", ""))
     if not nf_id or nf_id == "None":
+        if tenant_id_monitor:
+            registrar_evento(
+                tenant_id=tenant_id_monitor,
+                source="webhook",
+                event_type=event or "invoice.updated",
+                entity_type="nf",
+                status="ignored",
+                severity="warning",
+                message="Webhook de NF ignorado porque chegou sem id da nota.",
+                payload=_dict(data) or _dict(body),
+                processed_at=event_date,
+            )
+        logger.info(f"[BLING NF] Webhook ignorado sem id. event={event}")
         return {"status": "ignorado", "motivo": "sem_id"}
 
     situacao_num = data.get("situacao")
@@ -361,6 +379,20 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
 
     # Ignorar eventos que não são emissão ou cancelamento
     if situacao_num not in _NF_SITUACAO_AUTORIZADA and situacao_num not in _NF_SITUACAO_CANCELADA:
+        if tenant_id_monitor:
+            registrar_evento(
+                tenant_id=tenant_id_monitor,
+                source="webhook",
+                event_type=event or "invoice.updated",
+                entity_type="nf",
+                status="ignored",
+                severity="info",
+                message=f"Webhook de NF ignorado porque a situacao {situacao_num} nao exige processamento local.",
+                nf_bling_id=nf_id,
+                payload=_dict(data),
+                processed_at=event_date,
+            )
+        logger.info(f"[BLING NF] Webhook ignorado para NF {nf_id} com situacao={situacao_num}")
         return {"status": "ignorado", "motivo": f"situacao_{situacao_num}_nao_tratada"}
 
     # Buscar NF completa na API do Bling para obter o pedido vinculado

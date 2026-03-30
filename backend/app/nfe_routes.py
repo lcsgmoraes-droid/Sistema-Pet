@@ -1046,6 +1046,158 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
     }
 
 
+def _parse_data_referencia(value) -> datetime | None:
+    texto = _texto(value)
+    if not texto:
+        return None
+
+    candidatos = [
+        texto,
+        texto.replace("Z", "+00:00"),
+        texto.split("T")[0],
+    ]
+    for candidato in candidatos:
+        try:
+            return datetime.fromisoformat(candidato)
+        except ValueError:
+            continue
+
+    for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(texto[:10], formato)
+        except ValueError:
+            continue
+    return None
+
+
+def _status_local_ultima_nf(ultima_nf: dict) -> str:
+    situacao_textual = _texto(_primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status")))
+    if situacao_textual:
+        if situacao_textual.isdigit():
+            return _STATUS_MAP.get(_coerce_int(situacao_textual, 0), situacao_textual)
+        return situacao_textual
+
+    situacao_codigo = _coerce_int(ultima_nf.get("situacao_codigo"), 0)
+    return _STATUS_MAP.get(situacao_codigo, "Pendente")
+
+
+def _normalizar_nota_pedido_integrado(pedido: PedidoIntegrado) -> dict | None:
+    payload = _dict(pedido.payload)
+    pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
+    ultima_nf = _dict(
+        _primeiro_preenchido(
+            payload.get("ultima_nf"),
+            pedido_payload.get("notaFiscal"),
+            pedido_payload.get("nota"),
+            pedido_payload.get("nfe"),
+        )
+    )
+    resumo = _resumo_pedido_integrado(pedido)
+    contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
+
+    nf_bling_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
+    if nf_bling_id == "-1":
+        nf_bling_id = None
+    nf_numero = _texto(ultima_nf.get("numero"))
+
+    if not nf_bling_id and not nf_numero:
+        return None
+
+    data_emissao = _primeiro_preenchido(
+        ultima_nf.get("dataEmissao"),
+        ultima_nf.get("data_emissao"),
+        ultima_nf.get("dataEmissaoNf"),
+        ultima_nf.get("data"),
+        pedido.updated_at.isoformat() if getattr(pedido, "updated_at", None) else None,
+        pedido.created_at.isoformat() if getattr(pedido, "created_at", None) else None,
+    )
+
+    return {
+        "id": str(nf_bling_id or ""),
+        "venda_id": None,
+        "numero": nf_numero,
+        "serie": _texto(ultima_nf.get("serie")),
+        "tipo": "nfe",
+        "tipo_codigo": 0,
+        "modelo": 55,
+        "chave": _texto(_primeiro_preenchido(ultima_nf.get("chave"), ultima_nf.get("chaveAcesso"))),
+        "status": _status_local_ultima_nf(ultima_nf),
+        "data_emissao": data_emissao,
+        "valor": _coerce_float(
+            _primeiro_preenchido(ultima_nf.get("valor_total"), resumo.get("valor_total")),
+            0.0,
+        ),
+        "cliente": {
+            "id": contato.get("id"),
+            "nome": _texto_relacionado(contato, fallback_to_id=False),
+            "cpf_cnpj": _texto(_primeiro_preenchido(contato.get("cpf"), contato.get("cnpj"), contato.get("cpfCnpj"))),
+        },
+        "canal": resumo.get("canal"),
+        "canal_label": resumo.get("canal_label"),
+        "loja": resumo.get("loja"),
+        "unidade_negocio": {"id": None, "nome": None},
+        "numero_loja_virtual": resumo.get("numero_loja_virtual"),
+        "origem_loja_virtual": resumo.get("origem_loja_virtual"),
+        "origem_canal_venda": resumo.get("origem_canal_venda"),
+        "numero_pedido_loja": resumo.get("numero_pedido_loja"),
+        "pedido_bling_id_ref": _texto(pedido.pedido_bling_id),
+        "origem": "pedido_integrado",
+    }
+
+
+def _adicionar_notas_de_pedidos_integrados(
+    db: Session,
+    tenant_id,
+    notas: list[dict],
+    *,
+    situacao: str | None = None,
+    data_inicial: str | None = None,
+    data_final: str | None = None,
+    limite_scan: int = 3000,
+) -> None:
+    pedidos = (
+        db.query(PedidoIntegrado)
+        .filter(PedidoIntegrado.tenant_id == tenant_id)
+        .order_by(PedidoIntegrado.updated_at.desc(), PedidoIntegrado.created_at.desc())
+        .limit(limite_scan)
+        .all()
+    )
+
+    data_inicial_ref = _parse_data_referencia(data_inicial)
+    data_final_ref = _parse_data_referencia(data_final)
+    chaves_existentes = {
+        (
+            _texto(nota.get("id")) or "",
+            _texto(nota.get("numero")) or "",
+        )
+        for nota in notas
+    }
+
+    for pedido in pedidos:
+        nota = _normalizar_nota_pedido_integrado(pedido)
+        if not nota:
+            continue
+
+        chave_nota = (
+            _texto(nota.get("id")) or "",
+            _texto(nota.get("numero")) or "",
+        )
+        if chave_nota in chaves_existentes:
+            continue
+
+        if situacao and str(nota.get("status") or "").lower() != situacao.lower():
+            continue
+
+        data_nota = _parse_data_referencia(nota.get("data_emissao"))
+        if data_inicial_ref and data_nota and data_nota.date() < data_inicial_ref.date():
+            continue
+        if data_final_ref and data_nota and data_nota.date() > data_final_ref.date():
+            continue
+
+        notas.append(nota)
+        chaves_existentes.add(chave_nota)
+
+
 def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list[dict], limite_scan: int = 3000) -> None:
     identificadores_desejados: set[str] = set()
     for nota in notas:
@@ -1474,6 +1626,20 @@ async def listar_nfes(
             })
     except Exception as e:
         logger.warning("listar_nfes", f"Erro ao consultar NFs locais: {e}")
+
+    # ── 4. Fallback / complemento: NFs já vinculadas nos pedidos integrados ─
+    # Mantém a tela útil mesmo quando a listagem direta do Bling estiver sob rate limit.
+    try:
+        _adicionar_notas_de_pedidos_integrados(
+            db,
+            tenant_id,
+            notas,
+            situacao=situacao,
+            data_inicial=data_inicial,
+            data_final=data_final,
+        )
+    except Exception as e:
+        logger.warning("listar_nfes", f"Erro ao complementar NFs via pedidos integrados: {e}")
 
     # Ordenar por data (mais recente primeiro)
     def _key_data(n):

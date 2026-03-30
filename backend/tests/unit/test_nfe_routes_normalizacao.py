@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from app.nfe_routes import (
+    _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
     _extrair_campos_fiscais_do_xml,
     _extrair_valor_nota,
@@ -137,6 +138,47 @@ def test_normalizar_resumo_canal_mapeia_loja_id_conhecida_para_mercado_livre():
     assert resumo["canal"] == "mercado_livre"
     assert resumo["canal_label"] == "Mercado Livre"
     assert resumo["origem_loja_virtual"] == "Mercado Livre"
+
+
+def test_normalizar_nota_pedido_integrado_usa_ultima_nf_salva_no_payload():
+    pedido = SimpleNamespace(
+        id=123,
+        tenant_id="tenant-1",
+        pedido_bling_id="25432947365",
+        pedido_bling_numero="11609",
+        canal="mercado_livre",
+        created_at=None,
+        updated_at=None,
+        payload={
+            "pedido": {
+                "numeroPedidoLoja": "2000015755197092",
+                "origemLojaVirtual": "Mercado Livre",
+                "contato": {
+                    "nome": "Leonardo Marcal Valles",
+                    "cpfCnpj": "12345678900",
+                },
+            },
+            "ultima_nf": {
+                "id": "25432772133",
+                "numero": "011008",
+                "serie": "2",
+                "situacao_codigo": 9,
+                "valor_total": 440.13,
+                "chave": "35123456789012345678901234567890123456789012",
+                "data_emissao": "2026-03-30",
+            },
+        },
+    )
+
+    nota = _normalizar_nota_pedido_integrado(pedido)
+
+    assert nota is not None
+    assert nota["id"] == "25432772133"
+    assert nota["numero"] == "011008"
+    assert nota["status"] == "Autorizada"
+    assert nota["valor"] == 440.13
+    assert nota["numero_pedido_loja"] == "2000015755197092"
+    assert nota["cliente"]["nome"] == "Leonardo Marcal Valles"
 
 
 def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():

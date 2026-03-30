@@ -34,6 +34,7 @@ def test_resumir_ultima_nf_webhook_captura_valor_total_da_nota():
             "id": "25428517969",
             "numero": "010984",
             "serie": "1",
+            "dataEmissao": "2026-03-29",
             "situacao": {"valor": 5, "descricao": "Autorizada"},
             "chaveAcesso": "CHAVE-XYZ",
             "valorTotalNf": 166.90,
@@ -42,6 +43,7 @@ def test_resumir_ultima_nf_webhook_captura_valor_total_da_nota():
 
     assert resumo["id"] == "25428517969"
     assert resumo["numero"] == "010984"
+    assert resumo["data_emissao"] == "2026-03-29"
     assert resumo["situacao"] == "Autorizada"
     assert resumo["situacao_codigo"] == 5
     assert resumo["valor_total"] == 166.90
