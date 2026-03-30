@@ -476,6 +476,9 @@ Itens executados nesta etapa:
   - modal de cadastro rapido movido para `frontend/src/components/pdv/ModalCadastroCliente.jsx`
   - persistencia de paineis movida para `frontend/src/hooks/usePersistentBooleanState.js`
   - `PDV.jsx` reduzido sem alterar o fluxo principal de venda
+- [x] continuar a decomposicao do `PDV.jsx` sem alterar a interface:
+  - sidebar de vendas recentes movida para `frontend/src/components/pdv/PDVVendasRecentesSidebar.jsx`
+  - `PDV.jsx` ficou responsavel apenas pelo estado e pelos handlers da sidebar
 
 Itens deliberadamente adiados por agora:
 
