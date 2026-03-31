@@ -516,3 +516,30 @@ def test_reconciliar_pedido_confirmado_busca_nf_autorizada_no_cache_local(monkey
     assert detalhes["nf_id"] == "25428517969"
     assert pedido.payload["ultima_nf"]["numero"] == "010983"
     assert chamadas["nf_id"] == "25428517969"
+
+
+def test_reconciliar_pedido_confirmado_trata_nf_conflitante_como_remediacao_sucesso(monkeypatch):
+    pedido = SimpleNamespace(
+        id=1099,
+        tenant_id="tenant-1",
+        pedido_bling_id="25441648300",
+        pedido_bling_numero="11732",
+        status="confirmado",
+        confirmado_em=None,
+        payload={
+            "ultima_nf": {"id": "25441651448", "numero": "011089", "situacao": "Autorizada"},
+        },
+    )
+    item = SimpleNamespace(sku="019516.1/1", quantidade=1, vendido_em=None)
+    db = Mock()
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        lambda **kwargs: "nf_vinculada_outro_pedido",
+    )
+
+    sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, [item])
+
+    assert sucesso is True
+    assert detalhes["acao"] == "nf_vinculada_outro_pedido"
+    assert detalhes["motivo"] == "nf_incorreta_removida_do_pedido"

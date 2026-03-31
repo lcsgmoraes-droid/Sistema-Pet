@@ -252,6 +252,153 @@ def _nf_cache_pertence_a_outro_pedido(
     return None
 
 
+def _restaurar_lotes_consumidos(db: Session, movimentacao: EstoqueMovimentacao) -> int:
+    from app.produtos_models import ProdutoLote
+
+    bruto = getattr(movimentacao, "lotes_consumidos", None)
+    if not bruto:
+        return 0
+    try:
+        lotes = json.loads(bruto) if isinstance(bruto, str) else bruto
+    except Exception:
+        lotes = []
+
+    restaurados = 0
+    for item_lote in lotes or []:
+        lote_id = item_lote.get("lote_id")
+        quantidade = float(item_lote.get("quantidade") or 0)
+        if not lote_id or quantidade <= 0:
+            continue
+
+        lote = db.query(ProdutoLote).filter(ProdutoLote.id == lote_id).first()
+        if not lote:
+            continue
+
+        lote.quantidade_disponivel = float(lote.quantidade_disponivel or 0) + quantidade
+        if lote.quantidade_disponivel > 0:
+            lote.status = "ativo"
+        db.add(lote)
+        restaurados += 1
+
+    return restaurados
+
+
+def desvincular_nf_de_pedido_incorreto(
+    db: Session,
+    *,
+    pedido: PedidoIntegrado,
+    itens: list[PedidoIntegradoItem],
+    nf_id: str | None = None,
+    nf_numero: str | None = None,
+    pedido_bling_id_esperado: str | None = None,
+) -> dict:
+    from app.estoque.service import EstoqueService
+    from app.integracao_bling_nf_routes import _remover_nf_do_pedido
+
+    pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
+    nf_id = _text(nf_id)
+    nf_numero = _text(nf_numero) or _numero_nf_pedido(pedido, nf_id)
+    pedido_bling_id_esperado = _text(pedido_bling_id_esperado)
+
+    movimentos = (
+        db.query(EstoqueMovimentacao)
+        .filter(
+            EstoqueMovimentacao.tenant_id == pedido.tenant_id,
+            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
+            EstoqueMovimentacao.referencia_id == pedido.id,
+            EstoqueMovimentacao.tipo == "saida",
+            EstoqueMovimentacao.status != "cancelado",
+        )
+        .order_by(EstoqueMovimentacao.id.asc())
+        .all()
+    )
+    movimentos_nf = [
+        mov
+        for mov in movimentos
+        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_id)
+    ]
+
+    usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
+    user_id_execucao = getattr(usuario_padrao, "id", None)
+
+    movimentos_cancelados = 0
+    estornos_criados = 0
+    itens_reabertos = 0
+    lotes_restaurados = 0
+
+    for movimentacao in movimentos_nf:
+        lotes_restaurados += _restaurar_lotes_consumidos(db, movimentacao)
+
+        user_id_movimentacao = getattr(movimentacao, "user_id", None) or user_id_execucao
+        if not user_id_movimentacao:
+            raise ValueError(
+                f"Nenhum usuario valido disponivel para estornar a movimentacao {movimentacao.id} "
+                f"do pedido {pedido.id}."
+            )
+
+        EstoqueService.estornar_estoque(
+            produto_id=movimentacao.produto_id,
+            quantidade=float(movimentacao.quantidade or 0),
+            motivo="nf_vinculada_pedido_incorreto",
+            referencia_id=pedido.id,
+            referencia_tipo="pedido_integrado",
+            user_id=user_id_movimentacao,
+            db=db,
+            tenant_id=pedido.tenant_id,
+            documento=nf_numero or nf_id,
+            observacao=(
+                f"Estorno automatico por desvinculo da NF {nf_numero or nf_id} "
+                f"do pedido incorreto {pedido.pedido_bling_numero or pedido.pedido_bling_id}"
+            ),
+        )
+        for kit_id, _estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(
+            db,
+            movimentacao.produto_id,
+        ).items():
+            _sincronizar_cache_estoque_virtual(db, pedido.tenant_id, kit_id)
+
+        movimentacao.status = "cancelado"
+        observacao_original = (movimentacao.observacao or "").strip()
+        complemento = (
+            f"Desvinculada automaticamente da NF {nf_numero or nf_id} "
+            f"(pedido correto {pedido_bling_id_esperado})"
+            if pedido_bling_id_esperado
+            else f"Desvinculada automaticamente da NF {nf_numero or nf_id}"
+        )
+        movimentacao.observacao = (
+            f"{observacao_original} | {complemento}"
+            if observacao_original and complemento not in observacao_original
+            else complemento
+        )
+        db.add(movimentacao)
+        movimentos_cancelados += 1
+        estornos_criados += 1
+
+    for item in itens:
+        if getattr(item, "vendido_em", None):
+            item.vendido_em = None
+            db.add(item)
+            itens_reabertos += 1
+
+    vinculo_removido = _remover_nf_do_pedido(
+        pedido,
+        nf_id=nf_id,
+        nf_numero=nf_numero,
+    )
+    db.add(pedido)
+
+    return {
+        "vinculo_removido": vinculo_removido,
+        "movimentos_cancelados": movimentos_cancelados,
+        "estornos_criados": estornos_criados,
+        "itens_reabertos": itens_reabertos,
+        "lotes_restaurados": lotes_restaurados,
+        "nf_numero": nf_numero,
+        "nf_bling_id": nf_id,
+        "pedido_bling_id_esperado": pedido_bling_id_esperado,
+    }
+
+
 def _recarregar_pedido_e_itens_para_nf(
     db: Session,
     pedido: PedidoIntegrado,
@@ -696,6 +843,14 @@ def processar_nf_autorizada(
         pedido_bling_id_atual=pedido_bling_id,
     )
     if pedido_ref_conflitante:
+        resultado_desvinculo = desvincular_nf_de_pedido_incorreto(
+            db=db,
+            pedido=pedido,
+            itens=itens,
+            nf_id=nf_id,
+            nf_numero=nf_numero,
+            pedido_bling_id_esperado=pedido_ref_conflitante,
+        )
         mensagem = (
             f"A NF {nf_numero or nf_id} pertence ao pedido Bling {pedido_ref_conflitante}, "
             f"nao ao pedido {pedido_bling_id}."
@@ -712,25 +867,31 @@ def processar_nf_autorizada(
             pedido_integrado_id=pedido.id,
             pedido_bling_id=pedido_bling_id,
             nf_bling_id=nf_id,
-            payload={"nf_numero": nf_numero, "pedido_bling_id_esperado": pedido_ref_conflitante},
-        )
-        abrir_incidente(
-            tenant_id=pedido.tenant_id,
-            code="NF_VINCULADA_A_OUTRO_PEDIDO",
-            severity="critical",
-            title="NF ja vinculada a outro pedido",
-            message=mensagem,
-            suggested_action="Revisar o vinculo da NF antes de reaplicar a baixa de estoque.",
-            auto_fixable=False,
-            pedido_integrado_id=pedido.id,
-            pedido_bling_id=pedido_bling_id,
-            nf_bling_id=nf_id,
-            details={
+            payload={
                 "nf_numero": nf_numero,
                 "pedido_bling_id_esperado": pedido_ref_conflitante,
+                "desvinculo": resultado_desvinculo,
             },
-            source="runtime",
+            auto_fix_applied=bool(
+                resultado_desvinculo.get("vinculo_removido")
+                or resultado_desvinculo.get("movimentos_cancelados")
+            ),
         )
+        resolver_incidentes_relacionados(
+            db,
+            tenant_id=pedido.tenant_id,
+            codes=[
+                "NF_VINCULADA_A_OUTRO_PEDIDO",
+                "ITEM_NAO_CONFIRMADO_EM_PEDIDO_CONFIRMADO",
+                "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
+            ],
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido.pedido_bling_id,
+            nf_bling_id=nf_id,
+            resolution_note="Vinculo incorreto da NF removido automaticamente.",
+        )
+        db.add(pedido)
+        db.commit()
         return "nf_vinculada_outro_pedido"
     movimentos_existentes = (
         db.query(EstoqueMovimentacao)
@@ -950,31 +1111,6 @@ def processar_nf_cancelada(
     nf_id: str | None = None,
 ) -> str:
     from app.estoque.service import EstoqueService
-    from app.produtos_models import ProdutoLote
-
-    def _restaurar_lotes_consumidos(movimentacao: EstoqueMovimentacao) -> None:
-        bruto = getattr(movimentacao, "lotes_consumidos", None)
-        if not bruto:
-            return
-        try:
-            lotes = json.loads(bruto) if isinstance(bruto, str) else bruto
-        except Exception:
-            lotes = []
-
-        for item_lote in lotes or []:
-            lote_id = item_lote.get("lote_id")
-            quantidade = float(item_lote.get("quantidade") or 0)
-            if not lote_id or quantidade <= 0:
-                continue
-
-            lote = db.query(ProdutoLote).filter(ProdutoLote.id == lote_id).first()
-            if not lote:
-                continue
-
-            lote.quantidade_disponivel = float(lote.quantidade_disponivel or 0) + quantidade
-            if lote.quantidade_disponivel > 0:
-                lote.status = "ativo"
-            db.add(lote)
 
     pedido.status = "cancelado"
     pedido.cancelado_em = datetime.now(timezone.utc)
@@ -997,7 +1133,7 @@ def processar_nf_cancelada(
     houve_estorno = False
 
     for movimentacao in movimentos_ativos:
-        _restaurar_lotes_consumidos(movimentacao)
+        _restaurar_lotes_consumidos(db, movimentacao)
 
         user_id_movimentacao = getattr(movimentacao, "user_id", None) or user_id_execucao
         if not user_id_movimentacao:

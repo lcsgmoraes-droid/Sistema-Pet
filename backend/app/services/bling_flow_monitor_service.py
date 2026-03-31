@@ -1411,6 +1411,12 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
         itens=itens,
         nf_id=nf_id,
     )
+    if acao == "nf_vinculada_outro_pedido":
+        return True, {
+            "acao": acao,
+            "nf_id": nf_id,
+            "motivo": "nf_incorreta_removida_do_pedido",
+        }
     return acao in {"venda_confirmada", "venda_ja_confirmada"}, {
         "acao": acao,
         "nf_id": nf_id,

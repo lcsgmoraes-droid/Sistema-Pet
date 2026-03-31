@@ -8,6 +8,7 @@ from app.integracao_bling_nf_routes import (
     _registrar_nf_no_pedido,
     _localizar_pedido_local_por_numero_bling,
     _localizar_pedido_local_por_numero_loja,
+    _remover_nf_do_pedido,
     _nf_webhook_autorizada,
 )
 from app.services.bling_nf_service import processar_nf_autorizada, processar_nf_cancelada
@@ -346,11 +347,25 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
         def first(self):
             return self.resultado
 
+        def all(self):
+            return self.resultado if isinstance(self.resultado, list) else []
+
     class FakeDB:
         def query(self, model):
             if getattr(model, "__name__", "") == "BlingNotaFiscalCache":
                 return FakeQuery(SimpleNamespace(pedido_bling_id_ref="25441648396"))
+            if getattr(model, "__name__", "") == "EstoqueMovimentacao":
+                return FakeQuery([])
             raise AssertionError(f"Consulta inesperada para {getattr(model, '__name__', model)}")
+
+        def add(self, obj):
+            return None
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            return None
 
     pedido = SimpleNamespace(
         status="confirmado",
@@ -362,12 +377,16 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
         payload={"ultima_nf": {"numero": "011089"}},
     )
     item = SimpleNamespace(sku="019516.1/1", quantidade=1, vendido_em=None)
-    incidentes = []
+    eventos = []
 
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: eventos.append(kwargs))
     monkeypatch.setattr(
-        "app.services.bling_nf_service.abrir_incidente",
-        lambda **kwargs: incidentes.append(kwargs),
+        "app.services.bling_nf_service.resolver_incidentes_relacionados",
+        lambda *args, **kwargs: 0,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=99),
     )
 
     resposta = processar_nf_autorizada(
@@ -378,7 +397,8 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
     )
 
     assert resposta == "nf_vinculada_outro_pedido"
-    assert incidentes[0]["code"] == "NF_VINCULADA_A_OUTRO_PEDIDO"
+    assert "ultima_nf" not in pedido.payload
+    assert eventos[0]["auto_fix_applied"] is True
 
 
 def test_registrar_nf_no_pedido_salva_data_emissao():
@@ -458,6 +478,30 @@ def test_registrar_nf_no_pedido_nao_substitui_ultima_nf_por_nota_mais_antiga():
 
     assert pedido.payload["ultima_nf"]["id"] == "25441651448"
     assert pedido.payload["ultima_nf"]["numero"] == "011089"
+
+
+def test_remover_nf_do_pedido_limpa_payload_principal_e_nota_embutida():
+    pedido = SimpleNamespace(
+        payload={
+            "ultima_nf": {"id": "25441651448", "numero": "011089"},
+            "pedido": {
+                "numeroLoja": "260331HQ17M377",
+                "notaFiscal": {"id": "25441651448", "numero": "011089"},
+                "cliente": {"nome": "Teste"},
+            },
+        }
+    )
+
+    alterado = _remover_nf_do_pedido(
+        pedido,
+        nf_id="25441651448",
+        nf_numero="011089",
+    )
+
+    assert alterado is True
+    assert "ultima_nf" not in pedido.payload
+    assert "notaFiscal" not in pedido.payload["pedido"]
+    assert pedido.payload["pedido"]["cliente"]["nome"] == "Teste"
 
 
 def test_nf_webhook_considera_autorizada_quando_texto_da_nf_diz_autorizada_mesmo_com_codigo_6():
@@ -555,6 +599,9 @@ def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
 
         def commit(self):
             self.commit_calls += 1
+
+        def rollback(self):
+            return None
 
     lote = SimpleNamespace(id=91, quantidade_disponivel=0.0, status="esgotado")
     movimentacao = SimpleNamespace(

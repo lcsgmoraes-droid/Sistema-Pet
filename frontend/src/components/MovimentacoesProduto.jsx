@@ -413,11 +413,11 @@ export default function MovimentacoesProduto() {
 
   // Calcular totalizadores
   const totalEntradas = movimentacoes
-    .filter(m => m.tipo === 'entrada')
+    .filter(m => m.tipo === 'entrada' && m.status !== 'cancelado')
     .reduce((sum, m) => sum + parseFloat(m.quantidade || 0), 0);
   
   const totalSaidas = movimentacoes
-    .filter(m => m.tipo === 'saida')
+    .filter(m => m.tipo === 'saida' && m.status !== 'cancelado')
     .reduce((sum, m) => sum + parseFloat(m.quantidade || 0), 0);
 
   // Resumo de vendas por canal
@@ -850,6 +850,7 @@ export default function MovimentacoesProduto() {
               ) : (
                 movimentacoes.map((mov, index) => {
                   const origem = getOrigem(mov);
+                  const movCancelado = mov.status === 'cancelado';
                   
                   // Verificar se é o mesmo pedido/venda que o anterior
                   const movAnterior = index > 0 ? movimentacoes[index - 1] : null;
@@ -861,7 +862,9 @@ export default function MovimentacoesProduto() {
                   return (
                     <tr 
                       key={mov.id} 
-                      className={`hover:bg-gray-50 cursor-pointer ${
+                      className={`cursor-pointer ${
+                        movCancelado ? 'bg-slate-50/80 opacity-70 hover:bg-slate-100' : 'hover:bg-gray-50'
+                      } ${
                         mesmaVenda ? 'border-l-4 border-l-blue-500 bg-blue-50' : ''
                       }`}
                       onClick={() => abrirModal(mov.tipo, mov)}
@@ -993,6 +996,11 @@ export default function MovimentacoesProduto() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
+                          {movCancelado && (
+                            <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs font-medium">
+                              Cancelado
+                            </span>
+                          )}
                           {mov.motivo && mov.motivo !== 'compra' && !String(mov.motivo).startsWith('venda') && (
                             <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
                               {getMotivoLabel(mov.motivo)}

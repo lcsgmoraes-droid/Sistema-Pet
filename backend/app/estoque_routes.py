@@ -2289,6 +2289,7 @@ def listar_movimentacoes_produto(
         resultado.append({
             "id": mov.id,
             "tipo": mov.tipo,
+            "status": mov.status,
             "motivo": mov.motivo,
             "quantidade": mov.quantidade,
             "quantidade_anterior": mov.quantidade_anterior,

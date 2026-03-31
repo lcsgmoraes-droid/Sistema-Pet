@@ -518,6 +518,7 @@ def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(
         id=3015,
         tipo="saida",
         motivo="venda_bling",
+        status="confirmado",
         quantidade=1.0,
         quantidade_anterior=4.0,
         quantidade_nova=3.0,

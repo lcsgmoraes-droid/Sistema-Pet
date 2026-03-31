@@ -19,6 +19,7 @@ from app.services.bling_nf_service import (
     processar_nf_cancelada,
     criar_produto_automatico_do_bling,
     AUTO_CADASTRO_BING_TAG,
+    _nf_cache_pertence_a_outro_pedido,
 )
 from app.services.bling_flow_monitor_service import (
     abrir_incidente,
@@ -531,6 +532,47 @@ def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, sit
     }
 
 
+def _nf_resumo_corresponde(resumo_nf: dict | None, *, nf_id: str | None, nf_numero: str | None) -> bool:
+    resumo_nf = _dict(resumo_nf)
+    nf_id = _texto(nf_id)
+    nf_numero = _texto(nf_numero)
+    resumo_id = _texto(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    resumo_numero = _texto(resumo_nf.get("numero"))
+
+    return bool(
+        (nf_id and resumo_id and resumo_id == nf_id)
+        or (nf_numero and resumo_numero and resumo_numero == nf_numero)
+    )
+
+
+def _remover_nf_do_pedido(
+    pedido: PedidoIntegrado,
+    *,
+    nf_id: str | None = None,
+    nf_numero: str | None = None,
+) -> bool:
+    payload_atual = pedido.payload if isinstance(pedido.payload, dict) else {}
+    payload = dict(payload_atual)
+    alterado = False
+
+    if _nf_resumo_corresponde(payload.get("ultima_nf"), nf_id=nf_id, nf_numero=nf_numero):
+        payload.pop("ultima_nf", None)
+        alterado = True
+
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else None
+    if pedido_payload is not None:
+        pedido_payload = dict(pedido_payload)
+        for chave in ("notaFiscal", "nota", "nfe"):
+            if _nf_resumo_corresponde(pedido_payload.get(chave), nf_id=nf_id, nf_numero=nf_numero):
+                pedido_payload.pop(chave, None)
+                alterado = True
+        payload["pedido"] = pedido_payload
+
+    if alterado:
+        pedido.payload = payload
+    return alterado
+
+
 def _gerar_provisao_simples_se_aplicavel(db: Session, pedido: PedidoIntegrado, data: dict) -> None:
     try:
         valor_total_nf = data.get("valorTotalNf") or data.get("valor_total", 0)
@@ -681,6 +723,56 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         if pedido:
             pedido_bling_id = pedido.pedido_bling_id
 
+    if pedido:
+        pedido_ref_conflitante = _nf_cache_pertence_a_outro_pedido(
+            db,
+            tenant_id=pedido.tenant_id,
+            nf_bling_id=nf_id,
+            pedido_bling_id_atual=pedido.pedido_bling_id,
+        )
+        if pedido_ref_conflitante and pedido_ref_conflitante != pedido.pedido_bling_id:
+            pedido_correto = (
+                db.query(PedidoIntegrado)
+                .filter(
+                    PedidoIntegrado.tenant_id == pedido.tenant_id,
+                    PedidoIntegrado.pedido_bling_id == pedido_ref_conflitante,
+                )
+                .first()
+            )
+            if pedido_correto:
+                pedido = pedido_correto
+                pedido_bling_id = pedido_correto.pedido_bling_id
+                pedido_bling_numero = pedido_correto.pedido_bling_numero
+            else:
+                if tenant_id_monitor:
+                    abrir_incidente(
+                        tenant_id=tenant_id_monitor,
+                        code="NF_VINCULADA_A_OUTRO_PEDIDO",
+                        severity="critical",
+                        title="NF recebida com conflito de pedido",
+                        message=(
+                            f"A NF {nf_numero or nf_id} pertence ao pedido Bling {pedido_ref_conflitante}, "
+                            f"mas o pedido local localizado foi {pedido.pedido_bling_id}."
+                        ),
+                        suggested_action="Importar o pedido correto antes de consolidar a NF localmente.",
+                        auto_fixable=False,
+                        pedido_integrado_id=pedido.id,
+                        pedido_bling_id=pedido.pedido_bling_id,
+                        nf_bling_id=nf_id,
+                        details={
+                            "nf_numero": nf_numero,
+                            "pedido_bling_id_esperado": pedido_ref_conflitante,
+                            "pedido_bling_numero": pedido_bling_numero,
+                            "numero_pedido_loja": numero_pedido_loja,
+                        },
+                        source="runtime",
+                    )
+                return {
+                    "status": "ok",
+                    "acao": "nf_bloqueada_por_conflito_de_pedido",
+                    "situacao": _status_nota_webhook(nf_dados, situacao_num),
+                }
+
     if not pedido and not pedido_bling_id and not pedido_bling_numero:
         # NF sem pedido vinculado (ex: NF emitida manualmente fora do fluxo)
         if tenant_id_monitor:
@@ -788,7 +880,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         elif acao == "venda_ja_confirmada":
             mensagem_evento = "NF autorizada processada; o pedido ja estava conciliado anteriormente."
         elif acao == "nf_vinculada_outro_pedido":
-            mensagem_evento = "NF autorizada recebida, mas a baixa foi bloqueada porque a nota pertence a outro pedido."
+            mensagem_evento = "NF autorizada recebida; o vinculo incorreto foi removido automaticamente e a baixa ficou bloqueada neste pedido."
         else:
             mensagem_evento = "NF autorizada recebida, mas a conciliacao nao conseguiu concluir a baixa automaticamente."
         registrar_evento(
