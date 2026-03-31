@@ -289,6 +289,35 @@ def test_localiza_pedido_por_numero_loja_em_payload_do_bling():
     assert encontrado is pedido
 
 
+def test_localiza_pedido_por_numero_loja_considera_loja_id_quando_ha_colisao():
+    db = Mock()
+    pedido_a = SimpleNamespace(
+        payload={
+            "pedido": {"numeroLoja": "260331HQ17M377", "loja": {"id": 205367939}},
+            "webhook": {"numeroLoja": "260331HQ17M377", "loja": {"id": 205367939}},
+        }
+    )
+    pedido_b = SimpleNamespace(
+        payload={
+            "pedido": {"numeroLoja": "260331HQ17M377", "loja": {"id": 206009795}},
+            "webhook": {"numeroLoja": "260331HQ17M377", "loja": {"id": 206009795}},
+        }
+    )
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+        pedido_a,
+        pedido_b,
+    ]
+
+    encontrado = _localizar_pedido_local_por_numero_loja(
+        db,
+        tenant_id="tenant-1",
+        numero_pedido_loja="260331HQ17M377",
+        loja_id="206009795",
+    )
+
+    assert encontrado is pedido_b
+
+
 def test_localiza_pedido_por_numero_bling():
     db = Mock()
     pedido = SimpleNamespace(id=55, pedido_bling_numero="11598")
@@ -301,6 +330,55 @@ def test_localiza_pedido_por_numero_bling():
     )
 
     assert encontrado is pedido
+
+
+def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
+    class FakeQuery:
+        def __init__(self, resultado=None):
+            self.resultado = resultado
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.resultado
+
+    class FakeDB:
+        def query(self, model):
+            if getattr(model, "__name__", "") == "BlingNotaFiscalCache":
+                return FakeQuery(SimpleNamespace(pedido_bling_id_ref="25441648396"))
+            raise AssertionError(f"Consulta inesperada para {getattr(model, '__name__', model)}")
+
+    pedido = SimpleNamespace(
+        status="confirmado",
+        confirmado_em=None,
+        tenant_id="tenant-1",
+        id=1224,
+        pedido_bling_id="25441648300",
+        pedido_bling_numero="11732",
+        payload={"ultima_nf": {"numero": "011089"}},
+    )
+    item = SimpleNamespace(sku="019516.1/1", quantidade=1, vendido_em=None)
+    incidentes = []
+
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente",
+        lambda **kwargs: incidentes.append(kwargs),
+    )
+
+    resposta = processar_nf_autorizada(
+        db=FakeDB(),
+        pedido=pedido,
+        itens=[item],
+        nf_id="25441651448",
+    )
+
+    assert resposta == "nf_vinculada_outro_pedido"
+    assert incidentes[0]["code"] == "NF_VINCULADA_A_OUTRO_PEDIDO"
 
 
 def test_registrar_nf_no_pedido_salva_data_emissao():

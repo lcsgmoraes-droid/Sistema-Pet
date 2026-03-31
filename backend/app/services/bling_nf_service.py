@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.estoque_reserva_service import EstoqueReservaService
+from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto, ProdutoKitComponente, EstoqueMovimentacao
@@ -222,6 +223,33 @@ def _numero_nf_pedido(pedido: PedidoIntegrado | None, fallback_nf_id: str | None
     ultima_nf = ultima_nf if isinstance(ultima_nf, dict) else {}
     numero = str(ultima_nf.get("numero") or "").strip()
     return numero or None
+
+
+def _nf_cache_pertence_a_outro_pedido(
+    db: Session,
+    *,
+    tenant_id,
+    nf_bling_id: str | None,
+    pedido_bling_id_atual: str | None,
+) -> str | None:
+    nf_bling_id = _text(nf_bling_id)
+    pedido_bling_id_atual = _text(pedido_bling_id_atual)
+    if not nf_bling_id or not pedido_bling_id_atual:
+        return None
+
+    registro = (
+        db.query(BlingNotaFiscalCache)
+        .filter(
+            BlingNotaFiscalCache.tenant_id == tenant_id,
+            BlingNotaFiscalCache.bling_id == nf_bling_id,
+        )
+        .order_by(BlingNotaFiscalCache.id.desc())
+        .first()
+    )
+    pedido_ref = _text(getattr(registro, "pedido_bling_id_ref", None))
+    if pedido_ref and pedido_ref != pedido_bling_id_atual:
+        return pedido_ref
+    return None
 
 
 def _recarregar_pedido_e_itens_para_nf(
@@ -661,6 +689,49 @@ def processar_nf_autorizada(
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido, nf_id)
+    pedido_ref_conflitante = _nf_cache_pertence_a_outro_pedido(
+        db,
+        tenant_id=pedido.tenant_id,
+        nf_bling_id=nf_id,
+        pedido_bling_id_atual=pedido_bling_id,
+    )
+    if pedido_ref_conflitante:
+        mensagem = (
+            f"A NF {nf_numero or nf_id} pertence ao pedido Bling {pedido_ref_conflitante}, "
+            f"nao ao pedido {pedido_bling_id}."
+        )
+        registrar_evento(
+            tenant_id=pedido.tenant_id,
+            source="runtime",
+            event_type="nf.processada",
+            entity_type="nf",
+            status="error",
+            severity="critical",
+            message="Processamento da NF bloqueado por vinculo com outro pedido",
+            error_message=mensagem,
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido_bling_id,
+            nf_bling_id=nf_id,
+            payload={"nf_numero": nf_numero, "pedido_bling_id_esperado": pedido_ref_conflitante},
+        )
+        abrir_incidente(
+            tenant_id=pedido.tenant_id,
+            code="NF_VINCULADA_A_OUTRO_PEDIDO",
+            severity="critical",
+            title="NF ja vinculada a outro pedido",
+            message=mensagem,
+            suggested_action="Revisar o vinculo da NF antes de reaplicar a baixa de estoque.",
+            auto_fixable=False,
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido_bling_id,
+            nf_bling_id=nf_id,
+            details={
+                "nf_numero": nf_numero,
+                "pedido_bling_id_esperado": pedido_ref_conflitante,
+            },
+            source="runtime",
+        )
+        return "nf_vinculada_outro_pedido"
     movimentos_existentes = (
         db.query(EstoqueMovimentacao)
         .filter(

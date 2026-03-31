@@ -268,6 +268,31 @@ def _numero_pedido_loja_pedido(pedido: PedidoIntegrado | None) -> str | None:
     return None
 
 
+def _loja_id_pedido_integrado(pedido: PedidoIntegrado | None) -> str | None:
+    payload = _dict(getattr(pedido, "payload", None))
+    pedido_payload = _dict(payload.get("pedido"))
+    webhook_payload = _dict(payload.get("webhook"))
+    pedido_loja = _dict(pedido_payload.get("loja"))
+    webhook_loja = _dict(webhook_payload.get("loja"))
+    loja_virtual = _dict(pedido_payload.get("lojaVirtual"))
+
+    return _text(
+        _primeiro_preenchido(
+            pedido_loja.get("id"),
+            webhook_loja.get("id"),
+            loja_virtual.get("id"),
+            pedido_payload.get("loja_id"),
+            webhook_payload.get("loja_id"),
+        )
+    )
+
+
+def _loja_id_nf_contexto(nf_contexto: dict | None) -> str | None:
+    nf_contexto = _dict(nf_contexto)
+    loja = _dict(nf_contexto.get("loja"))
+    return _text(_primeiro_preenchido(nf_contexto.get("loja_id"), loja.get("id")))
+
+
 def _canal_pedido_integrado(pedido: PedidoIntegrado | None) -> str | None:
     if not pedido:
         return None
@@ -343,6 +368,7 @@ def _resumir_nf_bling_recente(item: dict, modelo: int) -> dict:
         "valor_total": item.get("valorNota") or item.get("valorTotalNf") or item.get("valorTotal") or item.get("valor_total"),
         "data_emissao": _text(item.get("dataEmissao") or item.get("data_emissao") or item.get("data")),
         "numero_pedido_loja": _text(numero_pedido_loja),
+        "loja_id": _loja_id_nf_contexto(item),
         "pedido_bling_id": _text(pedido_ref.get("id")),
         "pedido_bling_numero": _text(pedido_ref.get("numero")),
         "canal": canal,
@@ -390,6 +416,7 @@ def _enriquecer_resumo_nf_com_relacao(resumo: dict) -> dict:
         "pedido_bling_id": _text(relacao.get("pedido_bling_id")) or _text(resumo.get("pedido_bling_id")),
         "pedido_bling_numero": _text(relacao.get("pedido_bling_numero")) or _text(resumo.get("pedido_bling_numero")),
         "numero_pedido_loja": _text(relacao.get("numero_pedido_loja")) or _text(resumo.get("numero_pedido_loja")),
+        "loja_id": _loja_id_nf_contexto(nf_completa) or _text(resumo.get("loja_id")),
         "valor_total": valor_total,
         "canal": canal,
         "canal_label": canal_label,
@@ -427,6 +454,7 @@ def _obter_nfs_recentes_cache_local(db: Session, *, tenant_id, dias: int) -> lis
             "valor_total": getattr(registro, "valor", None),
             "data_emissao": getattr(registro, "data_emissao", None).isoformat() if getattr(registro, "data_emissao", None) else None,
             "numero_pedido_loja": _text(getattr(registro, "numero_pedido_loja", None)),
+            "loja_id": _loja_id_nf_contexto(_dict(getattr(registro, "detalhe_payload", None)) or _dict(getattr(registro, "resumo_payload", None))),
             "pedido_bling_id": _text(getattr(registro, "pedido_bling_id_ref", None)),
             "pedido_bling_numero": _text(_dict(getattr(registro, "detalhe_payload", None)).get("pedido_bling_numero"))
             or _text(_dict(getattr(registro, "resumo_payload", None)).get("pedido_bling_numero")),
@@ -527,6 +555,15 @@ def _nf_detectada_combina_com_pedido(pedido: PedidoIntegrado, nf_contexto: dict 
             "nf": numero_nf,
         }
 
+    loja_id_pedido = _loja_id_pedido_integrado(pedido)
+    loja_id_nf = _loja_id_nf_contexto(nf_contexto)
+    if loja_id_pedido and loja_id_nf and loja_id_pedido != loja_id_nf:
+        return False, {
+            "motivo": "loja_divergente",
+            "pedido": loja_id_pedido,
+            "nf": loja_id_nf,
+        }
+
     canal_pedido = _canal_pedido_integrado(pedido)
     canal_nf = _text(nf_contexto.get("canal"))
     if canal_pedido and canal_nf and canal_pedido != canal_nf:
@@ -550,6 +587,7 @@ def _nf_detectada_combina_com_pedido(pedido: PedidoIntegrado, nf_contexto: dict 
 
     return True, {
         "numero_pedido_loja": numero_pedido_loja,
+        "loja_id": loja_id_pedido,
         "canal": canal_pedido,
         "total_pedido": total_pedido,
         "total_nf": total_nf,
@@ -667,6 +705,9 @@ def diagnosticar_pedido_integrado(
     nf = _ultima_nf(payload)
     nf_detectada = _dict(nf_detectada)
     nfs_detectadas = [_dict(item) for item in (nfs_detectadas or []) if isinstance(item, dict)]
+    nf_auditavel = nf
+    if not _nf_contexto_autorizado(nf) and len(nfs_detectadas) == 1 and _nf_contexto_autorizado(nfs_detectadas[0]):
+        nf_auditavel = nfs_detectadas[0]
     nf_local_id = _text(nf.get("id"))
     nf_local_numero = _text(nf.get("numero"))
     movimentacoes_saida_nf = movimentacoes_saida if movimentacoes_saida_nf is None else int(movimentacoes_saida_nf)
@@ -721,7 +762,7 @@ def diagnosticar_pedido_integrado(
 
     itens_vendidos = [item for item in itens if getattr(item, "vendido_em", None)]
 
-    if pedido.status == "confirmado" and _nf_contexto_autorizado(nf):
+    if pedido.status == "confirmado" and _nf_contexto_autorizado(nf_auditavel):
         for item in itens:
             if not getattr(item, "vendido_em", None):
                 incidentes.append(
@@ -734,7 +775,7 @@ def diagnosticar_pedido_integrado(
                         auto_fixable=True,
                         pedido=pedido,
                         sku=_text(item.sku),
-                        nf_bling_id=_text(nf.get("id")),
+                        nf_bling_id=_text(_primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))),
                     )
                 )
 
@@ -751,8 +792,9 @@ def diagnosticar_pedido_integrado(
                     suggested_action="Reconciliar as baixas pendentes do pedido confirmado.",
                     auto_fixable=True,
                     pedido=pedido,
-                    nf_bling_id=_text(nf.get("id")),
+                    nf_bling_id=_text(_primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))),
                     details={
+                        "nf_detectada": _json_safe(nf_auditavel),
                         "itens_vendidos": len(itens_vendidos),
                         "movimentacoes_saida": movimentacoes_saida,
                         "movimentacoes_saida_nf": movimentacoes_saida_nf,
@@ -1289,6 +1331,7 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
 
         if not nf_cache:
             numero_pedido_loja = _numero_pedido_loja_pedido(pedido)
+            loja_id_pedido = _loja_id_pedido_integrado(pedido)
             if numero_pedido_loja:
                 notas_loja = (
                     db.query(BlingNotaFiscalCache)
@@ -1308,8 +1351,22 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
                     for nota in notas_loja
                     if _nf_contexto_autorizado({"situacao": getattr(nota, "status", None)})
                 ]
+                if loja_id_pedido:
+                    notas_loja = [
+                        nota
+                        for nota in notas_loja
+                        if not _loja_id_nf_contexto(
+                            _dict(getattr(nota, "detalhe_payload", None)) or _dict(getattr(nota, "resumo_payload", None))
+                        )
+                        or _loja_id_nf_contexto(
+                            _dict(getattr(nota, "detalhe_payload", None)) or _dict(getattr(nota, "resumo_payload", None))
+                        ) == loja_id_pedido
+                    ]
                 notas_unicas: dict[str, BlingNotaFiscalCache] = {}
                 for nota in notas_loja:
+                    pedido_ref_nota = _text(getattr(nota, "pedido_bling_id_ref", None))
+                    if pedido_ref_nota and pedido_ref_nota != _text(getattr(pedido, "pedido_bling_id", None)):
+                        continue
                     chave = _nf_bling_id_valido(getattr(nota, "bling_id", None)) or _text(getattr(nota, "numero", None)) or ""
                     if chave and chave not in notas_unicas:
                         notas_unicas[chave] = nota
@@ -1536,7 +1593,13 @@ def auditar_fluxo_bling(
 
             nfs_detectadas: list[dict] = []
             numero_pedido_loja = _numero_pedido_loja_pedido(pedido)
-            if pedido.status in {"aberto", "expirado"} and numero_pedido_loja:
+            precisa_auditar_nfs_recentes = bool(
+                numero_pedido_loja
+                and (
+                    pedido.status in {"aberto", "expirado", "confirmado"}
+                )
+            )
+            if precisa_auditar_nfs_recentes:
                 if pedido.tenant_id not in nfs_recentes_por_tenant:
                     try:
                         notas_recentes = _obter_nfs_recentes_bling(

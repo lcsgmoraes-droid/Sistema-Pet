@@ -357,6 +357,43 @@ def _numero_pedido_loja_do_payload(pedido: PedidoIntegrado) -> str | None:
     return None
 
 
+def _loja_id_nf_payload(data: dict | None) -> str | None:
+    data = data if isinstance(data, dict) else {}
+    loja = data.get("loja") if isinstance(data.get("loja"), dict) else {}
+    loja_virtual = data.get("lojaVirtual") if isinstance(data.get("lojaVirtual"), dict) else {}
+    unidade = data.get("unidadeNegocio") if isinstance(data.get("unidadeNegocio"), dict) else {}
+
+    return _texto(
+        _primeiro_preenchido(
+            loja.get("id"),
+            loja_virtual.get("id"),
+            unidade.get("id"),
+            data.get("loja_id"),
+            data.get("lojaId"),
+        )
+    )
+
+
+def _loja_id_pedido(pedido: PedidoIntegrado) -> str | None:
+    payload = pedido.payload if isinstance(pedido.payload, dict) else {}
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    webhook_payload = payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
+
+    pedido_loja = pedido_payload.get("loja") if isinstance(pedido_payload.get("loja"), dict) else {}
+    webhook_loja = webhook_payload.get("loja") if isinstance(webhook_payload.get("loja"), dict) else {}
+    loja_virtual = pedido_payload.get("lojaVirtual") if isinstance(pedido_payload.get("lojaVirtual"), dict) else {}
+
+    return _texto(
+        _primeiro_preenchido(
+            pedido_loja.get("id"),
+            webhook_loja.get("id"),
+            loja_virtual.get("id"),
+            pedido_payload.get("loja_id"),
+            webhook_payload.get("loja_id"),
+        )
+    )
+
+
 def _localizar_pedido_local_por_numero_bling(
     db: Session,
     *,
@@ -382,11 +419,13 @@ def _localizar_pedido_local_por_numero_loja(
     *,
     tenant_id,
     numero_pedido_loja: str | None,
+    loja_id: str | None = None,
     limite_scan: int = 2000,
 ) -> PedidoIntegrado | None:
     numero = str(numero_pedido_loja or "").strip()
     if not numero:
         return None
+    loja_id = _texto(loja_id)
 
     pedidos = (
         db.query(PedidoIntegrado)
@@ -395,9 +434,24 @@ def _localizar_pedido_local_por_numero_loja(
         .limit(limite_scan)
         .all()
     )
+    candidatos: list[PedidoIntegrado] = []
     for pedido in pedidos:
         if _numero_pedido_loja_do_payload(pedido) == numero:
-            return pedido
+            candidatos.append(pedido)
+
+    if not candidatos:
+        return None
+
+    if loja_id:
+        candidatos_loja = [pedido for pedido in candidatos if _loja_id_pedido(pedido) == loja_id]
+        if len(candidatos_loja) == 1:
+            return candidatos_loja[0]
+        if len(candidatos_loja) > 1:
+            return None
+
+    if len(candidatos) == 1:
+        return candidatos[0]
+
     return None
 
 
@@ -622,6 +676,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             db,
             tenant_id=tenant_id_monitor,
             numero_pedido_loja=numero_pedido_loja,
+            loja_id=_loja_id_nf_payload(nf_dados) or _loja_id_nf_payload(data),
         )
         if pedido:
             pedido_bling_id = pedido.pedido_bling_id
@@ -726,18 +781,24 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     if _nf_webhook_autorizada(nf_dados, situacao_num):
         acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=nf_dados)
+        status_evento = "ok" if acao in {"venda_confirmada", "venda_ja_confirmada"} else "error"
+        severidade_evento = "info" if status_evento == "ok" else "critical"
+        if acao == "venda_confirmada":
+            mensagem_evento = "NF autorizada processada, pedido vinculado e estoque reconciliado."
+        elif acao == "venda_ja_confirmada":
+            mensagem_evento = "NF autorizada processada; o pedido ja estava conciliado anteriormente."
+        elif acao == "nf_vinculada_outro_pedido":
+            mensagem_evento = "NF autorizada recebida, mas a baixa foi bloqueada porque a nota pertence a outro pedido."
+        else:
+            mensagem_evento = "NF autorizada recebida, mas a conciliacao nao conseguiu concluir a baixa automaticamente."
         registrar_evento(
             tenant_id=pedido.tenant_id,
             source="webhook",
             event_type="invoice.authorized",
             entity_type="nf",
-            status="ok",
-            severity="info",
-            message=(
-                "NF autorizada processada, pedido vinculado e estoque reconciliado."
-                if acao == "venda_confirmada"
-                else "NF autorizada processada; o pedido ja estava conciliado anteriormente."
-            ),
+            status=status_evento,
+            severity=severidade_evento,
+            message=mensagem_evento,
             pedido_integrado_id=pedido.id,
             pedido_bling_id=pedido.pedido_bling_id,
             nf_bling_id=nf_id,

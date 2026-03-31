@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from app.services.bling_flow_monitor_service import (
     _build_incident_key,
+    _nf_detectada_combina_com_pedido,
     _json_safe,
     _obter_nfs_recentes_bling,
     _reconciliar_pedido_confirmado,
@@ -95,6 +96,34 @@ def test_diagnosticar_pedido_confirmado_aponta_saida_sem_nf_atual():
     assert "NF atual" in incidente["message"]
 
 
+def test_diagnosticar_pedido_confirmado_usa_nf_detectada_do_cache_para_apontar_baixa_faltante():
+    pedido = SimpleNamespace(id=23, pedido_bling_id="BL-23", status="confirmado", payload={})
+    itens = [
+        SimpleNamespace(sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None),
+    ]
+
+    incidentes = diagnosticar_pedido_integrado(
+        pedido,
+        itens,
+        {"ultima_nf": {"id": "0"}},
+        movimentacoes_saida=1,
+        movimentacoes_saida_nf=0,
+        nfs_detectadas=[
+            {
+                "id": "NF-23",
+                "numero": "011100",
+                "situacao": "Autorizada",
+                "situacao_codigo": 5,
+            }
+        ],
+    )
+
+    incidente = next(item for item in incidentes if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE")
+
+    assert incidente["nf_bling_id"] == "NF-23"
+    assert incidente["details"]["nf_detectada"]["numero"] == "011100"
+
+
 def test_diagnosticar_pedido_aberto_aponta_nf_detectada_sem_vinculo():
     pedido = SimpleNamespace(
         id=3,
@@ -165,6 +194,31 @@ def test_diagnosticar_pedido_aberto_aponta_multiplas_nfs_para_mesmo_pedido_loja(
     codigos = {incidente["code"] for incidente in incidentes}
 
     assert "NF_MULTIPLA_ENCONTRADA_POR_PEDIDO_LOJA" in codigos
+
+
+def test_nf_detectada_combina_com_pedido_rejeita_loja_divergente():
+    pedido = SimpleNamespace(
+        payload={
+            "pedido": {"numeroLoja": "260331HQ17M377", "loja": {"id": 205367939}},
+            "webhook": {"numeroLoja": "260331HQ17M377", "loja": {"id": 205367939}},
+        },
+        canal="shopee",
+    )
+
+    ok, detalhes = _nf_detectada_combina_com_pedido(
+        pedido,
+        {
+            "id": "NF-1",
+            "numero": "011089",
+            "numero_pedido_loja": "260331HQ17M377",
+            "loja_id": "206009795",
+            "canal": "shopee",
+            "valor_total": 41.18,
+        },
+    )
+
+    assert ok is False
+    assert detalhes["motivo"] == "loja_divergente"
 
 
 def test_obter_nfs_recentes_bling_enriquece_resumo_quando_lista_nao_traz_pedido_loja(monkeypatch):

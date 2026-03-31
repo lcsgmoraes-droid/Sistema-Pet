@@ -102,7 +102,7 @@ def test_reconciliar_nf_autorizada_cache_vincula_por_numero_pedido_loja(monkeypa
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.processar_nf_autorizada",
-        lambda **kwargs: capturado.setdefault("processou_nf", kwargs) or "venda_confirmada",
+        lambda **kwargs: (capturado.setdefault("processou_nf", kwargs), "venda_confirmada")[1],
     )
     monkeypatch.setattr(
         "app.services.bling_flow_monitor_service.registrar_vinculo_nf_pedido",
@@ -174,7 +174,7 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.processar_nf_autorizada",
-        lambda **kwargs: capturado.setdefault("processou_nf", kwargs) or "venda_confirmada",
+        lambda **kwargs: (capturado.setdefault("processou_nf", kwargs), "venda_confirmada")[1],
     )
     monkeypatch.setattr(
         "app.services.bling_flow_monitor_service.registrar_vinculo_nf_pedido",

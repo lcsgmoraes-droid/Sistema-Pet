@@ -76,7 +76,7 @@ def _deduplicar_registros_nfe_por_pedido(registros: list[BlingNotaFiscalCache]) 
         refs = _extrair_referencias_nf_cache(registro)
         chave = (
             _text(refs.get("pedido_bling_id"))
-            or f"loja::{_text(refs.get('numero_pedido_loja'))}"
+            or f"loja::{_text(refs.get('numero_pedido_loja'))}::{_text(refs.get('loja_id')) or 'sem_loja'}"
             or f"nf::{_text(refs.get('nf_bling_id'))}"
         )
         if not chave or chave in chaves_vistas:
@@ -105,7 +105,7 @@ def listar_tenants_com_nfes_autorizadas_recentes(db: Session, *, dias: int) -> l
 
 
 def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
-    from app.integracao_bling_nf_routes import _extrair_numero_pedido_loja_nf
+    from app.integracao_bling_nf_routes import _extrair_numero_pedido_loja_nf, _loja_id_nf_payload
 
     detalhe = _dict(getattr(registro, "detalhe_payload", None))
     resumo = _dict(getattr(registro, "resumo_payload", None))
@@ -137,6 +137,10 @@ def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
             or _extrair_numero_pedido_loja_nf(detalhe)
             or _extrair_numero_pedido_loja_nf(resumo)
         ),
+        "loja_id": (
+            _loja_id_nf_payload(detalhe)
+            or _loja_id_nf_payload(resumo)
+        ),
         "dados_nf": detalhe or resumo or {},
         "situacao_num": _coerce_int(_dict(detalhe.get("situacao")).get("id"), _coerce_int(detalhe.get("situacao"), 5)),
     }
@@ -149,6 +153,7 @@ def _localizar_pedido_para_nf_cache(
     pedido_bling_id: str | None,
     pedido_bling_numero: str | None,
     numero_pedido_loja: str | None,
+    loja_id: str | None,
 ) -> PedidoIntegrado | None:
     from app.integracao_bling_nf_routes import (
         _localizar_pedido_local_por_numero_bling,
@@ -177,6 +182,7 @@ def _localizar_pedido_para_nf_cache(
             db,
             tenant_id=tenant_id,
             numero_pedido_loja=numero_pedido_loja,
+            loja_id=loja_id,
         )
     return pedido
 
@@ -245,6 +251,7 @@ def reconciliar_nf_autorizada_cache(
         pedido_bling_id=refs.get("pedido_bling_id"),
         pedido_bling_numero=refs.get("pedido_bling_numero"),
         numero_pedido_loja=refs.get("numero_pedido_loja"),
+        loja_id=refs.get("loja_id"),
     )
 
     if not pedido:
@@ -311,6 +318,17 @@ def reconciliar_nf_autorizada_cache(
             itens=itens,
             nf_id=refs.get("nf_bling_id") or "",
         )
+        if acao not in {"venda_confirmada", "venda_ja_confirmada"}:
+            db.rollback()
+            return {
+                "success": False,
+                "motivo": "nf_nao_conciliada",
+                "acao": acao,
+                "pedido_id": pedido.id,
+                "pedido_bling_numero": pedido.pedido_bling_numero,
+                "nf_numero": refs.get("nf_numero"),
+                "nf_bling_id": refs.get("nf_bling_id"),
+            }
 
         registrar_vinculo_nf_pedido(
             pedido=pedido,
