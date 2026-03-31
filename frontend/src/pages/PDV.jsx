@@ -14,7 +14,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
-import { buscarVenda, criarVenda, listarVendas } from "../api/vendas";
+import { buscarVenda, listarVendas } from "../api/vendas";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
@@ -36,6 +36,7 @@ import { usePDVAssistente } from "../hooks/usePDVAssistente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
+import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
 import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -246,6 +247,17 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     limparComissao,
     sincronizarComissaoDaVenda,
     sincronizarEntregadorDaVenda,
+  });
+  const { salvarVenda } = usePDVSalvarVenda({
+    vendaAtual,
+    loading,
+    setLoading,
+    temCaixaAberto,
+    entregadorSelecionado,
+    vendaComissionada,
+    funcionarioComissao,
+    limparVenda,
+    carregarVendasRecentes: () => carregarVendasRecentes(),
   });
 
   // Carregar pendências quando o cliente mudar
@@ -1323,197 +1335,8 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     });
   };
 
-  // Salvar venda (rascunho)
-  const salvarVenda = async () => {
-    if (vendaAtual.itens.length === 0) {
-      alert("Adicione pelo menos um produto ou serviço");
-      return;
-    }
+  // salvarVenda movido para usePDVSalvarVenda
 
-    // 🔒 VALIDAÇÃO CRÍTICA: Verificar se tem caixa aberto
-    if (!temCaixaAberto) {
-      alert(
-        "❌ Não é possível salvar venda sem caixa aberto. Abra um caixa primeiro.",
-      );
-      return;
-    }
-
-    if (loading) return; // Proteger contra duplo-clique
-
-    setLoading(true);
-    try {
-      const entregadorIdResolvido =
-        vendaAtual.entregador_id || entregadorSelecionado?.id || null;
-
-      // Se a venda já existe (foi reaberta), atualizar ao invés de criar
-      if (vendaAtual.id) {
-        // Atualizar venda existente
-        await api.put(`/vendas/${vendaAtual.id}`, {
-          cliente_id: vendaAtual.cliente?.id,
-          funcionario_id: vendaAtual.funcionario_id, // ✅ Single source of truth
-          itens: vendaAtual.itens.map((item) => ({
-            tipo: item.tipo,
-            produto_id: item.produto_id,
-            servico_descricao: item.servico_descricao,
-            quantidade: item.quantidade,
-            preco_unitario: item.preco_unitario || item.preco_venda,
-            desconto_item: 0,
-            subtotal: item.subtotal,
-            lote_id: item.lote_id,
-            pet_id: item.pet_id || vendaAtual.pet?.id,
-          })),
-          desconto_valor: 0, // Descontos já aplicados nos itens
-          desconto_percentual: 0,
-          observacoes: vendaAtual.observacoes,
-          tem_entrega: vendaAtual.tem_entrega,
-          taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-          endereco_entrega: vendaAtual.entrega?.endereco_completo,
-          observacoes_entrega: vendaAtual.entrega?.observacoes_entrega,
-          distancia_km: vendaAtual.entrega?.distancia_km,
-          valor_por_km: vendaAtual.entrega?.valor_por_km,
-          loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: entregadorIdResolvido,
-        });
-
-        debugLog("🚨 DEBUG - Payload sendo enviado:", {
-          tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: entregadorIdResolvido,
-          vendaAtual_completo: vendaAtual,
-        });
-
-        // Buscar pagamentos atualizados
-        let totalPago = 0;
-        try {
-          const responsePagamentos = await api.get(
-            `/vendas/${vendaAtual.id}/pagamentos`,
-          );
-          totalPago = responsePagamentos.data.total_pago || 0;
-        } catch (error) {
-          console.error("Erro ao buscar pagamentos:", error);
-        }
-
-        // Recalcular e atualizar status baseado nos pagamentos
-        const totalVenda = vendaAtual.total;
-        let novoStatus = "aberta";
-
-        if (totalPago >= totalVenda - 0.01) {
-          novoStatus = "finalizada";
-        } else if (totalPago > 0) {
-          novoStatus = "baixa_parcial";
-        }
-
-        // Atualizar status se necessário
-        if (vendaAtual.status !== novoStatus) {
-          await api.patch(`/vendas/${vendaAtual.id}/status`, {
-            status: novoStatus,
-          });
-          debugLog(
-            `✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`,
-          );
-        }
-
-        alert("Venda atualizada com sucesso!");
-
-        // Limpar PDV para nova venda
-        limparVenda();
-      } else {
-        // Criar nova venda
-        debugLog("🚀 CRIANDO VENDA - Versão 2.0 - DESCONTOS ZERADOS");
-        debugLog("Desconto valor:", 0);
-        debugLog("Desconto percentual:", 0);
-        debugLog("✅ Checkbox Venda Comissionada:", vendaComissionada);
-        debugLog("💼 Funcionário Comissão:", funcionarioComissao);
-        debugLog(
-          "📋 Funcionário ID enviado:",
-          funcionarioComissao?.id || null,
-        );
-
-        if (vendaComissionada && !funcionarioComissao) {
-          console.error(
-            "⚠️ ERRO: Checkbox marcado mas funcionário não selecionado!",
-          );
-        }
-
-        // 🚚 Calcular percentuais de taxa de entrega
-        const taxaTotal = vendaAtual.entrega?.taxa_entrega_total || 0;
-        const taxaLoja = vendaAtual.entrega?.taxa_loja || 0;
-        const taxaEntregador = vendaAtual.entrega?.taxa_entregador || 0;
-        const percentualLoja =
-          taxaTotal > 0 ? (taxaLoja / taxaTotal) * 100 : 100;
-        const percentualEntregador =
-          taxaTotal > 0 ? (taxaEntregador / taxaTotal) * 100 : 0;
-
-        const payloadVenda = {
-          cliente_id: vendaAtual.cliente?.id,
-          funcionario_id: vendaAtual.funcionario_id, // ✅ Usar do vendaAtual (sincronizado via useEffect)
-          itens: vendaAtual.itens.map((item) => ({
-            tipo: item.tipo,
-            produto_id: item.produto_id,
-            servico_descricao: item.servico_descricao,
-            quantidade: item.quantidade,
-            preco_unitario: item.preco_unitario || item.preco_venda,
-            desconto_item: 0, // ZERADO - desconto já está no subtotal
-            subtotal: item.subtotal, // Já vem com desconto aplicado
-            lote_id: item.lote_id,
-            pet_id: item.pet_id || vendaAtual.pet?.id,
-          })),
-          desconto_valor: 0, // CORREÇÃO APLICADA: Descontos já nos itens
-          desconto_percentual: 0, // CORREÇÃO APLICADA: Não aplicar desconto novamente
-          observacoes: vendaAtual.observacoes,
-          tem_entrega: vendaAtual.tem_entrega,
-          taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-          percentual_taxa_loja: percentualLoja,
-          percentual_taxa_entregador: percentualEntregador,
-          endereco_entrega: vendaAtual.entrega?.endereco_completo,
-          observacoes_entrega: vendaAtual.entrega?.observacoes_entrega,
-          distancia_km: vendaAtual.entrega?.distancia_km,
-          valor_por_km: vendaAtual.entrega?.valor_por_km,
-          loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: entregadorIdResolvido,
-        };
-
-        debugLog(
-          "📦 PAYLOAD COMPLETO antes de enviar:",
-          JSON.stringify(payloadVenda, null, 2),
-        );
-        debugLog("🚚 Dados de entrega:", {
-          tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: entregadorIdResolvido,
-          entregadorSelecionado: entregadorSelecionado?.id,
-          vendaAtual_completo: vendaAtual,
-        });
-        debugLog("💰 Percentuais calculados:", {
-          taxaTotal,
-          taxaLoja,
-          taxaEntregador,
-          percentualLoja: `${percentualLoja.toFixed(2)}%`,
-          percentualEntregador: `${percentualEntregador.toFixed(2)}%`,
-        });
-
-        await criarVenda(payloadVenda);
-
-        alert("Venda salva com sucesso!");
-        limparVenda();
-      }
-
-      carregarVendasRecentes();
-    } catch (error) {
-      console.error("❌ Erro ao salvar venda:", error);
-      console.error("❌ Resposta do servidor:", error.response?.data);
-      console.error("❌ Status:", error.response?.status);
-      console.error("❌ Headers:", error.response?.headers);
-      const errorDetail =
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
-        "Erro ao salvar venda";
-      console.error("❌ Detalhes do erro:", errorDetail);
-      alert(`Erro ao salvar venda: ${errorDetail}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Buscar análise da venda
   const buscarAnaliseVenda = async () => {
     if (vendaAtual.itens.length === 0) {
       alert("Adicione pelo menos um produto para ver a análise");
