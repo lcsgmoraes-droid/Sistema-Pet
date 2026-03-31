@@ -12,6 +12,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -21,6 +22,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
       }

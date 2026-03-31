@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -60,6 +61,25 @@ interface VendaDetalhes {
     subtotal?: number;
     preco_unitario?: number;
   }>;
+}
+
+function reordenarParadasPorPosicao(
+  paradas: Parada[],
+  paradaId: number,
+  novaPosicao: number,
+) {
+  const ordenadas = [...paradas].sort((a, b) => a.ordem - b.ordem);
+  const indiceAtual = ordenadas.findIndex((parada) => parada.id === paradaId);
+
+  if (indiceAtual < 0) {
+    return null;
+  }
+
+  const posicaoClamped = Math.max(1, Math.min(novaPosicao, ordenadas.length));
+  const [paradaMovida] = ordenadas.splice(indiceAtual, 1);
+  ordenadas.splice(posicaoClamped - 1, 0, paradaMovida);
+
+  return ordenadas;
 }
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
@@ -133,6 +153,10 @@ export default function DetalheEntregaScreen() {
   const [modalVendaAberto, setModalVendaAberto] = useState(false);
   const [loadingVenda, setLoadingVenda] = useState(false);
   const [vendaDetalhes, setVendaDetalhes] = useState<VendaDetalhes | null>(null);
+  const [modalOrdemAberto, setModalOrdemAberto] = useState(false);
+  const [paradaOrdemEmEdicao, setParadaOrdemEmEdicao] = useState<Parada | null>(null);
+  const [novaOrdemTexto, setNovaOrdemTexto] = useState("");
+  const [salvandoOrdemManual, setSalvandoOrdemManual] = useState(false);
 
   const paradasPendentes =
     rota?.paradas?.filter((p) => p.status === "pendente").length ?? 0;
@@ -345,9 +369,54 @@ export default function DetalheEntregaScreen() {
         ordem: index + 1,
       }));
       setRota((prev) => (prev ? { ...prev, paradas: atualizadas } : prev));
+      return true;
     } catch {
       Alert.alert("Erro", "Não foi possível salvar a nova ordem das paradas.");
       await carregar();
+      return false;
+    }
+  }
+
+  function abrirModalOrdem(parada: Parada) {
+    if (rota?.status !== "pendente") return;
+    setParadaOrdemEmEdicao(parada);
+    setNovaOrdemTexto(String(parada.ordem));
+    setModalOrdemAberto(true);
+  }
+
+  function fecharModalOrdem() {
+    if (salvandoOrdemManual) return;
+    setModalOrdemAberto(false);
+    setParadaOrdemEmEdicao(null);
+    setNovaOrdemTexto("");
+  }
+
+  async function confirmarNovaOrdemManual() {
+    if (!rota || !paradaOrdemEmEdicao) return;
+
+    const novaPosicao = Number.parseInt(novaOrdemTexto, 10);
+    if (!Number.isFinite(novaPosicao)) {
+      Alert.alert("Posição inválida", "Digite um número válido para reordenar a entrega.");
+      return;
+    }
+
+    const ordenadas = reordenarParadasPorPosicao(
+      rota.paradas,
+      paradaOrdemEmEdicao.id,
+      novaPosicao,
+    );
+
+    if (!ordenadas) {
+      Alert.alert("Erro", "Não foi possível localizar essa parada para reordenar.");
+      return;
+    }
+
+    setSalvandoOrdemManual(true);
+    const salvou = await salvarNovaOrdemParadas(ordenadas);
+    setSalvandoOrdemManual(false);
+
+    if (salvou) {
+      fecharModalOrdem();
     }
   }
 
@@ -451,8 +520,23 @@ export default function DetalheEntregaScreen() {
       >
         {/* Cabeçalho */}
         <View style={styles.paradaHeader}>
-          <View style={styles.ordemCircle}>
-            <Text style={styles.ordemText}>{parada.ordem}</Text>
+          <View style={styles.ordemWrapper}>
+            {rota?.status === "pendente" ? (
+              <TouchableOpacity
+                style={styles.ordemCircle}
+                onPress={() => abrirModalOrdem(parada)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.ordemText}>{parada.ordem}</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.ordemCircle}>
+                <Text style={styles.ordemText}>{parada.ordem}</Text>
+              </View>
+            )}
+            {rota?.status === "pendente" ? (
+              <Text style={styles.ordemEditHint}>Toque para alterar</Text>
+            ) : null}
           </View>
           <View style={styles.paradaInfo}>
             <Text style={styles.paradaCliente} numberOfLines={1}>
@@ -466,7 +550,8 @@ export default function DetalheEntregaScreen() {
             <TouchableOpacity
               style={[styles.btnDrag, isActive && styles.btnDragAtivo]}
               onLongPress={drag}
-              delayLongPress={120}
+              delayLongPress={70}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Text style={styles.btnDragText}>☰</Text>
             </TouchableOpacity>
@@ -615,11 +700,13 @@ export default function DetalheEntregaScreen() {
       {/* Lista de paradas */}
       {rota.status === "pendente" ? (
         <>
-          <Text style={styles.dragHint}>Arraste pelo ícone ↕️ para reordenar antes de iniciar</Text>
+          <Text style={styles.dragHint}>
+            Arraste pelo ícone ↕️ ou toque no número azul para definir a ordem manualmente.
+          </Text>
           <DraggableFlatList
             data={[...rota.paradas].sort((a, b) => a.ordem - b.ordem)}
             keyExtractor={(item) => String(item.id)}
-            activationDistance={12}
+            activationDistance={4}
             autoscrollThreshold={60}
             autoscrollSpeed={80}
             dragItemOverflow={false}
@@ -635,6 +722,73 @@ export default function DetalheEntregaScreen() {
       ) : (
         rota.paradas.map((p) => renderParada(p))
       )}
+
+      <Modal
+        visible={modalOrdemAberto}
+        transparent
+        animationType="fade"
+        onRequestClose={fecharModalOrdem}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitulo}>Reordenar entrega</Text>
+            <Text style={styles.modalSubtitulo}>
+              Escolha a nova posição dessa parada na rota.
+            </Text>
+
+            {paradaOrdemEmEdicao ? (
+              <View style={styles.modalResumoOrdem}>
+                <Text style={styles.modalResumoOrdemLabel}>Entrega selecionada</Text>
+                <Text style={styles.modalResumoOrdemCliente} numberOfLines={1}>
+                  {paradaOrdemEmEdicao.cliente_nome ??
+                    `Cliente da venda #${paradaOrdemEmEdicao.venda_id}`}
+                </Text>
+                <Text style={styles.modalResumoOrdemEndereco} numberOfLines={2}>
+                  {paradaOrdemEmEdicao.endereco}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.modalCampoLabel}>
+              Nova posição (1 a {rota?.paradas.length ?? 1})
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={novaOrdemTexto}
+              onChangeText={(value) => setNovaOrdemTexto(value.replace(/\D/g, ""))}
+              placeholder="Ex: 1"
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                void confirmarNovaOrdemManual();
+              }}
+              editable={!salvandoOrdemManual}
+              autoFocus
+            />
+
+            <View style={styles.modalAcoes}>
+              <TouchableOpacity style={styles.modalCancelar} onPress={fecharModalOrdem}>
+                <Text style={styles.modalCancelarText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmar,
+                  salvandoOrdemManual && { opacity: 0.6 },
+                ]}
+                disabled={salvandoOrdemManual}
+                onPress={() => {
+                  void confirmarNovaOrdemManual();
+                }}
+              >
+                <Text style={styles.modalConfirmarText}>
+                  {salvandoOrdemManual ? "Salvando..." : "Salvar posição"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={modalRecebimentoAberto}
@@ -912,6 +1066,10 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 10,
   },
+  ordemWrapper: {
+    alignItems: "center",
+    width: 64,
+  },
   ordemCircle: {
     width: 30,
     height: 30,
@@ -923,6 +1081,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   ordemText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  ordemEditHint: {
+    marginTop: 4,
+    fontSize: 10,
+    color: "#2563eb",
+    fontWeight: "600",
+    textAlign: "center",
+  },
   paradaInfo: { flex: 1 },
   paradaCliente: { fontSize: 15, fontWeight: "600", color: "#111827" },
   paradaEndereco: { fontSize: 13, color: "#6b7280", marginTop: 2 },
@@ -1032,6 +1197,53 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalTitulo: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  modalSubtitulo: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  modalResumoOrdem: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#dbeafe",
+    backgroundColor: "#eff6ff",
+    padding: 12,
+    marginBottom: 14,
+  },
+  modalResumoOrdemLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1d4ed8",
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  modalResumoOrdemCliente: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  modalResumoOrdemEndereco: {
+    fontSize: 13,
+    color: "#4b5563",
+    marginTop: 4,
+  },
+  modalCampoLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    color: "#111827",
+    marginBottom: 16,
+  },
   modalHeaderDetalhes: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1051,12 +1263,6 @@ const styles = StyleSheet.create({
   },
   itemVendaNome: { fontSize: 14, fontWeight: '600', color: '#111827' },
   itemVendaValor: { fontSize: 12, color: '#4b5563', marginTop: 4 },
-  modalSubtitulo: {
-    marginTop: 4,
-    marginBottom: 12,
-    color: "#6b7280",
-    fontSize: 13,
-  },
   opcoesLinha: { flexDirection: "row", gap: 8 },
   opcaoBtn: {
     flex: 1,
