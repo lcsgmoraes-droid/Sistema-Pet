@@ -33,6 +33,7 @@ import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
+import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
@@ -196,12 +197,6 @@ export default function PDV() {
   const [painelClienteAberto, setPainelClienteAberto] =
     usePersistentBooleanState("pdv_painel_cliente_aberto", false);
 
-  // Estado de Oportunidades Inteligentes (D4 - Backend Integration)
-  // ✅ RULE: Oportunidades só aparecem com cliente selecionado
-  const [painelOportunidadesAberto, setPainelOportunidadesAberto] =
-    useState(false);
-  const [opportunities, setOpportunities] = useState([]);
-
   // 🆕 Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
   const [totalImpostos, setTotalImpostos] = useState(0);
@@ -232,6 +227,15 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     enviarMensagemAssistente,
     alternarPainelAssistente,
   } = usePDVAssistente(vendaAtual);
+  const {
+    painelOportunidadesAberto,
+    setPainelOportunidadesAberto,
+    opportunities,
+    abrirPainelOportunidades,
+    adicionarOportunidadeAoCarrinho,
+    buscarAlternativaOportunidade,
+    ignorarOportunidade,
+  } = usePDVOportunidades(vendaAtual, user?.id);
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -452,78 +456,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       setPendenciasProdutoIds([]);
     }
   };
-
-  // Buscar oportunidades do backend (D4 - Backend Integration)
-  const buscarOportunidades = async (vendaId) => {
-    const clienteId = vendaAtual.cliente?.id;
-    if (!clienteId) {
-      setOpportunities([]);
-      return;
-    }
-
-    try {
-      // Se há venda salva: usa endpoint por venda (exclui itens já no carrinho)
-      // Se não há venda salva ainda: usa endpoint direto por cliente
-      const url = vendaId
-        ? `/internal/pdv/oportunidades/${vendaId}`
-        : `/internal/pdv/oportunidades-cliente/${clienteId}`;
-
-      const response = await api.get(url);
-      const data = response.data;
-
-      // Extrair oportunidades da resposta
-      if (data && Array.isArray(data.oportunidades)) {
-        setOpportunities(data.oportunidades);
-      } else {
-        setOpportunities([]);
-      }
-    } catch (error) {
-      // Fail-safe: erro silencioso, apenas limpa lista
-      setOpportunities([]);
-    }
-  };
-
-  // Registrar evento de oportunidade (D5 - Event Tracking)
-  // Fire-and-forget: não aguarda resposta, não bloqueia UI
-  const registrarEventoOportunidade = async (eventType, oportunidade) => {
-    try {
-      // Payload mínimo para tracking
-      const payload = {
-        opportunity_id: oportunidade.id,
-        event_type: eventType,
-        user_id: user?.id,
-        contexto: "PDV",
-        extra_data: {
-          produto_origem_id: oportunidade.produto_origem_id || null,
-          produto_sugerido_id: oportunidade.produto_sugerido_id || null,
-          tipo_oportunidade: oportunidade.tipo || null,
-          venda_id: vendaAtual.id || null,
-        },
-      };
-
-      // Fire-and-forget: não aguarda resposta
-      api.post("/internal/pdv/eventos-oportunidade", payload).catch(() => {
-        // Erro silencioso - nunca afeta UX
-      });
-    } catch (error) {
-      // Fail-safe: erro silencioso
-    }
-  };
-
-  function adicionarOportunidadeAoCarrinho(oportunidade) {
-    registrarEventoOportunidade("oportunidade_convertida", oportunidade);
-    debugLog("Adicionar ao carrinho:", oportunidade.id);
-  }
-
-  function buscarAlternativaOportunidade(oportunidade) {
-    registrarEventoOportunidade("oportunidade_refinada", oportunidade);
-    debugLog("Buscar alternativa:", oportunidade.id);
-  }
-
-  function ignorarOportunidade(oportunidade) {
-    registrarEventoOportunidade("oportunidade_rejeitada", oportunidade);
-    setOpportunities((prev) => prev.filter((item) => item.id !== oportunidade.id));
-  }
 
   // 🆕 Função para calcular fiscal de um item (PDV-UX-01)
   async function calcularFiscalItem(item) {
@@ -2724,8 +2656,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
             mensagensAssistenteLength={mensagensAssistente.length}
             onAbrirPendenciasEstoque={() => setMostrarPendenciasEstoque(true)}
             onAbrirOportunidades={() => {
-              setPainelOportunidadesAberto(true);
-              buscarOportunidades(vendaAtual.id || null);
+              void abrirPainelOportunidades();
             }}
             onToggleAssistente={() => {
               void alternarPainelAssistente();

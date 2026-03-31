@@ -521,6 +521,10 @@ Itens executados nesta etapa:
   - logica do assistente IA e dos alertas de carrinho movida para `frontend/src/hooks/usePDVAssistente.js`
   - `PDV.jsx` deixou de concentrar estados, efeitos e chamadas de API desse fluxo
   - a abertura do painel do assistente passou a usar um handler unico de orquestracao
+- [x] continuar a extracao de hooks por fluxo no `PDV.jsx`:
+  - logica de oportunidades inteligentes movida para `frontend/src/hooks/usePDVOportunidades.js`
+  - `PDV.jsx` deixou de concentrar busca, tracking e acoes do painel lateral de oportunidades
+  - a abertura do painel de oportunidades passou a usar um handler unico de orquestracao
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
