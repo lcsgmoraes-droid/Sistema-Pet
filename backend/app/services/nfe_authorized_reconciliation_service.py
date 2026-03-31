@@ -23,6 +23,12 @@ def _limite_data_recentes(dias: int) -> datetime:
     return _utc_now() - timedelta(days=max(int(dias or 1), 1))
 
 
+def _garantir_registry_sqlalchemy_reconciliacao() -> None:
+    from app.services.bling_flow_monitor_service import _garantir_registry_sqlalchemy_auditoria
+
+    _garantir_registry_sqlalchemy_auditoria()
+
+
 def _text(value) -> str | None:
     if value is None:
         return None
@@ -63,6 +69,7 @@ def _buscar_nfes_autorizadas_recentes(
 
 
 def listar_tenants_com_nfes_autorizadas_recentes(db: Session, *, dias: int) -> list:
+    _garantir_registry_sqlalchemy_reconciliacao()
     return [
         tenant_id
         for (tenant_id,) in (
@@ -364,6 +371,7 @@ def reconciliar_nfes_autorizadas_recentes(
     dias: int = 3,
     limite_notas: int = 200,
 ) -> dict:
+    _garantir_registry_sqlalchemy_reconciliacao()
     registros = _buscar_nfes_autorizadas_recentes(
         db,
         tenant_id,
