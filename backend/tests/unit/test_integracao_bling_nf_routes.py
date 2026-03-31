@@ -401,6 +401,100 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
     assert eventos[0]["auto_fix_applied"] is True
 
 
+def test_nf_autorizada_remove_baixa_legada_de_pedido_incorreto(monkeypatch):
+    class FakeQuery:
+        def __init__(self, resultado=None):
+            self.resultado = resultado
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.resultado
+
+        def all(self):
+            return self.resultado if isinstance(self.resultado, list) else []
+
+    class FakeDB:
+        def __init__(self, movimentos):
+            self.movimentos = movimentos
+
+        def query(self, model):
+            nome = getattr(model, "__name__", "")
+            if nome == "BlingNotaFiscalCache":
+                return FakeQuery(SimpleNamespace(pedido_bling_id_ref="25439750635"))
+            if nome == "EstoqueMovimentacao":
+                return FakeQuery(self.movimentos)
+            raise AssertionError(f"Consulta inesperada para {nome}")
+
+        def add(self, obj):
+            return None
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            return None
+
+    movimento_legado = SimpleNamespace(
+        id=2953,
+        produto_id=6619,
+        quantidade=1,
+        lotes_consumidos=None,
+        status="confirmado",
+        observacao="Baixa automatica via webhook Bling (Atendido)",
+        user_id=12,
+        documento="11585",
+    )
+    pedido = SimpleNamespace(
+        status="confirmado",
+        confirmado_em=None,
+        tenant_id="tenant-1",
+        id=1078,
+        pedido_bling_id="25427170103",
+        pedido_bling_numero="11585",
+        payload={"ultima_nf": {"id": "25438627877", "numero": "011073"}},
+    )
+    item = SimpleNamespace(sku="013210.1", quantidade=1, vendido_em="2026-03-30T17:09:05Z")
+    eventos = []
+    estornos = []
+
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: eventos.append(kwargs))
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.resolver_incidentes_relacionados",
+        lambda *args, **kwargs: 0,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=99),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.KitEstoqueService.recalcular_kits_que_usam_produto",
+        lambda db, produto_id: {},
+    )
+    monkeypatch.setattr(
+        "app.estoque.service.EstoqueService.estornar_estoque",
+        lambda **kwargs: estornos.append(kwargs) or {"sucesso": True},
+    )
+
+    resposta = processar_nf_autorizada(
+        db=FakeDB([movimento_legado]),
+        pedido=pedido,
+        itens=[item],
+        nf_id="25438627877",
+    )
+
+    assert resposta == "nf_vinculada_outro_pedido"
+    assert movimento_legado.status == "cancelado"
+    assert estornos[0]["documento"] == "011073"
+    assert item.vendido_em is None
+    assert "ultima_nf" not in pedido.payload
+    assert eventos[0]["auto_fix_applied"] is True
+
+
 def test_registrar_nf_no_pedido_salva_data_emissao():
     pedido = SimpleNamespace(payload={})
 

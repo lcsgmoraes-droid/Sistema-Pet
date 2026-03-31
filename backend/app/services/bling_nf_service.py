@@ -315,7 +315,15 @@ def desvincular_nf_de_pedido_incorreto(
     movimentos_nf = [
         mov
         for mov in movimentos
-        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_id)
+        if (
+            movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_id)
+            or movimento_legado_pedido_para_nf(
+                mov,
+                pedido_bling_numero=pedido.pedido_bling_numero,
+                nf_numero=nf_numero,
+                nf_bling_id=nf_id,
+            )
+        )
     ]
 
     usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
