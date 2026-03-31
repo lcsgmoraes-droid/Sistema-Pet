@@ -240,3 +240,9 @@ class ConfiguracaoTributaria(BaseTenantModel):
     # Relacionamentos - DUPLICADO (manter comentado)
     # usuario = relationship("User", back_populates="configuracao_tributaria")
 
+
+# Garante o registro do modelo complementar usado no relationship()
+# quando este modulo e importado isoladamente, fora do app.main.
+import app.financeiro_models  # noqa: E402,F401
+from app.ia.aba7_models import DREPeriodo  # noqa: E402,F401
+

@@ -7,7 +7,7 @@ from time import monotonic, sleep
 from typing import Any, Optional
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, configure_mappers
 
 from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.db import SessionLocal
@@ -45,6 +45,19 @@ _NF_RECENTES_CACHE_SECONDS = 300
 _NF_RECENTES_ENRICH_LIMIT = 60
 _NF_RECENTES_ENRICH_DELAY_SECONDS = 0.35
 _nf_recentes_cache: dict[tuple[str, int], dict] = {}
+
+
+def _garantir_registry_sqlalchemy_auditoria() -> None:
+    # A auditoria pode rodar fora do app.main (script/scheduler/manual),
+    # então ela precisa bootstrapar explicitamente os modelos com relacionamentos
+    # declarados por string antes de qualquer query.
+    import app.models  # noqa: F401
+    import app.financeiro_models  # noqa: F401
+    import app.dre_plano_contas_models  # noqa: F401
+    import app.ia.aba7_extrato_models  # noqa: F401
+    import app.ia.aba7_models  # noqa: F401
+
+    configure_mappers()
 
 
 def _utcnow() -> datetime:
@@ -1284,6 +1297,7 @@ def auditar_fluxo_bling(
     limite: int = 300,
     auto_fix: bool = True,
 ) -> dict:
+    _garantir_registry_sqlalchemy_auditoria()
     cutoff = _utcnow() - timedelta(days=max(1, dias))
     query = db.query(PedidoIntegrado).filter(PedidoIntegrado.criado_em >= cutoff)
     if tenant_id:

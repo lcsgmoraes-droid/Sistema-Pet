@@ -216,3 +216,4 @@ class IndicesMercado(BaseTenantModel):
     referencia_ano = Column(Integer)  # Ano de referência dos dados
     ativo = Column(Boolean, default=True)
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+from app.ia.aba7_extrato_models import HistoricoAtualizacaoDRE  # noqa: E402,F401

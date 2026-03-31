@@ -576,6 +576,10 @@ Itens executados nesta etapa:
   - a rota passa a aceitar o alias `pedido` na URL alem de `busca`
   - um pedido com payload ruim nao derruba mais a listagem inteira durante a serializacao
   - a interface de confirmacao manual passa a explicar corretamente que o estoque aguardara a NF
+- [x] blindar a auditoria automatica do Monitor Bling contra falhas de registry do SQLAlchemy:
+  - o servico de auditoria agora bootstrapa explicitamente os modelos com relacionamentos por string antes de rodar
+  - a execucao manual e automatica da auditoria deixa de depender de import indireto do `app.main`
+  - foi adicionada validacao especifica para garantir esse bootstrap em processo isolado
 
 Itens deliberadamente adiados por agora:
 
