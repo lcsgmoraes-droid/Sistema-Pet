@@ -36,6 +36,7 @@ import { usePDVAssistente } from "../hooks/usePDVAssistente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
+import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
@@ -227,6 +228,25 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     handleRemoverFuncionarioComissao,
     limparComissao,
   } = usePDVComissao(setVendaAtual, modoVisualizacao);
+  const {
+    carregarVendaEspecifica,
+    handleBuscarVenda,
+    abrirModalPagamento,
+    limparVenda,
+    reabrirVenda,
+  } = usePDVVendaAtual({
+    vendaAtual,
+    setVendaAtual,
+    searchVendaQuery,
+    setSearchVendaQuery,
+    setLoading,
+    setModoVisualizacao,
+    setMostrarModalPagamento,
+    entregadorSelecionado,
+    limparComissao,
+    sincronizarComissaoDaVenda,
+    sincronizarEntregadorDaVenda,
+  });
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -798,161 +818,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  const carregarVendaEspecifica = async (
-    vendaId,
-    abrirModalPagamento = false,
-  ) => {
-    try {
-      setLoading(true);
-      const venda = await buscarVenda(vendaId);
-
-      if (!venda) {
-        alert("Venda não encontrada");
-        return;
-      }
-
-      // Carregar cliente se existir
-      let clienteCompleto = null;
-      if (venda.cliente_id) {
-        try {
-          clienteCompleto = await buscarClientePorId(venda.cliente_id);
-        } catch (error) {
-          console.error("Erro ao buscar cliente:", error);
-        }
-      }
-
-      // Buscar pagamentos da venda
-      let pagamentosVenda = [];
-      let totalPago = 0;
-      try {
-        const responsePagamentos = await api.get(
-          `/vendas/${vendaId}/pagamentos`,
-        );
-        pagamentosVenda = responsePagamentos.data.pagamentos || [];
-        totalPago = responsePagamentos.data.total_pago || 0;
-      } catch (error) {
-        console.error("Erro ao buscar pagamentos:", error);
-      }
-
-      await sincronizarComissaoDaVenda(venda.funcionario_id);
-
-      // Montar estado da venda
-      const vendaCarregada = {
-        id: venda.id,
-        numero_venda: venda.numero_venda, // ✅ ADICIONADO
-        status: venda.status,
-        data_venda: venda.data_venda, // ✅ ADICIONADO
-        cliente: clienteCompleto,
-        pet: null,
-        itens: venda.itens || [],
-        subtotal: venda.subtotal || 0,
-        desconto_valor: venda.desconto_valor || 0,
-        desconto_percentual: venda.desconto_percentual || 0,
-        total: venda.total || 0,
-        observacoes: venda.observacoes || "",
-        funcionario_id: venda.funcionario_id || null, // ✅ Funcionário de comissão
-        entregador_id: venda.entregador_id || null, // ✅ Entregador
-        tem_entrega: venda.tem_entrega || false,
-        entrega: venda.entrega || {
-          endereco_completo: "",
-          taxa_entrega_total: 0,
-          taxa_loja: 0,
-          taxa_entregador: 0,
-          observacoes_entrega: "",
-        },
-        pagamentos: pagamentosVenda,
-        total_pago: totalPago,
-      };
-
-      setVendaAtual(vendaCarregada);
-      setModoVisualizacao(true); // Modo leitura para venda existente
-
-      await sincronizarEntregadorDaVenda(venda.entregador_id);
-
-      // 🆕 Se foi solicitado, abre o modal de pagamento após carregar
-      if (abrirModalPagamento) {
-        setTimeout(() => {
-          setMostrarModalPagamento(true);
-        }, 500); // Pequeno delay para garantir que tudo foi renderizado
-      }
-    } catch (error) {
-      console.error("Erro ao carregar venda:", error);
-      if (error.response?.status === 404) {
-        alert("Venda não encontrada. Pode ter sido cancelada ou excluída.");
-      } else {
-        alert(
-          "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Buscar venda por número ou termo de busca
-  const handleBuscarVenda = async () => {
-    if (!searchVendaQuery.trim()) return;
-
-    try {
-      setLoading(true);
-
-      // Extrair apenas números da query (exemplo: "VEN-0011" -> "0011")
-      const numeroLimpo = searchVendaQuery.replace(/\D/g, "");
-
-      if (!numeroLimpo) {
-        alert("Digite um número de venda válido");
-        setLoading(false);
-        return;
-      }
-
-      debugLog("🔍 Buscando venda com número:", numeroLimpo);
-
-      // Buscar diretamente usando o parâmetro 'busca' do backend
-      const resultado = await listarVendas({
-        busca: numeroLimpo,
-        per_page: 50,
-      });
-
-      debugLog("📊 Vendas encontradas:", resultado.vendas?.length);
-
-      if (!resultado.vendas || resultado.vendas.length === 0) {
-        alert(`Nenhuma venda encontrada com "${numeroLimpo}"`);
-        setLoading(false);
-        return;
-      }
-
-      // Se encontrou apenas uma, carregar direto
-      if (resultado.vendas.length === 1) {
-        await carregarVendaEspecifica(resultado.vendas[0].id);
-        setSearchVendaQuery(""); // Limpar campo após buscar
-        return;
-      }
-
-      // Se encontrou múltiplas, mostrar lista para escolher
-      const escolha = resultado.vendas
-        .slice(0, 10) // Mostrar no máximo 10
-        .map(
-          (v, i) =>
-            `${i + 1}. ${v.numero_venda} - ${v.cliente_nome || "Sem cliente"} - ${v.status}`,
-        )
-        .join("\n");
-
-      const numeroEscolhido = prompt(
-        `Encontradas ${resultado.vendas.length} vendas. Digite o número da opção:\n\n${escolha}`,
-      );
-
-      const indice = parseInt(numeroEscolhido) - 1;
-      if (indice >= 0 && indice < resultado.vendas.length) {
-        await carregarVendaEspecifica(resultado.vendas[indice].id);
-        setSearchVendaQuery(""); // Limpar campo após buscar
-      }
-    } catch (error) {
-      console.error("Erro ao buscar venda:", error);
-      alert("Erro ao buscar venda: " + (error.message || "Erro desconhecido"));
-    } finally {
-      setLoading(false);
-    }
-  };
+  // carregarVendaEspecifica e handleBuscarVenda movidos para usePDVVendaAtual
 
   // Buscar clientes
   useEffect(() => {
@@ -1752,132 +1618,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  // Abrir modal de pagamento
-  const abrirModalPagamento = () => {
-    if (vendaAtual.itens.length === 0) {
-      alert("Adicione pelo menos um produto ou serviço");
-      return;
-    }
-
-    // Bloquear se a venda estiver finalizada (sem NF) ou pago_nf (com NF)
-    if (vendaAtual.status === "finalizada" || vendaAtual.status === "pago_nf") {
-      alert(
-        'Esta venda está finalizada. Clique em "Reabrir Venda" para modificar.',
-      );
-      return;
-    }
-
-    setMostrarModalPagamento(true);
-  };
-
-  // Limpar venda
-  const limparVenda = () => {
-    setVendaAtual({
-      cliente: null,
-      pet: null,
-      itens: [],
-      subtotal: 0,
-      desconto_valor: 0,
-      desconto_percentual: 0,
-      total: 0,
-      observacoes: "",
-      funcionario_id: null, // ✅ Limpar funcionário de comissão
-      entregador_id: entregadorSelecionado?.id || null, // 🚚 Manter entregador padrão
-      tem_entrega: false,
-      entrega: {
-        endereco_completo: "",
-        taxa_entrega_total: 0,
-        taxa_loja: 0,
-        taxa_entregador: 0,
-        observacoes_entrega: "",
-      },
-    });
-    limparComissao();
-    setModoVisualizacao(false);
-  };
-
-  // Reabrir venda ao clicar (modo visualização)
-  const reabrirVenda = async (venda) => {
-    try {
-      // Buscar detalhes completos da venda (incluindo itens)
-      const vendaCompleta = await buscarVenda(venda.id);
-
-      // Se tem cliente, buscar seus dados completos (incluindo pets)
-      let clienteCompleto = null;
-      if (vendaCompleta.cliente_id) {
-        clienteCompleto = await buscarClientePorId(vendaCompleta.cliente_id);
-      }
-
-      // Buscar pagamentos da venda
-      let pagamentosVenda = [];
-      let totalPago = 0;
-      try {
-        const responsePagamentos = await api.get(
-          `/vendas/${venda.id}/pagamentos`,
-        );
-        pagamentosVenda = responsePagamentos.data.pagamentos || [];
-        totalPago = responsePagamentos.data.total_pago || 0;
-      } catch (error) {
-        console.error("Erro ao buscar pagamentos:", error);
-      }
-
-      // 🆕 CARREGAR DADOS DE COMISSÃO se existir funcionario_id
-      debugLog(
-        "🔍 Venda carregada - funcionario_id:",
-        vendaCompleta.funcionario_id,
-      );
-      await sincronizarComissaoDaVenda(vendaCompleta.funcionario_id);
-
-      // Carregar dados da venda no PDV em modo visualização
-      const vendaParaSetar = {
-        id: vendaCompleta.id,
-        numero_venda: vendaCompleta.numero_venda,
-        data_venda: vendaCompleta.data_venda,
-        cliente: clienteCompleto,
-        pet: null,
-        itens: vendaCompleta.itens || [],
-        subtotal: parseFloat(vendaCompleta.subtotal || vendaCompleta.total),
-        desconto_valor: parseFloat(vendaCompleta.desconto_valor || 0),
-        desconto_percentual: parseFloat(vendaCompleta.desconto_percentual || 0),
-        total: parseFloat(vendaCompleta.total),
-        observacoes: vendaCompleta.observacoes || "",
-        status: vendaCompleta.status,
-        tem_entrega: vendaCompleta.tem_entrega || false,
-        entregador_id: vendaCompleta.entregador_id || null,
-        entrega: {
-          endereco_completo: vendaCompleta.endereco_entrega || "",
-          endereco_id: vendaCompleta.endereco_id || null,
-          taxa_entrega_total: parseFloat(
-            parseFloat(vendaCompleta.taxa_entrega || 0).toFixed(2),
-          ),
-          taxa_loja: parseFloat(
-            parseFloat(vendaCompleta.entrega?.taxa_loja || 0).toFixed(2),
-          ),
-          taxa_entregador: parseFloat(
-            parseFloat(vendaCompleta.entrega?.taxa_entregador || 0).toFixed(2),
-          ),
-          observacoes_entrega: vendaCompleta.observacoes_entrega || "",
-          distancia_km: vendaCompleta.distancia_km || 0,
-          valor_por_km: vendaCompleta.valor_por_km || 0,
-          loja_origem: vendaCompleta.loja_origem || "",
-          status_entrega: vendaCompleta.status_entrega || "pendente",
-        },
-        pagamentos: pagamentosVenda,
-        total_pago: totalPago,
-      };
-
-      setVendaAtual(vendaParaSetar);
-
-      // Ativar modo visualização (travado)
-      setModoVisualizacao(true);
-
-      // Scroll para o topo
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (error) {
-      console.error("Erro ao reabrir venda:", error);
-      alert("Erro ao carregar os dados da venda");
-    }
-  };
+  // abrirModalPagamento, limparVenda e reabrirVenda movidos para usePDVVendaAtual
 
   // Habilitar edição de venda
   const habilitarEdicao = () => {
