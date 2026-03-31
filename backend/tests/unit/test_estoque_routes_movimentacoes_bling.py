@@ -420,6 +420,65 @@ def test_contexto_venda_pedido_integrado_resolve_nf_pelo_cache_do_pedido(monkeyp
     assert contexto["nf_numero"] == "011087"
 
 
+def test_contexto_venda_pedido_integrado_ignora_nf_cache_de_outro_pedido():
+    class FakeQuery:
+        def __init__(self, resultados):
+            self.resultados = list(resultados)
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.resultados.pop(0) if self.resultados else None
+
+    class FakeDB:
+        def __init__(self, consultas):
+            self.consultas = consultas
+
+        def query(self, model):
+            nome = getattr(model, "__name__", "")
+            if nome == "BlingNotaFiscalCache":
+                return FakeQuery(self.consultas)
+            raise AssertionError(f"Modelo inesperado: {nome}")
+
+    pedido = SimpleNamespace(
+        tenant_id="tenant-1",
+        pedido_bling_id="pedido-correto",
+        canal="bling",
+        payload={
+            "pedido": {
+                "numeroPedidoLoja": "LOJA-123",
+            },
+            "ultima_nf": {"id": "nf-errada", "numero": "011044"},
+        },
+    )
+    cache_nf_errada = SimpleNamespace(
+        bling_id="nf-errada",
+        numero="011044",
+        serie="2",
+        status="Autorizada",
+        modelo=55,
+        pedido_bling_id_ref="pedido-de-outro",
+        numero_pedido_loja="OUTRA-LOJA",
+        detalhada_em=None,
+        last_synced_at=None,
+        id=1,
+    )
+
+    contexto = _contexto_venda_pedido_integrado(
+        FakeDB([cache_nf_errada, None, None]),
+        pedido,
+        6359,
+    )
+
+    assert contexto["nf_numero"] is None
+    assert contexto["nf_id"] is None
+    assert contexto["preco_venda_unitario"] is None
+
+
 def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(monkeypatch):
     class FakeQuery:
         def __init__(self, *, first_result=None, all_result=None):

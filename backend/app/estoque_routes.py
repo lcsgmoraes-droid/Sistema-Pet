@@ -145,6 +145,50 @@ def _nf_status_autorizado(*, situacao_codigo=None, situacao: str | None = None) 
     return any(token in texto_lower for token in ("autoriz", "emitida", "emitido"))
 
 
+def _registro_nf_compativel_com_pedido_integrado(
+    pedido: PedidoIntegrado | None,
+    registro: BlingNotaFiscalCache | None,
+) -> bool:
+    if not pedido or not registro:
+        return False
+
+    pedido_bling_id = _texto_limpo(getattr(pedido, "pedido_bling_id", None))
+    numero_pedido_loja = _numero_pedido_loja_integrado(pedido)
+    registro_pedido_bling_id = _texto_limpo(getattr(registro, "pedido_bling_id_ref", None))
+    registro_numero_pedido_loja = _texto_limpo(getattr(registro, "numero_pedido_loja", None))
+
+    if registro_pedido_bling_id and pedido_bling_id:
+        return registro_pedido_bling_id == pedido_bling_id
+
+    if registro_numero_pedido_loja and numero_pedido_loja:
+        return registro_numero_pedido_loja == numero_pedido_loja
+
+    # NF sem referencia local ainda pode ser usada como fallback fraco.
+    return not registro_pedido_bling_id and not registro_numero_pedido_loja
+
+
+def _buscar_cache_nf_por_id(
+    db: Session,
+    pedido: PedidoIntegrado | None,
+    nf_id: str | None,
+) -> BlingNotaFiscalCache | None:
+    nf_id = _texto_limpo(nf_id)
+    if not pedido or not nf_id or nf_id in {"0", "-1"}:
+        return None
+
+    query = db.query(BlingNotaFiscalCache).filter(
+        BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+        BlingNotaFiscalCache.bling_id == nf_id,
+    )
+    if hasattr(query, "order_by"):
+        query = query.order_by(
+            BlingNotaFiscalCache.detalhada_em.desc().nullslast(),
+            BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+            BlingNotaFiscalCache.id.desc(),
+        )
+    return query.first()
+
+
 def _obter_cache_nf_pedido_integrado(
     db: Session,
     pedido: PedidoIntegrado | None,
@@ -155,18 +199,8 @@ def _obter_cache_nf_pedido_integrado(
 
     nf_id = _texto_limpo(resumo_nf.get("id") or resumo_nf.get("nfe_id"))
     if nf_id and nf_id not in {"0", "-1"}:
-        query = db.query(BlingNotaFiscalCache).filter(
-            BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
-            BlingNotaFiscalCache.bling_id == nf_id,
-        )
-        if hasattr(query, "order_by"):
-            query = query.order_by(
-                BlingNotaFiscalCache.detalhada_em.desc().nullslast(),
-                BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
-                BlingNotaFiscalCache.id.desc(),
-            )
-        registro = query.first()
-        if registro:
+        registro = _buscar_cache_nf_por_id(db, pedido, nf_id)
+        if registro and _registro_nf_compativel_com_pedido_integrado(pedido, registro):
             return registro
 
     pedido_bling_id = _texto_limpo(getattr(pedido, "pedido_bling_id", None))
@@ -182,7 +216,7 @@ def _obter_cache_nf_pedido_integrado(
                 BlingNotaFiscalCache.id.desc(),
             )
         registro = query.first()
-        if registro:
+        if registro and _registro_nf_compativel_com_pedido_integrado(pedido, registro):
             return registro
 
     numero_pedido_loja = _numero_pedido_loja_integrado(pedido)
@@ -197,13 +231,22 @@ def _obter_cache_nf_pedido_integrado(
                 BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
                 BlingNotaFiscalCache.id.desc(),
             )
-        return query.first()
+        registro = query.first()
+        if registro and _registro_nf_compativel_com_pedido_integrado(pedido, registro):
+            return registro
 
     return None
 
 
 def _contexto_nf_pedido_integrado(db: Session, pedido: PedidoIntegrado | None) -> dict:
     resumo_nf = dict(_resumo_nf_pedido_integrado(pedido))
+    registro_resumo = _buscar_cache_nf_por_id(
+        db,
+        pedido,
+        resumo_nf.get("id") or resumo_nf.get("nfe_id"),
+    )
+    if registro_resumo and not _registro_nf_compativel_com_pedido_integrado(pedido, registro_resumo):
+        resumo_nf = {}
     registro = _obter_cache_nf_pedido_integrado(db, pedido, resumo_nf)
 
     if registro and (
