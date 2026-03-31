@@ -482,9 +482,21 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # Buscar NF completa na API do Bling para obter o pedido vinculado
     nf_relacao = _consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num)
     nf_dados = _dict(nf_relacao.get("nf_completa")) or _dict(data)
-    pedido_bling_id = nf_relacao.get("pedido_bling_id")
-    pedido_bling_numero = nf_relacao.get("pedido_bling_numero")
-    numero_pedido_loja = nf_relacao.get("numero_pedido_loja")
+    pedido_ref_nf = _dict(
+        _dict(nf_dados).get("pedido")
+        or _dict(nf_dados).get("pedidoVenda")
+        or _dict(nf_dados).get("pedidoCompra")
+        or _dict(data).get("pedido")
+        or _dict(data).get("pedidoVenda")
+        or _dict(data).get("pedidoCompra")
+    )
+    pedido_bling_id = nf_relacao.get("pedido_bling_id") or _texto(pedido_ref_nf.get("id"))
+    pedido_bling_numero = nf_relacao.get("pedido_bling_numero") or _texto(pedido_ref_nf.get("numero"))
+    numero_pedido_loja = (
+        nf_relacao.get("numero_pedido_loja")
+        or _extrair_numero_pedido_loja_nf(nf_dados)
+        or _extrair_numero_pedido_loja_nf(data)
+    )
     nf_numero = str(_dict(nf_dados).get("numero") or "").strip() or None
 
     if tenant_id_monitor:

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, configure_mappers
 
 from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.db import SessionLocal
+from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao, Produto
@@ -385,12 +386,62 @@ def _enriquecer_resumo_nf_com_relacao(resumo: dict) -> dict:
     }
 
 
-def _obter_nfs_recentes_bling(*, tenant_id, dias: int) -> list[dict]:
+def _obter_nfs_recentes_cache_local(db: Session, *, tenant_id, dias: int) -> list[dict]:
+    data_inicial = _utcnow() - timedelta(days=max(1, min(int(dias or 1), 15)))
+    registros = (
+        db.query(BlingNotaFiscalCache)
+        .filter(
+            BlingNotaFiscalCache.tenant_id == tenant_id,
+            BlingNotaFiscalCache.data_emissao.isnot(None),
+            BlingNotaFiscalCache.data_emissao >= data_inicial,
+        )
+        .order_by(BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc())
+        .limit(_NF_RECENTES_ENRICH_LIMIT * 3)
+        .all()
+    )
+    notas: list[dict] = []
+    ids_vistos: set[str] = set()
+    for registro in registros:
+        nf_id = _text(getattr(registro, "bling_id", None))
+        if not nf_id or nf_id in ids_vistos:
+            continue
+        ids_vistos.add(nf_id)
+        resumo = {
+            "id": nf_id,
+            "numero": _text(getattr(registro, "numero", None)),
+            "serie": _text(getattr(registro, "serie", None)),
+            "modelo": getattr(registro, "modelo", None),
+            "situacao": _text(getattr(registro, "status", None)),
+            "situacao_codigo": 5 if (_text(getattr(registro, "status", None)) or "").lower() == "autorizada" else 0,
+            "chave": _text(getattr(registro, "chave", None)),
+            "valor_total": getattr(registro, "valor", None),
+            "data_emissao": getattr(registro, "data_emissao", None).isoformat() if getattr(registro, "data_emissao", None) else None,
+            "numero_pedido_loja": _text(getattr(registro, "numero_pedido_loja", None)),
+            "pedido_bling_id": _text(getattr(registro, "pedido_bling_id_ref", None)),
+            "pedido_bling_numero": _text(_dict(getattr(registro, "detalhe_payload", None)).get("pedido_bling_numero"))
+            or _text(_dict(getattr(registro, "resumo_payload", None)).get("pedido_bling_numero")),
+            "canal": _text(getattr(registro, "canal", None)),
+            "canal_label": _text(getattr(registro, "canal_label", None)),
+        }
+        if resumo.get("numero_pedido_loja") or resumo.get("pedido_bling_numero"):
+            notas.append(resumo)
+    return notas
+
+
+def _obter_nfs_recentes_bling(*, tenant_id, dias: int, db: Session | None = None) -> list[dict]:
     dias = max(1, min(int(dias or 1), 15))
     cache_key = (str(tenant_id or ""), dias)
     cache_atual = _nf_recentes_cache.get(cache_key)
     if cache_atual and (monotonic() - cache_atual.get("ts_monotonic", 0)) <= _NF_RECENTES_CACHE_SECONDS:
         return deepcopy(cache_atual.get("items") or [])
+
+    notas_cache_local = _obter_nfs_recentes_cache_local(db, tenant_id=tenant_id, dias=dias) if db else []
+    if notas_cache_local:
+        _nf_recentes_cache[cache_key] = {
+            "ts_monotonic": monotonic(),
+            "items": deepcopy(notas_cache_local),
+        }
+        return notas_cache_local
 
     from app.bling_integration import BlingAPI
 
@@ -1357,6 +1408,7 @@ def auditar_fluxo_bling(
                         notas_recentes = _obter_nfs_recentes_bling(
                             tenant_id=pedido.tenant_id,
                             dias=max(1, min(dias, 5)),
+                            db=db,
                         )
                         nfs_recentes_por_tenant[pedido.tenant_id] = _indexar_nfs_por_pedido_loja(notas_recentes)
                     except Exception as exc:

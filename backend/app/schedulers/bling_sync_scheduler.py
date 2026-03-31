@@ -1,20 +1,25 @@
-"""Scheduler de sincronização e reconciliação do Bling."""
+"""Scheduler de sincronizacao e reconciliacao do Bling."""
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 import logging
 
-from app.services.bling_sync_service import BlingSyncService
-from app.services.bling_flow_monitor_service import executar_auditoria_background
-from app.services.nfe_pending_reconciliation_service import executar_reconciliacao_automatica_nfes_pendentes
 from app.db import SessionLocal
+from app.services.bling_flow_monitor_service import executar_auditoria_background
+from app.services.bling_sync_service import BlingSyncService
+from app.services.nfe_authorized_reconciliation_service import (
+    executar_reconciliacao_automatica_nfes_autorizadas,
+)
+from app.services.nfe_pending_reconciliation_service import (
+    executar_reconciliacao_automatica_nfes_pendentes,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class BlingSyncScheduler:
-    """Executa retries e auditorias periódicas da integração com o Bling."""
+    """Executa retries e auditorias periodicas da integracao com o Bling."""
 
     def __init__(self):
         self.scheduler = BackgroundScheduler()
@@ -43,6 +48,13 @@ class BlingSyncScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            func=self.reconciliar_nfes_autorizadas,
+            trigger=IntervalTrigger(minutes=15),
+            id="bling_nfe_authorized_reconcile",
+            name="Bling NF Authorized Reconcile",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             func=self.auditar_fluxo_bling,
             trigger=IntervalTrigger(minutes=15),
             id="bling_flow_audit_autofix",
@@ -59,10 +71,11 @@ class BlingSyncScheduler:
 
         logger.info("[BLING SYNC] Jobs configurados:")
         logger.info("   - Fila pendente: a cada 1 minuto")
-        logger.info("   - Reconciliação recente: a cada 15 minutos")
+        logger.info("   - Reconciliacao recente: a cada 15 minutos")
         logger.info("   - NFs pendentes recentes: a cada 15 minutos")
+        logger.info("   - NFs autorizadas sem baixa: a cada 15 minutos")
         logger.info("   - Fluxo pedido/NF/estoque: a cada 15 minutos")
-        logger.info("   - Auditoria geral: diariamente às 02:00")
+        logger.info("   - Auditoria geral: diariamente as 02:00")
 
     def start(self) -> None:
         if not self.scheduler.running:
@@ -82,7 +95,7 @@ class BlingSyncScheduler:
     def reconciliar_recentes(self) -> None:
         result = BlingSyncService.reconcile_recent_products(minutes=30, limit=150)
         if result.get("avaliados"):
-            logger.info("[BLING SYNC] Reconciliação recente: %s", result)
+            logger.info("[BLING SYNC] Reconciliacao recente: %s", result)
 
     def reconciliar_nfes_pendentes(self) -> None:
         db = SessionLocal()
@@ -93,7 +106,20 @@ class BlingSyncScheduler:
                 limite_notas_por_tenant=200,
             )
             if result.get("tenants_com_pendencias"):
-                logger.info("[BLING SYNC] Reconciliação automática de NFs pendentes: %s", result)
+                logger.info("[BLING SYNC] Reconciliacao automatica de NFs pendentes: %s", result)
+        finally:
+            db.close()
+
+    def reconciliar_nfes_autorizadas(self) -> None:
+        db = SessionLocal()
+        try:
+            result = executar_reconciliacao_automatica_nfes_autorizadas(
+                db,
+                dias=5,
+                limite_notas_por_tenant=300,
+            )
+            if result.get("notas_reconciliadas_total"):
+                logger.info("[BLING SYNC] Reconciliacao automatica de NFs autorizadas: %s", result)
         finally:
             db.close()
 
@@ -104,7 +130,7 @@ class BlingSyncScheduler:
             or result.get("auto_fix_tentados")
             or result.get("auto_fix_sucessos")
         ):
-            logger.info("[BLING SYNC] Auditoria automática do fluxo Bling: %s", result)
+            logger.info("[BLING SYNC] Auditoria automatica do fluxo Bling: %s", result)
 
     def reconciliar_geral(self) -> None:
         result = BlingSyncService.run_nightly_forced_link_and_sync(link_limit=800, sync_limit=1200)

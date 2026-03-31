@@ -580,6 +580,13 @@ Itens executados nesta etapa:
   - o servico de auditoria agora bootstrapa explicitamente os modelos com relacionamentos por string antes de rodar
   - a execucao manual e automatica da auditoria deixa de depender de import indireto do `app.main`
   - foi adicionada validacao especifica para garantir esse bootstrap em processo isolado
+- [x] reconciliar automaticamente NFs autorizadas que chegaram ao sistema mas nao consolidaram a baixa:
+  - o backend agora cruza NFs autorizadas recentes do cache local com pedidos locais por `pedido_bling_id`, `pedido_bling_numero` e `numero_pedido_loja`
+  - se a NF existir, o pedido existir e ainda houver item reservado sem `vendido_em`, a reconciliacao religa o vinculo e reaplica a baixa usando a NF como fonte de verdade
+  - o scheduler passa a revisar esse cenario a cada 15 minutos, sem depender da API do Bling para enxergar uma NF que ja esta salva localmente
+- [x] fazer o Monitor Bling mostrar o numero humano da NF tambem em incidentes sem pedido vinculado:
+  - a API do monitor agora enriquece incidentes e eventos pelo cache local de NFs usando `nf_bling_id`
+  - quando a nota ja esta no sistema, a tela consegue exibir `NF numero` mesmo antes do pedido estar 100% reconciliado
 
 Itens deliberadamente adiados por agora:
 

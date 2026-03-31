@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.db import get_session
+from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_models import PedidoIntegrado
 from app.services.bling_flow_monitor_service import (
     auditar_fluxo_bling,
@@ -139,6 +140,35 @@ def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict
     return mapa
 
 
+def _mapa_numeros_notas_cache(db: Session, tenant_id, registros: list[dict]) -> dict[str, dict[str, str | None]]:
+    nf_bling_ids = {
+        _texto(registro.get("nf_bling_id"))
+        for registro in registros
+        if _texto(registro.get("nf_bling_id"))
+    }
+    if not nf_bling_ids:
+        return {}
+
+    mapa: dict[str, dict[str, str | None]] = {}
+    query = (
+        db.query(BlingNotaFiscalCache)
+        .filter(
+            BlingNotaFiscalCache.tenant_id == tenant_id,
+            BlingNotaFiscalCache.bling_id.in_(list(nf_bling_ids)),
+        )
+        .order_by(BlingNotaFiscalCache.id.desc())
+    )
+    for nota in query.all():
+        chave = _texto(getattr(nota, "bling_id", None))
+        if not chave or chave in mapa:
+            continue
+        mapa[chave] = {
+            "nf_numero": _texto(getattr(nota, "numero", None)),
+            "numero_pedido_loja": _texto(getattr(nota, "numero_pedido_loja", None)),
+        }
+    return mapa
+
+
 @router.get("/resumo")
 def resumo_monitor(
     db: Session = Depends(get_session),
@@ -192,12 +222,14 @@ def listar_incidentes(
         for incidente in incidentes
     ]
     mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
+    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
     for registro in registros:
         info = mapa_numeros.get(
             (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
         ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
             (None, registro.get("pedido_bling_id"))
         )
+        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
         detalhes = _dict(registro.get("details"))
         registro["pedido_bling_numero"] = (
             _dict(info).get("pedido_bling_numero")
@@ -206,10 +238,12 @@ def listar_incidentes(
         registro["numero_pedido_loja"] = (
             _dict(info).get("numero_pedido_loja")
             or _texto(_primeiro_preenchido(detalhes.get("numero_pedido_loja"), _dict(detalhes.get("nf_detectada")).get("numero_pedido_loja")))
+            or _dict(info_nf).get("numero_pedido_loja")
         )
         registro["nf_numero"] = (
             _dict(info).get("nf_numero")
             or _texto(_primeiro_preenchido(detalhes.get("nf_numero"), _dict(detalhes.get("nf_detectada")).get("numero")))
+            or _dict(info_nf).get("nf_numero")
         )
         registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual")
     return registros
@@ -253,19 +287,29 @@ def listar_eventos(
         for evento in eventos
     ]
     mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
+    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
     for registro in registros:
         info = mapa_numeros.get(
             (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
         ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
             (None, registro.get("pedido_bling_id"))
         )
+        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
         payload = _dict(registro.get("payload"))
         registro["pedido_bling_numero"] = (
             _dict(info).get("pedido_bling_numero")
             or _texto(_primeiro_preenchido(payload.get("pedido_bling_numero"), _dict(payload.get("pedido")).get("numero")))
         )
-        registro["numero_pedido_loja"] = _dict(info).get("numero_pedido_loja") or _numero_pedido_loja_payload(payload)
-        registro["nf_numero"] = _dict(info).get("nf_numero") or _nf_numero_payload(payload)
+        registro["numero_pedido_loja"] = (
+            _dict(info).get("numero_pedido_loja")
+            or _numero_pedido_loja_payload(payload)
+            or _dict(info_nf).get("numero_pedido_loja")
+        )
+        registro["nf_numero"] = (
+            _dict(info).get("nf_numero")
+            or _nf_numero_payload(payload)
+            or _dict(info_nf).get("nf_numero")
+        )
         registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
     return registros
 

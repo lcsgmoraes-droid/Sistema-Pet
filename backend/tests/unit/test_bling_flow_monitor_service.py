@@ -179,6 +179,55 @@ def test_obter_nfs_recentes_bling_enriquece_resumo_quando_lista_nao_traz_pedido_
     assert notas[0]["canal"] == "mercado_livre"
 
 
+def test_obter_nfs_recentes_bling_prefere_cache_local(monkeypatch):
+    class _FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def limit(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [
+                SimpleNamespace(
+                    bling_id="NF-011100",
+                    numero="011100",
+                    serie="2",
+                    modelo=55,
+                    status="Autorizada",
+                    chave="CHAVE-011100",
+                    valor=68.90,
+                    data_emissao=datetime(2026, 3, 31, 2, 54, 59),
+                    numero_pedido_loja="260331JFWD1VMB",
+                    pedido_bling_id_ref=None,
+                    detalhe_payload={},
+                    resumo_payload={"pedido_bling_numero": "11753"},
+                    canal="shopee",
+                    canal_label="Shopee",
+                )
+            ]
+
+    class _FakeDB:
+        def query(self, model):
+            return _FakeQuery()
+
+    def _bling_nao_deveria_ser_usado():
+        raise AssertionError("Nao deveria consultar a API quando o cache local ja possui as NFs")
+
+    monkeypatch.setattr("app.bling_integration.BlingAPI", _bling_nao_deveria_ser_usado)
+    _nf_recentes_cache.clear()
+
+    notas = _obter_nfs_recentes_bling(tenant_id="tenant-1", dias=7, db=_FakeDB())
+
+    assert len(notas) == 1
+    assert notas[0]["numero"] == "011100"
+    assert notas[0]["numero_pedido_loja"] == "260331JFWD1VMB"
+    assert notas[0]["pedido_bling_numero"] == "11753"
+
+
 def test_normalizar_data_evento_monitor_converte_iso_utc_em_datetime_naive():
     data = normalizar_data_evento_monitor("2026-03-29T18:35:00+00:00")
 
