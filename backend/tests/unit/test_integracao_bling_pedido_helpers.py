@@ -11,6 +11,13 @@ from app.integracao_bling_pedido_routes import (
     _serializar_pedido_bling,
     _situacao_codigo_bling,
 )
+from app.services.pedido_integrado_consolidation_service import (
+    escolher_pedido_canonico,
+    marcar_payload_como_mesclado,
+    numero_pedido_loja_do_payload,
+    pedido_esta_mesclado,
+    registrar_alias_bling_no_payload,
+)
 
 
 def test_situacao_codigo_bling_prioriza_id():
@@ -133,6 +140,69 @@ def test_montar_payload_pedido_preserva_ultima_nf_mais_recente():
 
     assert payload["ultima_nf"]["id"] == "25441651448"
     assert payload["ultima_nf"]["numero"] == "011089"
+
+
+def test_numero_pedido_loja_do_payload_prioriza_pedido_e_faz_fallback():
+    assert numero_pedido_loja_do_payload({"pedido": {"numeroPedidoLoja": "LOJA-1"}}) == "LOJA-1"
+    assert numero_pedido_loja_do_payload({"webhook": {"numeroLoja": "LOJA-2"}}) == "LOJA-2"
+
+
+def test_registrar_alias_bling_no_payload_evita_duplicidade():
+    payload = registrar_alias_bling_no_payload(
+        {"pedido": {"numeroPedidoLoja": "260330GDQVHGXX"}},
+        pedido_bling_id="25439737683",
+        pedido_bling_numero="11680",
+        numero_pedido_loja="260330GDQVHGXX",
+        loja_id="205367939",
+    )
+    payload = registrar_alias_bling_no_payload(
+        payload,
+        pedido_bling_id="25439737683",
+        pedido_bling_numero="11680",
+        numero_pedido_loja="260330GDQVHGXX",
+        loja_id="205367939",
+    )
+
+    assert len(payload["pedidos_bling_aliases"]) == 1
+    assert payload["pedidos_bling_aliases"][0]["pedido_bling_id"] == "25439737683"
+
+
+def test_marcar_payload_como_mesclado_sinaliza_canonico():
+    pedido_canonico = SimpleNamespace(id=10, pedido_bling_id="25438349686", pedido_bling_numero="11629")
+
+    payload = marcar_payload_como_mesclado(
+        {"pedido": {"numeroPedidoLoja": "260330GDQVHGXX"}},
+        pedido_canonico=pedido_canonico,
+        numero_pedido_loja="260330GDQVHGXX",
+        loja_id="205367939",
+    )
+
+    assert pedido_esta_mesclado(payload) is True
+    assert payload["pedido_mesclado"]["pedido_canonico_id"] == 10
+
+
+def test_escolher_pedido_canonico_prefere_pedido_com_nf():
+    sem_nf = SimpleNamespace(
+        id=20,
+        status="confirmado",
+        created_at=None,
+        criado_em=None,
+        payload={"pedido": {"numeroPedidoLoja": "260330GDQVHGXX"}},
+    )
+    com_nf = SimpleNamespace(
+        id=10,
+        status="aberto",
+        created_at=None,
+        criado_em=None,
+        payload={
+            "pedido": {"numeroPedidoLoja": "260330GDQVHGXX"},
+            "ultima_nf": {"id": "25441651448", "numero": "011089"},
+        },
+    )
+
+    escolhido = escolher_pedido_canonico([sem_nf, com_nf])
+
+    assert escolhido.id == 10
 
 
 def test_serializar_pedido_bling_expoe_campos_enriquecidos():

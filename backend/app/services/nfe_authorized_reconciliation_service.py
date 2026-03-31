@@ -9,6 +9,7 @@ from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
+from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
 from app.utils.logger import logger
 
 
@@ -163,13 +164,10 @@ def _localizar_pedido_para_nf_cache(
     pedido = None
     pedido_bling_id = _text(pedido_bling_id)
     if pedido_bling_id:
-        pedido = (
-            db.query(PedidoIntegrado)
-            .filter(
-                PedidoIntegrado.tenant_id == tenant_id,
-                PedidoIntegrado.pedido_bling_id == pedido_bling_id,
-            )
-            .first()
+        pedido = localizar_pedido_por_bling_id(
+            db,
+            tenant_id=tenant_id,
+            pedido_bling_id=pedido_bling_id,
         )
     if not pedido and pedido_bling_numero:
         pedido = _localizar_pedido_local_por_numero_bling(

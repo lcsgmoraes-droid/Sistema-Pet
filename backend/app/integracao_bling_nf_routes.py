@@ -27,6 +27,10 @@ from app.services.bling_flow_monitor_service import (
     registrar_vinculo_nf_pedido,
     resolver_incidentes_relacionados,
 )
+from app.services.pedido_integrado_consolidation_service import (
+    localizar_pedido_canonico_por_numero_loja,
+    localizar_pedido_por_bling_id,
+)
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
@@ -405,7 +409,7 @@ def _localizar_pedido_local_por_numero_bling(
     if not numero:
         return None
 
-    return (
+    pedido = (
         db.query(PedidoIntegrado)
         .filter(
             PedidoIntegrado.tenant_id == tenant_id,
@@ -413,6 +417,11 @@ def _localizar_pedido_local_por_numero_bling(
         )
         .first()
     )
+    return localizar_pedido_por_bling_id(
+        db,
+        tenant_id=tenant_id,
+        pedido_bling_id=getattr(pedido, "pedido_bling_id", None),
+    ) if pedido else None
 
 
 def _localizar_pedido_local_por_numero_loja(
@@ -423,37 +432,13 @@ def _localizar_pedido_local_por_numero_loja(
     loja_id: str | None = None,
     limite_scan: int = 2000,
 ) -> PedidoIntegrado | None:
-    numero = str(numero_pedido_loja or "").strip()
-    if not numero:
-        return None
-    loja_id = _texto(loja_id)
-
-    pedidos = (
-        db.query(PedidoIntegrado)
-        .filter(PedidoIntegrado.tenant_id == tenant_id)
-        .order_by(PedidoIntegrado.created_at.desc())
-        .limit(limite_scan)
-        .all()
+    return localizar_pedido_canonico_por_numero_loja(
+        db,
+        tenant_id=tenant_id,
+        numero_pedido_loja=numero_pedido_loja,
+        loja_id=loja_id,
+        limite_scan=limite_scan,
     )
-    candidatos: list[PedidoIntegrado] = []
-    for pedido in pedidos:
-        if _numero_pedido_loja_do_payload(pedido) == numero:
-            candidatos.append(pedido)
-
-    if not candidatos:
-        return None
-
-    if loja_id:
-        candidatos_loja = [pedido for pedido in candidatos if _loja_id_pedido(pedido) == loja_id]
-        if len(candidatos_loja) == 1:
-            return candidatos_loja[0]
-        if len(candidatos_loja) > 1:
-            return None
-
-    if len(candidatos) == 1:
-        return candidatos[0]
-
-    return None
 
 
 def _consultar_relacao_nf_bling(nf_id: str, situacao_num: int) -> dict:
@@ -701,10 +686,11 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
 
     pedido = None
     if pedido_bling_id:
-        query = db.query(PedidoIntegrado).filter(PedidoIntegrado.pedido_bling_id == pedido_bling_id)
-        if tenant_id_monitor:
-            query = query.filter(PedidoIntegrado.tenant_id == tenant_id_monitor)
-        pedido = query.first()
+        pedido = localizar_pedido_por_bling_id(
+            db,
+            tenant_id=tenant_id_monitor,
+            pedido_bling_id=pedido_bling_id,
+        )
     if not pedido and tenant_id_monitor and pedido_bling_numero:
         pedido = _localizar_pedido_local_por_numero_bling(
             db,
@@ -732,12 +718,11 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         )
         if pedido_ref_conflitante and pedido_ref_conflitante != pedido.pedido_bling_id:
             pedido_correto = (
-                db.query(PedidoIntegrado)
-                .filter(
-                    PedidoIntegrado.tenant_id == pedido.tenant_id,
-                    PedidoIntegrado.pedido_bling_id == pedido_ref_conflitante,
+                localizar_pedido_por_bling_id(
+                    db,
+                    tenant_id=pedido.tenant_id,
+                    pedido_bling_id=pedido_ref_conflitante,
                 )
-                .first()
             )
             if pedido_correto:
                 pedido = pedido_correto

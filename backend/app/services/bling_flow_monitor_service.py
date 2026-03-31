@@ -16,6 +16,7 @@ from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao, Produto
+from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
 from app.utils.logger import logger
 
 
@@ -1433,10 +1434,11 @@ def autocorrigir_incidente(db: Session, incidente: BlingFlowIncident) -> dict:
             PedidoIntegrado.tenant_id == incidente.tenant_id,
         ).first()
     if not pedido and incidente.pedido_bling_id:
-        pedido = db.query(PedidoIntegrado).filter(
-            PedidoIntegrado.pedido_bling_id == incidente.pedido_bling_id,
-            PedidoIntegrado.tenant_id == incidente.tenant_id,
-        ).first()
+        pedido = localizar_pedido_por_bling_id(
+            db,
+            tenant_id=incidente.tenant_id,
+            pedido_bling_id=incidente.pedido_bling_id,
+        )
 
     try:
         if incidente.code == "SKU_SEM_PRODUTO_LOCAL":
@@ -1548,7 +1550,10 @@ def auditar_fluxo_bling(
 ) -> dict:
     _garantir_registry_sqlalchemy_auditoria()
     cutoff = _utcnow() - timedelta(days=max(1, dias))
-    query = db.query(PedidoIntegrado).filter(PedidoIntegrado.criado_em >= cutoff)
+    query = db.query(PedidoIntegrado).filter(
+        PedidoIntegrado.criado_em >= cutoff,
+        PedidoIntegrado.status != "mesclado",
+    )
     if tenant_id:
         query = query.filter(PedidoIntegrado.tenant_id == tenant_id)
 

@@ -20,6 +20,16 @@ from app.services.bling_flow_monitor_service import (
     registrar_evento,
     registrar_vinculo_nf_pedido,
 )
+from app.services.pedido_integrado_consolidation_service import (
+    listar_pedidos_por_numero_loja,
+    localizar_pedido_canonico_por_numero_loja,
+    localizar_pedido_por_bling_id,
+    loja_id_do_payload,
+    marcar_payload_como_mesclado,
+    numero_pedido_loja_do_payload,
+    pedido_esta_mesclado,
+    registrar_alias_bling_no_payload,
+)
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
 
@@ -429,6 +439,188 @@ def _normalizar_item_payload(item_payload: dict) -> dict:
     }
 
 
+def _sincronizar_itens_pedido_integrado(
+    db: Session,
+    *,
+    pedido: PedidoIntegrado,
+    itens_bling: list[dict] | None,
+) -> int:
+    itens_bling = itens_bling or []
+    if not itens_bling:
+        return 0
+
+    itens_existentes = (
+        db.query(PedidoIntegradoItem)
+        .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+        .all()
+    )
+    chaves_existentes: dict[tuple[str | None, int], int] = {}
+    for item in itens_existentes:
+        chave = (_texto(item.sku), int(float(item.quantidade or 0)))
+        chaves_existentes[chave] = chaves_existentes.get(chave, 0) + 1
+
+    criados = 0
+    for item in itens_bling:
+        item_normalizado = _normalizar_item_payload(item)
+        sku = _texto(item_normalizado.get("sku"))
+        quantidade = int(float(item_normalizado.get("quantidade") or 0))
+        descricao = _texto(item_normalizado.get("descricao"))
+        if not sku or quantidade <= 0:
+            continue
+
+        chave = (sku, quantidade)
+        if chaves_existentes.get(chave, 0) > 0:
+            chaves_existentes[chave] -= 1
+            continue
+
+        item_pedido = PedidoIntegradoItem(
+            tenant_id=pedido.tenant_id,
+            pedido_integrado_id=pedido.id,
+            sku=sku,
+            descricao=descricao,
+            quantidade=quantidade,
+        )
+        try:
+            if pedido.status not in {"cancelado", "expirado", "mesclado"}:
+                EstoqueReservaService.reservar(db, item_pedido)
+        except ValueError as e:
+            logger.warning(f"[BLING WEBHOOK] Reserva nao criada para SKU {sku} em merge de duplicidade: {e}")
+        db.add(item_pedido)
+        chaves_existentes[chave] = chaves_existentes.get(chave, 0) + 1
+        criados += 1
+
+    return criados
+
+
+def _consolidar_pedido_duplicado_por_numero_loja(
+    db: Session,
+    *,
+    tenant_id,
+    pedido_bling_id: str,
+    pedido_bling_numero,
+    canal: str,
+    status_inicial: str,
+    payload_pedido: dict,
+    itens_bling: list[dict] | None,
+    event: str | None,
+    event_date,
+) -> PedidoIntegrado | None:
+    numero_pedido_loja = numero_pedido_loja_do_payload(payload_pedido)
+    if not numero_pedido_loja:
+        return None
+
+    loja_id = loja_id_do_payload(payload_pedido)
+    candidatos = [
+        pedido
+        for pedido in listar_pedidos_por_numero_loja(
+            db,
+            tenant_id=tenant_id,
+            numero_pedido_loja=numero_pedido_loja,
+            loja_id=loja_id,
+        )
+        if _texto(pedido.pedido_bling_id) != _texto(pedido_bling_id)
+    ]
+    pedido_canonico = localizar_pedido_canonico_por_numero_loja(
+        db,
+        tenant_id=tenant_id,
+        numero_pedido_loja=numero_pedido_loja,
+        loja_id=loja_id,
+    )
+    if not pedido_canonico or int(pedido_canonico.id) not in {int(pedido.id) for pedido in candidatos}:
+        return None
+
+    payload_canonico = _montar_payload_pedido(
+        webhook_data=_dict(payload_pedido).get("webhook"),
+        pedido_completo=_payload_principal(payload_pedido),
+        payload_atual=pedido_canonico.payload,
+        ultima_nf=_dict(payload_pedido).get("ultima_nf"),
+    )
+    payload_canonico = registrar_alias_bling_no_payload(
+        payload_canonico,
+        pedido_bling_id=pedido_bling_id,
+        pedido_bling_numero=_texto(pedido_bling_numero),
+        numero_pedido_loja=numero_pedido_loja,
+        loja_id=loja_id,
+        merged_at=datetime.utcnow(),
+    )
+    pedido_canonico.payload = payload_canonico
+    if (not pedido_canonico.canal or pedido_canonico.canal == "bling") and canal:
+        pedido_canonico.canal = canal
+    if not pedido_canonico.pedido_bling_numero and pedido_bling_numero:
+        pedido_canonico.pedido_bling_numero = _texto(pedido_bling_numero)
+    db.add(pedido_canonico)
+    db.flush()
+
+    pedido_duplicado = localizar_pedido_por_bling_id(
+        db,
+        tenant_id=tenant_id,
+        pedido_bling_id=pedido_bling_id,
+        resolver_mescla=False,
+    )
+    if not pedido_duplicado:
+        payload_duplicado = marcar_payload_como_mesclado(
+            payload_pedido,
+            pedido_canonico=pedido_canonico,
+            numero_pedido_loja=numero_pedido_loja,
+            loja_id=loja_id,
+            merged_at=datetime.utcnow(),
+        )
+        pedido_duplicado = PedidoIntegrado(
+            tenant_id=tenant_id,
+            pedido_bling_id=pedido_bling_id,
+            pedido_bling_numero=_texto(pedido_bling_numero),
+            canal=canal,
+            status="mesclado",
+            expira_em=pedido_canonico.expira_em,
+            cancelado_em=datetime.utcnow(),
+            payload=payload_duplicado,
+        )
+    else:
+        pedido_duplicado.payload = marcar_payload_como_mesclado(
+            pedido_duplicado.payload,
+            pedido_canonico=pedido_canonico,
+            numero_pedido_loja=numero_pedido_loja,
+            loja_id=loja_id,
+            merged_at=datetime.utcnow(),
+        )
+        pedido_duplicado.status = "mesclado"
+        pedido_duplicado.cancelado_em = pedido_duplicado.cancelado_em or datetime.utcnow()
+    db.add(pedido_duplicado)
+
+    itens_criados = _sincronizar_itens_pedido_integrado(
+        db,
+        pedido=pedido_canonico,
+        itens_bling=itens_bling,
+    )
+    db.commit()
+    db.refresh(pedido_canonico)
+
+    registrar_evento(
+        tenant_id=tenant_id,
+        source="runtime",
+        event_type=event or "order.duplicate_merged",
+        entity_type="pedido",
+        status="warning",
+        severity="high",
+        message="Pedido duplicado no Bling foi consolidado pelo numero do pedido da loja.",
+        pedido_integrado_id=pedido_canonico.id,
+        pedido_bling_id=pedido_canonico.pedido_bling_id,
+        payload={
+            "pedido_bling_id_duplicado": pedido_bling_id,
+            "pedido_bling_numero_duplicado": _texto(pedido_bling_numero),
+            "numero_pedido_loja": numero_pedido_loja,
+            "pedido_canonico_id": pedido_canonico.id,
+            "pedido_canonico_bling_id": pedido_canonico.pedido_bling_id,
+            "itens_incorporados": itens_criados,
+            "status_inicial_duplicado": status_inicial,
+        },
+        processed_at=event_date,
+        auto_fix_applied=True,
+    )
+
+    return pedido_canonico
+
+
 def _serializar_itens_pedido(pedido_payload: dict, itens_db: list[PedidoIntegradoItem]) -> list[dict]:
     payload_itens = [_normalizar_item_payload(item) for item in (pedido_payload.get("itens") or [])]
     usados: set[int] = set()
@@ -782,7 +974,10 @@ def listar_pedidos_bling(
 ):
     tenant_id = user_tenant[1]
 
-    q = db.query(PedidoIntegrado).filter(PedidoIntegrado.tenant_id == tenant_id)
+    q = db.query(PedidoIntegrado).filter(
+        PedidoIntegrado.tenant_id == tenant_id,
+        PedidoIntegrado.status != "mesclado",
+    )
 
     if status:
         q = q.filter(PedidoIntegrado.status == status)
@@ -1055,9 +1250,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 ).first()
             # Fallback: buscar pela chave do pedido se vier como ID
             if not pedido and pedido_numero_nf:
-                pedido = db.query(PedidoIntegrado).filter(
-                    PedidoIntegrado.pedido_bling_id == pedido_numero_nf
-                ).first()
+                pedido = localizar_pedido_por_bling_id(
+                    db,
+                    tenant_id=_tenant_uuid,
+                    pedido_bling_id=pedido_numero_nf,
+                )
 
             if pedido and pedido.status not in ("confirmado", "cancelado"):
                 status_anterior = pedido.status
@@ -1169,9 +1366,20 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     # EVENTO: EXCLUÍDO
     # ========================
     if event.endswith(".deleted"):
-        pedido = db.query(PedidoIntegrado).filter(
-            PedidoIntegrado.pedido_bling_id == pedido_bling_id
-        ).first()
+        pedido_exato = localizar_pedido_por_bling_id(
+            db,
+            tenant_id=_tenant_uuid,
+            pedido_bling_id=pedido_bling_id,
+            resolver_mescla=False,
+        )
+        if pedido_exato and pedido_esta_mesclado(pedido_exato):
+            return {"status": "ignorado", "motivo": "pedido_duplicado_mesclado"}
+
+        pedido = localizar_pedido_por_bling_id(
+            db,
+            tenant_id=_tenant_uuid,
+            pedido_bling_id=pedido_bling_id,
+        )
         if pedido and pedido.status not in ("confirmado", "cancelado"):
             itens = db.query(PedidoIntegradoItem).filter(
                 PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -1198,9 +1406,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 logger.warning(f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}")
 
         if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
-            pedido = db.query(PedidoIntegrado).filter(
-                PedidoIntegrado.pedido_bling_id == pedido_bling_id
-            ).first()
+            pedido = localizar_pedido_por_bling_id(
+                db,
+                tenant_id=_tenant_uuid,
+                pedido_bling_id=pedido_bling_id,
+            )
             if pedido and pedido.status not in ("confirmado", "cancelado"):
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -1221,9 +1431,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             return {"status": "ok", "acao": "cancelado_por_situacao"}
 
         if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
-            pedido = db.query(PedidoIntegrado).filter(
-                PedidoIntegrado.pedido_bling_id == pedido_bling_id
-            ).first()
+            pedido = localizar_pedido_por_bling_id(
+                db,
+                tenant_id=_tenant_uuid,
+                pedido_bling_id=pedido_bling_id,
+            )
             if pedido and pedido.status not in ("confirmado", "cancelado"):
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -1252,9 +1464,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
         if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_CANCELADO:
-            pedido = db.query(PedidoIntegrado).filter(
-                PedidoIntegrado.pedido_bling_id == pedido_bling_id
-            ).first()
+            pedido = localizar_pedido_por_bling_id(
+                db,
+                tenant_id=_tenant_uuid,
+                pedido_bling_id=pedido_bling_id,
+            )
             if pedido and pedido.status not in ("confirmado", "cancelado"):
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -1281,9 +1495,11 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             return {"status": "ok", "acao": "cancelado_via_consulta_api"}
 
         if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_ATENDIDO:
-            pedido = db.query(PedidoIntegrado).filter(
-                PedidoIntegrado.pedido_bling_id == pedido_bling_id
-            ).first()
+            pedido = localizar_pedido_por_bling_id(
+                db,
+                tenant_id=_tenant_uuid,
+                pedido_bling_id=pedido_bling_id,
+            )
             if pedido and pedido.status not in ("confirmado", "cancelado"):
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -1323,11 +1539,15 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
     # EVENTO: CRIADO
     # ========================
     # Idempotência
-    existente = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.pedido_bling_id == pedido_bling_id
-    ).first()
+    existente = localizar_pedido_por_bling_id(
+        db,
+        tenant_id=_tenant_uuid,
+        pedido_bling_id=pedido_bling_id,
+        resolver_mescla=False,
+    )
     if existente:
-        return {"status": "ignorado", "motivo": "pedido_ja_existe"}
+        motivo = "pedido_ja_mesclado" if pedido_esta_mesclado(existente) else "pedido_ja_existe"
+        return {"status": "ignorado", "motivo": motivo}
 
     numero = data.get("numero")
     loja_data = data.get("loja", {}) if isinstance(data.get("loja"), dict) else {}
@@ -1390,6 +1610,34 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         ultima_nf=resumo_nf_pedido,
     )
     canal, _, _ = _resolver_canal_pedido(payload_pedido, canal_bruto)
+
+    pedido_consolidado = _consolidar_pedido_duplicado_por_numero_loja(
+        db,
+        tenant_id=_tenant_uuid,
+        pedido_bling_id=pedido_bling_id,
+        pedido_bling_numero=numero,
+        canal=canal,
+        status_inicial=status_inicial,
+        payload_pedido=payload_pedido,
+        itens_bling=itens_bling,
+        event=event,
+        event_date=event_date,
+    )
+    if pedido_consolidado:
+        if status_inicial == "confirmado" and pedido_consolidado.status not in ("confirmado", "cancelado"):
+            itens_salvos = db.query(PedidoIntegradoItem).filter(
+                PedidoIntegradoItem.pedido_integrado_id == pedido_consolidado.id
+            ).all()
+            _confirmar_pedido(
+                db=db,
+                pedido=pedido_consolidado,
+                itens=itens_salvos,
+                motivo="venda_bling_webhook_duplicado",
+                observacao="Pedido duplicado no Bling consolidado no pedido canonico; venda aguardando NF",
+                processed_at=event_date,
+                aplicar_baixa_estoque=False,
+            )
+        return {"status": "ok", "pedido_id": pedido_consolidado.id, "acao": "pedido_duplicado_mesclado"}
 
     pedido = PedidoIntegrado(
         tenant_id=_tenant_uuid,
