@@ -32,12 +32,13 @@ import PDVProdutosCard from "../components/pdv/PDVProdutosCard";
 import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import { useAuth } from "../contexts/AuthContext";
+import { usePDVAssistente } from "../hooks/usePDVAssistente";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
 import { debugLog, debugWarn } from "../utils/debug";
-import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import { formatBRL } from "../utils/formatters";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 
 export default function PDV() {
@@ -201,15 +202,6 @@ export default function PDV() {
     useState(false);
   const [opportunities, setOpportunities] = useState([]);
 
-  // === ASSISTENTE IA DO PDV ===
-  const [painelAssistenteAberto, setPainelAssistenteAberto] = useState(false);
-  const [mensagensAssistente, setMensagensAssistente] = useState([]);
-  const [inputAssistente, setInputAssistente] = useState('');
-  const [enviandoAssistente, setEnviandoAssistente] = useState(false);
-  const chatAssistenteEndRef = useRef(null);
-  const [alertasCarrinho, setAlertasCarrinho] = useState([]);  // alertas proativos
-  const [infosCarrinho, setInfosCarrinho] = useState([]);      // infos de duração
-
   // 🆕 Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
   const [totalImpostos, setTotalImpostos] = useState(0);
@@ -227,6 +219,19 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
   const buscaProdutoAtualRef = useRef("");
+  const {
+    painelAssistenteAberto,
+    setPainelAssistenteAberto,
+    mensagensAssistente,
+    inputAssistente,
+    setInputAssistente,
+    enviandoAssistente,
+    chatAssistenteEndRef,
+    alertasCarrinho,
+    infosCarrinho,
+    enviarMensagemAssistente,
+    alternarPainelAssistente,
+  } = usePDVAssistente(vendaAtual);
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -234,32 +239,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       carregarPendencias();
     }
   }, [vendaAtual.cliente]);
-
-  // Resetar chat do assistente e alertas quando cliente mudar
-  useEffect(() => {
-    setMensagensAssistente([]);
-    setInputAssistente('');
-    setAlertasCarrinho([]);
-    setInfosCarrinho([]);
-  }, [vendaAtual.cliente?.id]);
-
-  // Auto-scroll chat para o final
-  useEffect(() => {
-    chatAssistenteEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [mensagensAssistente]);
-
-  // Verificar alertas proativos quando os itens do carrinho mudam
-  useEffect(() => {
-    if (vendaAtual.cliente?.id && vendaAtual.itens?.length > 0) {
-      const timer = setTimeout(() => {
-        verificarAlertasCarrinho(vendaAtual.cliente.id, vendaAtual.itens);
-      }, 800);
-      return () => clearTimeout(timer);
-    } else {
-      setAlertasCarrinho([]);
-      setInfosCarrinho([]);
-    }
-  }, [vendaAtual.itens, vendaAtual.cliente?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Salvar dados do carrinho no sessionStorage para a calculadora universal
   useEffect(() => {
@@ -501,86 +480,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     } catch (error) {
       // Fail-safe: erro silencioso, apenas limpa lista
       setOpportunities([]);
-    }
-  };
-
-  // Carrega resumo do cliente para o assistente IA
-  const carregarInfoCliente = async (clienteId) => {
-    if (!clienteId) return;
-    try {
-      const res = await api.get(`/clientes/${clienteId}/info-pdv`);
-      const info = res.data;
-      const pets = info.pets?.map(p => p.nome).join(', ') || 'Nenhum';
-      const ultimaCompra = info.resumo_financeiro?.ultima_compra;
-      const topProdutos = info.sugestoes?.slice(0, 3).map(s => s.nome).join(', ') || 'Nenhum';
-      const oportunidades = info.oportunidades || [];
-      let autoMsg = `Resumo de **${info.cliente?.nome}**:\n`;
-      autoMsg += `🛒 ${info.resumo_financeiro?.numero_compras || 0} compras — ticket médio: ${formatMoneyBRL(info.resumo_financeiro?.ticket_medio || 0)}\n`;
-      if (ultimaCompra?.data) {
-        autoMsg += `📅 Última compra: ${ultimaCompra.data} (${formatMoneyBRL(ultimaCompra.valor || 0)})\n`;
-      }
-      if (pets !== 'Nenhum') autoMsg += `🐾 Pets: ${pets}\n`;
-      autoMsg += `⭐ Favoritos: ${topProdutos}\n`;
-      if (oportunidades.length > 0) {
-        autoMsg += `\n⚠️ ${oportunidades.length} produto(s) para reabastecer:\n`;
-        oportunidades.slice(0, 3).forEach(op => {
-          autoMsg += `• ${op.produto_nome} (${op.dias_atraso}d atrasado)\n`;
-        });
-      }
-      autoMsg += '\nPergunta sobre este cliente?';
-      setMensagensAssistente([{ role: 'assistant', texto: autoMsg }]);
-    } catch {
-      setMensagensAssistente([{ role: 'assistant', texto: 'Não foi possível carregar o histórico. Pode me perguntar qualquer coisa!' }]);
-    }
-  };
-
-  // Verifica alertas proativos do carrinho (fase de vida, alergias, duração)
-  const verificarAlertasCarrinho = async (clienteId, itens) => {
-    if (!clienteId || !itens || itens.length === 0) {
-      setAlertasCarrinho([]);
-      setInfosCarrinho([]);
-      return;
-    }
-    try {
-      const payload = {
-        itens: itens.map(i => ({
-          produto_id: i.produto_id || null,
-          produto_nome: i.produto_nome || i.nome || '',
-          quantidade: i.quantidade || 1,
-          preco_unitario: i.preco_unitario || 0,
-        }))
-      };
-      const res = await api.post(`/clientes/${clienteId}/alertas-carrinho`, payload);
-      setAlertasCarrinho(res.data.alertas || []);
-      setInfosCarrinho(res.data.infos || []);
-    } catch {
-      // silencioso
-    }
-  };
-
-  // Envia mensagem para o chat IA do cliente (passa carrinho junto)
-  const enviarMensagemAssistente = async () => {
-    const msg = inputAssistente.trim();
-    if (!msg || !vendaAtual.cliente?.id || enviandoAssistente) return;
-    setMensagensAssistente(prev => [...prev, { role: 'user', texto: msg }]);
-    setInputAssistente('');
-    setEnviandoAssistente(true);
-    try {
-      const carrinhoPayload = vendaAtual.itens?.map(i => ({
-        produto_id: i.produto_id || null,
-        produto_nome: i.produto_nome || i.nome || '',
-        quantidade: i.quantidade || 1,
-        preco_unitario: i.preco_unitario || 0,
-      })) || [];
-      const res = await api.post(`/clientes/${vendaAtual.cliente.id}/chat-pdv`, {
-        mensagem: msg,
-        carrinho: carrinhoPayload,
-      });
-      setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: res.data.resposta }]);
-    } catch {
-      setMensagensAssistente(prev => [...prev, { role: 'assistant', texto: 'Erro ao responder. Tente novamente.' }]);
-    } finally {
-      setEnviandoAssistente(false);
     }
   };
 
@@ -2829,11 +2728,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
               buscarOportunidades(vendaAtual.id || null);
             }}
             onToggleAssistente={() => {
-              const abrindo = !painelAssistenteAberto;
-              setPainelAssistenteAberto(abrindo);
-              if (abrindo && mensagensAssistente.length === 0) {
-                carregarInfoCliente(vendaAtual.cliente.id);
-              }
+              void alternarPainelAssistente();
             }}
             menuCaixaKey={caixaKey}
             onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}

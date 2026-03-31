@@ -517,6 +517,10 @@ Itens executados nesta etapa:
   - card de observacoes movido para `frontend/src/components/pdv/PDVObservacoesCard.jsx`
   - camada restante de modais consolidada em `frontend/src/components/pdv/PDVModalsLayer.jsx`
   - `PDV.jsx` deixou de carregar JSX duplicado escondido e ficou mais focado em estado e callbacks
+- [x] iniciar a extracao de hooks por fluxo no `PDV.jsx`:
+  - logica do assistente IA e dos alertas de carrinho movida para `frontend/src/hooks/usePDVAssistente.js`
+  - `PDV.jsx` deixou de concentrar estados, efeitos e chamadas de API desse fluxo
+  - a abertura do painel do assistente passou a usar um handler unico de orquestracao
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
