@@ -170,11 +170,13 @@ def _pedido_precisa_reconciliacao(
     nf_bling_id: str | None,
     nf_numero: str | None,
 ) -> bool:
+    from app.services.bling_nf_service import movimento_documentado_por_nf
+
     payload = pedido.payload if isinstance(pedido.payload, dict) else {}
     ultima_nf = _dict(payload.get("ultima_nf"))
     ultima_nf_id = _text(ultima_nf.get("id"))
     ultima_nf_numero = _text(ultima_nf.get("numero"))
-    movimentos_saida = (
+    movimentacoes_saida = (
         db.query(EstoqueMovimentacao)
         .filter(
             EstoqueMovimentacao.tenant_id == pedido.tenant_id,
@@ -183,7 +185,15 @@ def _pedido_precisa_reconciliacao(
             EstoqueMovimentacao.tipo == "saida",
             EstoqueMovimentacao.status != "cancelado",
         )
-        .count()
+        .all()
+    )
+    possui_movimentacao_nf = any(
+        movimento_documentado_por_nf(
+            mov,
+            nf_numero=nf_numero,
+            nf_bling_id=nf_bling_id,
+        )
+        for mov in movimentacoes_saida
     )
     return bool(
         not ultima_nf_id
@@ -191,7 +201,7 @@ def _pedido_precisa_reconciliacao(
         or (nf_bling_id and ultima_nf_id != nf_bling_id)
         or (nf_numero and ultima_nf_numero != nf_numero)
         or any(not getattr(item, "vendido_em", None) for item in itens)
-        or movimentos_saida == 0
+        or not possui_movimentacao_nf
     )
 
 

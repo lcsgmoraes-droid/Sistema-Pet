@@ -5,6 +5,7 @@ from app.estoque_routes import (
     _contexto_venda_pedido_integrado,
     _label_canal_movimentacao,
     _observacao_exibicao_movimentacao_bling,
+    listar_movimentacoes_produto,
 )
 
 
@@ -417,3 +418,88 @@ def test_contexto_venda_pedido_integrado_resolve_nf_pelo_cache_do_pedido(monkeyp
 
     assert contexto["canal"] == "shopee"
     assert contexto["nf_numero"] == "011087"
+
+
+def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(monkeypatch):
+    class FakeQuery:
+        def __init__(self, *, first_result=None, all_result=None):
+            self.first_result = first_result
+            self.all_result = all_result or []
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return list(self.all_result)
+
+        def first(self):
+            return self.first_result
+
+    class FakeDB:
+        def __init__(self, produto, movimentacoes, pedidos):
+            self.produto = produto
+            self.movimentacoes = movimentacoes
+            self.pedidos = pedidos
+
+        def query(self, model):
+            nome = getattr(model, "__name__", "")
+            if nome == "Produto":
+                return FakeQuery(first_result=self.produto)
+            if nome == "EstoqueMovimentacao":
+                return FakeQuery(all_result=self.movimentacoes)
+            if nome == "PedidoIntegrado":
+                return FakeQuery(all_result=self.pedidos)
+            return FakeQuery()
+
+    produto = SimpleNamespace(id=6359, tenant_id="tenant-1")
+    movimento = SimpleNamespace(
+        id=3015,
+        tipo="saida",
+        motivo="venda_bling",
+        quantidade=1.0,
+        quantidade_anterior=4.0,
+        quantidade_nova=3.0,
+        custo_unitario=22.31,
+        valor_total=22.31,
+        documento="11733",
+        referencia_id=1225,
+        referencia_tipo="pedido_integrado",
+        observacao="Baixa automatica via webhook Bling (Atendido)",
+        lote_id=None,
+        lotes_consumidos=None,
+        created_at=None,
+        user_id=99,
+    )
+    pedido = SimpleNamespace(
+        id=1225,
+        tenant_id="tenant-1",
+        pedido_bling_id="25441648396",
+        pedido_bling_numero="11733",
+        canal="bling",
+        payload={
+            "pedido": {
+                "loja": {"id": 205367939},
+                "itens": [{"codigo": "SKU-1", "quantidade": 1, "valor": 41.18, "total": 41.18}],
+            },
+            "ultima_nf": {"id": "25441651448", "numero": "011089", "valor_total": 41.18},
+        },
+    )
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda db, produto: [6359],
+    )
+
+    resultado = listar_movimentacoes_produto(
+        produto_id=6359,
+        db=FakeDB(produto, [movimento], [pedido]),
+        user_and_tenant=(SimpleNamespace(id=1), "tenant-1"),
+    )
+
+    assert len(resultado) == 1
+    assert resultado[0]["documento"] == "11733"
+    assert resultado[0]["nf_numero"] is None
+    assert resultado[0]["observacao_exibicao"] == "Baixa automatica via webhook Bling (Atendido)"

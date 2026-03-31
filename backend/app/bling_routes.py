@@ -214,14 +214,14 @@ def listar_incidentes_compat(
             or (info_nf or {}).get("numero_pedido_loja")
         )
         registro["nf_numero"] = (
-            (info or {}).get("nf_numero")
-            or _texto(
+            _texto(
                 _primeiro_preenchido(
                     detalhes.get("nf_numero"),
                     (detalhes.get("nf_detectada") or {}).get("numero"),
                 )
             )
             or (info_nf or {}).get("nf_numero")
+            or (info or {}).get("nf_numero")
         )
         registro["pedido_status_atual"] = (info or {}).get("pedido_status_atual")
     return registros
@@ -289,9 +289,9 @@ def listar_eventos_compat(
             or (info_nf or {}).get("numero_pedido_loja")
         )
         registro["nf_numero"] = (
-            (info or {}).get("nf_numero")
-            or _nf_numero_payload(payload)
+            _nf_numero_payload(payload)
             or (info_nf or {}).get("nf_numero")
+            or (info or {}).get("nf_numero")
         )
         registro["pedido_status_atual"] = (info or {}).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
     return registros

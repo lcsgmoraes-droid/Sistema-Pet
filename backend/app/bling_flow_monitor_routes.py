@@ -162,8 +162,16 @@ def _mapa_numeros_notas_cache(db: Session, tenant_id, registros: list[dict]) -> 
         chave = _texto(getattr(nota, "bling_id", None))
         if not chave or chave in mapa:
             continue
+        detalhe = _dict(getattr(nota, "detalhe_payload", None))
+        resumo = _dict(getattr(nota, "resumo_payload", None))
         mapa[chave] = {
-            "nf_numero": _texto(getattr(nota, "numero", None)),
+            "nf_numero": _texto(
+                _primeiro_preenchido(
+                    getattr(nota, "numero", None),
+                    detalhe.get("numero"),
+                    resumo.get("numero"),
+                )
+            ),
             "numero_pedido_loja": _texto(getattr(nota, "numero_pedido_loja", None)),
         }
     return mapa
@@ -241,9 +249,9 @@ def listar_incidentes(
             or _dict(info_nf).get("numero_pedido_loja")
         )
         registro["nf_numero"] = (
-            _dict(info).get("nf_numero")
-            or _texto(_primeiro_preenchido(detalhes.get("nf_numero"), _dict(detalhes.get("nf_detectada")).get("numero")))
+            _texto(_primeiro_preenchido(detalhes.get("nf_numero"), _dict(detalhes.get("nf_detectada")).get("numero")))
             or _dict(info_nf).get("nf_numero")
+            or _dict(info).get("nf_numero")
         )
         registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual")
     return registros
@@ -306,9 +314,9 @@ def listar_eventos(
             or _dict(info_nf).get("numero_pedido_loja")
         )
         registro["nf_numero"] = (
-            _dict(info).get("nf_numero")
-            or _nf_numero_payload(payload)
+            _nf_numero_payload(payload)
             or _dict(info_nf).get("nf_numero")
+            or _dict(info).get("nf_numero")
         )
         registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
     return registros

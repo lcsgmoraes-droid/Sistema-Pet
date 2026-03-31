@@ -567,6 +567,37 @@ def _produto_por_sku(db: Session, tenant_id, sku: str) -> tuple[Produto | None, 
     return produto, "desconhecido"
 
 
+def _contar_movimentacoes_saida_nf(
+    db: Session,
+    pedido: PedidoIntegrado,
+    *,
+    payload: dict | None,
+) -> tuple[int, int]:
+    from app.services.bling_nf_service import movimento_documentado_por_nf
+
+    nf = _ultima_nf(payload)
+    nf_id = _text(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+    nf_numero = _text(nf.get("numero"))
+    movimentacoes = (
+        db.query(EstoqueMovimentacao)
+        .filter(
+            EstoqueMovimentacao.tenant_id == pedido.tenant_id,
+            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
+            EstoqueMovimentacao.referencia_id == pedido.id,
+            EstoqueMovimentacao.tipo == "saida",
+            EstoqueMovimentacao.status != "cancelado",
+        )
+        .all()
+    )
+    total = len(movimentacoes)
+    total_nf = sum(
+        1
+        for mov in movimentacoes
+        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_id)
+    )
+    return total, total_nf
+
+
 def _make_incident(
     code: str,
     *,
@@ -601,6 +632,7 @@ def diagnosticar_pedido_integrado(
     payload: dict | None,
     *,
     movimentacoes_saida: int,
+    movimentacoes_saida_nf: int | None = None,
     itens_sem_produto: list[dict] | None = None,
     itens_mapeados_por_barra: list[dict] | None = None,
     nf_detectada: dict | None = None,
@@ -614,6 +646,7 @@ def diagnosticar_pedido_integrado(
     nfs_detectadas = [_dict(item) for item in (nfs_detectadas or []) if isinstance(item, dict)]
     nf_local_id = _text(nf.get("id"))
     nf_local_numero = _text(nf.get("numero"))
+    movimentacoes_saida_nf = movimentacoes_saida if movimentacoes_saida_nf is None else int(movimentacoes_saida_nf)
 
     if not itens:
         incidentes.append(
@@ -682,7 +715,7 @@ def diagnosticar_pedido_integrado(
                     )
                 )
 
-        if itens_vendidos and movimentacoes_saida < len(itens_vendidos):
+        if itens_vendidos and movimentacoes_saida_nf < len(itens_vendidos):
             incidentes.append(
                 _make_incident(
                     "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
@@ -690,7 +723,7 @@ def diagnosticar_pedido_integrado(
                     title="Pedido confirmado sem baixa completa de estoque",
                     message=(
                         f"Existem {len(itens_vendidos)} item(ns) vendidos, mas apenas "
-                        f"{movimentacoes_saida} movimentacao(oes) de saida para o pedido."
+                        f"{movimentacoes_saida_nf} movimentacao(oes) de saida vinculada(s) a NF atual."
                     ),
                     suggested_action="Reconciliar as baixas pendentes do pedido confirmado.",
                     auto_fixable=True,
@@ -699,6 +732,7 @@ def diagnosticar_pedido_integrado(
                     details={
                         "itens_vendidos": len(itens_vendidos),
                         "movimentacoes_saida": movimentacoes_saida,
+                        "movimentacoes_saida_nf": movimentacoes_saida_nf,
                     },
                 )
             )
@@ -1371,12 +1405,11 @@ def auditar_fluxo_bling(
             itens = db.query(PedidoIntegradoItem).filter(
                 PedidoIntegradoItem.pedido_integrado_id == pedido.id
             ).all()
-            movimentacoes_saida = db.query(EstoqueMovimentacao).filter(
-                EstoqueMovimentacao.tenant_id == pedido.tenant_id,
-                EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-                EstoqueMovimentacao.referencia_id == pedido.id,
-                EstoqueMovimentacao.tipo == "saida",
-            ).count()
+            movimentacoes_saida, movimentacoes_saida_nf = _contar_movimentacoes_saida_nf(
+                db,
+                pedido,
+                payload=_dict(pedido.payload),
+            )
 
             itens_sem_produto = []
             itens_mapeados_por_barra = []
@@ -1434,6 +1467,7 @@ def auditar_fluxo_bling(
                 itens,
                 _dict(pedido.payload),
                 movimentacoes_saida=movimentacoes_saida,
+                movimentacoes_saida_nf=movimentacoes_saida_nf,
                 itens_sem_produto=itens_sem_produto,
                 itens_mapeados_por_barra=itens_mapeados_por_barra,
                 nf_detectada=nfs_detectadas[0] if len(nfs_detectadas) == 1 else None,

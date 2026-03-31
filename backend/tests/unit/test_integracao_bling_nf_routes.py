@@ -15,9 +15,9 @@ from app.services.bling_nf_service import processar_nf_autorizada, processar_nf_
 
 def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.side_effect = [
+    db.query.return_value.filter.return_value.order_by.return_value.all.side_effect = [
         [],
-        [SimpleNamespace(produto_id=12)],
+        [SimpleNamespace(produto_id=12, documento="010001", observacao="Baixa automatica via NF 010001")],
     ]
     pedido = SimpleNamespace(
         status="aberto",
@@ -83,9 +83,67 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     assert chamadas_baixa[0]["user_id"] == 99
 
 
+def test_nf_autorizada_reaproveita_baixa_legada_e_normaliza_para_nf(monkeypatch):
+    db = Mock()
+    movimento_legado = SimpleNamespace(
+        id=3015,
+        produto_id=12,
+        documento="11733",
+        observacao="Baixa automatica via webhook Bling (Atendido)",
+        status="confirmado",
+    )
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [movimento_legado]
+    pedido = SimpleNamespace(
+        status="confirmado",
+        confirmado_em=None,
+        tenant_id="tenant-1",
+        id=77,
+        pedido_bling_numero="11733",
+        payload={"ultima_nf": {"numero": "011089"}},
+    )
+    item = SimpleNamespace(sku="026209.1", quantidade=1, vendido_em=None)
+    produto = SimpleNamespace(id=12, tipo_kit=None, tipo_produto="SIMPLES")
+    chamadas_baixa = []
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.buscar_produto_do_item",
+        lambda **kwargs: produto,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
+        lambda db_arg, item_arg: setattr(item_arg, "vendido_em", "2026-03-31T01:00:00Z"),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
+        lambda **kwargs: SimpleNamespace(id=99),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda **kwargs: [12],
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.baixar_estoque_item_integrado",
+        lambda **kwargs: chamadas_baixa.append(kwargs) or {"movimentos": [{"produto_id": 12, "quantidade": 1.0}]},
+    )
+    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
+    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.resolver_incidentes_relacionados",
+        lambda *args, **kwargs: 0,
+    )
+
+    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="25441651448")
+
+    assert resposta == "venda_confirmada"
+    assert chamadas_baixa == []
+    assert item.vendido_em is not None
+    assert movimento_legado.documento == "011089"
+    assert movimento_legado.observacao == "Baixa automatica via NF 011089"
+
+
 def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,
@@ -153,7 +211,7 @@ def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
 
 def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,
@@ -173,6 +231,10 @@ def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
     monkeypatch.setattr(
         "app.services.bling_nf_service._obter_usuario_padrao_tenant",
         lambda **kwargs: SimpleNamespace(id=15),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.produto_ids_estoque_afetados",
+        lambda **kwargs: [6401],
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
@@ -303,7 +365,7 @@ def test_nf_webhook_considera_autorizada_quando_texto_da_nf_diz_autorizada_mesmo
 
 def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monkeypatch):
     db = Mock()
-    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,

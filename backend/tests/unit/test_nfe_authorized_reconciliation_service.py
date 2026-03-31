@@ -31,9 +31,9 @@ class _FakeQuery:
 
 
 class _FakeDB:
-    def __init__(self, itens, movimentos_count):
+    def __init__(self, itens, movimentos=None):
         self.itens = itens
-        self.movimentos_count = movimentos_count
+        self.movimentos = movimentos or []
         self.flush_calls = 0
         self.commit_calls = 0
         self.rollback_calls = 0
@@ -41,10 +41,12 @@ class _FakeDB:
 
     def query(self, model):
         nome = getattr(model, "__name__", "")
+        if nome == "PedidoIntegrado":
+            return _FakeQuery(first_result=None)
         if nome == "PedidoIntegradoItem":
             return _FakeQuery(all_result=self.itens)
         if nome == "EstoqueMovimentacao":
-            return _FakeQuery(count_result=self.movimentos_count)
+            return _FakeQuery(all_result=self.movimentos, count_result=len(self.movimentos))
         raise AssertionError(f"Modelo inesperado na query: {nome}")
 
     def add(self, obj):
@@ -83,7 +85,7 @@ def test_reconciliar_nf_autorizada_cache_vincula_por_numero_pedido_loja(monkeypa
         resumo_payload={},
         status="Autorizada",
     )
-    db = _FakeDB([item], movimentos_count=0)
+    db = _FakeDB([item], movimentos=[])
     capturado = {}
 
     monkeypatch.setattr(
@@ -128,3 +130,71 @@ def test_reconciliar_nf_autorizada_cache_vincula_por_numero_pedido_loja(monkeypa
     assert capturado["processou_nf"]["nf_id"] == "25443301147"
     assert capturado["vinculo_nf"]["nf_numero"] == "011100"
     assert db.commit_calls == 1
+
+
+def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legada(monkeypatch):
+    pedido = SimpleNamespace(
+        id=1225,
+        tenant_id="tenant-1",
+        pedido_bling_id="25441648396",
+        pedido_bling_numero="11733",
+        status="confirmado",
+        payload={"ultima_nf": {"id": "25441651001", "numero": "011088"}},
+    )
+    item = SimpleNamespace(sku="019516.1/1", vendido_em="2026-03-30T22:28:21")
+    registro = SimpleNamespace(
+        bling_id="25441651448",
+        numero="011089",
+        numero_pedido_loja="260331HQ17M377",
+        pedido_bling_id_ref="25441648396",
+        detalhe_payload={"numero": "011089", "numeroPedidoLoja": "260331HQ17M377", "situacao": 5},
+        resumo_payload={},
+        status="Autorizada",
+    )
+    movimento_legado = SimpleNamespace(
+        produto_id=6359,
+        documento="11733",
+        observacao="Baixa automatica via webhook Bling (Atendido)",
+        status="confirmado",
+    )
+    db = _FakeDB([item], movimentos=[movimento_legado])
+    capturado = {}
+
+    monkeypatch.setattr(
+        "app.integracao_bling_nf_routes._localizar_pedido_local_por_numero_loja",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_nf_routes._localizar_pedido_local_por_numero_bling",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_nf_routes._registrar_nf_no_pedido",
+        lambda **kwargs: capturado.setdefault("registrou_nf", kwargs),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        lambda **kwargs: capturado.setdefault("processou_nf", kwargs) or "venda_confirmada",
+    )
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.registrar_vinculo_nf_pedido",
+        lambda **kwargs: capturado.setdefault("vinculo_nf", kwargs),
+    )
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.resolver_incidentes_relacionados",
+        lambda *args, **kwargs: 1,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.registrar_evento",
+        lambda **kwargs: capturado.setdefault("evento", kwargs),
+    )
+
+    resultado = reconciliar_nf_autorizada_cache(
+        db,
+        tenant_id="tenant-1",
+        registro=registro,
+    )
+
+    assert resultado["success"] is True
+    assert resultado["motivo"] == "reconciliada"
+    assert capturado["processou_nf"]["nf_id"] == "25441651448"

@@ -513,6 +513,7 @@ def _contexto_venda_pedido_integrado(
     nf_contexto = _contexto_nf_pedido_integrado(db, pedido)
     contexto = {
         "canal": _canal_pedido_integrado(pedido),
+        "nf_id": nf_contexto.get("id"),
         "nf_numero": nf_contexto.get("numero"),
         "preco_venda_unitario": None,
     }
@@ -2216,15 +2217,31 @@ def listar_movimentacoes_produto(
                 contexto_venda = _contexto_venda_pedido_integrado(db, pedido_integrado, produto_id)
                 canal_venda = contexto_venda.get("canal")
                 nf_numero = contexto_venda.get("nf_numero")
-                if not nf_numero:
-                    continue
-                preco_venda_unitario = contexto_venda.get("preco_venda_unitario")
-                documento_exibicao = nf_numero or mov.documento
-                observacao_exibicao = _observacao_exibicao_movimentacao_bling(
-                    canal=canal_venda,
-                    nf_numero=nf_numero,
-                    observacao_original=mov.observacao,
+                nf_id = contexto_venda.get("nf_id")
+                try:
+                    from .services.bling_nf_service import movimento_documentado_por_nf
+                except Exception:
+                    movimento_documentado_por_nf = None
+
+                movimento_usa_nf = bool(
+                    movimento_documentado_por_nf
+                    and movimento_documentado_por_nf(
+                        mov,
+                        nf_numero=nf_numero,
+                        nf_bling_id=nf_id,
+                    )
                 )
+
+                if movimento_usa_nf:
+                    preco_venda_unitario = contexto_venda.get("preco_venda_unitario")
+                    documento_exibicao = nf_numero or mov.documento
+                    observacao_exibicao = _observacao_exibicao_movimentacao_bling(
+                        canal=canal_venda,
+                        nf_numero=nf_numero,
+                        observacao_original=mov.observacao,
+                    )
+                else:
+                    nf_numero = None
 
         resultado.append({
             "id": mov.id,

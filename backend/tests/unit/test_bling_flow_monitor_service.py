@@ -66,6 +66,27 @@ def test_diagnosticar_pedido_confirmado_sem_baixa_e_item_nao_confirmado():
     assert "SKU_MAPEADO_POR_CODIGO_BARRAS" in codigos
 
 
+def test_diagnosticar_pedido_confirmado_aponta_saida_sem_nf_atual():
+    pedido = SimpleNamespace(id=22, pedido_bling_id="BL-22", status="confirmado")
+    itens = [
+        SimpleNamespace(sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None),
+    ]
+
+    incidentes = diagnosticar_pedido_integrado(
+        pedido,
+        itens,
+        {"ultima_nf": {"id": "NF-22", "numero": "011089", "situacao": "Autorizada"}},
+        movimentacoes_saida=1,
+        movimentacoes_saida_nf=0,
+    )
+
+    incidente = next(item for item in incidentes if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE")
+
+    assert incidente["details"]["movimentacoes_saida"] == 1
+    assert incidente["details"]["movimentacoes_saida_nf"] == 0
+    assert "NF atual" in incidente["message"]
+
+
 def test_diagnosticar_pedido_aberto_aponta_nf_detectada_sem_vinculo():
     pedido = SimpleNamespace(
         id=3,

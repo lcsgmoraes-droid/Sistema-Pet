@@ -22,6 +22,13 @@ from app.utils.logger import logger
 AUTO_CADASTRO_BING_TAG = "[AUTO-BLING-NF]"
 
 
+def _text(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def buscar_produto_do_item(db: Session, tenant_id, sku: str):
     if not sku:
         return None
@@ -78,6 +85,113 @@ def consumir_movimentacoes_esperadas(
     for produto_id in ids_esperados:
         movimentos_consumidos[produto_id] += 1
     return True
+
+
+def _regex_token_numerico(valor: str | None) -> str | None:
+    texto = _text(valor)
+    if not texto:
+        return None
+    return rf"(?<!\d){re.escape(texto)}(?!\d)"
+
+
+def movimento_documentado_por_nf(
+    mov: EstoqueMovimentacao | None,
+    *,
+    nf_numero: str | None = None,
+    nf_bling_id: str | None = None,
+) -> bool:
+    if not mov:
+        return False
+
+    documento = _text(getattr(mov, "documento", None))
+    observacao = _text(getattr(mov, "observacao", None)) or ""
+    nf_numero = _text(nf_numero)
+    nf_bling_id = _text(nf_bling_id)
+
+    if nf_numero and documento == nf_numero:
+        return True
+
+    padrao_nf_numero = _regex_token_numerico(nf_numero)
+    if padrao_nf_numero and re.search(padrao_nf_numero, observacao):
+        return True
+
+    padrao_nf_bling = _regex_token_numerico(nf_bling_id)
+    if padrao_nf_bling and re.search(padrao_nf_bling, observacao):
+        return True
+
+    return False
+
+
+def movimento_legado_pedido_para_nf(
+    mov: EstoqueMovimentacao | None,
+    *,
+    pedido_bling_numero: str | None = None,
+    nf_numero: str | None = None,
+    nf_bling_id: str | None = None,
+) -> bool:
+    if not mov or movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id):
+        return False
+
+    documento = _text(getattr(mov, "documento", None))
+    observacao = (_text(getattr(mov, "observacao", None)) or "").lower()
+    pedido_bling_numero = _text(pedido_bling_numero)
+
+    if pedido_bling_numero and documento == pedido_bling_numero:
+        return True
+
+    if "webhook bling" in observacao or "pedido criado ja atendido" in observacao:
+        return True
+
+    return False
+
+
+def _consumir_movimentacoes_esperadas_lista(
+    ids_esperados: list[int],
+    movimentos_por_produto: dict[int, list[EstoqueMovimentacao]],
+) -> list[EstoqueMovimentacao] | None:
+    if not ids_esperados:
+        return None
+
+    selecionadas: list[EstoqueMovimentacao] = []
+    for produto_id in ids_esperados:
+        lista = movimentos_por_produto.get(produto_id) or []
+        if not lista:
+            return None
+        selecionadas.append(lista[0])
+
+    for movimentacao in selecionadas:
+        lista = movimentos_por_produto.get(int(movimentacao.produto_id)) or []
+        if lista:
+            lista.pop(0)
+
+    return selecionadas
+
+
+def _normalizar_movimentacoes_legadas_para_nf(
+    db: Session,
+    movimentos: list[EstoqueMovimentacao],
+    *,
+    nf_numero: str | None,
+    nf_bling_id: str | None,
+) -> int:
+    movimentos_atualizados = 0
+    observacao_nf = (
+        f"Baixa automatica via NF {nf_numero}"
+        if _text(nf_numero)
+        else f"Baixa automatica via NF Bling #{nf_bling_id}"
+        if _text(nf_bling_id)
+        else None
+    )
+
+    for movimentacao in movimentos:
+        if _text(nf_numero):
+            movimentacao.documento = _text(nf_numero)
+        if observacao_nf:
+            movimentacao.observacao = observacao_nf
+        db.add(movimentacao)
+        movimentos_atualizados += 1
+
+    return movimentos_atualizados
 
 
 def _sincronizar_cache_estoque_virtual(db: Session, tenant_id, kit_id: int) -> float | None:
@@ -520,21 +634,40 @@ def processar_nf_autorizada(
 ) -> str:
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido, nf_id)
-    movimentos_existentes = db.query(EstoqueMovimentacao).filter(
-        EstoqueMovimentacao.tenant_id == pedido.tenant_id,
-        EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-        EstoqueMovimentacao.referencia_id == pedido.id,
-        EstoqueMovimentacao.tipo == "saida",
-    ).all()
-    movimentos_por_produto = Counter(
-        int(mov.produto_id) for mov in movimentos_existentes if getattr(mov, "produto_id", None)
+    movimentos_existentes = (
+        db.query(EstoqueMovimentacao)
+        .filter(
+            EstoqueMovimentacao.tenant_id == pedido.tenant_id,
+            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
+            EstoqueMovimentacao.referencia_id == pedido.id,
+            EstoqueMovimentacao.tipo == "saida",
+            EstoqueMovimentacao.status != "cancelado",
+        )
+        .order_by(EstoqueMovimentacao.id.asc())
+        .all()
     )
-    movimentos_consumidos = Counter()
+    movimentos_nf_por_produto: dict[int, list[EstoqueMovimentacao]] = {}
+    movimentos_legados_por_produto: dict[int, list[EstoqueMovimentacao]] = {}
+    for mov in movimentos_existentes:
+        produto_id_mov = getattr(mov, "produto_id", None)
+        if not produto_id_mov:
+            continue
+        produto_id_int = int(produto_id_mov)
+        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_id):
+            movimentos_nf_por_produto.setdefault(produto_id_int, []).append(mov)
+        elif movimento_legado_pedido_para_nf(
+            mov,
+            pedido_bling_numero=getattr(pedido, "pedido_bling_numero", None),
+            nf_numero=nf_numero,
+            nf_bling_id=nf_id,
+        ):
+            movimentos_legados_por_produto.setdefault(produto_id_int, []).append(mov)
     usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
     user_id_execucao = getattr(usuario_padrao, "id", None)
     venda_ja_confirmada = pedido.status == "confirmado" and all(item.vendido_em for item in itens)
     itens_confirmados = 0
     baixas_criadas = 0
+    baixas_normalizadas = 0
     houve_erros = False
 
     pedido.status = "confirmado"
@@ -590,13 +723,28 @@ def processar_nf_autorizada(
                 continue
 
             ids_esperados = produto_ids_estoque_afetados(db=db, produto=produto)
-            baixa_ja_existente = consumir_movimentacoes_esperadas(
+            movimentos_nf_existentes = _consumir_movimentacoes_esperadas_lista(
                 ids_esperados,
-                movimentos_por_produto,
-                movimentos_consumidos,
+                movimentos_nf_por_produto,
             )
 
-            if baixa_ja_existente:
+            if movimentos_nf_existentes:
+                if not item.vendido_em:
+                    EstoqueReservaService.confirmar_venda(db, item)
+                    itens_confirmados += 1
+                continue
+
+            movimentos_legados = _consumir_movimentacoes_esperadas_lista(
+                ids_esperados,
+                movimentos_legados_por_produto,
+            )
+            if movimentos_legados:
+                baixas_normalizadas += _normalizar_movimentacoes_legadas_para_nf(
+                    db,
+                    movimentos_legados,
+                    nf_numero=nf_numero,
+                    nf_bling_id=nf_id,
+                )
                 if not item.vendido_em:
                     EstoqueReservaService.confirmar_venda(db, item)
                     itens_confirmados += 1
@@ -619,7 +767,7 @@ def processar_nf_autorizada(
                 for movimento in movimentos_gerados:
                     produto_id_mov = movimento.get("produto_id")
                     if produto_id_mov:
-                        movimentos_consumidos[int(produto_id_mov)] += 1
+                        movimentos_nf_por_produto.setdefault(int(produto_id_mov), [])
                 baixas_criadas += len(movimentos_gerados)
             else:
                 baixas_criadas += 1
@@ -679,7 +827,7 @@ def processar_nf_autorizada(
     if incidentes_resolvidos:
         db.commit()
 
-    if venda_ja_confirmada and itens_confirmados == 0 and baixas_criadas == 0 and not houve_erros:
+    if venda_ja_confirmada and itens_confirmados == 0 and baixas_criadas == 0 and baixas_normalizadas == 0 and not houve_erros:
         return "venda_ja_confirmada"
 
     registrar_evento(
