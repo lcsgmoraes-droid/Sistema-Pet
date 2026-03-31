@@ -3,6 +3,7 @@ from unittest.mock import Mock
 
 from app.integracao_bling_pedido_routes import (
     _confirmar_pedido,
+    _montar_payload_pedido,
     _normalizar_canal,
     _resumir_ultima_nf_do_pedido_bling,
     _resumir_ultima_nf_webhook,
@@ -106,6 +107,32 @@ def test_resolver_canal_pedido_inferido_pelo_numero_loja_virtual():
     assert canal == "mercado_livre"
     assert label == "Mercado Livre"
     assert origem == "mercado_livre"
+
+
+def test_montar_payload_pedido_preserva_ultima_nf_mais_recente():
+    payload = _montar_payload_pedido(
+        webhook_data={"pedido": {"numero": "11733"}},
+        pedido_completo={"numero": "11733"},
+        payload_atual={
+            "ultima_nf": {
+                "id": "25441651448",
+                "numero": "011089",
+                "serie": "2",
+                "situacao": "Autorizada",
+                "data_emissao": "2026-03-30 19:28:21",
+            }
+        },
+        ultima_nf={
+            "id": "25441651001",
+            "numero": "011088",
+            "serie": "2",
+            "situacao": "Autorizada",
+            "data_emissao": "2026-03-30 19:28:16",
+        },
+    )
+
+    assert payload["ultima_nf"]["id"] == "25441651448"
+    assert payload["ultima_nf"]["numero"] == "011089"
 
 
 def test_serializar_pedido_bling_expoe_campos_enriquecidos():

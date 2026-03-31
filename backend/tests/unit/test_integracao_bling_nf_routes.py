@@ -353,6 +353,35 @@ def test_registrar_nf_no_pedido_preserva_numero_existente_quando_webhook_vem_inc
     assert pedido.payload["ultima_nf"]["situacao"] == "Autorizada"
 
 
+def test_registrar_nf_no_pedido_nao_substitui_ultima_nf_por_nota_mais_antiga():
+    pedido = SimpleNamespace(
+        payload={
+            "ultima_nf": {
+                "id": "25441651448",
+                "numero": "011089",
+                "serie": "2",
+                "situacao": "Autorizada",
+                "data_emissao": "2026-03-30 19:28:21",
+            }
+        }
+    )
+
+    _registrar_nf_no_pedido(
+        pedido=pedido,
+        data={
+            "numero": "011088",
+            "serie": "2",
+            "situacao": 5,
+            "dataEmissao": "2026-03-30 19:28:16",
+        },
+        nf_id="25441651001",
+        situacao_num=5,
+    )
+
+    assert pedido.payload["ultima_nf"]["id"] == "25441651448"
+    assert pedido.payload["ultima_nf"]["numero"] == "011089"
+
+
 def test_nf_webhook_considera_autorizada_quando_texto_da_nf_diz_autorizada_mesmo_com_codigo_6():
     assert _nf_webhook_autorizada(
         {

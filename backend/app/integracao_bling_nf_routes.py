@@ -55,6 +55,16 @@ def _texto(value) -> str | None:
     return texto or None
 
 
+def _primeiro_preenchido(*valores):
+    for valor in valores:
+        if valor is None:
+            continue
+        if isinstance(valor, str) and not valor.strip():
+            continue
+        return valor
+    return None
+
+
 def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
     atual = _dict(atual)
     nova = _dict(nova)
@@ -64,6 +74,71 @@ def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
             continue
         mesclada[chave] = valor
     return mesclada
+
+
+def _coerce_data_nf(value) -> datetime | None:
+    texto = _texto(value)
+    if not texto:
+        return None
+    texto = texto.replace("Z", "+00:00")
+    try:
+        if "T" not in texto and " " in texto:
+            texto = texto.replace(" ", "T", 1)
+        dt = datetime.fromisoformat(texto)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except ValueError:
+        try:
+            return datetime.fromisoformat(texto.split("T")[0])
+        except ValueError:
+            return None
+
+
+def _numero_nf_int(nf: dict | None) -> int | None:
+    numero = _texto(_dict(nf).get("numero"))
+    if not numero or not numero.isdigit():
+        return None
+    return int(numero)
+
+
+def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
+    atual = _dict(atual)
+    nova = _dict(nova)
+    if not atual:
+        return True
+    if not nova:
+        return False
+
+    atual_id = _texto(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
+    nova_id = _texto(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
+    atual_numero = _texto(atual.get("numero"))
+    nova_numero = _texto(nova.get("numero"))
+
+    if (atual_id and nova_id and atual_id == nova_id) or (atual_numero and nova_numero and atual_numero == nova_numero):
+        return True
+
+    atual_data = _coerce_data_nf(_primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao")))
+    nova_data = _coerce_data_nf(_primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao")))
+    if atual_data and nova_data and atual_data != nova_data:
+        return nova_data > atual_data
+    if nova_data and not atual_data:
+        return True
+    if atual_data and not nova_data:
+        return False
+
+    atual_numero_int = _numero_nf_int(atual)
+    nova_numero_int = _numero_nf_int(nova)
+    if atual_numero_int is not None and nova_numero_int is not None and atual_numero_int != nova_numero_int:
+        return nova_numero_int > atual_numero_int
+
+    return False
+
+
+def _consolidar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
+    if _nova_nf_deve_substituir(atual, nova):
+        return _mesclar_ultima_nf(atual, nova)
+    return _mesclar_ultima_nf(nova, atual)
 
 
 def _modelo_nota_bling(nf_data: dict | None) -> int:
@@ -379,7 +454,7 @@ def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, sit
     status_nf = _status_nota_webhook(data, situacao_num)
     pedido.payload = {
         **payload_atual,
-        "ultima_nf": _mesclar_ultima_nf(
+        "ultima_nf": _consolidar_ultima_nf(
             ultima_nf_atual,
             {
                 "id": nf_id,

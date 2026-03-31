@@ -68,6 +68,25 @@ def _buscar_nfes_autorizadas_recentes(
     )
 
 
+def _deduplicar_registros_nfe_por_pedido(registros: list[BlingNotaFiscalCache]) -> list[BlingNotaFiscalCache]:
+    selecionados: list[BlingNotaFiscalCache] = []
+    chaves_vistas: set[str] = set()
+
+    for registro in registros:
+        refs = _extrair_referencias_nf_cache(registro)
+        chave = (
+            _text(refs.get("pedido_bling_id"))
+            or f"loja::{_text(refs.get('numero_pedido_loja'))}"
+            or f"nf::{_text(refs.get('nf_bling_id'))}"
+        )
+        if not chave or chave in chaves_vistas:
+            continue
+        chaves_vistas.add(chave)
+        selecionados.append(registro)
+
+    return selecionados
+
+
 def listar_tenants_com_nfes_autorizadas_recentes(db: Session, *, dias: int) -> list:
     _garantir_registry_sqlalchemy_reconciliacao()
     return [
@@ -388,6 +407,7 @@ def reconciliar_nfes_autorizadas_recentes(
         dias=dias,
         limite_notas=limite_notas,
     )
+    registros = _deduplicar_registros_nfe_por_pedido(registros)
     resultados: list[dict] = []
     reconciliadas = 0
 

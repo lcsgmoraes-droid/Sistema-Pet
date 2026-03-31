@@ -7,7 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from app.db import get_session
@@ -162,6 +162,73 @@ def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
     return mesclada
 
 
+def _coerce_data_nf(value) -> datetime | None:
+    texto = _texto(value)
+    if not texto:
+        return None
+    texto = texto.replace("Z", "+00:00")
+    try:
+        if "T" not in texto and " " in texto:
+            texto = texto.replace(" ", "T", 1)
+        dt = datetime.fromisoformat(texto)
+        if dt.tzinfo is not None:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except ValueError:
+        try:
+            return datetime.fromisoformat(texto.split("T")[0])
+        except ValueError:
+            return None
+
+
+def _numero_nf_int(nf: dict | None) -> int | None:
+    numero = _texto(_dict(nf).get("numero"))
+    if not numero or not numero.isdigit():
+        return None
+    return int(numero)
+
+
+def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
+    atual = _dict(atual)
+    nova = _dict(nova)
+    if not atual:
+        return True
+    if not nova:
+        return False
+
+    atual_id = _texto(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
+    nova_id = _texto(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
+    atual_numero = _texto(atual.get("numero"))
+    nova_numero = _texto(nova.get("numero"))
+
+    if (atual_id and nova_id and atual_id == nova_id) or (atual_numero and nova_numero and atual_numero == nova_numero):
+        return True
+
+    atual_data = _coerce_data_nf(_primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao")))
+    nova_data = _coerce_data_nf(_primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao")))
+    if atual_data and nova_data and atual_data != nova_data:
+        return nova_data > atual_data
+    if nova_data and not atual_data:
+        return True
+    if atual_data and not nova_data:
+        return False
+
+    atual_numero_int = _numero_nf_int(atual)
+    nova_numero_int = _numero_nf_int(nova)
+    if atual_numero_int is not None and nova_numero_int is not None and atual_numero_int != nova_numero_int:
+        return nova_numero_int > atual_numero_int
+
+    return False
+
+
+def _consolidar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
+    if not atual and not nova:
+        return None
+    if _nova_nf_deve_substituir(atual, nova):
+        return _mesclar_ultima_nf(atual, nova)
+    return _mesclar_ultima_nf(nova, atual)
+
+
 def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | None, payload_atual: dict | None = None, ultima_nf: dict | None = None) -> dict:
     payload = dict(_dict(payload_atual))
     if isinstance(webhook_data, dict) and webhook_data:
@@ -169,7 +236,7 @@ def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | No
     pedido_base = pedido_completo if isinstance(pedido_completo, dict) and pedido_completo else _payload_principal(payload) or _dict(webhook_data)
     payload["pedido"] = pedido_base
     if ultima_nf:
-        payload["ultima_nf"] = _mesclar_ultima_nf(payload.get("ultima_nf"), ultima_nf)
+        payload["ultima_nf"] = _consolidar_ultima_nf(payload.get("ultima_nf"), ultima_nf)
     return payload
 
 
