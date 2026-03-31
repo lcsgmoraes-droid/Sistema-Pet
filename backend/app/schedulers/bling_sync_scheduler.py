@@ -6,6 +6,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 import logging
 
 from app.services.bling_sync_service import BlingSyncService
+from app.services.bling_flow_monitor_service import executar_auditoria_background
 from app.services.nfe_pending_reconciliation_service import executar_reconciliacao_automatica_nfes_pendentes
 from app.db import SessionLocal
 
@@ -42,6 +43,13 @@ class BlingSyncScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            func=self.auditar_fluxo_bling,
+            trigger=IntervalTrigger(minutes=15),
+            id="bling_flow_audit_autofix",
+            name="Bling Flow Audit Autofix",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             func=self.reconciliar_geral,
             trigger=CronTrigger(hour=2, minute=0),
             id="bling_sync_full_reconcile",
@@ -53,6 +61,7 @@ class BlingSyncScheduler:
         logger.info("   - Fila pendente: a cada 1 minuto")
         logger.info("   - Reconciliação recente: a cada 15 minutos")
         logger.info("   - NFs pendentes recentes: a cada 15 minutos")
+        logger.info("   - Fluxo pedido/NF/estoque: a cada 15 minutos")
         logger.info("   - Auditoria geral: diariamente às 02:00")
 
     def start(self) -> None:
@@ -87,6 +96,15 @@ class BlingSyncScheduler:
                 logger.info("[BLING SYNC] Reconciliação automática de NFs pendentes: %s", result)
         finally:
             db.close()
+
+    def auditar_fluxo_bling(self) -> None:
+        result = executar_auditoria_background(dias=3, limite=300, auto_fix=True)
+        if (
+            result.get("incidentes_detectados")
+            or result.get("auto_fix_tentados")
+            or result.get("auto_fix_sucessos")
+        ):
+            logger.info("[BLING SYNC] Auditoria automática do fluxo Bling: %s", result)
 
     def reconciliar_geral(self) -> None:
         result = BlingSyncService.run_nightly_forced_link_and_sync(link_limit=800, sync_limit=1200)

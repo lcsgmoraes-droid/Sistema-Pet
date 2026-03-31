@@ -24,6 +24,7 @@ from app.services.bling_flow_monitor_service import (
     abrir_incidente,
     registrar_evento,
     registrar_vinculo_nf_pedido,
+    resolver_incidentes_relacionados,
 )
 from app.services.provisao_simples_service import gerar_provisao_simples_por_nf
 from app.tenancy.context import set_current_tenant
@@ -101,6 +102,14 @@ def _status_nota_webhook(nf_data: dict | None, situacao_num: int | None = None) 
     if situacao_num == 1:
         return "Pendente"
     return _texto(_dict(nf_data.get("situacao")).get("descricao")) or _texto(nf_data.get("status")) or "Pendente"
+
+
+def _nf_webhook_autorizada(nf_data: dict | None, situacao_num: int | None = None) -> bool:
+    return (_status_nota_webhook(nf_data, situacao_num) or "").strip().lower() == "autorizada"
+
+
+def _nf_webhook_cancelada(nf_data: dict | None, situacao_num: int | None = None) -> bool:
+    return (_status_nota_webhook(nf_data, situacao_num) or "").strip().lower() == "cancelada"
 
 
 def _atualizar_cache_nota_webhook(
@@ -476,6 +485,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     pedido_bling_id = nf_relacao.get("pedido_bling_id")
     pedido_bling_numero = nf_relacao.get("pedido_bling_numero")
     numero_pedido_loja = nf_relacao.get("numero_pedido_loja")
+    nf_numero = str(_dict(nf_dados).get("numero") or "").strip() or None
 
     if tenant_id_monitor:
         _atualizar_cache_nota_webhook(
@@ -499,6 +509,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             payload={
                 **_dict(data),
                 "status_nf": _status_nota_webhook(nf_dados, situacao_num),
+                "nf_numero": nf_numero,
                 "pedido_bling_numero": pedido_bling_numero,
                 "numero_pedido_loja": numero_pedido_loja,
             },
@@ -542,6 +553,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 nf_bling_id=nf_id,
                 details={
                     "situacao_num": situacao_num,
+                    "nf_numero": nf_numero,
                     "pedido_bling_numero": pedido_bling_numero,
                     "numero_pedido_loja": numero_pedido_loja,
                 },
@@ -567,6 +579,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
                 nf_bling_id=nf_id,
                 details={
                     "situacao_num": situacao_num,
+                    "nf_numero": nf_numero,
                     "pedido_bling_numero": pedido_bling_numero,
                     "numero_pedido_loja": numero_pedido_loja,
                 },
@@ -592,7 +605,6 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         nf_id=nf_id,
         situacao_num=situacao_num,
     )
-    nf_numero = str(_dict(nf_dados).get("numero") or "").strip() or None
     registrar_vinculo_nf_pedido(
         pedido=pedido,
         source="webhook",
@@ -607,6 +619,15 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         processed_at=event_date,
         db=db,
     )
+    resolver_incidentes_relacionados(
+        db,
+        tenant_id=pedido.tenant_id,
+        codes=["NF_SEM_PEDIDO_VINCULADO", "NF_SEM_PEDIDO_LOCAL"],
+        pedido_integrado_id=pedido.id,
+        pedido_bling_id=pedido.pedido_bling_id,
+        nf_bling_id=nf_id,
+        resolution_note="NF vinculada posteriormente ao pedido correspondente.",
+    )
 
     itens = db.query(PedidoIntegradoItem).filter(
         PedidoIntegradoItem.pedido_integrado_id == pedido.id
@@ -615,7 +636,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     # NF EMITIDA / AUTORIZADA
     # ============================
-    if situacao_num in _NF_SITUACAO_AUTORIZADA:
+    if _nf_webhook_autorizada(nf_dados, situacao_num):
         acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=nf_dados)
         registrar_evento(
@@ -647,7 +668,7 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     # ============================
     # NF CANCELADA
     # ============================
-    if situacao_num in _NF_SITUACAO_CANCELADA:
+    if _nf_webhook_cancelada(nf_dados, situacao_num):
         acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         registrar_evento(
             tenant_id=pedido.tenant_id,

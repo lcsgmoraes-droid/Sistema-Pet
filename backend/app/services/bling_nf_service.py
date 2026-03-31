@@ -11,7 +11,11 @@ from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto, ProdutoKitComponente, EstoqueMovimentacao
 from app.services.kit_estoque_service import KitEstoqueService
-from app.services.bling_flow_monitor_service import abrir_incidente, registrar_evento
+from app.services.bling_flow_monitor_service import (
+    abrir_incidente,
+    registrar_evento,
+    resolver_incidentes_relacionados,
+)
 from app.utils.logger import logger
 
 
@@ -94,15 +98,16 @@ def _sincronizar_cache_estoque_virtual(db: Session, tenant_id, kit_id: int) -> f
 def _numero_nf_pedido(pedido: PedidoIntegrado | None, fallback_nf_id: str | None = None) -> str | None:
     payload_bruto = getattr(pedido, "payload", None)
     payload = payload_bruto if isinstance(payload_bruto, dict) else {}
-    ultima_nf = payload.get("ultima_nf") if isinstance(payload.get("ultima_nf"), dict) else {}
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    ultima_nf = (
+        payload.get("ultima_nf")
+        or pedido_payload.get("notaFiscal")
+        or pedido_payload.get("nota")
+        or pedido_payload.get("nfe")
+    )
+    ultima_nf = ultima_nf if isinstance(ultima_nf, dict) else {}
     numero = str(ultima_nf.get("numero") or "").strip()
-    if numero:
-        return numero
-    numero_pedido = str(getattr(pedido, "pedido_bling_numero", "") or "").strip()
-    if numero_pedido:
-        return numero_pedido
-    fallback = str(fallback_nf_id or "").strip()
-    return fallback or None
+    return numero or None
 
 
 def baixar_estoque_item_integrado(
@@ -606,8 +611,8 @@ def processar_nf_autorizada(
                 referencia_id=pedido.id,
                 referencia_tipo="pedido_integrado",
                 user_id=user_id_execucao,
-                documento=nf_numero or pedido.pedido_bling_numero,
-                observacao=f"Baixa automatica via NF {nf_numero}" if nf_numero else f"Baixa automatica via NF Bling #{nf_id}",
+                documento=nf_numero,
+                observacao=f"Baixa automatica via NF {nf_numero}" if nf_numero else "Baixa automatica via NF autorizada do Bling",
             )
             movimentos_gerados = resultado_baixa.get("movimentos") or []
             if movimentos_gerados:
@@ -658,6 +663,21 @@ def processar_nf_autorizada(
 
     db.add(pedido)
     db.commit()
+    incidentes_resolvidos = resolver_incidentes_relacionados(
+        db,
+        tenant_id=pedido.tenant_id,
+        codes=[
+            "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
+            "ITEM_NAO_CONFIRMADO_EM_PEDIDO_CONFIRMADO",
+            "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO",
+        ],
+        pedido_integrado_id=pedido.id,
+        pedido_bling_id=pedido_bling_id,
+        nf_bling_id=nf_id,
+        resolution_note="Baixa de estoque reconciliada a partir da NF autorizada.",
+    )
+    if incidentes_resolvidos:
+        db.commit()
 
     if venda_ja_confirmada and itens_confirmados == 0 and baixas_criadas == 0 and not houve_erros:
         return "venda_ja_confirmada"

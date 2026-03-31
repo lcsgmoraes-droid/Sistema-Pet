@@ -219,7 +219,7 @@ function buildEventResult(evento) {
 
 function buildEventNarrative(evento) {
   const pedidoLabel = evento.pedido_bling_numero || evento.pedido_bling_id;
-  const nfLabel = evento.nf_numero || evento.nf_bling_id;
+  const nfLabel = evento.nf_numero;
   const linkSource = LINK_SOURCE_LABELS[evento?.payload?.link_source] || '';
 
   switch (evento.event_type) {
@@ -286,7 +286,7 @@ function buildEventReferenceSummary(evento) {
   const pedido = evento.pedido_bling_numero || evento.pedido_bling_id;
   if (pedido) partes.push(`Pedido ${pedido}`);
   if (evento.numero_pedido_loja) partes.push(`Loja ${evento.numero_pedido_loja}`);
-  if (evento.nf_numero || evento.nf_bling_id) partes.push(`NF ${evento.nf_numero || evento.nf_bling_id}`);
+  if (evento.nf_numero) partes.push(`NF ${evento.nf_numero}`);
   if (evento.sku) partes.push(`SKU ${evento.sku}`);
 
   return partes.join(' | ');
@@ -471,7 +471,7 @@ function EventCard({ evento, defaultExpanded = false }) {
               <p className="mt-1 text-sm text-emerald-800">
                 {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || '-')}
                 {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ''}
-                {evento.nf_numero || evento.nf_bling_id ? ` | NF ${evento.nf_numero || evento.nf_bling_id}` : ''}
+                {evento.nf_numero ? ` | NF ${evento.nf_numero}` : ''}
               </p>
             </div>
           )}

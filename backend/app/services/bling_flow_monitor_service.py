@@ -1012,6 +1012,46 @@ def resolver_incidente_por_id(
     return incidente
 
 
+def resolver_incidentes_relacionados(
+    db: Session,
+    *,
+    tenant_id,
+    codes: list[str] | tuple[str, ...] | set[str] | None = None,
+    pedido_integrado_id: int | None = None,
+    pedido_bling_id: str | None = None,
+    nf_bling_id: str | None = None,
+    resolution_note: str | None = None,
+) -> int:
+    query = db.query(BlingFlowIncident).filter(
+        BlingFlowIncident.tenant_id == tenant_id,
+        BlingFlowIncident.status.in_(OPEN_INCIDENT_STATUSES),
+    )
+    if codes:
+        query = query.filter(BlingFlowIncident.code.in_(list(codes)))
+
+    filtros = []
+    if pedido_integrado_id:
+        filtros.append(BlingFlowIncident.pedido_integrado_id == pedido_integrado_id)
+    if pedido_bling_id:
+        filtros.append(BlingFlowIncident.pedido_bling_id == _text(pedido_bling_id))
+    if nf_bling_id:
+        filtros.append(BlingFlowIncident.nf_bling_id == _text(nf_bling_id))
+    if filtros:
+        query = query.filter(or_(*filtros))
+
+    resolvidos = 0
+    for incidente in query.all():
+        incidente.status = "resolved"
+        incidente.resolved_em = _utcnow()
+        detalhes = _dict(incidente.details)
+        if resolution_note:
+            detalhes["resolution_note"] = resolution_note
+        incidente.details = _json_safe(detalhes)
+        db.add(incidente)
+        resolvidos += 1
+    return resolvidos
+
+
 def _resolver_incidentes_ausentes(
     db: Session,
     pedido: PedidoIntegrado,
