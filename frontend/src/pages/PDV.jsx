@@ -33,13 +33,14 @@ import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
+import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
-import { debugLog, debugWarn } from "../utils/debug";
+import { debugLog } from "../utils/debug";
 import { formatBRL } from "../utils/formatters";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 
@@ -140,20 +141,7 @@ export default function PDV() {
   const [erroCupom, setErroCupom] = useState("");
   const [saldoCampanhas, setSaldoCampanhas] = useState(null); // {saldo_cashback, total_carimbos, cupons_ativos}
 
-  // Estado de comissão
-  const [vendaComissionada, setVendaComissionada] = useState(false);
-  const [funcionarioComissao, setFuncionarioComissao] = useState(null);
-  const [funcionariosSugeridos, setFuncionariosSugeridos] = useState([]);
-  const [buscaFuncionario, setBuscaFuncionario] = useState(""); // Texto de busca
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null); // Guardar status antes de reabrir
-
-  // ✅ Sincronizar funcionario_id com vendaAtual sempre que mudar
-  useEffect(() => {
-    setVendaAtual((prev) => ({
-      ...prev,
-      funcionario_id: funcionarioComissao?.id || null,
-    }));
-  }, [funcionarioComissao]);
 
   // Estados do drawer de análise de venda
   const [mostrarAnaliseVenda, setMostrarAnaliseVenda] = useState(false);
@@ -226,6 +214,19 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     handleTaxaEntregadorChange,
     handleObservacoesEntregaChange,
   } = usePDVEntrega(vendaAtual, setVendaAtual);
+  const {
+    vendaComissionada,
+    funcionarioComissao,
+    funcionariosSugeridos,
+    buscaFuncionario,
+    sincronizarComissaoDaVenda,
+    handleToggleVendaComissionada,
+    handleBuscaFuncionarioFocus,
+    handleBuscaFuncionarioChange,
+    handleSelecionarFuncionarioComissao,
+    handleRemoverFuncionarioComissao,
+    limparComissao,
+  } = usePDVComissao(setVendaAtual, modoVisualizacao);
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -714,55 +715,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  const carregarFuncionariosComissao = async (busca = "") => {
-    try {
-      const response = await api.get("/comissoes/configuracoes/funcionarios");
-      const funcionarios = response.data.data || [];
-      const termo = String(busca || "").trim().toLowerCase();
-      const filtrados = termo
-        ? funcionarios.filter((f) => f.nome.toLowerCase().includes(termo))
-        : funcionarios;
-
-      setFuncionariosSugeridos(filtrados);
-      return filtrados;
-    } catch (error) {
-      console.error("Erro ao buscar funcionários:", error);
-      setFuncionariosSugeridos([]);
-      return [];
-    }
-  };
-
-  const handleToggleVendaComissionada = (checked) => {
-    setVendaComissionada(checked);
-    if (!checked) {
-      setFuncionarioComissao(null);
-      setBuscaFuncionario("");
-      setFuncionariosSugeridos([]);
-    }
-  };
-
-  const handleBuscaFuncionarioFocus = async () => {
-    if (!modoVisualizacao) {
-      await carregarFuncionariosComissao();
-    }
-  };
-
-  const handleBuscaFuncionarioChange = async (valor) => {
-    setBuscaFuncionario(valor);
-    await carregarFuncionariosComissao(valor);
-  };
-
-  const handleSelecionarFuncionarioComissao = (func) => {
-    setFuncionarioComissao(func);
-    setFuncionariosSugeridos([]);
-    setBuscaFuncionario("");
-  };
-
-  const handleRemoverFuncionarioComissao = () => {
-    setFuncionarioComissao(null);
-    setBuscaFuncionario("");
-  };
-
   const handleNovaVenda = () => {
     if (window.confirm("Descartar venda atual sem salvar?")) {
       limparVenda();
@@ -882,47 +834,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         console.error("Erro ao buscar pagamentos:", error);
       }
 
-      // 🆕 CARREGAR DADOS DE COMISSÃO se existir funcionario_id
-      debugLog("🔍 Venda carregada - funcionario_id:", venda.funcionario_id);
-      let funcionarioCarregado = null;
-      if (venda.funcionario_id) {
-        try {
-          // Buscar dados do funcionário
-          const responseFuncionarios = await api.get(
-            "/comissoes/configuracoes/funcionarios",
-          );
-          const funcionarios = responseFuncionarios.data?.data || [];
-          debugLog("📋 Funcionários disponíveis:", funcionarios);
-          funcionarioCarregado = funcionarios.find(
-            (f) => f.id === venda.funcionario_id,
-          );
-
-          if (funcionarioCarregado) {
-            setVendaComissionada(true);
-            setFuncionarioComissao(funcionarioCarregado);
-            debugLog(
-              "✅ Funcionário comissão carregado:",
-              funcionarioCarregado,
-            );
-          } else {
-            debugWarn(
-              "⚠️ Funcionário ID",
-              venda.funcionario_id,
-              "não encontrado na lista",
-            );
-          }
-        } catch (error) {
-          console.error("Erro ao carregar funcionário de comissão:", error);
-        }
-      } else {
-        debugLog(
-          "ℹ️ Venda sem funcionario_id - limpando estados de comissão",
-        );
-        // Se não tem funcionario_id, limpar estados de comissão
-        setVendaComissionada(false);
-        setFuncionarioComissao(null);
-        setBuscaFuncionario("");
-      }
+      await sincronizarComissaoDaVenda(venda.funcionario_id);
 
       // Montar estado da venda
       const vendaCarregada = {
@@ -1880,9 +1792,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         observacoes_entrega: "",
       },
     });
-    setVendaComissionada(false); // Desmarcar checkbox
-    setFuncionarioComissao(null); // Limpar funcionário de comissão
-    setBuscaFuncionario(""); // Limpar texto de busca
+    limparComissao();
     setModoVisualizacao(false);
   };
 
@@ -1916,41 +1826,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         "🔍 Venda carregada - funcionario_id:",
         vendaCompleta.funcionario_id,
       );
-      if (vendaCompleta.funcionario_id) {
-        try {
-          const responseFuncionarios = await api.get(
-            "/comissoes/configuracoes/funcionarios",
-          );
-          const funcionarios = responseFuncionarios.data?.data || [];
-          const funcionarioCarregado = funcionarios.find(
-            (f) => f.id === vendaCompleta.funcionario_id,
-          );
-
-          if (funcionarioCarregado) {
-            setVendaComissionada(true);
-            setFuncionarioComissao(funcionarioCarregado);
-            debugLog(
-              "✅ Funcionário comissão carregado:",
-              funcionarioCarregado,
-            );
-          } else {
-            debugWarn(
-              "⚠️ Funcionário ID",
-              vendaCompleta.funcionario_id,
-              "não encontrado na lista",
-            );
-          }
-        } catch (error) {
-          console.error("Erro ao carregar funcionário de comissão:", error);
-        }
-      } else {
-        debugLog(
-          "ℹ️ Venda sem funcionario_id - limpando estados de comissão",
-        );
-        setVendaComissionada(false);
-        setFuncionarioComissao(null);
-        setBuscaFuncionario("");
-      }
+      await sincronizarComissaoDaVenda(vendaCompleta.funcionario_id);
 
       // Carregar dados da venda no PDV em modo visualização
       const vendaParaSetar = {
@@ -2634,4 +2510,5 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     </>
   );
 }
+
 

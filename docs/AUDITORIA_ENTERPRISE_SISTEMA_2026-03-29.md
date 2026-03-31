@@ -529,6 +529,10 @@ Itens executados nesta etapa:
   - fluxo de entrega movido para `frontend/src/hooks/usePDVEntrega.js`
   - `PDV.jsx` deixou de concentrar carregamento de entregadores, calculo de custo operacional e handlers de entrega
   - a sincronizacao do entregador ao carregar uma venda passou a ficar centralizada no hook
+- [x] continuar a extracao de hooks operacionais do `PDV.jsx`:
+  - fluxo de comissao movido para `frontend/src/hooks/usePDVComissao.js`
+  - `PDV.jsx` deixou de concentrar busca de funcionarios com comissao, handlers do card e sincronizacao da venda carregada
+  - a limpeza e reaplicacao do estado de comissao passaram a ficar centralizadas no hook
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
