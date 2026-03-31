@@ -510,6 +510,13 @@ Itens executados nesta etapa:
 - [x] continuar a reducao do corpo principal do `PDV.jsx` sem alterar a interface:
   - card de entrega movido para `frontend/src/components/pdv/PDVEntregaCard.jsx`
   - `PDV.jsx` ficou responsavel pelos handlers de endereco, entregador e taxas, sem manter o JSX detalhado desse fluxo
+- [x] seguir limpando a estrutura do `PDV.jsx` sem alterar a interface:
+  - alerta de drive movido para `frontend/src/components/pdv/PDVDriveAlertBanner.jsx`
+  - cabecalho operacional movido para `frontend/src/components/pdv/PDVHeaderBar.jsx`
+  - banners de caixa fechado e numero da venda movidos para `frontend/src/components/pdv/PDVInfoBanners.jsx`
+  - card de observacoes movido para `frontend/src/components/pdv/PDVObservacoesCard.jsx`
+  - camada restante de modais consolidada em `frontend/src/components/pdv/PDVModalsLayer.jsx`
+  - `PDV.jsx` deixou de carregar JSX duplicado escondido e ficou mais focado em estado e callbacks
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling

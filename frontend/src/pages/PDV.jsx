@@ -6,19 +6,7 @@
 // 3. Validar impacto financeiro
 
 import {
-  AlertCircle,
-  Bell,
-  Bot,
   CheckCircle,
-  CreditCard,
-  History,
-  Save,
-  Search,
-  ShoppingCart,
-  Star,
-  Trash2,
-  Wallet,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -27,30 +15,22 @@ import api from "../api";
 import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
 import { buscarVenda, criarVenda, listarVendas } from "../api/vendas";
-import AnaliseVendaDrawer from "../components/AnaliseVendaDrawer";
-import MenuCaixa from "../components/MenuCaixa";
-import ModalAbrirCaixa from "../components/ModalAbrirCaixa";
-import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
-import ModalPagamento from "../components/ModalPagamento";
-import HistoricoCliente from "../components/pdv/HistoricoCliente";
+import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
 import PDVClienteSidebar from "../components/pdv/PDVClienteSidebar";
-import ModalCadastroCliente from "../components/pdv/ModalCadastroCliente";
 import PDVAcoesFooterCard from "../components/pdv/PDVAcoesFooterCard";
-import ModalCalculadoraRacaoPDV from "../components/pdv/ModalCalculadoraRacaoPDV";
 import PDVComissaoCard from "../components/pdv/PDVComissaoCard";
-import PDVDescontoItemModal from "../components/pdv/PDVDescontoItemModal";
-import PDVDescontoTotalModal from "../components/pdv/PDVDescontoTotalModal";
-import PDVEnderecoModal from "../components/pdv/PDVEnderecoModal";
 import PDVEntregaCard from "../components/pdv/PDVEntregaCard";
+import PDVHeaderBar from "../components/pdv/PDVHeaderBar";
+import PDVInfoBanners from "../components/pdv/PDVInfoBanners";
+import PDVModalsLayer from "../components/pdv/PDVModalsLayer";
 import PDVModoVisualizacaoBanner from "../components/pdv/PDVModoVisualizacaoBanner";
-import ModalPendenciasEstoque from "../components/pdv/ModalPendenciasEstoque";
+import PDVObservacoesCard from "../components/pdv/PDVObservacoesCard";
 import PDVOportunidadesSidebar from "../components/pdv/PDVOportunidadesSidebar";
 import PDVProdutosCard from "../components/pdv/PDVProdutosCard";
 import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
-import VendasEmAberto from "../components/pdv/VendasEmAberto";
 import { useAuth } from "../contexts/AuthContext";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -2708,333 +2688,170 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
+  const carregarPagamentosDaVenda = async (vendaId) => {
+    try {
+      const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
+      return {
+        pagamentos: responsePagamentos.data.pagamentos || [],
+        totalPago: responsePagamentos.data.total_pago || 0,
+      };
+    } catch (error) {
+      console.error("Erro ao buscar pagamentos:", error);
+      return {
+        pagamentos: [],
+        totalPago: 0,
+      };
+    }
+  };
+
+  const recarregarVendaAtualComPagamentos = async (vendaId) => {
+    const vendaAtualizada = await buscarVenda(vendaId);
+    const { pagamentos, totalPago } = await carregarPagamentosDaVenda(vendaId);
+
+    setVendaAtual({
+      ...vendaAtualizada,
+      pagamentos,
+      total_pago: totalPago,
+    });
+
+    return vendaAtualizada;
+  };
+
+  const handleConfirmarPagamento = async () => {
+    setMostrarModalPagamento(false);
+
+    if (modoVisualizacao && vendaAtual.id) {
+      try {
+        const vendaAtualizada = await recarregarVendaAtualComPagamentos(
+          vendaAtual.id,
+        );
+        debugLog("\u2705 Venda recarregada:", vendaAtualizada);
+      } catch (error) {
+        console.error("Erro ao recarregar venda:", error);
+      }
+    } else {
+      limparVenda();
+    }
+
+    carregarVendasRecentes();
+    setCaixaKey((prev) => prev + 1);
+  };
+
+  const handleVendaAtualizadaAposPagamento = async () => {
+    if (!vendaAtual.id) {
+      return;
+    }
+
+    const vendaAtualizada = await recarregarVendaAtualComPagamentos(
+      vendaAtual.id,
+    );
+    setModoVisualizacao(
+      vendaAtualizada.status === "finalizada" ||
+        vendaAtualizada.status === "baixa_parcial",
+    );
+    carregarVendasRecentes();
+  };
+
+  const handleAbrirCaixaSucesso = () => {
+    setMostrarModalAbrirCaixa(false);
+    setCaixaKey((prev) => prev + 1);
+    setTemCaixaAberto(true);
+  };
+
+  const handleFecharCalculadoraRacao = () => {
+    const racoes = vendaAtual.itens.filter((item) => {
+      const nomeCategoria = (item.categoria_nome || "").toLowerCase();
+      return (
+        nomeCategoria.includes("ra\xe7\xe3o") || nomeCategoria.includes("racao")
+      );
+    });
+
+    if (racoes.length > 0) {
+      setRacaoIdFechada(racoes[racoes.length - 1].produto_id);
+    }
+
+    setMostrarCalculadoraRacao(false);
+  };
+
+  const handleClienteCriadoRapido = (cliente) => {
+    selecionarCliente(cliente);
+    setMostrarModalCliente(false);
+  };
+
+  const handleVendasEmAbertoSucesso = () => {
+    api
+      .get(`/clientes/${vendaAtual.cliente.id}/vendas-em-aberto`)
+      .then((response) => {
+        if (response.data.resumo.total_vendas > 0) {
+          setVendasEmAbertoInfo(response.data.resumo);
+        } else {
+          setVendasEmAbertoInfo(null);
+        }
+      })
+      .catch(() => setVendasEmAbertoInfo(null));
+  };
+
+  const handleConfirmarCreditoCliente = (novoSaldo) => {
+    setVendaAtual((prev) => ({
+      ...prev,
+      cliente: { ...prev.cliente, credito: novoSaldo },
+    }));
+    setMostrarModalAdicionarCredito(false);
+  };
+
   return (
     <>
-      {/* 🚗 Drive Alert — aparece quando cliente chegou no estacionamento */}
-      {driveAlertVisible && driveAguardando.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white shadow-lg">
-          <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <span className="text-2xl animate-bounce">🚗</span>
-              <div>
-                <div className="font-bold text-base">
-                  {driveAguardando.length === 1
-                    ? "1 cliente aguardando no estacionamento (Drive)"
-                    : `${driveAguardando.length} clientes aguardando no estacionamento (Drive)`}
-                </div>
-                <div className="text-xs text-red-100 flex flex-wrap gap-3 mt-0.5">
-                  {driveAguardando.map((p) => (
-                    <span key={p.pedido_id} className="flex items-center gap-1.5">
-                      <span className="font-semibold">#{p.pedido_id.slice(-6)}</span>
-                      {p.palavra_chave_retirada && (
-                        <span className="bg-red-700 px-1 rounded">{p.palavra_chave_retirada}</span>
-                      )}
-                      <button
-                        onClick={() => confirmarDriveEntregue(p.pedido_id)}
-                        className="bg-white text-red-700 font-bold text-xs px-2 py-0.5 rounded hover:bg-red-50 transition-colors"
-                      >
-                        Entreguei
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setDriveAlertVisible(false)}
-              className="text-red-200 hover:text-white p-1 rounded"
-              title="Fechar alerta (não marca como entregue)"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
+      <PDVDriveAlertBanner
+        driveAlertVisible={driveAlertVisible}
+        driveAguardando={driveAguardando}
+        onClose={() => setDriveAlertVisible(false)}
+        onConfirmarEntregue={confirmarDriveEntregue}
+      />
       <div className="flex h-screen bg-gray-50" style={driveAlertVisible && driveAguardando.length > 0 ? { paddingTop: '52px' } : {}}>
         {/* Área Principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="bg-white border-b px-6 py-4">
-            {(destaqueAbrirCaixa || destaqueVenda) && (
-              <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 text-sm">
-                {destaqueAbrirCaixa
-                  ? "Etapa da introducao guiada: abra o caixa para liberar salvamento e finalizacao de vendas."
-                  : "Etapa da introducao guiada: use esta tela para concluir a venda e validar o fluxo operacional."}
-              </div>
-            )}
+          <PDVHeaderBar
+            destaqueAbrirCaixa={destaqueAbrirCaixa}
+            destaqueVenda={destaqueVenda}
+            caixaGuiaClasses={caixaGuiaClasses}
+            iniciarTour={iniciarTour}
+            searchVendaQuery={searchVendaQuery}
+            onSearchVendaQueryChange={setSearchVendaQuery}
+            onBuscarVenda={handleBuscarVenda}
+            vendaAtual={vendaAtual}
+            pendenciasCount={pendenciasCount}
+            opportunitiesCount={opportunities.length}
+            painelAssistenteAberto={painelAssistenteAberto}
+            mensagensAssistenteLength={mensagensAssistente.length}
+            onAbrirPendenciasEstoque={() => setMostrarPendenciasEstoque(true)}
+            onAbrirOportunidades={() => {
+              setPainelOportunidadesAberto(true);
+              buscarOportunidades(vendaAtual.id || null);
+            }}
+            onToggleAssistente={() => {
+              const abrindo = !painelAssistenteAberto;
+              setPainelAssistenteAberto(abrindo);
+              if (abrindo && mensagensAssistente.length === 0) {
+                carregarInfoCliente(vendaAtual.cliente.id);
+              }
+            }}
+            menuCaixaKey={caixaKey}
+            onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}
+            onNavigateMeusCaixas={() => navigate("/meus-caixas")}
+            modoVisualizacao={modoVisualizacao}
+            loading={loading}
+            temCaixaAberto={temCaixaAberto}
+            onCancelarEdicao={cancelarEdicao}
+            onExcluirVenda={excluirVenda}
+            onSalvarVenda={salvarVenda}
+            onAbrirModalPagamento={abrirModalPagamento}
+          />
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <ShoppingCart className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">
-                    Ponto de Venda
-                  </h1>
-                  <p className="text-sm text-gray-500">
-                    {new Date().toLocaleDateString("pt-BR", {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-                <button
-                  onClick={iniciarTour}
-                  title="Ver tour guiado do PDV"
-                  className="flex items-center gap-1 px-2 py-1 text-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline text-xs">Tour</span>
-                </button>
-
-                {/* Busca Rápida de Venda */}
-                <div className="flex items-center gap-2 ml-6">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Buscar venda (Ex: 0011)"
-                      value={searchVendaQuery}
-                      onChange={(e) => setSearchVendaQuery(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter" && searchVendaQuery.trim()) {
-                          handleBuscarVenda();
-                        }
-                      }}
-                      className="pl-10 pr-4 py-2 w-64 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-                    />
-                    <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
-                  </div>
-                  <button
-                    onClick={handleBuscarVenda}
-                    disabled={!searchVendaQuery.trim() || loading}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Buscar
-                  </button>
-                </div>
-              </div>
-
-              {/* Ações rápidas */}
-              <div className="flex items-center space-x-3">
-                {/* Botão Pendências de Estoque */}
-                {vendaAtual.cliente && (
-                  <button
-                    onClick={() => setMostrarPendenciasEstoque(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-orange-50 border-2 border-orange-400 rounded-lg transition-colors relative"
-                    title="Lista de espera - Produtos sem estoque"
-                  >
-                    <Bell className="w-5 h-5 text-orange-500" />
-                    {pendenciasCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                        {pendenciasCount}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* Botão Oportunidades Inteligentes - D4 Backend Integration */}
-                {/* ✅ RULE: Botão só aparece se cliente selecionado */}
-                {vendaAtual.cliente && (
-                  <button
-                    onClick={() => {
-                      setPainelOportunidadesAberto(true);
-                      buscarOportunidades(vendaAtual.id || null);
-                    }}
-                    className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-yellow-50 border-2 border-yellow-400 rounded-lg transition-colors"
-                    title="Ver oportunidades de venda"
-                  >
-                    <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-                    {opportunities.length > 0 && (
-                      <span className="font-semibold text-yellow-600">
-                        {Math.min(opportunities.length, 6)}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* Botão Assistente IA */}
-                {vendaAtual.cliente && (
-                  <button
-                    onClick={() => {
-                      const abrindo = !painelAssistenteAberto;
-                      setPainelAssistenteAberto(abrindo);
-                      if (abrindo && mensagensAssistente.length === 0) {
-                        carregarInfoCliente(vendaAtual.cliente.id);
-                      }
-                    }}
-                    className={`flex items-center space-x-1 px-3 py-2 rounded-lg border-2 transition-colors ${
-                      painelAssistenteAberto
-                        ? 'bg-indigo-100 border-indigo-500 text-indigo-700'
-                        : 'bg-white hover:bg-indigo-50 border-indigo-300 text-indigo-600'
-                    }`}
-                    title="Assistente IA do cliente"
-                  >
-                    <Bot className="w-5 h-5" />
-                    {mensagensAssistente.length > 1 && !painelAssistenteAberto && (
-                      <span className="w-2 h-2 bg-indigo-500 rounded-full"></span>
-                    )}
-                  </button>
-                )}
-
-                {/* Menu de Controle de Caixa */}
-                <div
-                  className={destaqueAbrirCaixa ? `rounded-lg ${caixaGuiaClasses.action}` : ""}
-                >
-                  <MenuCaixa
-                    key={caixaKey}
-                    onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}
-                  />
-                </div>
-
-                {/* Botão Meus Caixas */}
-                <button
-                  onClick={() => navigate("/meus-caixas")}
-                  className="flex items-center space-x-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition-colors"
-                  title="Ver histórico de caixas"
-                >
-                  <Wallet className="w-5 h-5" />
-                  <span>Meus Caixas</span>
-                </button>
-
-                {/* Botões quando está editando uma venda existente */}
-                {!modoVisualizacao && vendaAtual.id && (
-                  <>
-                    <button
-                      onClick={cancelarEdicao}
-                      disabled={loading}
-                      className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <X className="w-5 h-5" />
-                      <span>Cancelar Edição</span>
-                    </button>
-                    <button
-                      onClick={excluirVenda}
-                      disabled={loading}
-                      className="flex items-center space-x-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                      <span>Excluir</span>
-                    </button>
-                  </>
-                )}
-
-                <button
-                  onClick={salvarVenda}
-                  disabled={loading || modoVisualizacao || !temCaixaAberto}
-                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    !temCaixaAberto
-                      ? "🔒 Caixa fechado - Abra o caixa para salvar vendas"
-                      : "Salvar venda atual"
-                  }
-                >
-                  <Save className="w-5 h-5" />
-                  <span>Salvar</span>
-                  {!temCaixaAberto && <span className="text-xs">🔒</span>}
-                </button>
-                <button
-                  onClick={abrirModalPagamento}
-                  disabled={
-                    loading ||
-                    vendaAtual.status === "finalizada" ||
-                    vendaAtual.status === "pago_nf" ||
-                    !temCaixaAberto
-                  }
-                  className="flex items-center space-x-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title={
-                    !temCaixaAberto
-                      ? "🔒 Caixa fechado - Abra o caixa para registrar recebimentos"
-                      : "Registrar pagamento da venda"
-                  }
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span>Registrar Recebimento</span>
-                  {!temCaixaAberto && <span className="text-xs">🔒</span>}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Alerta de Caixa Fechado */}
-          {!temCaixaAberto && !modoVisualizacao && (
-            <div className="bg-red-50 border-b border-red-200 px-6 py-3">
-              <div className="flex items-center justify-center max-w-5xl mx-auto">
-                <div className="flex items-center space-x-2 text-red-800">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-bold text-lg">🔒 CAIXA FECHADO</span>
-                  <span className="text-sm">
-                    - É necessário abrir o caixa para registrar vendas e
-                    recebimentos
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 🆕 NÚMERO DA VENDA - Aparece quando venda tem ID */}
-          {vendaAtual.id && vendaAtual.numero_venda && (
-            <div className="bg-blue-50 border-b border-blue-200 px-4 py-1.5">
-              <div className="flex items-center justify-between max-w-5xl mx-auto">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-blue-800">
-                    Venda:
-                  </span>
-                  <div className="flex items-center gap-1.5 bg-white px-2 py-0.5 rounded border border-blue-300">
-                    <span className="font-bold text-blue-700 text-sm">
-                      #{vendaAtual.numero_venda}
-                    </span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(vendaAtual.numero_venda);
-                        const btn = event.target.closest("button");
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = "✓";
-                        btn.classList.add("text-green-600");
-                        setTimeout(() => {
-                          btn.innerHTML = originalText;
-                          btn.classList.remove("text-green-600");
-                        }, 1500);
-                      }}
-                      className="text-blue-600 hover:text-blue-800 transition-colors text-xs"
-                      title="Copiar número da venda"
-                    >
-                      📋
-                    </button>
-                  </div>
-                </div>
-                {vendaAtual.data_venda && (
-                  <span className="text-xs text-blue-600">
-                    {(() => {
-                      const dataStr = vendaAtual.data_venda;
-                      if (
-                        typeof dataStr === "string" &&
-                        dataStr.includes("T")
-                      ) {
-                        const [date] = dataStr.split("T");
-                        const [y, m, d] = date.split("-");
-                        return `${d}/${m}/${y}`;
-                      }
-                      return new Date(dataStr).toLocaleDateString("pt-BR");
-                    })()}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
+          <PDVInfoBanners
+            temCaixaAberto={temCaixaAberto}
+            modoVisualizacao={modoVisualizacao}
+            vendaAtual={vendaAtual}
+          />
           <PDVModoVisualizacaoBanner
             ativo={modoVisualizacao}
             vendaAtual={vendaAtual}
@@ -3115,25 +2932,16 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
                 vendaAtual={vendaAtual}
               />
 
-              {/* Card Observações */}
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Observações
-                </h2>
-                <textarea
-                  value={vendaAtual.observacoes || ""}
-                  onChange={(e) =>
-                    setVendaAtual({
-                      ...vendaAtual,
-                      observacoes: e.target.value,
-                    })
-                  }
-                  placeholder="Observações da venda (opcional)..."
-                  disabled={modoVisualizacao}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-                  rows={3}
-                />
-              </div>
+              <PDVObservacoesCard
+                modoVisualizacao={modoVisualizacao}
+                observacoes={vendaAtual.observacoes}
+                onObservacoesChange={(observacoes) =>
+                  setVendaAtual({
+                    ...vendaAtual,
+                    observacoes,
+                  })
+                }
+              />
 
               <PDVEntregaCard
                 cliente={vendaAtual.cliente}
@@ -3244,238 +3052,63 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
           enviarMensagemAssistente={enviarMensagemAssistente}
         />
 
-        {/* Modal de Pagamento */}
-        {mostrarModalPagamento && (
-          <ModalPagamento
-            venda={vendaAtual}
-            onClose={() => setMostrarModalPagamento(false)}
-            onAnalisarVenda={
-              podeVerMargem ? analisarVendaComFormasPagamento : null
-            }
-            onConfirmar={async () => {
-              setMostrarModalPagamento(false);
-
-              // Se está em modo visualização, recarregar a venda ao invés de limpar
-              if (modoVisualizacao && vendaAtual.id) {
-                try {
-                  // Recarregar venda atualizada do servidor
-                  const response = await api.get(`/vendas/${vendaAtual.id}`);
-                  const vendaAtualizada = response.data;
-
-                  // Buscar pagamentos atualizados
-                  let pagamentosVenda = [];
-                  let totalPago = 0;
-                  try {
-                    const responsePagamentos = await api.get(
-                      `/vendas/${vendaAtual.id}/pagamentos`,
-                    );
-                    pagamentosVenda = responsePagamentos.data.pagamentos || [];
-                    totalPago = responsePagamentos.data.total_pago || 0;
-                  } catch (error) {
-                    console.error("Erro ao buscar pagamentos:", error);
-                  }
-
-                  setVendaAtual({
-                    ...vendaAtualizada,
-                    pagamentos: pagamentosVenda,
-                    total_pago: totalPago,
-                  });
-
-                  debugLog("✅ Venda recarregada:", vendaAtualizada);
-                } catch (error) {
-                  console.error("Erro ao recarregar venda:", error);
-                }
-              } else {
-                // Venda nova, limpar normalmente
-                limparVenda();
-              }
-
-              carregarVendasRecentes();
-              // Forçar recarga do MenuCaixa para atualizar saldo
-              setCaixaKey((prev) => prev + 1);
-            }}
-            onVendaAtualizada={async () => {
-              // Recarregar venda após exclusão de pagamentos
-              if (vendaAtual.id) {
-                const vendaAtualizada = await buscarVenda(vendaAtual.id);
-
-                // Buscar pagamentos atualizados
-                let pagamentosVenda = [];
-                let totalPago = 0;
-                try {
-                  const responsePagamentos = await api.get(
-                    `/vendas/${vendaAtual.id}/pagamentos`,
-                  );
-                  pagamentosVenda = responsePagamentos.data.pagamentos || [];
-                  totalPago = responsePagamentos.data.total_pago || 0;
-                } catch (error) {
-                  console.error("Erro ao buscar pagamentos:", error);
-                }
-
-                setVendaAtual({
-                  ...vendaAtualizada,
-                  pagamentos: pagamentosVenda,
-                  total_pago: totalPago,
-                });
-                setModoVisualizacao(
-                  vendaAtualizada.status === "finalizada" ||
-                    vendaAtualizada.status === "baixa_parcial",
-                );
-                carregarVendasRecentes(); // Atualizar lista de vendas também
-              }
-            }}
-          />
-        )}
-
-        {/* Modal de Abrir Caixa */}
-        {mostrarModalAbrirCaixa && (
-          <ModalAbrirCaixa
-            onClose={() => setMostrarModalAbrirCaixa(false)}
-            onSucesso={() => {
-              setMostrarModalAbrirCaixa(false);
-              // Forçar recarga do MenuCaixa
-              setCaixaKey((prev) => prev + 1);
-              // Atualizar estado de caixa aberto
-              setTemCaixaAberto(true);
-            }}
-          />
-        )}
-
-        {/* 🆕 Modal da Calculadora de Ração no PDV */}
-        {mostrarCalculadoraRacao && (
-          <ModalCalculadoraRacaoPDV
-            isOpen={mostrarCalculadoraRacao}
-            itensCarrinho={vendaAtual.itens}
-            racaoIdFechada={racaoIdFechada}
-            onClose={() => {
-              // Marcar última ração como fechada para não reabre automático
-              const racoes = vendaAtual.itens.filter((item) => {
-                const nomeCategoria = (item.categoria_nome || "").toLowerCase();
-                return (
-                  nomeCategoria.includes("ração") ||
-                  nomeCategoria.includes("racao")
-                );
-              });
-              if (racoes.length > 0) {
-                setRacaoIdFechada(racoes[racoes.length - 1].produto_id);
-              }
-              setMostrarCalculadoraRacao(false);
-            }}
-          />
-        )}
-
-        {/* Modal de Pendências de Estoque */}
-        {mostrarPendenciasEstoque && vendaAtual.cliente && (
-          <ModalPendenciasEstoque
-            isOpen={mostrarPendenciasEstoque}
-            onClose={() => setMostrarPendenciasEstoque(false)}
-            clienteId={vendaAtual.cliente.id}
-            onPendenciaAdicionada={() => carregarPendencias()}
-          />
-        )}
-
-        {/* Modal de Cadastro Rápido de Cliente */}
-        {mostrarModalCliente && (
-          <ModalCadastroCliente
-            onClose={() => setMostrarModalCliente(false)}
-            onClienteCriado={(cliente) => {
-              selecionarCliente(cliente);
-              setMostrarModalCliente(false);
-            }}
-          />
-        )}
-
-        {/* Modal de Endereço Adicional */}
-        {mostrarModalEndereco && enderecoAtual && (
-          <PDVEnderecoModal
-            enderecoAtual={enderecoAtual}
-            loadingCep={loadingCep}
-            onBuscarCep={buscarCepModal}
-            onChange={setEnderecoAtual}
-            onClose={fecharModalEndereco}
-            onSalvar={salvarEnderecoNoCliente}
-          />
-        )}
-
-        {/* Modal de Desconto Individual no Item */}
-        {mostrarModalDescontoItem && itemEditando && (
-          <PDVDescontoItemModal
-            itemEditando={itemEditando}
-            onChangeItem={setItemEditando}
-            onClose={() => setMostrarModalDescontoItem(false)}
-            onRemover={removerItemEditando}
-            onSalvar={salvarDescontoItem}
-          />
-        )}
-
-        {/* Modal de Desconto Total */}
-        {mostrarModalDescontoTotal && (
-          <PDVDescontoTotalModal
-            itens={vendaAtual.itens}
-            onAplicar={aplicarDescontoTotal}
-            onClose={() => setMostrarModalDescontoTotal(false)}
-            setTipoDescontoTotal={setTipoDescontoTotal}
-            setValorDescontoTotal={setValorDescontoTotal}
-            tipoDescontoTotal={tipoDescontoTotal}
-            valorDescontoTotal={valorDescontoTotal}
-          />
-        )}
-
-        {/* Modal de Vendas em Aberto */}
-        {mostrarVendasEmAberto && vendaAtual.cliente && (
-          <VendasEmAberto
-            clienteId={vendaAtual.cliente.id}
-            clienteNome={vendaAtual.cliente.nome}
-            onClose={() => setMostrarVendasEmAberto(false)}
-            onSucesso={() => {
-              // Recarregar info de vendas em aberto
-              api
-                .get(`/clientes/${vendaAtual.cliente.id}/vendas-em-aberto`)
-                .then((response) => {
-                  if (response.data.resumo.total_vendas > 0) {
-                    setVendasEmAbertoInfo(response.data.resumo);
-                  } else {
-                    setVendasEmAbertoInfo(null);
-                  }
-                })
-                .catch(() => setVendasEmAbertoInfo(null));
-            }}
-          />
-        )}
-
-        {/* Modal de Adicionar Crédito */}
-        {mostrarModalAdicionarCredito && vendaAtual.cliente && (
-          <ModalAdicionarCredito
-            cliente={vendaAtual.cliente}
-            onConfirmar={(novoSaldo) => {
-              setVendaAtual((prev) => ({
-                ...prev,
-                cliente: { ...prev.cliente, credito: novoSaldo },
-              }));
-              setMostrarModalAdicionarCredito(false);
-            }}
-            onClose={() => setMostrarModalAdicionarCredito(false)}
-          />
-        )}
-
-        {/* Modal de Histórico do Cliente */}
-        {mostrarHistoricoCliente && vendaAtual.cliente && (
-          <HistoricoCliente
-            clienteId={vendaAtual.cliente.id}
-            clienteNome={vendaAtual.cliente.nome}
-            onClose={() => setMostrarHistoricoCliente(false)}
-          />
-        )}
-
-        {/* Drawer de Análise de Venda - APENAS PARA ADMIN */}
-        {podeVerMargem && (
-          <AnaliseVendaDrawer
-            mostrar={mostrarAnaliseVenda}
-            onFechar={() => setMostrarAnaliseVenda(false)}
-            dados={dadosAnalise}
-            carregando={carregandoAnalise}
-          />
-        )}
+        <PDVModalsLayer
+          carregandoAnalise={carregandoAnalise}
+          dadosAnalise={dadosAnalise}
+          enderecoAtual={enderecoAtual}
+          itemEditando={itemEditando}
+          loadingCep={loadingCep}
+          mostrarAnaliseVenda={mostrarAnaliseVenda}
+          mostrarCalculadoraRacao={mostrarCalculadoraRacao}
+          mostrarHistoricoCliente={mostrarHistoricoCliente}
+          mostrarModalAbrirCaixa={mostrarModalAbrirCaixa}
+          mostrarModalAdicionarCredito={mostrarModalAdicionarCredito}
+          mostrarModalCliente={mostrarModalCliente}
+          mostrarModalDescontoItem={mostrarModalDescontoItem}
+          mostrarModalDescontoTotal={mostrarModalDescontoTotal}
+          mostrarModalEndereco={mostrarModalEndereco}
+          mostrarModalPagamento={mostrarModalPagamento}
+          mostrarPendenciasEstoque={mostrarPendenciasEstoque}
+          mostrarVendasEmAberto={mostrarVendasEmAberto}
+          podeVerMargem={podeVerMargem}
+          racaoIdFechada={racaoIdFechada}
+          setTipoDescontoTotal={setTipoDescontoTotal}
+          setValorDescontoTotal={setValorDescontoTotal}
+          tipoDescontoTotal={tipoDescontoTotal}
+          valorDescontoTotal={valorDescontoTotal}
+          vendaAtual={vendaAtual}
+          onAbrirCaixaSucesso={handleAbrirCaixaSucesso}
+          onAnalisarVenda={
+            podeVerMargem ? analisarVendaComFormasPagamento : null
+          }
+          onAplicarDescontoTotal={aplicarDescontoTotal}
+          onBuscarCep={buscarCepModal}
+          onChangeEnderecoAtual={setEnderecoAtual}
+          onChangeItemEditando={setItemEditando}
+          onClienteCriado={handleClienteCriadoRapido}
+          onCloseAnalise={() => setMostrarAnaliseVenda(false)}
+          onCloseCalculadoraRacao={handleFecharCalculadoraRacao}
+          onCloseHistoricoCliente={() => setMostrarHistoricoCliente(false)}
+          onCloseModalAbrirCaixa={() => setMostrarModalAbrirCaixa(false)}
+          onCloseModalAdicionarCredito={() =>
+            setMostrarModalAdicionarCredito(false)
+          }
+          onCloseModalCliente={() => setMostrarModalCliente(false)}
+          onCloseModalDescontoItem={() => setMostrarModalDescontoItem(false)}
+          onCloseModalDescontoTotal={() => setMostrarModalDescontoTotal(false)}
+          onCloseModalEndereco={fecharModalEndereco}
+          onCloseModalPagamento={() => setMostrarModalPagamento(false)}
+          onClosePendenciasEstoque={() => setMostrarPendenciasEstoque(false)}
+          onCloseVendasEmAberto={() => setMostrarVendasEmAberto(false)}
+          onConfirmarCredito={handleConfirmarCreditoCliente}
+          onConfirmarPagamento={handleConfirmarPagamento}
+          onPendenciaAdicionada={carregarPendencias}
+          onRemoverItemEditando={removerItemEditando}
+          onSalvarDescontoItem={salvarDescontoItem}
+          onSalvarEndereco={salvarEnderecoNoCliente}
+          onVendaAtualizada={handleVendaAtualizadaAposPagamento}
+          onVendasEmAbertoSucesso={handleVendasEmAbertoSucesso}
+        />
       </div>
     </>
   );
