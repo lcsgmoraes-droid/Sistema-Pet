@@ -1,9 +1,11 @@
+from decimal import Decimal
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
 from app.services.bling_flow_monitor_service import (
     _build_incident_key,
+    _json_safe,
     _obter_nfs_recentes_bling,
     _reconciliar_pedido_confirmado,
     diagnosticar_pedido_integrado,
@@ -12,6 +14,12 @@ from app.services.bling_flow_monitor_service import (
     registrar_vinculo_nf_pedido,
     serializar_data_evento_monitor,
 )
+
+
+def test_json_safe_converte_decimal_para_float():
+    payload = _json_safe({"valor_total": Decimal("41.18"), "itens": [Decimal("2.00")]})
+
+    assert payload == {"valor_total": 41.18, "itens": [2.0]}
 
 
 def test_build_incident_key_usa_referencias_principais():
@@ -363,3 +371,94 @@ def test_reconciliar_pedido_confirmado_sem_nf_deterministica_nao_aplica_baixa():
 
     assert sucesso is False
     assert detalhes["motivo"] == "nf_ausente_ou_nao_autorizada"
+
+
+def test_reconciliar_pedido_confirmado_busca_nf_autorizada_no_cache_local(monkeypatch):
+    class FakeQuery:
+        def __init__(self, first_result=None, all_result=None):
+            self.first_result = first_result
+            self.all_result = all_result or []
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.first_result
+
+        def all(self):
+            return self.all_result
+
+    class FakeDB:
+        def __init__(self, nf_cache):
+            self.nf_cache = nf_cache
+            self.flush_calls = 0
+
+        def query(self, model):
+            nome = getattr(model, "__name__", "")
+            if nome == "BlingNotaFiscalCache":
+                return FakeQuery(first_result=self.nf_cache, all_result=[self.nf_cache])
+            raise AssertionError(f"Modelo inesperado: {nome}")
+
+        def add(self, obj):
+            return None
+
+        def flush(self):
+            self.flush_calls += 1
+
+    pedido = SimpleNamespace(
+        id=1088,
+        tenant_id="tenant-1",
+        pedido_bling_id="25430581957",
+        pedido_bling_numero="11598",
+        status="confirmado",
+        confirmado_em=None,
+        payload={
+            "pedido": {"numeroLoja": "260329D3XB4GMW"},
+            "ultima_nf": {"id": "0"},
+        },
+    )
+    item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
+    nf_cache = SimpleNamespace(
+        id=91,
+        bling_id="25428517969",
+        numero="010983",
+        status="Autorizada",
+        data_emissao=datetime(2026, 3, 29, 18, 35, 0),
+        last_synced_at=datetime(2026, 3, 29, 18, 36, 0),
+        detalhe_payload={"numero": "010983"},
+        resumo_payload={},
+    )
+    db = FakeDB(nf_cache)
+    chamadas = {}
+
+    def _fake_registrar_nf_no_pedido(*, pedido, data, nf_id, situacao_num):
+        pedido.payload["ultima_nf"] = {
+            "id": nf_id,
+            "numero": data.get("numero"),
+            "situacao_codigo": situacao_num,
+            "situacao": "Autorizada",
+        }
+
+    def _fake_processar_nf_autorizada(**kwargs):
+        chamadas.update(kwargs)
+        return "venda_confirmada"
+
+    monkeypatch.setattr(
+        "app.integracao_bling_nf_routes._registrar_nf_no_pedido",
+        _fake_registrar_nf_no_pedido,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        _fake_processar_nf_autorizada,
+    )
+
+    sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, [item])
+
+    assert sucesso is True
+    assert detalhes["acao"] == "venda_confirmada"
+    assert detalhes["nf_id"] == "25428517969"
+    assert pedido.payload["ultima_nf"]["numero"] == "010983"
+    assert chamadas["nf_id"] == "25428517969"

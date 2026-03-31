@@ -224,6 +224,32 @@ def _numero_nf_pedido(pedido: PedidoIntegrado | None, fallback_nf_id: str | None
     return numero or None
 
 
+def _recarregar_pedido_e_itens_para_nf(
+    db: Session,
+    pedido: PedidoIntegrado,
+    itens: list[PedidoIntegradoItem],
+) -> tuple[PedidoIntegrado, list[PedidoIntegradoItem]]:
+    if not isinstance(db, Session):
+        return pedido, list(itens or [])
+
+    pedido_query = db.query(PedidoIntegrado).filter(
+        PedidoIntegrado.id == pedido.id,
+        PedidoIntegrado.tenant_id == pedido.tenant_id,
+    )
+    if hasattr(pedido_query, "with_for_update"):
+        pedido_query = pedido_query.with_for_update()
+    pedido_lock = pedido_query.first() or pedido
+
+    itens_query = db.query(PedidoIntegradoItem).filter(
+        PedidoIntegradoItem.pedido_integrado_id == pedido_lock.id
+    )
+    if hasattr(itens_query, "with_for_update"):
+        itens_query = itens_query.with_for_update()
+    itens_lock = itens_query.all() or list(itens or [])
+
+    return pedido_lock, itens_lock
+
+
 def baixar_estoque_item_integrado(
     *,
     db: Session,
@@ -632,6 +658,7 @@ def processar_nf_autorizada(
     itens: list[PedidoIntegradoItem],
     nf_id: str,
 ) -> str:
+    pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido, nf_id)
     movimentos_existentes = (

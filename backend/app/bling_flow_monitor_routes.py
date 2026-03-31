@@ -26,6 +26,13 @@ def _texto(value):
     return texto or None
 
 
+def _nf_bling_id_valido(value):
+    texto = _texto(value)
+    if not texto or texto in {"0", "-1"}:
+        return None
+    return texto
+
+
 def _dict(value):
     return value if isinstance(value, dict) else {}
 
@@ -219,7 +226,7 @@ def listar_incidentes(
             "auto_fix_status": incidente.auto_fix_status,
             "pedido_integrado_id": incidente.pedido_integrado_id,
             "pedido_bling_id": incidente.pedido_bling_id,
-            "nf_bling_id": incidente.nf_bling_id,
+            "nf_bling_id": _nf_bling_id_valido(incidente.nf_bling_id),
             "sku": incidente.sku,
             "occurrences": incidente.occurrences,
             "first_seen_em": _serializar_data_monitor(incidente.first_seen_em),
@@ -286,7 +293,7 @@ def listar_eventos(
             "error_message": evento.error_message,
             "pedido_integrado_id": evento.pedido_integrado_id,
             "pedido_bling_id": evento.pedido_bling_id,
-            "nf_bling_id": evento.nf_bling_id,
+            "nf_bling_id": _nf_bling_id_valido(evento.nf_bling_id),
             "sku": evento.sku,
             "auto_fix_applied": evento.auto_fix_applied,
             "processed_at": _serializar_data_monitor(evento.processed_at),

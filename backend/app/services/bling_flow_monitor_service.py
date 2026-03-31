@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from time import monotonic, sleep
 from typing import Any, Optional
 
@@ -130,12 +131,21 @@ def _json_safe(value: Any) -> Any:
         return [_json_safe(v) for v in value]
     if isinstance(value, datetime):
         return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
     if hasattr(value, "hex") and callable(getattr(value, "hex", None)):
         try:
             return str(value)
         except Exception:
             return None
     return value
+
+
+def _nf_bling_id_valido(value: Any) -> str | None:
+    texto = _text(value)
+    if not texto or texto in {"0", "-1"}:
+        return None
+    return texto
 
 
 def registrar_vinculo_nf_pedido(
@@ -170,7 +180,7 @@ def registrar_vinculo_nf_pedido(
         message=message or "NF vinculada ao pedido durante o processamento do evento",
         pedido_integrado_id=pedido.id,
         pedido_bling_id=pedido.pedido_bling_id,
-        nf_bling_id=_text(nf_bling_id) or _text(nf_contexto.get("id")),
+        nf_bling_id=_nf_bling_id_valido(nf_bling_id) or _nf_bling_id_valido(nf_contexto.get("id")),
         payload={**payload_base, **payload_extra},
         processed_at=processed_at,
         db=db,
@@ -190,7 +200,7 @@ def _build_incident_key(
         code,
         str(pedido_integrado_id or ""),
         pedido_bling_id or "",
-        nf_bling_id or "",
+        _nf_bling_id_valido(nf_bling_id) or "",
         sku or "",
     ]
     return "|".join(parts)
@@ -611,6 +621,19 @@ def _make_incident(
     nf_bling_id: str | None = None,
     details: dict | None = None,
 ) -> dict:
+    detalhes = _dict(_json_safe(details or {}))
+    nf_detectada = _dict(detalhes.get("nf_detectada"))
+    nf_payload = _ultima_nf(_dict(getattr(pedido, "payload", None)))
+    nf_numero = _text(
+        _primeiro_preenchido(
+            detalhes.get("nf_numero"),
+            nf_detectada.get("numero"),
+            nf_payload.get("numero"),
+        )
+    )
+    if nf_numero:
+        detalhes["nf_numero"] = nf_numero
+
     return {
         "code": code,
         "severity": severity,
@@ -620,9 +643,9 @@ def _make_incident(
         "auto_fixable": auto_fixable,
         "pedido_integrado_id": pedido.id,
         "pedido_bling_id": _text(pedido.pedido_bling_id),
-        "nf_bling_id": _text(nf_bling_id),
+        "nf_bling_id": _nf_bling_id_valido(nf_bling_id),
         "sku": _text(sku),
-        "details": _json_safe(details or {}),
+        "details": detalhes,
     }
 
 
@@ -965,7 +988,7 @@ def registrar_evento(
             error_message=error_message,
             pedido_integrado_id=pedido_integrado_id,
             pedido_bling_id=_text(pedido_bling_id),
-            nf_bling_id=_text(nf_bling_id),
+            nf_bling_id=_nf_bling_id_valido(nf_bling_id),
             sku=_text(sku),
             payload=_json_safe(payload or {}),
             auto_fix_applied=auto_fix_applied,
@@ -1037,6 +1060,7 @@ def abrir_incidente(
             incidente.message = message
             incidente.suggested_action = suggested_action
             incidente.auto_fixable = auto_fixable
+            incidente.nf_bling_id = _nf_bling_id_valido(nf_bling_id)
             incidente.details = _json_safe(details or {})
             incidente.auto_fix_status = "pending" if auto_fixable else "manual"
         else:
@@ -1055,7 +1079,7 @@ def abrir_incidente(
                 dedupe_key=dedupe_key,
                 pedido_integrado_id=pedido_integrado_id,
                 pedido_bling_id=_text(pedido_bling_id),
-                nf_bling_id=_text(nf_bling_id),
+                nf_bling_id=_nf_bling_id_valido(nf_bling_id),
                 sku=_text(sku),
                 details=_json_safe(details or {}),
                 first_seen_em=agora,
@@ -1240,12 +1264,89 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
     from app.services.bling_nf_service import processar_nf_autorizada
 
     nf = _ultima_nf(getattr(pedido, "payload", None))
-    nf_id = _text(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
-    if not _nf_contexto_autorizado(nf) or not nf_id or nf_id in {"0", "-1"}:
-        return False, {
-            "motivo": "nf_ausente_ou_nao_autorizada",
-            "nf_id": nf_id,
-        }
+    nf_id = _nf_bling_id_valido(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+    if not _nf_contexto_autorizado(nf) or not nf_id:
+        nf_cache = None
+        motivo_cache = "nf_ausente_ou_nao_autorizada"
+
+        pedido_bling_id = _text(getattr(pedido, "pedido_bling_id", None))
+        if pedido_bling_id:
+            nf_cache = (
+                db.query(BlingNotaFiscalCache)
+                .filter(
+                    BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+                    BlingNotaFiscalCache.pedido_bling_id_ref == pedido_bling_id,
+                )
+                .order_by(
+                    BlingNotaFiscalCache.data_emissao.desc().nullslast(),
+                    BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                    BlingNotaFiscalCache.id.desc(),
+                )
+                .first()
+            )
+            if nf_cache and not _nf_contexto_autorizado({"situacao": getattr(nf_cache, "status", None)}):
+                nf_cache = None
+
+        if not nf_cache:
+            numero_pedido_loja = _numero_pedido_loja_pedido(pedido)
+            if numero_pedido_loja:
+                notas_loja = (
+                    db.query(BlingNotaFiscalCache)
+                    .filter(
+                        BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+                        BlingNotaFiscalCache.numero_pedido_loja == numero_pedido_loja,
+                    )
+                    .order_by(
+                        BlingNotaFiscalCache.data_emissao.desc().nullslast(),
+                        BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                        BlingNotaFiscalCache.id.desc(),
+                    )
+                    .all()
+                )
+                notas_loja = [
+                    nota
+                    for nota in notas_loja
+                    if _nf_contexto_autorizado({"situacao": getattr(nota, "status", None)})
+                ]
+                notas_unicas: dict[str, BlingNotaFiscalCache] = {}
+                for nota in notas_loja:
+                    chave = _nf_bling_id_valido(getattr(nota, "bling_id", None)) or _text(getattr(nota, "numero", None)) or ""
+                    if chave and chave not in notas_unicas:
+                        notas_unicas[chave] = nota
+                if len(notas_unicas) == 1:
+                    nf_cache = next(iter(notas_unicas.values()))
+                elif len(notas_unicas) > 1:
+                    motivo_cache = "nf_cache_ambigua_por_numero_pedido_loja"
+                else:
+                    motivo_cache = "nf_cache_nao_encontrada"
+
+        if not nf_cache:
+            return False, {
+                "motivo": motivo_cache,
+                "nf_id": nf_id,
+            }
+
+        from app.integracao_bling_nf_routes import _registrar_nf_no_pedido
+
+        detalhe_nf = _dict(getattr(nf_cache, "detalhe_payload", None))
+        resumo_nf = _dict(getattr(nf_cache, "resumo_payload", None))
+        dados_nf = detalhe_nf or resumo_nf or {}
+        _registrar_nf_no_pedido(
+            pedido=pedido,
+            data=dados_nf,
+            nf_id=_nf_bling_id_valido(getattr(nf_cache, "bling_id", None)) or "",
+            situacao_num=5,
+        )
+        db.add(pedido)
+        db.flush()
+
+        nf = _ultima_nf(getattr(pedido, "payload", None))
+        nf_id = _nf_bling_id_valido(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+        if not _nf_contexto_autorizado(nf) or not nf_id:
+            return False, {
+                "motivo": "nf_cache_nao_consolidada_no_pedido",
+                "nf_id": nf_id,
+            }
 
     acao = processar_nf_autorizada(
         db=db,
