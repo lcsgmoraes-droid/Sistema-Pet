@@ -33,6 +33,7 @@ import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import { useAuth } from "../contexts/AuthContext";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
+import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -146,11 +147,6 @@ export default function PDV() {
   const [buscaFuncionario, setBuscaFuncionario] = useState(""); // Texto de busca
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null); // Guardar status antes de reabrir
 
-  // 🚚 Estados para Entregadores e Custo Operacional (DECLARAR ANTES DOS useEffects)
-  const [entregadores, setEntregadores] = useState([]);
-  const [entregadorSelecionado, setEntregadorSelecionado] = useState(null);
-  const [custoOperacionalEntrega, setCustoOperacionalEntrega] = useState(0);
-
   // ✅ Sincronizar funcionario_id com vendaAtual sempre que mudar
   useEffect(() => {
     setVendaAtual((prev) => ({
@@ -158,25 +154,6 @@ export default function PDV() {
       funcionario_id: funcionarioComissao?.id || null,
     }));
   }, [funcionarioComissao]);
-
-  // ✅ Sincronizar entregador_id com vendaAtual sempre que mudar
-  useEffect(() => {
-    const novoEntregadorId = entregadorSelecionado?.id || null;
-    if (!novoEntregadorId) {
-      return;
-    }
-
-    debugLog("🔄 Sincronizando entregador_id:", novoEntregadorId);
-    setVendaAtual((prev) => {
-      if (prev.entregador_id === novoEntregadorId) {
-        return prev;
-      }
-      return {
-        ...prev,
-        entregador_id: novoEntregadorId,
-      };
-    });
-  }, [entregadorSelecionado]);
 
   // Estados do drawer de análise de venda
   const [mostrarAnaliseVenda, setMostrarAnaliseVenda] = useState(false);
@@ -236,6 +213,19 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     buscarAlternativaOportunidade,
     ignorarOportunidade,
   } = usePDVOportunidades(vendaAtual, user?.id);
+  const {
+    entregadores,
+    entregadorSelecionado,
+    sincronizarEntregadorDaVenda,
+    handleToggleTemEntrega,
+    handleSelecionarEnderecoEntrega,
+    handleEnderecoEntregaChange,
+    handleSelecionarEntregador,
+    handleTaxaEntregaTotalChange,
+    handleTaxaLojaChange,
+    handleTaxaEntregadorChange,
+    handleObservacoesEntregaChange,
+  } = usePDVEntrega(vendaAtual, setVendaAtual);
 
   // Carregar pendências quando o cliente mudar
   useEffect(() => {
@@ -279,134 +269,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       setTemCaixaAberto(false);
     }
   };
-
-  // 🚚 Carregar entregadores disponíveis ao iniciar
-  useEffect(() => {
-    // debugLog('⭐⭐⭐ useEffect de entregadores RODANDO! ⭐⭐⭐');
-    carregarEntregadores();
-  }, []);
-
-  const carregarEntregadores = async () => {
-    // debugLog('🔥🔥🔥 INICIANDO carregarEntregadores 🔥🔥🔥');
-    try {
-      // debugLog('📦 Fazendo request para /clientes...');
-      const response = await api.get("/clientes/", {
-        params: {
-          is_entregador: true,
-          incluir_inativos: false,
-          limit: 100,
-        },
-      });
-
-      // debugLog('✅ Response recebido:', response.data);
-      // A API retorna um objeto paginado: {items: Array, total: number, skip: number, limit: number}
-      let entregadoresList =
-        response.data.items || response.data.clientes || response.data || [];
-
-      // Garantir que é um array
-      if (!Array.isArray(entregadoresList)) {
-        console.error("❌ Resposta da API não é um array:", entregadoresList);
-        entregadoresList = [];
-      }
-
-      // debugLog('📋 Total de entregadores carregados:', entregadoresList.length);
-      // debugLog('📋 Lista completa:', entregadoresList);
-      setEntregadores(entregadoresList);
-
-      // Pré-selecionar entregador padrão
-      const entregadorPadrao = entregadoresList.find((e) => {
-        // debugLog('🔍 Verificando entregador:', e.nome, 'entregador_padrao:', e.entregador_padrao);
-        return e.entregador_padrao === true;
-      });
-
-      // debugLog('🔍 Resultado da busca do padrão:', entregadorPadrao);
-
-      if (entregadorPadrao) {
-        // debugLog('🎯🎯🎯 ENTREGADOR PADRÃO ENCONTRADO:', entregadorPadrao.nome, 'ID:', entregadorPadrao.id);
-        setEntregadorSelecionado(entregadorPadrao);
-        // ✅ Setar IMEDIATAMENTE no vendaAtual também (evitar race condition)
-        setVendaAtual((prev) => {
-          // debugLog('💾 Setando entregador_id no vendaAtual:', entregadorPadrao.id);
-          return {
-            ...prev,
-            entregador_id: entregadorPadrao.id,
-          };
-        });
-        calcularCustoOperacional(entregadorPadrao);
-      } else {
-        // console.error('❌❌❌ NENHUM ENTREGADOR PADRÃO ENCONTRADO!');
-      }
-    } catch (error) {
-      console.error("Erro ao carregar entregadores:", error);
-      toast.error("Erro ao carregar lista de entregadores");
-    }
-  };
-
-  // 🚚 Calcular custo operacional baseado no entregador selecionado
-  const calcularCustoOperacional = async (entregador) => {
-    if (!entregador) {
-      setCustoOperacionalEntrega(0);
-      return;
-    }
-
-    let custo = 0;
-
-    // Modelo 1: Taxa Fixa
-    if (
-      entregador.modelo_custo_entrega === "taxa_fixa" &&
-      entregador.taxa_fixa_entrega
-    ) {
-      custo = Number(entregador.taxa_fixa_entrega);
-    }
-    // Modelo 2: Por KM (precisaria da distância - por enquanto usar taxa fixa ou 0)
-    else if (
-      entregador.modelo_custo_entrega === "por_km" &&
-      entregador.valor_por_km_entrega
-    ) {
-      // TODO: Integrar com cálculo de distância da API de mapas
-      // Por enquanto, assumir 0 ou usar valor fixo como fallback
-      custo = 0;
-      // debugLog('⚠️ Modelo por KM requer cálculo de distância');
-    }
-    // Modelo 3: Rateio RH (buscar do backend)
-    else if (
-      entregador.modelo_custo_entrega === "rateio_rh" &&
-      entregador.controla_rh
-    ) {
-      try {
-        // Buscar custo calculado pelo backend
-        const response = await api.get(
-          `/entregadores/${entregador.id}/custo-operacional`,
-        );
-        custo = response.data.custo_por_entrega || 0;
-      } catch (error) {
-        console.error("Erro ao buscar custo RH:", error);
-        // Fallback: usar custo_rh_ajustado se disponível
-        custo = entregador.custo_rh_ajustado || 0;
-      }
-    }
-    // Fallback: buscar da configuração global
-    else {
-      try {
-        const response = await api.get("/configuracoes/entregas");
-        custo = response.data.taxa_fixa || 0;
-      } catch (error) {
-        console.error("Erro ao buscar configuração de entrega:", error);
-        custo = 10; // Valor padrão
-      }
-    }
-
-    setCustoOperacionalEntrega(custo);
-  };
-
-  // 🚚 Atualizar custo operacional quando entregador mudar
-  useEffect(() => {
-    if (vendaAtual.tem_entrega && entregadorSelecionado) {
-      calcularCustoOperacional(entregadorSelecionado);
-    } else {
-      setCustoOperacionalEntrega(0);
-    }
-  }, [entregadorSelecionado, vendaAtual.tem_entrega]);
 
   // Adicionar produto à lista de espera direto da busca (estoque zerado)
   const adicionarNaListaEsperaRapido = async (produto, e) => {
@@ -907,132 +769,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  const handleToggleTemEntrega = (temEntrega) => {
-    setVendaAtual((prev) => {
-      const taxaEntrega = temEntrega ? prev.entrega?.taxa_entrega_total || 0 : 0;
-      return {
-        ...prev,
-        tem_entrega: temEntrega,
-        total: recalcularTotalComEntrega(prev.subtotal, taxaEntrega),
-        entrega: temEntrega ? prev.entrega : criarEntregaVazia(),
-      };
-    });
-  };
-
-  const handleSelecionarEnderecoEntrega = (enderecoCompleto) => {
-    setVendaAtual((prev) => ({
-      ...prev,
-      entrega: {
-        ...prev.entrega,
-        endereco_completo: enderecoCompleto,
-      },
-    }));
-  };
-
-  const handleEnderecoEntregaChange = (valor) => {
-    setVendaAtual((prev) => ({
-      ...prev,
-      entrega: {
-        ...prev.entrega,
-        endereco_completo: valor,
-      },
-    }));
-  };
-
-  const handleSelecionarEntregador = (entregadorId) => {
-    const entregador = entregadores.find(
-      (ent) => ent.id === parseInt(entregadorId, 10),
-    );
-
-    setEntregadorSelecionado(entregador || null);
-    setVendaAtual((prev) => ({
-      ...prev,
-      entregador_id: entregador?.id || null,
-    }));
-
-    if (entregador) {
-      calcularCustoOperacional(entregador);
-    }
-  };
-
-  const handleTaxaEntregaTotalChange = (valor) => {
-    const total = parseFloat(valor) || 0;
-    const totalArredondado = parseFloat(total.toFixed(2));
-
-    setVendaAtual((prev) => {
-      const taxaLojaAtual = prev.entrega?.taxa_loja || 0;
-      const taxaEntregadorCalculada = parseFloat(
-        (totalArredondado - taxaLojaAtual).toFixed(2),
-      );
-
-      return {
-        ...prev,
-        total: recalcularTotalComEntrega(
-          prev.subtotal,
-          prev.tem_entrega ? totalArredondado : 0,
-        ),
-        entrega: {
-          ...prev.entrega,
-          taxa_entrega_total: totalArredondado,
-          taxa_loja: parseFloat(taxaLojaAtual.toFixed(2)),
-          taxa_entregador: taxaEntregadorCalculada,
-        },
-      };
-    });
-  };
-
-  const handleTaxaLojaChange = (valor) => {
-    const taxaLoja = parseFloat(valor) || 0;
-    const taxaLojaArredondada = parseFloat(taxaLoja.toFixed(2));
-
-    setVendaAtual((prev) => {
-      const total = prev.entrega?.taxa_entrega_total || 0;
-      const taxaEntregadorArredondada = parseFloat(
-        (total - taxaLojaArredondada).toFixed(2),
-      );
-
-      return {
-        ...prev,
-        entrega: {
-          ...prev.entrega,
-          taxa_loja: taxaLojaArredondada,
-          taxa_entregador: taxaEntregadorArredondada,
-        },
-      };
-    });
-  };
-
-  const handleTaxaEntregadorChange = (valor) => {
-    const taxaEntregador = parseFloat(valor) || 0;
-    const taxaEntregadorArredondada = parseFloat(taxaEntregador.toFixed(2));
-
-    setVendaAtual((prev) => {
-      const total = prev.entrega?.taxa_entrega_total || 0;
-      const taxaLojaArredondada = parseFloat(
-        (total - taxaEntregadorArredondada).toFixed(2),
-      );
-
-      return {
-        ...prev,
-        entrega: {
-          ...prev.entrega,
-          taxa_entregador: taxaEntregadorArredondada,
-          taxa_loja: taxaLojaArredondada,
-        },
-      };
-    });
-  };
-
-  const handleObservacoesEntregaChange = (valor) => {
-    setVendaAtual((prev) => ({
-      ...prev,
-      entrega: {
-        ...prev.entrega,
-        observacoes_entrega: valor,
-      },
-    }));
-  };
-
   // 🚗 Confirmar entrega no drive
   const confirmarDriveEntregue = async (pedidoId) => {
     try {
@@ -1219,48 +955,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       setVendaAtual(vendaCarregada);
       setModoVisualizacao(true); // Modo leitura para venda existente
 
-      // 🚚 Sincronizar entregador selecionado se a venda tem entregador
-      if (venda.entregador_id) {
-        debugLog("🔍 Venda tem entregador_id:", venda.entregador_id);
-        try {
-          // Buscar entregador direto da API (evita race condition com array entregadores)
-          const responseEntregador = await api.get(
-            `/clientes/${venda.entregador_id}`,
-          );
-          const entregadorCarregado = responseEntregador.data;
-
-          if (entregadorCarregado && entregadorCarregado.is_entregador) {
-            debugLog("✅ Entregador carregado:", entregadorCarregado.nome);
-            setEntregadorSelecionado(entregadorCarregado);
-            calcularCustoOperacional(entregadorCarregado);
-          } else {
-            debugWarn(
-              "⚠️ Cliente ID",
-              venda.entregador_id,
-              "não é um entregador válido",
-            );
-          }
-        } catch (error) {
-          console.error("❌ Erro ao carregar entregador:", error);
-          // Se falhar, tentar do array como fallback
-          const entregador = entregadores.find(
-            (e) => e.id === venda.entregador_id,
-          );
-          if (entregador) {
-            debugLog(
-              "✅ Entregador encontrado no array (fallback):",
-              entregador.nome,
-            );
-            setEntregadorSelecionado(entregador);
-            calcularCustoOperacional(entregador);
-          }
-        }
-      } else {
-        debugLog(
-          "ℹ️ Venda sem entregador_id - limpando entregadorSelecionado",
-        );
-        setEntregadorSelecionado(null);
-      }
+      await sincronizarEntregadorDaVenda(venda.entregador_id);
 
       // 🆕 Se foi solicitado, abre o modal de pagamento após carregar
       if (abrirModalPagamento) {

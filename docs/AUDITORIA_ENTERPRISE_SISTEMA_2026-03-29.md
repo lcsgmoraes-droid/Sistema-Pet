@@ -525,6 +525,10 @@ Itens executados nesta etapa:
   - logica de oportunidades inteligentes movida para `frontend/src/hooks/usePDVOportunidades.js`
   - `PDV.jsx` deixou de concentrar busca, tracking e acoes do painel lateral de oportunidades
   - a abertura do painel de oportunidades passou a usar um handler unico de orquestracao
+- [x] seguir tirando logica operacional de dentro do `PDV.jsx`:
+  - fluxo de entrega movido para `frontend/src/hooks/usePDVEntrega.js`
+  - `PDV.jsx` deixou de concentrar carregamento de entregadores, calculo de custo operacional e handlers de entrega
+  - a sincronizacao do entregador ao carregar uma venda passou a ficar centralizada no hook
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
