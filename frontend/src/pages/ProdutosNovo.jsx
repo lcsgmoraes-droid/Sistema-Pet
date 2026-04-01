@@ -3,22 +3,8 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import ProdutosNovoFooterActions from '../components/produto/ProdutosNovoFooterActions';
-import ProdutosNovoFornecedorModal from '../components/produto/ProdutosNovoFornecedorModal';
-import ProdutosNovoHeader from '../components/produto/ProdutosNovoHeader';
-import ProdutosNovoEntradaModal from '../components/produto/ProdutosNovoEntradaModal';
-import ProdutosNovoLoteModal from '../components/produto/ProdutosNovoLoteModal';
-import ProdutosNovoComposicaoTab from '../components/produto/ProdutosNovoComposicaoTab';
-import ProdutosNovoCaracteristicasTab from '../components/produto/ProdutosNovoCaracteristicasTab';
-import ProdutosNovoEstoqueTab from '../components/produto/ProdutosNovoEstoqueTab';
-import ProdutosNovoRacaoTab from '../components/produto/ProdutosNovoRacaoTab';
-import ProdutosNovoRecorrenciaTab from '../components/produto/ProdutosNovoRecorrenciaTab';
-import ProdutosNovoFornecedoresTab from '../components/produto/ProdutosNovoFornecedoresTab';
-import ProdutosNovoTabs from '../components/produto/ProdutosNovoTabs';
-import ProdutosNovoTributacaoTab from '../components/produto/ProdutosNovoTributacaoTab';
-import ProdutosNovoVariacoesTab from '../components/produto/ProdutosNovoVariacoesTab';
-import ProdutosNovoImagensTab from '../components/produto/ProdutosNovoImagensTab';
-import ProdutosNovoStatusBanners from '../components/produto/ProdutosNovoStatusBanners';
+import ProdutosNovoMainContent from '../components/produto/ProdutosNovoMainContent';
+import ProdutosNovoModalsLayer from '../components/produto/ProdutosNovoModalsLayer';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
 import useProdutosNovoCodigos from '../hooks/useProdutosNovoCodigos';
 import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
@@ -539,31 +525,31 @@ export default function ProdutosNovo() {
   }
 
   return (
-    <div className="p-6">
-      <ProdutosNovoHeader {...headerProps} />
+    <>
+      <ProdutosNovoMainContent
+        canShowComposicaoTab={canShowComposicaoTab}
+        canShowVariacoesTab={canShowVariacoesTab}
+        caracteristicasTabProps={caracteristicasTabProps}
+        composicaoTabProps={composicaoTabProps}
+        estoqueTabProps={estoqueTabProps}
+        footerProps={footerProps}
+        fornecedoresTabProps={fornecedoresTabProps}
+        handleSubmit={handleSubmit}
+        headerProps={headerProps}
+        imagensTabProps={imagensTabProps}
+        racaoTabProps={racaoTabProps}
+        recorrenciaTabProps={recorrenciaTabProps}
+        statusBannersProps={statusBannersProps}
+        tabsProps={tabsProps}
+        tributacaoTabProps={tributacaoTabProps}
+        variacoesTabProps={variacoesTabProps}
+      />
 
-      <ProdutosNovoTabs {...tabsProps} />
-
-      <ProdutosNovoStatusBanners {...statusBannersProps} />
-
-      <form onSubmit={handleSubmit}>
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          {abaAtiva === 1 && <ProdutosNovoCaracteristicasTab {...caracteristicasTabProps} />}
-          {abaAtiva === 2 && <ProdutosNovoImagensTab {...imagensTabProps} />}
-          {abaAtiva === 3 && <ProdutosNovoEstoqueTab {...estoqueTabProps} />}
-          {abaAtiva === 4 && <ProdutosNovoFornecedoresTab {...fornecedoresTabProps} />}
-          {abaAtiva === 5 && <ProdutosNovoTributacaoTab {...tributacaoTabProps} />}
-          {abaAtiva === 6 && <ProdutosNovoRecorrenciaTab {...recorrenciaTabProps} />}
-          {abaAtiva === 7 && <ProdutosNovoRacaoTab {...racaoTabProps} />}
-          {canShowVariacoesTab && <ProdutosNovoVariacoesTab {...variacoesTabProps} />}
-          {canShowComposicaoTab && <ProdutosNovoComposicaoTab {...composicaoTabProps} />}
-        </div>
-        <ProdutosNovoFooterActions {...footerProps} />
-      </form>
-
-      {entradaModalProps && <ProdutosNovoEntradaModal {...entradaModalProps} />}
-      {loteModalProps && <ProdutosNovoLoteModal {...loteModalProps} />}
-      {fornecedorModalProps && <ProdutosNovoFornecedorModal {...fornecedorModalProps} />}
-    </div>
+      <ProdutosNovoModalsLayer
+        entradaModalProps={entradaModalProps}
+        fornecedorModalProps={fornecedorModalProps}
+        loteModalProps={loteModalProps}
+      />
+    </>
   );
 }

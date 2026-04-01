@@ -725,6 +725,10 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] quebrar a aba de caracteristicas do `ProdutosNovo` em secoes menores e reutilizaveis
   - os blocos de dados basicos, precos e estrutura foram extraidos para `frontend/src/components/produto/ProdutosNovoDadosBasicosSection.jsx`, `frontend/src/components/produto/ProdutosNovoPrecosSection.jsx` e `frontend/src/components/produto/ProdutosNovoEstruturaSection.jsx`
   - `ProdutosNovoCaracteristicasTab.jsx` caiu de `744` para `67` linhas, mantendo o mesmo contrato da aba
+- [x] separar a composicao visual restante do `ProdutosNovo.jsx` em corpo principal e camada de modais
+  - a montagem visual principal foi movida para `frontend/src/components/produto/ProdutosNovoMainContent.jsx`
+  - a camada de modais foi movida para `frontend/src/components/produto/ProdutosNovoModalsLayer.jsx`
+  - `ProdutosNovo.jsx` caiu de `569` para `555` linhas e ficou mais focado em hooks e orquestracao
 - [ ] revisar contratos de props residuais entre as abas/componentes de `ProdutosNovo` e agrupar blocos repetidos de callbacks/estado onde isso reduzir ruido real de manutencao
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
