@@ -11,7 +11,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
-import { buscarVenda } from "../api/vendas";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
@@ -32,6 +31,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { usePDVAnalisePagamento } from "../hooks/usePDVAnalisePagamento";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
+import { usePDVDescontos } from "../hooks/usePDVDescontos";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
@@ -125,22 +125,7 @@ export default function PDV() {
   const [enderecoAtual, setEnderecoAtual] = useState(null);
   const [loadingCep, setLoadingCep] = useState(false);
 
-  // Estados dos modais de desconto
-  const [mostrarModalDescontoItem, setMostrarModalDescontoItem] =
-    useState(false);
-  const [itemEditando, setItemEditando] = useState(null);
-  const [mostrarModalDescontoTotal, setMostrarModalDescontoTotal] =
-    useState(false);
-  const [tipoDescontoTotal, setTipoDescontoTotal] = useState("valor");
-  const [valorDescontoTotal, setValorDescontoTotal] = useState(0);
-
-  // Estados de cupom de desconto
-  const [codigoCupom, setCodigoCupom] = useState("");
-  const [cupomAplicado, setCupomAplicado] = useState(null); // {code, discount_applied, message}
-  const [loadingCupom, setLoadingCupom] = useState(false);
-  const [erroCupom, setErroCupom] = useState("");
   const [saldoCampanhas, setSaldoCampanhas] = useState(null); // {saldo_cashback, total_carimbos, cupons_ativos}
-  const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);
 
 
   // Estados do drawer de análise de venda
@@ -255,13 +240,48 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     carregarVendasRecentes: () => carregarVendasRecentes(),
   });
   const {
+    mostrarModalDescontoItem,
+    setMostrarModalDescontoItem,
+    itemEditando,
+    setItemEditando,
+    mostrarModalDescontoTotal,
+    setMostrarModalDescontoTotal,
+    tipoDescontoTotal,
+    setTipoDescontoTotal,
+    valorDescontoTotal,
+    setValorDescontoTotal,
+    codigoCupom,
+    cupomAplicado,
+    loadingCupom,
+    erroCupom,
+    recalcularTotais,
+    abrirModalDescontoItem,
+    salvarDescontoItem,
+    removerItemEditando,
+    abrirModalDescontoTotal,
+    aplicarDescontoTotal,
+    removerDescontoTotal,
+    aplicarCupom,
+    removerCupom,
+    handleCodigoCupomChange,
+    handleCodigoCupomKeyDown,
+  } = usePDVDescontos({
+    vendaAtual,
+    setVendaAtual,
+  });
+  const {
     mostrarAnaliseVenda,
     setMostrarAnaliseVenda,
     dadosAnalise,
     carregandoAnalise,
-    analisarVendaComFormasPagamento: analisarVendaComFormasPagamentoHook,
-    handleConfirmarPagamento: handleConfirmarPagamentoHook,
-    handleVendaAtualizadaAposPagamento: handleVendaAtualizadaAposPagamentoHook,
+    analisarVendaComFormasPagamento,
+    habilitarEdicao,
+    cancelarEdicao,
+    excluirVenda,
+    mudarStatusParaAberta,
+    emitirNotaVendaFinalizada,
+    handleConfirmarPagamento,
+    handleVendaAtualizadaAposPagamento,
   } = usePDVAnalisePagamento({
     vendaAtual,
     setVendaAtual,
@@ -558,208 +578,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  // Funções de desconto individual
-  const abrirModalDescontoItem = (item) => {
-    setItemEditando({
-      ...item,
-      preco: item.preco_unitario, // Garantir que preco está definido
-      descontoValor: item.desconto_valor || 0,
-      descontoPercentual: item.desconto_percentual || 0,
-      tipoDesconto: "valor", // Sempre começar com valor (R$)
-    });
-    setMostrarModalDescontoItem(true);
-  };
-
-  const salvarDescontoItem = () => {
-    const itensAtualizados = vendaAtual.itens.map((item) => {
-      if (item.produto_id === itemEditando.produto_id) {
-        const precoUnitario = itemEditando.preco;
-        const quantidade = item.quantidade;
-        const subtotalSemDesconto = precoUnitario * quantidade;
-        let descontoValor = 0;
-        let descontoPercentual = 0;
-
-        if (itemEditando.tipoDesconto === "valor") {
-          descontoValor = parseFloat(itemEditando.descontoValor) || 0;
-          // Calcular percentual sobre o total do item (preço × quantidade)
-          descontoPercentual =
-            subtotalSemDesconto > 0
-              ? (descontoValor / subtotalSemDesconto) * 100
-              : 0;
-        } else {
-          descontoPercentual = parseFloat(itemEditando.descontoPercentual) || 0;
-          // Desconto total sobre o item (não por unidade)
-          descontoValor = (subtotalSemDesconto * descontoPercentual) / 100;
-        }
-
-        const precoComDesconto = precoUnitario - descontoValor / quantidade;
-        const subtotal = subtotalSemDesconto - descontoValor;
-
-        return {
-          ...item,
-          desconto_valor: descontoValor,
-          desconto_percentual: descontoPercentual,
-          tipo_desconto_aplicado: itemEditando.tipoDesconto, // 🆕 Salvar tipo original
-          preco_com_desconto: precoComDesconto,
-          subtotal,
-        };
-      }
-      return item;
-    });
-
-    recalcularTotais(itensAtualizados);
-    setMostrarModalDescontoItem(false);
-    setItemEditando(null);
-  };
-
-  const removerItemEditando = () => {
-    vendaAtual.itens.forEach((item, index) => {
-      if (item.produto_id === itemEditando?.produto_id) {
-        removerItem(index);
-      }
-    });
-    setMostrarModalDescontoItem(false);
-  };
-
-  // Funções de desconto total
-  const abrirModalDescontoTotal = () => {
-    // Pré-popular com o desconto atual (se houver)
-    if (vendaAtual.desconto_valor > 0) {
-      setTipoDescontoTotal("valor");
-      setValorDescontoTotal(vendaAtual.desconto_valor);
-    } else {
-      setTipoDescontoTotal("valor");
-      setValorDescontoTotal(0);
-    }
-    setMostrarModalDescontoTotal(true);
-  };
-
-  const aplicarDescontoTotal = (tipoDesconto, valor) => {
-    const itens = vendaAtual.itens;
-    if (itens.length === 0) return;
-
-    // Calcular o total bruto de cada item (preço original × quantidade, sem desconto)
-    const subtotaisBrutos = itens.map(
-      (item) => (item.preco_unitario || item.preco_venda) * item.quantidade,
-    );
-    const totalBruto = subtotaisBrutos.reduce((sum, v) => sum + v, 0);
-
-    // Calcular valor total do desconto
-    let descontoTotal = 0;
-    if (tipoDesconto === "valor") {
-      descontoTotal = Math.min(parseFloat(valor) || 0, totalBruto);
-    } else {
-      const pct = Math.min(parseFloat(valor) || 0, 100);
-      descontoTotal = (totalBruto * pct) / 100;
-    }
-
-    // Ratear proporcionalmente, ajustando arredondamento no último item
-    let descontoAlocado = 0;
-    const itensAtualizados = itens.map((item, idx) => {
-      const subtotalBrutoItem = subtotaisBrutos[idx];
-      let descontoItem;
-
-      if (idx === itens.length - 1) {
-        // Último item absorve o restante para evitar erro de centavos
-        descontoItem = parseFloat((descontoTotal - descontoAlocado).toFixed(2));
-      } else {
-        const proporcao = totalBruto > 0 ? subtotalBrutoItem / totalBruto : 0;
-        descontoItem = parseFloat((descontoTotal * proporcao).toFixed(2));
-        descontoAlocado += descontoItem;
-      }
-
-      const descontoPercentual =
-        subtotalBrutoItem > 0 ? (descontoItem / subtotalBrutoItem) * 100 : 0;
-      const subtotal = subtotalBrutoItem - descontoItem;
-      const precoComDesconto =
-        item.quantidade > 0 ? subtotal / item.quantidade : 0;
-
-      return {
-        ...item,
-        desconto_valor: descontoItem,
-        desconto_percentual: descontoPercentual,
-        tipo_desconto_aplicado: tipoDesconto,
-        preco_com_desconto: precoComDesconto,
-        subtotal,
-      };
-    });
-
-    recalcularTotais(itensAtualizados);
-    setMostrarModalDescontoTotal(false);
-  };
-
-  const removerDescontoTotal = () => {
-    const itensAtualizados = vendaAtual.itens.map((item) => {
-      const subtotalBruto =
-        (item.preco_unitario || item.preco_venda) * item.quantidade;
-      return {
-        ...item,
-        desconto_valor: 0,
-        desconto_percentual: 0,
-        tipo_desconto_aplicado: null,
-        preco_com_desconto: item.preco_unitario || item.preco_venda,
-        subtotal: subtotalBruto,
-      };
-    });
-    recalcularTotais(itensAtualizados);
-  };
-
-  // Cupom de desconto
-  const aplicarCupom = async () => {
-    const code = codigoCupom.trim().toUpperCase();
-    if (!code) return;
-    if (vendaAtual.itens.length === 0) {
-      setErroCupom("Adicione itens à venda antes de aplicar um cupom.");
-      return;
-    }
-    setLoadingCupom(true);
-    setErroCupom("");
-    try {
-      const res = await api.post(`/campanhas/cupons/${code}/resgatar`, {
-        venda_total: vendaAtual.total,
-        customer_id: vendaAtual.cliente?.id || null,
-      });
-      const dados = res.data;
-      setCupomAplicado(dados);
-      setCodigoCupom("");
-      // Aplicar desconto automaticamente
-      aplicarDescontoTotal("valor", dados.discount_applied);
-    } catch (err) {
-      const msg = err?.response?.data?.detail || "Erro ao validar cupom";
-      setErroCupom(msg);
-    } finally {
-      setLoadingCupom(false);
-    }
-  };
-
-  const removerCupom = () => {
-    setCupomAplicado(null);
-    setCodigoCupom("");
-    setErroCupom("");
-    removerDescontoTotal();
-  };
-
-  const criarEntregaVazia = () => ({
-    endereco_completo: "",
-    taxa_entrega_total: 0,
-    taxa_loja: 0,
-    taxa_entregador: 0,
-    observacoes_entrega: "",
-  });
-
-  const recalcularTotalComEntrega = (subtotal, taxaEntrega) =>
-    parseFloat((Number(subtotal || 0) + Number(taxaEntrega || 0)).toFixed(2));
-
-  const handleCodigoCupomChange = (valor) => {
-    setCodigoCupom(String(valor || "").toUpperCase());
-    setErroCupom("");
-  };
-
-  const handleCodigoCupomKeyDown = (e) => {
-    if (e.key === "Enter") {
-      aplicarCupom();
-    }
-  };
+  // fluxo de descontos/cupom movido para usePDVDescontos
 
   const handleNovaVenda = () => {
     if (window.confirm("Descartar venda atual sem salvar?")) {
@@ -1317,420 +1136,8 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }));
   };
 
-  // Recalcular totais
-  const recalcularTotais = (itens) => {
-    const subtotal = itens.reduce((sum, item) => sum + item.subtotal, 0);
-
-    // Somar todos os descontos individuais dos itens
-    // NOTA: desconto_valor JÁ É O TOTAL do desconto para o item (não precisa multiplicar por quantidade)
-    const descontoItens = itens.reduce((sum, item) => {
-      return sum + (item.desconto_valor || 0);
-    }, 0);
-
-    // Calcular total bruto (subtotal + descontos aplicados)
-    const totalBruto = subtotal + descontoItens;
-    const descontoPercentual =
-      totalBruto > 0 ? (descontoItens / totalBruto) * 100 : 0;
-
-    const taxaEntrega = vendaAtual.tem_entrega
-      ? vendaAtual.entrega?.taxa_entrega_total || 0
-      : 0;
-    // O subtotal já tem o desconto aplicado (soma dos item.subtotal que já considera desconto individual)
-    // Então o total final é: subtotal + taxa de entrega
-    const total = subtotal + taxaEntrega;
-
-    setVendaAtual({
-      ...vendaAtual,
-      itens,
-      subtotal,
-      desconto_valor: descontoItens,
-      desconto_percentual: descontoPercentual,
-      total,
-    });
-  };
-
   // salvarVenda movido para usePDVSalvarVenda
-
-  const buscarAnaliseVenda = async () => {
-    if (vendaAtual.itens.length === 0) {
-      alert("Adicione pelo menos um produto para ver a análise");
-      return;
-    }
-
-    setCarregandoAnalise(true);
-    setMostrarAnaliseVenda(true);
-
-    try {
-      const response = await api.post("/formas-pagamento/analisar-venda", {
-        items: vendaAtual.itens.map((item) => ({
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-          preco_venda: item.preco_unitario || item.preco_venda,
-          custo: item.custo,
-        })),
-        desconto: vendaAtual.desconto_valor || 0,
-        taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-        forma_pagamento_id: vendaAtual.forma_pagamento_id || null,
-        parcelas: vendaAtual.parcelas || 1,
-        vendedor_id: vendaAtual.funcionario_id, // Single source of truth
-      });
-
-      setDadosAnalise(response.data);
-    } catch (error) {
-      console.error("Erro ao buscar análise:", error);
-      alert("Erro ao carregar análise da venda");
-      setMostrarAnaliseVenda(false);
-    } finally {
-      setCarregandoAnalise(false);
-    }
-  };
-
-  // Analisar venda existente pelo ID
-  const analisarVenda = async (vendaId) => {
-    setCarregandoAnalise(true);
-    setMostrarAnaliseVenda(true);
-
-    try {
-      // Buscar dados da venda
-      const vendaResponse = await api.get(`/vendas/${vendaId}`);
-      const venda = vendaResponse.data;
-
-      // Fazer análise com os dados da venda
-      const response = await api.post("/formas-pagamento/analisar-venda", {
-        items: venda.itens.map((item) => ({
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-          preco_venda: item.preco_unitario || item.preco_venda,
-          custo: item.custo,
-        })),
-        desconto: venda.desconto_valor || 0,
-        taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-        forma_pagamento_id: venda.forma_pagamento_id || null,
-        parcelas: venda.parcelas || 1,
-        vendedor_id: venda.vendedor_id || null,
-      });
-
-      setDadosAnalise(response.data);
-    } catch (error) {
-      console.error("Erro ao buscar análise:", error);
-      alert("Erro ao carregar análise da venda");
-      setMostrarAnaliseVenda(false);
-    } finally {
-      setCarregandoAnalise(false);
-    }
-  };
-
-  // Analisar venda com múltiplas formas de pagamento (do modal)
-  const analisarVendaComFormasPagamento = async (formasPagamento) => {
-    debugLog("🔍 DEBUG formasPagamento recebidas:", formasPagamento);
-
-    setCarregandoAnalise(true);
-    setMostrarAnaliseVenda(true);
-
-    try {
-      debugLog("💰 Enviando análise com múltiplas formas:", formasPagamento);
-
-      // Fazer análise com os dados da venda atual E MÚLTIPLAS FORMAS
-      const response = await api.post("/formas-pagamento/analisar-venda", {
-        items: vendaAtual.itens.map((item) => ({
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-          preco_venda: item.preco_unitario || item.preco_venda,
-          custo: item.custo,
-        })),
-        desconto: vendaAtual.desconto_valor || 0,
-        taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-        formas_pagamento: formasPagamento, // ARRAY de formas de pagamento
-        vendedor_id: vendaAtual.funcionario_id, // Single source of truth
-      });
-
-      debugLog("✅ Resposta da análise:", response.data);
-      setDadosAnalise(response.data);
-    } catch (error) {
-      console.error("Erro ao buscar análise:", error);
-      alert("Erro ao carregar análise da venda");
-      setMostrarAnaliseVenda(false);
-    } finally {
-      setCarregandoAnalise(false);
-    }
-  };
-
-  // abrirModalPagamento, limparVenda e reabrirVenda movidos para usePDVVendaAtual
-
-  // Habilitar edição de venda
-  const habilitarEdicao = () => {
-    setModoVisualizacao(false);
-  };
-
-  // Cancelar edição e voltar ao modo visualização
-  const cancelarEdicao = async () => {
-    if (!vendaAtual.id) {
-      limparVenda();
-      return;
-    }
-
-    // SEMPRE restaurar status original ao sair sem salvar (descarta alterações)
-    if (statusOriginalVenda && vendaAtual.status !== statusOriginalVenda) {
-      try {
-        setLoading(true);
-
-        // Restaurar status original (perder alterações não salvas)
-        await api.patch(`/vendas/${vendaAtual.id}/status`, {
-          status: statusOriginalVenda,
-        });
-
-        debugLog(
-          `✅ Status restaurado para: ${statusOriginalVenda} (alterações descartadas)`,
-        );
-      } catch (error) {
-        console.error("Erro ao restaurar status:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    // Limpar estados e voltar para nova venda
-    setStatusOriginalVenda(null);
-    limparVenda();
-  };
-
-  // Excluir venda
-  const excluirVenda = async () => {
-    if (!vendaAtual.id) return;
-
-    const confirmar = window.confirm(
-      "Deseja realmente excluir esta venda?\n\nEsta ação não pode ser desfeita e o estoque será devolvido.",
-    );
-
-    if (!confirmar) return;
-
-    try {
-      setLoading(true);
-      await api.delete(`/vendas/${vendaAtual.id}`);
-
-      // Limpar venda e recarregar lista
-      limparVenda();
-      carregarVendasRecentes();
-
-      alert("Venda excluída com sucesso!");
-    } catch (error) {
-      console.error("Erro ao excluir venda:", error);
-
-      // Tratamento amigável de erros estruturados
-      const errorData = error.response?.data?.detail;
-
-      if (errorData && typeof errorData === "object") {
-        // Erro estruturado com passos
-        let mensagem = `❌ ${errorData.erro || "Erro ao excluir venda"}\n\n`;
-        mensagem += `${errorData.mensagem || ""}\n\n`;
-
-        if (errorData.solucao) {
-          mensagem += `💡 Solução:\n${errorData.solucao}\n\n`;
-        }
-
-        if (errorData.passos && Array.isArray(errorData.passos)) {
-          mensagem += `📋 Passos para resolver:\n`;
-          errorData.passos.forEach((passo) => {
-            mensagem += `${passo}\n`;
-          });
-        }
-
-        if (errorData.rota_id) {
-          mensagem += `\n🚚 Rota ID: ${errorData.rota_id}`;
-          if (errorData.rota_status) {
-            mensagem += ` (${errorData.rota_status})`;
-          }
-        }
-
-        alert(mensagem);
-      } else if (typeof errorData === "string") {
-        // Erro simples (string)
-        alert(errorData);
-      } else {
-        // Fallback
-        alert("Erro ao excluir venda. Verifique se não há vínculos pendentes.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reabrir venda finalizada (mudar status para aberta)
-  // Mudar status de venda finalizada para aberta (permitir edição/exclusão)
-  const mudarStatusParaAberta = async () => {
-    if (!vendaAtual.id) return;
-
-    const confirmar = window.confirm(
-      'Deseja reabrir esta venda?\n\nOs pagamentos serão mantidos e o status mudará para "aberta".',
-    );
-
-    if (!confirmar) return;
-
-    // Guardar status original ANTES de modificar
-    setStatusOriginalVenda(vendaAtual.status);
-
-    try {
-      setLoading(true);
-
-      // Chamar rota de reabrir venda
-      await api.post(`/vendas/${vendaAtual.id}/reabrir`);
-
-      // Recarregar venda COMPLETA do servidor
-      const vendaAtualizada = await buscarVenda(vendaAtual.id);
-
-      // Buscar cliente completo se houver
-      let clienteCompleto = null;
-      if (vendaAtualizada.cliente_id) {
-        clienteCompleto = await buscarClientePorId(vendaAtualizada.cliente_id);
-      }
-
-      // Atualizar estado com TODOS os dados
-      setVendaAtual({
-        id: vendaAtualizada.id,
-        numero_venda: vendaAtualizada.numero_venda,
-        data_venda: vendaAtualizada.data_venda,
-        cliente: clienteCompleto, // ✅ Cliente completo com enderecos_adicionais
-        pet: null,
-        itens: vendaAtualizada.itens || [],
-        subtotal: parseFloat(vendaAtualizada.subtotal || vendaAtualizada.total),
-        desconto_valor: parseFloat(vendaAtualizada.desconto_valor || 0),
-        desconto_percentual: parseFloat(
-          vendaAtualizada.desconto_percentual || 0,
-        ),
-        total: parseFloat(vendaAtualizada.total),
-        observacoes: vendaAtualizada.observacoes || "",
-        status: "aberta", // Garantir status correto
-        tem_entrega: vendaAtualizada.tem_entrega || false,
-        entrega: {
-          endereco_completo: vendaAtualizada.endereco_entrega || "",
-          endereco_id: vendaAtualizada.endereco_id || null,
-          taxa_entrega_total: parseFloat(
-            parseFloat(vendaAtualizada.taxa_entrega || 0).toFixed(2),
-          ),
-          taxa_loja: parseFloat(
-            parseFloat(vendaAtualizada.taxa_loja || 0).toFixed(2),
-          ),
-          taxa_entregador: parseFloat(
-            parseFloat(vendaAtualizada.taxa_entregador || 0).toFixed(2),
-          ),
-          observacoes_entrega: vendaAtualizada.observacoes_entrega || "",
-          distancia_km: vendaAtualizada.distancia_km || 0,
-          valor_por_km: vendaAtualizada.valor_por_km || 0,
-          loja_origem: vendaAtualizada.loja_origem || "",
-          status_entrega: vendaAtualizada.status_entrega || "pendente",
-        },
-      });
-
-      // Desativar modo visualização para permitir edição
-      setModoVisualizacao(false);
-
-      alert(
-        "Venda reaberta com sucesso! Agora você pode editá-la.\n\nATENÇÃO: Se você não fizer alterações e sair, a venda voltará ao status anterior.",
-      );
-    } catch (error) {
-      console.error("Erro ao reabrir venda:", error);
-      alert(error.response?.data?.detail || "Erro ao reabrir venda");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const emitirNotaVendaFinalizada = async () => {
-    if (!vendaAtual.id) return;
-
-    let tipoNota = "nfce";
-    if (vendaAtual.cliente?.cnpj) {
-      const emitirNfe = window.confirm(
-        "Cliente tem CNPJ.\n\nClique OK para emitir NF-e (Empresa)\nClique Cancelar para emitir NFC-e (Cupom).",
-      );
-      tipoNota = emitirNfe ? "nfe" : "nfce";
-    }
-
-    const confirmar = window.confirm(
-      `Confirma emitir ${tipoNota === "nfe" ? "NF-e" : "NFC-e"} para esta venda finalizada?`,
-    );
-    if (!confirmar) return;
-
-    try {
-      setLoading(true);
-      await api.post("/nfe/emitir", {
-        venda_id: vendaAtual.id,
-        tipo_nota: tipoNota,
-      });
-
-      await carregarVendaEspecifica(vendaAtual.id);
-      toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} emitida com sucesso!`);
-    } catch (error) {
-      console.error("Erro ao emitir nota da venda finalizada:", error);
-      alert(error.response?.data?.detail || "Erro ao emitir nota fiscal");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const carregarPagamentosDaVenda = async (vendaId) => {
-    try {
-      const responsePagamentos = await api.get(`/vendas/${vendaId}/pagamentos`);
-      return {
-        pagamentos: responsePagamentos.data.pagamentos || [],
-        totalPago: responsePagamentos.data.total_pago || 0,
-      };
-    } catch (error) {
-      console.error("Erro ao buscar pagamentos:", error);
-      return {
-        pagamentos: [],
-        totalPago: 0,
-      };
-    }
-  };
-
-  const recarregarVendaAtualComPagamentos = async (vendaId) => {
-    const vendaAtualizada = await buscarVenda(vendaId);
-    const { pagamentos, totalPago } = await carregarPagamentosDaVenda(vendaId);
-
-    setVendaAtual({
-      ...vendaAtualizada,
-      pagamentos,
-      total_pago: totalPago,
-    });
-
-    return vendaAtualizada;
-  };
-
-  const handleConfirmarPagamentoLegado = async () => {
-    setMostrarModalPagamento(false);
-
-    if (modoVisualizacao && vendaAtual.id) {
-      try {
-        const vendaAtualizada = await recarregarVendaAtualComPagamentos(
-          vendaAtual.id,
-        );
-        debugLog("\u2705 Venda recarregada:", vendaAtualizada);
-      } catch (error) {
-        console.error("Erro ao recarregar venda:", error);
-      }
-    } else {
-      limparVenda();
-    }
-
-    carregarVendasRecentes();
-    setCaixaKey((prev) => prev + 1);
-  };
-
-  const handleVendaAtualizadaAposPagamento = async () => {
-    if (!vendaAtual.id) {
-      return;
-    }
-
-    const vendaAtualizada = await recarregarVendaAtualComPagamentos(
-      vendaAtual.id,
-    );
-    setModoVisualizacao(
-      vendaAtualizada.status === "finalizada" ||
-        vendaAtualizada.status === "baixa_parcial",
-    );
-    carregarVendasRecentes();
-  };
+  // análise, pagamento e pós-finalização movidos para usePDVAnalisePagamento
 
   const handleAbrirCaixaSucesso = () => {
     setMostrarModalAbrirCaixa(false);
@@ -2054,7 +1461,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
           vendaAtual={vendaAtual}
           onAbrirCaixaSucesso={handleAbrirCaixaSucesso}
           onAnalisarVenda={
-            podeVerMargem ? analisarVendaComFormasPagamentoHook : null
+            podeVerMargem ? analisarVendaComFormasPagamento : null
           }
           onAplicarDescontoTotal={aplicarDescontoTotal}
           onBuscarCep={buscarCepModal}
@@ -2076,12 +1483,12 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
           onClosePendenciasEstoque={() => setMostrarPendenciasEstoque(false)}
           onCloseVendasEmAberto={() => setMostrarVendasEmAberto(false)}
           onConfirmarCredito={handleConfirmarCreditoCliente}
-          onConfirmarPagamento={handleConfirmarPagamentoHook}
+          onConfirmarPagamento={handleConfirmarPagamento}
           onPendenciaAdicionada={carregarPendencias}
           onRemoverItemEditando={removerItemEditando}
           onSalvarDescontoItem={salvarDescontoItem}
           onSalvarEndereco={salvarEnderecoNoCliente}
-          onVendaAtualizada={handleVendaAtualizadaAposPagamentoHook}
+          onVendaAtualizada={handleVendaAtualizadaAposPagamento}
           onVendasEmAbertoSucesso={handleVendasEmAbertoSucesso}
         />
       </div>
