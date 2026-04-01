@@ -6,6 +6,8 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
 import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
+import useProdutosNovoImagens from '../hooks/useProdutosNovoImagens';
+import useProdutosNovoKit from '../hooks/useProdutosNovoKit';
 import useProdutosNovoLotes from '../hooks/useProdutosNovoLotes';
 import {
   createProduto,
@@ -14,8 +16,6 @@ import {
   getProdutoVariacoes,
   gerarSKU,
   gerarCodigoBarras,
-  uploadImagemProduto,
-  deleteImagemProduto,
   calcularPrecoVenda,
   calcularMarkup,
   formatarMoeda,
@@ -170,13 +170,6 @@ export default function ProdutosNovo() {
   const [mostrarFormVariacao, setMostrarFormVariacao] = useState(false);
   
   // Estados para composição de kit
-  const [produtosDisponiveis, setProdutosDisponiveis] = useState([]);
-  const [produtoKitSelecionado, setProdutoKitSelecionado] = useState('');
-  const [quantidadeKit, setQuantidadeKit] = useState('');
-  const [estoqueVirtualKit, setEstoqueVirtualKit] = useState(0);
-  const [buscaComponente, setBuscaComponente] = useState('');
-  const [dropdownComponenteVisivel, setDropdownComponenteVisivel] = useState(false);
-  
   // Estados para predecessor/sucessor
   const [mostrarBuscaPredecessor, setMostrarBuscaPredecessor] = useState(false);
   const [produtosBusca, setProdutosBusca] = useState([]);
@@ -187,7 +180,6 @@ export default function ProdutosNovo() {
   
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
   
   // Estados para controlar edição de campos monetários
   const [camposEmEdicao, setCamposEmEdicao] = useState({
@@ -250,6 +242,35 @@ export default function ProdutosNovo() {
     setImagens,
     setLotes,
     setFornecedores,
+  });
+
+  const {
+    uploadingImage,
+    handleUploadImagem,
+    handleDeleteImagem,
+    handleSetPrincipal,
+  } = useProdutosNovoImagens({
+    id,
+    setImagens,
+  });
+
+  const {
+    produtosDisponiveis,
+    produtoKitSelecionado,
+    setProdutoKitSelecionado,
+    quantidadeKit,
+    setQuantidadeKit,
+    estoqueVirtualKit,
+    buscaComponente,
+    setBuscaComponente,
+    dropdownComponenteVisivel,
+    setDropdownComponenteVisivel,
+    adicionarProdutoKit,
+    removerProdutoKit,
+  } = useProdutosNovoKit({
+    abaAtiva,
+    formData,
+    setFormData,
   });
   
   // Auto-detectar "ração" no nome do produto
@@ -366,205 +387,6 @@ export default function ProdutosNovo() {
       alert('Erro ao gerar cÃ³digo de barras');
     }
   };
-
-  // ==================== IMAGENS ====================
-  
-  const handleUploadImagem = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-    
-    // Validações
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    
-    // Validar todos os arquivos
-    for (const file of files) {
-      if (!allowedTypes.includes(file.type)) {
-        alert(`${file.name}: Apenas JPG, PNG e WebP são permitidos`);
-        return;
-      }
-      if (file.size > maxSize) {
-        alert(`${file.name}: Imagem deve ter no máximo 5MB`);
-        return;
-      }
-    }
-    
-    try {
-      setUploadingImage(true);
-      
-      // Upload de cada arquivo
-      const uploadedImages = [];
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-          const response = await uploadImagemProduto(id, formData);
-          uploadedImages.push(response.data);
-        } catch (error) {
-          console.error(`Erro ao enviar ${file.name}:`, error);
-          alert(`Erro ao enviar ${file.name}: ${error.response?.data?.detail || 'Erro desconhecido'}`);
-        }
-      }
-      
-      // Recarregar todas as imagens do servidor
-      const imagensRes = await api.get(`/produtos/${id}/imagens`);
-      setImagens(imagensRes.data || []);
-      
-      alert(`${uploadedImages.length} imagem(ns) enviada(s) com sucesso!`);
-      
-    } catch (error) {
-      console.error('Erro ao enviar imagens:', error);
-      alert(error.response?.data?.detail || 'Erro ao enviar imagens');
-    } finally {
-      setUploadingImage(false);
-      e.target.value = '';
-    }
-  };
-  
-  const handleDeleteImagem = async (imagemId) => {
-    if (!confirm('Deseja realmente excluir esta imagem?')) return;
-    
-    try {
-      await deleteImagemProduto(imagemId);
-      
-      // Recarregar imagens do servidor
-      const imagensRes = await api.get(`/produtos/${id}/imagens`);
-      setImagens(imagensRes.data || []);
-      
-      alert('Imagem excluída com sucesso!');
-    } catch (error) {
-      console.error('Erro ao excluir imagem:', error);
-      alert('Erro ao excluir imagem');
-    }
-  };
-  
-  const handleSetPrincipal = async (imagemId) => {
-    try {
-      await api.put(`/produtos/imagens/${imagemId}`, { principal: true });
-      
-      // Recarregar imagens do servidor
-      const imagensRes = await api.get(`/produtos/${id}/imagens`);
-      setImagens(imagensRes.data || []);
-      
-      alert('Imagem principal atualizada!');
-    } catch (error) {
-      console.error('Erro ao definir imagem principal:', error);
-      alert('Erro ao definir imagem principal');
-    }
-  };
-
-  // ============================================
-  // FUNÇÕES DE GERENCIAMENTO DE KIT/COMPOSIÇÃO
-  // ============================================
-  
-  // Carregar produtos disponíveis para compor o kit
-  const carregarProdutosDisponiveis = async () => {
-    try {
-      const response = await api.get('/produtos/', {
-        params: {
-          apenas_ativos: true,
-          tipo_produto: 'SIMPLES',
-          page_size: 2000,
-        }
-      });
-      // Backend retorna objeto paginado: {items: [...], total: 0, page: 1}
-      setProdutosDisponiveis(response.data.items || []);
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      setProdutosDisponiveis([]);
-    }
-  };
-  
-  // Adicionar produto à composição do kit
-  const adicionarProdutoKit = () => {
-    if (!produtoKitSelecionado || !quantidadeKit || quantidadeKit <= 0) {
-      alert('Selecione um produto e informe a quantidade!');
-      return;
-    }
-    
-    // Verificar se já existe
-    const jaExiste = formData.composicao_kit.find(
-      item => item.produto_id === parseInt(produtoKitSelecionado)
-    );
-    
-    if (jaExiste) {
-      alert('Este produto já foi adicionado ao kit!');
-      return;
-    }
-    
-    const produtoSelecionado = produtosDisponiveis.find(
-      p => p.id === parseInt(produtoKitSelecionado)
-    );
-    
-    const novoItem = {
-      produto_componente_id: produtoSelecionado.id, // Backend espera produto_componente_id
-      produto_id: produtoSelecionado.id, // Mantém para exibição no frontend
-      produto_nome: produtoSelecionado.nome,
-      produto_sku: produtoSelecionado.codigo,
-      quantidade: parseFloat(quantidadeKit),
-      estoque_componente: produtoSelecionado.estoque_atual || 0,
-    };
-    
-    setFormData(prev => ({
-      ...prev,
-      composicao_kit: [...prev.composicao_kit, novoItem]
-    }));
-    
-    // Limpar seleção
-    setProdutoKitSelecionado('');
-    setQuantidadeKit('');
-    setBuscaComponente('');
-    
-    // Recalcular estoque virtual
-    calcularEstoqueVirtualKit([...formData.composicao_kit, novoItem]);
-  };
-  
-  // Remover produto da composição
-  const removerProdutoKit = (produtoId) => {
-    const novaComposicao = formData.composicao_kit.filter(
-      item => item.produto_id !== produtoId
-    );
-    
-    setFormData(prev => ({
-      ...prev,
-      composicao_kit: novaComposicao
-    }));
-    
-    calcularEstoqueVirtualKit(novaComposicao);
-  };
-  
-  // Calcular estoque virtual do kit baseado nos componentes
-  const calcularEstoqueVirtualKit = (composicao) => {
-    if (!composicao || composicao.length === 0) {
-      setEstoqueVirtualKit(0);
-      return;
-    }
-    
-    // Calcular quantos kits podem ser montados com cada componente
-    const possibilidades = composicao.map(item => {
-      const estoqueComponente = item.estoque_componente || 0;
-      const quantidadeNecessaria = item.quantidade || 1;
-      return Math.floor(estoqueComponente / quantidadeNecessaria);
-    });
-    
-    // O estoque do kit é o MENOR valor (gargalo)
-    const estoqueMin = Math.min(...possibilidades);
-    setEstoqueVirtualKit(estoqueMin >= 0 ? estoqueMin : 0);
-  };
-  
-  // Carregar produtos quando abrir a aba de composição
-  useEffect(() => {
-    // Carregar se for KIT ou VARIACAO-KIT
-    const ehKit = formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit);
-    
-    if (abaAtiva === 9 && ehKit) {
-      carregarProdutosDisponiveis();
-      if (formData.composicao_kit && formData.composicao_kit.length > 0) {
-        calcularEstoqueVirtualKit(formData.composicao_kit);
-      }
-    }
-  }, [abaAtiva, formData.tipo_produto, formData.tipo_kit]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
