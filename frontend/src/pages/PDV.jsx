@@ -35,6 +35,7 @@ import { usePDVDescontos } from "../hooks/usePDVDescontos";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
+import { usePDVVendasRecentes } from "../hooks/usePDVVendasRecentes";
 import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
 import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -105,15 +106,6 @@ export default function PDV() {
   const [pendenciasCount, setPendenciasCount] = useState(0);
   const [pendenciasProdutoIds, setPendenciasProdutoIds] = useState([]);
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
-  const [vendasRecentes, setVendasRecentes] = useState([]);
-  const [filtroVendas, setFiltroVendas] = useState("24h");
-  const [filtroStatus, setFiltroStatus] = useState("todas");
-  const [confirmandoRetirada, setConfirmandoRetirada] = useState({
-    vendaId: null,
-    nome: "",
-  });
-  const [filtroTemEntrega, setFiltroTemEntrega] = useState(false);
-  const [buscaNumeroVenda, setBuscaNumeroVenda] = useState("");
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [searchVendaQuery, setSearchVendaQuery] = useState("");
@@ -133,16 +125,33 @@ export default function PDV() {
   // Estado para controlar expansão de itens KIT no carrinho
   const [itensKitExpandidos, setItensKitExpandidos] = useState({});
 
-  // 🚗 Estados de Drive pickup
-  const [driveAguardando, setDriveAguardando] = useState([]);
-  const [driveAlertVisible, setDriveAlertVisible] = useState(false);
-
   // Estados de controle de painéis laterais (UX - FASE 1)
   const [painelVendasAberto, setPainelVendasAberto] =
     usePersistentBooleanState("pdv_painel_vendas_aberto", false);
 
   const [painelClienteAberto, setPainelClienteAberto] =
     usePersistentBooleanState("pdv_painel_cliente_aberto", false);
+
+  const {
+    vendasRecentes,
+    filtroVendas,
+    setFiltroVendas,
+    filtroStatus,
+    setFiltroStatus,
+    confirmandoRetirada,
+    setConfirmandoRetirada,
+    filtroTemEntrega,
+    setFiltroTemEntrega,
+    buscaNumeroVenda,
+    setBuscaNumeroVenda,
+    driveAguardando,
+    driveAlertVisible,
+    carregarVendasRecentes,
+    confirmarDriveEntregue,
+    abrirConfirmacaoRetirada,
+    confirmarRetirada,
+    fecharDriveAlert,
+  } = usePDVVendasRecentes();
 
   // 🆕 Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
@@ -429,28 +438,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }, [vendaAtual.itens]);
 
-  // Carregar vendas recentes
-  useEffect(() => {
-    carregarVendasRecentes();
-  }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
-
-  // 🚗 Polling drive — verifica a cada 30s se tem clientes esperando no estacionamento
-  useEffect(() => {
-    const verificarDrive = async () => {
-      try {
-        const res = await api.get("/ecommerce-drive/aguardando");
-        const lista = res.data?.pedidos || [];
-        setDriveAguardando(lista);
-        setDriveAlertVisible(lista.length > 0);
-      } catch {
-        // silencioso — não quebrar o PDV se endpoint falhar
-      }
-    };
-    verificarDrive();
-    const intervalo = setInterval(verificarDrive, 30000);
-    return () => clearInterval(intervalo);
-  }, []);
-
   // Carregar venda específica se vier na URL
   useEffect(() => {
     const vendaId =
@@ -583,83 +570,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
   const handleNovaVenda = () => {
     if (window.confirm("Descartar venda atual sem salvar?")) {
       limparVenda();
-    }
-  };
-
-  // 🚗 Confirmar entrega no drive
-  const confirmarDriveEntregue = async (pedidoId) => {
-    try {
-      await api.post(`/ecommerce-drive/pedido/${pedidoId}/entregue`);
-      setDriveAguardando((prev) => prev.filter((p) => p.pedido_id !== pedidoId));
-      if (driveAguardando.length <= 1) setDriveAlertVisible(false);
-    } catch (err) {
-      console.error("Erro ao confirmar drive entregue:", err);
-    }
-  };
-
-  const carregarVendasRecentes = async () => {
-    try {
-      const hoje = new Date();
-      let dataInicio;
-
-      if (filtroVendas === "24h") {
-        dataInicio = new Date(hoje.getTime() - 24 * 60 * 60 * 1000);
-      } else if (filtroVendas === "7d") {
-        dataInicio = new Date(hoje.getTime() - 7 * 24 * 60 * 60 * 1000);
-      } else {
-        dataInicio = new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000);
-      }
-
-      const params = {
-        data_inicio: dataInicio.toISOString().split("T")[0],
-        data_fim: hoje.toISOString().split("T")[0],
-        per_page: 50, // Aumentado para 50
-      };
-
-      // Busca por número da venda tem prioridade
-      if (buscaNumeroVenda.trim()) {
-        params.busca = buscaNumeroVenda.trim();
-        // Remover filtros de data quando buscar por número
-        delete params.data_inicio;
-        delete params.data_fim;
-      } else {
-        if (filtroStatus === "pago") {
-          params.status = "finalizada";
-        } else if (filtroStatus === "aberta") {
-          params.status = "aberta";
-        }
-        // 'todas' não adiciona filtro de status
-
-        // Filtro de tem entrega - só adicionar se estiver marcado
-        if (filtroTemEntrega === true) {
-          params.tem_entrega = true;
-        }
-      }
-
-      debugLog("📊 Parâmetros de busca de vendas:", params);
-      const resultado = await listarVendas(params);
-
-      setVendasRecentes(resultado.vendas || []);
-    } catch (error) {
-      console.error("Erro ao carregar vendas:", error);
-    }
-  };
-
-  const abrirConfirmacaoRetirada = (e, vendaId) => {
-    e.stopPropagation();
-    setConfirmandoRetirada({ vendaId, nome: "" });
-  };
-
-  const confirmarRetirada = async (e, vendaId) => {
-    e.stopPropagation();
-    try {
-      await api.post(`/vendas/${vendaId}/marcar-entregue`, {
-        retirado_por: confirmandoRetirada.nome.trim() || null,
-      });
-      setConfirmandoRetirada({ vendaId: null, nome: "" });
-      carregarVendasRecentes();
-    } catch (error) {
-      console.error("Erro ao confirmar retirada:", error);
     }
   };
 
@@ -1191,7 +1101,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       <PDVDriveAlertBanner
         driveAlertVisible={driveAlertVisible}
         driveAguardando={driveAguardando}
-        onClose={() => setDriveAlertVisible(false)}
+        onClose={fecharDriveAlert}
         onConfirmarEntregue={confirmarDriveEntregue}
       />
       <div className="flex h-screen bg-gray-50" style={driveAlertVisible && driveAguardando.length > 0 ? { paddingTop: '52px' } : {}}>

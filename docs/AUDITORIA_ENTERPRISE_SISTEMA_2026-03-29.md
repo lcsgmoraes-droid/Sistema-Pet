@@ -549,6 +549,10 @@ Itens executados nesta etapa:
   - hook `frontend/src/hooks/usePDVDescontos.js` criado para centralizar desconto por item, desconto total, cupom e recalculo financeiro do carrinho
   - `PDVResumoFinanceiroCard` e `PDVModalsLayer` passaram a consumir esse fluxo via hook, em vez de depender da logica inline da pagina
   - `PDV.jsx` caiu para `1499` linhas, mantendo a mesma interface operacional
+- [x] extrair o fluxo de vendas recentes e drive do `PDV.jsx`:
+  - hook `frontend/src/hooks/usePDVVendasRecentes.js` criado para centralizar filtros, listagem de vendas recentes, confirmacao de retirada e polling do drive
+  - `PDVDriveAlertBanner` e `PDVVendasRecentesSidebar` passaram a consumir esse fluxo via hook, em vez de depender de efeitos e chamadas de API inline na pagina
+  - `PDV.jsx` caiu para `1409` linhas, mantendo a mesma interface operacional
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
