@@ -699,6 +699,11 @@ Itens executados nesta etapa:
   - o cabecalho, a navegacao entre abas e o rodape de acoes foram extraidos para `frontend/src/components/produto/ProdutosNovoHeader.jsx`, `frontend/src/components/produto/ProdutosNovoTabs.jsx` e `frontend/src/components/produto/ProdutosNovoFooterActions.jsx`
   - as abas de tributacao, recorrencia e racao passaram a usar os componentes `frontend/src/components/produto/ProdutosNovoTributacaoTab.jsx`, `frontend/src/components/produto/ProdutosNovoRecorrenciaTab.jsx` e `frontend/src/components/produto/ProdutosNovoRacaoTab.jsx`
   - `ProdutosNovo.jsx` caiu de `3012` para `2361` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `ProdutosNovo.jsx` pelas abas restantes e pelos modais residuais:
+  - a aba de variacoes passou a usar `frontend/src/components/produto/ProdutosNovoVariacoesTab.jsx`
+  - a aba de composicao passou a usar `frontend/src/components/produto/ProdutosNovoComposicaoTab.jsx`
+  - os modais residuais de entrada, lote e fornecedor foram extraidos para `frontend/src/components/produto/ProdutosNovoEntradaModal.jsx`, `frontend/src/components/produto/ProdutosNovoLoteModal.jsx` e `frontend/src/components/produto/ProdutosNovoFornecedorModal.jsx`
+  - `ProdutosNovo.jsx` caiu de `2361` para `1603` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
@@ -708,7 +713,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelas abas restantes (`variacoes` e `composicao`) e pelos modais residuais (`lotes` e `fornecedores`)
+- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pela componentizacao dos blocos residuais da aba de caracteristicas e pela reducao do acoplamento de props entre a pagina e os hooks/componentes
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida

@@ -1,14 +1,19 @@
-﻿/**
+/**
  * FormulÃ¡rio de Cadastro/EdiÃ§Ã£o de Produtos - Layout em Abas
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import ProdutosNovoFooterActions from '../components/produto/ProdutosNovoFooterActions';
+import ProdutosNovoFornecedorModal from '../components/produto/ProdutosNovoFornecedorModal';
 import ProdutosNovoHeader from '../components/produto/ProdutosNovoHeader';
+import ProdutosNovoEntradaModal from '../components/produto/ProdutosNovoEntradaModal';
+import ProdutosNovoLoteModal from '../components/produto/ProdutosNovoLoteModal';
+import ProdutosNovoComposicaoTab from '../components/produto/ProdutosNovoComposicaoTab';
 import ProdutosNovoRacaoTab from '../components/produto/ProdutosNovoRacaoTab';
 import ProdutosNovoRecorrenciaTab from '../components/produto/ProdutosNovoRecorrenciaTab';
 import ProdutosNovoTabs from '../components/produto/ProdutosNovoTabs';
 import ProdutosNovoTributacaoTab from '../components/produto/ProdutosNovoTributacaoTab';
+import ProdutosNovoVariacoesTab from '../components/produto/ProdutosNovoVariacoesTab';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
 import useProdutosNovoCodigos from '../hooks/useProdutosNovoCodigos';
 import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
@@ -1576,545 +1581,42 @@ export default function ProdutosNovo() {
 
           {/* ABA 8: VARIAÇÕES (Sprint 2) - Apenas para produtos PAI */}
           {abaAtiva === 8 && formData.tipo_produto === 'PAI' && (
-            <div className="space-y-6">
-              {!isEdicao ? (
-                /* Mensagem quando produto ainda não foi salvo */
-                <div className="text-center py-16 border-2 border-dashed border-yellow-300 rounded-lg bg-yellow-50">
-                  <svg className="mx-auto h-16 w-16 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <p className="mt-4 text-xl font-semibold text-yellow-900">Aba Bloqueada</p>
-                  <p className="mt-2 text-sm text-yellow-800">
-                    Salve o produto primeiro para habilitar o cadastro de variações.
-                  </p>
-                  <p className="mt-4 text-xs text-yellow-700">
-                    Após salvar, você será redirecionado automaticamente para cadastrar as variações.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-2">
-                      Variações do Produto: {formData.nome}
-                    </h3>
-                    <p className="text-sm text-blue-700">
-                      Cadastre as variações deste produto. Cada variação é um produto vendável independente 
-                      com seu próprio SKU, preço e estoque.
-                    </p>
-                  </div>
-
-                  {/* Grid de Variações Cadastradas */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-md font-semibold">Variações Cadastradas</h4>
-                      <button
-                        type="button"
-                        onClick={handleToggleFormVariacao}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                      >
-                        {mostrarFormVariacao ? '❌ Cancelar' : '➕ Nova Variação'}
-                      </button>
-                    </div>
-
-                    {/* Formulário de Nova Variação */}
-                    {mostrarFormVariacao && (
-                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
-                        <h5 className="font-semibold mb-3">Cadastrar Nova Variação</h5>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              SKU *
-                            </label>
-                            <input
-                              type="text"
-                              value={novaVariacao.sku}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, sku: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="Ex: PROD001-P"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Nome Complementar *
-                            </label>
-                            <input
-                              type="text"
-                              value={novaVariacao.nome}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, nome: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="Ex: Tamanho P"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Código de Barras
-                            </label>
-                            <input
-                              type="text"
-                              value={novaVariacao.codigo_barras}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, codigo_barras: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="EAN-13"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Preço de Custo
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={novaVariacao.preco_custo}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, preco_custo: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Preço de Venda *
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={novaVariacao.preco_venda}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, preco_venda: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="0.00"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Estoque Mínimo
-                            </label>
-                            <input
-                              type="number"
-                              value={novaVariacao.estoque_minimo}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, estoque_minimo: e.target.value})}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* REGRA OFICIAL: VARIACAO pode ser KIT */}
-                        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                          <label className="flex items-start gap-3 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={novaVariacao.e_kit}
-                              onChange={(e) => setNovaVariacao({...novaVariacao, e_kit: e.target.checked})}
-                              className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <div>
-                              <span className="font-medium text-gray-900">🧩 Esta variação é um KIT (possui composição)</span>
-                              <p className="text-sm text-gray-600 mt-1">
-                                Se marcado, você poderá definir a composição do kit após salvar a variação.
-                              </p>
-                            </div>
-                          </label>
-                        </div>
-                        
-                        <div className="mt-4 flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCancelarVariacao}
-                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleSalvarVariacao}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                          >
-                            Salvar Variação
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tabela de Variações */}
-                    {variacoes.length === 0 ? (
-                      <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                        <p className="text-gray-500">Nenhuma variação cadastrada ainda.</p>
-                        <p className="text-sm text-gray-400 mt-1">Clique em "Nova Variação" para começar.</p>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código de Barras</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Venda</th>
-                              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {variacoes.map((variacao) => (
-                              <tr key={variacao.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 text-sm font-medium text-gray-900">{variacao.codigo}</td>
-                                <td className="px-4 py-3 text-sm text-gray-700">{variacao.nome}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{variacao.codigo_barras || '-'}</td>
-                                <td className="px-4 py-3 text-sm text-right text-gray-900">
-                                  R$ {(variacao.preco_custo || 0).toFixed(2)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-right text-gray-900 font-semibold">
-                                  R$ {variacao.preco_venda.toFixed(2)}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-right">
-                                  <span className={`font-semibold ${
-                                    variacao.estoque_atual <= variacao.estoque_minimo 
-                                      ? 'text-red-600' 
-                                      : 'text-green-600'
-                                  }`}>
-                                    {variacao.estoque_atual || 0}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => navigate(`/produtos/${variacao.id}/editar`)}
-                                    className="text-blue-600 hover:text-blue-800 mr-2"
-                                    title="Editar"
-                                  >
-                                    ✏️
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleExcluirVariacao(variacao)}
-                                    className="text-red-600 hover:text-red-800"
-                                    title="Excluir"
-                                  >
-                                    🗑️
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+            <ProdutosNovoVariacoesTab
+              formData={formData}
+              isEdicao={isEdicao}
+              mostrarFormVariacao={mostrarFormVariacao}
+              novaVariacao={novaVariacao}
+              setNovaVariacao={setNovaVariacao}
+              variacoes={variacoes}
+              handleToggleFormVariacao={handleToggleFormVariacao}
+              handleCancelarVariacao={handleCancelarVariacao}
+              handleSalvarVariacao={handleSalvarVariacao}
+              handleExcluirVariacao={handleExcluirVariacao}
+              onEditarVariacao={(variacao) => navigate(`/produtos/${variacao.id}/editar`)}
+            />
           )}
-          
           {/* ============================================
               ABA 9: COMPOSIÇÃO/KIT (Produto KIT ou VARIACAO-KIT)
               ============================================ */}
           {abaAtiva === 9 && (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) && (
-            <div className="space-y-6">
-              {/* Escolha do tipo de estoque: Virtual ou Físico */}
-              <div className="bg-white border-2 border-gray-300 rounded-lg p-5">
-                <h3 className="font-semibold text-gray-900 mb-4">Tipo de Estoque do Kit</h3>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Opção: Estoque Virtual */}
-                  <div 
-                    onClick={() => handleChange('e_kit_fisico', false)}
-                    className={`cursor-pointer p-4 border-2 rounded-lg transition-all ${
-                      !formData.e_kit_fisico 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-300 bg-white hover:border-blue-300'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="radio"
-                        name="tipo_estoque_kit"
-                        checked={!formData.e_kit_fisico}
-                        onChange={() => handleChange('e_kit_fisico', false)}
-                        className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">📊</span>
-                          <h4 className="font-semibold text-gray-900">Estoque Virtual</h4>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2">
-                          O estoque é calculado <strong>automaticamente</strong> com base nos componentes disponíveis.
-                        </p>
-                        <div className="mt-2 text-xs text-gray-500 space-y-1">
-                          <div>✓ Não permite movimentação manual</div>
-                          <div>✓ Estoque = menor disponibilidade dos componentes</div>
-                          <div>✓ Ideal para kits montados sob demanda</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Opção: Estoque Físico */}
-                  <div 
-                    onClick={() => handleChange('e_kit_fisico', true)}
-                    className={`cursor-pointer p-4 border-2 rounded-lg transition-all ${
-                      formData.e_kit_fisico 
-                        ? 'border-green-500 bg-green-50' 
-                        : 'border-gray-300 bg-white hover:border-green-300'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="radio"
-                        name="tipo_estoque_kit"
-                        checked={formData.e_kit_fisico}
-                        onChange={() => handleChange('e_kit_fisico', true)}
-                        className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">📦</span>
-                          <h4 className="font-semibold text-gray-900">Estoque Físico</h4>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-2">
-                          O kit possui estoque <strong>próprio e independente</strong> dos componentes.
-                        </p>
-                        <div className="mt-2 text-xs text-gray-500 space-y-1">
-                          <div>✓ Permite movimentação manual</div>
-                          <div>✓ Entrada: diminui componentes (montou kits)</div>
-                          <div>✓ Ideal para kits pré-montados</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-purple-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Composição do Kit</h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Defina quais produtos compõem este kit e as quantidades necessárias de cada um.
-                    </p>
-                    {!formData.e_kit_fisico && (
-                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                        <strong>📊 Estoque Virtual Ativo</strong>
-                        <br />
-                        O estoque deste kit será calculado automaticamente baseado nos componentes.
-                        <br />
-                        <span className="text-xs italic">
-                          Estoque do kit = menor disponibilidade entre os componentes (considerando as quantidades necessárias)
-                        </span>
-                      </div>
-                    )}
-                    {formData.e_kit_fisico && (
-                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                        <strong>📦 Estoque Físico Ativo</strong>
-                        <br />
-                        <strong>Entrada no kit:</strong> Os componentes serão automaticamente DIMINUÍDOS (unitários viraram kit).
-                        <br />
-                        <strong>Saída manual:</strong> Você poderá escolher se os componentes voltam ao estoque (desfez o kit) ou não (perda/roubo).
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Estoque Virtual Calculado */}
-              {!formData.e_kit_fisico && formData.composicao_kit.length > 0 && (
-                <div className="bg-white border-2 border-green-300 rounded-lg p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700">Estoque Virtual do Kit</h4>
-                      <p className="text-xs text-gray-500 mt-1">Calculado automaticamente</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-4xl font-bold text-green-600">
-                        {estoqueVirtualKit}
-                      </div>
-                      <p className="text-xs text-gray-500">kits disponíveis</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Formulário para adicionar produto */}
-              <div className="border border-gray-300 rounded-lg p-5 bg-gray-50">
-                <h4 className="font-semibold text-gray-900 mb-4">Adicionar Produto ao Kit</h4>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Produto
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={buscaComponente}
-                        onChange={(e) => {
-                          setBuscaComponente(e.target.value);
-                          setProdutoKitSelecionado('');
-                          setDropdownComponenteVisivel(true);
-                        }}
-                        onFocus={() => setDropdownComponenteVisivel(true)}
-                        onBlur={() => setTimeout(() => setDropdownComponenteVisivel(false), 180)}
-                        placeholder="Buscar por SKU ou nome..."
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        autoComplete="off"
-                      />
-                      {dropdownComponenteVisivel && buscaComponente.length > 0 && (() => {
-                        const termo = buscaComponente.toLowerCase();
-                        const filtrados = produtosDisponiveis
-                          .filter(p =>
-                            (p.codigo && p.codigo.toLowerCase().includes(termo)) ||
-                            (p.nome && p.nome.toLowerCase().includes(termo))
-                          )
-                          .slice(0, 30);
-                        return filtrados.length > 0 ? (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
-                            {filtrados.map(p => (
-                              <div
-                                key={p.id}
-                                className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm flex justify-between items-center"
-                                onMouseDown={() => {
-                                  setProdutoKitSelecionado(String(p.id));
-                                  setBuscaComponente(`[${p.codigo}] ${p.nome}`);
-                                  setDropdownComponenteVisivel(false);
-                                }}
-                              >
-                                <span><span className="font-semibold text-blue-700">{p.codigo}</span> – {p.nome}</span>
-                                <span className="text-xs text-gray-400 ml-2 shrink-0">Estoque: {p.estoque_atual || 0}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantidade
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={quantidadeKit}
-                      onChange={(e) => setQuantidadeKit(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="1"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={adicionarProdutoKit}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Adicionar ao Kit
-                </button>
-              </div>
-
-              {/* Lista de Produtos no Kit */}
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Produtos no Kit ({formData.composicao_kit.length})</h4>
-                
-                {formData.composicao_kit.length === 0 ? (
-                  <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                    </svg>
-                    <p className="mt-2 text-sm text-gray-600">Nenhum produto adicionado ao kit ainda</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Kits Possíveis</th>
-                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {formData.composicao_kit.map((item, index) => {
-                          const kitsPossiveis = Math.floor(item.estoque_componente / item.quantidade);
-                          const eGargalo = kitsPossiveis === estoqueVirtualKit && estoqueVirtualKit > 0;
-                          
-                          return (
-                            <tr key={item.produto_id} className={`hover:bg-gray-50 ${eGargalo ? 'bg-yellow-50' : ''}`}>
-                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                {item.produto_sku || '-'}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-700">
-                                {item.produto_nome}
-                                {eGargalo && (
-                                  <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded">
-                                    ⚠️ LIMITADOR
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-900 font-semibold">
-                                {item.quantidade}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center text-gray-600">
-                                {item.estoque_componente || 0}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-center">
-                                <span className={`font-semibold ${
-                                  kitsPossiveis === 0 ? 'text-red-600' : 
-                                  kitsPossiveis < 5 ? 'text-yellow-600' : 
-                                  'text-green-600'
-                                }`}>
-                                  {kitsPossiveis}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => removerProdutoKit(item.produto_id)}
-                                  className="text-red-600 hover:text-red-800"
-                                  title="Remover do kit"
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Alertas */}
-              {formData.composicao_kit.length > 0 && estoqueVirtualKit === 0 && !formData.e_kit_fisico && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <div className="text-sm text-red-800">
-                      <strong>Kit sem estoque disponível!</strong>
-                      <p className="mt-1">
-                        Pelo menos um dos componentes está sem estoque suficiente para montar o kit.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ProdutosNovoComposicaoTab
+              formData={formData}
+              handleChange={handleChange}
+              estoqueVirtualKit={estoqueVirtualKit}
+              produtosDisponiveis={produtosDisponiveis}
+              produtoKitSelecionado={produtoKitSelecionado}
+              setProdutoKitSelecionado={setProdutoKitSelecionado}
+              quantidadeKit={quantidadeKit}
+              setQuantidadeKit={setQuantidadeKit}
+              buscaComponente={buscaComponente}
+              setBuscaComponente={setBuscaComponente}
+              dropdownComponenteVisivel={dropdownComponenteVisivel}
+              setDropdownComponenteVisivel={setDropdownComponenteVisivel}
+              adicionarProdutoKit={adicionarProdutoKit}
+              removerProdutoKit={removerProdutoKit}
+            />
           )}
         </div>
-
         <ProdutosNovoFooterActions
           isEdicao={isEdicao}
           onCancel={() => navigate('/produtos')}
@@ -2122,322 +1624,34 @@ export default function ProdutosNovo() {
         />
       </form>
 
-      {/* Modal de Entrada de Estoque */}
       {modalEntrada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Nova Entrada de Estoque</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantidade *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={entradaData.quantidade}
-                  onChange={(e) => setEntradaData({...entradaData, quantidade: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between items-center">
-                  <span>NÃºmero do Lote</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const sugestao = `LOTE-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-                      setEntradaData({...entradaData, nome_lote: sugestao});
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Gerar SugestÃ£o
-                  </button>
-                </label>
-                <input
-                  type="text"
-                  value={entradaData.nome_lote}
-                  onChange={(e) => setEntradaData({...entradaData, nome_lote: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Ex: LOTE-20260105-001 (deixe vazio para gerar automaticamente)"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Fabricação
-                </label>
-                <input
-                  type="date"
-                  value={entradaData.data_fabricacao}
-                  onChange={(e) => setEntradaData({...entradaData, data_fabricacao: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Validade
-                </label>
-                <input
-                  type="date"
-                  value={entradaData.data_validade}
-                  onChange={(e) => setEntradaData({...entradaData, data_validade: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço de Custo *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={entradaData.preco_custo}
-                    onChange={(e) => setEntradaData({...entradaData, preco_custo: e.target.value})}
-                    className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalEntrada(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleEntradaEstoque}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Registrar Entrada
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProdutosNovoEntradaModal
+          entradaData={entradaData}
+          setEntradaData={setEntradaData}
+          onClose={() => setModalEntrada(false)}
+          onSubmit={handleEntradaEstoque}
+        />
       )}
-
-      {/* Modal Edição de Lote */}
       {modalEdicaoLote && loteEmEdicao && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Editar Lote</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome do Lote *
-                </label>
-                <input
-                  type="text"
-                  value={loteEmEdicao.nome_lote}
-                  onChange={(e) => setLoteEmEdicao({...loteEmEdicao, nome_lote: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Nome do lote"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantidade *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={loteEmEdicao.quantidade_inicial}
-                  onChange={(e) => setLoteEmEdicao({...loteEmEdicao, quantidade_inicial: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Fabricação
-                </label>
-                <input
-                  type="date"
-                  value={loteEmEdicao.data_fabricacao}
-                  onChange={(e) => setLoteEmEdicao({...loteEmEdicao, data_fabricacao: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Data de Validade
-                </label>
-                <input
-                  type="date"
-                  value={loteEmEdicao.data_validade}
-                  onChange={(e) => setLoteEmEdicao({...loteEmEdicao, data_validade: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Custo Unitário *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={loteEmEdicao.custo_unitario}
-                  onChange={(e) => setLoteEmEdicao({...loteEmEdicao, custo_unitario: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0,00"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setModalEdicaoLote(false);
-                  setLoteEmEdicao(null);
-                }}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSalvarEdicaoLote}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Salvar Alterações
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProdutosNovoLoteModal
+          loteEmEdicao={loteEmEdicao}
+          setLoteEmEdicao={setLoteEmEdicao}
+          onClose={() => {
+            setModalEdicaoLote(false);
+            setLoteEmEdicao(null);
+          }}
+          onSubmit={handleSalvarEdicaoLote}
+        />
       )}
-
-      {/* Modal Fornecedor */}
       {modalFornecedor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              {fornecedorEdit ? 'Editar Fornecedor' : 'Adicionar Fornecedor'}
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fornecedor *
-                </label>
-                <select
-                  value={fornecedorData.fornecedor_id}
-                  onChange={(e) => setFornecedorData({...fornecedorData, fornecedor_id: e.target.value})}
-                  disabled={Boolean(fornecedorEdit)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                >
-                  <option value="">Selecione...</option>
-                  {clientes.map(cli => (
-                    <option key={cli.id} value={cli.id}>{cli.nome}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Código no Fornecedor
-                </label>
-                <input
-                  type="text"
-                  value={fornecedorData.codigo_fornecedor}
-                  onChange={(e) => setFornecedorData({...fornecedorData, codigo_fornecedor: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="SKU-FORNECEDOR-001"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Preço de Custo
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={fornecedorData.preco_custo}
-                    onChange={(e) => setFornecedorData({...fornecedorData, preco_custo: e.target.value})}
-                    className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Prazo de Entrega (dias)
-                </label>
-                <input
-                  type="number"
-                  value={fornecedorData.prazo_entrega}
-                  onChange={(e) => setFornecedorData({...fornecedorData, prazo_entrega: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="7"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estoque no Fornecedor
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={fornecedorData.estoque_fornecedor}
-                  onChange={(e) => setFornecedorData({...fornecedorData, estoque_fornecedor: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="100"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={fornecedorData.e_principal}
-                  onChange={(e) => setFornecedorData({...fornecedorData, e_principal: e.target.checked})}
-                  className="w-4 h-4 text-blue-600 rounded"
-                />
-                <label className="text-sm font-medium text-gray-700">
-                  Fornecedor Principal
-                </label>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalFornecedor(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveFornecedor}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Salvar
-              </button>
-            </div>
-          </div>
-        </div>
+        <ProdutosNovoFornecedorModal
+          clientes={clientes}
+          fornecedorData={fornecedorData}
+          fornecedorEdit={fornecedorEdit}
+          setFornecedorData={setFornecedorData}
+          onClose={() => setModalFornecedor(false)}
+          onSubmit={handleSaveFornecedor}
+        />
       )}
     </div>
   );
