@@ -89,6 +89,9 @@ function montarCupom(venda) {
   const totalBruto = subtotal + descontoTotal;
   const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || 0);
   const total = Number(venda?.total || 0);
+  const enderecoEntrega = venda?.entrega?.endereco_completo || venda?.endereco_entrega || '';
+  const observacoesEntrega =
+    venda?.entrega?.observacoes_entrega || venda?.observacoes_entrega || '';
   const telefoneCliente =
     venda?.cliente?.celular ||
     venda?.cliente?.telefone ||
@@ -163,10 +166,13 @@ function montarCupom(venda) {
     linhas.push('-'.repeat(RECEIPT_WIDTH));
   }
 
-  if (venda?.tem_entrega && venda?.entrega?.endereco_completo) {
-    linhas.push('ENTREGA:', ...wrap(venda.entrega.endereco_completo, RECEIPT_WIDTH));
-    if (venda?.entrega?.observacoes_entrega) {
-      linhas.push(...wrap(`Obs: ${venda.entrega.observacoes_entrega}`, RECEIPT_WIDTH));
+  if (venda?.tem_entrega && (enderecoEntrega || observacoesEntrega)) {
+    linhas.push('ENTREGA:');
+    if (enderecoEntrega) {
+      linhas.push(...wrap(enderecoEntrega, RECEIPT_WIDTH));
+    }
+    if (observacoesEntrega) {
+      linhas.push(...wrap(`Obs: ${observacoesEntrega}`, RECEIPT_WIDTH));
     }
     linhas.push('-'.repeat(RECEIPT_WIDTH));
   }
@@ -261,6 +267,8 @@ ImprimirCupom.propTypes = {
     total: PropTypes.number,
     cliente_nome: PropTypes.string,
     telefone_cliente: PropTypes.string,
+    endereco_entrega: PropTypes.string,
+    observacoes_entrega: PropTypes.string,
     cliente: PropTypes.shape({
       nome: PropTypes.string,
       telefone: PropTypes.string,

@@ -52,6 +52,7 @@ interface VendaDetalhes {
   forma_pagamento?: string;
   status_pagamento?: string;
   endereco_entrega?: string;
+  observacoes_entrega?: string;
   total?: number;
   valor_total?: number;
   itens?: Array<{
@@ -961,6 +962,10 @@ export default function DetalheEntregaScreen() {
                 <Text style={styles.detalheLinha}>
                   <Text style={styles.detalheLabel}>Endereço: </Text>
                   {vendaDetalhes?.endereco_entrega || 'N/A'}
+                </Text>
+                <Text style={styles.detalheLinha}>
+                  <Text style={styles.detalheLabel}>Obs. da entrega: </Text>
+                  {vendaDetalhes?.observacoes_entrega || 'N/A'}
                 </Text>
                 <Text style={styles.detalheLinha}>
                   <Text style={styles.detalheLabel}>Total: </Text>
