@@ -22,6 +22,7 @@ import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVEstoqueFiscal } from "../hooks/usePDVEstoqueFiscal";
 import { usePDVInicializacao } from "../hooks/usePDVInicializacao";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
+import { usePDVPageComposition } from "../hooks/usePDVPageComposition";
 import { usePDVProdutos } from "../hooks/usePDVProdutos";
 import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
 import { usePDVUIState } from "../hooks/usePDVUIState";
@@ -346,227 +347,192 @@ export default function PDV() {
     limparVenda,
   });
 
+  const { driveAlertProps, containerStyle, mainAreaProps, overlayProps } =
+    usePDVPageComposition({
+      navigate,
+      destaqueAbrirCaixa,
+      destaqueVenda,
+      caixaGuiaClasses,
+      vendaGuiaClasses,
+      iniciarTour,
+      searchVendaQuery,
+      setSearchVendaQuery,
+      handleBuscarVenda,
+      vendaAtual,
+      pendenciasCount,
+      opportunities,
+      painelAssistenteAberto,
+      mensagensAssistente,
+      setMostrarPendenciasEstoque,
+      abrirPainelOportunidades,
+      alternarPainelAssistente,
+      caixaKey,
+      setMostrarModalAbrirCaixa,
+      modoVisualizacao,
+      loading,
+      temCaixaAberto,
+      cancelarEdicao,
+      excluirVenda,
+      salvarVenda,
+      abrirModalPagamento,
+      setModoVisualizacao,
+      limparVenda,
+      emitirNotaVendaFinalizada,
+      mudarStatusParaAberta,
+      habilitarEdicao,
+      setMostrarModalCliente,
+      setMostrarHistoricoCliente,
+      setMostrarModalAdicionarCredito,
+      setMostrarVendasEmAberto,
+      buscarCliente,
+      buscarClientePorCodigoExato,
+      clientesSugeridos,
+      copiadoClienteCampo,
+      setBuscarCliente,
+      copiarCampoCliente,
+      limparClienteSelecionado,
+      selecionarCliente,
+      selecionarPet,
+      saldoCampanhas,
+      vendasEmAbertoInfo,
+      buscaProduto,
+      buscaProdutoContainerRef,
+      copiadoCodigoItem,
+      inputProdutoRef,
+      itensKitExpandidos,
+      mostrarSugestoesProduto,
+      abrirModalDescontoItem,
+      adicionarNaListaEsperaRapido,
+      alterarQuantidade,
+      atualizarPetDoItem,
+      atualizarQuantidadeItem,
+      handleBuscarProdutoChange,
+      handleBuscarProdutoFocus,
+      handleBuscarProdutoKeyDown,
+      copiarCodigoProdutoCarrinho,
+      removerItem,
+      selecionarProdutoSugerido,
+      toggleKitExpansion,
+      pendenciasProdutoIds,
+      produtosSugeridos,
+      setVendaAtual,
+      entregadorSelecionado,
+      entregadores,
+      abrirModalEndereco,
+      handleEnderecoEntregaChange,
+      handleObservacoesEntregaChange,
+      handleSelecionarEnderecoEntrega,
+      handleSelecionarEntregador,
+      handleTaxaEntregaTotalChange,
+      handleTaxaEntregadorChange,
+      handleTaxaLojaChange,
+      handleToggleTemEntrega,
+      alertasCarrinho,
+      codigoCupom,
+      cupomAplicado,
+      erroCupom,
+      loadingCupom,
+      abrirModalDescontoTotal,
+      aplicarCupom,
+      handleCodigoCupomChange,
+      handleCodigoCupomKeyDown,
+      removerCupom,
+      removerDescontoTotal,
+      totalImpostos,
+      buscaFuncionario,
+      funcionarioComissao,
+      funcionariosSugeridos,
+      handleBuscaFuncionarioChange,
+      handleBuscaFuncionarioFocus,
+      handleRemoverFuncionarioComissao,
+      handleSelecionarFuncionarioComissao,
+      handleToggleVendaComissionada,
+      vendaComissionada,
+      handleNovaVenda,
+      painelClienteAberto,
+      setPainelClienteAberto,
+      painelVendasAberto,
+      setPainelVendasAberto,
+      filtroVendas,
+      setFiltroVendas,
+      filtroStatus,
+      setFiltroStatus,
+      filtroTemEntrega,
+      setFiltroTemEntrega,
+      buscaNumeroVenda,
+      setBuscaNumeroVenda,
+      vendasRecentes,
+      reabrirVenda,
+      confirmandoRetirada,
+      abrirConfirmacaoRetirada,
+      confirmarRetirada,
+      setConfirmandoRetirada,
+      painelOportunidadesAberto,
+      setPainelOportunidadesAberto,
+      adicionarOportunidadeAoCarrinho,
+      buscarAlternativaOportunidade,
+      ignorarOportunidade,
+      setPainelAssistenteAberto,
+      enviandoAssistente,
+      chatAssistenteEndRef,
+      inputAssistente,
+      setInputAssistente,
+      enviarMensagemAssistente,
+      carregandoAnalise,
+      dadosAnalise,
+      enderecoAtual,
+      itemEditando,
+      loadingCep,
+      mostrarAnaliseVenda,
+      mostrarCalculadoraRacao,
+      mostrarHistoricoCliente,
+      mostrarModalAbrirCaixa,
+      mostrarModalAdicionarCredito,
+      mostrarModalCliente,
+      mostrarModalDescontoItem,
+      setMostrarModalDescontoItem,
+      mostrarModalDescontoTotal,
+      setMostrarModalDescontoTotal,
+      mostrarModalEndereco,
+      fecharModalEndereco,
+      mostrarModalPagamento,
+      setMostrarModalPagamento,
+      mostrarPendenciasEstoque,
+      mostrarVendasEmAberto,
+      podeVerMargem,
+      racaoIdFechada,
+      setTipoDescontoTotal,
+      setValorDescontoTotal,
+      tipoDescontoTotal,
+      valorDescontoTotal,
+      handleAbrirCaixaSucesso,
+      analisarVendaComFormasPagamento,
+      aplicarDescontoTotal,
+      buscarCepModal,
+      setEnderecoAtual,
+      setItemEditando,
+      handleClienteCriado: handleClienteCriadoRapido,
+      fecharCalculadoraRacao,
+      handleConfirmarCreditoCliente,
+      handleConfirmarPagamento,
+      carregarPendencias,
+      removerItemEditando,
+      salvarDescontoItem,
+      salvarEnderecoNoCliente,
+      handleVendaAtualizadaAposPagamento,
+      handleVendasEmAbertoSucesso,
+      driveAlertVisible,
+      driveAguardando,
+      fecharDriveAlert,
+      confirmarDriveEntregue,
+    });
+
   return (
     <>
-      <PDVDriveAlertBanner
-        driveAlertVisible={driveAlertVisible}
-        driveAguardando={driveAguardando}
-        onClose={fecharDriveAlert}
-        onConfirmarEntregue={confirmarDriveEntregue}
-      />
-      <div
-        className="flex h-screen bg-gray-50"
-        style={
-          driveAlertVisible && driveAguardando.length > 0
-            ? { paddingTop: "52px" }
-            : {}
-        }
-      >
-        <PDVMainArea
-          destaqueAbrirCaixa={destaqueAbrirCaixa}
-          destaqueVenda={destaqueVenda}
-          caixaGuiaClasses={caixaGuiaClasses}
-          vendaGuiaClasses={vendaGuiaClasses}
-          iniciarTour={iniciarTour}
-          searchVendaQuery={searchVendaQuery}
-          onSearchVendaQueryChange={setSearchVendaQuery}
-          onBuscarVenda={handleBuscarVenda}
-          vendaAtual={vendaAtual}
-          pendenciasCount={pendenciasCount}
-          opportunitiesCount={opportunities.length}
-          painelAssistenteAberto={painelAssistenteAberto}
-          mensagensAssistenteLength={mensagensAssistente.length}
-          onAbrirPendenciasEstoque={() => setMostrarPendenciasEstoque(true)}
-          onAbrirOportunidades={() => {
-            void abrirPainelOportunidades();
-          }}
-          onToggleAssistente={() => {
-            void alternarPainelAssistente();
-          }}
-          caixaKey={caixaKey}
-          onAbrirCaixa={() => setMostrarModalAbrirCaixa(true)}
-          onNavigateMeusCaixas={() => navigate("/meus-caixas")}
-          modoVisualizacao={modoVisualizacao}
-          loading={loading}
-          temCaixaAberto={temCaixaAberto}
-          onCancelarEdicao={cancelarEdicao}
-          onExcluirVenda={excluirVenda}
-          onSalvarVenda={salvarVenda}
-          onAbrirModalPagamento={abrirModalPagamento}
-          onSairModoVisualizacao={() => {
-            setModoVisualizacao(false);
-            limparVenda();
-          }}
-          emitirNotaVendaFinalizada={emitirNotaVendaFinalizada}
-          mudarStatusParaAberta={mudarStatusParaAberta}
-          habilitarEdicao={habilitarEdicao}
-          onAbrirCadastroCliente={() => setMostrarModalCliente(true)}
-          onAbrirHistoricoCliente={() => setMostrarHistoricoCliente(true)}
-          onAbrirModalAdicionarCredito={() =>
-            setMostrarModalAdicionarCredito(true)
-          }
-          onAbrirVendasEmAberto={() => setMostrarVendasEmAberto(true)}
-          buscarCliente={buscarCliente}
-          buscarClientePorCodigoExato={buscarClientePorCodigoExato}
-          clientesSugeridos={clientesSugeridos}
-          copiadoClienteCampo={copiadoClienteCampo}
-          onBuscarClienteChange={setBuscarCliente}
-          onCopiarCampoCliente={copiarCampoCliente}
-          onRemoverCliente={limparClienteSelecionado}
-          onSelecionarCliente={selecionarCliente}
-          onSelecionarPet={selecionarPet}
-          saldoCampanhas={saldoCampanhas}
-          vendasEmAbertoInfo={vendasEmAbertoInfo}
-          buscaProduto={buscaProduto}
-          buscaProdutoContainerRef={buscaProdutoContainerRef}
-          copiadoCodigoItem={copiadoCodigoItem}
-          inputProdutoRef={inputProdutoRef}
-          itensKitExpandidos={itensKitExpandidos}
-          mostrarSugestoesProduto={mostrarSugestoesProduto}
-          onAbrirModalDescontoItem={abrirModalDescontoItem}
-          onAdicionarNaListaEsperaRapido={adicionarNaListaEsperaRapido}
-          onAlterarQuantidade={alterarQuantidade}
-          onAtualizarPetItem={atualizarPetDoItem}
-          onAtualizarQuantidadeItem={atualizarQuantidadeItem}
-          onBuscarProdutoChange={handleBuscarProdutoChange}
-          onBuscarProdutoFocus={handleBuscarProdutoFocus}
-          onBuscarProdutoKeyDown={handleBuscarProdutoKeyDown}
-          onCopiarCodigoProdutoCarrinho={copiarCodigoProdutoCarrinho}
-          onRemoverItem={removerItem}
-          onSelecionarProdutoSugerido={selecionarProdutoSugerido}
-          onToggleKitExpansion={toggleKitExpansion}
-          pendenciasProdutoIds={pendenciasProdutoIds}
-          produtosSugeridos={produtosSugeridos}
-          onObservacoesChange={(observacoes) =>
-            setVendaAtual({
-              ...vendaAtual,
-              observacoes,
-            })
-          }
-          entregadorSelecionado={entregadorSelecionado}
-          entregadores={entregadores}
-          onAbrirModalEndereco={abrirModalEndereco}
-          onEnderecoEntregaChange={handleEnderecoEntregaChange}
-          onObservacoesEntregaChange={handleObservacoesEntregaChange}
-          onSelecionarEndereco={handleSelecionarEnderecoEntrega}
-          onSelecionarEntregador={handleSelecionarEntregador}
-          onTaxaEntregaTotalChange={handleTaxaEntregaTotalChange}
-          onTaxaEntregadorChange={handleTaxaEntregadorChange}
-          onTaxaLojaChange={handleTaxaLojaChange}
-          onToggleTemEntrega={handleToggleTemEntrega}
-          alertasCarrinho={alertasCarrinho}
-          codigoCupom={codigoCupom}
-          cupomAplicado={cupomAplicado}
-          erroCupom={erroCupom}
-          loadingCupom={loadingCupom}
-          onAbrirModalDescontoTotal={abrirModalDescontoTotal}
-          onAplicarCupom={aplicarCupom}
-          onCodigoCupomChange={handleCodigoCupomChange}
-          onCodigoCupomKeyDown={handleCodigoCupomKeyDown}
-          onRemoverCupom={removerCupom}
-          onRemoverDescontoTotal={removerDescontoTotal}
-          totalImpostos={totalImpostos}
-          buscaFuncionario={buscaFuncionario}
-          funcionarioComissao={funcionarioComissao}
-          funcionariosSugeridos={funcionariosSugeridos}
-          onBuscaFuncionarioChange={handleBuscaFuncionarioChange}
-          onBuscaFuncionarioFocus={handleBuscaFuncionarioFocus}
-          onRemoverFuncionario={handleRemoverFuncionarioComissao}
-          onSelecionarFuncionario={handleSelecionarFuncionarioComissao}
-          onToggleVendaComissionada={handleToggleVendaComissionada}
-          vendaComissionada={vendaComissionada}
-          onNovaVenda={handleNovaVenda}
-        />
-
-        <PDVOverlays
-          vendaAtual={vendaAtual}
-          painelClienteAberto={painelClienteAberto}
-          setPainelClienteAberto={setPainelClienteAberto}
-          painelVendasAberto={painelVendasAberto}
-          setPainelVendasAberto={setPainelVendasAberto}
-          filtroVendas={filtroVendas}
-          setFiltroVendas={setFiltroVendas}
-          filtroStatus={filtroStatus}
-          setFiltroStatus={setFiltroStatus}
-          filtroTemEntrega={filtroTemEntrega}
-          setFiltroTemEntrega={setFiltroTemEntrega}
-          buscaNumeroVenda={buscaNumeroVenda}
-          setBuscaNumeroVenda={setBuscaNumeroVenda}
-          vendasRecentes={vendasRecentes}
-          reabrirVenda={reabrirVenda}
-          confirmandoRetirada={confirmandoRetirada}
-          abrirConfirmacaoRetirada={abrirConfirmacaoRetirada}
-          confirmarRetirada={confirmarRetirada}
-          setConfirmandoRetirada={setConfirmandoRetirada}
-          painelOportunidadesAberto={painelOportunidadesAberto}
-          setPainelOportunidadesAberto={setPainelOportunidadesAberto}
-          opportunities={opportunities}
-          adicionarOportunidadeAoCarrinho={adicionarOportunidadeAoCarrinho}
-          buscarAlternativaOportunidade={buscarAlternativaOportunidade}
-          ignorarOportunidade={ignorarOportunidade}
-          painelAssistenteAberto={painelAssistenteAberto}
-          setPainelAssistenteAberto={setPainelAssistenteAberto}
-          mensagensAssistente={mensagensAssistente}
-          enviandoAssistente={enviandoAssistente}
-          chatAssistenteEndRef={chatAssistenteEndRef}
-          inputAssistente={inputAssistente}
-          setInputAssistente={setInputAssistente}
-          enviarMensagemAssistente={enviarMensagemAssistente}
-          carregandoAnalise={carregandoAnalise}
-          dadosAnalise={dadosAnalise}
-          enderecoAtual={enderecoAtual}
-          itemEditando={itemEditando}
-          loadingCep={loadingCep}
-          mostrarAnaliseVenda={mostrarAnaliseVenda}
-          mostrarCalculadoraRacao={mostrarCalculadoraRacao}
-          mostrarHistoricoCliente={mostrarHistoricoCliente}
-          mostrarModalAbrirCaixa={mostrarModalAbrirCaixa}
-          mostrarModalAdicionarCredito={mostrarModalAdicionarCredito}
-          mostrarModalCliente={mostrarModalCliente}
-          mostrarModalDescontoItem={mostrarModalDescontoItem}
-          mostrarModalDescontoTotal={mostrarModalDescontoTotal}
-          mostrarModalEndereco={mostrarModalEndereco}
-          mostrarModalPagamento={mostrarModalPagamento}
-          mostrarPendenciasEstoque={mostrarPendenciasEstoque}
-          mostrarVendasEmAberto={mostrarVendasEmAberto}
-          podeVerMargem={podeVerMargem}
-          racaoIdFechada={racaoIdFechada}
-          setTipoDescontoTotal={setTipoDescontoTotal}
-          setValorDescontoTotal={setValorDescontoTotal}
-          tipoDescontoTotal={tipoDescontoTotal}
-          valorDescontoTotal={valorDescontoTotal}
-          onAbrirCaixaSucesso={handleAbrirCaixaSucesso}
-          onAnalisarVenda={
-            podeVerMargem ? analisarVendaComFormasPagamento : null
-          }
-          onAplicarDescontoTotal={aplicarDescontoTotal}
-          onBuscarCep={buscarCepModal}
-          onChangeEnderecoAtual={setEnderecoAtual}
-          onChangeItemEditando={setItemEditando}
-          onClienteCriado={handleClienteCriadoRapido}
-          onCloseAnalise={() => setMostrarAnaliseVenda(false)}
-          onCloseCalculadoraRacao={fecharCalculadoraRacao}
-          onCloseHistoricoCliente={() => setMostrarHistoricoCliente(false)}
-          onCloseModalAbrirCaixa={() => setMostrarModalAbrirCaixa(false)}
-          onCloseModalAdicionarCredito={() =>
-            setMostrarModalAdicionarCredito(false)
-          }
-          onCloseModalCliente={() => setMostrarModalCliente(false)}
-          onCloseModalDescontoItem={() => setMostrarModalDescontoItem(false)}
-          onCloseModalDescontoTotal={() => setMostrarModalDescontoTotal(false)}
-          onCloseModalEndereco={fecharModalEndereco}
-          onCloseModalPagamento={() => setMostrarModalPagamento(false)}
-          onClosePendenciasEstoque={() => setMostrarPendenciasEstoque(false)}
-          onCloseVendasEmAberto={() => setMostrarVendasEmAberto(false)}
-          onConfirmarCredito={handleConfirmarCreditoCliente}
-          onConfirmarPagamento={handleConfirmarPagamento}
-          onPendenciaAdicionada={carregarPendencias}
-          onRemoverItemEditando={removerItemEditando}
-          onSalvarDescontoItem={salvarDescontoItem}
-          onSalvarEndereco={salvarEnderecoNoCliente}
-          onVendaAtualizada={handleVendaAtualizadaAposPagamento}
-          onVendasEmAbertoSucesso={handleVendasEmAbertoSucesso}
-        />
+      <PDVDriveAlertBanner {...driveAlertProps} />
+      <div className="flex h-screen bg-gray-50" style={containerStyle}>
+        <PDVMainArea {...mainAreaProps} />
+        <PDVOverlays {...overlayProps} />
       </div>
     </>
   );

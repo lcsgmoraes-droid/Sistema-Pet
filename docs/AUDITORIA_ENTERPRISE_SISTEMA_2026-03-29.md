@@ -668,6 +668,10 @@ Itens executados nesta etapa:
   - `frontend/src/hooks/usePDVComissao.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
   - a busca e sugestao de funcionarios foi movida para `frontend/src/hooks/usePDVFuncionariosBusca.js`
   - o estado derivado de comissao e a sincronizacao com a venda foram movidos para `frontend/src/hooks/usePDVComissaoEstado.js`
+- [x] fazer a reducao final de orquestracao do PDV antes de migrar para outro modulo:
+  - a montagem de props de `PDVDriveAlertBanner`, `PDVMainArea` e `PDVOverlays` foi movida para `frontend/src/hooks/usePDVPageComposition.js`
+  - `PDV.jsx` ficou concentrado na inicializacao dos hooks de dominio e na composicao final da pagina
+  - a proxima frente principal de decomposicao recomendada passa a ser `ProdutosNovo.jsx`
 
 Itens deliberadamente adiados por agora:
 
@@ -677,8 +681,8 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar quebrando os hooks residuais do PDV, com foco em normalizar contratos entre hooks de composicao e reduzir props drilling em `PDVMainArea.jsx` e `PDVOverlays.jsx`
-- [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
+- [ ] iniciar a decomposicao de `ProdutosNovo.jsx` em feature folders menores
+- [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
 - [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
