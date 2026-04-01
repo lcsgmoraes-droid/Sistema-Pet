@@ -672,6 +672,10 @@ Itens executados nesta etapa:
   - a montagem de props de `PDVDriveAlertBanner`, `PDVMainArea` e `PDVOverlays` foi movida para `frontend/src/hooks/usePDVPageComposition.js`
   - `PDV.jsx` ficou concentrado na inicializacao dos hooks de dominio e na composicao final da pagina
   - a proxima frente principal de decomposicao recomendada passa a ser `ProdutosNovo.jsx`
+- [x] iniciar a decomposicao de `ProdutosNovo.jsx` pelo carregamento e fiscal:
+  - a logica de carregar dados auxiliares, opcoes de racao, produto, predecessor/sucessor, imagens, lotes e fornecedores foi movida para `frontend/src/hooks/useProdutosNovoCarregamento.js`
+  - o carregamento e a persistencia fiscal passaram a sair da pagina e ficar concentrados no mesmo hook
+  - `ProdutosNovo.jsx` caiu de `4039` para `3761` linhas sem mudar a interface da tela
 
 Itens deliberadamente adiados por agora:
 
@@ -681,7 +685,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] iniciar a decomposicao de `ProdutosNovo.jsx` em feature folders menores
+- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de lotes, imagens, fornecedores e kit
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida

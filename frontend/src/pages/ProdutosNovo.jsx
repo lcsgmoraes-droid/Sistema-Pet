@@ -4,15 +4,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
+import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
 import {
-  getProduto,
   createProduto,
   updateProduto,
   deleteProduto,
   getProdutoVariacoes,
-  getCategorias,
-  getMarcas,
-  getDepartamentos,
   gerarSKU,
   gerarCodigoBarras,
   getLotes,
@@ -234,14 +231,29 @@ export default function ProdutosNovo() {
     e_principal: false,
   });
 
-  // Carregar dados iniciais
-  useEffect(() => {
-    carregarDadosAuxiliares();
-    
-    if (isEdicao) {
-      carregarProduto();
-    }
-  }, [id]);
+  const { salvarFiscal } = useProdutosNovoCarregamento({
+    id,
+    isEdicao,
+    formData,
+    setCategorias,
+    setCategoriasHierarquicas,
+    setMarcas,
+    setDepartamentos,
+    setClientes,
+    setOpcoesLinhas,
+    setOpcoesPortes,
+    setOpcoesFases,
+    setOpcoesTratamentos,
+    setOpcoesSabores,
+    setOpcoesApresentacoes,
+    setLoading,
+    setFormData,
+    setPredecessorInfo,
+    setSucessorInfo,
+    setImagens,
+    setLotes,
+    setFornecedores,
+  });
   
   // Auto-detectar "ração" no nome do produto
   useEffect(() => {
@@ -288,296 +300,6 @@ export default function ProdutosNovo() {
       setVariacoes(response.data);
     } catch (error) {
       console.error('Erro ao carregar variações:', error);
-    }
-  };
-
-  const carregarDadosAuxiliares = async () => {
-    try {
-      const [catRes, marcRes, depRes, cliRes] = await Promise.all([
-        getCategorias(),
-        getMarcas(),
-        getDepartamentos(),
-        api.get('/clientes/', { params: { tipo_cadastro: 'fornecedor', apenas_ativos: true } }),
-      ]);
-      setCategorias(catRes.data);
-      
-      // Construir lista hierárquica para o select
-      const hierarquica = construirListaHierarquica(catRes.data);
-      setCategoriasHierarquicas(hierarquica);
-      
-      setMarcas(marcRes.data);
-      setDepartamentos(depRes.data);
-      setClientes(Array.isArray(cliRes.data) ? cliRes.data : (cliRes.data.items || []));
-      
-      // Carregar opções de ração
-      carregarOpcoesRacao();
-    } catch (error) {
-      console.error('Erro ao carregar dados auxiliares:', error);
-    }
-  };
-  
-  // Carregar opções dinâmicas de ração das APIs
-  const carregarOpcoesRacao = async () => {
-    try {
-      const [linhas, portes, fases, tratamentos, sabores, apresentacoes] = await Promise.all([
-        api.get('/opcoes-racao/linhas', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/portes', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/fases', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/tratamentos', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/sabores', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/apresentacoes', { params: { apenas_ativos: true } }),
-      ]);
-      
-      setOpcoesLinhas(linhas.data);
-      setOpcoesPortes(portes.data);
-      setOpcoesFases(fases.data);
-      setOpcoesTratamentos(tratamentos.data);
-      setOpcoesSabores(sabores.data);
-      setOpcoesApresentacoes(apresentacoes.data);
-    } catch (error) {
-      console.error('Erro ao carregar opções de ração:', error);
-    }
-  };
-  
-  // Função para construir lista hierárquica de categorias para o select
-  const construirListaHierarquica = (cats, parentId = null, nivel = 0) => {
-    let resultado = [];
-    
-    const filhos = cats.filter(c => c.categoria_pai_id === parentId);
-    
-    filhos.forEach((cat) => {
-      // Usar espaços não-quebráveis (\u00a0) e seta para indicar nível
-      const indentacao = '\u00a0\u00a0\u00a0\u00a0'.repeat(nivel); // 4 espaços não-quebráveis por nível
-      const seta = nivel > 0 ? '→ ' : '';
-      
-      resultado.push({
-        ...cat,
-        nomeFormatado: indentacao + seta + cat.nome,
-        nivel
-      });
-      
-      // Recursão para filhos
-      const subFilhos = construirListaHierarquica(cats, cat.id, nivel + 1);
-      resultado = resultado.concat(subFilhos);
-    });
-    
-    return resultado;
-  };
-
-  const carregarProduto = async () => {
-    try {
-      setLoading(true);
-      
-      // 🧹 Limpar estados de predecessor/sucessor ao carregar novo produto
-      setPredecessorInfo(null);
-      setSucessorInfo(null);
-      
-      const response = await getProduto(id);
-      const produto = response.data;
-      
-      // Calcular markup baseado nos preços salvos
-      let markup = '';
-      if (produto.preco_custo && produto.preco_venda && produto.preco_custo > 0) {
-        markup = calcularMarkup(produto.preco_custo, produto.preco_venda).toFixed(2);
-      }
-      
-      // Preencher formulário
-      setFormData({
-        ...produto,
-        sku: produto.codigo || '', // Mapear codigo para sku
-        codigo: produto.codigo || '',
-        nome: produto.nome || '',
-        codigo_barras: produto.codigo_barras || '',
-        categoria_id: produto.categoria_id || '',
-        marca_id: produto.marca_id || '',
-        departamento_id: produto.departamento_id || '',
-        unidade: produto.unidade || 'UN',
-        descricao: produto.descricao_curta || '',
-        tipo: produto.tipo || 'produto',
-        preco_custo: produto.preco_custo || '',
-        preco_venda: produto.preco_venda || '',
-        preco_promocional: produto.preco_promocional || '',
-        data_inicio_promocao: produto.promocao_inicio || '',
-        data_fim_promocao: produto.promocao_fim || '',
-        preco_ecommerce: produto.preco_ecommerce ?? '',
-        preco_ecommerce_promo: produto.preco_ecommerce_promo ?? '',
-        preco_ecommerce_promo_inicio: produto.preco_ecommerce_promo_inicio ?? '',
-        preco_ecommerce_promo_fim: produto.preco_ecommerce_promo_fim ?? '',
-        preco_app: produto.preco_app ?? '',
-        preco_app_promo: produto.preco_app_promo ?? '',
-        preco_app_promo_inicio: produto.preco_app_promo_inicio ?? '',
-        preco_app_promo_fim: produto.preco_app_promo_fim ?? '',
-        estoque_minimo: produto.estoque_minimo || '',
-        estoque_maximo: produto.estoque_maximo || '',
-        controle_lote: produto.controle_lote ?? true,
-        markup: markup, // Adicionar markup calculado
-        // Sprint 2: Tipo de produto e composição
-        tipo_produto: produto.tipo_produto || 'SIMPLES',
-        produto_pai_id: produto.produto_pai_id || null,
-        tipo_kit: produto.tipo_kit || null, // VARIACAO pode ser KIT
-        e_kit_fisico: produto.e_kit_fisico || false,
-        composicao_kit: produto.composicao_kit || [],
-        // Tributação
-        origem: produto.origem || '0',
-        ncm: produto.ncm || '',
-        cest: produto.cest || '',
-        cfop: produto.cfop || '',
-        aliquota_icms: produto.aliquota_icms || '',
-        aliquota_pis: produto.aliquota_pis || '',
-        aliquota_cofins: produto.aliquota_cofins || '',
-        // Garantir campos de recorrência sempre definidos
-        tem_recorrencia: produto.tem_recorrencia || false,
-        tipo_recorrencia: produto.tipo_recorrencia || 'monthly',
-        intervalo_dias: produto.intervalo_dias || '',
-        numero_doses: produto.numero_doses || '',
-        especie_compativel: produto.especie_compativel || 'both',
-        observacoes_recorrencia: produto.observacoes_recorrencia || '',
-        // Ração - Calculadora (Fase 2)
-        classificacao_racao: produto.classificacao_racao || '',
-        peso_embalagem: produto.peso_embalagem || '',
-        tabela_nutricional: produto.tabela_nutricional || '',
-        tabela_consumo: produto.tabela_consumo || '',
-        categoria_racao: produto.categoria_racao || '',
-        especies_indicadas: produto.especies_indicadas || 'both',
-        
-        // Opções de Ração - Sistema Dinâmico
-        linha_racao_id: produto.linha_racao_id || '',
-        porte_animal_id: produto.porte_animal_id || '',
-        fase_publico_id: produto.fase_publico_id || '',
-        tipo_tratamento_id: produto.tipo_tratamento_id || '',
-        sabor_proteina_id: produto.sabor_proteina_id || '',
-        apresentacao_peso_id: produto.apresentacao_peso_id || '',
-      });
-
-      // 🔗 Carregar informações do predecessor
-      if (produto.produto_predecessor_id) {
-        try {
-          const predecessorRes = await getProduto(produto.produto_predecessor_id);
-          setPredecessorInfo({
-            id: predecessorRes.data.id,
-            codigo: predecessorRes.data.codigo,
-            nome: predecessorRes.data.nome,
-            motivo_descontinuacao: produto.motivo_descontinuacao,
-            data_descontinuacao: produto.predecessor?.data_descontinuacao
-          });
-        } catch (error) {
-          console.error('Erro ao carregar predecessor:', error);
-        }
-      }
-
-      // 🔗 Carregar informações do sucessor (se produto foi descontinuado)
-      if (produto.data_descontinuacao) {
-        try {
-          // Buscar produtos que têm este como predecessor
-          const response = await api.get('/produtos/', {
-            params: { 
-              produto_predecessor_id: produto.id,
-              ativo: null // Incluir ativos e inativos
-            }
-          });
-          
-          // A API pode retornar um array direto ou um objeto paginado
-          const sucessores = Array.isArray(response.data) ? response.data : (response.data.items || []);
-          
-          if (sucessores && sucessores.length > 0) {
-            const sucessor = sucessores[0];
-            setSucessorInfo({
-              id: sucessor.id,
-              codigo: sucessor.codigo,
-              nome: sucessor.nome,
-              motivo_descontinuacao: produto.motivo_descontinuacao,
-              data_descontinuacao: produto.data_descontinuacao
-            });
-          }
-        } catch (error) {
-          console.error('❌ Erro ao carregar sucessor:', error);
-        }
-      }
-
-      // Carregar imagens do endpoint específico
-      try {
-        const imagensRes = await api.get(`/produtos/${id}/imagens`);
-        setImagens(imagensRes.data || []);
-      } catch (error) {
-        console.error('Erro ao carregar imagens:', error);
-        setImagens([]);
-      }
-
-      // Carregar lotes mesmo se o flag antigo ainda estiver desligado.
-      try {
-        const lotesRes = await getLotes(id);
-        const lotesCarregados = lotesRes.data || [];
-        setLotes(lotesCarregados);
-        if (lotesCarregados.length > 0 && !produto.controle_lote) {
-          setFormData(prev => ({ ...prev, controle_lote: true }));
-        }
-      } catch (error) {
-        console.error('Erro ao carregar lotes:', error);
-        setLotes([]);
-      }
-
-      // Carregar fornecedores
-      const fornRes = await getFornecedoresProduto(id);
-      setFornecedores(fornRes.data);
-
-      // 📦 FISCAL V2: Carregar dados fiscais
-      await carregarFiscal(produto);
-    } catch (error) {
-      console.error('❌ Erro ao carregar produto:', error);
-      alert('Erro ao carregar produto: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 📦 FISCAL V2: Carregar dados fiscais
-  const carregarFiscal = async (produto) => {
-    try {
-      const isKit = produto.tipo_produto === 'KIT';
-
-      const { data } = isKit
-        ? await api.get(`/produtos/${produto.id}/kit/fiscal`)
-        : await api.get(`/produtos/${produto.id}/fiscal`);
-
-      setFormData((prev) => ({
-        ...prev,
-        tributacao: {
-          origem: data.origem,
-          herdado_da_empresa: data.herdado_da_empresa,
-          origem_mercadoria: data.origem_mercadoria ?? '0',
-          ncm: data.ncm ?? '',
-          cest: data.cest ?? '',
-          cfop: data.cfop ?? '',
-          cst_icms: data.cst_icms ?? '',
-          icms_aliquota: data.icms_aliquota ?? '',
-          icms_st: data.icms_st ?? false,
-          pis_aliquota: data.pis_aliquota ?? '',
-          cofins_aliquota: data.cofins_aliquota ?? '',
-        },
-      }));
-    } catch (e) {
-      console.error('Erro ao carregar fiscal:', e);
-    }
-  };
-
-  // 💾 FISCAL V2: Salvar dados fiscais
-  const salvarFiscal = async (produto) => {
-    const payload = {
-      origem_mercadoria: formData.tributacao.origem_mercadoria,
-      ncm: formData.tributacao.ncm,
-      cest: formData.tributacao.cest,
-      cfop: formData.tributacao.cfop,
-      cst_icms: formData.tributacao.cst_icms,
-      icms_aliquota: formData.tributacao.icms_aliquota,
-      icms_st: formData.tributacao.icms_st,
-      pis_aliquota: formData.tributacao.pis_aliquota,
-      cofins_aliquota: formData.tributacao.cofins_aliquota,
-    };
-
-    if (produto.tipo_produto === 'KIT') {
-      await api.put(`/produtos/${produto.id}/kit/fiscal`, payload);
-    } else {
-      await api.put(`/produtos/${produto.id}/fiscal`, payload);
     }
   };
 
