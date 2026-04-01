@@ -655,6 +655,10 @@ Itens executados nesta etapa:
   - `frontend/src/hooks/usePDVVendaAtual.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
   - a logica de carregar, buscar e reabrir venda foi movida para `frontend/src/hooks/usePDVVendaCarregamento.js`
   - as acoes locais de limpar venda e abrir o modal de pagamento foram movidas para `frontend/src/hooks/usePDVVendaAcoes.js`
+- [x] continuar quebrando os hooks mais pesados do PDV pelo fluxo de cliente:
+  - `frontend/src/hooks/usePDVCliente.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
+  - o estado derivado do cliente atual, vendas em aberto, saldo de campanhas e copia de dados foram movidos para `frontend/src/hooks/usePDVClienteContexto.js`
+  - a busca de clientes, sugestoes e selecao do cliente foram movidas para `frontend/src/hooks/usePDVClienteBusca.js`
 
 Itens deliberadamente adiados por agora:
 
@@ -664,7 +668,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar quebrando os hooks mais pesados do PDV, com foco em `usePDVDescontos.js` e `usePDVCliente.js`
+- [ ] continuar quebrando os hooks mais pesados do PDV, com foco em `usePDVDescontos.js` e `usePDVComissao.js`
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
