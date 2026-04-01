@@ -1,16 +1,15 @@
-// ⚠️ ARQUIVO CRÍTICO DE PRODUÇÃO
-// Este arquivo impacta diretamente operações reais (PDV / Financeiro / Estoque).
-// NÃO alterar sem:
+﻿// âš ï¸ ARQUIVO CRÃTICO DE PRODUÃ‡ÃƒO
+// Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
+// NÃƒO alterar sem:
 // 1. Entender o fluxo completo
-// 2. Testar cenário real
+// 2. Testar cenÃ¡rio real
 // 3. Validar impacto financeiro
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
-import { getProdutosVendaveis } from "../api/produtos";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
@@ -35,6 +34,7 @@ import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVDescontos } from "../hooks/usePDVDescontos";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
+import { usePDVProdutos } from "../hooks/usePDVProdutos";
 import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
 import { usePDVVendasRecentes } from "../hooks/usePDVVendasRecentes";
 import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
@@ -60,7 +60,7 @@ export default function PDV() {
   const { user } = useAuth();
   const { iniciarTour } = useTour("pdv", tourPDV, { delay: 1200 });
 
-  // 🔒 Controle de visibilidade de dados gerenciais (lucro, margem, custos)
+  // ðŸ”’ Controle de visibilidade de dados gerenciais (lucro, margem, custos)
   const podeVerMargem = user?.is_admin === true;
 
   // Estado da venda atual
@@ -73,8 +73,8 @@ export default function PDV() {
     desconto_percentual: 0,
     total: 0,
     observacoes: "",
-    funcionario_id: null, // ✅ Funcionário para comissão
-    entregador_id: null, // 🚚 Entregador para entrega
+    funcionario_id: null, // âœ… FuncionÃ¡rio para comissÃ£o
+    entregador_id: null, // ðŸšš Entregador para entrega
     tem_entrega: false,
     entrega: {
       endereco_completo: "",
@@ -85,11 +85,6 @@ export default function PDV() {
     },
   });
 
-  // Estados de busca
-  const [buscarProduto, setBuscarProduto] = useState("");
-  const [produtosSugeridos, setProdutosSugeridos] = useState([]);
-  const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
-
   // Estados de UI
   const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
   const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
@@ -98,7 +93,6 @@ export default function PDV() {
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
     useState(false);
-  const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
     useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
@@ -106,20 +100,17 @@ export default function PDV() {
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [searchVendaQuery, setSearchVendaQuery] = useState("");
-  const [caixaKey, setCaixaKey] = useState(0); // Para forçar recarga do MenuCaixa
+  const [caixaKey, setCaixaKey] = useState(0); // Para forÃ§ar recarga do MenuCaixa
   const [temCaixaAberto, setTemCaixaAberto] = useState(false);
 
-  // Estados do modal de endereço
+  // Estados do modal de endereÃ§o
   const [mostrarModalEndereco, setMostrarModalEndereco] = useState(false);
   const [enderecoAtual, setEnderecoAtual] = useState(null);
   const [loadingCep, setLoadingCep] = useState(false);
 
-  // Estados do drawer de análise de venda
+  // Estados do drawer de anÃ¡lise de venda
 
-  // Estado para controlar expansão de itens KIT no carrinho
-  const [itensKitExpandidos, setItensKitExpandidos] = useState({});
-
-  // Estados de controle de painéis laterais (UX - FASE 1)
+  // Estados de controle de painÃ©is laterais (UX - FASE 1)
   const [painelVendasAberto, setPainelVendasAberto] =
     usePersistentBooleanState("pdv_painel_vendas_aberto", false);
 
@@ -166,23 +157,14 @@ export default function PDV() {
     fecharDriveAlert,
   } = usePDVVendasRecentes();
 
-  // 🆕 Estados fiscais do PDV (PDV-UX-01)
+  // ðŸ†• Estados fiscais do PDV (PDV-UX-01)
   const [fiscalItens, setFiscalItens] = useState({});
   const [totalImpostos, setTotalImpostos] = useState(0);
 
-  // 🆕 Estados para Calculadora de Ração no PDV
+  // ðŸ†• Estados para Calculadora de RaÃ§Ã£o no PDV
 const [mostrarCalculadoraRacao, setMostrarCalculadoraRacao] = useState(false);
-const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fechada (não reabre automático)
+const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o fechada (nÃ£o reabre automÃ¡tico)
 
-  // Refs
-  const inputProdutoRef = useRef(null);
-  const buscaProdutoContainerRef = useRef(null);
-  const ultimoAutoAddProdutoRef = useRef("");
-  const ultimoEventoTeclaProdutoMsRef = useRef(0);
-  const sequenciaRapidaProdutoRef = useRef(0);
-  const leituraScannerDetectadaRef = useRef(false);
-  const adicionandoProdutoPorEnterRef = useRef(false);
-  const buscaProdutoAtualRef = useRef("");
   const {
     painelAssistenteAberto,
     setPainelAssistenteAberto,
@@ -292,6 +274,32 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     setVendaAtual,
   });
   const {
+    buscaProduto,
+    buscaProdutoContainerRef,
+    copiadoCodigoItem,
+    inputProdutoRef,
+    itensKitExpandidos,
+    mostrarSugestoesProduto,
+    produtosSugeridos,
+    alterarQuantidade,
+    atualizarPetDoItem,
+    atualizarQuantidadeItem,
+    copiarCodigoProdutoCarrinho,
+    handleBuscarProdutoChange,
+    handleBuscarProdutoFocus,
+    handleBuscarProdutoKeyDown,
+    limparBuscaProduto,
+    removerItem,
+    selecionarProdutoSugerido,
+    toggleKitExpansion,
+  } = usePDVProdutos({
+    vendaAtual,
+    setVendaAtual,
+    modoVisualizacao,
+    temCaixaAberto,
+    recalcularTotais,
+  });
+  const {
     mostrarAnaliseVenda,
     setMostrarAnaliseVenda,
     dadosAnalise,
@@ -316,7 +324,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     carregarVendasRecentes: () => carregarVendasRecentes(),
   });
 
-  // Carregar pendências quando o cliente mudar
+  // Carregar pendÃªncias quando o cliente mudar
   useEffect(() => {
     if (vendaAtual.cliente) {
       carregarPendencias();
@@ -338,11 +346,11 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }, [vendaAtual.itens, vendaAtual.cliente]);
 
-  // Verificar se há caixa aberto
+  // Verificar se hÃ¡ caixa aberto
   useEffect(() => {
     verificarCaixaAberto();
 
-    // 🔄 Verificar caixa a cada 30 segundos (polling)
+    // ðŸ”„ Verificar caixa a cada 30 segundos (polling)
     const intervalId = setInterval(() => {
       verificarCaixaAberto();
     }, 30000); // 30 segundos
@@ -353,13 +361,13 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
   const verificarCaixaAberto = async () => {
     try {
       const response = await api.get("/caixas/aberto");
-      setTemCaixaAberto(!!response.data); // true se houver caixa, false se não
+      setTemCaixaAberto(!!response.data); // true se houver caixa, false se nÃ£o
     } catch (error) {
       setTemCaixaAberto(false);
     }
   };
 
-  // Adicionar produto à lista de espera direto da busca (estoque zerado)
+  // Adicionar produto Ã  lista de espera direto da busca (estoque zerado)
   const adicionarNaListaEsperaRapido = async (produto, e) => {
     e.stopPropagation();
     if (!vendaAtual.cliente) {
@@ -374,18 +382,17 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         prioridade: 1,
         observacoes: null,
       });
-      toast.success(`"${produto.nome}" adicionado à lista de espera!`);
-      setBuscarProduto("");
-      setProdutosSugeridos([]);
+      toast.success(`"${produto.nome}" adicionado Ã  lista de espera!`);
+      limparBuscaProduto();
       carregarPendencias();
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Erro ao adicionar à lista de espera",
+        error.response?.data?.detail || "Erro ao adicionar Ã  lista de espera",
       );
     }
   };
 
-  // Carregar pendências de estoque do cliente
+  // Carregar pendÃªncias de estoque do cliente
   const carregarPendencias = async () => {
     if (!vendaAtual.cliente) {
       setPendenciasCount(0);
@@ -408,7 +415,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   };
 
-  // 🆕 Função para calcular fiscal de um item (PDV-UX-01)
+  // ðŸ†• FunÃ§Ã£o para calcular fiscal de um item (PDV-UX-01)
   async function calcularFiscalItem(item) {
     try {
       const payload = {
@@ -425,7 +432,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }
 
-  // 🆕 Recalcular fiscal sempre que o carrinho mudar (PDV-UX-01)
+  // ðŸ†• Recalcular fiscal sempre que o carrinho mudar (PDV-UX-01)
   useEffect(() => {
     async function recalcularFiscal() {
       let impostosTotais = 0;
@@ -451,7 +458,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }, [vendaAtual.itens]);
 
-  // Carregar venda específica se vier na URL
+  // Carregar venda especÃ­fica se vier na URL
   useEffect(() => {
     const vendaId =
       searchParams.get("venda") ||
@@ -468,7 +475,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }, [destaqueAbrirCaixa, temCaixaAberto, mostrarModalAbrirCaixa]);
 
-  // 🆕 DETECTAR REDIRECIONAMENTO DO CONTAS A RECEBER
+  // ðŸ†• DETECTAR REDIRECIONAMENTO DO CONTAS A RECEBER
   useEffect(() => {
     const vendaId = sessionStorage.getItem("abrirVenda");
     const abrirModal = sessionStorage.getItem("abrirModalPagamento");
@@ -483,7 +490,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }, []);
 
-  // Funções do modal de endereço
+  // FunÃ§Ãµes do modal de endereÃ§o
   const abrirModalEnderecoPDV = () => {
     setEnderecoAtual({
       tipo: "entrega",
@@ -515,7 +522,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       const data = await response.json();
 
       if (data.erro) {
-        alert("CEP não encontrado");
+        alert("CEP nÃ£o encontrado");
         return;
       }
 
@@ -540,7 +547,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       !enderecoAtual.endereco ||
       !enderecoAtual.cidade
     ) {
-      alert("Preencha pelo menos CEP, Endereço e Cidade");
+      alert("Preencha pelo menos CEP, EndereÃ§o e Cidade");
       return;
     }
 
@@ -553,7 +560,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       // Buscar dados atuais do cliente
       const clienteAtual = await buscarClientePorId(vendaAtual.cliente.id);
 
-      // Adicionar novo endereço ao array de enderecos_adicionais
+      // Adicionar novo endereÃ§o ao array de enderecos_adicionais
       const enderecosAdicionais = clienteAtual.enderecos_adicionais || [];
       enderecosAdicionais.push({ ...enderecoAtual });
 
@@ -570,11 +577,11 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         cliente: clienteAtualizado,
       });
 
-      alert("Endereço adicionado com sucesso!");
+      alert("EndereÃ§o adicionado com sucesso!");
       fecharModalEndereco();
     } catch (error) {
-      console.error("Erro ao salvar endereço:", error);
-      alert("Erro ao salvar endereço. Tente novamente.");
+      console.error("Erro ao salvar endereÃ§o:", error);
+      alert("Erro ao salvar endereÃ§o. Tente novamente.");
     }
   };
 
@@ -588,339 +595,13 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
 
   // carregarVendaEspecifica e handleBuscarVenda movidos para usePDVVendaAtual
 
-  // Buscar produtos
-  useEffect(() => {
-    const termoAtual = String(buscarProduto || "").trim();
-    buscaProdutoAtualRef.current = termoAtual;
 
-    if (termoAtual.length >= 2) {
-      setMostrarSugestoesProduto(true);
-      const timer = setTimeout(async () => {
-        try {
-          const response = await getProdutosVendaveis({ busca: termoAtual });
+  // fluxo de produtos movido para usePDVProdutos
 
-          // Evita reabrir sugestão com resposta atrasada após Enter/limpeza do campo
-          if (buscaProdutoAtualRef.current !== termoAtual) {
-            return;
-          }
-
-          const produtos = response.data.items || [];
-
-          const termo = termoAtual;
-          const termoLower = termo.toLowerCase();
-          const matchExato = produtos.find((p) => {
-            const codigo = String(p.codigo || "").toLowerCase();
-            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
-            return codigo === termoLower || codigoBarras === termoLower;
-          });
-
-          // Leitor costuma enviar Enter após o código; se encontrar match exato,
-          // adiciona direto no carrinho para não exigir clique manual.
-          if (
-            matchExato &&
-            ultimoAutoAddProdutoRef.current !== termoLower &&
-            leituraScannerDetectadaRef.current &&
-            !modoVisualizacao
-          ) {
-            ultimoAutoAddProdutoRef.current = termoLower;
-            adicionarProduto(matchExato);
-            leituraScannerDetectadaRef.current = false;
-            sequenciaRapidaProdutoRef.current = 0;
-            setMostrarSugestoesProduto(false);
-            return;
-          }
-
-          setProdutosSugeridos(produtos);
-        } catch (error) {
-          console.error("Erro ao buscar produtos:", error);
-          setProdutosSugeridos([]);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      ultimoAutoAddProdutoRef.current = "";
-      leituraScannerDetectadaRef.current = false;
-      sequenciaRapidaProdutoRef.current = 0;
-      setProdutosSugeridos([]);
-      setMostrarSugestoesProduto(false);
-    }
-  }, [buscarProduto, modoVisualizacao]);
-
-  useEffect(() => {
-    const handleCliqueFora = (event) => {
-      if (!buscaProdutoContainerRef.current) return;
-      if (!buscaProdutoContainerRef.current.contains(event.target)) {
-        setMostrarSugestoesProduto(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleCliqueFora);
-    return () => document.removeEventListener("mousedown", handleCliqueFora);
-  }, []);
-
-  function registrarPossivelLeituraScanner(evento) {
-    if (
-      evento.key.length !== 1 ||
-      evento.ctrlKey ||
-      evento.altKey ||
-      evento.metaKey
-    ) {
-      return;
-    }
-
-    const agora = Date.now();
-    const delta = agora - ultimoEventoTeclaProdutoMsRef.current;
-    ultimoEventoTeclaProdutoMsRef.current = agora;
-
-    if (delta > 0 && delta <= 45) {
-      sequenciaRapidaProdutoRef.current += 1;
-    } else {
-      sequenciaRapidaProdutoRef.current = 1;
-    }
-
-    // Leitores de código de barras digitam muito rápido; usuário no teclado não.
-    leituraScannerDetectadaRef.current = sequenciaRapidaProdutoRef.current >= 6;
-  }
-
-  async function adicionarProdutoViaEnter() {
-    const termo = String(buscarProduto || "").trim();
-    if (!termo || modoVisualizacao || adicionandoProdutoPorEnterRef.current) {
-      return;
-    }
-
-    adicionandoProdutoPorEnterRef.current = true;
-    try {
-      const termoLower = termo.toLowerCase();
-      let produtoSelecionado = null;
-
-      if (produtosSugeridos.length > 0) {
-        produtoSelecionado =
-          produtosSugeridos.find((p) => {
-            const codigo = String(p.codigo || "").toLowerCase();
-            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
-            return codigo === termoLower || codigoBarras === termoLower;
-          }) || produtosSugeridos[0];
-      }
-
-      if (!produtoSelecionado) {
-        const response = await getProdutosVendaveis({ busca: termo });
-        const produtos = response.data.items || [];
-        produtoSelecionado =
-          produtos.find((p) => {
-            const codigo = String(p.codigo || "").toLowerCase();
-            const codigoBarras = String(p.codigo_barras || "").toLowerCase();
-            return codigo === termoLower || codigoBarras === termoLower;
-          }) || produtos[0] || null;
-      }
-
-      if (produtoSelecionado) {
-        adicionarProduto(produtoSelecionado);
-      }
-    } catch (error) {
-      console.error("Erro ao adicionar produto via Enter:", error);
-    } finally {
-      leituraScannerDetectadaRef.current = false;
-      sequenciaRapidaProdutoRef.current = 0;
-      adicionandoProdutoPorEnterRef.current = false;
-    }
-  }
-
-  const copiarCodigoProdutoCarrinho = (codigo, chaveItem) => {
-    if (!codigo) return;
-    navigator.clipboard.writeText(String(codigo));
-    setCopiadoCodigoItem(chaveItem);
-    setTimeout(() => setCopiadoCodigoItem(""), 2000);
-  };
-
-  const handleBuscarProdutoChange = (valor) => {
-    setBuscarProduto(valor);
-    if (!String(valor || "").trim()) {
-      setProdutosSugeridos([]);
-      setMostrarSugestoesProduto(false);
-    }
-  };
-
-  const handleBuscarProdutoFocus = () => {
-    if (
-      String(buscarProduto || "").trim().length >= 2 &&
-      produtosSugeridos.length > 0
-    ) {
-      setMostrarSugestoesProduto(true);
-    }
-  };
-
-  const handleBuscarProdutoKeyDown = async (e) => {
-    registrarPossivelLeituraScanner(e);
-
-    if (e.key === "Enter") {
-      e.preventDefault();
-      await adicionarProdutoViaEnter();
-    }
-  };
-
-  const selecionarProdutoSugerido = (produto) => {
-    adicionarProduto(produto);
-    setMostrarSugestoesProduto(false);
-  };
-
-  // Adicionar produto ao carrinho
-  const adicionarProduto = (produto) => {
-    // 🔒 VALIDAÇÃO CRÍTICA: Verificar se tem caixa aberto ANTES de adicionar produto
-    if (!temCaixaAberto) {
-      alert(
-        "❌ Não é possível adicionar produtos sem caixa aberto. Abra um caixa primeiro.",
-      );
-      return;
-    }
-
-    debugLog("🛒 Produto sendo adicionado:", {
-      nome: produto.nome,
-      categoria_id: produto.categoria_id,
-      categoria_nome: produto.categoria_nome,
-      peso_embalagem: produto.peso_embalagem,
-      classificacao_racao: produto.classificacao_racao,
-    });
-
-    const itemExistente = vendaAtual.itens.find(
-      (item) => item.produto_id === produto.id,
-    );
-
-    let novosItens;
-    if (itemExistente) {
-      // Incrementar quantidade
-      novosItens = vendaAtual.itens.map((item) =>
-        item.produto_id === produto.id
-          ? {
-              ...item,
-              quantidade: item.quantidade + 1,
-              subtotal: (item.quantidade + 1) * item.preco_unitario,
-            }
-          : item,
-      );
-    } else {
-      // Adicionar novo item
-      novosItens = [
-        ...vendaAtual.itens,
-        {
-          tipo: "produto",
-          produto_id: produto.id,
-          produto_nome: produto.nome,
-          produto_codigo: produto.codigo || null,
-          quantidade: 1,
-          preco_unitario: parseFloat(produto.preco_venda),
-          desconto_item: 0,
-          subtotal: parseFloat(produto.preco_venda),
-          pet_id: vendaAtual.pet?.id || null, // Pet selecionado no topo (opcional)
-          // Adicionar informações do KIT
-          tipo_produto: produto.tipo_produto,
-          tipo_kit: produto.tipo_kit,
-          composicao_kit: produto.composicao_kit || [],
-          // 🆕 Adicionar dados necessários para calculadora de ração
-          categoria_id: produto.categoria_id,
-          categoria_nome: produto.categoria_nome,
-          peso_pacote_kg: produto.peso_liquido || produto.peso_bruto, // Usar peso do produto
-          // 🎯 CAMPO PRINCIPAL para identificação de ração (usado pela calculadora antiga)
-          peso_embalagem: produto.peso_embalagem,
-          classificacao_racao: produto.classificacao_racao,
-          estoque_atual: produto.estoque_atual,
-          estoque_virtual: produto.estoque_virtual,
-        },
-      ];
-    }
-
-    recalcularTotais(novosItens);
-    setBuscarProduto("");
-    setProdutosSugeridos([]);
-    setMostrarSugestoesProduto(false);
-    inputProdutoRef.current?.focus();
-
-    // ✅ ABERTURA AUTOMÁTICA DESATIVADA
-    // Modal agora abre apenas via botão flutuante (acionado manualmente)
-    // Conforme requisito: "NÃO abrir automaticamente ao adicionar item"
-  };
-
-  // Alterar quantidade
-  const alterarQuantidade = (index, delta) => {
-    const novosItens = vendaAtual.itens.map((item, i) => {
-      if (i === index) {
-        const novaQuantidade = Math.max(1, item.quantidade + delta);
-        const subtotalSemDesconto = novaQuantidade * item.preco_unitario;
-
-        let novoDescontoValor = item.desconto_valor || 0;
-
-        // 🆕 LÓGICA CORRIGIDA: Só recalcula se foi desconto PERCENTUAL
-        if (
-          item.tipo_desconto_aplicado === "percentual" &&
-          item.desconto_percentual > 0
-        ) {
-          // Desconto percentual: recalcular o valor baseado na nova quantidade
-          novoDescontoValor =
-            (subtotalSemDesconto * item.desconto_percentual) / 100;
-        }
-        // Se foi desconto em VALOR: mantém o desconto_valor fixo
-
-        const subtotalComDesconto = subtotalSemDesconto - novoDescontoValor;
-
-        return {
-          ...item,
-          quantidade: novaQuantidade,
-          desconto_valor: novoDescontoValor,
-          subtotal: subtotalComDesconto,
-        };
-      }
-      return item;
-    });
-    recalcularTotais(novosItens);
-  };
-
-  const atualizarQuantidadeItem = (index, novaQuantidade) => {
-    const novosItens = vendaAtual.itens.map((it, i) => {
-      if (i === index) {
-        const subtotalSemDesconto = novaQuantidade * it.preco_unitario;
-        let novoDescontoValor = it.desconto_valor || 0;
-
-        if (
-          it.tipo_desconto_aplicado === "percentual" &&
-          it.desconto_percentual > 0
-        ) {
-          novoDescontoValor =
-            (subtotalSemDesconto * it.desconto_percentual) / 100;
-        }
-
-        return {
-          ...it,
-          quantidade: novaQuantidade,
-          desconto_valor: novoDescontoValor,
-          subtotal: subtotalSemDesconto - novoDescontoValor,
-        };
-      }
-      return it;
-    });
-
-    recalcularTotais(novosItens);
-  };
-
-  const atualizarPetDoItem = (index, petId) => {
-    const novosItens = vendaAtual.itens.map((it, i) => {
-      if (i === index) {
-        return {
-          ...it,
-          pet_id: petId,
-        };
-      }
-      return it;
-    });
-
-    setVendaAtual({
-      ...vendaAtual,
-      itens: novosItens,
-    });
-  };
-
-  // 🥫 Abrir modal de calculadora de ração manualmente (via botão flutuante)
+  // ðŸ¥« Abrir modal de calculadora de raÃ§Ã£o manualmente (via botÃ£o flutuante)
   const abrirCalculadoraRacao = () => {
-    debugLog("🔍 Debug - Itens no carrinho:", vendaAtual.itens);
-    debugLog("🔍 Debug - Verificando rações...");
+    debugLog("ðŸ” Debug - Itens no carrinho:", vendaAtual.itens);
+    debugLog("ðŸ” Debug - Verificando raÃ§Ãµes...");
 
     vendaAtual.itens.forEach((item, index) => {
       debugLog(`  Item ${index + 1}: ${item.produto_nome}`);
@@ -928,37 +609,23 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
       debugLog(`    - classificacao_racao: ${item.classificacao_racao}`);
       debugLog(`    - categoria_id: ${item.categoria_id}`);
       debugLog(`    - categoria_nome: ${item.categoria_nome}`);
-      debugLog(`    - É ração?: ${ehRacao(item)}`);
+      debugLog(`    - Ã‰ raÃ§Ã£o?: ${ehRacao(item)}`);
     });
 
     const racoes = contarRacoes(vendaAtual.itens);
-    debugLog(`📊 Total de rações encontradas: ${racoes}`);
+    debugLog(`ðŸ“Š Total de raÃ§Ãµes encontradas: ${racoes}`);
 
     if (racoes === 0) {
-      toast.error("Nenhuma ração no carrinho");
+      toast.error("Nenhuma raÃ§Ã£o no carrinho");
       return;
     }
 
-    setRacaoIdFechada(null); // Limpar ração fechada anterior
+    setRacaoIdFechada(null); // Limpar raÃ§Ã£o fechada anterior
     setMostrarCalculadoraRacao(true);
   };
 
-  // Remover item
-  const removerItem = (index) => {
-    const novosItens = vendaAtual.itens.filter((_, i) => i !== index);
-    recalcularTotais(novosItens);
-  };
-
-  // Alternar expansão do item KIT
-  const toggleKitExpansion = (index) => {
-    setItensKitExpandidos((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  };
-
   // salvarVenda movido para usePDVSalvarVenda
-  // análise, pagamento e pós-finalização movidos para usePDVAnalisePagamento
+  // anÃ¡lise, pagamento e pÃ³s-finalizaÃ§Ã£o movidos para usePDVAnalisePagamento
 
   const handleAbrirCaixaSucesso = () => {
     setMostrarModalAbrirCaixa(false);
@@ -1007,7 +674,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
         onConfirmarEntregue={confirmarDriveEntregue}
       />
       <div className="flex h-screen bg-gray-50" style={driveAlertVisible && driveAguardando.length > 0 ? { paddingTop: '52px' } : {}}>
-        {/* Área Principal */}
+        {/* Ãrea Principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <PDVHeaderBar
             destaqueAbrirCaixa={destaqueAbrirCaixa}
@@ -1058,7 +725,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
             habilitarEdicao={habilitarEdicao}
           />
 
-          {/* Conteúdo Principal */}
+          {/* ConteÃºdo Principal */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-5xl mx-auto space-y-4">
               <PDVClienteCard
@@ -1292,5 +959,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     </>
   );
 }
+
+
 
 
