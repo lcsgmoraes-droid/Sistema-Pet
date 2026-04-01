@@ -14,6 +14,9 @@ from app.services.nfe_authorized_reconciliation_service import (
 from app.services.nfe_pending_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_pendentes,
 )
+from app.services.pedido_duplicate_reconciliation_service import (
+    executar_reconciliacao_automatica_duplicidades_pedidos,
+)
 from app.services.pedido_status_reconciliation_service import (
     executar_reconciliacao_automatica_status_pedidos,
 )
@@ -65,6 +68,13 @@ class BlingSyncScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            func=self.reconciliar_duplicidades_pedidos,
+            trigger=IntervalTrigger(minutes=15),
+            id="bling_order_duplicates_reconcile",
+            name="Bling Order Duplicate Reconcile",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             func=self.auditar_fluxo_bling,
             trigger=IntervalTrigger(minutes=15),
             id="bling_flow_audit_autofix",
@@ -85,6 +95,7 @@ class BlingSyncScheduler:
         logger.info("   - NFs pendentes recentes: a cada 15 minutos")
         logger.info("   - NFs autorizadas sem baixa: a cada 15 minutos")
         logger.info("   - Status de pedidos recentes: a cada 15 minutos")
+        logger.info("   - Duplicidades seguras por pedido loja: a cada 15 minutos")
         logger.info("   - Fluxo pedido/NF/estoque: a cada 15 minutos")
         logger.info("   - Auditoria geral: diariamente as 02:00")
 
@@ -144,6 +155,19 @@ class BlingSyncScheduler:
             )
             if result.get("confirmados_total") or result.get("cancelados_total") or result.get("erros_total"):
                 logger.info("[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s", result)
+        finally:
+            db.close()
+
+    def reconciliar_duplicidades_pedidos(self) -> None:
+        db = SessionLocal()
+        try:
+            result = executar_reconciliacao_automatica_duplicidades_pedidos(
+                db,
+                dias=7,
+                limite_grupos_por_tenant=20,
+            )
+            if result.get("grupos_consolidados_total") or result.get("erros_total"):
+                logger.info("[BLING SYNC] Reconciliacao automatica de duplicidades dos pedidos: %s", result)
         finally:
             db.close()
 

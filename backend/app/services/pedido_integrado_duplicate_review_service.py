@@ -401,6 +401,9 @@ def consolidar_duplicidades_seguras_pedido(
     *,
     tenant_id,
     pedido_id: int,
+    source: str = "manual",
+    auto_fix_applied: bool = False,
+    resolution_note: str = "Duplicidades seguras consolidadas manualmente.",
 ) -> dict:
     pedido_base = (
         db.query(PedidoIntegrado)
@@ -538,13 +541,13 @@ def consolidar_duplicidades_seguras_pedido(
         codes=["PEDIDO_DUPLICADO_POR_NUMERO_LOJA"],
         pedido_integrado_id=pedido_canonico.id,
         pedido_bling_id=pedido_canonico.pedido_bling_id,
-        resolution_note="Duplicidades seguras consolidadas manualmente.",
+        resolution_note=resolution_note,
     )
     db.commit()
 
     registrar_evento(
         tenant_id=tenant_id,
-        source="manual",
+        source=source,
         event_type="order.duplicate_consolidated",
         entity_type="pedido",
         status="ok",
@@ -558,7 +561,7 @@ def consolidar_duplicidades_seguras_pedido(
             "pedidos_mesclados": mesclados,
         },
         db=db,
-        auto_fix_applied=False,
+        auto_fix_applied=auto_fix_applied,
     )
 
     return {

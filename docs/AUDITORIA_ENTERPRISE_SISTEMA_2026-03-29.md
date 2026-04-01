@@ -604,6 +604,10 @@ Itens executados nesta etapa:
   - o backend agora roda uma reconciliacao periodica dos pedidos recentes para reaplicar cancelamento ou confirmacao quando o webhook falhar
   - pedidos que ja estavam `confirmado` localmente voltam a aceitar cancelamento vindo do Bling, liberando a reserva pendente
   - foi criado um endpoint manual para reconciliar status de pedidos recentes por tenant sem depender de ajuste em banco
+- [x] blindar tambem as duplicidades recentes de pedidos por `numeroPedidoLoja`:
+  - o backend agora roda uma reconciliacao periodica das duplicidades recentes e consolida automaticamente apenas os grupos ja classificados como seguros
+  - foi criado um endpoint manual por tenant para revisar e consolidar duplicidades recentes sem precisar esperar o scheduler
+  - o scheduler deixa de depender so do monitor/autofix para evitar que duplicidade recente vire ruido operacional ou reserva paralela
 - [x] alinhar o detalhe de reservas do produto com a mesma regra do contador:
   - o modal de reservas ativas deixa de esconder pedidos `confirmado` que ainda seguram estoque
   - a operacao passa a enxergar exatamente quais pedidos estao compondo a reserva daquele SKU

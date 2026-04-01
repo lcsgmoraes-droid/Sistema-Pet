@@ -1513,6 +1513,9 @@ def autocorrigir_incidente(db: Session, incidente: BlingFlowIncident) -> dict:
                 db,
                 tenant_id=incidente.tenant_id,
                 pedido_id=pedido.id,
+                source="autofix",
+                auto_fix_applied=True,
+                resolution_note="Duplicidades seguras consolidadas automaticamente pelo monitor.",
             )
             sucesso = bool(resultado.get("success"))
             detalhes = resultado
