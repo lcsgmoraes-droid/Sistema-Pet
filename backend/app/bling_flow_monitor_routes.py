@@ -8,6 +8,7 @@ from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.db import get_session
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_models import PedidoIntegrado
+from app.services.pedido_integrado_duplicate_review_service import mapear_duplicidade_por_pedido_ids
 from app.services.bling_flow_monitor_service import (
     auditar_fluxo_bling,
     autocorrigir_incidente,
@@ -184,6 +185,89 @@ def _mapa_numeros_notas_cache(db: Session, tenant_id, registros: list[dict]) -> 
     return mapa
 
 
+def _acoes_operacionais_monitor(registro: dict) -> dict:
+    duplicidade = _dict(registro.get("duplicidade"))
+    pedido_id = registro.get("pedido_integrado_id")
+    return {
+        "pode_consolidar_duplicidade": bool(
+            pedido_id
+            and duplicidade.get("pedido_atual_eh_canonico")
+            and (duplicidade.get("pedidos_seguro_ids") or [])
+        ),
+        "pode_reconciliar_fluxo": bool(pedido_id),
+        "tem_revisao_manual_pendente": bool(duplicidade.get("requer_revisao_manual")),
+    }
+
+
+def _enriquecer_registros_contexto(db: Session, tenant_id, registros: list[dict]) -> list[dict]:
+    mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
+    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
+    pedido_ids = [int(registro["pedido_integrado_id"]) for registro in registros if registro.get("pedido_integrado_id")]
+    duplicidade_por_pedido = mapear_duplicidade_por_pedido_ids(
+        db,
+        tenant_id=tenant_id,
+        pedido_ids=pedido_ids,
+    )
+
+    for registro in registros:
+        info = mapa_numeros.get(
+            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
+        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
+            (None, registro.get("pedido_bling_id"))
+        )
+        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
+        detalhes = _dict(registro.get("details")) or _dict(registro.get("payload"))
+        duplicidade = duplicidade_por_pedido.get(int(registro.get("pedido_integrado_id"))) if registro.get("pedido_integrado_id") else None
+
+        registro["pedido_bling_numero"] = (
+            _dict(info).get("pedido_bling_numero")
+            or _texto(
+                _primeiro_preenchido(
+                    detalhes.get("pedido_bling_numero"),
+                    _dict(detalhes.get("nf_detectada")).get("pedido_bling_numero"),
+                    _dict(_dict(duplicidade).get("pedido_canonico")).get("pedido_bling_numero"),
+                    _dict(_dict(duplicidade).get("pedido_canonico")).get("pedido_bling_id"),
+                )
+            )
+        )
+        registro["numero_pedido_loja"] = (
+            _dict(info).get("numero_pedido_loja")
+            or _texto(
+                _primeiro_preenchido(
+                    detalhes.get("numero_pedido_loja"),
+                    _dict(detalhes.get("nf_detectada")).get("numero_pedido_loja"),
+                    _dict(duplicidade).get("numero_pedido_loja"),
+                )
+            )
+            or _dict(info_nf).get("numero_pedido_loja")
+        )
+        registro["nf_numero"] = (
+            _texto(
+                _primeiro_preenchido(
+                    detalhes.get("nf_numero"),
+                    _dict(detalhes.get("nf_detectada")).get("numero"),
+                    _dict(_dict(duplicidade).get("pedido_canonico")).get("nf_numero"),
+                )
+            )
+            or _dict(info_nf).get("nf_numero")
+            or _dict(info).get("nf_numero")
+        )
+        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(detalhes.get("pedido_status_atual"))
+        registro["duplicidade"] = duplicidade or {
+            "tem_duplicados": False,
+            "pedido_atual_eh_canonico": True,
+            "pedidos_duplicados": [],
+            "pedidos_seguro_ids": [],
+            "pedidos_bloqueados_ids": [],
+            "bloqueios": [],
+            "pode_consolidar_automaticamente": False,
+            "requer_revisao_manual": False,
+        }
+        registro["acoes_disponiveis"] = _acoes_operacionais_monitor(registro)
+
+    return registros
+
+
 @router.get("/resumo")
 def resumo_monitor(
     db: Session = Depends(get_session),
@@ -236,32 +320,7 @@ def listar_incidentes(
         }
         for incidente in incidentes
     ]
-    mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
-    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
-    for registro in registros:
-        info = mapa_numeros.get(
-            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
-        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
-            (None, registro.get("pedido_bling_id"))
-        )
-        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
-        detalhes = _dict(registro.get("details"))
-        registro["pedido_bling_numero"] = (
-            _dict(info).get("pedido_bling_numero")
-            or _texto(_primeiro_preenchido(detalhes.get("pedido_bling_numero"), _dict(detalhes.get("nf_detectada")).get("pedido_bling_numero")))
-        )
-        registro["numero_pedido_loja"] = (
-            _dict(info).get("numero_pedido_loja")
-            or _texto(_primeiro_preenchido(detalhes.get("numero_pedido_loja"), _dict(detalhes.get("nf_detectada")).get("numero_pedido_loja")))
-            or _dict(info_nf).get("numero_pedido_loja")
-        )
-        registro["nf_numero"] = (
-            _texto(_primeiro_preenchido(detalhes.get("nf_numero"), _dict(detalhes.get("nf_detectada")).get("numero")))
-            or _dict(info_nf).get("nf_numero")
-            or _dict(info).get("nf_numero")
-        )
-        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual")
-    return registros
+    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.get("/eventos")
@@ -301,32 +360,7 @@ def listar_eventos(
         }
         for evento in eventos
     ]
-    mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
-    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
-    for registro in registros:
-        info = mapa_numeros.get(
-            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
-        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
-            (None, registro.get("pedido_bling_id"))
-        )
-        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
-        payload = _dict(registro.get("payload"))
-        registro["pedido_bling_numero"] = (
-            _dict(info).get("pedido_bling_numero")
-            or _texto(_primeiro_preenchido(payload.get("pedido_bling_numero"), _dict(payload.get("pedido")).get("numero")))
-        )
-        registro["numero_pedido_loja"] = (
-            _dict(info).get("numero_pedido_loja")
-            or _numero_pedido_loja_payload(payload)
-            or _dict(info_nf).get("numero_pedido_loja")
-        )
-        registro["nf_numero"] = (
-            _nf_numero_payload(payload)
-            or _dict(info_nf).get("nf_numero")
-            or _dict(info).get("nf_numero")
-        )
-        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
-    return registros
+    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.post("/auditar")

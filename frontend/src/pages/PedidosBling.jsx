@@ -79,7 +79,7 @@ function LinhaItem({ item }) {
   );
 }
 
-function CardPedido({ pedido, onConfirmar, onCancelar }) {
+function CardPedido({ pedido, onConfirmar, onCancelar, onConsolidarDuplicidade, onReconciliarFluxo }) {
   const [expandido, setExpandido] = useState(false);
   const [acao, setAcao] = useState(false);
 
@@ -91,6 +91,8 @@ function CardPedido({ pedido, onConfirmar, onCancelar }) {
   const totalPedido = pedido.financeiro?.total;
   const notaFiscal = pedido.nota_fiscal || {};
   const situacaoBling = pedido.situacao_bling || {};
+  const duplicidade = pedido.duplicidade || {};
+  const acoesDisponiveis = pedido.acoes_disponiveis || {};
 
   async function handleConfirmar() {
     if (!window.confirm(`Confirmar pedido Bling #${pedido.pedido_bling_numero || pedido.pedido_bling_id}?
@@ -122,6 +124,24 @@ As reservas de estoque serao liberadas.`)) return;
       onCancelar();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao cancelar pedido');
+    } finally {
+      setAcao(false);
+    }
+  }
+
+  async function handleConsolidarDuplicidade() {
+    setAcao(true);
+    try {
+      await onConsolidarDuplicidade(pedido);
+    } finally {
+      setAcao(false);
+    }
+  }
+
+  async function handleReconciliarFluxo() {
+    setAcao(true);
+    try {
+      await onReconciliarFluxo(pedido);
     } finally {
       setAcao(false);
     }
@@ -182,6 +202,24 @@ As reservas de estoque serao liberadas.`)) return;
               Cancelar
             </button>
           )}
+          {acoesDisponiveis.pode_consolidar_duplicidade && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleConsolidarDuplicidade(); }}
+              disabled={acao}
+              className="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
+            >
+              Consolidar
+            </button>
+          )}
+          {acoesDisponiveis.pode_reconciliar_fluxo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleReconciliarFluxo(); }}
+              disabled={acao}
+              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
+            >
+              Reconciliar
+            </button>
+          )}
 
           <span className="text-gray-400 text-sm">{expandido ? '^' : 'v'}</span>
         </div>
@@ -213,6 +251,34 @@ As reservas de estoque serao liberadas.`)) return;
                 <CampoInfo label="Situacao NF" valor={notaFiscal.situacao} />
                 <CampoInfo label="Chave" valor={notaFiscal.chave} />
               </div>
+            </div>
+          )}
+
+          {duplicidade.tem_duplicados && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Duplicidade por numero do pedido loja</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                <CampoInfo label="Pedido canônico" valor={duplicidade.pedido_canonico?.pedido_bling_numero || duplicidade.pedido_canonico?.pedido_bling_id} />
+                <CampoInfo label="Pedido loja" valor={duplicidade.numero_pedido_loja} />
+                <CampoInfo label="Revisao manual" valor={duplicidade.requer_revisao_manual ? 'Sim' : 'Nao'} />
+              </div>
+              {(duplicidade.pedidos_duplicados || []).length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {duplicidade.pedidos_duplicados.map((duplicado) => (
+                    <div key={duplicado.id} className="rounded-lg border border-amber-100 bg-white px-3 py-2 text-sm text-gray-700">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">#{duplicado.pedido_bling_numero || duplicado.pedido_bling_id || duplicado.id}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${duplicado.pode_mesclar_automaticamente ? 'bg-green-50 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {duplicado.pode_mesclar_automaticamente ? 'Seguro para consolidar' : 'Bloqueado para revisao'}
+                        </span>
+                      </div>
+                      {duplicado.motivos_bloqueio?.length > 0 && (
+                        <p className="text-xs text-amber-700 mt-1">{duplicado.motivos_bloqueio.join(', ')}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -289,6 +355,37 @@ export default function PedidosBling() {
     setPagina(1);
   }
 
+  async function consolidarDuplicidade(pedido) {
+    try {
+      const response = await api.post(`/integracoes/bling/pedidos/${pedido.id}/consolidar-duplicidade`);
+      const totalMesclados = response.data?.pedidos_mesclados?.length || 0;
+      toast.success(`Duplicidade consolidada. ${totalMesclados} pedido(s) incorporado(s).`);
+      await carregar();
+    } catch (e) {
+      const detail = typeof e.response?.data?.detail === 'string'
+        ? e.response.data.detail
+        : e.response?.data?.detail?.motivo || 'Erro ao consolidar duplicidade';
+      toast.error(detail);
+    }
+  }
+
+  async function reconciliarFluxo(pedido) {
+    try {
+      const response = await api.post(`/integracoes/bling/pedidos/${pedido.id}/reconciliar-fluxo`);
+      toast.success(
+        response.data?.nf_numero
+          ? `Fluxo reconciliado com a NF ${response.data.nf_numero}.`
+          : 'Fluxo reconciliado com sucesso.'
+      );
+      await carregar();
+    } catch (e) {
+      const detail = typeof e.response?.data?.detail === 'string'
+        ? e.response.data.detail
+        : e.response?.data?.detail?.motivo || 'Erro ao reconciliar fluxo do pedido';
+      toast.error(detail);
+    }
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
@@ -346,7 +443,14 @@ export default function PedidosBling() {
       ) : (
         <div className="space-y-3">
           {pedidos.map((p) => (
-            <CardPedido key={p.id} pedido={p} onConfirmar={carregar} onCancelar={carregar} />
+            <CardPedido
+              key={p.id}
+              pedido={p}
+              onConfirmar={carregar}
+              onCancelar={carregar}
+              onConsolidarDuplicidade={consolidarDuplicidade}
+              onReconciliarFluxo={reconciliarFluxo}
+            />
           ))}
         </div>
       )}

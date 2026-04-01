@@ -587,6 +587,18 @@ Itens executados nesta etapa:
 - [x] fazer o Monitor Bling mostrar o numero humano da NF tambem em incidentes sem pedido vinculado:
   - a API do monitor agora enriquece incidentes e eventos pelo cache local de NFs usando `nf_bling_id`
   - quando a nota ja esta no sistema, a tela consegue exibir `NF numero` mesmo antes do pedido estar 100% reconciliado
+- [x] blindar o sistema contra duplicidade historica de pedidos por `numeroPedidoLoja`:
+  - foi criado um servico de revisao operacional para listar grupos duplicados, escolher pedido canonico e separar o que e seguro do que ainda exige revisao manual
+  - `Pedidos Bling` passa a exibir o contexto de duplicidade do pedido, incluindo canonico, duplicados e bloqueios operacionais
+  - o backend ganhou uma acao dedicada para consolidar duplicidades seguras sem misturar pedidos que ja tiveram venda ou movimentacao de estoque
+- [x] criar acoes operacionais por linha para a equipe resolver fluxo sem depender de ajuste manual no banco:
+  - `Pedidos Bling` passa a oferecer `Consolidar` e `Reconciliar` por pedido quando houver acao segura disponivel
+  - `Monitor Bling` passa a mostrar o contexto de duplicidade e os botoes operacionais de consolidacao/reconciliacao por incidente
+  - `NF de Saida` passa a oferecer um botao por nota para forcar reconciliacao do fluxo daquela NF especifica
+- [x] enriquecer o Monitor Bling com o pedido canônico e a classe de incidente operacional de duplicidade:
+  - a auditoria agora abre `PEDIDO_DUPLICADO_POR_NUMERO_LOJA` quando encontra mais de um pedido local ativo para o mesmo numero de pedido da loja
+  - incidentes e eventos passam a receber contexto de duplicidade, incluindo pedido canonico, duplicados seguros e duplicados bloqueados
+  - as respostas do monitor agora tambem devolvem `acoes_disponiveis`, facilitando a operacao na tela sem adivinhacao
 
 Itens deliberadamente adiados por agora:
 
@@ -600,6 +612,7 @@ Proximas tarefas sugeridas para execucao continua:
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
+- [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
 - [ ] revisar a politica de cancelamento de NF por canal para os casos em que o produto nao deve voltar automaticamente ao estoque
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema

@@ -30,6 +30,11 @@ from app.services.pedido_integrado_consolidation_service import (
     pedido_esta_mesclado,
     registrar_alias_bling_no_payload,
 )
+from app.services.pedido_integrado_duplicate_review_service import (
+    consolidar_duplicidades_seguras_pedido,
+    mapear_duplicidade_por_pedido_ids,
+    reconciliar_fluxo_pedido_integrado,
+)
 from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
 
@@ -680,7 +685,25 @@ def _serializar_itens_pedido(pedido_payload: dict, itens_db: list[PedidoIntegrad
     return itens_serializados
 
 
-def _serializar_pedido_bling(pedido: PedidoIntegrado, itens_db: list[PedidoIntegradoItem]) -> dict:
+def _acoes_operacionais_pedido(pedido: PedidoIntegrado, duplicidade: dict | None = None) -> dict:
+    duplicidade = _dict(duplicidade)
+    pedido_atual_eh_canonico = bool(duplicidade.get("pedido_atual_eh_canonico"))
+    pedidos_seguro_ids = duplicidade.get("pedidos_seguro_ids") or []
+    pode_consolidar = bool(pedido_atual_eh_canonico and pedidos_seguro_ids)
+
+    return {
+        "pode_consolidar_duplicidade": pode_consolidar,
+        "pode_reconciliar_fluxo": bool(getattr(pedido, "id", None)),
+        "tem_revisao_manual_pendente": bool(duplicidade.get("requer_revisao_manual")),
+    }
+
+
+def _serializar_pedido_bling(
+    pedido: PedidoIntegrado,
+    itens_db: list[PedidoIntegradoItem],
+    *,
+    duplicidade: dict | None = None,
+) -> dict:
     payload = _dict(pedido.payload)
     pedido_payload = _payload_principal(payload)
     contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
@@ -688,6 +711,7 @@ def _serializar_pedido_bling(pedido: PedidoIntegrado, itens_db: list[PedidoInteg
     ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
     situacao = _dict(pedido_payload.get("situacao"))
     canal, canal_label, canal_origem = _resolver_canal_pedido(payload, pedido.canal)
+    duplicidade = _dict(duplicidade)
 
     return {
         "id": pedido.id,
@@ -741,6 +765,18 @@ def _serializar_pedido_bling(pedido: PedidoIntegrado, itens_db: list[PedidoInteg
         },
         "observacoes": _texto(_primeiro_preenchido(pedido_payload.get("observacoes"), pedido_payload.get("observacao"), pedido_payload.get("observacoesInternas"))),
         "itens": _serializar_itens_pedido(pedido_payload, itens_db),
+        "duplicidade": duplicidade
+        or {
+            "tem_duplicados": False,
+            "pedido_atual_eh_canonico": True,
+            "pedidos_duplicados": [],
+            "pedidos_seguro_ids": [],
+            "pedidos_bloqueados_ids": [],
+            "bloqueios": [],
+            "pode_consolidar_automaticamente": False,
+            "requer_revisao_manual": False,
+        },
+        "acoes_disponiveis": _acoes_operacionais_pedido(pedido, duplicidade),
     }
 
 
@@ -999,6 +1035,11 @@ def listar_pedidos_bling(
         .limit(por_pagina)
         .all()
     )
+    duplicidade_por_pedido = mapear_duplicidade_por_pedido_ids(
+        db,
+        tenant_id=tenant_id,
+        pedido_ids=[int(p.id) for p in pedidos if getattr(p, "id", None)],
+    )
 
     result = []
     for p in pedidos:
@@ -1006,7 +1047,13 @@ def listar_pedidos_bling(
             PedidoIntegradoItem.pedido_integrado_id == p.id
         ).all()
         try:
-            result.append(_serializar_pedido_bling(p, itens))
+            result.append(
+                _serializar_pedido_bling(
+                    p,
+                    itens,
+                    duplicidade=duplicidade_por_pedido.get(int(p.id)),
+                )
+            )
         except Exception as exc:
             logger.exception(
                 "[BLING PEDIDOS] Falha ao serializar pedido local id=%s bling_id=%s numero=%s: %s",
@@ -1023,6 +1070,68 @@ def listar_pedidos_bling(
         "paginas": (total + por_pagina - 1) // por_pagina,
         "pedidos": result,
     }
+
+
+@router.post("/pedidos/{pedido_id}/consolidar-duplicidade")
+def consolidar_duplicidade_pedido(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    user_tenant=Depends(get_current_user_and_tenant),
+):
+    tenant_id = user_tenant[1]
+
+    try:
+        resultado = consolidar_duplicidades_seguras_pedido(
+            db,
+            tenant_id=tenant_id,
+            pedido_id=pedido_id,
+        )
+    except Exception as exc:
+        logger.exception("[BLING PEDIDOS] Falha ao consolidar duplicidade do pedido %s: %s", pedido_id, exc)
+        raise HTTPException(status_code=500, detail=f"Erro ao consolidar duplicidade: {exc}")
+
+    if resultado.get("success"):
+        return resultado
+
+    motivo = resultado.get("motivo")
+    if motivo == "pedido_nao_encontrado":
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado")
+    if motivo == "pedido_sem_duplicidade":
+        raise HTTPException(status_code=400, detail="Este pedido nao possui duplicidade ativa")
+    if motivo in {"pedido_sem_duplicidade_canonica", "duplicidades_requerem_revisao_manual", "nenhuma_duplicidade_segura_aplicada"}:
+        raise HTTPException(status_code=409, detail=resultado)
+
+    raise HTTPException(status_code=400, detail=resultado)
+
+
+@router.post("/pedidos/{pedido_id}/reconciliar-fluxo")
+def reconciliar_fluxo_pedido(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    user_tenant=Depends(get_current_user_and_tenant),
+):
+    tenant_id = user_tenant[1]
+
+    try:
+        resultado = reconciliar_fluxo_pedido_integrado(
+            db,
+            tenant_id=tenant_id,
+            pedido_id=pedido_id,
+        )
+    except Exception as exc:
+        logger.exception("[BLING PEDIDOS] Falha ao reconciliar fluxo do pedido %s: %s", pedido_id, exc)
+        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar fluxo do pedido: {exc}")
+
+    if resultado.get("success"):
+        return resultado
+
+    motivo = resultado.get("motivo")
+    if motivo == "pedido_nao_encontrado":
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado")
+    if motivo in {"pedido_sem_itens", "reconciliacao_sem_sucesso"}:
+        raise HTTPException(status_code=409, detail=resultado)
+
+    raise HTTPException(status_code=400, detail=resultado)
 
 
 # ============================================================

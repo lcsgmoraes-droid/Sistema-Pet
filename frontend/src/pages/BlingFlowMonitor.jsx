@@ -315,6 +315,9 @@ function splitEventBuckets(eventos) {
 function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
   const pedidoLabel = incidente.pedido_bling_numero || incidente.pedido_bling_id || '-';
   const autoFixDetalhe = formatAutofixDetails(incidente.details);
+  const duplicidade = incidente.duplicidade || {};
+  const acoesDisponiveis = incidente.acoes_disponiveis || {};
+  const pedidoCanonico = duplicidade.pedido_canonico || {};
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -343,6 +346,50 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
         <DetailField label="SKU" value={incidente.sku} hint="SKU do item impactado pelo incidente." mono />
       </div>
 
+      {duplicidade.tem_duplicados && (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+          <div className="flex items-center gap-2">
+            <Badge tone="yellow">pedido duplicado</Badge>
+            <span className="text-sm font-semibold text-amber-900">
+              Pedido loja {duplicidade.numero_pedido_loja || incidente.numero_pedido_loja || '-'}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-amber-800">
+            O sistema identificou mais de um pedido local para o mesmo numero de pedido da loja. O pedido canonico fica como fonte principal do fluxo.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+            <DetailField
+              label="Pedido canonico"
+              value={pedidoCanonico.pedido_bling_numero || pedidoCanonico.pedido_bling_id || '-'}
+              hint="Pedido principal escolhido pelo sistema para centralizar NF, estoque e historico."
+            />
+            <DetailField
+              label="NF do canonico"
+              value={pedidoCanonico.nf_numero}
+              hint="NF atualmente vinculada ao pedido canonico."
+            />
+          </div>
+          {(duplicidade.pedidos_duplicados || []).length > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-100 bg-white px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pedidos duplicados detectados</p>
+              <div className="mt-2 space-y-2">
+                {duplicidade.pedidos_duplicados.map((pedido) => (
+                  <div key={pedido.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                    <span className="font-medium">#{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.id}</span>
+                    <Badge tone={pedido.pode_mesclar_automaticamente ? 'green' : 'yellow'}>
+                      {pedido.pode_mesclar_automaticamente ? 'seguro para mesclar' : 'revisao manual'}
+                    </Badge>
+                    {pedido.motivos_bloqueio?.length > 0 && (
+                      <span className="text-xs text-amber-700">{pedido.motivos_bloqueio.join(', ')}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {incidente.suggested_action && (
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
           {incidente.suggested_action}
@@ -362,6 +409,26 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
+        {acoesDisponiveis.pode_consolidar_duplicidade && incidente.status !== 'resolved' && (
+          <button
+            type="button"
+            onClick={() => onCorrigir({ ...incidente, acao_forcada: 'consolidar_duplicidade' })}
+            disabled={acaoId === `consolidar-${incidente.id}`}
+            className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600 disabled:opacity-50"
+          >
+            Consolidar duplicados
+          </button>
+        )}
+        {acoesDisponiveis.pode_reconciliar_fluxo && incidente.status !== 'resolved' && (
+          <button
+            type="button"
+            onClick={() => onCorrigir({ ...incidente, acao_forcada: 'reconciliar_fluxo' })}
+            disabled={acaoId === `reconciliar-${incidente.id}`}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+          >
+            Reconciliar fluxo
+          </button>
+        )}
         {incidente.auto_fixable && incidente.status !== 'resolved' && (
           <button
             type="button"
@@ -539,22 +606,46 @@ export default function BlingFlowMonitor() {
   }
 
   async function corrigirIncidente(incidente) {
-    setAcaoId(`corrigir-${incidente.id}`);
+    const acaoForcada = incidente.acao_forcada;
+    const pedidoId = incidente.pedido_integrado_id;
+    const actionKey =
+      acaoForcada === 'consolidar_duplicidade'
+        ? `consolidar-${incidente.id}`
+        : acaoForcada === 'reconciliar_fluxo'
+          ? `reconciliar-${incidente.id}`
+          : `corrigir-${incidente.id}`;
+    setAcaoId(actionKey);
     try {
-      const response = await monitorRequest('post', `/incidentes/${incidente.id}/corrigir`);
-      const detalhe =
-        response.data?.details?.error ||
-        response.data?.details?.motivo ||
-        (Array.isArray(response.data?.details?.erros) ? response.data.details.erros.join(' | ') : '');
-
-      if (response.data?.success) {
-        toast.success('Correcao automatica aplicada.');
+      if (acaoForcada === 'consolidar_duplicidade' && pedidoId) {
+        const response = await api.post(`/integracoes/bling/pedidos/${pedidoId}/consolidar-duplicidade`);
+        const totalMesclados = response.data?.pedidos_mesclados?.length || 0;
+        toast.success(`Duplicidade consolidada. ${totalMesclados} pedido(s) incorporado(s).`);
+      } else if (acaoForcada === 'reconciliar_fluxo' && pedidoId) {
+        const response = await api.post(`/integracoes/bling/pedidos/${pedidoId}/reconciliar-fluxo`);
+        toast.success(
+          response.data?.nf_numero
+            ? `Fluxo reconciliado com a NF ${response.data.nf_numero}.`
+            : 'Fluxo reconciliado com sucesso.'
+        );
       } else {
-        toast.error(friendlyErrorMessage(detalhe) || 'A correcao automatica nao conseguiu resolver o incidente.');
+        const response = await monitorRequest('post', `/incidentes/${incidente.id}/corrigir`);
+        const detalhe =
+          response.data?.details?.error ||
+          response.data?.details?.motivo ||
+          (Array.isArray(response.data?.details?.erros) ? response.data.details.erros.join(' | ') : '');
+
+        if (response.data?.success) {
+          toast.success('Correcao automatica aplicada.');
+        } else {
+          toast.error(friendlyErrorMessage(detalhe) || 'A correcao automatica nao conseguiu resolver o incidente.');
+        }
       }
       await carregar();
     } catch (error) {
-      toast.error(friendlyErrorMessage(error.response?.data?.detail) || 'Erro ao corrigir incidente');
+      const detail = typeof error.response?.data?.detail === 'string'
+        ? error.response?.data?.detail
+        : error.response?.data?.detail?.motivo || error.response?.data?.detail?.error;
+      toast.error(friendlyErrorMessage(detail) || 'Erro ao corrigir incidente');
     } finally {
       setAcaoId('');
     }

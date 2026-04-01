@@ -188,6 +188,7 @@ export default function CentralNFSaida() {
   const [modalCancelar, setModalCancelar] = useState(null);
   const [justificativa, setJustificativa] = useState('');
   const [cancelando, setCancelando] = useState(false);
+  const [reconciliandoNotaId, setReconciliandoNotaId] = useState('');
   const detalhesNotasCacheRef = useRef(new Map());
 
   const SITUACOES = [
@@ -292,6 +293,29 @@ export default function CentralNFSaida() {
       link.remove();
     } catch {
       alert('Erro ao baixar XML');
+    }
+  }
+
+  async function reconciliarFluxoNota(nota) {
+    const notaId = String(nota?.id || '').trim();
+    if (!notaId) {
+      alert('Nao foi possivel identificar esta NF para reconciliar.');
+      return;
+    }
+
+    try {
+      setReconciliandoNotaId(notaId);
+      const response = await api.post(`/nfe/${notaId}/reconciliar-fluxo`);
+      const numero = response.data?.nf_numero || nota.numero || notaId;
+      alert(`Fluxo da NF ${numero} reconciliado com sucesso.`);
+      await carregarNotas(true);
+    } catch (error) {
+      const detail = typeof error.response?.data?.detail === 'string'
+        ? error.response.data.detail
+        : error.response?.data?.detail?.motivo || 'Erro ao reconciliar o fluxo desta NF.';
+      alert(detail);
+    } finally {
+      setReconciliandoNotaId('');
     }
   }
 
@@ -841,6 +865,14 @@ export default function CentralNFSaida() {
                         title="Excluir nota do sistema"
                       >
                         <Trash2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => reconciliarFluxoNota(nota)}
+                        disabled={reconciliandoNotaId === String(nota.id)}
+                        className="text-amber-600 hover:text-amber-900 p-1 hover:bg-amber-50 rounded disabled:opacity-50"
+                        title="Forcar reconciliacao desta NF"
+                      >
+                        <Zap className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => baixarDanfe(nota.id, nota.numero)}

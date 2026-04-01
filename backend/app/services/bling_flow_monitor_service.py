@@ -16,6 +16,11 @@ from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao, Produto
+from app.services.pedido_integrado_duplicate_review_service import (
+    consolidar_duplicidades_seguras_pedido,
+    listar_grupos_duplicados_pedido_loja,
+    reconciliar_fluxo_pedido_integrado,
+)
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
 from app.utils.logger import logger
 
@@ -30,7 +35,7 @@ SEVERITY_RANK = {
 
 FINAL_STATUS = {"confirmado", "cancelado", "expirado"}
 OPEN_INCIDENT_STATUSES = {"open", "ignored"}
-MONITORED_INCIDENT_CODES = {
+PEDIDO_MONITORED_INCIDENT_CODES = {
     "PEDIDO_SEM_ITENS",
     "SKU_SEM_PRODUTO_LOCAL",
     "RESERVA_ATIVA_EM_PEDIDO_FINALIZADO",
@@ -43,6 +48,10 @@ MONITORED_INCIDENT_CODES = {
     "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
     "SKU_MAPEADO_POR_CODIGO_BARRAS",
 }
+EXTRA_MONITORED_INCIDENT_CODES = {
+    "PEDIDO_DUPLICADO_POR_NUMERO_LOJA",
+}
+MONITORED_INCIDENT_CODES = PEDIDO_MONITORED_INCIDENT_CODES | EXTRA_MONITORED_INCIDENT_CODES
 NF_AUTHORIZED_CODES = {2, 5, 9}
 _NF_RECENTES_CACHE_SECONDS = 300
 _NF_RECENTES_ENRICH_LIMIT = 60
@@ -1228,11 +1237,39 @@ def _resolver_incidentes_ausentes(
             BlingFlowIncident.tenant_id == pedido.tenant_id,
             BlingFlowIncident.source == "auditoria",
             BlingFlowIncident.status == "open",
-            BlingFlowIncident.code.in_(list(MONITORED_INCIDENT_CODES)),
+            BlingFlowIncident.code.in_(list(PEDIDO_MONITORED_INCIDENT_CODES)),
             or_(
                 BlingFlowIncident.pedido_integrado_id == pedido.id,
                 BlingFlowIncident.pedido_bling_id == pedido.pedido_bling_id,
             ),
+        )
+        .all()
+    )
+
+    resolvidos = 0
+    for incidente in incidentes:
+        if incidente.dedupe_key in active_keys:
+            continue
+        incidente.status = "resolved"
+        incidente.resolved_em = _utcnow()
+        db.add(incidente)
+        resolvidos += 1
+    return resolvidos
+
+
+def _resolver_incidentes_duplicidade_ausentes(
+    db: Session,
+    *,
+    tenant_id,
+    active_keys: set[str],
+) -> int:
+    incidentes = (
+        db.query(BlingFlowIncident)
+        .filter(
+            BlingFlowIncident.tenant_id == tenant_id,
+            BlingFlowIncident.source == "auditoria",
+            BlingFlowIncident.status == "open",
+            BlingFlowIncident.code == "PEDIDO_DUPLICADO_POR_NUMERO_LOJA",
         )
         .all()
     )
@@ -1471,6 +1508,14 @@ def autocorrigir_incidente(db: Session, incidente: BlingFlowIncident) -> dict:
                 pedido,
                 _dict(_dict(incidente.details).get("nf_detectada")),
             )
+        elif pedido and incidente.code == "PEDIDO_DUPLICADO_POR_NUMERO_LOJA":
+            resultado = consolidar_duplicidades_seguras_pedido(
+                db,
+                tenant_id=incidente.tenant_id,
+                pedido_id=pedido.id,
+            )
+            sucesso = bool(resultado.get("success"))
+            detalhes = resultado
         else:
             sucesso = False
             detalhes = {"motivo": "autofix_nao_implementado"}
@@ -1694,6 +1739,74 @@ def auditar_fluxo_bling(
                 pedido_integrado_id=pedido.id,
                 pedido_bling_id=pedido.pedido_bling_id,
             )
+
+    tenant_ids_duplicidade = {tenant_id} if tenant_id else {pedido.tenant_id for pedido in pedidos if getattr(pedido, "tenant_id", None)}
+    for duplicate_tenant_id in tenant_ids_duplicidade:
+        duplicate_active_keys: set[str] = set()
+        duplicate_groups = listar_grupos_duplicados_pedido_loja(
+            db,
+            tenant_id=duplicate_tenant_id,
+            dias=max(int(dias or 0), 30),
+            limite_scan=max(max(1, min(limite, 1000)) * 8, 2000),
+        )
+        for grupo in duplicate_groups:
+            pedido_canonico = _dict(grupo.get("pedido_canonico"))
+            pedido_canonico_id = _coerce_int(pedido_canonico.get("id"), 0) or None
+            pedido_canonico_bling_id = _text(pedido_canonico.get("pedido_bling_id"))
+            nf_bling_id = _nf_bling_id_valido(pedido_canonico.get("nf_bling_id"))
+            nf_numero = _text(pedido_canonico.get("nf_numero"))
+            numero_pedido_loja = _text(grupo.get("numero_pedido_loja"))
+            seguros = grupo.get("pedidos_seguro_ids") or []
+            bloqueados = grupo.get("pedidos_bloqueados_ids") or []
+
+            incidente = abrir_incidente(
+                tenant_id=duplicate_tenant_id,
+                code="PEDIDO_DUPLICADO_POR_NUMERO_LOJA",
+                severity="high",
+                title="Pedidos duplicados para o mesmo numero da loja",
+                message=(
+                    f"Foram encontrados {len(grupo.get('pedidos_duplicados') or []) + 1} pedidos locais para o numero "
+                    f"da loja {numero_pedido_loja}. O sistema passou a tratar o pedido canonico, "
+                    "mas o historico antigo precisa ser saneado para evitar ruido e reservas indevidas."
+                ),
+                suggested_action=(
+                    "Consolidar os duplicados seguros no pedido canonico e revisar manualmente os casos com "
+                    "movimentacao de estoque ou item vendido."
+                ),
+                auto_fixable=bool(seguros),
+                pedido_integrado_id=pedido_canonico_id,
+                pedido_bling_id=pedido_canonico_bling_id,
+                nf_bling_id=nf_bling_id,
+                details={
+                    "numero_pedido_loja": numero_pedido_loja,
+                    "nf_numero": nf_numero,
+                    "pedido_canonico": grupo.get("pedido_canonico"),
+                    "pedidos_duplicados": grupo.get("pedidos_duplicados") or [],
+                    "pedidos_seguro_ids": seguros,
+                    "pedidos_bloqueados_ids": bloqueados,
+                    "bloqueios": grupo.get("bloqueios") or [],
+                    "pode_consolidar_automaticamente": grupo.get("pode_consolidar_automaticamente", False),
+                    "requer_revisao_manual": grupo.get("requer_revisao_manual", False),
+                },
+                source="auditoria",
+                db=db,
+            )
+            if not incidente:
+                continue
+            duplicate_active_keys.add(incidente.dedupe_key)
+
+            if auto_fix and incidente.auto_fixable and incidente.status == "open":
+                auto_fix_tentados += 1
+                resultado = autocorrigir_incidente(db, incidente)
+                if resultado.get("success"):
+                    auto_fix_sucessos += 1
+
+        incidentes_resolvidos += _resolver_incidentes_duplicidade_ausentes(
+            db,
+            tenant_id=duplicate_tenant_id,
+            active_keys=duplicate_active_keys,
+        )
+    db.commit()
 
     incidentes_abertos_query = db.query(BlingFlowIncident).filter(
         BlingFlowIncident.status == "open",

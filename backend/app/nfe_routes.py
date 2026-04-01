@@ -19,9 +19,11 @@ from app.db import get_session
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
+from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.services.bling_sync_service import BlingSyncService
+from app.services.nfe_authorized_reconciliation_service import reconciliar_nf_autorizada_cache
 from app.services.nfe_cache_service import (
     existe_nota_cache_no_intervalo,
     listar_notas_cache,
@@ -1942,6 +1944,52 @@ async def reconciliar_pendentes_nfe(
     except Exception as exc:
         logger.warning("reconciliar_pendentes_nfe", f"Falha ao reconciliar NFs pendentes: {exc}")
         raise HTTPException(status_code=500, detail=f"Erro ao reconciliar NFs pendentes: {exc}")
+
+
+@router.post("/{nfe_id}/reconciliar-fluxo")
+async def reconciliar_fluxo_nfe(
+    nfe_id: str,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = user_and_tenant
+
+    registro = (
+        db.query(BlingNotaFiscalCache)
+        .filter(
+            BlingNotaFiscalCache.tenant_id == tenant_id,
+            BlingNotaFiscalCache.bling_id == str(nfe_id).strip(),
+        )
+        .order_by(BlingNotaFiscalCache.id.desc())
+        .first()
+    )
+    if not registro and str(nfe_id).strip().isdigit():
+        registro = (
+            db.query(BlingNotaFiscalCache)
+            .filter(
+                BlingNotaFiscalCache.tenant_id == tenant_id,
+                BlingNotaFiscalCache.id == int(str(nfe_id).strip()),
+            )
+            .first()
+        )
+
+    if not registro:
+        raise HTTPException(status_code=404, detail="NF nao encontrada no cache local")
+
+    try:
+        resultado = reconciliar_nf_autorizada_cache(
+            db,
+            tenant_id=tenant_id,
+            registro=registro,
+        )
+        if resultado.get("success"):
+            return {"success": True, **resultado}
+        raise HTTPException(status_code=409, detail=resultado)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("reconciliar_fluxo_nfe", f"Falha ao reconciliar NF {nfe_id}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar fluxo da NF: {exc}")
 
     notas: list[dict] = []
     bling_ok = False

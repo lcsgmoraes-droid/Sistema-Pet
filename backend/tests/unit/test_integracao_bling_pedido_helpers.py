@@ -275,6 +275,39 @@ def test_serializar_pedido_bling_expoe_campos_enriquecidos():
     assert serializado["itens"][0]["valor_unitario"] == 15.5
 
 
+def test_serializar_pedido_bling_expoe_contexto_duplicidade_e_acoes():
+    pedido = SimpleNamespace(
+        id=20,
+        pedido_bling_id="25439737683",
+        pedido_bling_numero="11680",
+        canal="shopee",
+        status="confirmado",
+        criado_em=None,
+        expira_em=None,
+        confirmado_em=None,
+        cancelado_em=None,
+        payload={"pedido": {"numeroPedidoLoja": "260330GDQVHGXX", "itens": []}},
+    )
+
+    serializado = _serializar_pedido_bling(
+        pedido,
+        [],
+        duplicidade={
+            "tem_duplicados": True,
+            "pedido_atual_eh_canonico": True,
+            "pedidos_seguro_ids": [21],
+            "pedidos_bloqueados_ids": [],
+            "bloqueios": [],
+            "pedidos_duplicados": [{"id": 21, "pedido_bling_numero": "11681"}],
+            "requer_revisao_manual": False,
+        },
+    )
+
+    assert serializado["duplicidade"]["tem_duplicados"] is True
+    assert serializado["acoes_disponiveis"]["pode_consolidar_duplicidade"] is True
+    assert serializado["acoes_disponiveis"]["pode_reconciliar_fluxo"] is True
+
+
 def test_confirmar_pedido_so_marca_item_vendido_apos_baixa(monkeypatch):
     db = Mock()
     pedido = SimpleNamespace(

@@ -10,6 +10,7 @@ from app.models import User
 from app.bling_integration import BlingAPI
 from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.bling_flow_monitor_routes import (
+    _enriquecer_registros_contexto,
     _mapa_numeros_pedidos,
     _mapa_numeros_notas_cache,
     _nf_numero_payload,
@@ -184,47 +185,7 @@ def listar_incidentes_compat(
         }
         for incidente in incidentes
     ]
-    mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
-    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
-    for registro in registros:
-        info = mapa_numeros.get(
-            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
-        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
-            (None, registro.get("pedido_bling_id"))
-        )
-        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
-        detalhes = registro.get("details") or {}
-        registro["pedido_bling_numero"] = (
-            (info or {}).get("pedido_bling_numero")
-            or _texto(
-                _primeiro_preenchido(
-                    detalhes.get("pedido_bling_numero"),
-                    (detalhes.get("nf_detectada") or {}).get("pedido_bling_numero"),
-                )
-            )
-        )
-        registro["numero_pedido_loja"] = (
-            (info or {}).get("numero_pedido_loja")
-            or _texto(
-                _primeiro_preenchido(
-                    detalhes.get("numero_pedido_loja"),
-                    (detalhes.get("nf_detectada") or {}).get("numero_pedido_loja"),
-                )
-            )
-            or (info_nf or {}).get("numero_pedido_loja")
-        )
-        registro["nf_numero"] = (
-            _texto(
-                _primeiro_preenchido(
-                    detalhes.get("nf_numero"),
-                    (detalhes.get("nf_detectada") or {}).get("numero"),
-                )
-            )
-            or (info_nf or {}).get("nf_numero")
-            or (info or {}).get("nf_numero")
-        )
-        registro["pedido_status_atual"] = (info or {}).get("pedido_status_atual")
-    return registros
+    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.get("/monitor/eventos")
@@ -264,37 +225,7 @@ def listar_eventos_compat(
         }
         for evento in eventos
     ]
-    mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
-    mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
-    for registro in registros:
-        info = mapa_numeros.get(
-            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
-        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
-            (None, registro.get("pedido_bling_id"))
-        )
-        info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
-        payload = registro.get("payload") or {}
-        registro["pedido_bling_numero"] = (
-            (info or {}).get("pedido_bling_numero")
-            or _texto(
-                _primeiro_preenchido(
-                    payload.get("pedido_bling_numero"),
-                    (payload.get("pedido") or {}).get("numero"),
-                )
-            )
-        )
-        registro["numero_pedido_loja"] = (
-            (info or {}).get("numero_pedido_loja")
-            or _numero_pedido_loja_payload(payload)
-            or (info_nf or {}).get("numero_pedido_loja")
-        )
-        registro["nf_numero"] = (
-            _nf_numero_payload(payload)
-            or (info_nf or {}).get("nf_numero")
-            or (info or {}).get("nf_numero")
-        )
-        registro["pedido_status_atual"] = (info or {}).get("pedido_status_atual") or _texto(payload.get("pedido_status_atual"))
-    return registros
+    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.post("/monitor/auditar")
