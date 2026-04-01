@@ -639,6 +639,10 @@ Itens executados nesta etapa:
 - [x] alinhar o detalhe de reservas do produto com a mesma regra do contador:
   - o modal de reservas ativas deixa de esconder pedidos `confirmado` que ainda seguram estoque
   - a operacao passa a enxergar exatamente quais pedidos estao compondo a reserva daquele SKU
+- [x] comecar a quebrar os hooks mais pesados do PDV sem alterar a interface:
+  - `frontend/src/hooks/usePDVProdutos.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
+  - a busca de produto, sugestoes e leitura por scanner foram movidas para `frontend/src/hooks/usePDVProdutoBusca.js`
+  - a mutacao dos itens do carrinho, copia de codigo, KIT e quantidade foram movidas para `frontend/src/hooks/usePDVCarrinhoItens.js`
 
 Itens deliberadamente adiados por agora:
 
@@ -648,7 +652,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar quebrando `PDV.jsx` em subcomponentes e hooks por fluxo
+- [ ] continuar quebrando os hooks mais pesados do PDV, com foco em `usePDVAnalisePagamento.js` e `usePDVEntrega.js`
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
