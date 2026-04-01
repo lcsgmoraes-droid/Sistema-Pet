@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
+import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
+import useProdutosNovoLotes from '../hooks/useProdutosNovoLotes';
 import {
   createProduto,
   updateProduto,
@@ -12,16 +14,8 @@ import {
   getProdutoVariacoes,
   gerarSKU,
   gerarCodigoBarras,
-  getLotes,
-  entradaEstoque,
-  updateLote,
-  deleteLote,
   uploadImagemProduto,
   deleteImagemProduto,
-  getFornecedoresProduto,
-  addFornecedorProduto,
-  updateFornecedorProduto,
-  deleteFornecedorProduto,
   calcularPrecoVenda,
   calcularMarkup,
   formatarMoeda,
@@ -149,9 +143,7 @@ export default function ProdutosNovo() {
   const [categoriasHierarquicas, setCategoriasHierarquicas] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
-  const [lotes, setLotes] = useState([]);
   const [imagens, setImagens] = useState([]);
-  const [fornecedores, setFornecedores] = useState([]);
   const [clientes, setClientes] = useState([]);
   
   // Opções de Ração - Dados dinâmicos das APIs
@@ -196,19 +188,6 @@ export default function ProdutosNovo() {
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-
-  // Modal de entrada de estoque
-  const [modalEntrada, setModalEntrada] = useState(false);
-  const [entradaData, setEntradaData] = useState({
-    quantidade: '',
-    nome_lote: '',
-    data_fabricacao: '',
-    data_validade: '',
-    preco_custo: '',
-  });
-
-  // Modal de edição de lote
-  const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   
   // Estados para controlar edição de campos monetários
   const [camposEmEdicao, setCamposEmEdicao] = useState({
@@ -217,19 +196,37 @@ export default function ProdutosNovo() {
     preco_venda: false,
     preco_promocional: false,
   });
-  const [loteEmEdicao, setLoteEmEdicao] = useState(null);
 
-  // Modal de fornecedor
-  const [modalFornecedor, setModalFornecedor] = useState(false);
-  const [fornecedorEdit, setFornecedorEdit] = useState(null);
-  const [fornecedorData, setFornecedorData] = useState({
-    fornecedor_id: '',
-    codigo_fornecedor: '',
-    preco_custo: '',
-    prazo_entrega: '',
-    estoque_fornecedor: '',
-    e_principal: false,
-  });
+  const {
+    lotes,
+    setLotes,
+    modalEntrada,
+    setModalEntrada,
+    entradaData,
+    setEntradaData,
+    modalEdicaoLote,
+    setModalEdicaoLote,
+    loteEmEdicao,
+    setLoteEmEdicao,
+    handleEntradaEstoque,
+    handleEditarLote,
+    handleSalvarEdicaoLote,
+    handleExcluirLote,
+  } = useProdutosNovoLotes({ id });
+
+  const {
+    fornecedores,
+    setFornecedores,
+    modalFornecedor,
+    setModalFornecedor,
+    fornecedorEdit,
+    fornecedorData,
+    setFornecedorData,
+    handleAddFornecedor,
+    handleEditFornecedor,
+    handleSaveFornecedor,
+    handleDeleteFornecedor,
+  } = useProdutosNovoFornecedores({ id });
 
   const { salvarFiscal } = useProdutosNovoCarregamento({
     id,
@@ -370,114 +367,6 @@ export default function ProdutosNovo() {
     }
   };
 
-  const handleEntradaEstoque = async () => {
-    if (!entradaData.quantidade || !entradaData.preco_custo) {
-      alert('Preencha quantidade e preÃ§o de custo!');
-      return;
-    }
-
-    try {
-      // Gerar nÃºmero de lote automÃ¡tico se nÃ£o preenchido
-      const numeroLote = entradaData.nome_lote || `LOTE-${Date.now()}`;
-      
-      // Converter datas para formato ISO com hora
-      const dataFabricacao = entradaData.data_fabricacao 
-        ? new Date(entradaData.data_fabricacao + 'T00:00:00').toISOString() 
-        : null;
-      const dataValidade = entradaData.data_validade 
-        ? new Date(entradaData.data_validade + 'T23:59:59').toISOString() 
-        : null;
-      
-      await entradaEstoque(id, {
-        nome_lote: numeroLote,
-        quantidade: parseFloat(entradaData.quantidade),
-        preco_custo: parseFloat(entradaData.preco_custo),
-        data_fabricacao: dataFabricacao,
-        data_validade: dataValidade,
-        observacoes: entradaData.observacoes || null,
-      });
-      
-      alert('Entrada de estoque realizada com sucesso!');
-      setModalEntrada(false);
-      setEntradaData({
-        quantidade: '',
-        nome_lote: '',
-        data_fabricacao: '',
-        data_validade: '',
-        preco_custo: '',
-      });
-      
-      // Recarregar lotes
-      const lotesRes = await getLotes(id);
-      setLotes(lotesRes.data);
-    } catch (error) {
-      console.error('Erro ao registrar entrada:', error);
-      alert(error.response?.data?.detail || 'Erro ao registrar entrada de estoque');
-    }
-  };
-
-  const handleEditarLote = (lote) => {
-    setLoteEmEdicao({
-      id: lote.id,
-      nome_lote: lote.nome_lote,
-      quantidade_inicial: lote.quantidade_inicial,
-      data_fabricacao: lote.data_fabricacao?.split('T')[0] || '',
-      data_validade: lote.data_validade?.split('T')[0] || '',
-      custo_unitario: lote.custo_unitario,
-    });
-    setModalEdicaoLote(true);
-  };
-
-  const handleSalvarEdicaoLote = async () => {
-    try {
-      const dataFabricacao = loteEmEdicao.data_fabricacao 
-        ? new Date(loteEmEdicao.data_fabricacao + 'T00:00:00').toISOString()
-        : null;
-      
-      const dataValidade = loteEmEdicao.data_validade 
-        ? new Date(loteEmEdicao.data_validade + 'T23:59:59').toISOString()
-        : null;
-
-      const dados = {
-        nome_lote: loteEmEdicao.nome_lote,
-        quantidade_inicial: parseFloat(loteEmEdicao.quantidade_inicial),
-        data_fabricacao: dataFabricacao,
-        data_validade: dataValidade,
-        custo_unitario: parseFloat(loteEmEdicao.custo_unitario),
-      };
-
-      await updateLote(id, loteEmEdicao.id, dados);
-      alert('Lote atualizado com sucesso!');
-      setModalEdicaoLote(false);
-      setLoteEmEdicao(null);
-      
-      // Recarregar lotes
-      const lotesRes = await getLotes(id);
-      setLotes(lotesRes.data);
-    } catch (error) {
-      console.error('Erro ao atualizar lote:', error);
-      alert(error.response?.data?.detail || 'Erro ao atualizar lote');
-    }
-  };
-
-  const handleExcluirLote = async (lote) => {
-    if (!window.confirm(`Deseja realmente excluir o lote ${lote.nome_lote}?\n\nQuantidade: ${lote.quantidade_disponivel} unidades\nIsso removerá o registro de entrada do estoque.`)) {
-      return;
-    }
-
-    try {
-      await deleteLote(id, lote.id);
-      alert('Lote excluído com sucesso!');
-      
-      // Recarregar lotes
-      const lotesRes = await getLotes(id);
-      setLotes(lotesRes.data);
-    } catch (error) {
-      console.error('Erro ao excluir lote:', error);
-      alert(error.response?.data?.detail || 'Erro ao excluir lote');
-    }
-  };
-
   // ==================== IMAGENS ====================
   
   const handleUploadImagem = async (e) => {
@@ -565,85 +454,6 @@ export default function ProdutosNovo() {
     }
   };
 
-  // ==================== FORNECEDORES ====================
-  
-  const handleAddFornecedor = () => {
-    setFornecedorEdit(null);
-    setFornecedorData({
-      fornecedor_id: '',
-      codigo_fornecedor: '',
-      preco_custo: '',
-      prazo_entrega: '',
-      estoque_fornecedor: '',
-      e_principal: false,
-    });
-    setModalFornecedor(true);
-  };
-  
-  const handleEditFornecedor = (fornecedor) => {
-    setFornecedorEdit(fornecedor);
-    setFornecedorData({
-      fornecedor_id: fornecedor.fornecedor_id,
-      codigo_fornecedor: fornecedor.codigo_fornecedor || '',
-      preco_custo: fornecedor.preco_custo || '',
-      prazo_entrega: fornecedor.prazo_entrega || '',
-      estoque_fornecedor: fornecedor.estoque_fornecedor || '',
-      e_principal: fornecedor.e_principal || false,
-    });
-    setModalFornecedor(true);
-  };
-  
-  const handleSaveFornecedor = async () => {
-    if (!fornecedorData.fornecedor_id) {
-      alert('Selecione um fornecedor');
-      return;
-    }
-
-    try {
-      const dados = {
-        ...fornecedorData,
-        preco_custo: fornecedorData.preco_custo ? parseFloat(fornecedorData.preco_custo) : null,
-        prazo_entrega: fornecedorData.prazo_entrega ? parseInt(fornecedorData.prazo_entrega) : null,
-        estoque_fornecedor: fornecedorData.estoque_fornecedor ? parseFloat(fornecedorData.estoque_fornecedor) : null,
-      };
-
-      if (fornecedorEdit) {
-        await updateFornecedorProduto(fornecedorEdit.id, dados);
-        alert('Fornecedor atualizado!');
-      } else {
-        await addFornecedorProduto(id, dados);
-        alert('Fornecedor vinculado!');
-      }
-      
-      // Recarregar fornecedores
-      const fornRes = await getFornecedoresProduto(id);
-      setFornecedores(fornRes.data);
-      
-      setModalFornecedor(false);
-      
-    } catch (error) {
-      console.error('Erro ao salvar fornecedor:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar fornecedor');
-    }
-  };
-  
-  const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!confirm('Deseja realmente desvincular este fornecedor?')) return;
-    
-    try {
-      await deleteFornecedorProduto(fornecedorId);
-      
-      // Recarregar fornecedores
-      const fornRes = await getFornecedoresProduto(id);
-      setFornecedores(fornRes.data);
-      
-      alert('Fornecedor desvinculado!');
-    } catch (error) {
-      console.error('Erro ao desvincular fornecedor:', error);
-      alert('Erro ao desvincular fornecedor');
-    }
-  };
-  
   // ============================================
   // FUNÇÕES DE GERENCIAMENTO DE KIT/COMPOSIÇÃO
   // ============================================

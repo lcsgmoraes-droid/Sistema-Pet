@@ -676,6 +676,10 @@ Itens executados nesta etapa:
   - a logica de carregar dados auxiliares, opcoes de racao, produto, predecessor/sucessor, imagens, lotes e fornecedores foi movida para `frontend/src/hooks/useProdutosNovoCarregamento.js`
   - o carregamento e a persistencia fiscal passaram a sair da pagina e ficar concentrados no mesmo hook
   - `ProdutosNovo.jsx` caiu de `4039` para `3761` linhas sem mudar a interface da tela
+- [x] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de lotes e fornecedores:
+  - o CRUD de lotes foi movido para `frontend/src/hooks/useProdutosNovoLotes.js`, incluindo modais, estados e recarga da grade
+  - o CRUD de fornecedores foi movido para `frontend/src/hooks/useProdutosNovoFornecedores.js`, incluindo modal, formulario e recarga da lista
+  - `ProdutosNovo.jsx` caiu de `3761` para `3571` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
@@ -685,7 +689,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de lotes, imagens, fornecedores e kit
+- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de imagens e kit
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
