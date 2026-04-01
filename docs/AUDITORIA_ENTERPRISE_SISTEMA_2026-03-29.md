@@ -541,6 +541,10 @@ Itens executados nesta etapa:
   - fluxo de salvar e atualizar venda movido para `frontend/src/hooks/usePDVSalvarVenda.js`
   - `PDV.jsx` deixou de concentrar payloads operacionais, sincronizacao de status por pagamento e logs de persistencia
   - `PDV.jsx` caiu para `1846` linhas, mantendo a mesma interface operacional
+- [x] iniciar a extracao do fluxo de analise e pagamento do `PDV.jsx`:
+  - hook `frontend/src/hooks/usePDVAnalisePagamento.js` criado para centralizar analise da venda, recarga apos pagamento e estados do drawer
+  - `PDVModalsLayer` passou a consumir o fluxo de analise/pagamento via hook, em vez de depender so da pagina
+  - a limpeza completa do bloco legado desse fluxo ficou preparada para a proxima passada, sem alterar a interface operacional
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling

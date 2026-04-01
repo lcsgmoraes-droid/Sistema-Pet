@@ -5,16 +5,13 @@
 // 2. Testar cenário real
 // 3. Validar impacto financeiro
 
-import {
-  CheckCircle,
-} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import { buscarClientePorId, buscarClientes } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
-import { buscarVenda, listarVendas } from "../api/vendas";
+import { buscarVenda } from "../api/vendas";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
@@ -32,6 +29,7 @@ import PDVProdutosCard from "../components/pdv/PDVProdutosCard";
 import PDVResumoFinanceiroCard from "../components/pdv/PDVResumoFinanceiroCard";
 import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar";
 import { useAuth } from "../contexts/AuthContext";
+import { usePDVAnalisePagamento } from "../hooks/usePDVAnalisePagamento";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
@@ -142,13 +140,10 @@ export default function PDV() {
   const [loadingCupom, setLoadingCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
   const [saldoCampanhas, setSaldoCampanhas] = useState(null); // {saldo_cashback, total_carimbos, cupons_ativos}
+  const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);
 
-  const [statusOriginalVenda, setStatusOriginalVenda] = useState(null); // Guardar status antes de reabrir
 
   // Estados do drawer de análise de venda
-  const [mostrarAnaliseVenda, setMostrarAnaliseVenda] = useState(false);
-  const [dadosAnalise, setDadosAnalise] = useState(null);
-  const [carregandoAnalise, setCarregandoAnalise] = useState(false);
 
   // Estado para controlar expansão de itens KIT no carrinho
   const [itensKitExpandidos, setItensKitExpandidos] = useState({});
@@ -257,6 +252,25 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     vendaComissionada,
     funcionarioComissao,
     limparVenda,
+    carregarVendasRecentes: () => carregarVendasRecentes(),
+  });
+  const {
+    mostrarAnaliseVenda,
+    setMostrarAnaliseVenda,
+    dadosAnalise,
+    carregandoAnalise,
+    analisarVendaComFormasPagamento: analisarVendaComFormasPagamentoHook,
+    handleConfirmarPagamento: handleConfirmarPagamentoHook,
+    handleVendaAtualizadaAposPagamento: handleVendaAtualizadaAposPagamentoHook,
+  } = usePDVAnalisePagamento({
+    vendaAtual,
+    setVendaAtual,
+    setLoading,
+    modoVisualizacao,
+    setModoVisualizacao,
+    setMostrarModalPagamento,
+    limparVenda,
+    carregarVendaEspecifica,
     carregarVendasRecentes: () => carregarVendasRecentes(),
   });
 
@@ -1683,7 +1697,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     return vendaAtualizada;
   };
 
-  const handleConfirmarPagamento = async () => {
+  const handleConfirmarPagamentoLegado = async () => {
     setMostrarModalPagamento(false);
 
     if (modoVisualizacao && vendaAtual.id) {
@@ -2040,7 +2054,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
           vendaAtual={vendaAtual}
           onAbrirCaixaSucesso={handleAbrirCaixaSucesso}
           onAnalisarVenda={
-            podeVerMargem ? analisarVendaComFormasPagamento : null
+            podeVerMargem ? analisarVendaComFormasPagamentoHook : null
           }
           onAplicarDescontoTotal={aplicarDescontoTotal}
           onBuscarCep={buscarCepModal}
@@ -2062,12 +2076,12 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
           onClosePendenciasEstoque={() => setMostrarPendenciasEstoque(false)}
           onCloseVendasEmAberto={() => setMostrarVendasEmAberto(false)}
           onConfirmarCredito={handleConfirmarCreditoCliente}
-          onConfirmarPagamento={handleConfirmarPagamento}
+          onConfirmarPagamento={handleConfirmarPagamentoHook}
           onPendenciaAdicionada={carregarPendencias}
           onRemoverItemEditando={removerItemEditando}
           onSalvarDescontoItem={salvarDescontoItem}
           onSalvarEndereco={salvarEnderecoNoCliente}
-          onVendaAtualizada={handleVendaAtualizadaAposPagamento}
+          onVendaAtualizada={handleVendaAtualizadaAposPagamentoHook}
           onVendasEmAbertoSucesso={handleVendasEmAbertoSucesso}
         />
       </div>
