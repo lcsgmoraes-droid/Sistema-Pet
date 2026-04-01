@@ -5,11 +5,8 @@
 // 2. Testar cenÃ¡rio real
 // 3. Validar impacto financeiro
 
-import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import api from "../api";
-import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
 import PDVClienteCard from "../components/pdv/PDVClienteCard";
@@ -29,21 +26,22 @@ import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar
 import { useAuth } from "../contexts/AuthContext";
 import { usePDVAnalisePagamento } from "../hooks/usePDVAnalisePagamento";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
+import { usePDVCaixaRacao } from "../hooks/usePDVCaixaRacao";
 import { usePDVCliente } from "../hooks/usePDVCliente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVDescontos } from "../hooks/usePDVDescontos";
+import { usePDVEndereco } from "../hooks/usePDVEndereco";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
+import { usePDVEstoqueFiscal } from "../hooks/usePDVEstoqueFiscal";
+import { usePDVInicializacao } from "../hooks/usePDVInicializacao";
 import { usePDVOportunidades } from "../hooks/usePDVOportunidades";
 import { usePDVProdutos } from "../hooks/usePDVProdutos";
 import { usePDVSalvarVenda } from "../hooks/usePDVSalvarVenda";
+import { usePDVUIState } from "../hooks/usePDVUIState";
 import { usePDVVendasRecentes } from "../hooks/usePDVVendasRecentes";
 import { usePDVVendaAtual } from "../hooks/usePDVVendaAtual";
-import { usePersistentBooleanState } from "../hooks/usePersistentBooleanState";
-import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
 import { useTour } from "../hooks/useTour";
 import { tourPDV } from "../tours/tourDefinitions";
-import { debugLog } from "../utils/debug";
-import { formatBRL } from "../utils/formatters";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 
 export default function PDV() {
@@ -85,37 +83,30 @@ export default function PDV() {
     },
   });
 
-  // Estados de UI
-  const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
-  const [mostrarModalCliente, setMostrarModalCliente] = useState(false);
-  const [mostrarModalAbrirCaixa, setMostrarModalAbrirCaixa] = useState(false);
-  const [mostrarVendasEmAberto, setMostrarVendasEmAberto] = useState(false);
-  const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
-  const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
-    useState(false);
-  const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
-    useState(false);
-  const [pendenciasCount, setPendenciasCount] = useState(0);
-  const [pendenciasProdutoIds, setPendenciasProdutoIds] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [modoVisualizacao, setModoVisualizacao] = useState(false);
-  const [searchVendaQuery, setSearchVendaQuery] = useState("");
-  const [caixaKey, setCaixaKey] = useState(0); // Para forÃ§ar recarga do MenuCaixa
-  const [temCaixaAberto, setTemCaixaAberto] = useState(false);
-
-  // Estados do modal de endereÃ§o
-  const [mostrarModalEndereco, setMostrarModalEndereco] = useState(false);
-  const [enderecoAtual, setEnderecoAtual] = useState(null);
-  const [loadingCep, setLoadingCep] = useState(false);
-
-  // Estados do drawer de anÃ¡lise de venda
-
-  // Estados de controle de painÃ©is laterais (UX - FASE 1)
-  const [painelVendasAberto, setPainelVendasAberto] =
-    usePersistentBooleanState("pdv_painel_vendas_aberto", false);
-
-  const [painelClienteAberto, setPainelClienteAberto] =
-    usePersistentBooleanState("pdv_painel_cliente_aberto", false);
+  const {
+    mostrarModalPagamento,
+    setMostrarModalPagamento,
+    mostrarModalCliente,
+    setMostrarModalCliente,
+    mostrarVendasEmAberto,
+    setMostrarVendasEmAberto,
+    mostrarHistoricoCliente,
+    setMostrarHistoricoCliente,
+    mostrarModalAdicionarCredito,
+    setMostrarModalAdicionarCredito,
+    mostrarPendenciasEstoque,
+    setMostrarPendenciasEstoque,
+    loading,
+    setLoading,
+    modoVisualizacao,
+    setModoVisualizacao,
+    searchVendaQuery,
+    setSearchVendaQuery,
+    painelVendasAberto,
+    setPainelVendasAberto,
+    painelClienteAberto,
+    setPainelClienteAberto,
+  } = usePDVUIState();
 
   const {
     buscarCliente,
@@ -157,13 +148,33 @@ export default function PDV() {
     fecharDriveAlert,
   } = usePDVVendasRecentes();
 
-  // ðŸ†• Estados fiscais do PDV (PDV-UX-01)
-  const [fiscalItens, setFiscalItens] = useState({});
-  const [totalImpostos, setTotalImpostos] = useState(0);
+  const {
+    mostrarModalAbrirCaixa,
+    setMostrarModalAbrirCaixa,
+    caixaKey,
+    temCaixaAberto,
+    mostrarCalculadoraRacao,
+    racaoIdFechada,
+    fecharCalculadoraRacao,
+    handleAbrirCaixaSucesso,
+  } = usePDVCaixaRacao({
+    vendaAtual,
+    destaqueAbrirCaixa,
+  });
 
-  // ðŸ†• Estados para Calculadora de RaÃ§Ã£o no PDV
-const [mostrarCalculadoraRacao, setMostrarCalculadoraRacao] = useState(false);
-const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o fechada (nÃ£o reabre automÃ¡tico)
+  const {
+    mostrarModalEndereco,
+    enderecoAtual,
+    setEnderecoAtual,
+    loadingCep,
+    abrirModalEndereco,
+    fecharModalEndereco,
+    buscarCepModal,
+    salvarEnderecoNoCliente,
+  } = usePDVEndereco({
+    vendaAtual,
+    setVendaAtual,
+  });
 
   const {
     painelAssistenteAberto,
@@ -174,7 +185,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
     enviandoAssistente,
     chatAssistenteEndRef,
     alertasCarrinho,
-    infosCarrinho,
     enviarMensagemAssistente,
     alternarPainelAssistente,
   } = usePDVAssistente(vendaAtual);
@@ -300,6 +310,16 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
     recalcularTotais,
   });
   const {
+    pendenciasCount,
+    pendenciasProdutoIds,
+    totalImpostos,
+    carregarPendencias,
+    adicionarNaListaEsperaRapido,
+  } = usePDVEstoqueFiscal({
+    vendaAtual,
+    limparBuscaProduto,
+  });
+  const {
     mostrarAnaliseVenda,
     setMostrarAnaliseVenda,
     dadosAnalise,
@@ -323,347 +343,21 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
     carregarVendaEspecifica,
     carregarVendasRecentes: () => carregarVendasRecentes(),
   });
-
-  // Carregar pendÃªncias quando o cliente mudar
-  useEffect(() => {
-    if (vendaAtual.cliente) {
-      carregarPendencias();
-    }
-  }, [vendaAtual.cliente]);
-
-  // Salvar dados do carrinho no sessionStorage para a calculadora universal
-  useEffect(() => {
-    if (vendaAtual.itens && vendaAtual.itens.length > 0) {
-      sessionStorage.setItem(
-        "pdv_calculadora_data",
-        JSON.stringify({
-          itens: vendaAtual.itens,
-          clienteId: vendaAtual.cliente?.id || null,
-        }),
-      );
-    } else {
-      sessionStorage.removeItem("pdv_calculadora_data");
-    }
-  }, [vendaAtual.itens, vendaAtual.cliente]);
-
-  // Verificar se hÃ¡ caixa aberto
-  useEffect(() => {
-    verificarCaixaAberto();
-
-    // ðŸ”„ Verificar caixa a cada 30 segundos (polling)
-    const intervalId = setInterval(() => {
-      verificarCaixaAberto();
-    }, 30000); // 30 segundos
-
-    return () => clearInterval(intervalId); // Limpar interval ao desmontar
-  }, [caixaKey]);
-
-  const verificarCaixaAberto = async () => {
-    try {
-      const response = await api.get("/caixas/aberto");
-      setTemCaixaAberto(!!response.data); // true se houver caixa, false se nÃ£o
-    } catch (error) {
-      setTemCaixaAberto(false);
-    }
-  };
-
-  // Adicionar produto Ã  lista de espera direto da busca (estoque zerado)
-  const adicionarNaListaEsperaRapido = async (produto, e) => {
-    e.stopPropagation();
-    if (!vendaAtual.cliente) {
-      toast.error("Selecione um cliente primeiro");
-      return;
-    }
-    try {
-      await api.post("/pendencias-estoque/", {
-        cliente_id: vendaAtual.cliente.id,
-        produto_id: produto.id,
-        quantidade_desejada: 1,
-        prioridade: 1,
-        observacoes: null,
-      });
-      toast.success(`"${produto.nome}" adicionado Ã  lista de espera!`);
-      limparBuscaProduto();
-      carregarPendencias();
-    } catch (error) {
-      toast.error(
-        error.response?.data?.detail || "Erro ao adicionar Ã  lista de espera",
-      );
-    }
-  };
-
-  // Carregar pendÃªncias de estoque do cliente
-  const carregarPendencias = async () => {
-    if (!vendaAtual.cliente) {
-      setPendenciasCount(0);
-      return;
-    }
-
-    try {
-      const response = await api.get(
-        `/pendencias-estoque/cliente/${vendaAtual.cliente.id}`,
-      );
-      const todas = Array.isArray(response.data?.pendencias) ? response.data.pendencias : [];
-      const pendenciasAtivas = todas.filter(
-        (p) => p.status === "pendente" || p.status === "notificado",
-      );
-      setPendenciasCount(pendenciasAtivas.length);
-      setPendenciasProdutoIds(pendenciasAtivas.map((p) => p.produto_id));
-    } catch (error) {
-      setPendenciasCount(0);
-      setPendenciasProdutoIds([]);
-    }
-  };
-
-  // ðŸ†• FunÃ§Ã£o para calcular fiscal de um item (PDV-UX-01)
-  async function calcularFiscalItem(item) {
-    try {
-      const payload = {
-        produto_id: item.produto_id,
-        preco_unitario: item.preco_unitario,
-        quantidade: item.quantidade,
-      };
-
-      const { data } = await api.post("/pdv/fiscal/calcular", payload);
-      return data;
-    } catch (error) {
-      console.error("Erro ao calcular fiscal:", error);
-      return null;
-    }
-  }
-
-  // ðŸ†• Recalcular fiscal sempre que o carrinho mudar (PDV-UX-01)
-  useEffect(() => {
-    async function recalcularFiscal() {
-      let impostosTotais = 0;
-      const fiscais = {};
-
-      for (const item of vendaAtual.itens) {
-        const fiscal = await calcularFiscalItem(item);
-        if (fiscal) {
-          fiscais[item.produto_id] = fiscal;
-          impostosTotais += Number(fiscal.total_impostos);
-        }
-      }
-
-      setFiscalItens(fiscais);
-      setTotalImpostos(impostosTotais.toFixed(2));
-    }
-
-    if (vendaAtual.itens && vendaAtual.itens.length > 0) {
-      recalcularFiscal();
-    } else {
-      setFiscalItens({});
-      setTotalImpostos(0);
-    }
-  }, [vendaAtual.itens]);
-
-  // Carregar venda especÃ­fica se vier na URL
-  useEffect(() => {
-    const vendaId =
-      searchParams.get("venda") ||
-      searchParams.get("vendaId") ||
-      searchParams.get("venda_id");
-    if (vendaId) {
-      carregarVendaEspecifica(Number.parseInt(vendaId));
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (destaqueAbrirCaixa && !temCaixaAberto && !mostrarModalAbrirCaixa) {
-      setMostrarModalAbrirCaixa(true);
-    }
-  }, [destaqueAbrirCaixa, temCaixaAberto, mostrarModalAbrirCaixa]);
-
-  // ðŸ†• DETECTAR REDIRECIONAMENTO DO CONTAS A RECEBER
-  useEffect(() => {
-    const vendaId = sessionStorage.getItem("abrirVenda");
-    const abrirModal = sessionStorage.getItem("abrirModalPagamento");
-
-    if (vendaId && abrirModal === "true") {
-      // Limpa os dados do sessionStorage
-      sessionStorage.removeItem("abrirVenda");
-      sessionStorage.removeItem("abrirModalPagamento");
-
-      // Carrega a venda e abre o modal
-      carregarVendaEspecifica(Number.parseInt(vendaId), true);
-    }
-  }, []);
-
-  // FunÃ§Ãµes do modal de endereÃ§o
-  const abrirModalEnderecoPDV = () => {
-    setEnderecoAtual({
-      tipo: "entrega",
-      apelido: "",
-      cep: "",
-      endereco: "",
-      numero: "",
-      complemento: "",
-      bairro: "",
-      cidade: "",
-      estado: "",
-    });
-    setMostrarModalEndereco(true);
-  };
-
-  const fecharModalEndereco = () => {
-    setMostrarModalEndereco(false);
-    setEnderecoAtual(null);
-  };
-
-  const buscarCepModal = async (cep) => {
-    if (!cep || cep.length !== 9) return;
-
-    setLoadingCep(true);
-    try {
-      const response = await fetch(
-        `https://viacep.com.br/ws/${cep.replace("-", "")}/json/`,
-      );
-      const data = await response.json();
-
-      if (data.erro) {
-        alert("CEP nÃ£o encontrado");
-        return;
-      }
-
-      setEnderecoAtual((prev) => ({
-        ...prev,
-        endereco: data.logradouro || "",
-        bairro: data.bairro || "",
-        cidade: data.localidade || "",
-        estado: data.uf || "",
-      }));
-    } catch (error) {
-      console.error("Erro ao buscar CEP:", error);
-      alert("Erro ao buscar CEP");
-    } finally {
-      setLoadingCep(false);
-    }
-  };
-
-  const salvarEnderecoNoCliente = async () => {
-    if (
-      !enderecoAtual.cep ||
-      !enderecoAtual.endereco ||
-      !enderecoAtual.cidade
-    ) {
-      alert("Preencha pelo menos CEP, EndereÃ§o e Cidade");
-      return;
-    }
-
-    if (!vendaAtual.cliente || !vendaAtual.cliente.id) {
-      alert("Selecione um cliente primeiro");
-      return;
-    }
-
-    try {
-      // Buscar dados atuais do cliente
-      const clienteAtual = await buscarClientePorId(vendaAtual.cliente.id);
-
-      // Adicionar novo endereÃ§o ao array de enderecos_adicionais
-      const enderecosAdicionais = clienteAtual.enderecos_adicionais || [];
-      enderecosAdicionais.push({ ...enderecoAtual });
-
-      // Atualizar cliente no backend
-      await api.put(`/clientes/${vendaAtual.cliente.id}`, {
-        ...clienteAtual,
-        enderecos_adicionais: enderecosAdicionais,
-      });
-
-      // Atualizar cliente na venda atual
-      const clienteAtualizado = await buscarClientePorId(vendaAtual.cliente.id);
-      setVendaAtual({
-        ...vendaAtual,
-        cliente: clienteAtualizado,
-      });
-
-      alert("EndereÃ§o adicionado com sucesso!");
-      fecharModalEndereco();
-    } catch (error) {
-      console.error("Erro ao salvar endereÃ§o:", error);
-      alert("Erro ao salvar endereÃ§o. Tente novamente.");
-    }
-  };
-
-  // fluxo de descontos/cupom movido para usePDVDescontos
-
-  const handleNovaVenda = () => {
-    if (window.confirm("Descartar venda atual sem salvar?")) {
-      limparVenda();
-    }
-  };
-
-  // carregarVendaEspecifica e handleBuscarVenda movidos para usePDVVendaAtual
-
-
-  // fluxo de produtos movido para usePDVProdutos
-
-  // ðŸ¥« Abrir modal de calculadora de raÃ§Ã£o manualmente (via botÃ£o flutuante)
-  const abrirCalculadoraRacao = () => {
-    debugLog("ðŸ” Debug - Itens no carrinho:", vendaAtual.itens);
-    debugLog("ðŸ” Debug - Verificando raÃ§Ãµes...");
-
-    vendaAtual.itens.forEach((item, index) => {
-      debugLog(`  Item ${index + 1}: ${item.produto_nome}`);
-      debugLog(`    - peso_embalagem: ${item.peso_embalagem}`);
-      debugLog(`    - classificacao_racao: ${item.classificacao_racao}`);
-      debugLog(`    - categoria_id: ${item.categoria_id}`);
-      debugLog(`    - categoria_nome: ${item.categoria_nome}`);
-      debugLog(`    - Ã‰ raÃ§Ã£o?: ${ehRacao(item)}`);
-    });
-
-    const racoes = contarRacoes(vendaAtual.itens);
-    debugLog(`ðŸ“Š Total de raÃ§Ãµes encontradas: ${racoes}`);
-
-    if (racoes === 0) {
-      toast.error("Nenhuma raÃ§Ã£o no carrinho");
-      return;
-    }
-
-    setRacaoIdFechada(null); // Limpar raÃ§Ã£o fechada anterior
-    setMostrarCalculadoraRacao(true);
-  };
-
-  // salvarVenda movido para usePDVSalvarVenda
-  // anÃ¡lise, pagamento e pÃ³s-finalizaÃ§Ã£o movidos para usePDVAnalisePagamento
-
-  const handleAbrirCaixaSucesso = () => {
-    setMostrarModalAbrirCaixa(false);
-    setCaixaKey((prev) => prev + 1);
-    setTemCaixaAberto(true);
-  };
-
-  const handleFecharCalculadoraRacao = () => {
-    const racoes = vendaAtual.itens.filter((item) => {
-      const nomeCategoria = (item.categoria_nome || "").toLowerCase();
-      return (
-        nomeCategoria.includes("ra\xe7\xe3o") || nomeCategoria.includes("racao")
-      );
-    });
-
-    if (racoes.length > 0) {
-      setRacaoIdFechada(racoes[racoes.length - 1].produto_id);
-    }
-
-    setMostrarCalculadoraRacao(false);
-  };
-
-  const handleClienteCriadoRapido = async (cliente) => {
-    await handleClienteCriadoRapidoHook(cliente);
-    setMostrarModalCliente(false);
-  };
-
-  const handleVendasEmAbertoSucesso = () => {
-    void recarregarVendasEmAbertoClienteAtual();
-  };
-
-  const handleConfirmarCreditoCliente = (novoSaldo) => {
-    setVendaAtual((prev) => ({
-      ...prev,
-      cliente: { ...prev.cliente, credito: novoSaldo },
-    }));
-    setMostrarModalAdicionarCredito(false);
-  };
+  const {
+    handleNovaVenda,
+    handleClienteCriadoRapido,
+    handleVendasEmAbertoSucesso,
+    handleConfirmarCreditoCliente,
+  } = usePDVInicializacao({
+    searchParams,
+    carregarVendaEspecifica,
+    handleClienteCriadoRapidoHook,
+    setMostrarModalCliente,
+    recarregarVendasEmAbertoClienteAtual,
+    setVendaAtual,
+    setMostrarModalAdicionarCredito,
+    limparVenda,
+  });
 
   return (
     <>
@@ -794,7 +488,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
                 entregadorSelecionado={entregadorSelecionado}
                 entregadores={entregadores}
                 modoVisualizacao={modoVisualizacao}
-                onAbrirModalEndereco={abrirModalEnderecoPDV}
+                onAbrirModalEndereco={abrirModalEndereco}
                 onEnderecoEntregaChange={handleEnderecoEntregaChange}
                 onObservacoesEntregaChange={handleObservacoesEntregaChange}
                 onSelecionarEndereco={handleSelecionarEnderecoEntrega}
@@ -933,7 +627,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
           onChangeItemEditando={setItemEditando}
           onClienteCriado={handleClienteCriadoRapido}
           onCloseAnalise={() => setMostrarAnaliseVenda(false)}
-          onCloseCalculadoraRacao={handleFecharCalculadoraRacao}
+          onCloseCalculadoraRacao={fecharCalculadoraRacao}
           onCloseHistoricoCliente={() => setMostrarHistoricoCliente(false)}
           onCloseModalAbrirCaixa={() => setMostrarModalAbrirCaixa(false)}
           onCloseModalAdicionarCredito={() =>

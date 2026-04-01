@@ -561,6 +561,10 @@ Itens executados nesta etapa:
   - hook `frontend/src/hooks/usePDVProdutos.js` criado para centralizar busca de produto, sugestoes, leitura por scanner, adicao ao carrinho, quantidade, pet por item, remocao e expansao de KIT
   - `PDVProdutosCard` e a acao de lista de espera rapida passaram a consumir esse fluxo via hook, em vez de depender do bloco inline da pagina
   - `PDV.jsx` caiu para `968` linhas, mantendo a mesma interface operacional
+- [x] extrair o bloco auxiliar restante do `PDV.jsx` para hooks de suporte:
+  - hooks `frontend/src/hooks/usePDVEstoqueFiscal.js`, `frontend/src/hooks/usePDVEndereco.js` e `frontend/src/hooks/usePDVCaixaRacao.js` passaram a centralizar pendencias de estoque, calculo fiscal, modal de endereco, calculadora de racao e estado operacional do caixa
+  - hooks `frontend/src/hooks/usePDVUIState.js` e `frontend/src/hooks/usePDVInicializacao.js` passaram a centralizar estado visual, restauracao de venda via URL/sessionStorage e handlers auxiliares do fluxo
+  - `PDV.jsx` caiu para `631` linhas, mantendo a mesma interface operacional
 - [x] persistir a listagem de NF do Bling em cache local no banco:
   - tabela `bling_notas_fiscais_cache` criada para armazenar resumos e detalhes de NF/NFC-e ja vistos
   - `GET /nfe/` passa a usar o cache persistente como fonte principal e sincroniza apenas uma janela incremental recente do Bling
