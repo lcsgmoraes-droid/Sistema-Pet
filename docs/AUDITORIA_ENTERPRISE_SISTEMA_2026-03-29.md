@@ -694,6 +694,11 @@ Itens executados nesta etapa:
   - os handlers de recorrencia foram movidos para `frontend/src/hooks/useProdutosNovoRecorrencia.js`
   - os handlers de classificacao, fase e apresentacao de racao foram movidos para `frontend/src/hooks/useProdutosNovoRacao.js`
   - `ProdutosNovo.jsx` caiu de `3160` para `3012` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos residuais de acao/toolbar e pela componentizacao das abas densas:
+  - a geracao de SKU e codigo de barras foi movida para `frontend/src/hooks/useProdutosNovoCodigos.js`
+  - o cabecalho, a navegacao entre abas e o rodape de acoes foram extraidos para `frontend/src/components/produto/ProdutosNovoHeader.jsx`, `frontend/src/components/produto/ProdutosNovoTabs.jsx` e `frontend/src/components/produto/ProdutosNovoFooterActions.jsx`
+  - as abas de tributacao, recorrencia e racao passaram a usar os componentes `frontend/src/components/produto/ProdutosNovoTributacaoTab.jsx`, `frontend/src/components/produto/ProdutosNovoRecorrenciaTab.jsx` e `frontend/src/components/produto/ProdutosNovoRacaoTab.jsx`
+  - `ProdutosNovo.jsx` caiu de `3012` para `2361` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
@@ -703,7 +708,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos residuais de acao/toolbar e pela componentizacao das abas mais densas
+- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelas abas restantes (`variacoes` e `composicao`) e pelos modais residuais (`lotes` e `fornecedores`)
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida

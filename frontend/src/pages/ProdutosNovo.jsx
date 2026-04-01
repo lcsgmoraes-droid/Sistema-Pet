@@ -3,8 +3,14 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import TabelaConsumoEditor from '../components/TabelaConsumoEditor';
+import ProdutosNovoFooterActions from '../components/produto/ProdutosNovoFooterActions';
+import ProdutosNovoHeader from '../components/produto/ProdutosNovoHeader';
+import ProdutosNovoRacaoTab from '../components/produto/ProdutosNovoRacaoTab';
+import ProdutosNovoRecorrenciaTab from '../components/produto/ProdutosNovoRecorrenciaTab';
+import ProdutosNovoTabs from '../components/produto/ProdutosNovoTabs';
+import ProdutosNovoTributacaoTab from '../components/produto/ProdutosNovoTributacaoTab';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
+import useProdutosNovoCodigos from '../hooks/useProdutosNovoCodigos';
 import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
 import useProdutosNovoImagens from '../hooks/useProdutosNovoImagens';
 import useProdutosNovoKit from '../hooks/useProdutosNovoKit';
@@ -16,8 +22,6 @@ import useProdutosNovoSubmit from '../hooks/useProdutosNovoSubmit';
 import useProdutosNovoTributacao from '../hooks/useProdutosNovoTributacao';
 import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
 import {
-  gerarSKU,
-  gerarCodigoBarras,
   calcularPrecoVenda,
   calcularMarkup,
   formatarMoeda,
@@ -345,6 +349,20 @@ export default function ProdutosNovo() {
     salvarFiscal,
     setSalvando,
   });
+
+  const { handleGerarSKU, handleGerarCodigoBarras } = useProdutosNovoCodigos({
+    formData,
+    setFormData,
+  });
+
+  const handleVoltar = () => {
+    if (formData.tipo_produto === 'VARIACAO' && formData.produto_pai_id) {
+      navigate(`/produtos/${formData.produto_pai_id}/editar?aba=8`);
+      return;
+    }
+
+    navigate('/produtos');
+  };
   
   // Auto-detectar "ração" no nome do produto
   useEffect(() => {
@@ -378,37 +396,6 @@ export default function ProdutosNovo() {
     }
   }, [formData.tipo_produto, abaAtiva, isEdicao]);
 
-  const handleGerarSKU = async () => {
-    try {
-      const response = await gerarSKU('PROD');
-      setFormData(prev => ({
-        ...prev,
-        sku: response.data.sku,
-        codigo: response.data.sku,
-      }));
-      alert('SKU gerado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao gerar SKU:', error);
-      alert('Erro ao gerar SKU');
-    }
-  };
-
-  const handleGerarCodigoBarras = async () => {
-    if (!formData.sku) {
-      alert('Gere ou informe um SKU primeiro!');
-      return;
-    }
-
-    try {
-      const response = await gerarCodigoBarras(formData.sku);
-      setFormData(prev => ({ ...prev, codigo_barras: response.data.codigo_barras }));
-      alert('Código de barras gerado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao gerar cÃ³digo de barras:', error);
-      alert('Erro ao gerar cÃ³digo de barras');
-    }
-  };
-
   if (loading) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
@@ -428,93 +415,14 @@ export default function ProdutosNovo() {
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex justify-between items-start">
-          <div>
-            <button
-              onClick={() => {
-                // Se for variação, voltar para o produto PAI
-                if (formData.tipo_produto === 'VARIACAO' && formData.produto_pai_id) {
-                  navigate(`/produtos/${formData.produto_pai_id}/editar?aba=8`);
-                } else {
-                  navigate('/produtos');
-                }
-              }}
-              className="text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              Voltar
-            </button>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {isEdicao ? 'Editar Produto' : 'Novo Produto'}
-            </h1>
-            {/* Informações do Produto - Sempre Visível */}
-            {isEdicao && formData.codigo && (
-              <div className="mt-3 flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-700">SKU:</span>
-                  <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-lg font-mono">
-                    {formData.codigo}
-                  </span>
-                </div>
-                {formData.nome && (
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-gray-700">Descrição:</span>
-                    <span className="text-gray-600">
-                      {formData.nome}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <a
-            href="/cadastros/categorias"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 border border-blue-200 flex items-center gap-2 text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Gerenciar Categorias
-          </a>
-        </div>
-      </div>
+      <ProdutosNovoHeader formData={formData} isEdicao={isEdicao} onVoltar={handleVoltar} />
 
-      {/* Abas */}
-      <div className="mb-6 border-b border-gray-200">
-        <nav className="flex gap-8">
-          {[
-            { id: 1, label: 'Características' },
-            { id: 2, label: 'Imagens' },
-            { id: 3, label: 'Estoque/Lotes' },
-            { id: 4, label: 'Fornecedores' },
-            { id: 5, label: 'Tributação' },
-            { id: 6, label: '🔄 Recorrência' },
-            { id: 7, label: '🥫 Ração' },
-            // Aba de variações (aparece sempre que produto for PAI)
-            ...(formData.tipo_produto === 'PAI' ? [{ id: 8, label: '📦 Variações' }] : []),
-            // Aba de composição (aparece se produto for KIT OU se for VARIACAO com tipo_kit definido)
-            ...(formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit) ? [{ id: 9, label: '🧩 Composição' }] : []),
-          ].map((aba) => (
-            <button
-              key={aba.id}
-              onClick={() => setAbaAtiva(aba.id)}
-              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                abaAtiva === aba.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {aba.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+      <ProdutosNovoTabs
+        abaAtiva={abaAtiva}
+        onChangeAba={setAbaAtiva}
+        tipoProduto={formData.tipo_produto}
+        tipoKit={formData.tipo_kit}
+      />
 
       {/* 🔗 Banner: Produto é continuação de outro (Edit Mode) */}
       {isEdicao && predecessorInfo && (
@@ -1635,613 +1543,37 @@ export default function ProdutosNovo() {
                 </>
               )}
             </div>
-          )}
-
-          {/* ABA 5: TRIBUTAÇÃO */}
+          )}          {/* ABA 5: TRIBUTAÇÃO */}
           {abaAtiva === 5 && (
-            <div className="space-y-6">
-              {/* 🏷️ FISCAL V2: Badge de Origem */}
-              {isEdicao && formData.tributacao && (
-                <div className="mb-4 flex gap-2">
-                  {formData.tributacao.origem === 'produto_legado' && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
-                      ⚪ Legado
-                    </span>
-                  )}
-                  {(formData.tributacao.origem === 'produto_fiscal_v2' || formData.tributacao.origem === 'kit_fiscal_v2') && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
-                      🟡 Personalizado
-                    </span>
-                  )}
-                  {formData.tributacao.herdado_da_empresa && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-200 text-blue-800">
-                      🔵 Herdado da empresa
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* 🔒 Aviso e botão de personalização quando fiscal é herdado */}
-              {isEdicao && formData.tributacao?.herdado_da_empresa === true && (
-                <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3 flex-1">
-                      <p className="text-sm text-blue-700">
-                        Esta configuração fiscal está sendo herdada da empresa. Para editar, personalize o fiscal deste produto.
-                      </p>
-                      <div className="mt-3">
-                        <button
-                          type="button"
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                          onClick={handlePersonalizarFiscal}
-                        >
-                          ✏️ Personalizar fiscal deste produto
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Origem
-                    <span
-                      className="tooltip-icon"
-                      title="Define se o produto é nacional ou importado. Impacta o cálculo do ICMS."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <select
-                    value={formData.tributacao?.origem_mercadoria || '0'}
-                    onChange={(e) => handleChangeTributacao('origem_mercadoria', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="0">0 - Nacional</option>
-                    <option value="1">1 - Estrangeira (Importação direta)</option>
-                    <option value="2">2 - Estrangeira (Adquirida no mercado interno)</option>
-                    <option value="3">3 - Nacional (&gt; 40% conteúdo importado)</option>
-                    <option value="4">4 - Nacional (Conforme processo produtivo básico)</option>
-                    <option value="5">5 - Nacional (&lt; 40% conteúdo importado)</option>
-                    <option value="6">6 - Estrangeira (Importação direta sem similar)</option>
-                    <option value="7">7 - Estrangeira (Mercado interno sem similar)</option>
-                    <option value="8">8 - Nacional (&gt; 70% conteúdo importado)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    NCM
-                    <span
-                      className="tooltip-icon"
-                      title="Nomenclatura Comum do Mercosul. Classificação fiscal do produto, base para impostos."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tributacao?.ncm || ''}
-                    onChange={(e) => handleChangeTributacao('ncm', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="00000000"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    CEST
-                    <span
-                      className="tooltip-icon"
-                      title="Código Especificador da Substituição Tributária. Para produtos sujeitos a ICMS ST."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tributacao?.cest || ''}
-                    onChange={(e) => handleChangeTributacao('cest', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="0000000"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    CFOP
-                    <span
-                      className="tooltip-icon"
-                      title="Código Fiscal de Operações e Prestações. Define a natureza da operação de venda."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.tributacao?.cfop || ''}
-                    onChange={(e) => handleChangeTributacao('cfop', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="0000"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Alíquota ICMS (%)
-                    <span
-                      className="tooltip-icon"
-                      title="Imposto sobre Circulação de Mercadorias. Alíquota estadual aplicada na venda. Impacta o preço final."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.tributacao?.icms_aliquota || ''}
-                    onChange={(e) => handleChangeTributacao('icms_aliquota', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="0,00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Alíquota PIS (%)
-                    <span
-                      className="tooltip-icon"
-                      title="Programa de Integração Social. Contribuição federal sobre a venda. Geralmente 1,65%."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.tributacao?.pis_aliquota || ''}
-                    onChange={(e) => handleChangeTributacao('pis_aliquota', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="0,00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Alíquota COFINS (%)
-                    <span
-                      className="tooltip-icon"
-                      title="Contribuição para Financiamento da Seguridade Social. Contribuição federal sobre a venda. Geralmente 7,6%."
-                    >
-                      🛈
-                    </span>
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.tributacao?.cofins_aliquota || ''}
-                    onChange={(e) => handleChangeTributacao('cofins_aliquota', e.target.value)}
-                    disabled={formData.tributacao?.herdado_da_empresa === true}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ABA 6: RECORRÊNCIA */}
+            <ProdutosNovoTributacaoTab
+              formData={formData}
+              handleChangeTributacao={handleChangeTributacao}
+              handlePersonalizarFiscal={handlePersonalizarFiscal}
+            />
+          )}          {/* ABA 6: RECORRÊNCIA */}
           {abaAtiva === 6 && (
-            <div className="space-y-6">
-              <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-purple-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-purple-800">Sistema de Recorrência (Fase 1)</h3>
-                    <div className="mt-2 text-sm text-purple-700">
-                      <p>Configure produtos que precisam ser recomprados periodicamente (vacinas, antipulgas, rações).</p>
-                      <p className="mt-1">O sistema criará lembretes automáticos para notificar clientes 7 dias antes.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Ativar Recorrência */}
-              <div className="flex items-center p-4 bg-gray-50 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="tem_recorrencia"
-                  checked={formData.tem_recorrencia}
-                  onChange={(e) => handleChange('tem_recorrencia', e.target.checked)}
-                  className="h-5 w-5 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                />
-                <label htmlFor="tem_recorrencia" className="ml-3">
-                  <span className="text-base font-medium text-gray-900">Produto com Recorrência</span>
-                  <p className="text-sm text-gray-500">Ativar lembretes automáticos para este produto</p>
-                </label>
-              </div>
-
-              {formData.tem_recorrencia && (
-                <div className="space-y-4 border-t pt-6">
-                  {/* Tipo de Recorrência */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo de Recorrência *
-                      </label>
-                      <select
-                        value={formData.tipo_recorrencia}
-                        onChange={(e) => handleTipoRecorrenciaChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        <option value="daily">Diária</option>
-                        <option value="weekly">Semanal (7 dias)</option>
-                        <option value="monthly">Mensal (30 dias)</option>
-                        <option value="yearly">Anual (365 dias)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Intervalo (em dias) *
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={formData.intervalo_dias}
-                        onChange={(e) => handleChange('intervalo_dias', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        placeholder="Ex: 30 (para Nexgard)"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Exemplos: Nexgard = 30, Vacina Anual = 365
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Número de Doses */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Número de Doses (opcional)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.numero_doses}
-                      onChange={(e) => handleChange('numero_doses', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Ex: 3 (para vacina com 3 doses)"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      💉 Se vazio, será recorrente indefinidamente. Se preenchido (ex: 3), o sistema finalizará após a última dose.
-                    </p>
-                  </div>
-
-                  {/* Espécie Compatível */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Compatibilidade por Espécie
-                    </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="especie_compativel"
-                          value="both"
-                          checked={formData.especie_compativel === 'both'}
-                          onChange={(e) => handleChange('especie_compativel', e.target.value)}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">🐶🐱 Cães e Gatos</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="especie_compativel"
-                          value="dog"
-                          checked={formData.especie_compativel === 'dog'}
-                          onChange={(e) => handleChange('especie_compativel', e.target.value)}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">🐶 Apenas Cães</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="especie_compativel"
-                          value="cat"
-                          checked={formData.especie_compativel === 'cat'}
-                          onChange={(e) => handleChange('especie_compativel', e.target.value)}
-                          className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
-                        />
-                        <span className="ml-2 text-sm text-gray-700">🐱 Apenas Gatos</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Observações */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Observações / Instruções
-                    </label>
-                    <textarea
-                      value={formData.observacoes_recorrencia}
-                      onChange={(e) => handleChange('observacoes_recorrencia', e.target.value)}
-                      rows="3"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Ex: Aplicar mensalmente no mesmo dia. Não atrasar mais de 5 dias."
-                    />
-                  </div>
-
-                  {/* Preview do Lembrete */}
-                  {formData.intervalo_dias && (
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <h4 className="text-sm font-semibold text-purple-900 mb-2">📌 Preview do Lembrete</h4>
-                      <div className="text-sm text-purple-700 space-y-1">
-                        <p>✓ Cliente será notificado <strong>7 dias antes</strong> da próxima dose</p>
-                        <p>✓ Intervalo configurado: <strong>{formData.intervalo_dias} dias</strong></p>
-                        <p>✓ Após a compra, um novo lembrete será criado automaticamente</p>
-                        {formData.especie_compativel !== 'both' && (
-                          <p className="mt-2 text-purple-800">
-                            ⚠️ Sistema validará se o pet é compatível na hora da venda
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ABA 7: RAÇÃO - CALCULADORA */}
+            <ProdutosNovoRecorrenciaTab
+              formData={formData}
+              handleChange={handleChange}
+              handleTipoRecorrenciaChange={handleTipoRecorrenciaChange}
+            />
+          )}          {/* ABA 7: RAÇÃO - CALCULADORA */}
           {abaAtiva === 7 && (
-            <div className="space-y-6">
-              <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-orange-800">Calculadora de Ração (Fase 2)</h3>
-                    <div className="mt-2 text-sm text-orange-700">
-                      <p>Configure informações de ração para usar na calculadora de duração e custo.</p>
-                      <p className="mt-1">A IA usará esses dados para recomendar rações aos clientes.</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* E ração */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    É ração?
-                  </label>
-                  <select
-                    value={formData.classificacao_racao || 'nao'}
-                    onChange={(e) => handleClassificacaoRacaoChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  >
-                    <option value="nao">Não</option>
-                    <option value="sim">Sim</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Opções de Ração - Sistema Dinâmico */}
-              {formData.classificacao_racao === 'sim' && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4">
-                  <h4 className="text-sm font-semibold text-blue-900 mb-4">📋 Informações Detalhadas da Ração</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Linha */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Linha
-                      </label>
-                      <select
-                        value={formData.linha_racao_id}
-                        onChange={(e) => handleChange('linha_racao_id', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Selecione...</option>
-                        {opcoesLinhas.map(linha => (
-                          <option key={linha.id} value={linha.id}>{linha.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Porte */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Porte do Animal
-                      </label>
-                      <select
-                        value={formData.porte_animal_id}
-                        onChange={(e) => handleChange('porte_animal_id', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Selecione...</option>
-                        {opcoesPortes.map(porte => (
-                          <option key={porte.id} value={porte.id}>{porte.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Fase */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Fase/Público
-                      </label>
-                      <select
-                        value={formData.fase_publico_id}
-                        onChange={(e) => handleFasePublicoChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Selecione...</option>
-                        {opcoesFases.map(fase => (
-                          <option key={fase.id} value={fase.id}>{fase.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Tratamento */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Tratamento <span className="text-gray-400">(Opcional)</span>
-                      </label>
-                      <select
-                        value={formData.tipo_tratamento_id}
-                        onChange={(e) => handleChange('tipo_tratamento_id', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Nenhum</option>
-                        {opcoesTratamentos.map(tratamento => (
-                          <option key={tratamento.id} value={tratamento.id}>{tratamento.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Sabor */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Sabor/Proteína
-                      </label>
-                      <select
-                        value={formData.sabor_proteina_id}
-                        onChange={(e) => handleChange('sabor_proteina_id', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Selecione...</option>
-                        {opcoesSabores.map(sabor => (
-                          <option key={sabor.id} value={sabor.id}>{sabor.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Apresentação */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Apresentação (Peso)
-                      </label>
-                      <select
-                        value={formData.apresentacao_peso_id}
-                        onChange={(e) => handleApresentacaoPesoChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        <option value="">Selecione...</option>
-                        {opcoesApresentacoes.map(apr => (
-                          <option key={apr.id} value={apr.id}>{apr.peso_kg}kg</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-blue-600 mt-3">
-                    💡 <strong>Dica:</strong> Essas informações ajudam a IA a recomendar a ração ideal para cada pet no PDV.
-                    Você pode gerenciar as opções disponíveis em <strong>Cadastros &gt; Opções de Ração</strong>.
-                  </p>
-                </div>
-              )}
-
-              {/* Espécies Indicadas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Espécies Indicadas
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="especies_indicadas"
-                        value="both"
-                        checked={formData.especies_indicadas === 'both'}
-                        onChange={(e) => handleChange('especies_indicadas', e.target.value)}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">🐶🐱 Ambos</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="especies_indicadas"
-                        value="dog"
-                        checked={formData.especies_indicadas === 'dog'}
-                        onChange={(e) => handleChange('especies_indicadas', e.target.value)}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">🐶 Cães</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        name="especies_indicadas"
-                        value="cat"
-                        checked={formData.especies_indicadas === 'cat'}
-                        onChange={(e) => handleChange('especies_indicadas', e.target.value)}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">🐱 Gatos</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tabela Nutricional (JSON) - OCULTO - Usado apenas pelo sistema */}
-              <input
-                type="hidden"
-                value={formData.tabela_nutricional}
-              />
-
-              {/* Tabela de Consumo da Embalagem - EDITOR VISUAL */}
-              <div>
-                <TabelaConsumoEditor
-                  value={formData.tabela_consumo}
-                  onChange={(value) => handleChange('tabela_consumo', value)}
-                  pesoEmbalagem={parseFloat(formData.peso_embalagem) || null}
-                />
-              </div>
-
-              {/* Preview */}
-              {formData.peso_embalagem && formData.classificacao_racao && (
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                  <h4 className="text-sm font-semibold text-orange-900 mb-2">📊 Preview da Calculadora</h4>
-                  <div className="text-sm text-orange-700 space-y-1">
-                    <p>✓ Peso: <strong>{formData.peso_embalagem}kg</strong></p>
-                    <p>✓ Classificação: <strong>{formData.classificacao_racao.replace('_', ' ')}</strong></p>
-                    {formData.categoria_racao && <p>✓ Categoria: <strong>{formData.categoria_racao}</strong></p>}
-                    {formData.tabela_consumo && <p className="text-green-600">✓ Tabela de consumo configurada</p>}
-                    {!formData.tabela_consumo && <p className="text-yellow-600">⚠️ Sem tabela de consumo (usará cálculo genérico)</p>}
-                    <p className="mt-2 text-orange-800">
-                      💡 Use a Calculadora de Ração para ver duração e custo/dia
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <ProdutosNovoRacaoTab
+              formData={formData}
+              handleChange={handleChange}
+              handleApresentacaoPesoChange={handleApresentacaoPesoChange}
+              handleClassificacaoRacaoChange={handleClassificacaoRacaoChange}
+              handleFasePublicoChange={handleFasePublicoChange}
+              opcoesApresentacoes={opcoesApresentacoes}
+              opcoesFases={opcoesFases}
+              opcoesLinhas={opcoesLinhas}
+              opcoesPortes={opcoesPortes}
+              opcoesSabores={opcoesSabores}
+              opcoesTratamentos={opcoesTratamentos}
+            />
           )}
-          
+
           {/* ABA 8: VARIAÇÕES (Sprint 2) - Apenas para produtos PAI */}
           {abaAtiva === 8 && formData.tipo_produto === 'PAI' && (
             <div className="space-y-6">
@@ -2783,23 +2115,11 @@ export default function ProdutosNovo() {
           )}
         </div>
 
-        {/* Botões de Ação */}
-        <div className="mt-6 flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => navigate('/produtos')}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={salvando}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
-          >
-            {salvando ? 'Salvando...' : isEdicao ? 'Atualizar' : 'Cadastrar'}
-          </button>
-        </div>
+        <ProdutosNovoFooterActions
+          isEdicao={isEdicao}
+          onCancel={() => navigate('/produtos')}
+          salvando={salvando}
+        />
       </form>
 
       {/* Modal de Entrada de Estoque */}
@@ -3122,4 +2442,5 @@ export default function ProdutosNovo() {
     </div>
   );
 }
+
 
