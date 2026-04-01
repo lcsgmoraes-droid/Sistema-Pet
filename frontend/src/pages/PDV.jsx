@@ -754,7 +754,7 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da raÃ§Ã£o
               />
 
               <PDVProdutosCard
-                buscaProduto={buscarProduto}
+                buscaProduto={buscaProduto}
                 buscaProdutoContainerRef={buscaProdutoContainerRef}
                 copiadoCodigoItem={copiadoCodigoItem}
                 inputProdutoRef={inputProdutoRef}
