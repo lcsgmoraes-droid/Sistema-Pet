@@ -362,117 +362,124 @@ export default function ProdutosNovo() {
   };
 
 
-  const {
-    canShowComposicaoTab,
-    canShowVariacoesTab,
-    caracteristicasTabProps,
-    composicaoTabProps,
-    entradaModalProps,
-    estoqueTabProps,
-    footerProps,
-    fornecedoresTabProps,
-    fornecedorModalProps,
-    headerProps,
-    imagensTabProps,
-    loteModalProps,
-    racaoTabProps,
-    recorrenciaTabProps,
-    statusBannersProps,
-    tabsProps,
-    tributacaoTabProps,
-    variacoesTabProps,
-  } = useProdutosNovoPageComposition({
-    adicionarProdutoKit,
-    abaAtiva,
-    buscaComponente,
-    buscaPredecessor,
-    camposEmEdicao,
-    categoriasHierarquicas,
-    clientes,
-    departamentos,
-    dropdownComponenteVisivel,
-    entradaData,
-    estoqueVirtualKit,
-    formData,
-    fornecedores,
-    fornecedorData,
-    fornecedorEdit,
-    formatarData,
-    formatarMoeda,
-    handleAddFornecedor,
-    handleApresentacaoPesoChange,
-    handleBuscaPredecessorChange,
-    handleCancelarVariacao,
-    handleChange,
-    handleChangeTributacao,
-    handleClassificacaoRacaoChange,
-    handleDeleteFornecedor,
-    handleDeleteImagem,
-    handleEditarLote,
-    handleEditFornecedor,
-    handleExcluirLote,
-    handleExcluirVariacao,
-    handleEntradaEstoque,
-    handleFasePublicoChange,
-    handleGerarCodigoBarras,
-    handleGerarSKU,
-    handlePersonalizarFiscal,
-    handleRemoverPredecessor,
-    handleSalvarEdicaoLote,
-    handleSalvarVariacao,
-    handleSaveFornecedor,
-    handleSelecionarPredecessor,
-    handleSetPrincipal,
-    handleTipoRecorrenciaChange,
-    handleToggleBuscaPredecessor,
-    handleToggleFormVariacao,
-    handleUploadImagem,
-    handleVoltar,
-    imagens,
-    isEdicao,
-    loading,
-    loteEmEdicao,
-    lotes,
-    marcas,
-    modalEdicaoLote,
-    modalEntrada,
-    modalFornecedor,
-    mostrarBuscaPredecessor,
-    mostrarFormVariacao,
-    navigate,
-    novaVariacao,
-    opcoesApresentacoes,
-    opcoesFases,
-    opcoesLinhas,
-    opcoesPortes,
-    opcoesSabores,
-    opcoesTratamentos,
-    parseNumber,
-    predecessorInfo,
-    predecessorSelecionado,
-    produtoKitSelecionado,
-    produtosBusca,
-    produtosDisponiveis,
-    quantidadeKit,
-    removerProdutoKit,
-    salvando,
-    setAbaAtiva,
-    setCamposEmEdicao,
-    setEntradaData,
-    setFornecedorData,
-    setFormData,
-    setLoteEmEdicao,
-    setModalEdicaoLote,
-    setModalEntrada,
-    setModalFornecedor,
-    setNovaVariacao,
-    setProdutoKitSelecionado,
-    setQuantidadeKit,
-    setBuscaComponente,
-    setDropdownComponenteVisivel,
-    sucessorInfo,
-    uploadingImage,
-    variacoes,
+  const { mainContentProps, modalsLayerProps } = useProdutosNovoPageComposition({
+    pageState: {
+      abaAtiva,
+      camposEmEdicao,
+      formData,
+      isEdicao,
+      loading,
+      salvando,
+      setCamposEmEdicao,
+      setFormData,
+    },
+    catalogos: {
+      categoriasHierarquicas,
+      clientes,
+      departamentos,
+      marcas,
+    },
+    predecessorState: {
+      buscaPredecessor,
+      handleBuscaPredecessorChange,
+      handleRemoverPredecessor,
+      handleSelecionarPredecessor,
+      handleToggleBuscaPredecessor,
+      mostrarBuscaPredecessor,
+      predecessorInfo,
+      predecessorSelecionado,
+      produtosBusca,
+      sucessorInfo,
+    },
+    imagensState: {
+      handleDeleteImagem,
+      handleSetPrincipal,
+      handleUploadImagem,
+      imagens,
+      uploadingImage,
+    },
+    lotesState: {
+      entradaData,
+      handleEditarLote,
+      handleEntradaEstoque,
+      handleExcluirLote,
+      handleSalvarEdicaoLote,
+      loteEmEdicao,
+      lotes,
+      modalEdicaoLote,
+      modalEntrada,
+      setEntradaData,
+      setLoteEmEdicao,
+      setModalEdicaoLote,
+      setModalEntrada,
+    },
+    fornecedoresState: {
+      fornecedores,
+      fornecedorData,
+      fornecedorEdit,
+      handleAddFornecedor,
+      handleDeleteFornecedor,
+      handleEditFornecedor,
+      handleSaveFornecedor,
+      modalFornecedor,
+      setFornecedorData,
+      setModalFornecedor,
+    },
+    tributacaoState: {
+      handleChangeTributacao,
+      handlePersonalizarFiscal,
+    },
+    recorrenciaState: {
+      handleTipoRecorrenciaChange,
+    },
+    racaoState: {
+      handleApresentacaoPesoChange,
+      handleClassificacaoRacaoChange,
+      handleFasePublicoChange,
+      opcoesApresentacoes,
+      opcoesFases,
+      opcoesLinhas,
+      opcoesPortes,
+      opcoesSabores,
+      opcoesTratamentos,
+    },
+    variacoesState: {
+      handleCancelarVariacao,
+      handleExcluirVariacao,
+      handleSalvarVariacao,
+      handleToggleFormVariacao,
+      mostrarFormVariacao,
+      novaVariacao,
+      setNovaVariacao,
+      variacoes,
+    },
+    kitState: {
+      adicionarProdutoKit,
+      buscaComponente,
+      dropdownComponenteVisivel,
+      estoqueVirtualKit,
+      produtoKitSelecionado,
+      produtosDisponiveis,
+      quantidadeKit,
+      removerProdutoKit,
+      setBuscaComponente,
+      setDropdownComponenteVisivel,
+      setProdutoKitSelecionado,
+      setQuantidadeKit,
+    },
+    navigationState: {
+      handleVoltar,
+      navigate,
+      setAbaAtiva,
+    },
+    utilsState: {
+      formatarData,
+      formatarMoeda,
+      handleChange,
+      handleGerarCodigoBarras,
+      handleGerarSKU,
+      parseNumber,
+    },
   });
   
   // Auto-detectar "ração" no nome do produto
@@ -527,29 +534,11 @@ export default function ProdutosNovo() {
   return (
     <>
       <ProdutosNovoMainContent
-        canShowComposicaoTab={canShowComposicaoTab}
-        canShowVariacoesTab={canShowVariacoesTab}
-        caracteristicasTabProps={caracteristicasTabProps}
-        composicaoTabProps={composicaoTabProps}
-        estoqueTabProps={estoqueTabProps}
-        footerProps={footerProps}
-        fornecedoresTabProps={fornecedoresTabProps}
         handleSubmit={handleSubmit}
-        headerProps={headerProps}
-        imagensTabProps={imagensTabProps}
-        racaoTabProps={racaoTabProps}
-        recorrenciaTabProps={recorrenciaTabProps}
-        statusBannersProps={statusBannersProps}
-        tabsProps={tabsProps}
-        tributacaoTabProps={tributacaoTabProps}
-        variacoesTabProps={variacoesTabProps}
+        {...mainContentProps}
       />
 
-      <ProdutosNovoModalsLayer
-        entradaModalProps={entradaModalProps}
-        fornecedorModalProps={fornecedorModalProps}
-        loteModalProps={loteModalProps}
-      />
+      <ProdutosNovoModalsLayer {...modalsLayerProps} />
     </>
   );
 }

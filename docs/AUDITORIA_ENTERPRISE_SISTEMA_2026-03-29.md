@@ -734,7 +734,10 @@ Proximas tarefas sugeridas para execucao continua:
   - o fluxo de enderecos adicionais e CEP do modal foi movido para `frontend/src/hooks/useClientesNovoEnderecos.js`
   - os componentes inline `ClienteSegmentoBadgeWrapper` e `WhatsAppHistorico` passaram para `frontend/src/components/ClienteSegmentoBadgeWrapper.jsx` e `frontend/src/components/WhatsAppHistorico.jsx`
   - `ClientesNovo.jsx` caiu de `4198` para `3937` linhas sem alterar a experiencia da tela
-- [ ] revisar contratos de props residuais entre as abas/componentes de `ProdutosNovo` e agrupar blocos repetidos de callbacks/estado onde isso reduzir ruido real de manutencao
+- [x] revisar contratos de props residuais entre as abas/componentes de `ProdutosNovo` e agrupar blocos repetidos de callbacks/estado onde isso reduzir ruido real de manutencao
+  - o hook `frontend/src/hooks/useProdutosNovoPageComposition.js` passou a receber blocos de dominio (`pageState`, `catalogos`, `fornecedoresState`, `imagensState`, `kitState`, `lotesState`, `navigationState`, `predecessorState`, `racaoState`, `recorrenciaState`, `tributacaoState`, `utilsState` e `variacoesState`) em vez de uma lista extensa de props soltas
+  - a composicao agora devolve `mainContentProps` e `modalsLayerProps`, reduzindo o fio espalhado entre a pagina e os componentes de tela
+  - `ProdutosNovo.jsx` caiu de `555` para `544` linhas e ficou mais focado em orquestracao dos hooks
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
 - [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
