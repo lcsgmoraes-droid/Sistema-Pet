@@ -12,6 +12,7 @@ from app.nfe_routes import (
     _normalizar_nota_bling,
     _normalizar_resumo_canal,
     _planejar_sincronizacao_bling_nfes,
+    _sort_key_nota_por_numero_desc,
     _situacao_num,
     _status_nota_bling,
 )
@@ -212,6 +213,19 @@ def test_normalizar_nota_pedido_integrado_descarta_id_zero_da_nf():
     assert nota is not None
     assert nota["id"] == ""
     assert nota["numero"] == "011009"
+
+
+def test_sort_key_nota_por_numero_desc_prioriza_numero_maior():
+    notas = [
+        {"id": "1", "numero": "011083", "data_emissao": "2026-04-01"},
+        {"id": "2", "numero": "011127", "data_emissao": "2026-03-31"},
+        {"id": "3", "numero": "011086", "data_emissao": "2026-04-01"},
+        {"id": "4", "numero": "", "data_emissao": "2026-04-02"},
+    ]
+
+    notas.sort(key=_sort_key_nota_por_numero_desc, reverse=True)
+
+    assert [nota["numero"] for nota in notas] == ["011127", "011086", "011083", ""]
 
 
 def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_incompleto(monkeypatch):

@@ -95,6 +95,15 @@ def _coerce_int(value, default: int = 0) -> int:
         return default
 
 
+def _sort_key_nota_por_numero_desc(nota: dict) -> tuple[int, str, int]:
+    numero_texto = str(nota.get("numero") or "").strip()
+    numero_digits = re.sub(r"\D", "", numero_texto)
+    numero_int = _coerce_int(numero_digits, default=-1) if numero_digits else -1
+    data_emissao = str(nota.get("data_emissao") or "").strip()
+    nota_id = _coerce_int(nota.get("id"), default=-1)
+    return (numero_int, data_emissao, nota_id)
+
+
 def _cache_key_listar_nfes(tenant_id, data_inicial: str | None, data_final: str | None, situacao: str | None) -> tuple[str, str, str, str]:
     return (
         str(tenant_id or ""),
@@ -1897,7 +1906,7 @@ async def listar_nfes(
 
     _enriquecer_notas_com_vendas(db, tenant_id, notas)
     _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas)
-    notas.sort(key=lambda nota: nota.get("data_emissao") or "", reverse=True)
+    notas.sort(key=_sort_key_nota_por_numero_desc, reverse=True)
 
     payload = {
         "success": True,
