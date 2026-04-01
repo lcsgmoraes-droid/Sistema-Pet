@@ -18,6 +18,7 @@ import ProdutosNovoTabs from '../components/produto/ProdutosNovoTabs';
 import ProdutosNovoTributacaoTab from '../components/produto/ProdutosNovoTributacaoTab';
 import ProdutosNovoVariacoesTab from '../components/produto/ProdutosNovoVariacoesTab';
 import ProdutosNovoImagensTab from '../components/produto/ProdutosNovoImagensTab';
+import ProdutosNovoStatusBanners from '../components/produto/ProdutosNovoStatusBanners';
 import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
 import useProdutosNovoCodigos from '../hooks/useProdutosNovoCodigos';
 import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
@@ -30,6 +31,7 @@ import useProdutosNovoRecorrencia from '../hooks/useProdutosNovoRecorrencia';
 import useProdutosNovoSubmit from '../hooks/useProdutosNovoSubmit';
 import useProdutosNovoTributacao from '../hooks/useProdutosNovoTributacao';
 import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
+import useProdutosNovoPageComposition from '../hooks/useProdutosNovoPageComposition';
 import {
   calcularPrecoVenda,
   calcularMarkup,
@@ -372,6 +374,120 @@ export default function ProdutosNovo() {
 
     navigate('/produtos');
   };
+
+
+  const {
+    canShowComposicaoTab,
+    canShowVariacoesTab,
+    caracteristicasTabProps,
+    composicaoTabProps,
+    entradaModalProps,
+    estoqueTabProps,
+    footerProps,
+    fornecedoresTabProps,
+    fornecedorModalProps,
+    headerProps,
+    imagensTabProps,
+    loteModalProps,
+    racaoTabProps,
+    recorrenciaTabProps,
+    statusBannersProps,
+    tabsProps,
+    tributacaoTabProps,
+    variacoesTabProps,
+  } = useProdutosNovoPageComposition({
+    adicionarProdutoKit,
+    abaAtiva,
+    buscaComponente,
+    buscaPredecessor,
+    camposEmEdicao,
+    categoriasHierarquicas,
+    clientes,
+    departamentos,
+    dropdownComponenteVisivel,
+    entradaData,
+    estoqueVirtualKit,
+    formData,
+    fornecedores,
+    fornecedorData,
+    fornecedorEdit,
+    formatarData,
+    formatarMoeda,
+    handleAddFornecedor,
+    handleApresentacaoPesoChange,
+    handleBuscaPredecessorChange,
+    handleCancelarVariacao,
+    handleChange,
+    handleChangeTributacao,
+    handleClassificacaoRacaoChange,
+    handleDeleteFornecedor,
+    handleDeleteImagem,
+    handleEditarLote,
+    handleEditFornecedor,
+    handleExcluirLote,
+    handleExcluirVariacao,
+    handleEntradaEstoque,
+    handleFasePublicoChange,
+    handleGerarCodigoBarras,
+    handleGerarSKU,
+    handlePersonalizarFiscal,
+    handleRemoverPredecessor,
+    handleSalvarEdicaoLote,
+    handleSalvarVariacao,
+    handleSaveFornecedor,
+    handleSelecionarPredecessor,
+    handleSetPrincipal,
+    handleTipoRecorrenciaChange,
+    handleToggleBuscaPredecessor,
+    handleToggleFormVariacao,
+    handleUploadImagem,
+    handleVoltar,
+    imagens,
+    isEdicao,
+    loading,
+    loteEmEdicao,
+    lotes,
+    marcas,
+    modalEdicaoLote,
+    modalEntrada,
+    modalFornecedor,
+    mostrarBuscaPredecessor,
+    mostrarFormVariacao,
+    navigate,
+    novaVariacao,
+    opcoesApresentacoes,
+    opcoesFases,
+    opcoesLinhas,
+    opcoesPortes,
+    opcoesSabores,
+    opcoesTratamentos,
+    parseNumber,
+    predecessorInfo,
+    predecessorSelecionado,
+    produtoKitSelecionado,
+    produtosBusca,
+    produtosDisponiveis,
+    quantidadeKit,
+    removerProdutoKit,
+    salvando,
+    setAbaAtiva,
+    setCamposEmEdicao,
+    setEntradaData,
+    setFornecedorData,
+    setFormData,
+    setLoteEmEdicao,
+    setModalEdicaoLote,
+    setModalEntrada,
+    setModalFornecedor,
+    setNovaVariacao,
+    setProdutoKitSelecionado,
+    setQuantidadeKit,
+    setBuscaComponente,
+    setDropdownComponenteVisivel,
+    sucessorInfo,
+    uploadingImage,
+    variacoes,
+  });
   
   // Auto-detectar "ração" no nome do produto
   useEffect(() => {
@@ -424,269 +540,30 @@ export default function ProdutosNovo() {
 
   return (
     <div className="p-6">
-      <ProdutosNovoHeader formData={formData} isEdicao={isEdicao} onVoltar={handleVoltar} />
+      <ProdutosNovoHeader {...headerProps} />
 
-      <ProdutosNovoTabs
-        abaAtiva={abaAtiva}
-        onChangeAba={setAbaAtiva}
-        tipoProduto={formData.tipo_produto}
-        tipoKit={formData.tipo_kit}
-      />
+      <ProdutosNovoTabs {...tabsProps} />
 
-      {/* 🔗 Banner: Produto é continuação de outro (Edit Mode) */}
-      {isEdicao && predecessorInfo && (
-        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 p-5 rounded-lg shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-7 h-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  🔗 Este produto é continuação de outro
-                </h3>
-              </div>
-              <p className="text-sm text-gray-700 mb-3">
-                Este produto substitui:{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate(`/produtos/${predecessorInfo.id}/editar`)}
-                  className="font-bold text-blue-700 hover:text-blue-900 hover:underline"
-                >
-                  {predecessorInfo.codigo} - {predecessorInfo.nome}
-                </button>
-              </p>
-              {predecessorInfo.motivo_descontinuacao && (
-                <div className="bg-white/70 rounded-md px-3 py-2 text-sm">
-                  <span className="font-medium text-gray-700">Motivo da substituição:</span>{' '}
-                  <span className="text-gray-900">{predecessorInfo.motivo_descontinuacao}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <ProdutosNovoStatusBanners {...statusBannersProps} />
 
-      {/* ⚠️ Banner: Produto foi descontinuado (Edit Mode) */}
-      {isEdicao && sucessorInfo && (
-        <div className="mb-6 bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-500 p-5 rounded-lg shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="w-7 h-7 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  ⚠️ Este produto foi descontinuado
-                </h3>
-              </div>
-              <p className="text-sm text-gray-700 mb-3">
-                Descontinuado em{' '}
-                <span className="font-semibold">
-                  {new Date(sucessorInfo.data_descontinuacao).toLocaleDateString('pt-BR')}
-                </span>
-              </p>
-              <p className="text-sm text-gray-700 mb-3">
-                Substituído por:{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate(`/produtos/${sucessorInfo.id}/editar`)}
-                  className="font-bold text-red-700 hover:text-red-900 hover:underline"
-                >
-                  {sucessorInfo.codigo} - {sucessorInfo.nome}
-                </button>
-              </p>
-              {sucessorInfo.motivo_descontinuacao && (
-                <div className="bg-white/70 rounded-md px-3 py-2 text-sm">
-                  <span className="font-medium text-gray-700">Motivo:</span>{' '}
-                  <span className="text-gray-900">{sucessorInfo.motivo_descontinuacao}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* FormulÃ¡rio */}
       <form onSubmit={handleSubmit}>
         <div className="bg-white rounded-lg shadow-sm p-6">
-          
-          {/* ABA 1: CARACTER?STICAS */}
-          {abaAtiva === 1 && (
-            <ProdutosNovoCaracteristicasTab
-              buscaPredecessor={buscaPredecessor}
-              camposEmEdicao={camposEmEdicao}
-              categoriasHierarquicas={categoriasHierarquicas}
-              departamentos={departamentos}
-              formData={formData}
-              handleBuscaPredecessorChange={handleBuscaPredecessorChange}
-              handleChange={handleChange}
-              handleGerarCodigoBarras={handleGerarCodigoBarras}
-              handleGerarSKU={handleGerarSKU}
-              handleRemoverPredecessor={handleRemoverPredecessor}
-              handleSelecionarPredecessor={handleSelecionarPredecessor}
-              handleToggleBuscaPredecessor={handleToggleBuscaPredecessor}
-              isEdicao={isEdicao}
-              marcas={marcas}
-              mostrarBuscaPredecessor={mostrarBuscaPredecessor}
-              parseNumber={parseNumber}
-              predecessorSelecionado={predecessorSelecionado}
-              produtosBusca={produtosBusca}
-              setAbaAtiva={setAbaAtiva}
-              setCamposEmEdicao={setCamposEmEdicao}
-              setFormData={setFormData}
-            />
-          )}
-          {/* ABA 2: IMAGENS */}
-          {abaAtiva === 2 && (
-            <ProdutosNovoImagensTab
-              handleDeleteImagem={handleDeleteImagem}
-              handleSetPrincipal={handleSetPrincipal}
-              handleUploadImagem={handleUploadImagem}
-              imagens={imagens}
-              isEdicao={isEdicao}
-              uploadingImage={uploadingImage}
-            />
-          )}
-
-          {/* ABA 3: ESTOQUE/LOTES */}
-          {abaAtiva === 3 && (
-            <ProdutosNovoEstoqueTab
-              formData={formData}
-              formatarData={formatarData}
-              formatarMoeda={formatarMoeda}
-              handleChange={handleChange}
-              handleEditarLote={handleEditarLote}
-              handleExcluirLote={handleExcluirLote}
-              isEdicao={isEdicao}
-              lotes={lotes}
-              setModalEntrada={setModalEntrada}
-            />
-          )}
-
-
-          {/* ABA 4: FORNECEDORES */}
-          {abaAtiva === 4 && (
-            <ProdutosNovoFornecedoresTab
-              fornecedores={fornecedores}
-              formatarMoeda={formatarMoeda}
-              handleAddFornecedor={handleAddFornecedor}
-              handleDeleteFornecedor={handleDeleteFornecedor}
-              handleEditFornecedor={handleEditFornecedor}
-              isEdicao={isEdicao}
-            />
-          )}
-
-          {/* ABA 5: TRIBUTAÇÃO */}
-          {abaAtiva === 5 && (
-            <ProdutosNovoTributacaoTab
-              formData={formData}
-              handleChangeTributacao={handleChangeTributacao}
-              handlePersonalizarFiscal={handlePersonalizarFiscal}
-            />
-          )}          {/* ABA 6: RECORRÊNCIA */}
-          {abaAtiva === 6 && (
-            <ProdutosNovoRecorrenciaTab
-              formData={formData}
-              handleChange={handleChange}
-              handleTipoRecorrenciaChange={handleTipoRecorrenciaChange}
-            />
-          )}          {/* ABA 7: RAÇÃO - CALCULADORA */}
-          {abaAtiva === 7 && (
-            <ProdutosNovoRacaoTab
-              formData={formData}
-              handleChange={handleChange}
-              handleApresentacaoPesoChange={handleApresentacaoPesoChange}
-              handleClassificacaoRacaoChange={handleClassificacaoRacaoChange}
-              handleFasePublicoChange={handleFasePublicoChange}
-              opcoesApresentacoes={opcoesApresentacoes}
-              opcoesFases={opcoesFases}
-              opcoesLinhas={opcoesLinhas}
-              opcoesPortes={opcoesPortes}
-              opcoesSabores={opcoesSabores}
-              opcoesTratamentos={opcoesTratamentos}
-            />
-          )}
-
-          {/* ABA 8: VARIAÇÕES (Sprint 2) - Apenas para produtos PAI */}
-          {abaAtiva === 8 && formData.tipo_produto === 'PAI' && (
-            <ProdutosNovoVariacoesTab
-              formData={formData}
-              isEdicao={isEdicao}
-              mostrarFormVariacao={mostrarFormVariacao}
-              novaVariacao={novaVariacao}
-              setNovaVariacao={setNovaVariacao}
-              variacoes={variacoes}
-              handleToggleFormVariacao={handleToggleFormVariacao}
-              handleCancelarVariacao={handleCancelarVariacao}
-              handleSalvarVariacao={handleSalvarVariacao}
-              handleExcluirVariacao={handleExcluirVariacao}
-              onEditarVariacao={(variacao) => navigate(`/produtos/${variacao.id}/editar`)}
-            />
-          )}
-          {/* ============================================
-              ABA 9: COMPOSIÇÃO/KIT (Produto KIT ou VARIACAO-KIT)
-              ============================================ */}
-          {abaAtiva === 9 && (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) && (
-            <ProdutosNovoComposicaoTab
-              formData={formData}
-              handleChange={handleChange}
-              estoqueVirtualKit={estoqueVirtualKit}
-              produtosDisponiveis={produtosDisponiveis}
-              produtoKitSelecionado={produtoKitSelecionado}
-              setProdutoKitSelecionado={setProdutoKitSelecionado}
-              quantidadeKit={quantidadeKit}
-              setQuantidadeKit={setQuantidadeKit}
-              buscaComponente={buscaComponente}
-              setBuscaComponente={setBuscaComponente}
-              dropdownComponenteVisivel={dropdownComponenteVisivel}
-              setDropdownComponenteVisivel={setDropdownComponenteVisivel}
-              adicionarProdutoKit={adicionarProdutoKit}
-              removerProdutoKit={removerProdutoKit}
-            />
-          )}
+          {abaAtiva === 1 && <ProdutosNovoCaracteristicasTab {...caracteristicasTabProps} />}
+          {abaAtiva === 2 && <ProdutosNovoImagensTab {...imagensTabProps} />}
+          {abaAtiva === 3 && <ProdutosNovoEstoqueTab {...estoqueTabProps} />}
+          {abaAtiva === 4 && <ProdutosNovoFornecedoresTab {...fornecedoresTabProps} />}
+          {abaAtiva === 5 && <ProdutosNovoTributacaoTab {...tributacaoTabProps} />}
+          {abaAtiva === 6 && <ProdutosNovoRecorrenciaTab {...recorrenciaTabProps} />}
+          {abaAtiva === 7 && <ProdutosNovoRacaoTab {...racaoTabProps} />}
+          {canShowVariacoesTab && <ProdutosNovoVariacoesTab {...variacoesTabProps} />}
+          {canShowComposicaoTab && <ProdutosNovoComposicaoTab {...composicaoTabProps} />}
         </div>
-        <ProdutosNovoFooterActions
-          isEdicao={isEdicao}
-          onCancel={() => navigate('/produtos')}
-          salvando={salvando}
-        />
+        <ProdutosNovoFooterActions {...footerProps} />
       </form>
 
-      {modalEntrada && (
-        <ProdutosNovoEntradaModal
-          entradaData={entradaData}
-          setEntradaData={setEntradaData}
-          onClose={() => setModalEntrada(false)}
-          onSubmit={handleEntradaEstoque}
-        />
-      )}
-      {modalEdicaoLote && loteEmEdicao && (
-        <ProdutosNovoLoteModal
-          loteEmEdicao={loteEmEdicao}
-          setLoteEmEdicao={setLoteEmEdicao}
-          onClose={() => {
-            setModalEdicaoLote(false);
-            setLoteEmEdicao(null);
-          }}
-          onSubmit={handleSalvarEdicaoLote}
-        />
-      )}
-      {modalFornecedor && (
-        <ProdutosNovoFornecedorModal
-          clientes={clientes}
-          fornecedorData={fornecedorData}
-          fornecedorEdit={fornecedorEdit}
-          setFornecedorData={setFornecedorData}
-          onClose={() => setModalFornecedor(false)}
-          onSubmit={handleSaveFornecedor}
-        />
-      )}
+      {entradaModalProps && <ProdutosNovoEntradaModal {...entradaModalProps} />}
+      {loteModalProps && <ProdutosNovoLoteModal {...loteModalProps} />}
+      {fornecedorModalProps && <ProdutosNovoFornecedorModal {...fornecedorModalProps} />}
     </div>
   );
 }
-

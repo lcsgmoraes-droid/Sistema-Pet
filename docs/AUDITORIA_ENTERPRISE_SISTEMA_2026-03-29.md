@@ -718,7 +718,11 @@ Proximas tarefas sugeridas para execucao continua:
   - as abas residuais iniciais ficaram unificadas em componentes dedicados: `ProdutosNovoCaracteristicasTab.jsx`, `ProdutosNovoImagensTab.jsx`, `ProdutosNovoEstoqueTab.jsx` e `ProdutosNovoFornecedoresTab.jsx`
   - `ProdutosNovo.jsx` caiu de `1603` para `692` linhas sem alterar a experiencia da tela
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
-- [ ] reduzir o acoplamento de props residuais em `ProdutosNovo.jsx` criando um hook/compositor de pagina para as abas e modais
+- [x] reduzir o acoplamento de props residuais em `ProdutosNovo.jsx` criando um hook/compositor de pagina para as abas e modais
+  - a montagem de props das abas, banners e modais foi movida para `frontend/src/hooks/useProdutosNovoPageComposition.js`
+  - os banners de predecessor/sucessor foram extraidos para `frontend/src/components/produto/ProdutosNovoStatusBanners.jsx`
+  - `ProdutosNovo.jsx` caiu de `692` para `569` linhas sem alterar a experiencia da tela
+- [ ] revisar contratos de props residuais entre as abas/componentes de `ProdutosNovo` e agrupar blocos repetidos de callbacks/estado onde isso reduzir ruido real de manutencao
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
 - [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
