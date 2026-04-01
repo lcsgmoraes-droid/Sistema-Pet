@@ -9,11 +9,12 @@ import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
 import useProdutosNovoImagens from '../hooks/useProdutosNovoImagens';
 import useProdutosNovoKit from '../hooks/useProdutosNovoKit';
 import useProdutosNovoLotes from '../hooks/useProdutosNovoLotes';
+import useProdutosNovoPredecessor from '../hooks/useProdutosNovoPredecessor';
+import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
 import {
   createProduto,
   updateProduto,
   deleteProduto,
-  getProdutoVariacoes,
   gerarSKU,
   gerarCodigoBarras,
   calcularPrecoVenda,
@@ -154,30 +155,6 @@ export default function ProdutosNovo() {
   const [opcoesSabores, setOpcoesSabores] = useState([]);
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
   
-  // Sprint 2: Estados para variações
-  const [variacoes, setVariacoes] = useState([]);
-  const [novaVariacao, setNovaVariacao] = useState({
-    sku: '',
-    nome: '',
-    codigo_barras: '',
-    preco_custo: '',
-    preco_venda: '',
-    estoque_minimo: 0,
-    e_kit: false, // VARIACAO pode ser KIT
-    e_kit_fisico: false,
-    composicao_kit: []
-  });
-  const [mostrarFormVariacao, setMostrarFormVariacao] = useState(false);
-  
-  // Estados para composição de kit
-  // Estados para predecessor/sucessor
-  const [mostrarBuscaPredecessor, setMostrarBuscaPredecessor] = useState(false);
-  const [produtosBusca, setProdutosBusca] = useState([]);
-  const [buscaPredecessor, setBuscaPredecessor] = useState('');
-  const [predecessorSelecionado, setPredecessorSelecionado] = useState(null);
-  const [predecessorInfo, setPredecessorInfo] = useState(null); // Info do predecessor ao editar
-  const [sucessorInfo, setSucessorInfo] = useState(null); // Info do sucessor (se descontinuado)
-  
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
   
@@ -187,6 +164,59 @@ export default function ProdutosNovo() {
     markup: false,
     preco_venda: false,
     preco_promocional: false,
+  });
+
+  const handleChange = (campo, valor) => {
+    setFormData(prev => {
+      const novosDados = { ...prev, [campo]: valor };
+
+      if (campo === 'sku' || campo === 'codigo') {
+        const skuNormalizado = (valor || '').toString().toUpperCase();
+        novosDados.sku = skuNormalizado;
+        novosDados.codigo = skuNormalizado;
+      }
+      
+      // Calcular markup automaticamente quando mudar preço
+      if (campo === 'preco_custo' || campo === 'preco_venda') {
+        const custo = parseNumber(campo === 'preco_custo' ? valor : prev.preco_custo);
+        const venda = parseNumber(campo === 'preco_venda' ? valor : prev.preco_venda);
+        
+        if (custo && venda && custo > 0) {
+          const markup = calcularMarkup(custo, venda);
+          novosDados.markup = markup.toFixed(2);
+        }
+      }
+      
+      // Calcular preço de venda pelo markup
+      if (campo === 'markup') {
+        const custo = parseNumber(prev.preco_custo);
+        const markupVal = parseNumber(valor);
+        
+        if (custo && custo > 0 && markupVal >= 0) {
+          const venda = calcularPrecoVenda(custo, markupVal);
+          novosDados.preco_venda = venda.toFixed(2);
+        }
+      }
+      
+      return novosDados;
+    });
+  };
+
+  const {
+    mostrarBuscaPredecessor,
+    produtosBusca,
+    buscaPredecessor,
+    predecessorSelecionado,
+    predecessorInfo,
+    sucessorInfo,
+    setPredecessorInfo,
+    setSucessorInfo,
+    handleToggleBuscaPredecessor,
+    handleBuscaPredecessorChange,
+    handleSelecionarPredecessor,
+    handleRemoverPredecessor,
+  } = useProdutosNovoPredecessor({
+    handleChange,
   });
 
   const {
@@ -272,6 +302,23 @@ export default function ProdutosNovo() {
     formData,
     setFormData,
   });
+
+  const {
+    variacoes,
+    novaVariacao,
+    setNovaVariacao,
+    mostrarFormVariacao,
+    handleToggleFormVariacao,
+    handleCancelarVariacao,
+    handleSalvarVariacao,
+    handleExcluirVariacao,
+  } = useProdutosNovoVariacoes({
+    id,
+    isEdicao,
+    abaAtiva,
+    formData,
+    navigate,
+  });
   
   // Auto-detectar "ração" no nome do produto
   useEffect(() => {
@@ -293,7 +340,7 @@ export default function ProdutosNovo() {
     if (!loading && isEdicao) {
       const abaParam = searchParams.get('aba');
       if (abaParam) {
-        setAbaAtiva(parseInt(abaParam));
+        setAbaAtiva(parseInt(abaParam, 10));
       }
     }
   }, [loading, searchParams, isEdicao]);
@@ -304,58 +351,6 @@ export default function ProdutosNovo() {
       setAbaAtiva(1);
     }
   }, [formData.tipo_produto, abaAtiva, isEdicao]);
-  
-  // Sprint 2: Carregar variações quando abrir a aba
-  useEffect(() => {
-    if (isEdicao && abaAtiva === 8 && formData.tipo_produto === 'PAI') {
-      carregarVariacoes();
-    }
-  }, [abaAtiva, isEdicao, formData.tipo_produto]);
-  
-  const carregarVariacoes = async () => {
-    try {
-      const response = await getProdutoVariacoes(id);
-      setVariacoes(response.data);
-    } catch (error) {
-      console.error('Erro ao carregar variações:', error);
-    }
-  };
-
-  const handleChange = (campo, valor) => {
-    setFormData(prev => {
-      const novosDados = { ...prev, [campo]: valor };
-
-      if (campo === 'sku' || campo === 'codigo') {
-        const skuNormalizado = (valor || '').toString().toUpperCase();
-        novosDados.sku = skuNormalizado;
-        novosDados.codigo = skuNormalizado;
-      }
-      
-      // Calcular markup automaticamente quando mudar preço
-      if (campo === 'preco_custo' || campo === 'preco_venda') {
-        const custo = parseNumber(campo === 'preco_custo' ? valor : prev.preco_custo);
-        const venda = parseNumber(campo === 'preco_venda' ? valor : prev.preco_venda);
-        
-        if (custo && venda && custo > 0) {
-          const markup = calcularMarkup(custo, venda);
-          novosDados.markup = markup.toFixed(2);
-        }
-      }
-      
-      // Calcular preço de venda pelo markup
-      if (campo === 'markup') {
-        const custo = parseNumber(prev.preco_custo);
-        const markupVal = parseNumber(valor);
-        
-        if (custo && custo > 0 && markupVal >= 0) {
-          const venda = calcularPrecoVenda(custo, markupVal);
-          novosDados.preco_venda = venda.toFixed(2);
-        }
-      }
-      
-      return novosDados;
-    });
-  };
 
   const handleGerarSKU = async () => {
     try {
@@ -1137,14 +1132,7 @@ export default function ProdutosNovo() {
                         <input
                           type="checkbox"
                           checked={mostrarBuscaPredecessor}
-                          onChange={(e) => {
-                            setMostrarBuscaPredecessor(e.target.checked);
-                            if (!e.target.checked) {
-                              setPredecessorSelecionado(null);
-                              handleChange('produto_predecessor_id', null);
-                              handleChange('motivo_descontinuacao', '');
-                            }
-                          }}
+                          onChange={(e) => handleToggleBuscaPredecessor(e.target.checked)}
                           className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
                         />
                         <span className="text-sm font-medium text-gray-700">Este produto substitui outro</span>
@@ -1162,21 +1150,7 @@ export default function ProdutosNovo() {
                             type="text"
                             placeholder="Digite o nome ou código do produto..."
                             value={buscaPredecessor}
-                            onChange={async (e) => {
-                              setBuscaPredecessor(e.target.value);
-                              if (e.target.value.length >= 2) {
-                                try {
-                                  const response = await api.get('/produtos/', {
-                                    params: { busca: e.target.value, page_size: 10 }
-                                  });
-                                  setProdutosBusca(response.data.items || []);
-                                } catch (err) {
-                                  console.error('Erro ao buscar produtos:', err);
-                                }
-                              } else {
-                                setProdutosBusca([]);
-                              }
-                            }}
+                            onChange={(e) => handleBuscaPredecessorChange(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                           />
                           
@@ -1186,12 +1160,7 @@ export default function ProdutosNovo() {
                               {produtosBusca.map(produto => (
                                 <div
                                   key={produto.id}
-                                  onClick={() => {
-                                    setPredecessorSelecionado(produto);
-                                    handleChange('produto_predecessor_id', produto.id);
-                                    setBuscaPredecessor('');
-                                    setProdutosBusca([]);
-                                  }}
+                                  onClick={() => handleSelecionarPredecessor(produto)}
                                   className="p-3 hover:bg-amber-50 cursor-pointer border-b border-gray-200 last:border-0"
                                 >
                                   <div className="font-medium text-gray-900">{produto.nome}</div>
@@ -1214,10 +1183,7 @@ export default function ProdutosNovo() {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setPredecessorSelecionado(null);
-                                    handleChange('produto_predecessor_id', null);
-                                  }}
+                                  onClick={handleRemoverPredecessor}
                                   className="text-red-600 hover:text-red-800"
                                 >
                                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2461,7 +2427,7 @@ export default function ProdutosNovo() {
                       <h4 className="text-md font-semibold">Variações Cadastradas</h4>
                       <button
                         type="button"
-                        onClick={() => setMostrarFormVariacao(!mostrarFormVariacao)}
+                        onClick={handleToggleFormVariacao}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                       >
                         {mostrarFormVariacao ? '❌ Cancelar' : '➕ Nova Variação'}
@@ -2570,86 +2536,14 @@ export default function ProdutosNovo() {
                         <div className="mt-4 flex justify-end gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              setMostrarFormVariacao(false);
-                              setNovaVariacao({
-                                sku: '',
-                                nome: '',
-                                codigo_barras: '',
-                                preco_custo: '',
-                                preco_venda: '',
-                                estoque_minimo: 0,
-                                e_kit: false,
-                                e_kit_fisico: false,
-                                composicao_kit: []
-                              });
-                            }}
+                            onClick={handleCancelarVariacao}
                             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                           >
                             Cancelar
                           </button>
                           <button
                             type="button"
-                            onClick={async () => {
-                              // Validações
-                              if (!novaVariacao.sku || !novaVariacao.nome || !novaVariacao.preco_venda) {
-                                alert('Preencha SKU, Nome e Preço de Venda');
-                                return;
-                              }
-                              
-                              try {
-                                // Criar variação via API
-                                const dadosVariacao = {
-                                  codigo: novaVariacao.sku,
-                                  nome: `${formData.nome} - ${novaVariacao.nome}`,
-                                  codigo_barras: novaVariacao.codigo_barras || null,
-                                  preco_custo: parseFloat(novaVariacao.preco_custo) || 0,
-                                  preco_venda: parseFloat(novaVariacao.preco_venda),
-                                  estoque_minimo: parseInt(novaVariacao.estoque_minimo) || 0,
-                                  tipo_produto: 'VARIACAO',
-                                  produto_pai_id: parseInt(id),
-                                  categoria_id: formData.categoria_id || null,
-                                  marca_id: formData.marca_id || null,
-                                  unidade: formData.unidade || 'UN',
-                                };
-                                
-                                // REGRA OFICIAL: VARIACAO pode ser KIT
-                                if (novaVariacao.e_kit) {
-                                  dadosVariacao.tipo_kit = 'VIRTUAL'; // Padrão: virtual (será configurado depois na aba composição)
-                                  dadosVariacao.e_kit_fisico = false;
-                                }
-                                
-                                const respostaCriacao = await createProduto(dadosVariacao);
-                                const variacaoCriada = respostaCriacao?.data;
-
-                                if (novaVariacao.e_kit && variacaoCriada?.id) {
-                                  alert('Variação-kit cadastrada com sucesso! Agora defina a composição.');
-                                  navigate(`/produtos/${variacaoCriada.id}/editar?aba=9`);
-                                  return;
-                                }
-
-                                alert('Variação cadastrada com sucesso!');
-                                setMostrarFormVariacao(false);
-                                setNovaVariacao({
-                                  sku: '',
-                                  nome: '',
-                                  codigo_barras: '',
-                                  preco_custo: '',
-                                  preco_venda: '',
-                                  estoque_minimo: 0,
-                                  e_kit: false,
-                                  e_kit_fisico: false,
-                                  composicao_kit: []
-                                });
-                                
-                                // Recarregar variações
-                                const response = await getProdutoVariacoes(id);
-                                setVariacoes(response.data);
-                              } catch (error) {
-                                console.error('Erro ao cadastrar variação:', error);
-                                alert(error.response?.data?.detail || 'Erro ao cadastrar variação');
-                              }
-                            }}
+                            onClick={handleSalvarVariacao}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                           >
                             Salvar Variação
@@ -2710,19 +2604,7 @@ export default function ProdutosNovo() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={async () => {
-                                      if (!confirm(`Deseja excluir a variação ${variacao.nome}?`)) return;
-                                      try {
-                                        await deleteProduto(variacao.id);
-                                        alert('Variação excluída com sucesso!');
-                                        // Recarrega a lista completa
-                                        const response = await getProdutoVariacoes(id);
-                                        setVariacoes(response.data || []);
-                                      } catch (error) {
-                                        console.error('Erro ao excluir variação:', error);
-                                        alert('Erro ao excluir variação');
-                                      }
-                                    }}
+                                    onClick={() => handleExcluirVariacao(variacao)}
                                     className="text-red-600 hover:text-red-800"
                                     title="Excluir"
                                   >
