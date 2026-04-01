@@ -659,6 +659,15 @@ Itens executados nesta etapa:
   - `frontend/src/hooks/usePDVCliente.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
   - o estado derivado do cliente atual, vendas em aberto, saldo de campanhas e copia de dados foram movidos para `frontend/src/hooks/usePDVClienteContexto.js`
   - a busca de clientes, sugestoes e selecao do cliente foram movidas para `frontend/src/hooks/usePDVClienteBusca.js`
+- [x] continuar quebrando os hooks mais pesados do PDV pelo fluxo de descontos:
+  - `frontend/src/hooks/usePDVDescontos.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
+  - o desconto por item foi movido para `frontend/src/hooks/usePDVDescontoItens.js`
+  - o desconto total foi movido para `frontend/src/hooks/usePDVDescontoTotal.js`
+  - a aplicacao de cupom foi movida para `frontend/src/hooks/usePDVCupom.js`
+- [x] continuar quebrando os hooks mais pesados do PDV pelo fluxo de comissao:
+  - `frontend/src/hooks/usePDVComissao.js` virou um hook de composicao, mantendo a mesma API publica para a pagina
+  - a busca e sugestao de funcionarios foi movida para `frontend/src/hooks/usePDVFuncionariosBusca.js`
+  - o estado derivado de comissao e a sincronizacao com a venda foram movidos para `frontend/src/hooks/usePDVComissaoEstado.js`
 
 Itens deliberadamente adiados por agora:
 
@@ -668,7 +677,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar quebrando os hooks mais pesados do PDV, com foco em `usePDVDescontos.js` e `usePDVComissao.js`
+- [ ] continuar quebrando os hooks residuais do PDV, com foco em normalizar contratos entre hooks de composicao e reduzir props drilling em `PDVMainArea.jsx` e `PDVOverlays.jsx`
 - [ ] quebrar `ProdutosNovo.jsx` em feature folders menores
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
