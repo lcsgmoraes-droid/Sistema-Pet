@@ -713,8 +713,12 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pela componentizacao dos blocos residuais da aba de caracteristicas e pela reducao do acoplamento de props entre a pagina e os hooks/componentes
+- [x] continuar a decomposicao de `ProdutosNovo.jsx` pela componentizacao dos blocos residuais da aba de caracteristicas e pela reducao do acoplamento de props entre a pagina e os hooks/componentes:
+  - a aba de caracteristicas passou a usar `frontend/src/components/produto/ProdutosNovoCaracteristicasTab.jsx`
+  - as abas residuais iniciais ficaram unificadas em componentes dedicados: `ProdutosNovoCaracteristicasTab.jsx`, `ProdutosNovoImagensTab.jsx`, `ProdutosNovoEstoqueTab.jsx` e `ProdutosNovoFornecedoresTab.jsx`
+  - `ProdutosNovo.jsx` caiu de `1603` para `692` linhas sem alterar a experiencia da tela
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
+- [ ] reduzir o acoplamento de props residuais em `ProdutosNovo.jsx` criando um hook/compositor de pagina para as abas e modais
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
 - [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
