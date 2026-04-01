@@ -729,6 +729,11 @@ Proximas tarefas sugeridas para execucao continua:
   - a montagem visual principal foi movida para `frontend/src/components/produto/ProdutosNovoMainContent.jsx`
   - a camada de modais foi movida para `frontend/src/components/produto/ProdutosNovoModalsLayer.jsx`
   - `ProdutosNovo.jsx` caiu de `569` para `555` linhas e ficou mais focado em hooks e orquestracao
+- [x] iniciar a decomposicao de `ClientesNovo.jsx` pelos fluxos mais seguros de listagem e enderecos
+  - a listagem, busca e paginacao foram movidas para `frontend/src/hooks/useClientesNovoListagem.js`
+  - o fluxo de enderecos adicionais e CEP do modal foi movido para `frontend/src/hooks/useClientesNovoEnderecos.js`
+  - os componentes inline `ClienteSegmentoBadgeWrapper` e `WhatsAppHistorico` passaram para `frontend/src/components/ClienteSegmentoBadgeWrapper.jsx` e `frontend/src/components/WhatsAppHistorico.jsx`
+  - `ClientesNovo.jsx` caiu de `4198` para `3937` linhas sem alterar a experiencia da tela
 - [ ] revisar contratos de props residuais entre as abas/componentes de `ProdutosNovo` e agrupar blocos repetidos de callbacks/estado onde isso reduzir ruido real de manutencao
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida

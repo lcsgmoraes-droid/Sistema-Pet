@@ -22,25 +22,23 @@ import {
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import ClienteInsights from "../components/ClienteInsights";
+import ClienteSegmentoBadgeWrapper from "../components/ClienteSegmentoBadgeWrapper";
 import {
   ClienteSegmentos,
-  SegmentoBadge,
 } from "../components/ClienteSegmentos";
 import ClienteTimeline from "../components/ClienteTimeline";
 import ExtratoCredito from "../components/ExtratoCredito";
 import ModalAdicionarCredito from "../components/ModalAdicionarCredito";
 import ModalImportacaoPessoas from "../components/ModalImportacaoPessoas";
 import ModalRemoverCredito from "../components/ModalRemoverCredito";
+import WhatsAppHistorico from "../components/WhatsAppHistorico";
+import { useClientesNovoEnderecos } from "../hooks/useClientesNovoEnderecos";
+import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
 import { formatBRL } from "../utils/formatters";
 
 const Pessoas = () => {
   const navigate = useNavigate();
-  const [clientes, setClientes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] =
-    useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
@@ -53,9 +51,6 @@ const Pessoas = () => {
   const [tipoFiltro, setTipoFiltro] = useState("todos"); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
 
   // Estados de paginação
-  const [paginaAtual, setPaginaAtual] = useState(1);
-  const [totalRegistros, setTotalRegistros] = useState(0);
-  const [registrosPorPagina, setRegistrosPorPagina] = useState(20);
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [pets, setPets] = useState([]);
@@ -72,6 +67,21 @@ const Pessoas = () => {
   const [loadingResumo, setLoadingResumo] = useState(false);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [lancandoCarimbo, setLancandoCarimbo] = useState(false);
+  const {
+    clientes,
+    loading,
+    carregamentoInicialConcluido,
+    searchTerm,
+    setSearchTerm,
+    paginaAtual,
+    setPaginaAtual,
+    totalRegistros,
+    registrosPorPagina,
+    setRegistrosPorPagina,
+    filteredClientes,
+    loadClientes,
+    getClientePorCodigoExato,
+  } = useClientesNovoListagem({ tipoFiltro, setError });
 
   // Form states
   const [formData, setFormData] = useState({
@@ -136,9 +146,19 @@ const Pessoas = () => {
   });
 
   // Estado para endereços adicionais
-  const [enderecosAdicionais, setEnderecosAdicionais] = useState([]);
-  const [enderecoAtual, setEnderecoAtual] = useState(null);
-  const [mostrarFormEndereco, setMostrarFormEndereco] = useState(false);
+  const {
+    enderecosAdicionais,
+    setEnderecosAdicionais,
+    enderecoAtual,
+    setEnderecoAtual,
+    mostrarFormEndereco,
+    loadingCepEndereco,
+    abrirModalEndereco,
+    fecharModalEndereco,
+    buscarCepModal,
+    salvarEndereco,
+    removerEndereco,
+  } = useClientesNovoEnderecos();
 
   const [currentPet, setCurrentPet] = useState({
     nome: "",
@@ -168,10 +188,6 @@ const Pessoas = () => {
     { number: 5, title: "Animais" },
     { number: 6, title: "Financeiro" },
   ];
-
-  useEffect(() => {
-    loadClientes();
-  }, [tipoFiltro, paginaAtual, registrosPorPagina]);
 
   // Debounce para busca (aguarda 500ms após usuário parar de digitar)
   useEffect(() => {
@@ -217,45 +233,6 @@ const Pessoas = () => {
     }
   };
 
-  const loadClientes = async () => {
-    try {
-      setLoading(true);
-      const skip = (paginaAtual - 1) * registrosPorPagina;
-      const params = new URLSearchParams({
-        skip: skip.toString(),
-        limit: registrosPorPagina.toString(),
-      });
-
-      if (tipoFiltro !== "todos") {
-        params.append("tipo_cadastro", tipoFiltro);
-      }
-
-      // Adicionar busca se houver termo
-      if (searchTerm && searchTerm.trim()) {
-        params.append("search", searchTerm.trim());
-      }
-
-      const url = `/clientes/?${params.toString()}`;
-      const response = await api.get(url);
-
-      // API agora retorna { items: [], total: X }
-      if (response.data.items) {
-        setClientes(response.data.items);
-        setTotalRegistros(response.data.total);
-      } else {
-        // Fallback para compatibilidade (caso API antiga)
-        setClientes(response.data);
-        setTotalRegistros(response.data.length);
-      }
-    } catch (err) {
-      setError("Erro ao carregar pessoas");
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setCarregamentoInicialConcluido(true);
-    }
-  };
-
   const buscarCep = async (cep) => {
     const cepLimpo = cep.replace(/\D/g, "");
 
@@ -291,93 +268,6 @@ const Pessoas = () => {
   };
 
   // Funções de gerenciamento de endereços adicionais
-  const abrirModalEndereco = (index = null) => {
-    if (index !== null) {
-      // Editando endereço existente
-      setEnderecoAtual({ ...enderecosAdicionais[index], index });
-    } else {
-      // Novo endereço
-      setEnderecoAtual({
-        tipo: "entrega",
-        apelido: "",
-        cep: "",
-        endereco: "",
-        numero: "",
-        complemento: "",
-        bairro: "",
-        cidade: "",
-        estado: "",
-      });
-    }
-    setMostrarFormEndereco(true);
-  };
-
-  const fecharModalEndereco = () => {
-    setMostrarFormEndereco(false);
-    setEnderecoAtual(null);
-  };
-
-  const buscarCepModal = async (cep) => {
-    if (!cep || cep.length !== 9) return;
-
-    setLoadingCep(true);
-    try {
-      const response = await fetch(
-        `https://viacep.com.br/ws/${cep.replace("-", "")}/json/`,
-      );
-      const data = await response.json();
-
-      if (data.erro) {
-        alert("CEP não encontrado");
-        return;
-      }
-
-      setEnderecoAtual((prev) => ({
-        ...prev,
-        endereco: data.logradouro || "",
-        bairro: data.bairro || "",
-        cidade: data.localidade || "",
-        estado: data.uf || "",
-      }));
-    } catch (error) {
-      console.error("Erro ao buscar CEP:", error);
-      alert("Erro ao buscar CEP");
-    } finally {
-      setLoadingCep(false);
-    }
-  };
-
-  const salvarEndereco = () => {
-    if (
-      !enderecoAtual.cep ||
-      !enderecoAtual.endereco ||
-      !enderecoAtual.cidade
-    ) {
-      alert("Preencha pelo menos CEP, Endereço e Cidade");
-      return;
-    }
-
-    const novosEnderecos = [...enderecosAdicionais];
-
-    if (enderecoAtual.index !== undefined) {
-      // Editando endereço existente
-      novosEnderecos[enderecoAtual.index] = { ...enderecoAtual };
-      delete novosEnderecos[enderecoAtual.index].index;
-    } else {
-      // Novo endereço
-      novosEnderecos.push({ ...enderecoAtual });
-    }
-
-    setEnderecosAdicionais(novosEnderecos);
-    fecharModalEndereco();
-  };
-
-  const removerEndereco = (index) => {
-    if (confirm("Deseja realmente remover este endereço?")) {
-      const novosEnderecos = enderecosAdicionais.filter((_, i) => i !== index);
-      setEnderecosAdicionais(novosEnderecos);
-    }
-  };
 
   const handleSubmitFinal = async () => {
     setError("");
@@ -1127,22 +1017,11 @@ const Pessoas = () => {
     setPets(pets.filter((_, i) => i !== index));
   };
 
-  const filteredClientes = clientes.filter(
-    (cliente) =>
-      cliente.codigo?.includes(searchTerm) ||
-      cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cliente.cpf?.includes(searchTerm) ||
-      cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cliente.celular?.includes(searchTerm),
-  );
-
   const abrirPessoaPorCodigoNoEnter = () => {
     const termo = String(searchTerm || "").trim();
     if (!termo) return;
 
-    const clienteCodigoExato = filteredClientes.find(
-      (cliente) => String(cliente?.codigo || "").trim() === termo,
-    );
+    const clienteCodigoExato = getClientePorCodigoExato(termo);
 
     if (clienteCodigoExato) {
       openModal(clienteCodigoExato);
@@ -1151,146 +1030,6 @@ const Pessoas = () => {
 
   // ============================================================================
   // COMPONENTE: ClienteSegmentoBadgeWrapper (lazy load badge na lista)
-  // ============================================================================
-  function ClienteSegmentoBadgeWrapper({ clienteId }) {
-    const [segmento, setSegmento] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [loaded, setLoaded] = useState(false);
-
-    useEffect(() => {
-      if (clienteId && !loaded) {
-        loadSegmento();
-      }
-    }, [clienteId]);
-
-    const loadSegmento = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get(`/segmentacao/clientes/${clienteId}`);
-        setSegmento(response.data.segmento);
-      } catch (err) {
-        // Cliente sem segmento (404) - silencioso
-        if (err.response?.status !== 404) {
-          console.error("Erro ao carregar segmento:", err);
-        }
-      } finally {
-        setLoading(false);
-        setLoaded(true);
-      }
-    };
-
-    if (loading) {
-      return <span className="text-xs text-gray-400">...</span>;
-    }
-
-    if (!segmento) {
-      return <span className="text-xs text-gray-400">-</span>;
-    }
-
-    return <SegmentoBadge segmento={segmento} size="sm" />;
-  }
-
-  // ============================================================================
-  // COMPONENTE: WhatsAppHistorico
-  // ============================================================================
-  function WhatsAppHistorico({ clienteId }) {
-    const [mensagens, setMensagens] = useState([]);
-    const [loadingMensagens, setLoadingMensagens] = useState(true);
-
-    useEffect(() => {
-      if (clienteId) {
-        loadMensagens();
-      }
-    }, [clienteId]);
-
-    const loadMensagens = async () => {
-      try {
-        setLoadingMensagens(true);
-        const response = await api.get(
-          `/whatsapp/clientes/${clienteId}/whatsapp/ultimas?limit=5`,
-        );
-        setMensagens(response.data);
-      } catch (err) {
-        console.error("Erro ao carregar mensagens:", err);
-        setMensagens([]);
-      } finally {
-        setLoadingMensagens(false);
-      }
-    };
-
-    if (loadingMensagens) {
-      return (
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
-          <p className="text-sm text-gray-600 mt-2">Carregando mensagens...</p>
-        </div>
-      );
-    }
-
-    if (mensagens.length === 0) {
-      return (
-        <div className="text-center py-6 text-gray-500">
-          <FiMessageCircle size={32} className="mx-auto mb-2 text-gray-400" />
-          <p className="text-sm">Nenhuma mensagem registrada ainda</p>
-          <p className="text-xs mt-1">
-            As mensagens enviadas e recebidas aparecerão aqui
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-3">
-        <p className="text-sm font-medium text-gray-700 mb-3">
-          Últimas 5 mensagens:
-        </p>
-        {mensagens.map((msg) => (
-          <div
-            key={msg.id}
-            className={`p-3 rounded-lg border ${
-              msg.direcao === "enviada"
-                ? "bg-green-50 border-green-200 ml-6"
-                : "bg-blue-50 border-blue-200 mr-6"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-semibold ${
-                    msg.direcao === "enviada"
-                      ? "text-green-700"
-                      : "text-blue-700"
-                  }`}
-                >
-                  {msg.direcao === "enviada" ? "→ Enviada" : "← Recebida"}
-                </span>
-                <span
-                  className={`text-xs px-2 py-0.5 rounded-full ${
-                    msg.status === "lido"
-                      ? "bg-green-200 text-green-800"
-                      : msg.status === "enviado"
-                        ? "bg-yellow-200 text-yellow-800"
-                        : msg.status === "recebido"
-                          ? "bg-blue-200 text-blue-800"
-                          : "bg-red-200 text-red-800"
-                  }`}
-                >
-                  {msg.status}
-                </span>
-              </div>
-              <span className="text-xs text-gray-500">
-                {new Date(msg.created_at).toLocaleString("pt-BR")}
-              </span>
-            </div>
-            <p className="text-sm text-gray-700">
-              {msg.preview || msg.conteudo}
-            </p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   const isCarregamentoInicial = loading && !carregamentoInicialConcluido;
 
   if (isCarregamentoInicial) {
@@ -3989,7 +3728,7 @@ const Pessoas = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                       placeholder="00000-000"
                     />
-                    {loadingCep && (
+                    {loadingCepEndereco && (
                       <div className="absolute right-2 top-2">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                       </div>
