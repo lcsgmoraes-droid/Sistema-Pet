@@ -10,11 +10,12 @@ import useProdutosNovoImagens from '../hooks/useProdutosNovoImagens';
 import useProdutosNovoKit from '../hooks/useProdutosNovoKit';
 import useProdutosNovoLotes from '../hooks/useProdutosNovoLotes';
 import useProdutosNovoPredecessor from '../hooks/useProdutosNovoPredecessor';
+import useProdutosNovoRacao from '../hooks/useProdutosNovoRacao';
+import useProdutosNovoRecorrencia from '../hooks/useProdutosNovoRecorrencia';
+import useProdutosNovoSubmit from '../hooks/useProdutosNovoSubmit';
+import useProdutosNovoTributacao from '../hooks/useProdutosNovoTributacao';
 import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
 import {
-  createProduto,
-  updateProduto,
-  deleteProduto,
   gerarSKU,
   gerarCodigoBarras,
   calcularPrecoVenda,
@@ -22,8 +23,6 @@ import {
   formatarMoeda,
   formatarData,
 } from '../api/produtos';
-import api from '../api';
-import { debugLog } from '../utils/debug';
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
@@ -274,6 +273,10 @@ export default function ProdutosNovo() {
     setFornecedores,
   });
 
+  const { handleChangeTributacao, handlePersonalizarFiscal } = useProdutosNovoTributacao({
+    setFormData,
+  });
+
   const {
     uploadingImage,
     handleUploadImagem,
@@ -318,6 +321,29 @@ export default function ProdutosNovo() {
     abaAtiva,
     formData,
     navigate,
+  });
+
+  const { handleTipoRecorrenciaChange } = useProdutosNovoRecorrencia({
+    handleChange,
+  });
+
+  const {
+    handleClassificacaoRacaoChange,
+    handleFasePublicoChange,
+    handleApresentacaoPesoChange,
+  } = useProdutosNovoRacao({
+    opcoesApresentacoes,
+    opcoesFases,
+    setFormData,
+  });
+
+  const { handleSubmit } = useProdutosNovoSubmit({
+    id,
+    isEdicao,
+    formData,
+    navigate,
+    salvarFiscal,
+    setSalvando,
   });
   
   // Auto-detectar "ração" no nome do produto
@@ -380,137 +406,6 @@ export default function ProdutosNovo() {
     } catch (error) {
       console.error('Erro ao gerar cÃ³digo de barras:', error);
       alert('Erro ao gerar cÃ³digo de barras');
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // ValidaÃ§Ãµes bÃ¡sicas
-    if (!formData.nome) {
-      alert('Preencha o campo Nome');
-      return;
-    }
-    
-    // Produto PAI não precisa de preço
-    if (formData.tipo_produto !== 'PAI' && !formData.preco_venda) {
-      alert('Preencha o Preço de Venda');
-      return;
-    }
-
-    if (!formData.codigo && !formData.sku) {
-      alert('Preencha o campo SKU/Código');
-      return;
-    }
-
-    try {
-      setSalvando(true);
-      const skuNormalizado = (formData.sku || formData.codigo || '').trim().toUpperCase();
-
-      // Normaliza composição do kit para o schema do backend.
-      // O backend exige produto_componente_id, mas ao carregar edição pode vir produto_id.
-      const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
-        produto_componente_id: item.produto_componente_id || item.produto_id,
-        quantidade: item.quantidade ? parseFloat(item.quantidade) : 1,
-        ordem: Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : 0,
-        opcional: Boolean(item.opcional),
-      }));
-      
-      // Preparar dados para envio
-      const dados = {
-        codigo: skuNormalizado,
-        nome: formData.nome,
-        descricao_curta: formData.descricao || null,
-        codigo_barras: formData.codigo_barras || null,
-        unidade: formData.unidade || 'UN',
-        preco_custo: formData.preco_custo ? parseFloat(formData.preco_custo) : 0,
-        preco_venda: parseFloat(formData.preco_venda),
-        preco_promocional: formData.preco_promocional ? parseFloat(formData.preco_promocional) : null,
-        promocao_inicio: formData.data_inicio_promocao || null,
-        promocao_fim: formData.data_fim_promocao || null,
-        preco_ecommerce: formData.preco_ecommerce ? parseFloat(formData.preco_ecommerce) : null,
-        preco_ecommerce_promo: formData.preco_ecommerce_promo ? parseFloat(formData.preco_ecommerce_promo) : null,
-        preco_ecommerce_promo_inicio: formData.preco_ecommerce_promo_inicio || null,
-        preco_ecommerce_promo_fim: formData.preco_ecommerce_promo_fim || null,
-        preco_app: formData.preco_app ? parseFloat(formData.preco_app) : null,
-        preco_app_promo: formData.preco_app_promo ? parseFloat(formData.preco_app_promo) : null,
-        preco_app_promo_inicio: formData.preco_app_promo_inicio || null,
-        preco_app_promo_fim: formData.preco_app_promo_fim || null,
-        controle_lote: formData.controle_lote || false,
-        estoque_minimo: formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
-        estoque_maximo: formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
-        // Apenas enviar IDs se nÃ£o forem vazios
-        categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
-        marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
-        departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,
-        // Sprint 2: Tipo de produto (SIMPLES, PAI, KIT, VARIACAO)
-        tipo_produto: formData.tipo_produto || 'SIMPLES',
-        produto_pai_id: formData.produto_pai_id || null,
-        // Kit/Composição (KIT ou VARIACAO-KIT)
-        tipo_kit: (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) 
-          ? (formData.e_kit_fisico ? 'FISICO' : 'VIRTUAL') 
-          : null,
-        e_kit_fisico: (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) 
-          ? formData.e_kit_fisico 
-          : null,
-        composicao_kit: (formData.tipo_produto === 'KIT' || (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)) 
-          ? composicaoKitNormalizada
-          : null,
-        // Sistema Predecessor/Sucessor
-        produto_predecessor_id: formData.produto_predecessor_id || null,
-        motivo_descontinuacao: formData.motivo_descontinuacao || null,
-        // ❌ Tributação: NÃO enviar mais para produtos (agora via Fiscal V2)
-        // Recorrência (Fase 1)
-        tem_recorrencia: formData.tem_recorrencia || false,
-        tipo_recorrencia: formData.tem_recorrencia ? formData.tipo_recorrencia : null,
-        intervalo_dias: formData.tem_recorrencia && formData.intervalo_dias ? parseInt(formData.intervalo_dias) : null,
-        numero_doses: formData.tem_recorrencia && formData.numero_doses ? parseInt(formData.numero_doses) : null,
-        especie_compativel: formData.tem_recorrencia ? formData.especie_compativel : null,
-        observacoes_recorrencia: formData.tem_recorrencia ? formData.observacoes_recorrencia : null,
-        // Ração - Calculadora (Fase 2)
-        classificacao_racao: formData.classificacao_racao || null,
-        peso_embalagem: formData.peso_embalagem ? parseFloat(formData.peso_embalagem) : null,
-        tabela_nutricional: formData.tabela_nutricional || null,
-        tabela_consumo: formData.tabela_consumo || null,
-        categoria_racao: formData.categoria_racao || null,
-        especies_indicadas: formData.especies_indicadas || null,
-        
-        // Opções de Ração - Sistema Dinâmico
-        linha_racao_id: formData.linha_racao_id ? parseInt(formData.linha_racao_id) : null,
-        porte_animal_id: formData.porte_animal_id ? parseInt(formData.porte_animal_id) : null,
-        fase_publico_id: formData.fase_publico_id ? parseInt(formData.fase_publico_id) : null,
-        tipo_tratamento_id: formData.tipo_tratamento_id ? parseInt(formData.tipo_tratamento_id) : null,
-        sabor_proteina_id: formData.sabor_proteina_id ? parseInt(formData.sabor_proteina_id) : null,
-        apresentacao_peso_id: formData.apresentacao_peso_id ? parseInt(formData.apresentacao_peso_id) : null,
-      };
-      
-      debugLog('ðŸ“¤ Enviando dados para API:', dados);
-
-      if (isEdicao) {
-        // 💾 FISCAL V2: Salvar dados fiscais ANTES de atualizar produto
-        await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
-        
-        await updateProduto(id, dados);
-        alert('Produto atualizado com sucesso!');
-        navigate('/produtos');
-      } else {
-        const response = await createProduto(dados);
-        const produtoId = response.data.id;
-        
-        // Se for produto PAI, redirecionar para edição (aba de variações)
-        if (formData.tipo_produto === 'PAI') {
-          alert('Produto PAI criado com sucesso! Agora cadastre as variações.');
-          navigate(`/produtos/${produtoId}/editar?aba=8`);
-        } else {
-          alert('Produto cadastrado com sucesso!');
-          navigate('/produtos');
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar produto');
-    } finally {
-      setSalvando(false);
     }
   };
 
@@ -1783,15 +1678,7 @@ export default function ProdutosNovo() {
                         <button
                           type="button"
                           className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              tributacao: {
-                                ...prev.tributacao,
-                                herdado_da_empresa: false,
-                              },
-                            }))
-                          }
+                          onClick={handlePersonalizarFiscal}
                         >
                           ✏️ Personalizar fiscal deste produto
                         </button>
@@ -1814,7 +1701,7 @@ export default function ProdutosNovo() {
                   </label>
                   <select
                     value={formData.tributacao?.origem_mercadoria || '0'}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, origem_mercadoria: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('origem_mercadoria', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                   >
@@ -1843,7 +1730,7 @@ export default function ProdutosNovo() {
                   <input
                     type="text"
                     value={formData.tributacao?.ncm || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, ncm: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('ncm', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="00000000"
@@ -1863,7 +1750,7 @@ export default function ProdutosNovo() {
                   <input
                     type="text"
                     value={formData.tributacao?.cest || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, cest: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('cest', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="0000000"
@@ -1883,7 +1770,7 @@ export default function ProdutosNovo() {
                   <input
                     type="text"
                     value={formData.tributacao?.cfop || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, cfop: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('cfop', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="0000"
@@ -1904,7 +1791,7 @@ export default function ProdutosNovo() {
                     type="number"
                     step="0.01"
                     value={formData.tributacao?.icms_aliquota || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, icms_aliquota: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('icms_aliquota', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="0,00"
@@ -1925,7 +1812,7 @@ export default function ProdutosNovo() {
                     type="number"
                     step="0.01"
                     value={formData.tributacao?.pis_aliquota || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, pis_aliquota: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('pis_aliquota', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="0,00"
@@ -1946,7 +1833,7 @@ export default function ProdutosNovo() {
                     type="number"
                     step="0.01"
                     value={formData.tributacao?.cofins_aliquota || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, tributacao: { ...prev.tributacao, cofins_aliquota: e.target.value } }))}
+                    onChange={(e) => handleChangeTributacao('cofins_aliquota', e.target.value)}
                     disabled={formData.tributacao?.herdado_da_empresa === true}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                     placeholder="0,00"
@@ -2001,14 +1888,7 @@ export default function ProdutosNovo() {
                       </label>
                       <select
                         value={formData.tipo_recorrencia}
-                        onChange={(e) => {
-                          handleChange('tipo_recorrencia', e.target.value);
-                          // Auto-preencher intervalo_dias baseado no tipo
-                          if (e.target.value === 'daily') handleChange('intervalo_dias', '1');
-                          else if (e.target.value === 'weekly') handleChange('intervalo_dias', '7');
-                          else if (e.target.value === 'monthly') handleChange('intervalo_dias', '30');
-                          else if (e.target.value === 'yearly') handleChange('intervalo_dias', '365');
-                        }}
+                        onChange={(e) => handleTipoRecorrenciaChange(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       >
                         <option value="daily">Diária</option>
@@ -2159,21 +2039,7 @@ export default function ProdutosNovo() {
                   </label>
                   <select
                     value={formData.classificacao_racao || 'nao'}
-                    onChange={(e) => {
-                      const valor = e.target.value;
-                      setFormData(prev => ({
-                        ...prev,
-                        classificacao_racao: valor,
-                        linha_racao_id: valor === 'sim' ? prev.linha_racao_id : '',
-                        porte_animal_id: valor === 'sim' ? prev.porte_animal_id : '',
-                        fase_publico_id: valor === 'sim' ? prev.fase_publico_id : '',
-                        tipo_tratamento_id: valor === 'sim' ? prev.tipo_tratamento_id : '',
-                        sabor_proteina_id: valor === 'sim' ? prev.sabor_proteina_id : '',
-                        apresentacao_peso_id: valor === 'sim' ? prev.apresentacao_peso_id : '',
-                        peso_embalagem: valor === 'sim' ? prev.peso_embalagem : '',
-                        categoria_racao: valor === 'sim' ? prev.categoria_racao : ''
-                      }));
-                    }}
+                    onChange={(e) => handleClassificacaoRacaoChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                   >
                     <option value="nao">Não</option>
@@ -2229,15 +2095,7 @@ export default function ProdutosNovo() {
                       </label>
                       <select
                         value={formData.fase_publico_id}
-                        onChange={(e) => {
-                          const faseId = e.target.value;
-                          const faseSelecionada = opcoesFases.find(fase => String(fase.id) === String(faseId));
-                          setFormData(prev => ({
-                            ...prev,
-                            fase_publico_id: faseId,
-                            categoria_racao: faseSelecionada ? faseSelecionada.nome : ''
-                          }));
-                        }}
+                        onChange={(e) => handleFasePublicoChange(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">Selecione...</option>
@@ -2288,15 +2146,7 @@ export default function ProdutosNovo() {
                       </label>
                       <select
                         value={formData.apresentacao_peso_id}
-                        onChange={(e) => {
-                          const apresentacaoId = e.target.value;
-                          const apresentacao = opcoesApresentacoes.find(apr => String(apr.id) === String(apresentacaoId));
-                          setFormData(prev => ({
-                            ...prev,
-                            apresentacao_peso_id: apresentacaoId,
-                            peso_embalagem: apresentacao ? String(apresentacao.peso_kg) : prev.peso_embalagem
-                          }));
-                        }}
+                        onChange={(e) => handleApresentacaoPesoChange(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">Selecione...</option>

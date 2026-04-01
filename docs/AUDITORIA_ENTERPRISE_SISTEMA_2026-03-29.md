@@ -688,6 +688,12 @@ Itens executados nesta etapa:
   - o fluxo de busca, selecao e limpeza de predecessor foi movido para `frontend/src/hooks/useProdutosNovoPredecessor.js`
   - o fluxo de carregamento, criacao e exclusao de variacoes foi movido para `frontend/src/hooks/useProdutosNovoVariacoes.js`
   - `ProdutosNovo.jsx` caiu de `3278` para `3160` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de submissao e pelas abas mais densas (`recorrencia`, `racao` e `tributacao`):
+  - o fluxo de submissao e persistencia do produto foi movido para `frontend/src/hooks/useProdutosNovoSubmit.js`
+  - os handlers de fiscal do formulario foram movidos para `frontend/src/hooks/useProdutosNovoTributacao.js`
+  - os handlers de recorrencia foram movidos para `frontend/src/hooks/useProdutosNovoRecorrencia.js`
+  - os handlers de classificacao, fase e apresentacao de racao foram movidos para `frontend/src/hooks/useProdutosNovoRacao.js`
+  - `ProdutosNovo.jsx` caiu de `3160` para `3012` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
@@ -697,7 +703,7 @@ Itens deliberadamente adiados por agora:
 
 Proximas tarefas sugeridas para execucao continua:
 
-- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos de submissao e pelas abas mais densas (`recorrencia`, `racao` e `tributacao`)
+- [ ] continuar a decomposicao de `ProdutosNovo.jsx` pelos fluxos residuais de acao/toolbar e pela componentizacao das abas mais densas
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
 - [ ] criar contrato visual padrao para tabelas, filtros, paginas de detalhe e estados vazios
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
