@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
-import { buscarClientePorId, buscarClientes } from "../api/clientes";
+import { buscarClientePorId } from "../api/clientes";
 import { getProdutosVendaveis } from "../api/produtos";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVAssistenteSidebar from "../components/pdv/PDVAssistenteSidebar";
@@ -30,6 +30,7 @@ import PDVVendasRecentesSidebar from "../components/pdv/PDVVendasRecentesSidebar
 import { useAuth } from "../contexts/AuthContext";
 import { usePDVAnalisePagamento } from "../hooks/usePDVAnalisePagamento";
 import { usePDVAssistente } from "../hooks/usePDVAssistente";
+import { usePDVCliente } from "../hooks/usePDVCliente";
 import { usePDVComissao } from "../hooks/usePDVComissao";
 import { usePDVDescontos } from "../hooks/usePDVDescontos";
 import { usePDVEntrega } from "../hooks/usePDVEntrega";
@@ -85,9 +86,7 @@ export default function PDV() {
   });
 
   // Estados de busca
-  const [buscarCliente, setBuscarCliente] = useState("");
   const [buscarProduto, setBuscarProduto] = useState("");
-  const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [produtosSugeridos, setProdutosSugeridos] = useState([]);
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
 
@@ -99,13 +98,11 @@ export default function PDV() {
   const [mostrarHistoricoCliente, setMostrarHistoricoCliente] = useState(false);
   const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
     useState(false);
-  const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
   const [copiadoCodigoItem, setCopiadoCodigoItem] = useState("");
   const [mostrarPendenciasEstoque, setMostrarPendenciasEstoque] =
     useState(false);
   const [pendenciasCount, setPendenciasCount] = useState(0);
   const [pendenciasProdutoIds, setPendenciasProdutoIds] = useState([]);
-  const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [searchVendaQuery, setSearchVendaQuery] = useState("");
@@ -116,9 +113,6 @@ export default function PDV() {
   const [mostrarModalEndereco, setMostrarModalEndereco] = useState(false);
   const [enderecoAtual, setEnderecoAtual] = useState(null);
   const [loadingCep, setLoadingCep] = useState(false);
-
-  const [saldoCampanhas, setSaldoCampanhas] = useState(null); // {saldo_cashback, total_carimbos, cupons_ativos}
-
 
   // Estados do drawer de análise de venda
 
@@ -131,6 +125,25 @@ export default function PDV() {
 
   const [painelClienteAberto, setPainelClienteAberto] =
     usePersistentBooleanState("pdv_painel_cliente_aberto", false);
+
+  const {
+    buscarCliente,
+    setBuscarCliente,
+    clientesSugeridos,
+    copiadoClienteCampo,
+    vendasEmAbertoInfo,
+    saldoCampanhas,
+    buscarClientePorCodigoExato,
+    selecionarCliente,
+    selecionarPet,
+    copiarCampoCliente,
+    limparClienteSelecionado,
+    handleClienteCriadoRapido: handleClienteCriadoRapidoHook,
+    recarregarVendasEmAbertoClienteAtual,
+  } = usePDVCliente({
+    vendaAtual,
+    setVendaAtual,
+  });
 
   const {
     vendasRecentes,
@@ -575,32 +588,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
 
   // carregarVendaEspecifica e handleBuscarVenda movidos para usePDVVendaAtual
 
-  // Buscar clientes
-  useEffect(() => {
-    if (buscarCliente.length >= 1) {
-      const timer = setTimeout(async () => {
-        try {
-          // Se a busca for telefone, usa só dígitos para bater com qualquer máscara.
-          // Se for nome/texto, mantém como foi digitado.
-          const termoOriginal = buscarCliente.trim();
-          const termoDigitos = termoOriginal.replace(/\D/g, "");
-          const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termoOriginal;
-          const clientes = await buscarClientes({
-            search: termoBusca,
-            limit: 20,
-          });
-          setClientesSugeridos(clientes || []);
-        } catch (error) {
-          console.error("Erro ao buscar clientes:", error);
-          setClientesSugeridos([]);
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      setClientesSugeridos([]);
-    }
-  }, [buscarCliente]);
-
   // Buscar produtos
   useEffect(() => {
     const termoAtual = String(buscarProduto || "").trim();
@@ -738,77 +725,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     }
   }
 
-  function buscarClientePorCodigoExato(termo) {
-    const termoLimpo = String(termo || "").trim().toLowerCase();
-    if (!termoLimpo) return null;
-
-    // Quando a busca for numérica, prioriza ID exato do cliente.
-    const porId = clientesSugeridos.find(
-      (cliente) => String(cliente?.id || "").trim().toLowerCase() === termoLimpo,
-    );
-    if (porId) return porId;
-
-    // Em seguida, tenta código exato.
-    return clientesSugeridos.find(
-      (cliente) =>
-        String(cliente?.codigo || "").trim().toLowerCase() === termoLimpo,
-    );
-  }
-
-  // Selecionar cliente
-  const selecionarCliente = async (cliente) => {
-    setVendaAtual({ ...vendaAtual, cliente, pet: null });
-    setBuscarCliente("");
-    setClientesSugeridos([]);
-    setSaldoCampanhas(null);
-
-    // Garante dados completos (telefone/celular/codigo) no card principal do PDV.
-    try {
-      const clienteCompleto = await buscarClientePorId(cliente.id);
-      if (clienteCompleto) {
-        setVendaAtual((prev) => ({
-          ...prev,
-          cliente: {
-            ...prev.cliente,
-            ...clienteCompleto,
-          },
-        }));
-      }
-    } catch (_) {
-      // Segue com os dados resumidos para não travar o fluxo do caixa.
-    }
-
-    // Verificar se cliente tem vendas em aberto
-    try {
-      const response = await api.get(
-        `/clientes/${cliente.id}/vendas-em-aberto`,
-      );
-      if (response.data.resumo.total_vendas > 0) {
-        setVendasEmAbertoInfo(response.data.resumo);
-      } else {
-        setVendasEmAbertoInfo(null);
-      }
-    } catch (error) {
-      console.error("Erro ao verificar vendas em aberto:", error);
-      setVendasEmAbertoInfo(null);
-    }
-
-    // Buscar saldo de campanhas (cashback + carimbos + cupons ativos)
-    try {
-      const res = await api.get(`/campanhas/clientes/${cliente.id}/saldo`);
-      setSaldoCampanhas(res.data);
-    } catch (_) {
-      // Silencioso — campanhas são opcionais
-    }
-  };
-
-  const copiarCampoCliente = (valor, campo) => {
-    if (!valor) return;
-    navigator.clipboard.writeText(String(valor));
-    setCopiadoClienteCampo(campo);
-    setTimeout(() => setCopiadoClienteCampo(""), 2000);
-  };
-
   const copiarCodigoProdutoCarrinho = (codigo, chaveItem) => {
     if (!codigo) return;
     navigator.clipboard.writeText(String(codigo));
@@ -845,11 +761,6 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
   const selecionarProdutoSugerido = (produto) => {
     adicionarProduto(produto);
     setMostrarSugestoesProduto(false);
-  };
-
-  // Selecionar pet
-  const selecionarPet = (pet) => {
-    setVendaAtual({ ...vendaAtual, pet });
   };
 
   // Adicionar produto ao carrinho
@@ -1070,22 +981,13 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
     setMostrarCalculadoraRacao(false);
   };
 
-  const handleClienteCriadoRapido = (cliente) => {
-    selecionarCliente(cliente);
+  const handleClienteCriadoRapido = async (cliente) => {
+    await handleClienteCriadoRapidoHook(cliente);
     setMostrarModalCliente(false);
   };
 
   const handleVendasEmAbertoSucesso = () => {
-    api
-      .get(`/clientes/${vendaAtual.cliente.id}/vendas-em-aberto`)
-      .then((response) => {
-        if (response.data.resumo.total_vendas > 0) {
-          setVendasEmAbertoInfo(response.data.resumo);
-        } else {
-          setVendasEmAbertoInfo(null);
-        }
-      })
-      .catch(() => setVendasEmAbertoInfo(null));
+    void recarregarVendasEmAbertoClienteAtual();
   };
 
   const handleConfirmarCreditoCliente = (novoSaldo) => {
@@ -1174,25 +1076,10 @@ const [racaoIdFechada, setRacaoIdFechada] = useState(null); // ID da ração fec
                 onAbrirVendasEmAberto={() => setMostrarVendasEmAberto(true)}
                 onBuscarClienteChange={setBuscarCliente}
                 onCopiarCampoCliente={copiarCampoCliente}
-                onRemoverCliente={() => {
-                  setVendaAtual({
-                    ...vendaAtual,
-                    cliente: null,
-                    pet: null,
-                  });
-                  setSaldoCampanhas(null);
-                }}
+                onRemoverCliente={limparClienteSelecionado}
                 onSelecionarCliente={selecionarCliente}
                 onSelecionarPet={selecionarPet}
-                onTrocarCliente={() => {
-                  setVendaAtual({
-                    ...vendaAtual,
-                    cliente: null,
-                    pet: null,
-                  });
-                  setVendasEmAbertoInfo(null);
-                  setSaldoCampanhas(null);
-                }}
+                onTrocarCliente={limparClienteSelecionado}
                 saldoCampanhas={saldoCampanhas}
                 vendaAtual={vendaAtual}
                 vendaGuiaClasses={vendaGuiaClasses}
