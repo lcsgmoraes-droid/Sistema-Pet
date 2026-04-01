@@ -8,6 +8,49 @@ import api from '../api';
 import toast from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 
+const CANAIS_DESTAQUE = ['loja_fisica', 'mercado_livre', 'shopee', 'amazon'];
+
+const LABELS_CANAIS = {
+  loja_fisica: 'Loja FÃ­sica',
+  mercado_livre: 'Mercado Livre',
+  shopee: 'Shopee',
+  amazon: 'Amazon',
+  site: 'Site',
+  instagram: 'Instagram',
+  whatsapp: 'WhatsApp',
+};
+
+const ESTILOS_CANAIS = {
+  loja_fisica: {
+    card: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    bar: 'bg-emerald-400',
+  },
+  mercado_livre: {
+    card: 'bg-yellow-50 border-yellow-200 text-yellow-700',
+    bar: 'bg-yellow-400',
+  },
+  shopee: {
+    card: 'bg-orange-50 border-orange-200 text-orange-700',
+    bar: 'bg-orange-400',
+  },
+  amazon: {
+    card: 'bg-sky-50 border-sky-200 text-sky-700',
+    bar: 'bg-sky-400',
+  },
+  site: {
+    card: 'bg-indigo-50 border-indigo-200 text-indigo-700',
+    bar: 'bg-indigo-400',
+  },
+  instagram: {
+    card: 'bg-pink-50 border-pink-200 text-pink-700',
+    bar: 'bg-pink-400',
+  },
+  whatsapp: {
+    card: 'bg-green-50 border-green-200 text-green-700',
+    bar: 'bg-green-400',
+  },
+};
+
 function formatarQuantidade(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -422,9 +465,28 @@ export default function MovimentacoesProduto() {
 
   // Resumo de vendas por canal
   const vendasPorCanal = useMemo(() => {
+    const isSaidaVendaVinculada = (mov) => {
+      if (mov?.tipo !== 'saida' || mov?.status === 'cancelado' || !mov?.canal) {
+        return false;
+      }
+
+      if (mov.referencia_tipo === 'venda') {
+        return true;
+      }
+
+      if (mov.referencia_tipo === 'pedido_integrado') {
+        return Boolean(
+          mov.nf_numero ||
+          (typeof mov.documento === 'string' && mov.documento.startsWith('NF '))
+        );
+      }
+
+      return false;
+    };
+
     const grupos = {};
     movimentacoes
-      .filter(m => m.tipo === 'saida' && m.referencia_tipo === 'venda' && m.canal)
+      .filter(isSaidaVendaVinculada)
       .forEach(m => {
         const canal = m.canal;
         if (!grupos[canal]) grupos[canal] = { qtd: 0, valor: 0, count: 0 };
@@ -434,8 +496,21 @@ export default function MovimentacoesProduto() {
           : 0;
         grupos[canal].count += 1;
       });
+
+    const temVendasPorCanal = Object.values(grupos).some((g) => g.count > 0);
+    if (!temVendasPorCanal) {
+      return [];
+    }
+
+    CANAIS_DESTAQUE.forEach((canal) => {
+      if (!grupos[canal]) {
+        grupos[canal] = { qtd: 0, valor: 0, count: 0 };
+      }
+    });
+
     const totalQtd = Object.values(grupos).reduce((s, g) => s + g.qtd, 0);
     return Object.entries(grupos)
+      .filter(([canal, g]) => g.count > 0 || CANAIS_DESTAQUE.includes(canal))
       .map(([canal, g]) => ({
         canal,
         qtd: g.qtd,
@@ -443,7 +518,17 @@ export default function MovimentacoesProduto() {
         count: g.count,
         pct: totalQtd > 0 ? (g.qtd / totalQtd) * 100 : 0,
       }))
-      .sort((a, b) => b.qtd - a.qtd);
+      .sort((a, b) => {
+        if (b.qtd !== a.qtd) return b.qtd - a.qtd;
+
+        const aIndex = CANAIS_DESTAQUE.indexOf(a.canal);
+        const bIndex = CANAIS_DESTAQUE.indexOf(b.canal);
+        if (aIndex !== -1 || bIndex !== -1) {
+          return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+        }
+
+        return a.canal.localeCompare(b.canal);
+      });
   }, [movimentacoes]);
 
   if (loading) {
@@ -725,46 +810,22 @@ export default function MovimentacoesProduto() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
             <h2 className="text-base font-bold text-slate-800">Vendas por Canal</h2>
-            <span className="ml-auto text-xs text-slate-400">Apenas saídas vinculadas a vendas</span>
+            <span className="ml-auto text-xs text-slate-400">Saídas vinculadas a vendas e NFs confirmadas</span>
           </div>
           <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {vendasPorCanal.map(({ canal, qtd, valor, count, pct }) => {
-              const labelCanal = {
-                loja_fisica: 'Loja Física',
-                mercado_livre: 'Mercado Livre',
-                shopee: 'Shopee',
-                amazon: 'Amazon',
-                site: 'Site',
-                instagram: 'Instagram',
-                whatsapp: 'WhatsApp',
-              }[canal] || canal;
-              const corCanal = {
-                loja_fisica: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-                mercado_livre: 'bg-yellow-50 border-yellow-200 text-yellow-700',
-                shopee: 'bg-orange-50 border-orange-200 text-orange-700',
-                amazon: 'bg-sky-50 border-sky-200 text-sky-700',
-                site: 'bg-indigo-50 border-indigo-200 text-indigo-700',
-                instagram: 'bg-pink-50 border-pink-200 text-pink-700',
-                whatsapp: 'bg-green-50 border-green-200 text-green-700',
-              }[canal] || 'bg-slate-50 border-slate-200 text-slate-700';
-              const barColor = {
-                loja_fisica: 'bg-emerald-400',
-                mercado_livre: 'bg-yellow-400',
-                shopee: 'bg-orange-400',
-                amazon: 'bg-sky-400',
-                site: 'bg-indigo-400',
-                instagram: 'bg-pink-400',
-                whatsapp: 'bg-green-400',
-              }[canal] || 'bg-slate-400';
+              const labelCanal = LABELS_CANAIS[canal] || canal;
+              const corCanal = ESTILOS_CANAIS[canal]?.card || 'bg-slate-50 border-slate-200 text-slate-700';
+              const barColor = ESTILOS_CANAIS[canal]?.bar || 'bg-slate-400';
               return (
                 <div key={canal} className={`rounded-xl border p-4 ${corCanal}`}>
                   <div className="text-xs font-bold uppercase tracking-wide opacity-70">{labelCanal}</div>
                   <div className="mt-2 flex items-end justify-between gap-2">
                     <div>
                       <div className="text-2xl font-black">{formatBRL(qtd)} un</div>
-                      {valor > 0 && (
-                        <div className="mt-0.5 text-xs font-semibold opacity-80">{formatMoneyBRL(valor)}</div>
-                      )}
+                      <div className="mt-0.5 text-xs font-semibold opacity-80">
+                        {valor > 0 ? formatMoneyBRL(valor) : 'Sem vendas no histórico'}
+                      </div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold">{pct.toFixed(0)}%</div>
@@ -982,15 +1043,7 @@ export default function MovimentacoesProduto() {
                             mov.canal === 'whatsapp' ? 'bg-green-100 text-green-700' :
                             'bg-slate-100 text-slate-600'
                           }`}>
-                            {mov.canal_label || {
-                              loja_fisica: 'Loja Física',
-                              mercado_livre: 'Mercado Livre',
-                              shopee: 'Shopee',
-                              amazon: 'Amazon',
-                              site: 'Site',
-                              instagram: 'Instagram',
-                              whatsapp: 'WhatsApp',
-                            }[mov.canal] || mov.canal}
+                            {mov.canal_label || LABELS_CANAIS[mov.canal] || mov.canal}
                           </span>
                         ) : '-'}
                       </td>
