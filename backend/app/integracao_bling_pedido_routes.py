@@ -289,7 +289,7 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
     }
 
 
-def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None) -> dict | None:
+def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquecer_via_api: bool = True) -> dict | None:
     pedido_payload = _dict(pedido_payload)
     nota_ref = _dict(
         _primeiro_preenchido(
@@ -305,6 +305,9 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None) -> dict | No
     resumo_nf = _resumir_ultima_nf_webhook({**nota_ref, "id": nf_id})
     if resumo_nf.get("numero") and resumo_nf.get("valor_total") is not None:
         return resumo_nf
+
+    if not enriquecer_via_api:
+        return resumo_nf if resumo_nf.get("id") or resumo_nf.get("numero") else None
 
     try:
         from app.bling_integration import BlingAPI
@@ -352,8 +355,12 @@ def _sincronizar_nf_do_pedido(
     source: str,
     message: str,
     link_source: str,
+    enriquecer_via_api: bool = True,
 ) -> dict | None:
-    resumo_nf = _resumir_ultima_nf_do_pedido_bling(pedido_payload)
+    resumo_nf = _resumir_ultima_nf_do_pedido_bling(
+        pedido_payload,
+        enriquecer_via_api=enriquecer_via_api,
+    )
     if not resumo_nf:
         return None
 
@@ -1075,7 +1082,7 @@ def listar_pedidos_bling(
 @router.post("/pedidos/reconciliar-status")
 def reconciliar_status_pedidos_recentes(
     dias: int = Query(7, ge=1, le=30),
-    limite: int = Query(200, ge=1, le=500),
+    limite: int = Query(60, ge=1, le=500),
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):

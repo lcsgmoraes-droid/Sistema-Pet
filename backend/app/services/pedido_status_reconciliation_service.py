@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+import time
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from app.utils.logger import logger
 
 
 _STATUS_PEDIDOS_RECONCILIAVEIS = ("aberto", "confirmado", "expirado")
+_INTERVALO_MINIMO_CONSULTA_SEGUNDOS = 0.45
+_ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = 0.0
 
 
 def _utc_now() -> datetime:
@@ -76,10 +79,32 @@ def listar_tenants_com_pedidos_reconciliaveis(db: Session, *, dias: int) -> list
     ]
 
 
+def _aguardar_janela_rate_limit() -> None:
+    global _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS
+
+    agora = time.monotonic()
+    restante = _INTERVALO_MINIMO_CONSULTA_SEGUNDOS - (agora - _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS)
+    if restante > 0:
+        time.sleep(restante)
+    _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = time.monotonic()
+
+
 def _consultar_pedido_bling(pedido_bling_id: str) -> dict:
     from app.bling_integration import BlingAPI
 
-    return BlingAPI().consultar_pedido(pedido_bling_id)
+    ultima_falha = None
+    for espera in (0.0, 0.8, 1.4):
+        if espera > 0:
+            time.sleep(espera)
+        _aguardar_janela_rate_limit()
+        try:
+            return BlingAPI().consultar_pedido(pedido_bling_id)
+        except Exception as exc:
+            ultima_falha = exc
+            if "TOO_MANY_REQUESTS" not in str(exc):
+                raise
+
+    raise ultima_falha
 
 
 def _carregar_itens_pedido(db: Session, pedido_id: int) -> list[PedidoIntegradoItem]:
@@ -138,6 +163,7 @@ def reconciliar_status_pedido_local(
         source="scheduler",
         message="NF identificada na reconciliacao automatica do pedido.",
         link_source="pedido.status_reconciliation",
+        enriquecer_via_api=False,
     )
 
     situacao_id = _situacao_codigo_bling(_dict(pedido_api).get("situacao"))
@@ -224,7 +250,7 @@ def reconciliar_status_pedidos_recentes(
     tenant_id,
     *,
     dias: int = 7,
-    limite_pedidos: int = 200,
+    limite_pedidos: int = 60,
 ) -> dict:
     pedidos_antes = _contar_pedidos_recentes_reconciliaveis(db, tenant_id, dias=dias)
     pedidos = _buscar_pedidos_recentes_reconciliaveis(
@@ -300,7 +326,7 @@ def executar_reconciliacao_automatica_status_pedidos(
     db: Session,
     *,
     dias: int = 7,
-    limite_pedidos_por_tenant: int = 200,
+    limite_pedidos_por_tenant: int = 60,
 ) -> dict:
     tenant_ids = listar_tenants_com_pedidos_reconciliaveis(db, dias=dias)
     resultados: list[dict] = []

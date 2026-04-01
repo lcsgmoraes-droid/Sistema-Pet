@@ -140,7 +140,7 @@ class BlingSyncScheduler:
             result = executar_reconciliacao_automatica_status_pedidos(
                 db,
                 dias=7,
-                limite_pedidos_por_tenant=250,
+                limite_pedidos_por_tenant=60,
             )
             if result.get("confirmados_total") or result.get("cancelados_total") or result.get("erros_total"):
                 logger.info("[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s", result)
