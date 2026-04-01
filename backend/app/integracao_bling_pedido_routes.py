@@ -1072,6 +1072,31 @@ def listar_pedidos_bling(
     }
 
 
+@router.post("/pedidos/reconciliar-status")
+def reconciliar_status_pedidos_recentes(
+    dias: int = Query(7, ge=1, le=30),
+    limite: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_session),
+    user_tenant=Depends(get_current_user_and_tenant),
+):
+    tenant_id = user_tenant[1]
+
+    from app.services.pedido_status_reconciliation_service import (
+        reconciliar_status_pedidos_recentes as _reconciliar_status_pedidos_recentes,
+    )
+
+    try:
+        return _reconciliar_status_pedidos_recentes(
+            db,
+            tenant_id,
+            dias=dias,
+            limite_pedidos=limite,
+        )
+    except Exception as exc:
+        logger.exception("[BLING PEDIDOS] Falha ao reconciliar status dos pedidos recentes: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar status dos pedidos: {exc}")
+
+
 @router.post("/pedidos/{pedido_id}/consolidar-duplicidade")
 def consolidar_duplicidade_pedido(
     pedido_id: int,

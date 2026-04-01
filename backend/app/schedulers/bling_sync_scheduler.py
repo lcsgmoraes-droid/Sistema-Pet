@@ -14,6 +14,9 @@ from app.services.nfe_authorized_reconciliation_service import (
 from app.services.nfe_pending_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_pendentes,
 )
+from app.services.pedido_status_reconciliation_service import (
+    executar_reconciliacao_automatica_status_pedidos,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +58,13 @@ class BlingSyncScheduler:
             replace_existing=True,
         )
         self.scheduler.add_job(
+            func=self.reconciliar_status_pedidos,
+            trigger=IntervalTrigger(minutes=15),
+            id="bling_order_status_reconcile",
+            name="Bling Order Status Reconcile",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
             func=self.auditar_fluxo_bling,
             trigger=IntervalTrigger(minutes=15),
             id="bling_flow_audit_autofix",
@@ -74,6 +84,7 @@ class BlingSyncScheduler:
         logger.info("   - Reconciliacao recente: a cada 15 minutos")
         logger.info("   - NFs pendentes recentes: a cada 15 minutos")
         logger.info("   - NFs autorizadas sem baixa: a cada 15 minutos")
+        logger.info("   - Status de pedidos recentes: a cada 15 minutos")
         logger.info("   - Fluxo pedido/NF/estoque: a cada 15 minutos")
         logger.info("   - Auditoria geral: diariamente as 02:00")
 
@@ -120,6 +131,19 @@ class BlingSyncScheduler:
             )
             if result.get("notas_reconciliadas_total"):
                 logger.info("[BLING SYNC] Reconciliacao automatica de NFs autorizadas: %s", result)
+        finally:
+            db.close()
+
+    def reconciliar_status_pedidos(self) -> None:
+        db = SessionLocal()
+        try:
+            result = executar_reconciliacao_automatica_status_pedidos(
+                db,
+                dias=7,
+                limite_pedidos_por_tenant=250,
+            )
+            if result.get("confirmados_total") or result.get("cancelados_total") or result.get("erros_total"):
+                logger.info("[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s", result)
         finally:
             db.close()
 

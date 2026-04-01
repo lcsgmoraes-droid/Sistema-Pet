@@ -600,6 +600,14 @@ Itens executados nesta etapa:
   - incidentes e eventos passam a receber contexto de duplicidade, incluindo pedido canonico, duplicados seguros e duplicados bloqueados
   - as respostas do monitor agora tambem devolvem `acoes_disponiveis`, facilitando a operacao na tela sem adivinhacao
 
+- [x] blindar o espelhamento de status do pedido do Bling para o sistema local:
+  - o backend agora roda uma reconciliacao periodica dos pedidos recentes para reaplicar cancelamento ou confirmacao quando o webhook falhar
+  - pedidos que ja estavam `confirmado` localmente voltam a aceitar cancelamento vindo do Bling, liberando a reserva pendente
+  - foi criado um endpoint manual para reconciliar status de pedidos recentes por tenant sem depender de ajuste em banco
+- [x] alinhar o detalhe de reservas do produto com a mesma regra do contador:
+  - o modal de reservas ativas deixa de esconder pedidos `confirmado` que ainda seguram estoque
+  - a operacao passa a enxergar exatamente quais pedidos estao compondo a reserva daquele SKU
+
 Itens deliberadamente adiados por agora:
 
 - [ ] Sentry
