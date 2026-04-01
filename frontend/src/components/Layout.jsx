@@ -853,10 +853,17 @@ const Layout = () => {
 
       menuItems.forEach((item) => {
         if (!Array.isArray(item.submenu) || item.submenu.length === 0) return;
+
         const possuiRotaAtiva = item.submenu.some((subitem) =>
           location.pathname.startsWith(subitem.path),
         );
-        if (possuiRotaAtiva && !proximo[item.path]) {
+
+        // Autoabre apenas na primeira vez para a rota ativa.
+        // Se o usuario fechou manualmente, respeitamos esse estado.
+        if (
+          possuiRotaAtiva &&
+          typeof proximo[item.path] === "undefined"
+        ) {
           proximo[item.path] = true;
           mudou = true;
         }
@@ -864,7 +871,7 @@ const Layout = () => {
 
       return mudou ? proximo : prev;
     });
-  }, [location.pathname, menuItems]);
+  }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
 
