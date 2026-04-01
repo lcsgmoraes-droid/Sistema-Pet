@@ -1489,7 +1489,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             tenant_id=_tenant_uuid,
             pedido_bling_id=pedido_bling_id,
         )
-        if pedido and pedido.status not in ("confirmado", "cancelado"):
+        if pedido and pedido.status != "cancelado":
             itens = db.query(PedidoIntegradoItem).filter(
                 PedidoIntegradoItem.pedido_integrado_id == pedido.id
             ).all()
@@ -1520,7 +1520,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status not in ("confirmado", "cancelado"):
+            if pedido and pedido.status != "cancelado":
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
@@ -1545,7 +1545,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status not in ("confirmado", "cancelado"):
+            if pedido and pedido.status != "cancelado":
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()
@@ -1578,7 +1578,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status not in ("confirmado", "cancelado"):
+            if pedido and pedido.status != "cancelado":
                 itens = db.query(PedidoIntegradoItem).filter(
                     PedidoIntegradoItem.pedido_integrado_id == pedido.id
                 ).all()

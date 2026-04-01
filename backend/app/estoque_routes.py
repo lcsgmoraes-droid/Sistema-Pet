@@ -633,7 +633,6 @@ def _detalhar_reservas_ativas_produto(
         .filter(
             PedidoIntegradoItem.tenant_id == tenant_id,
             PedidoIntegrado.tenant_id == tenant_id,
-            PedidoIntegrado.status.in_(["aberto", "expirado"]),
             PedidoIntegradoItem.liberado_em.is_(None),
             PedidoIntegradoItem.vendido_em.is_(None),
         )

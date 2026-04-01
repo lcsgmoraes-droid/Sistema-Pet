@@ -1095,7 +1095,7 @@ export default function MovimentacoesProduto() {
             <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
               {reservasAtivas.length === 0 ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                  Nenhum pedido em aberto foi encontrado para esta reserva.
+                  Nenhum pedido com reserva ativa foi encontrado para este produto.
                 </div>
               ) : (
                 <div className="space-y-3">
