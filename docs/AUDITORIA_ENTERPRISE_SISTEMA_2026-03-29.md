@@ -718,6 +718,10 @@ Proximas tarefas sugeridas para execucao continua:
   - as abas residuais iniciais ficaram unificadas em componentes dedicados: `ProdutosNovoCaracteristicasTab.jsx`, `ProdutosNovoImagensTab.jsx`, `ProdutosNovoEstoqueTab.jsx` e `ProdutosNovoFornecedoresTab.jsx`
   - `ProdutosNovo.jsx` caiu de `1603` para `692` linhas sem alterar a experiencia da tela
 - [ ] revisar contratos e agrupamentos de props residuais entre `PDVMainArea.jsx` e `PDVOverlays.jsx` apenas se surgir necessidade pratica
+- [x] iniciar a decomposicao de `PedidosBling.jsx` pelos componentes inline e pela listagem/acoes da pagina
+  - os elementos inline foram extraidos para `frontend/src/components/pedidosBling/PedidoBlingStatusBadge.jsx`, `frontend/src/components/pedidosBling/PedidoBlingCampoInfo.jsx`, `frontend/src/components/pedidosBling/PedidoBlingLinhaItem.jsx` e `frontend/src/components/pedidosBling/PedidoBlingCard.jsx`
+  - a listagem, os filtros, a paginacao e as acoes de consolidar/reconciliar foram movidos para `frontend/src/hooks/usePedidosBlingListagem.js`
+  - `PedidosBling.jsx` deixou de concentrar helpers visuais, effects de carregamento e chamadas de acao, ficando focado na composicao da tela
 - [x] reduzir o acoplamento de props residuais em `ProdutosNovo.jsx` criando um hook/compositor de pagina para as abas e modais
   - a montagem de props das abas, banners e modais foi movida para `frontend/src/hooks/useProdutosNovoPageComposition.js`
   - os banners de predecessor/sucessor foram extraidos para `frontend/src/components/produto/ProdutosNovoStatusBanners.jsx`
