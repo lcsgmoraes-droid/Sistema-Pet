@@ -1,1 +1,0 @@
-import{a as s}from"./index-D_OsngXr.js";const n=async(e={})=>{const a=await s.get("/clientes/",{params:e});return a.data.items||a.data.clientes||a.data||[]},r=async e=>(await s.get(`/clientes/${e}`)).data;export{r as a,n as b};
