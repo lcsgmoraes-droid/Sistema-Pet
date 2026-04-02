@@ -798,6 +798,10 @@ Proximas tarefas sugeridas para execucao continua:
   - o aviso de duplicidade foi movido para `frontend/src/components/clientes/ClientesNovoDuplicadoWarning.jsx`
   - o modal de endereco adicional foi movido para `frontend/src/components/clientes/ClientesNovoEnderecoModal.jsx`
   - `ClientesNovo.jsx` caiu de `3726` para `3389` linhas e ficou com menos JSX inline nos fluxos de cadastro
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pelas etapas mais densas do wizard
+  - a etapa de pets foi movida para `frontend/src/components/clientes/ClientesNovoPetsStep.jsx`
+  - a etapa financeira foi movida para `frontend/src/components/clientes/ClientesNovoFinanceiroStep.jsx`
+  - `ClientesNovo.jsx` caiu de `3389` para `2884` linhas e ficou mais focado na orquestracao do cadastro
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
