@@ -750,6 +750,10 @@ Proximas tarefas sugeridas para execucao continua:
 - [ ] criar uma suite minima E2E para login, Monitor Bling e NF de saida
 - [ ] tratar os grupos historicos de duplicidade que ainda ficaram bloqueados por terem movimentacao ou item vendido
 - [ ] revisar a politica de cancelamento de NF por canal para os casos em que o produto nao deve voltar automaticamente ao estoque
+- [x] iniciar a decomposicao de `ProdutosBalanco.jsx` pelos fluxos de carregamento/filtros e pela grade de lancamentos
+  - o carregamento, a paginacao, os filtros e os handlers de lancamento foram movidos para `frontend/src/hooks/useProdutosBalancoPage.js`
+  - a tela passou a usar `frontend/src/components/produtoBalanco/ProdutosBalancoFiltros.jsx`, `ProdutosBalancoTabela.jsx` e `ProdutosBalancoPaginacao.jsx`
+  - `ProdutosBalanco.jsx` deixou de concentrar a operacao inteira e ficou focado na composicao da pagina
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
