@@ -722,6 +722,10 @@ Proximas tarefas sugeridas para execucao continua:
   - os elementos inline foram extraidos para `frontend/src/components/pedidosBling/PedidoBlingStatusBadge.jsx`, `frontend/src/components/pedidosBling/PedidoBlingCampoInfo.jsx`, `frontend/src/components/pedidosBling/PedidoBlingLinhaItem.jsx` e `frontend/src/components/pedidosBling/PedidoBlingCard.jsx`
   - a listagem, os filtros, a paginacao e as acoes de consolidar/reconciliar foram movidos para `frontend/src/hooks/usePedidosBlingListagem.js`
   - `PedidosBling.jsx` deixou de concentrar helpers visuais, effects de carregamento e chamadas de acao, ficando focado na composicao da tela
+- [x] iniciar a decomposicao de `OperadorasCartao.jsx` pelos fluxos de cadastro/listagem e pela quebra dos blocos visuais
+  - a carga, a selecao, o formulario e a persistencia foram movidos para `frontend/src/hooks/useOperadorasCartaoPage.js`
+  - a interface foi separada em `frontend/src/components/operadorasCartao/OperadoraCartaoCard.jsx`, `frontend/src/components/operadorasCartao/OperadoraCartaoPadraoInfo.jsx`, `frontend/src/components/operadorasCartao/OperadoraCartaoEmptyState.jsx` e `frontend/src/components/operadorasCartao/OperadoraCartaoModal.jsx`
+  - `OperadorasCartao.jsx` deixou de concentrar o CRUD inteiro e ficou focado em composicao e introducao guiada
 - [x] reduzir o acoplamento de props residuais em `ProdutosNovo.jsx` criando um hook/compositor de pagina para as abas e modais
   - a montagem de props das abas, banners e modais foi movida para `frontend/src/hooks/useProdutosNovoPageComposition.js`
   - os banners de predecessor/sucessor foram extraidos para `frontend/src/components/produto/ProdutosNovoStatusBanners.jsx`
