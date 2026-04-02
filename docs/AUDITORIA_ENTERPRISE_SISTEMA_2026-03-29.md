@@ -770,6 +770,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a edicao de preco e a edicao em lote foram movidas para `frontend/src/hooks/useProdutosEdicao.js`
   - a exclusao, resolucao de conflitos 409 e alternancia ativo/inativo foram movidas para `frontend/src/hooks/useProdutosExclusao.js`
   - `Produtos.jsx` caiu para `1064` linhas e ficou mais focado na composicao da tela e nos helpers visuais restantes
+- [x] extrair os utilitarios visuais e o estado da tabela/colunas de `Produtos.jsx`
+  - os utilitarios de busca, composicao de kit, texto quebrado e estoque visual foram movidos para `frontend/src/components/produtos/produtosUtils.js`
+  - o estado de expansao da tabela e a configuracao de colunas visiveis foram movidos para `frontend/src/hooks/useProdutosTabela.js`
+  - `Produtos.jsx` caiu para `860` linhas e ficou concentrado em hooks de dominio, composicao e a definicao das colunas da grade
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

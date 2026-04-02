@@ -8,161 +8,30 @@
 /**
  * PÃ¡gina de Listagem de Produtos - Estilo Bling
  */
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import {
-  formatarData,
-  formatarMoeda,
-} from "../api/produtos";
+import { formatarMoeda } from "../api/produtos";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
+import {
+  corrigirTextoQuebrado,
+  isKitFisicoProduto,
+  isKitVirtualProduto,
+  isProdutoComComposicao,
+  montarMensagemConflitoExclusao,
+  normalizeSearchText,
+  obterEstoqueVisualProduto,
+} from "../components/produtos/produtosUtils";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 import useProdutosEdicao from "../hooks/useProdutosEdicao";
 import useProdutosExclusao from "../hooks/useProdutosExclusao";
 import useProdutosListagem from "../hooks/useProdutosListagem";
 import useProdutosPageComposition from "../hooks/useProdutosPageComposition";
 import useProdutosRelatorios from "../hooks/useProdutosRelatorios";
+import useProdutosTabela from "../hooks/useProdutosTabela";
 import { useTour } from "../hooks/useTour";
 import { tourProdutos } from "../tours/tourDefinitions";
-
-const normalizeSearchText = (value) => {
-  if (value === null || value === undefined) return "";
-  return String(value)
-    .toLowerCase()
-    .normalize("NFD")
-    .replaceAll(/[\u0300-\u036f]/g, "");
-};
-
-const corrigirTextoQuebrado = (value) => {
-  if (value === null || value === undefined) return "";
-
-  const textoOriginal = String(value);
-  const scoreQuebrado = (texto) => (texto.match(/[ÃƒÃ‚Ã¢ï¿½]/g) || []).length;
-
-  const tentarTextDecoderUtf8 = (texto) => {
-    try {
-      const bytes = Uint8Array.from(
-        texto,
-        (char) => (char.codePointAt(0) ?? 0) & 0xff,
-      );
-      return new TextDecoder("utf-8").decode(bytes);
-    } catch {
-      return texto;
-    }
-  };
-
-  const candidatos = [
-    textoOriginal,
-    tentarTextDecoderUtf8(textoOriginal),
-    tentarTextDecoderUtf8(tentarTextDecoderUtf8(textoOriginal)),
-  ];
-
-  let melhor = candidatos[0];
-  let melhorScore = scoreQuebrado(melhor);
-
-  for (const candidato of candidatos) {
-    const score = scoreQuebrado(candidato);
-    if (score < melhorScore) {
-      melhor = candidato;
-      melhorScore = score;
-    }
-  }
-
-  return melhor
-    .replaceAll("Ã¢ÂÅ’", "âŒ")
-    .replaceAll("ÃƒÂ§", "Ã§")
-    .replaceAll("ÃƒÂ£", "Ã£")
-    .replaceAll("ÃƒÂµ", "Ãµ")
-    .replaceAll("ÃƒÂ¡", "Ã¡")
-    .replaceAll("ÃƒÂ©", "Ã©")
-    .replaceAll("ÃƒÂª", "Ãª")
-    .replaceAll("ÃƒÂ­", "Ã­")
-    .replaceAll("ÃƒÂ³", "Ã³")
-    .replaceAll("ÃƒÂº", "Ãº")
-    .replaceAll("Ã¢â‚¬â€œ", "-")
-    .replaceAll("Ã‚", "");
-};
-
-const montarMensagemConflitoExclusao = (nomeProduto, detalheServidor) => {
-  const detalheLimpo = corrigirTextoQuebrado(detalheServidor || "");
-  const correspondenciaQuantidade = detalheLimpo.match(/possui\s+(\d+)/i);
-  const quantidadeVariacoes = correspondenciaQuantidade?.[1] || "1";
-  const nomeLimpo = corrigirTextoQuebrado(nomeProduto || "Produto");
-
-  return `Produto '${nomeLimpo}' possui ${quantidadeVariacoes} variacao(oes) ativa(s) e nao pode ser desativado. Desative primeiro todas as variacoes.`;
-};
-
-const getProdutoSearchRank = (produto, buscaNormalizada) => {
-  const termo = normalizeSearchText(buscaNormalizada).trim();
-  if (!termo) return 999;
-
-  const codigo = normalizeSearchText(produto.codigo || produto.sku);
-  const codigoBarras = normalizeSearchText(produto.codigo_barras);
-  const nome = normalizeSearchText(produto.nome);
-
-  const regras = [
-    [1, codigo === termo],
-    [2, codigoBarras === termo],
-    [3, nome === termo],
-    [4, codigo?.startsWith(termo)],
-    [5, codigoBarras?.startsWith(termo)],
-    [6, nome?.startsWith(termo)],
-    [7, codigo?.includes(termo)],
-    [8, codigoBarras?.includes(termo)],
-    [9, nome?.includes(termo)],
-  ];
-
-  const match = regras.find(([, condicao]) => Boolean(condicao));
-  return match ? Number(match[0]) : 999;
-};
-
-const compareProdutosByBusca = (produtoA, produtoB, buscaNormalizada) => {
-  const rankA = getProdutoSearchRank(produtoA, buscaNormalizada);
-  const rankB = getProdutoSearchRank(produtoB, buscaNormalizada);
-
-  if (rankA !== rankB) {
-    return rankA - rankB;
-  }
-
-  const codigoA = String(produtoA.codigo || produtoA.sku || "");
-  const codigoB = String(produtoB.codigo || produtoB.sku || "");
-  const codigoCompare = codigoA.localeCompare(codigoB, "pt-BR", {
-    numeric: true,
-    sensitivity: "base",
-  });
-
-  if (codigoCompare !== 0) {
-    return codigoCompare;
-  }
-
-  return String(produtoA.nome || "").localeCompare(String(produtoB.nome || ""), "pt-BR", {
-    sensitivity: "base",
-    numeric: true,
-  });
-};
-
-const isKitVirtualProduto = (produto) => {
-  const tipoProduto = String(produto?.tipo_produto || "").toUpperCase();
-  const tipoKit = String(produto?.tipo_kit || "").toUpperCase();
-  return (tipoProduto === "KIT" || tipoProduto === "VARIACAO") && tipoKit === "VIRTUAL";
-};
-
-const isKitFisicoProduto = (produto) => {
-  const tipoProduto = String(produto?.tipo_produto || "").toUpperCase();
-  const tipoKit = String(produto?.tipo_kit || "").toUpperCase();
-  return (tipoProduto === "KIT" || tipoProduto === "VARIACAO") && tipoKit === "FISICO";
-};
-
-const isProdutoComComposicao = (produto) =>
-  isKitVirtualProduto(produto) || isKitFisicoProduto(produto);
-
-const obterEstoqueVisualProduto = (produto) => {
-  if (isKitVirtualProduto(produto)) {
-    return Number(produto?.estoque_virtual ?? produto?.estoque_atual ?? produto?.estoque ?? 0);
-  }
-  return Number(produto?.estoque_atual ?? produto?.estoque ?? 0);
-};
 
 // ====================================================
 // DEFINIÃ‡ÃƒO DE COLUNAS DA LISTAGEM
@@ -757,15 +626,6 @@ const PRODUTOS_COLUNAS = [
 export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
-  const linhaProdutoRefs = useRef({});
-  const [kitsExpandidos, setKitsExpandidos] = useState([]);
-  const [paisExpandidos, setPaisExpandidos] = useState([]);
-  const [colunasVisiveis, setColunasVisiveis] = useState(() => {
-    const salvo = localStorage.getItem("produtos_colunas_visiveis");
-    return salvo ? JSON.parse(salvo) : null;
-  });
-  const [modalColunas, setModalColunas] = useState(false);
-  const [colunasTemporarias, setColunasTemporarias] = useState([]);
   const [modalImportacao, setModalImportacao] = useState(false);
   const {
     carregarDados,
@@ -789,8 +649,12 @@ export default function Produtos() {
     totalPaginas,
   } = useProdutosListagem({
     normalizeSearchText,
-    onOcultarPaisVariacoes: () => setPaisExpandidos([]),
-    paisExpandidos,
+    onOcultarPaisVariacoes: () => produtosTabela.resetPaisExpandidos(),
+    paisExpandidos: produtosTabela.paisExpandidos,
+  });
+  const produtosTabela = useProdutosTabela({
+    colunasTabela: PRODUTOS_COLUNAS,
+    produtosVisiveisRef,
   });
   const {
     colunasRelatorio,
@@ -811,6 +675,23 @@ export default function Produtos() {
     filtros,
     obterEstoqueVisualProduto,
   });
+  const {
+    abrirModalColunas,
+    colunasTemporarias,
+    filtrarColunas,
+    getCorEstoque,
+    getValidadeMaisProxima,
+    kitsExpandidos,
+    linhaProdutoRefs,
+    modalColunas,
+    onCloseModalColunas,
+    paisExpandidos,
+    restaurarColunasPadrao,
+    salvarColunas,
+    toggleColuna,
+    toggleKitExpandido,
+    togglePaiExpandido,
+  } = produtosTabela;
   const copiarTexto = (texto, tipo) => {
     navigator.clipboard.writeText(texto);
     toast.success(`${tipo} copiado!`);
@@ -859,129 +740,6 @@ export default function Produtos() {
     setSelecionados,
   });
 
-  const getCorEstoque = (produto) => {
-    if (!produto.controlar_estoque) return "text-gray-500";
-    const estoque = obterEstoqueVisualProduto(produto);
-    const minimo = produto.estoque_minimo || 0;
-    if (estoque <= 0) return "text-red-600 font-semibold";
-    if (estoque <= minimo) return "text-yellow-600 font-medium";
-    return "text-gray-700";
-  };
-
-  const getValidadeMaisProxima = (produto) => {
-    if (!produto.lotes || produto.lotes.length === 0) return "-";
-    const lotes = produto.lotes
-      .filter((l) => l.data_validade)
-      .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
-    if (lotes.length === 0) return "-";
-    const proximaValidade = lotes[0].data_validade;
-    const dias = Math.floor(
-      (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
-    );
-    let cor = "text-gray-700";
-    if (dias < 0) cor = "text-red-600 font-bold";
-    else if (dias <= 30) cor = "text-orange-600 font-semibold";
-    else if (dias <= 90) cor = "text-yellow-600";
-    return <span className={cor}>{formatarData(proximaValidade)}</span>;
-  };
-
-  const garantirLinhaVisivel = (produtoId) => {
-    const linha = linhaProdutoRefs.current[produtoId];
-    if (!linha) return;
-    linha.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-      inline: "nearest",
-    });
-  };
-
-  const garantirGrupoPaiVisivel = (produtoId) => {
-    const produtosVisiveis = produtosVisiveisRef.current || [];
-    const variacoesVisiveis = produtosVisiveis.filter(
-      (produto) =>
-        produto.tipo_produto === "VARIACAO" && produto.produto_pai_id === produtoId,
-    );
-
-    const ultimoProdutoVisivel =
-      variacoesVisiveis[variacoesVisiveis.length - 1] ||
-      produtosVisiveis.find((produto) => produto.id === produtoId);
-
-    if (!ultimoProdutoVisivel) {
-      garantirLinhaVisivel(produtoId);
-      return;
-    }
-
-    const linha = linhaProdutoRefs.current[ultimoProdutoVisivel.id];
-    if (!linha) {
-      garantirLinhaVisivel(produtoId);
-      return;
-    }
-
-    linha.scrollIntoView({
-      behavior: "smooth",
-      block: variacoesVisiveis.length > 0 ? "end" : "center",
-      inline: "nearest",
-    });
-  };
-
-  const toggleKitExpandido = (produtoId) => {
-    const vaiExpandir = !kitsExpandidos.includes(produtoId);
-    setKitsExpandidos((prev) =>
-      prev.includes(produtoId)
-        ? prev.filter((id) => id !== produtoId)
-        : [...prev, produtoId],
-    );
-    if (vaiExpandir) {
-      setTimeout(() => garantirLinhaVisivel(produtoId), 80);
-    }
-  };
-
-  const togglePaiExpandido = (produtoId) => {
-    const vaiExpandir = !paisExpandidos.includes(produtoId);
-    setPaisExpandidos((prev) =>
-      prev.includes(produtoId)
-        ? prev.filter((id) => id !== produtoId)
-        : [...prev, produtoId],
-    );
-    if (vaiExpandir) {
-      setTimeout(() => garantirGrupoPaiVisivel(produtoId), 120);
-    }
-  };
-
-  const abrirModalColunas = () => {
-    const keys = colunasVisiveis || PRODUTOS_COLUNAS.map((c) => c.key);
-    setColunasTemporarias(keys);
-    setModalColunas(true);
-  };
-
-  const toggleColuna = (key) => {
-    setColunasTemporarias((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-    );
-  };
-
-  const salvarColunas = () => {
-    localStorage.setItem(
-      "produtos_colunas_visiveis",
-      JSON.stringify(colunasTemporarias),
-    );
-    setColunasVisiveis(colunasTemporarias);
-    setModalColunas(false);
-    toast.success("PreferÃªncias de colunas salvas!");
-  };
-
-  const restaurarColunasPadrao = () => {
-    localStorage.removeItem("produtos_colunas_visiveis");
-    setColunasVisiveis(null);
-    setColunasTemporarias(PRODUTOS_COLUNAS.map((c) => c.key));
-    toast.success("Colunas restauradas para o padrÃ£o!");
-  };
-
-  const filtrarColunas = (coluna) => {
-    if (!colunasVisiveis) return true;
-    return colunasVisiveis.includes(coluna.key);
-  };
-
   const { mainContentProps, modalsLayerProps } = useProdutosPageComposition({
     catalogosState: {
       categorias,
@@ -997,7 +755,7 @@ export default function Produtos() {
       filtrarColunas,
       modalColunas,
       modalRelatorioPersonalizado,
-      onCloseModalColunas: () => setModalColunas(false),
+      onCloseModalColunas,
       onCloseModalRelatorio,
       onGerarRelatorioPersonalizado,
       onOpenModalRelatorio,
