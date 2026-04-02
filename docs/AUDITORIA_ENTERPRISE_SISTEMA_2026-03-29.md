@@ -754,6 +754,11 @@ Proximas tarefas sugeridas para execucao continua:
   - o carregamento, a paginacao, os filtros e os handlers de lancamento foram movidos para `frontend/src/hooks/useProdutosBalancoPage.js`
   - a tela passou a usar `frontend/src/components/produtoBalanco/ProdutosBalancoFiltros.jsx`, `ProdutosBalancoTabela.jsx` e `ProdutosBalancoPaginacao.jsx`
   - `ProdutosBalanco.jsx` deixou de concentrar a operacao inteira e ficou focado na composicao da pagina
+- [x] iniciar a decomposicao de `Produtos.jsx` pela separacao da composicao visual da listagem e da camada de modais
+  - a composicao principal da tela foi movida para `frontend/src/components/produtos/ProdutosMainContent.jsx`
+  - a camada de modais foi movida para `frontend/src/components/produtos/ProdutosModalsLayer.jsx`
+  - a montagem das props da tela foi centralizada em `frontend/src/hooks/useProdutosPageComposition.js`
+  - `Produtos.jsx` caiu para `2014` linhas e ficou mais focado na orquestracao da pagina
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
