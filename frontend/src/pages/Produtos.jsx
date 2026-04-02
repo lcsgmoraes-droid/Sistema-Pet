@@ -8,12 +8,12 @@
 /**
  * PÃ¡gina de Listagem de Produtos - Estilo Bling
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
-import PRODUTOS_COLUNAS from "../components/produtos/produtosColumns";
+import { createProdutosColunas } from "../components/produtos/produtosColumns";
 import {
   corrigirTextoQuebrado,
   isProdutoComComposicao,
@@ -36,6 +36,7 @@ export default function Produtos() {
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const [modalImportacao, setModalImportacao] = useState(false);
   const [paisExpandidos, setPaisExpandidos] = useState([]);
+  const produtosColunas = useMemo(() => createProdutosColunas(), []);
   const {
     carregarDados,
     filtros,
@@ -62,7 +63,7 @@ export default function Produtos() {
     paisExpandidos,
   });
   const produtosTabela = useProdutosTabela({
-    colunasTabela: PRODUTOS_COLUNAS,
+    colunasTabela: produtosColunas,
     paisExpandidos,
     produtosVisiveisRef,
     setPaisExpandidos,
@@ -161,7 +162,7 @@ export default function Produtos() {
       abrirModalColunas,
       colunasRelatorio,
       colunasTemporarias,
-      colunasTabela: PRODUTOS_COLUNAS,
+      colunasTabela: produtosColunas,
       filtrarColunas,
       modalColunas,
       modalRelatorioPersonalizado,

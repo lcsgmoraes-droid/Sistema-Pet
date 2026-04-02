@@ -10,7 +10,8 @@ import {
 // ====================================================
 // DEFINICAO DE COLUNAS DA LISTAGEM
 // ====================================================
-const PRODUTOS_COLUNAS = [
+export function createProdutosColunas() {
+  return [
   {
     key: "checkbox",
     label: "",
@@ -595,6 +596,7 @@ const PRODUTOS_COLUNAS = [
       );
     },
   },
-];
+  ];
+}
 
-export default PRODUTOS_COLUNAS;
+export default createProdutosColunas;
