@@ -810,6 +810,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a etapa de endereco foi movida para `frontend/src/components/clientes/ClientesNovoEnderecoStep.jsx`
   - a etapa de informacoes complementares foi movida para `frontend/src/components/clientes/ClientesNovoComplementaresStep.jsx`
   - `ClientesNovo.jsx` caiu de `2089` para `1910` linhas e ficou mais focado na orquestracao do wizard
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pelo shell do wizard e pela camada de modais
+  - o wizard principal foi movido para `frontend/src/components/clientes/ClientesNovoWizardModal.jsx`
+  - a composicao dos modais foi movida para `frontend/src/components/clientes/ClientesNovoModalsLayer.jsx`
+  - `ClientesNovo.jsx` caiu de `1910` para `1729` linhas e ficou mais focado na listagem, acoes e fluxo de dominio
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
