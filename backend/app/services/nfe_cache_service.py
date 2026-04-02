@@ -10,6 +10,29 @@ from sqlalchemy.orm import Session
 from app.nfe_cache_models import BlingNotaFiscalCache
 
 
+_SOURCE_PRIORITY = {
+    "pedido_integrado": 10,
+    "local_venda": 40,
+    "runtime": 70,
+    "scheduler": 75,
+    "bling_api": 90,
+    "bling_webhook_nf": 100,
+    "webhook": 100,
+    "bling_detail": 110,
+}
+
+_STATUS_PRIORITY = {
+    "pendente": 10,
+    "emitida danfe": 20,
+    "autorizada": 100,
+    "cancelada": 100,
+    "cancelado": 100,
+    "rejeitada": 100,
+    "denegada": 100,
+    "inutilizada": 100,
+}
+
+
 def _texto(value) -> str | None:
     if value is None:
         return None
@@ -35,6 +58,52 @@ def _coerce_float(value, default: float | None = None) -> float | None:
 
 def _json_dict(value) -> dict | None:
     return value if isinstance(value, dict) and value else None
+
+
+def _source_rank(value) -> int:
+    return _SOURCE_PRIORITY.get(str(value or "").strip().lower(), 50)
+
+
+def _status_rank(value) -> int:
+    return _STATUS_PRIORITY.get(str(value or "").strip().lower(), 50 if _texto(value) else 0)
+
+
+def _mesclar_status(status_atual, status_novo, source_atual, source_novo) -> str | None:
+    status_atual_txt = _texto(status_atual)
+    status_novo_txt = _texto(status_novo)
+    if not status_novo_txt:
+        return status_atual_txt
+    if not status_atual_txt:
+        return status_novo_txt
+
+    rank_atual = _status_rank(status_atual_txt)
+    rank_novo = _status_rank(status_novo_txt)
+    source_rank_atual = _source_rank(source_atual)
+    source_rank_novo = _source_rank(source_novo)
+
+    if rank_novo > rank_atual:
+        return status_novo_txt
+    if rank_novo < rank_atual and source_rank_novo < source_rank_atual:
+        return status_atual_txt
+
+    # Evita que uma fonte fraca "rebaixe" uma NF final para um estado transitório.
+    if rank_atual >= 100 and rank_novo < 100 and source_rank_novo <= source_rank_atual:
+        return status_atual_txt
+
+    return status_novo_txt
+
+
+def _mesclar_source(source_atual, source_novo) -> str:
+    source_atual_txt = _texto(source_atual)
+    source_novo_txt = _texto(source_novo)
+
+    if not source_novo_txt:
+        return source_atual_txt or "cache_local"
+    if not source_atual_txt:
+        return source_novo_txt
+    if _source_rank(source_novo_txt) >= _source_rank(source_atual_txt):
+        return source_novo_txt
+    return source_atual_txt
 
 
 def _parse_datetime(value) -> datetime | None:
@@ -241,10 +310,11 @@ def upsert_nota_cache(
             tipo=_texto(nota.get("tipo")) or ("nfce" if modelo == 65 else "nfe"),
         )
 
+    source_novo = _texto(source) or _texto(nota.get("origem"))
     registro.tipo = _texto(nota.get("tipo")) or registro.tipo or ("nfce" if modelo == 65 else "nfe")
     registro.numero = _texto(nota.get("numero")) or registro.numero
     registro.serie = _texto(nota.get("serie")) or registro.serie
-    registro.status = _texto(nota.get("status")) or registro.status
+    registro.status = _mesclar_status(registro.status, nota.get("status"), registro.source, source_novo)
     registro.chave = _texto(nota.get("chave")) or registro.chave
     registro.data_emissao = _parse_datetime(nota.get("data_emissao")) or registro.data_emissao
 
@@ -263,7 +333,7 @@ def upsert_nota_cache(
     registro.origem_canal_venda = _texto(nota.get("origem_canal_venda")) or registro.origem_canal_venda
     registro.numero_pedido_loja = _texto(nota.get("numero_pedido_loja")) or registro.numero_pedido_loja
     registro.pedido_bling_id_ref = _texto(nota.get("pedido_bling_id_ref")) or registro.pedido_bling_id_ref
-    registro.source = _texto(source) or registro.source or _texto(nota.get("origem")) or "cache_local"
+    registro.source = _mesclar_source(registro.source, source_novo)
 
     if isinstance(resumo_payload, dict) and resumo_payload:
         registro.resumo_payload = resumo_payload
