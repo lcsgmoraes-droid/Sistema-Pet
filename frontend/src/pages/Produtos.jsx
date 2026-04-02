@@ -8,7 +8,7 @@
 /**
  * PÃ¡gina de Listagem de Produtos - Estilo Bling
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
@@ -19,11 +19,11 @@ import {
   getCategorias,
   getMarcas,
   getProdutoVariacoes,
-  getProdutos,
   toggleProdutoAtivo,
 } from "../api/produtos";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
+import useProdutosListagem from "../hooks/useProdutosListagem";
 import useProdutosPageComposition from "../hooks/useProdutosPageComposition";
 import { useTour } from "../hooks/useTour";
 import { tourProdutos } from "../tours/tourDefinitions";
@@ -827,17 +827,9 @@ export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const linhaProdutoRefs = useRef({});
-  const [persistirBusca, setPersistirBusca] = useState(() => {
-    const salvo = localStorage.getItem("produtos_persistir_busca");
-    return salvo === null ? true : salvo === "true";
-  });
-  const [produtosBrutos, setProdutosBrutos] = useState([]); // Dados originais da API
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selecionados, setSelecionados] = useState([]);
-  const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
   const [editandoPreco, setEditandoPreco] = useState(null);
   const [novoPreco, setNovoPreco] = useState("");
 
@@ -894,77 +886,31 @@ export default function Produtos() {
 
   // Modal de importaÃ§Ã£o
   const [modalImportacao, setModalImportacao] = useState(false);
-
-  // Filtros
-  const [filtros, setFiltros] = useState({
-    busca: (() => {
-      if (!persistirBusca) return "";
-      return localStorage.getItem("produtos_filtro_busca") || "";
-    })(),
-    ativo: "ativos",
-    categoria_id: "",
-    marca_id: "",
-    fornecedor_id: "",
-    estoque_baixo: false,
-    em_promocao: false,
-    mostrarPaisVariacoes: false,
-  });
-
-  // PaginaÃ§Ã£o
-  const [paginaAtual, setPaginaAtual] = useState(1);
-  const [itensPorPagina, setItensPorPagina] = useState(20);
-  const [totalItensServidor, setTotalItensServidor] = useState(0);
-  const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
-
-  // Aplica apenas filtros locais visuais.
-  // Busca/categoria/marca/fornecedor/estoque/promoÃ§Ã£o agora sÃ£o filtrados no backend.
-  const produtosFiltrados = useMemo(() => {
-    let produtosTemp = [...produtosBrutos];
-    const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
-
-    // No modo padrÃ£o, mostrar apenas produtos normais (sem PAI e sem VARIAÃ‡ÃƒO).
-    if (!filtros.mostrarPaisVariacoes) {
-      return produtosTemp.filter((p) => (p.tipo_produto || "SIMPLES") === "SIMPLES");
-    }
-
-    // Com "Mostrar Pais e VariaÃ§Ãµes" ativo, exibe as variaÃ§Ãµes
-    // somente quando o respectivo PAI estiver expandido.
-    produtosTemp = produtosTemp.filter((p) => {
-      if (p.tipo_produto !== "VARIACAO") {
-        return true;
-      }
-
-      // Se hÃ¡ busca ativa, mostrar a variaÃ§Ã£o diretamente quando ela prÃ³pria
-      // corresponder ao termo, sem exigir expansÃ£o do PAI.
-      if (buscaNormalizada) {
-        const codigo = normalizeSearchText(p.codigo || p.sku || "");
-        const nome = normalizeSearchText(p.nome || "");
-        return codigo.includes(buscaNormalizada) || nome.includes(buscaNormalizada);
-      }
-
-      return paisExpandidos.includes(p.produto_pai_id);
-    });
-
-    return produtosTemp;
-  }, [
+  const {
+    carregarDados,
+    filtros,
+    handleFiltroChange,
+    handleSelecionar,
+    handleSelecionarTodos,
+    itensPorPagina,
+    loading,
+    paginaAtual,
+    persistirBusca,
+    produtos,
     produtosBrutos,
-    filtros.busca,
-    filtros.mostrarPaisVariacoes,
+    produtosVisiveisRef,
+    selecionados,
+    setItensPorPagina,
+    setPaginaAtual,
+    setPersistirBusca,
+    setSelecionados,
+    totalItens,
+    totalPaginas,
+  } = useProdutosListagem({
+    normalizeSearchText,
+    onOcultarPaisVariacoes: () => setPaisExpandidos([]),
     paisExpandidos,
-  ]);
-
-  const produtosPaginados = produtosFiltrados;
-  const totalPaginas = Math.max(totalPaginasServidor, 1);
-  const totalItens = totalItensServidor;
-
-  // Alias para manter compatibilidade com o resto do cÃ³digo
-  const produtos = produtosPaginados;
-  const produtosVisiveisRef = useRef([]);
-
-  // Resetar para pÃ¡gina 1 quando filtros mudarem
-  useEffect(() => {
-    setPaginaAtual(1);
-  }, [filtros]);
+  });
 
   useEffect(() => {
     const handleClickFora = (event) => {
@@ -980,10 +926,6 @@ export default function Produtos() {
     return () => document.removeEventListener("mousedown", handleClickFora);
   }, []);
 
-  useEffect(() => {
-    produtosVisiveisRef.current = produtos;
-  }, [produtos]);
-
   // Carregar dados iniciais
   useEffect(() => {
     carregarCategorias();
@@ -991,123 +933,6 @@ export default function Produtos() {
     carregarFornecedores();
     carregarDepartamentos();
   }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      carregarDados();
-    }, filtros.busca ? 250 : 0);
-
-    return () => clearTimeout(timer);
-  }, [
-    paginaAtual,
-    itensPorPagina,
-    filtros.busca,
-    filtros.ativo,
-    filtros.categoria_id,
-    filtros.marca_id,
-    filtros.fornecedor_id,
-    filtros.estoque_baixo,
-    filtros.em_promocao,
-    filtros.mostrarPaisVariacoes,
-  ]);
-
-  // PersistÃªncia opcional da busca para que cada usuÃ¡rio escolha seu comportamento.
-  useEffect(() => {
-    localStorage.setItem("produtos_persistir_busca", String(persistirBusca));
-
-    if (persistirBusca) {
-      localStorage.setItem("produtos_filtro_busca", filtros.busca || "");
-      return;
-    }
-
-    localStorage.removeItem("produtos_filtro_busca");
-  }, [persistirBusca, filtros.busca]);
-
-  const carregarDados = async (filtrosAtuais = filtros) => {
-    try {
-      setLoading(true);
-      // Remover campos vazios dos filtros e montar paginaÃ§Ã£o no backend.
-      const filtrosLimpos = {};
-      Object.keys(filtrosAtuais).forEach((key) => {
-        const valor = filtrosAtuais[key];
-
-        if (key === "mostrarPaisVariacoes") {
-          return;
-        }
-
-        if (key === "ativo") {
-          if (valor === "ativos") {
-            filtrosLimpos[key] = true;
-          } else if (valor === "inativos") {
-            filtrosLimpos[key] = false;
-          }
-          return;
-        }
-
-        // SÃ³ incluir se nÃ£o for string vazia
-        if (valor !== "" && valor !== null && valor !== undefined) {
-          filtrosLimpos[key] = valor;
-        }
-      });
-
-      filtrosLimpos.page = paginaAtual;
-      filtrosLimpos.page_size = itensPorPagina;
-      filtrosLimpos.include_variations = filtrosAtuais.mostrarPaisVariacoes;
-
-      const response = await getProdutos(filtrosLimpos);
-
-      // API retorna { itens: [], total: 0, pagina: 1, ... } ou apenas array
-      let produtosData;
-      let totalApi = 0;
-      let pagesApi = 1;
-      if (Array.isArray(response.data)) {
-        produtosData = response.data;
-        totalApi = response.data.length;
-      } else if (response.data.itens) {
-        produtosData = response.data.itens;
-        totalApi = response.data.total || produtosData.length;
-        pagesApi = response.data.pages || 1;
-      } else if (response.data.items) {
-        produtosData = response.data.items;
-        totalApi = response.data.total || produtosData.length;
-        pagesApi = response.data.pages || 1;
-      } else if (response.data.produtos) {
-        produtosData = response.data.produtos;
-        totalApi = response.data.total || produtosData.length;
-        pagesApi = response.data.pages || 1;
-      } else if (response.data.data) {
-        produtosData = response.data.data;
-        totalApi = response.data.total || produtosData.length;
-        pagesApi = response.data.pages || 1;
-      } else {
-        // Procurar por qualquer propriedade que seja um array
-        const arrayKeys = Object.keys(response.data).filter((key) =>
-          Array.isArray(response.data[key]),
-        );
-        if (arrayKeys.length > 0) {
-          produtosData = response.data[arrayKeys[0]];
-        } else {
-          produtosData = [];
-        }
-        totalApi = response.data.total || produtosData.length;
-        pagesApi = response.data.pages || 1;
-      }
-
-      // ========================================
-      // ðŸ”’ SPRINT 2 - SALVAR DADOS BRUTOS (SEM ORGANIZAR)
-      // ========================================
-      // Salvar dados originais sem hierarquia
-      // A organizaÃ§Ã£o serÃ¡ feita no useMemo abaixo
-      setProdutosBrutos(produtosData);
-      setTotalItensServidor(totalApi);
-      setTotalPaginasServidor(Math.max(pagesApi, 1));
-    } catch (error) {
-      console.error("Erro ao carregar produtos:", error);
-      alert("Erro ao carregar produtos");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const carregarCategorias = async () => {
     try {
@@ -1152,20 +977,6 @@ export default function Produtos() {
     }
   };
 
-  const handleFiltroChange = (campo, valor) => {
-    const proximoFiltro = { ...filtros, [campo]: valor };
-    setFiltros(proximoFiltro);
-
-    if (campo === "mostrarPaisVariacoes" && !valor) {
-      // Ao ocultar variaÃ§Ãµes, fecha expansÃµes para manter o estado previsÃ­vel.
-      setPaisExpandidos([]);
-    }
-
-    if (campo !== "mostrarPaisVariacoes") {
-      setPaginaAtual(1);
-    }
-  };
-
   const handleToggleAtivo = async (produto) => {
     const proximoAtivo = produto.ativo === false;
     const acao = proximoAtivo ? "ativar" : "desativar";
@@ -1181,48 +992,6 @@ export default function Produtos() {
     } catch (error) {
       console.error(`Erro ao ${acao} produto:`, error);
       alert(`Erro ao ${acao} produto`);
-    }
-  };
-
-  const handleSelecionar = (id, event) => {
-    if (!id) {
-      console.error("Erro: ID do produto Ã© undefined ou null");
-      return;
-    }
-
-    // Se for Shift+click e houver um Ãºltimo selecionado, selecionar intervalo
-    if (event?.shiftKey && ultimoSelecionado !== null) {
-      const indexUltimo = produtos.findIndex((p) => p.id === ultimoSelecionado);
-      const indexAtual = produtos.findIndex((p) => p.id === id);
-
-      if (indexUltimo !== -1 && indexAtual !== -1) {
-        const inicio = Math.min(indexUltimo, indexAtual);
-        const fim = Math.max(indexUltimo, indexAtual);
-        const intervalo = produtos.slice(inicio, fim + 1).map((p) => p.id);
-
-        // Adicionar todos do intervalo aos jÃ¡ selecionados
-        setSelecionados((prev) => {
-          const novo = new Set(prev);
-          intervalo.forEach((prodId) => novo.add(prodId));
-          return Array.from(novo);
-        });
-        setUltimoSelecionado(id);
-        return;
-      }
-    }
-
-    // SeleÃ§Ã£o normal
-    setSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
-    setUltimoSelecionado(id);
-  };
-
-  const handleSelecionarTodos = () => {
-    if (selecionados.length === produtos.length) {
-      setSelecionados([]);
-    } else {
-      setSelecionados(produtos.map((p) => p.id));
     }
   };
 

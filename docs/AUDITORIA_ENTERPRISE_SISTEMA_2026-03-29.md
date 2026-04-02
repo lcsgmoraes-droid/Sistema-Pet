@@ -759,6 +759,9 @@ Proximas tarefas sugeridas para execucao continua:
   - a camada de modais foi movida para `frontend/src/components/produtos/ProdutosModalsLayer.jsx`
   - a montagem das props da tela foi centralizada em `frontend/src/hooks/useProdutosPageComposition.js`
   - `Produtos.jsx` caiu para `2014` linhas e ficou mais focado na orquestracao da pagina
+- [x] extrair a listagem, filtros, selecao e paginacao de `Produtos.jsx` para um hook de pagina
+  - a carga da listagem, a persistencia da busca, a selecao em massa e a paginacao foram movidas para `frontend/src/hooks/useProdutosListagem.js`
+  - `Produtos.jsx` deixou de concentrar efeitos de carregamento e handlers de listagem, ficando mais focado nas acoes de negocio da tela
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
