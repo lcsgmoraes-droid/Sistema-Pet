@@ -794,6 +794,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
   - `UsuariosPage.jsx` caiu de `290` para `55` linhas e ficou focado na composicao da tela
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pelos modais e alertas visuais mais isolados
+  - o aviso de duplicidade foi movido para `frontend/src/components/clientes/ClientesNovoDuplicadoWarning.jsx`
+  - o modal de endereco adicional foi movido para `frontend/src/components/clientes/ClientesNovoEnderecoModal.jsx`
+  - `ClientesNovo.jsx` caiu de `3726` para `3389` linhas e ficou com menos JSX inline nos fluxos de cadastro
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

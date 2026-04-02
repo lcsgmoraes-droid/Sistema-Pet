@@ -23,6 +23,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import ClienteInsights from "../components/ClienteInsights";
 import ClienteSegmentoBadgeWrapper from "../components/ClienteSegmentoBadgeWrapper";
+import ClientesNovoDuplicadoWarning from "../components/clientes/ClientesNovoDuplicadoWarning";
+import ClientesNovoEnderecoModal from "../components/clientes/ClientesNovoEnderecoModal";
 import {
   ClienteSegmentos,
 } from "../components/ClienteSegmentos";
@@ -1731,135 +1733,19 @@ const Pessoas = () => {
 
               {/* Aviso de Duplicata */}
               {showDuplicadoWarning && clienteDuplicado && (
-                <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <FiAlertCircle className="text-yellow-600 mt-1" size={24} />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-yellow-900 mb-2">
-                        ⚠️ Cliente já cadastrado!
-                      </h4>
-                      <p className="text-sm text-yellow-800 mb-3">
-                        Já existe um cliente com o mesmo{" "}
-                        <strong>{clienteDuplicado.campo}</strong> cadastrado:
-                      </p>
-
-                      {/* Card do cliente existente */}
-                      <div className="bg-white rounded-lg p-3 border border-yellow-300 mb-3">
-                        <p className="font-semibold text-gray-900">
-                          {clienteDuplicado.cliente.nome}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Código: {clienteDuplicado.cliente.codigo}
-                        </p>
-                        {clienteDuplicado.cliente.cpf && (
-                          <p className="text-sm text-gray-600">
-                            CPF: {clienteDuplicado.cliente.cpf}
-                          </p>
-                        )}
-                        {clienteDuplicado.cliente.celular && (
-                          <p className="text-sm text-gray-600">
-                            Celular: {clienteDuplicado.cliente.celular}
-                          </p>
-                        )}
-                        {clienteDuplicado.cliente.telefone && (
-                          <p className="text-sm text-gray-600">
-                            Telefone: {clienteDuplicado.cliente.telefone}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Se for documento único (CPF/CNPJ/CRMV): BLOQUEAR criação */}
-                      {isDocumentoUnico(clienteDuplicado.campo) ? (
-                        <div>
-                          <div className="bg-red-50 border border-red-300 rounded-lg p-4 mb-3">
-                            <p className="text-sm font-semibold text-red-900 mb-2">
-                              🚫 Não é possível criar novo cadastro
-                            </p>
-                            <p className="text-sm text-red-800 mb-2">
-                              {clienteDuplicado.campo.toUpperCase()} é um
-                              documento único e já está cadastrado.
-                            </p>
-                            <p className="text-sm text-red-700">
-                              Você pode editar o cadastro existente ou
-                              visualizá-lo.
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={editarClienteExistente}
-                              className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                            >
-                              ✏️ Editar cadastro existente
-                            </button>
-                            <button
-                              onClick={irParaClienteExistente}
-                              className="flex-1 px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
-                            >
-                              👁️ Ver cadastro
-                            </button>
-                          </div>
-                        </div>
-                      ) : /* Se for contato (telefone/celular): PERMITIR transferência */
-                      showConfirmacaoRemocao ? (
-                        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
-                          <p className="text-sm font-semibold text-red-900 mb-2">
-                            ⚠️ Atenção!
-                          </p>
-                          <p className="text-sm text-red-800 mb-3">
-                            O <strong>{clienteDuplicado.campo}</strong> será
-                            removido do cadastro do cliente{" "}
-                            <strong>{clienteDuplicado.cliente.nome}</strong>{" "}
-                            (Código {clienteDuplicado.cliente.codigo}) e uma
-                            observação será adicionada informando a
-                            transferência.
-                          </p>
-                          <p className="text-xs text-red-700 mb-3">
-                            No cadastro antigo ficará registrado: "Sem número
-                            por cadastro novo do cliente código{" "}
-                            {editingCliente?.codigo ||
-                              (clientes.length > 0
-                                ? Math.max(...clientes.map((c) => c.codigo)) + 1
-                                : 1)}
-                            "
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={confirmarRemocaoEContinuar}
-                              disabled={loading}
-                              className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                            >
-                              {loading
-                                ? "Processando..."
-                                : "Confirmar e continuar"}
-                            </button>
-                            <button
-                              onClick={cancelarRemocao}
-                              disabled={loading}
-                              className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={irParaClienteExistente}
-                            className="flex-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Ver cadastro existente
-                          </button>
-                          <button
-                            onClick={continuarMesmoDuplicado}
-                            className="flex-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Transferir {clienteDuplicado.campo}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <ClientesNovoDuplicadoWarning
+                  clienteDuplicado={clienteDuplicado}
+                  clientes={clientes}
+                  editingCliente={editingCliente}
+                  isDocumentoUnico={isDocumentoUnico}
+                  loading={loading}
+                  onCancelarRemocao={cancelarRemocao}
+                  onConfirmarRemocao={confirmarRemocaoEContinuar}
+                  onContinuarMesmoDuplicado={continuarMesmoDuplicado}
+                  onEditarClienteExistente={editarClienteExistente}
+                  onIrParaClienteExistente={irParaClienteExistente}
+                  showConfirmacaoRemocao={showConfirmacaoRemocao}
+                />
               )}
 
               {/* Step 1: Informações do Cliente */}
@@ -3629,252 +3515,16 @@ const Pessoas = () => {
         </div>
       )}
 
-      {/* Modal de Endereço Adicional */}
+      {/* Modal de Endereco Adicional */}
       {mostrarFormEndereco && enderecoAtual && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            {/* Header do Modal */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-              <h3 className="text-xl font-bold text-gray-900">
-                {enderecoAtual.index !== undefined
-                  ? "Editar Endereço"
-                  : "Adicionar Novo Endereço"}
-              </h3>
-              <button
-                onClick={fecharModalEndereco}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Conteúdo do Modal */}
-            <div className="p-6 space-y-4">
-              {/* Tipo e Apelido */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tipo de Endereço *
-                  </label>
-                  <select
-                    value={enderecoAtual.tipo}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        tipo: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  >
-                    <option value="entrega">📦 Entrega</option>
-                    <option value="cobranca">💰 Cobrança</option>
-                    <option value="comercial">🏢 Comercial</option>
-                    <option value="residencial">🏠 Residencial</option>
-                    <option value="trabalho">📍 Trabalho</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Apelido (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.apelido}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        apelido: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Ex: Casa da mãe, Escritório, Loja"
-                  />
-                </div>
-              </div>
-
-              {/* CEP */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    CEP *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={enderecoAtual.cep}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        const formatted =
-                          value.length > 5
-                            ? `${value.slice(0, 5)}-${value.slice(5, 8)}`
-                            : value;
-                        setEnderecoAtual({ ...enderecoAtual, cep: formatted });
-                      }}
-                      onBlur={(e) => buscarCepModal(e.target.value)}
-                      maxLength="9"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="00000-000"
-                    />
-                    {loadingCepEndereco && (
-                      <div className="absolute right-2 top-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Endereço e Número */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Endereço *
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.endereco}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        endereco: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Rua, Avenida, etc."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Número
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.numero}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        numero: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="123"
-                  />
-                </div>
-              </div>
-
-              {/* Complemento e Bairro */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Complemento
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.complemento}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        complemento: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Apto, Bloco, Sala..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Bairro
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.bairro}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        bairro: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Centro, Jardim..."
-                  />
-                </div>
-              </div>
-
-              {/* Cidade e Estado */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cidade *
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.cidade}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        cidade: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="São Paulo"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estado
-                  </label>
-                  <input
-                    type="text"
-                    value={enderecoAtual.estado}
-                    onChange={(e) =>
-                      setEnderecoAtual({
-                        ...enderecoAtual,
-                        estado: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    maxLength="2"
-                    placeholder="SP"
-                  />
-                </div>
-              </div>
-
-              <p className="text-xs text-gray-500">* Campos obrigatórios</p>
-            </div>
-
-            {/* Footer do Modal */}
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={fecharModalEndereco}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={salvarEndereco}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Salvar Endereço
-              </button>
-            </div>
-          </div>
-        </div>
+        <ClientesNovoEnderecoModal
+          enderecoAtual={enderecoAtual}
+          fecharModalEndereco={fecharModalEndereco}
+          loadingCepEndereco={loadingCepEndereco}
+          salvarEndereco={salvarEndereco}
+          buscarCepModal={buscarCepModal}
+          setEnderecoAtual={setEnderecoAtual}
+        />
       )}
 
       {/* Modal de Importação */}
