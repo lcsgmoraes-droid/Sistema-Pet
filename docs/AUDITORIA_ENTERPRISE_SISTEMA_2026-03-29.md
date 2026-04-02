@@ -784,6 +784,12 @@ Proximas tarefas sugeridas para execucao continua:
   - a paginacao foi movida para `frontend/src/components/produtos/ProdutosPaginationControls.jsx`
   - a tabela/listagem foi movida para `frontend/src/components/produtos/ProdutosTabelaSection.jsx`
   - `ProdutosMainContent.jsx` caiu de `566` para `127` linhas e ficou focado em composicao visual
+- [x] extrair os modais residuais de `Produtos` para componentes proprios
+  - o conflito de exclusao foi movido para `frontend/src/components/produtos/ProdutosConflitoExclusaoModal.jsx`
+  - a edicao em lote foi movida para `frontend/src/components/produtos/ProdutosEdicaoLoteModal.jsx`
+  - a configuracao de colunas foi movida para `frontend/src/components/produtos/ProdutosColunasModal.jsx`
+  - o relatorio personalizado foi movido para `frontend/src/components/produtos/ProdutosRelatorioModal.jsx`
+  - `ProdutosModalsLayer.jsx` caiu de `456` para `103` linhas e ficou focado em composicao dos modais
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
