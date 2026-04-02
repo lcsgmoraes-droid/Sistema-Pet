@@ -778,6 +778,12 @@ Proximas tarefas sugeridas para execucao continua:
   - a configuracao de colunas da listagem foi movida para `frontend/src/components/produtos/produtosColumns.jsx`
   - `Produtos.jsx` deixou de concentrar renderizacao de celulas e caiu para `275` linhas
   - a pagina ficou focada em hooks, composicao e orquestracao da tela, sem carregar a definicao inteira da tabela
+- [x] extrair os blocos visuais residuais da tela de `Produtos` para componentes proprios
+  - o cabecalho de acoes foi movido para `frontend/src/components/produtos/ProdutosHeaderActions.jsx`
+  - os filtros foram movidos para `frontend/src/components/produtos/ProdutosFiltrosPanel.jsx`
+  - a paginacao foi movida para `frontend/src/components/produtos/ProdutosPaginationControls.jsx`
+  - a tabela/listagem foi movida para `frontend/src/components/produtos/ProdutosTabelaSection.jsx`
+  - `ProdutosMainContent.jsx` caiu de `566` para `127` linhas e ficou focado em composicao visual
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
