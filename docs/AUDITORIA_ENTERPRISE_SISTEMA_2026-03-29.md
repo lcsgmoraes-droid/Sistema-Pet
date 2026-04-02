@@ -802,6 +802,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a etapa de pets foi movida para `frontend/src/components/clientes/ClientesNovoPetsStep.jsx`
   - a etapa financeira foi movida para `frontend/src/components/clientes/ClientesNovoFinanceiroStep.jsx`
   - `ClientesNovo.jsx` caiu de `3389` para `2884` linhas e ficou mais focado na orquestracao do cadastro
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pelo miolo do wizard
+  - a etapa de informacoes do cadastro foi movida para `frontend/src/components/clientes/ClientesNovoCadastroStep.jsx`
+  - a etapa de contatos foi movida para `frontend/src/components/clientes/ClientesNovoContatosStep.jsx`
+  - `ClientesNovo.jsx` caiu de `2884` para `2089` linhas e passou a concentrar menos JSX inline nas etapas iniciais
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
