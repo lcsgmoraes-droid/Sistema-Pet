@@ -8,21 +8,18 @@
 /**
  * PÃ¡gina de Listagem de Produtos - Estilo Bling
  */
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import api from "../api";
 import {
-  deleteProduto,
   formatarData,
   formatarMoeda,
-  getCategorias,
-  getMarcas,
-  getProdutoVariacoes,
-  toggleProdutoAtivo,
 } from "../api/produtos";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
+import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
+import useProdutosEdicao from "../hooks/useProdutosEdicao";
+import useProdutosExclusao from "../hooks/useProdutosExclusao";
 import useProdutosListagem from "../hooks/useProdutosListagem";
 import useProdutosPageComposition from "../hooks/useProdutosPageComposition";
 import useProdutosRelatorios from "../hooks/useProdutosRelatorios";
@@ -761,49 +758,14 @@ export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const linhaProdutoRefs = useRef({});
-  const [categorias, setCategorias] = useState([]);
-  const [marcas, setMarcas] = useState([]);
-  const [fornecedores, setFornecedores] = useState([]);
-  const [editandoPreco, setEditandoPreco] = useState(null);
-  const [novoPreco, setNovoPreco] = useState("");
-
-  // Estado para KITs expandidos
   const [kitsExpandidos, setKitsExpandidos] = useState([]);
-
-  // Estado para PAIs expandidos (mostrar variaÃ§Ãµes)
   const [paisExpandidos, setPaisExpandidos] = useState([]);
-
-  // Estado de colunas visÃ­veis (localStorage)
   const [colunasVisiveis, setColunasVisiveis] = useState(() => {
     const salvo = localStorage.getItem("produtos_colunas_visiveis");
     return salvo ? JSON.parse(salvo) : null;
   });
-
-  // Modal de configuraÃ§Ã£o de colunas
   const [modalColunas, setModalColunas] = useState(false);
   const [colunasTemporarias, setColunasTemporarias] = useState([]);
-
-  // Modal de ediÃ§Ã£o em lote
-  const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
-  const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
-    marca_id: "",
-    categoria_id: "",
-    departamento_id: "",
-  });
-  const [departamentos, setDepartamentos] = useState([]);
-
-  // Modal de resolucao rapida para conflitos de exclusao (409)
-  const [modalConflitoExclusao, setModalConflitoExclusao] = useState(false);
-  const [bloqueiosExclusao, setBloqueiosExclusao] = useState([]);
-  const [variacoesSelecionadasConflito, setVariacoesSelecionadasConflito] =
-    useState([]);
-  const [resolvendoConflitoExclusao, setResolvendoConflitoExclusao] =
-    useState(false);
-  const [autoSelecionarConflito, setAutoSelecionarConflito] = useState(true);
-  const [pularConfirmacaoConflito, setPularConfirmacaoConflito] =
-    useState(false);
-
-  // Modal de importaÃ§Ã£o
   const [modalImportacao, setModalImportacao] = useState(false);
   const {
     carregarDados,
@@ -849,440 +811,77 @@ export default function Produtos() {
     filtros,
     obterEstoqueVisualProduto,
   });
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    carregarCategorias();
-    carregarMarcas();
-    carregarFornecedores();
-    carregarDepartamentos();
-  }, []);
-
-  const carregarCategorias = async () => {
-    try {
-      const response = await getCategorias();
-      setCategorias(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar categorias:", error);
-    }
-  };
-
-  const carregarMarcas = async () => {
-    try {
-      const response = await getMarcas();
-      setMarcas(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar marcas:", error);
-    }
-  };
-
-  const carregarFornecedores = async () => {
-    try {
-      const response = await api.get(
-        "/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true",
-      );
-      const dados = response.data;
-      const lista = Array.isArray(dados)
-        ? dados
-        : dados.items || dados.clientes || dados.data || [];
-      setFornecedores(lista);
-    } catch (error) {
-      console.error("Erro ao carregar fornecedores:", error);
-    }
-  };
-
-  const carregarDepartamentos = async () => {
-    try {
-      const response = await api.get("/produtos/departamentos");
-      setDepartamentos(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar departamentos:", error);
-      // NÃ£o Ã© erro crÃ­tico, apenas nÃ£o mostra departamentos
-    }
-  };
-
-  const handleToggleAtivo = async (produto) => {
-    const proximoAtivo = produto.ativo === false;
-    const acao = proximoAtivo ? "ativar" : "desativar";
-
-    if (!confirm(`Deseja realmente ${acao} o produto "${produto.nome}"?`)) {
-      return;
-    }
-
-    try {
-      await toggleProdutoAtivo(produto.id, proximoAtivo);
-      toast.success(`Produto ${proximoAtivo ? "ativado" : "desativado"} com sucesso!`);
-      carregarDados();
-    } catch (error) {
-      console.error(`Erro ao ${acao} produto:`, error);
-      alert(`Erro ao ${acao} produto`);
-    }
-  };
-
-  const obterNomeProduto = (id) => {
-    const produto = produtosBrutos.find((item) => item.id === id);
-    return corrigirTextoQuebrado(produto?.nome || `Produto #${id}`);
-  };
-
-  const extrairErroExclusao = (error) => {
-    const statusCode = error?.response?.status;
-    const detalheServidor = corrigirTextoQuebrado(error?.response?.data?.detail);
-
-    if (statusCode === 409) {
-      return {
-        statusCode,
-        mensagem: detalheServidor || "Nao foi possivel excluir porque este produto possui vinculos ativos.",
-      };
-    }
-
-    if (statusCode === 404) {
-      return {
-        statusCode,
-        mensagem: "Produto nao encontrado. Atualize a tela e tente novamente.",
-      };
-    }
-
-    return {
-      statusCode,
-      mensagem:
-        detalheServidor ||
-        "Erro ao excluir produto. Tente novamente em instantes.",
-    };
-  };
-
-  const abrirModalConflitoExclusao = async (falhas) => {
-    const falhasConflito = falhas.filter((falha) => falha.statusCode === 409);
-
-    if (falhasConflito.length === 0) {
-      return false;
-    }
-
-    const paisComConflito = [...new Set(falhasConflito.map((falha) => falha.id))];
-    const bloqueios = [];
-
-    for (const parentId of paisComConflito) {
-      const falhaPai = falhasConflito.find((falha) => falha.id === parentId);
-      const parentNome = obterNomeProduto(parentId);
-      let variacoes = [];
-
-      try {
-        const response = await getProdutoVariacoes(parentId);
-        variacoes = (response?.data || []).filter((item) => item.ativo !== false);
-      } catch (error) {
-        console.error(
-          `Erro ao buscar variacoes do produto ${parentId} para resolver conflito:`,
-          error,
-        );
-      }
-
-      bloqueios.push({
-        parentId,
-        parentNome,
-        mensagem: montarMensagemConflitoExclusao(parentNome, falhaPai?.mensagem),
-        variacoes,
-      });
-    }
-
-    setBloqueiosExclusao(bloqueios);
-    const todasVariacoes = bloqueios.flatMap((bloqueio) =>
-      bloqueio.variacoes.map((variacao) => variacao.id),
-    );
-    setVariacoesSelecionadasConflito(autoSelecionarConflito ? todasVariacoes : []);
-    setModalConflitoExclusao(true);
-    return true;
-  };
-
-  const handleSelecionarVariacaoConflito = (variacaoId, checked) => {
-    setVariacoesSelecionadasConflito((prev) => {
-      if (checked) {
-        if (prev.includes(variacaoId)) return prev;
-        return [...prev, variacaoId];
-      }
-
-      return prev.filter((id) => id !== variacaoId);
-    });
-  };
-
-  const handleSelecionarTodasVariacoesDoPai = (parentId, checked) => {
-    const idsDoPai = (bloqueiosExclusao.find((item) => item.parentId === parentId)
-      ?.variacoes || []
-    ).map((variacao) => variacao.id);
-
-    setVariacoesSelecionadasConflito((prev) => {
-      if (checked) {
-        const conjunto = new Set([...prev, ...idsDoPai]);
-        return Array.from(conjunto);
-      }
-
-      return prev.filter((id) => !idsDoPai.includes(id));
-    });
-  };
-
-  const handleResolverConflitosExclusao = async () => {
-    if (bloqueiosExclusao.length === 0) {
-      setModalConflitoExclusao(false);
-      return;
-    }
-
-    if (!pularConfirmacaoConflito) {
-      const confirma = confirm(
-        "Confirmar resolucao rapida? O sistema vai desativar as variacoes selecionadas e tentar excluir os produtos pai.",
-      );
-      if (!confirma) return;
-    }
-
-    setResolvendoConflitoExclusao(true);
-
-    const paisExcluidos = [];
-    const paisComFalha = [];
-
-    for (const bloqueio of bloqueiosExclusao) {
-      const variacoesSelecionadas = bloqueio.variacoes.filter((variacao) =>
-        variacoesSelecionadasConflito.includes(variacao.id),
-      );
-
-      const resultadosVariacoes = await Promise.allSettled(
-        variacoesSelecionadas.map((variacao) => deleteProduto(variacao.id)),
-      );
-
-      const falhasVariacao = resultadosVariacoes
-        .filter((resultado) => resultado.status === "rejected")
-        .map((resultado) => extrairErroExclusao(resultado.reason));
-
-      try {
-        await deleteProduto(bloqueio.parentId);
-        paisExcluidos.push(bloqueio);
-      } catch (error) {
-        const erroPai = extrairErroExclusao(error);
-        paisComFalha.push({
-          ...bloqueio,
-          mensagem:
-            falhasVariacao[0]?.mensagem || erroPai.mensagem || bloqueio.mensagem,
-        });
-      }
-    }
-
-    setResolvendoConflitoExclusao(false);
-    setModalConflitoExclusao(false);
-
-    if (paisExcluidos.length > 0) {
-      toast.success(
-        `${paisExcluidos.length} produto(s) pai excluido(s) apos resolver variacoes.`,
-      );
-    }
-
-    if (paisComFalha.length > 0) {
-      const detalhes = paisComFalha
-        .slice(0, 3)
-        .map((item) => `${item.parentNome}: ${item.mensagem}`)
-        .join("\n");
-      const sufixo =
-        paisComFalha.length > 3 ? "\n...e outros produtos continuam bloqueados." : "";
-
-      alert(
-        `Ainda nao foi possivel excluir ${paisComFalha.length} produto(s):\n\n${detalhes}${sufixo}`,
-      );
-      setSelecionados(paisComFalha.map((item) => item.parentId));
-    } else {
-      setSelecionados([]);
-    }
-
-    setBloqueiosExclusao([]);
-    await carregarDados();
-  };
-
-  const handleExcluir = async (id) => {
-    if (!confirm("Deseja realmente excluir este produto?")) return;
-
-    try {
-      await deleteProduto(id);
-      toast.success("Produto excluido com sucesso!");
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao excluir produto:", error);
-      const erro = extrairErroExclusao(error);
-
-      if (erro.statusCode === 409) {
-        const abriuModal = await abrirModalConflitoExclusao([{ id, ...erro }]);
-        if (abriuModal) {
-          return;
-        }
-      }
-
-      alert(erro.mensagem);
-    }
-  };
-
-  const handleExcluirSelecionados = async () => {
-    if (!confirm(`Deseja realmente excluir ${selecionados.length} produtos?`))
-      return;
-
-    const resultados = await Promise.allSettled(
-      selecionados.map((id) => deleteProduto(id)),
-    );
-
-    const idsExcluidos = [];
-    const falhas = [];
-
-    resultados.forEach((resultado, index) => {
-      const id = selecionados[index];
-
-      if (resultado.status === "fulfilled") {
-        idsExcluidos.push(id);
-        return;
-      }
-
-      const erro = extrairErroExclusao(resultado.reason);
-      falhas.push({ id, ...erro });
-      console.error(`Erro ao excluir produto ${id}:`, resultado.reason);
-    });
-
-    if (idsExcluidos.length > 0) {
-      toast.success(
-        `${idsExcluidos.length} produto(s) excluido(s) com sucesso!`,
-      );
-      carregarDados();
-    }
-
-    if (falhas.length > 0) {
-      const abriuModal = await abrirModalConflitoExclusao(falhas);
-      if (abriuModal) {
-        setSelecionados(falhas.map((falha) => falha.id));
-        return;
-      }
-
-      const mensagens = falhas.slice(0, 3).map((falha) => {
-        return `ID ${falha.id}: ${falha.mensagem}`;
-      });
-      const sufixo =
-        falhas.length > 3 ? "\n...e outros produtos com erro." : "";
-
-      alert(
-        `Nao foi possivel excluir ${falhas.length} produto(s):\n\n${mensagens.join("\n")}${sufixo}`,
-      );
-
-      setSelecionados(falhas.map((falha) => falha.id));
-      return;
-    }
-
-    setSelecionados([]);
-  };
-
   const copiarTexto = (texto, tipo) => {
     navigator.clipboard.writeText(texto);
     toast.success(`${tipo} copiado!`);
   };
+  const { categorias, departamentos, fornecedores, marcas } =
+    useProdutosCatalogos();
+  const {
+    dadosEdicaoLote,
+    editandoPreco,
+    handleAbrirEdicaoLote,
+    handleCancelarEdicaoPreco,
+    handleEditarPreco,
+    handleSalvarEdicaoLote,
+    handleSalvarPreco,
+    modalEdicaoLote,
+    novoPreco,
+    setDadosEdicaoLote,
+    setModalEdicaoLote,
+    setNovoPreco,
+  } = useProdutosEdicao({
+    carregarDados,
+    selecionados,
+    setSelecionados,
+  });
+  const {
+    autoSelecionarConflito,
+    bloqueiosExclusao,
+    handleExcluir,
+    handleExcluirSelecionados,
+    handleResolverConflitosExclusao,
+    handleSelecionarTodasVariacoesDoPai,
+    handleSelecionarVariacaoConflito,
+    handleToggleAtivo,
+    modalConflitoExclusao,
+    onCloseModalConflito,
+    onToggleAutoSelecionarConflito,
+    pularConfirmacaoConflito,
+    resolvendoConflitoExclusao,
+    setPularConfirmacaoConflito,
+    variacoesSelecionadasConflito,
+  } = useProdutosExclusao({
+    carregarDados,
+    corrigirTextoQuebrado,
+    montarMensagemConflitoExclusao,
+    produtosBrutos,
+    setSelecionados,
+  });
 
-  const handleEditarPreco = (produtoId, precoAtual) => {
-    setEditandoPreco(produtoId);
-    setNovoPreco(precoAtual.toString());
-  };
-
-  const handleSalvarPreco = async (produtoId) => {
-    try {
-      await api.patch(`/produtos/${produtoId}?preco_venda=${novoPreco}`, {});
-      toast.success("PreÃ§o atualizado!");
-      setEditandoPreco(null);
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao atualizar preÃ§o:", error);
-      toast.error("Erro ao atualizar preÃ§o");
-    }
-  };
-
-  const handleCancelarEdicaoPreco = () => {
-    setEditandoPreco(null);
-  };
-
-  const handleAbrirEdicaoLote = () => {
-    if (selecionados.length === 0) {
-      toast.error("Selecione pelo menos um produto");
-      return;
-    }
-    setDadosEdicaoLote({
-      marca_id: "",
-      categoria_id: "",
-      departamento_id: "",
-    });
-    setModalEdicaoLote(true);
-  };
-
-  const handleSalvarEdicaoLote = async () => {
-    try {
-      // Validar se pelo menos um campo foi preenchido
-      const camposPreenchidos = Object.values(dadosEdicaoLote).filter(
-        (v) => v !== "",
-      );
-      if (camposPreenchidos.length === 0) {
-        toast.error("Preencha pelo menos um campo para atualizar");
-        return;
-      }
-
-      // Enviar apenas campos preenchidos
-      const dadosEnvio = {};
-      if (dadosEdicaoLote.marca_id)
-        dadosEnvio.marca_id = parseInt(dadosEdicaoLote.marca_id);
-      if (dadosEdicaoLote.categoria_id)
-        dadosEnvio.categoria_id = parseInt(dadosEdicaoLote.categoria_id);
-      if (dadosEdicaoLote.departamento_id)
-        dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id);
-
-      await api.patch("/produtos/atualizar-lote", {
-        produto_ids: selecionados,
-        ...dadosEnvio,
-      });
-
-      toast.success(
-        `${selecionados.length} produto(s) atualizado(s) com sucesso!`,
-      );
-      setModalEdicaoLote(false);
-      setSelecionados([]);
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao atualizar produtos:", error);
-      toast.error("Erro ao atualizar produtos");
-    }
-  };
-
-  // Determinar cor do estoque
   const getCorEstoque = (produto) => {
     if (!produto.controlar_estoque) return "text-gray-500";
-
     const estoque = obterEstoqueVisualProduto(produto);
     const minimo = produto.estoque_minimo || 0;
-
-    // Estoque zerado
     if (estoque <= 0) return "text-red-600 font-semibold";
-
-    // Estoque baixo
     if (estoque <= minimo) return "text-yellow-600 font-medium";
-
-    // Estoque normal
     return "text-gray-700";
   };
 
-  // Obter validade mais prÃ³xima dos lotes
   const getValidadeMaisProxima = (produto) => {
     if (!produto.lotes || produto.lotes.length === 0) return "-";
-
     const lotes = produto.lotes
       .filter((l) => l.data_validade)
       .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
-
     if (lotes.length === 0) return "-";
-
     const proximaValidade = lotes[0].data_validade;
     const dias = Math.floor(
       (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
     );
-
     let cor = "text-gray-700";
-    if (dias < 0)
-      cor = "text-red-600 font-bold"; // Vencido
-    else if (dias <= 30)
-      cor = "text-orange-600 font-semibold"; // PrÃ³ximo do vencimento
-    else if (dias <= 90) cor = "text-yellow-600"; // AtenÃ§Ã£o
-
+    if (dias < 0) cor = "text-red-600 font-bold";
+    else if (dias <= 30) cor = "text-orange-600 font-semibold";
+    else if (dias <= 90) cor = "text-yellow-600";
     return <span className={cor}>{formatarData(proximaValidade)}</span>;
   };
 
@@ -1325,7 +924,6 @@ export default function Produtos() {
     });
   };
 
-  // Expandir/colapsar KIT
   const toggleKitExpandido = (produtoId) => {
     const vaiExpandir = !kitsExpandidos.includes(produtoId);
     setKitsExpandidos((prev) =>
@@ -1338,7 +936,6 @@ export default function Produtos() {
     }
   };
 
-  // Expandir/colapsar PAI (mostrar variaÃ§Ãµes)
   const togglePaiExpandido = (produtoId) => {
     const vaiExpandir = !paisExpandidos.includes(produtoId);
     setPaisExpandidos((prev) =>
@@ -1416,22 +1013,10 @@ export default function Produtos() {
       bloqueiosExclusao,
       modalConflitoExclusao,
       onCancelarConflito: handleResolverConflitosExclusao,
-      onCloseModalConflito: () => {
-        if (resolvendoConflitoExclusao) return;
-        setModalConflitoExclusao(false);
-      },
+      onCloseModalConflito,
       onSelecionarTodasVariacoesDoPai: handleSelecionarTodasVariacoesDoPai,
       onSelecionarVariacaoConflito: handleSelecionarVariacaoConflito,
-      onToggleAutoSelecionarConflito: (checked) => {
-        setAutoSelecionarConflito(checked);
-        if (checked) {
-          setVariacoesSelecionadasConflito(
-            bloqueiosExclusao.flatMap((bloqueio) =>
-              bloqueio.variacoes.map((variacao) => variacao.id),
-            ),
-          );
-        }
-      },
+      onToggleAutoSelecionarConflito,
       onTogglePularConfirmacaoConflito: setPularConfirmacaoConflito,
       pularConfirmacaoConflito,
       resolvendoConflitoExclusao,
@@ -1448,7 +1033,7 @@ export default function Produtos() {
       menuRelatoriosAberto,
       menuRelatoriosRef,
       navigate,
-      onExcluirSelecionados: handleExcluirSelecionados,
+      onExcluirSelecionados: () => handleExcluirSelecionados(selecionados),
       onGerarRelatorioFiltrado,
       onGerarRelatorioGeral,
       onOpenEdicaoLote: handleAbrirEdicaoLote,

@@ -765,6 +765,11 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] extrair o fluxo de relatorios de `Produtos.jsx` para um hook dedicado
   - a geracao de CSV, a ordenacao do relatorio, a selecao de colunas e o controle do menu/modal foram movidos para `frontend/src/hooks/useProdutosRelatorios.js`
   - `Produtos.jsx` deixou de concentrar os helpers de exportacao e avancou na separacao entre listagem, relatorios e composicao da pagina
+- [x] extrair catalogos, edicao em lote/preco e exclusao com conflito de `Produtos.jsx` para hooks dedicados
+  - os catalogos auxiliares foram movidos para `frontend/src/hooks/useProdutosCatalogos.js`
+  - a edicao de preco e a edicao em lote foram movidas para `frontend/src/hooks/useProdutosEdicao.js`
+  - a exclusao, resolucao de conflitos 409 e alternancia ativo/inativo foram movidas para `frontend/src/hooks/useProdutosExclusao.js`
+  - `Produtos.jsx` caiu para `1064` linhas e ficou mais focado na composicao da tela e nos helpers visuais restantes
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
