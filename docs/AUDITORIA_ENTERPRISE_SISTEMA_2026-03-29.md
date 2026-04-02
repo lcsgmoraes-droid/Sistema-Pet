@@ -806,6 +806,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a etapa de informacoes do cadastro foi movida para `frontend/src/components/clientes/ClientesNovoCadastroStep.jsx`
   - a etapa de contatos foi movida para `frontend/src/components/clientes/ClientesNovoContatosStep.jsx`
   - `ClientesNovo.jsx` caiu de `2884` para `2089` linhas e passou a concentrar menos JSX inline nas etapas iniciais
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pelas etapas intermediarias do wizard
+  - a etapa de endereco foi movida para `frontend/src/components/clientes/ClientesNovoEnderecoStep.jsx`
+  - a etapa de informacoes complementares foi movida para `frontend/src/components/clientes/ClientesNovoComplementaresStep.jsx`
+  - `ClientesNovo.jsx` caiu de `2089` para `1910` linhas e ficou mais focado na orquestracao do wizard
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

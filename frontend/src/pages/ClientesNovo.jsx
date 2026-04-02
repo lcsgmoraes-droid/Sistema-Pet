@@ -1,4 +1,4 @@
-import { PawPrint } from "lucide-react";
+﻿import { PawPrint } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
 import {
   FiAlertCircle,
@@ -20,8 +20,10 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import ClienteSegmentoBadgeWrapper from "../components/ClienteSegmentoBadgeWrapper";
 import ClientesNovoCadastroStep from "../components/clientes/ClientesNovoCadastroStep";
+import ClientesNovoComplementaresStep from "../components/clientes/ClientesNovoComplementaresStep";
 import ClientesNovoContatosStep from "../components/clientes/ClientesNovoContatosStep";
 import ClientesNovoDuplicadoWarning from "../components/clientes/ClientesNovoDuplicadoWarning";
+import ClientesNovoEnderecoStep from "../components/clientes/ClientesNovoEnderecoStep";
 import ClientesNovoEnderecoModal from "../components/clientes/ClientesNovoEnderecoModal";
 import ClientesNovoFinanceiroStep from "../components/clientes/ClientesNovoFinanceiroStep";
 import ClientesNovoPetsStep from "../components/clientes/ClientesNovoPetsStep";
@@ -45,7 +47,7 @@ const Pessoas = () => {
   const [error, setError] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("todos"); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
 
-  // Estados de paginação
+  // Estados de paginaÃ§Ã£o
   const [loadingCep, setLoadingCep] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [pets, setPets] = useState([]);
@@ -95,13 +97,13 @@ const Pessoas = () => {
     razao_social: "",
     nome_fantasia: "",
     responsavel: "",
-    // Campo veterinário
+    // Campo veterinÃ¡rio
     crmv: "",
-    // Sistema de parceiros (comissões)
+    // Sistema de parceiros (comissÃµes)
     parceiro_ativo: false,
     parceiro_desde: "",
     parceiro_observacoes: "",
-    // Endereço
+    // EndereÃ§o
     cep: "",
     endereco: "",
     numero: "",
@@ -109,7 +111,7 @@ const Pessoas = () => {
     bairro: "",
     cidade: "",
     estado: "",
-    // Endereços de entrega
+    // EndereÃ§os de entrega
     endereco_entrega: "",
     endereco_entrega_2: "",
     // Campos de entrega (Sprint 1 - Bloco 4)
@@ -117,7 +119,7 @@ const Pessoas = () => {
     entregador_ativo: true,
     entregador_padrao: false,
     tipo_vinculo_entrega: "",
-    // Funcionário com controla RH
+    // FuncionÃ¡rio com controla RH
     controla_rh: false,
     gera_conta_pagar_custo_entrega: false,
     media_entregas_configurada: "",
@@ -128,7 +130,7 @@ const Pessoas = () => {
     valor_por_km_entrega: "",
     // Moto
     moto_propria: true,
-    // 📆 Acerto financeiro (ETAPA 4)
+    // ðŸ“† Acerto financeiro (ETAPA 4)
     tipo_acerto_entrega: "",
     dia_semana_acerto: "",
     dia_mes_acerto: "",
@@ -140,7 +142,7 @@ const Pessoas = () => {
     tags: "",
   });
 
-  // Estado para endereços adicionais
+  // Estado para endereÃ§os adicionais
   const {
     enderecosAdicionais,
     setEnderecosAdicionais,
@@ -176,18 +178,18 @@ const Pessoas = () => {
   });
 
   const steps = [
-    { number: 1, title: "Informações do cliente" },
+    { number: 1, title: "InformaÃ§Ãµes do cliente" },
     { number: 2, title: "Contatos" },
-    { number: 3, title: "Endereço" },
-    { number: 4, title: "Informações complementares" },
+    { number: 3, title: "EndereÃ§o" },
+    { number: 4, title: "InformaÃ§Ãµes complementares" },
     { number: 5, title: "Animais" },
     { number: 6, title: "Financeiro" },
   ];
 
-  // Debounce para busca (aguarda 500ms após usuário parar de digitar)
+  // Debounce para busca (aguarda 500ms apÃ³s usuÃ¡rio parar de digitar)
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Resetar para página 1 ao buscar
+      // Resetar para pÃ¡gina 1 ao buscar
       if (paginaAtual !== 1) {
         setPaginaAtual(1);
       } else {
@@ -198,7 +200,7 @@ const Pessoas = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Carregar raças quando espécie mudar
+  // Carregar raÃ§as quando espÃ©cie mudar
   useEffect(() => {
     if (currentPet && currentPet.especie) {
       loadRacas(currentPet.especie);
@@ -207,13 +209,13 @@ const Pessoas = () => {
     }
   }, [currentPet?.especie]);
 
-  // Editar pet automaticamente quando pets são carregados
+  // Editar pet automaticamente quando pets sÃ£o carregados
   useEffect(() => {
     if (petIdToEdit && pets.length > 0) {
       const petIndex = pets.findIndex((p) => p.id === petIdToEdit);
       if (petIndex !== -1) {
         editPet(petIndex);
-        setPetIdToEdit(null); // Limpar após editar
+        setPetIdToEdit(null); // Limpar apÃ³s editar
       }
     }
   }, [pets, petIdToEdit]);
@@ -223,7 +225,7 @@ const Pessoas = () => {
       const response = await api.get(`/clientes/racas?especie=${especie}`);
       setRacas(response.data);
     } catch (err) {
-      console.error("Erro ao carregar raças:", err);
+      console.error("Erro ao carregar raÃ§as:", err);
       setRacas([]);
     }
   };
@@ -243,7 +245,7 @@ const Pessoas = () => {
       const data = await response.json();
 
       if (data.erro) {
-        setCepError("CEP não encontrado");
+        setCepError("CEP nÃ£o encontrado");
         return;
       }
 
@@ -262,52 +264,52 @@ const Pessoas = () => {
     }
   };
 
-  // Funções de gerenciamento de endereços adicionais
+  // FunÃ§Ãµes de gerenciamento de endereÃ§os adicionais
 
   const handleSubmitFinal = async () => {
     setError("");
 
     try {
-      // ✅ VALIDAÇÕES DE CAMPOS OBRIGATÓRIOS
+      // âœ… VALIDAÃ‡Ã•ES DE CAMPOS OBRIGATÃ“RIOS
       const errosValidacao = [];
 
-      // Nome é obrigatório para todos
+      // Nome Ã© obrigatÃ³rio para todos
       if (!formData.nome || formData.nome.trim() === "") {
         errosValidacao.push("Nome");
       }
 
-      // Validações específicas para Pessoa Jurídica
+      // ValidaÃ§Ãµes especÃ­ficas para Pessoa JurÃ­dica
       if (formData.tipo_pessoa === "PJ") {
         if (!formData.cnpj || formData.cnpj.trim() === "") {
           errosValidacao.push("CNPJ");
         }
         if (!formData.razao_social || formData.razao_social.trim() === "") {
-          errosValidacao.push("Razão Social");
+          errosValidacao.push("RazÃ£o Social");
         }
       }
 
-      // Validações específicas para Pessoa Física
+      // ValidaÃ§Ãµes especÃ­ficas para Pessoa FÃ­sica
       if (formData.tipo_pessoa === "PF") {
         if (
           formData.tipo_cadastro === "cliente" &&
           (!formData.cpf || formData.cpf.trim() === "")
         ) {
-          // CPF opcional para clientes PF (muitos não têm)
-          // Removido pois é opcional
+          // CPF opcional para clientes PF (muitos nÃ£o tÃªm)
+          // Removido pois Ã© opcional
         }
       }
 
-      // Se houver erros de validação, mostrar e parar
+      // Se houver erros de validaÃ§Ã£o, mostrar e parar
       if (errosValidacao.length > 0) {
         const mensagem =
-          "❌ Faltam os seguintes campos obrigatórios:\n\n" +
-          errosValidacao.map((campo) => `• ${campo}`).join("\n");
+          "âŒ Faltam os seguintes campos obrigatÃ³rios:\n\n" +
+          errosValidacao.map((campo) => `â€¢ ${campo}`).join("\n");
         alert(mensagem);
         setError(mensagem);
         return;
       }
 
-      // ✅ VALIDAÇÕES DE ENTREGADOR (ETAPA 4)
+      // âœ… VALIDAÃ‡Ã•ES DE ENTREGADOR (ETAPA 4)
       if (formData.is_entregador) {
         // Validar tipo de acerto
         if (!formData.tipo_acerto_entrega) {
@@ -326,43 +328,43 @@ const Pessoas = () => {
           return;
         }
 
-        // Validar dia do mês para acerto mensal
+        // Validar dia do mÃªs para acerto mensal
         if (
           formData.tipo_acerto_entrega === "mensal" &&
           !formData.dia_mes_acerto
         ) {
-          alert("Informe o dia do mês para o acerto mensal");
+          alert("Informe o dia do mÃªs para o acerto mensal");
           return;
         }
 
-        // Validar range do dia do mês (1-28)
+        // Validar range do dia do mÃªs (1-28)
         if (formData.tipo_acerto_entrega === "mensal") {
           const dia = parseInt(formData.dia_mes_acerto);
           if (dia < 1 || dia > 28) {
-            alert("O dia do mês deve estar entre 1 e 28");
+            alert("O dia do mÃªs deve estar entre 1 e 28");
             return;
           }
         }
       }
 
-      // Remover campos que não existem no backend
+      // Remover campos que nÃ£o existem no backend
       const { celular_whatsapp, tags, ...clienteData } = formData;
 
-      // 🚚 LÓGICA AUTOMÁTICA DE ENTREGA baseada em tipo_cadastro
+      // ðŸšš LÃ“GICA AUTOMÃTICA DE ENTREGA baseada em tipo_cadastro
       if (clienteData.is_entregador) {
-        // Se é funcionário → tipo_vinculo = "funcionario" automaticamente
+        // Se Ã© funcionÃ¡rio â†’ tipo_vinculo = "funcionario" automaticamente
         if (clienteData.tipo_cadastro === "funcionario") {
           clienteData.tipo_vinculo_entrega = "funcionario";
           clienteData.is_terceirizado = false;
         }
-        // Se é fornecedor → is_terceirizado = true e tipo_vinculo = "terceirizado" automaticamente
+        // Se Ã© fornecedor â†’ is_terceirizado = true e tipo_vinculo = "terceirizado" automaticamente
         else if (clienteData.tipo_cadastro === "fornecedor") {
           clienteData.is_terceirizado = true;
           clienteData.tipo_vinculo_entrega = "terceirizado";
         }
       }
 
-      // Adicionar endereços adicionais aos dados do cliente
+      // Adicionar endereÃ§os adicionais aos dados do cliente
       clienteData.enderecos_adicionais =
         enderecosAdicionais.length > 0 ? enderecosAdicionais : null;
 
@@ -378,9 +380,9 @@ const Pessoas = () => {
         clienteData.tipo_cadastro = "cliente";
       }
 
-      // 🐛 DEBUG: Verificar entregador_padrao
-      // debugLog('🐛 entregador_padrao antes do envio:', clienteData.entregador_padrao);
-      // debugLog('🐛 is_entregador:', clienteData.is_entregador);
+      // ðŸ› DEBUG: Verificar entregador_padrao
+      // debugLog('ðŸ› entregador_padrao antes do envio:', clienteData.entregador_padrao);
+      // debugLog('ðŸ› is_entregador:', clienteData.is_entregador);
 
       // debugLog('Dados enviados:', clienteData);
 
@@ -441,24 +443,24 @@ const Pessoas = () => {
     } catch (err) {
       const errorDetails = err.response?.data?.details;
       console.error("Erro completo:", err.response?.data);
-      console.error("Detalhes de validação:", errorDetails);
+      console.error("Detalhes de validaÃ§Ã£o:", errorDetails);
 
-      // 🔍 Mapeamento de campos técnicos para nomes amigáveis
+      // ðŸ” Mapeamento de campos tÃ©cnicos para nomes amigÃ¡veis
       const camposPtBr = {
         nome: "Nome",
         data_nascimento: "Data de Nascimento",
         cpf: "CPF",
         cnpj: "CNPJ",
-        razao_social: "Razão Social",
+        razao_social: "RazÃ£o Social",
         nome_fantasia: "Nome Fantasia",
-        inscricao_estadual: "Inscrição Estadual",
-        responsavel: "Responsável",
+        inscricao_estadual: "InscriÃ§Ã£o Estadual",
+        responsavel: "ResponsÃ¡vel",
         telefone: "Telefone",
         celular: "Celular",
         email: "E-mail",
         cep: "CEP",
-        endereco: "Endereço",
-        numero: "Número",
+        endereco: "EndereÃ§o",
+        numero: "NÃºmero",
         bairro: "Bairro",
         cidade: "Cidade",
         estado: "Estado",
@@ -467,18 +469,18 @@ const Pessoas = () => {
         crmv: "CRMV",
         tipo_acerto_entrega: "Tipo de Acerto",
         dia_semana_acerto: "Dia da Semana para Acerto",
-        dia_mes_acerto: "Dia do Mês para Acerto",
-        tipo_vinculo_entrega: "Tipo de Vínculo",
+        dia_mes_acerto: "Dia do MÃªs para Acerto",
+        tipo_vinculo_entrega: "Tipo de VÃ­nculo",
       };
 
-      // ✅ Processar erros de validação do backend
+      // âœ… Processar erros de validaÃ§Ã£o do backend
       let mensagemErro = "";
 
       if (errorDetails && Array.isArray(errorDetails)) {
         const camposFaltando = [];
 
         errorDetails.forEach((detail) => {
-          // Extrair nome do campo (último elemento do array loc)
+          // Extrair nome do campo (Ãºltimo elemento do array loc)
           const campo = detail.loc[detail.loc.length - 1];
           const nomeCampo = camposPtBr[campo] || campo;
 
@@ -499,12 +501,12 @@ const Pessoas = () => {
 
         if (camposFaltando.length > 0) {
           mensagemErro =
-            "❌ Faltam os seguintes campos obrigatórios:\n\n" +
-            camposFaltando.map((campo) => `• ${campo}`).join("\n");
+            "âŒ Faltam os seguintes campos obrigatÃ³rios:\n\n" +
+            camposFaltando.map((campo) => `â€¢ ${campo}`).join("\n");
         }
       }
 
-      // Usar a mensagem personalizada ou a genérica
+      // Usar a mensagem personalizada ou a genÃ©rica
       const errorMessage =
         mensagemErro || err.response?.data?.message || "Erro ao salvar cliente";
       setError(errorMessage);
@@ -522,7 +524,7 @@ const Pessoas = () => {
     try {
       debugLog("Excluindo cliente ID:", id);
       const response = await api.delete(`/clientes/${id}`);
-      debugLog("Cliente excluído com sucesso:", response);
+      debugLog("Cliente excluÃ­do com sucesso:", response);
       await loadClientes();
     } catch (err) {
       console.error("Erro ao excluir cliente:", err);
@@ -537,9 +539,9 @@ const Pessoas = () => {
     try {
       debugLog("Excluindo pet ID:", petId);
       await api.delete(`/clientes/pets/${petId}`);
-      debugLog("Pet excluído com sucesso");
+      debugLog("Pet excluÃ­do com sucesso");
 
-      // Limpar estado de expansão para forçar re-render
+      // Limpar estado de expansÃ£o para forÃ§ar re-render
       setExpandedPets({});
 
       // Atualizar lista de clientes
@@ -569,25 +571,25 @@ const Pessoas = () => {
         customer_id: editingCliente.id,
       });
       await loadSaldoCampanhas(editingCliente.id);
-      alert(`✅ Carimbo lançado! Total: ${res.data.total_carimbos} carimbo(s)`);
+      alert(`âœ… Carimbo lanÃ§ado! Total: ${res.data.total_carimbos} carimbo(s)`);
     } catch (e) {
-      alert(e?.response?.data?.detail || "Erro ao lançar carimbo.");
+      alert(e?.response?.data?.detail || "Erro ao lanÃ§ar carimbo.");
     } finally {
       setLancandoCarimbo(false);
     }
   };
 
-  // Carregar apenas resumo financeiro leve (não o histórico completo)
+  // Carregar apenas resumo financeiro leve (nÃ£o o histÃ³rico completo)
   const loadResumoFinanceiro = async (clienteId) => {
     if (!clienteId) return;
 
     try {
       setLoadingResumo(true);
-      // Nova rota otimizada - apenas agregações
+      // Nova rota otimizada - apenas agregaÃ§Ãµes
       const response = await api.get(`/financeiro/cliente/${clienteId}/resumo`);
       setResumoFinanceiro(response.data.resumo);
     } catch (err) {
-      // Silencioso se 404 (cliente sem histórico financeiro ainda)
+      // Silencioso se 404 (cliente sem histÃ³rico financeiro ainda)
       if (err.response?.status !== 404) {
         console.error("Erro ao carregar resumo financeiro:", err);
       }
@@ -601,8 +603,8 @@ const Pessoas = () => {
     if (cliente) {
       setEditingCliente(cliente);
 
-      // 🐛 DEBUG: Verificar o que vem do backend
-      debugLog("🐛 Cliente carregado do backend:", {
+      // ðŸ› DEBUG: Verificar o que vem do backend
+      debugLog("ðŸ› Cliente carregado do backend:", {
         id: cliente.id,
         nome: cliente.nome,
         is_entregador: cliente.is_entregador,
@@ -649,7 +651,7 @@ const Pessoas = () => {
             : true,
         entregador_padrao: cliente.entregador_padrao || false,
         tipo_vinculo_entrega: cliente.tipo_vinculo_entrega || "",
-        // Funcionário com controla RH
+        // FuncionÃ¡rio com controla RH
         controla_rh: cliente.controla_rh || false,
         gera_conta_pagar_custo_entrega:
           cliente.gera_conta_pagar_custo_entrega || false,
@@ -662,7 +664,7 @@ const Pessoas = () => {
         // Moto
         moto_propria:
           cliente.moto_propria !== undefined ? cliente.moto_propria : true,
-        // 📆 Acerto financeiro (ETAPA 4)
+        // ðŸ“† Acerto financeiro (ETAPA 4)
         tipo_acerto_entrega: cliente.tipo_acerto_entrega || "",
         dia_semana_acerto: cliente.dia_semana_acerto || "",
         dia_mes_acerto: cliente.dia_mes_acerto || "",
@@ -675,14 +677,14 @@ const Pessoas = () => {
       });
       setPets(cliente.pets || []);
 
-      // Carregar endereços adicionais
+      // Carregar endereÃ§os adicionais
       setEnderecosAdicionais(cliente.enderecos_adicionais || []);
 
-      // Carregar apenas resumo financeiro leve (não histórico completo)
+      // Carregar apenas resumo financeiro leve (nÃ£o histÃ³rico completo)
       loadResumoFinanceiro(cliente.id);
       loadSaldoCampanhas(cliente.id);
 
-      // Se um pet específico deve ser editado, marcar para edição
+      // Se um pet especÃ­fico deve ser editado, marcar para ediÃ§Ã£o
       if (petIdToEdit) {
         setPetIdToEdit(petIdToEdit);
         setCurrentStep(5);
@@ -692,10 +694,10 @@ const Pessoas = () => {
       }
     } else {
       setEditingCliente(null);
-      // Se tipoFiltro for 'todos', usar 'cliente' como padrão
+      // Se tipoFiltro for 'todos', usar 'cliente' como padrÃ£o
       const tipoCadastro =
         tipo || (tipoFiltro === "todos" ? "cliente" : tipoFiltro);
-      // Fornecedor deve ser PJ por padrão
+      // Fornecedor deve ser PJ por padrÃ£o
       const tipoPessoa = tipoCadastro === "fornecedor" ? "PJ" : "PF";
 
       setFormData({
@@ -729,7 +731,7 @@ const Pessoas = () => {
         is_entregador: false,
         entregador_ativo: true,
         tipo_vinculo_entrega: "",
-        // Funcionário com controla RH
+        // FuncionÃ¡rio com controla RH
         controla_rh: false,
         media_entregas_configurada: "",
         custo_rh_ajustado: "",
@@ -747,7 +749,7 @@ const Pessoas = () => {
         tags: "",
       });
       setPets([]);
-      setEnderecosAdicionais([]); // Limpar endereços adicionais
+      setEnderecosAdicionais([]); // Limpar endereÃ§os adicionais
       setCurrentStep(1);
     }
     setShowModal(true);
@@ -806,7 +808,7 @@ const Pessoas = () => {
       if (currentStep === 1) {
         const temDuplicata = await verificarDuplicata();
         if (temDuplicata) {
-          return; // Não avança se houver duplicata
+          return; // NÃ£o avanÃ§a se houver duplicata
         }
       }
 
@@ -814,7 +816,7 @@ const Pessoas = () => {
       if (currentStep === 2) {
         const temDuplicata = await verificarDuplicata();
         if (temDuplicata) {
-          return; // Não avança se houver duplicata
+          return; // NÃ£o avanÃ§a se houver duplicata
         }
       }
 
@@ -822,13 +824,13 @@ const Pessoas = () => {
     }
   };
 
-  // Verificar se o campo é um documento único (não pode ser transferido)
+  // Verificar se o campo Ã© um documento Ãºnico (nÃ£o pode ser transferido)
   const isDocumentoUnico = (campo) => {
     return ["cpf", "cnpj", "crmv"].includes(campo);
   };
 
   const continuarMesmoDuplicado = () => {
-    // Mostrar confirmação de remoção
+    // Mostrar confirmaÃ§Ã£o de remoÃ§Ã£o
     setShowConfirmacaoRemocao(true);
   };
 
@@ -836,7 +838,7 @@ const Pessoas = () => {
     try {
       setLoading(true);
 
-      // Calcular próximo código disponível
+      // Calcular prÃ³ximo cÃ³digo disponÃ­vel
       const proximoCodigo =
         editingCliente?.codigo ||
         (clientes.length > 0
@@ -873,7 +875,7 @@ const Pessoas = () => {
 
   const irParaClienteExistente = () => {
     closeModal();
-    // Scroll até o cliente existente
+    // Scroll atÃ© o cliente existente
     const elemento = document.getElementById(
       `cliente-${clienteDuplicado.cliente.id}`,
     );
@@ -887,7 +889,7 @@ const Pessoas = () => {
   };
 
   const editarClienteExistente = () => {
-    // Carregar o cliente existente para edição
+    // Carregar o cliente existente para ediÃ§Ã£o
     const clienteParaEditar = clientes.find(
       (c) => c.id === clienteDuplicado.cliente.id,
     );
@@ -896,7 +898,7 @@ const Pessoas = () => {
       setShowDuplicadoWarning(false);
       setClienteDuplicado(null);
       setShowConfirmacaoRemocao(false);
-      // Abrir modal com o cliente para edição
+      // Abrir modal com o cliente para ediÃ§Ã£o
       openModal(clienteParaEditar);
     }
   };
@@ -911,7 +913,7 @@ const Pessoas = () => {
 
   const addPet = () => {
     if (!currentPet.nome || !currentPet.especie) {
-      setError("Nome e espécie são obrigatórios");
+      setError("Nome e espÃ©cie sÃ£o obrigatÃ³rios");
       return;
     }
 
@@ -1044,7 +1046,7 @@ const Pessoas = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Cadastros</h1>
         <p className="text-gray-600 mt-1">
-          Gerenciamento de clientes, fornecedores, veterinários, funcionários e
+          Gerenciamento de clientes, fornecedores, veterinÃ¡rios, funcionÃ¡rios e
           pets
         </p>
       </div>
@@ -1102,7 +1104,7 @@ const Pessoas = () => {
                 : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
-            Veterinários
+            VeterinÃ¡rios
           </button>
           <button
             onClick={() => {
@@ -1115,7 +1117,7 @@ const Pessoas = () => {
                 : "border-transparent text-gray-600 hover:text-gray-900"
             }`}
           >
-            Funcionários
+            FuncionÃ¡rios
           </button>
         </div>
       </div>
@@ -1126,7 +1128,7 @@ const Pessoas = () => {
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por código, nome, CPF/CNPJ, email ou telefone..."
+            placeholder="Buscar por cÃ³digo, nome, CPF/CNPJ, email ou telefone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
@@ -1156,9 +1158,9 @@ const Pessoas = () => {
               : tipoFiltro === "fornecedor"
                 ? "Fornecedor"
                 : tipoFiltro === "veterinario"
-                  ? "Veterinário"
+                  ? "VeterinÃ¡rio"
                   : tipoFiltro === "funcionario"
-                    ? "Funcionário"
+                    ? "FuncionÃ¡rio"
                     : "Cadastro"}
           </button>
         </div>
@@ -1172,7 +1174,7 @@ const Pessoas = () => {
         </div>
       )}
 
-      {/* Paginação Superior */}
+      {/* PaginaÃ§Ã£o Superior */}
       {!loading && totalRegistros > 0 && (
         <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg flex items-center justify-between mb-0">
           <div className="flex items-center gap-4">
@@ -1189,11 +1191,11 @@ const Pessoas = () => {
               }}
               className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
-              <option value={10}>10 por página</option>
-              <option value={20}>20 por página</option>
-              <option value={30}>30 por página</option>
-              <option value={50}>50 por página</option>
-              <option value={100}>100 por página</option>
+              <option value={10}>10 por pÃ¡gina</option>
+              <option value={20}>20 por pÃ¡gina</option>
+              <option value={30}>30 por pÃ¡gina</option>
+              <option value={50}>50 por pÃ¡gina</option>
+              <option value={100}>100 por pÃ¡gina</option>
             </select>
           </div>
 
@@ -1213,7 +1215,7 @@ const Pessoas = () => {
               Anterior
             </button>
 
-            {/* Páginas numeradas */}
+            {/* PÃ¡ginas numeradas */}
             <div className="flex items-center gap-1">
               {Array.from(
                 {
@@ -1268,7 +1270,7 @@ const Pessoas = () => {
               }
               className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Próxima
+              PrÃ³xima
             </button>
             <button
               onClick={() =>
@@ -1279,7 +1281,7 @@ const Pessoas = () => {
               }
               className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Última
+              Ãšltima
             </button>
           </div>
         </div>
@@ -1332,7 +1334,7 @@ const Pessoas = () => {
                     scope="col"
                     className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
                   >
-                    Ações
+                    AÃ§Ãµes
                   </th>
                 </tr>
               </thead>
@@ -1403,7 +1405,7 @@ const Pessoas = () => {
                         </button>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {/* Desabilitado: causa muitas requisições 404 na listagem */}
+                        {/* Desabilitado: causa muitas requisiÃ§Ãµes 404 na listagem */}
                         {/* <ClienteSegmentoBadgeWrapper clienteId={cliente.id} /> */}
                         <span className="text-xs text-gray-400">-</span>
                       </td>
@@ -1480,7 +1482,7 @@ const Pessoas = () => {
                                     </div>
                                     <div>
                                       <p className="text-xs text-gray-500">
-                                        Espécie/Raça
+                                        EspÃ©cie/RaÃ§a
                                       </p>
                                       <p className="text-sm text-gray-700">
                                         {pet.especie}{" "}
@@ -1545,7 +1547,7 @@ const Pessoas = () => {
           </div>
         )}
 
-        {/* Paginação Inferior */}
+        {/* PaginaÃ§Ã£o Inferior */}
         {!loading && totalRegistros > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1562,11 +1564,11 @@ const Pessoas = () => {
                 }}
                 className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value={10}>10 por página</option>
-                <option value={20}>20 por página</option>
-                <option value={30}>30 por página</option>
-                <option value={50}>50 por página</option>
-                <option value={100}>100 por página</option>
+                <option value={10}>10 por pÃ¡gina</option>
+                <option value={20}>20 por pÃ¡gina</option>
+                <option value={30}>30 por pÃ¡gina</option>
+                <option value={50}>50 por pÃ¡gina</option>
+                <option value={100}>100 por pÃ¡gina</option>
               </select>
             </div>
 
@@ -1586,7 +1588,7 @@ const Pessoas = () => {
                 Anterior
               </button>
 
-              {/* Páginas numeradas */}
+              {/* PÃ¡ginas numeradas */}
               <div className="flex items-center gap-1">
                 {Array.from(
                   {
@@ -1641,7 +1643,7 @@ const Pessoas = () => {
                 }
                 className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Próxima
+                PrÃ³xima
               </button>
               <button
                 onClick={() =>
@@ -1652,7 +1654,7 @@ const Pessoas = () => {
                 }
                 className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Última
+                Ãšltima
               </button>
             </div>
           </div>
@@ -1668,8 +1670,8 @@ const Pessoas = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">
                   {editingCliente
-                    ? `Editar ${editingCliente.tipo_cadastro === "cliente" ? "Cliente" : editingCliente.tipo_cadastro === "fornecedor" ? "Fornecedor" : "Veterinário"}`
-                    : `Adicionar ${formData.tipo_cadastro === "cliente" ? "Cliente" : formData.tipo_cadastro === "fornecedor" ? "Fornecedor" : "Veterinário"}`}
+                    ? `Editar ${editingCliente.tipo_cadastro === "cliente" ? "Cliente" : editingCliente.tipo_cadastro === "fornecedor" ? "Fornecedor" : "VeterinÃ¡rio"}`
+                    : `Adicionar ${formData.tipo_cadastro === "cliente" ? "Cliente" : formData.tipo_cadastro === "fornecedor" ? "Fornecedor" : "VeterinÃ¡rio"}`}
                 </h2>
                 <button
                   onClick={closeModal}
@@ -1763,353 +1765,24 @@ const Pessoas = () => {
 
               {/* Step 3: Endere?o */}
               {currentStep === 3 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Endereço
-                  </h3>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      CEP
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={formData.cep}
-                        onChange={(e) => {
-                          const cep = e.target.value;
-                          setFormData({ ...formData, cep });
-                          if (cep.replace(/\D/g, "").length === 8) {
-                            buscarCep(cep);
-                          }
-                        }}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="00000-000"
-                        maxLength="9"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => buscarCep(formData.cep)}
-                        disabled={loadingCep}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {loadingCep ? "Buscando..." : "Buscar"}
-                      </button>
-                    </div>
-                    {cepError && (
-                      <p className="text-xs text-red-500 mt-1">{cepError}</p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Digite o CEP para preencher o endereço automaticamente
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Endereço
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.endereco}
-                      onChange={(e) =>
-                        setFormData({ ...formData, endereco: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="Rua, Avenida..."
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Número
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.numero}
-                        onChange={(e) =>
-                          setFormData({ ...formData, numero: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="123"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Complemento
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.complemento}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            complemento: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        placeholder="Apto, Bloco..."
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Bairro
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.bairro}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bairro: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Cidade
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.cidade}
-                        onChange={(e) =>
-                          setFormData({ ...formData, cidade: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Estado
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.estado}
-                        onChange={(e) =>
-                          setFormData({ ...formData, estado: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        maxLength="2"
-                        placeholder="SP"
-                      />
-                    </div>
-                  </div>
-                </div>
+                <ClientesNovoEnderecoStep
+                  formData={formData}
+                  setFormData={setFormData}
+                  buscarCep={buscarCep}
+                  loadingCep={loadingCep}
+                  cepError={cepError}
+                />
               )}
-
-              {/* Step 4: Informações Complementares */}
+              {/* Step 4: Informacoes Complementares */}
               {currentStep === 4 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Informações complementares
-                  </h3>
-
-                  {/* Endereços Adicionais */}
-                  <div className="border-b pb-4 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="text-md font-semibold text-gray-800">
-                          Endereços Adicionais
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          Cadastre múltiplos endereços para entrega, cobrança,
-                          etc.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => abrirModalEndereco()}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 4v16m8-8H4"
-                          />
-                        </svg>
-                        Adicionar Endereço
-                      </button>
-                    </div>
-
-                    {/* Cards minimizados dos endereços */}
-                    {enderecosAdicionais.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        {/* ✅ key={index} é aceitável aqui: lista não reordena e não há ID único do backend */}
-                        {enderecosAdicionais.map((endereco, index) => (
-                          <div
-                            key={index}
-                            className="border border-gray-200 rounded-lg p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span
-                                    className={`px-2 py-1 text-xs font-medium rounded ${
-                                      endereco.tipo === "entrega"
-                                        ? "bg-blue-100 text-blue-800"
-                                        : endereco.tipo === "cobranca"
-                                          ? "bg-green-100 text-green-800"
-                                          : endereco.tipo === "comercial"
-                                            ? "bg-purple-100 text-purple-800"
-                                            : endereco.tipo === "residencial"
-                                              ? "bg-orange-100 text-orange-800"
-                                              : "bg-gray-100 text-gray-800"
-                                    }`}
-                                  >
-                                    {endereco.tipo === "entrega"
-                                      ? "📦 Entrega"
-                                      : endereco.tipo === "cobranca"
-                                        ? "💰 Cobrança"
-                                        : endereco.tipo === "comercial"
-                                          ? "🏢 Comercial"
-                                          : endereco.tipo === "residencial"
-                                            ? "🏠 Residencial"
-                                            : "📍 Trabalho"}
-                                  </span>
-                                  <span className="text-xs font-medium text-gray-500">
-                                    +{index + 1}
-                                  </span>
-                                </div>
-                                {endereco.apelido && (
-                                  <p className="text-sm font-semibold text-gray-900 mb-1">
-                                    {endereco.apelido}
-                                  </p>
-                                )}
-                                <p className="text-sm text-gray-700">
-                                  {endereco.endereco}, {endereco.numero}
-                                  {endereco.complemento &&
-                                    ` - ${endereco.complemento}`}
-                                </p>
-                                <p className="text-xs text-gray-600 mt-1">
-                                  {endereco.bairro}, {endereco.cidade}/
-                                  {endereco.estado}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                  CEP: {endereco.cep}
-                                </p>
-                              </div>
-                              <div className="flex gap-1 ml-2">
-                                <button
-                                  type="button"
-                                  onClick={() => abrirModalEndereco(index)}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                  title="Editar"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                  </svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => removerEndereco(index)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                  title="Excluir"
-                                >
-                                  <svg
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-gray-500 text-sm">
-                        <svg
-                          className="w-12 h-12 mx-auto mb-2 text-gray-400"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        Nenhum endereço adicional cadastrado
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Marcações / Tags
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.tags}
-                      onChange={(e) =>
-                        setFormData({ ...formData, tags: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder="Ex: Bom pagador, Cliente fiel, VIP"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Separe por vírgula para múltiplas tags
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Observações
-                    </label>
-                    <textarea
-                      value={formData.observacoes}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          observacoes: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      rows="4"
-                      placeholder="Informações adicionais sobre o cliente..."
-                    />
-                  </div>
-                </div>
+                <ClientesNovoComplementaresStep
+                  formData={formData}
+                  setFormData={setFormData}
+                  enderecosAdicionais={enderecosAdicionais}
+                  abrirModalEndereco={abrirModalEndereco}
+                  removerEndereco={removerEndereco}
+                />
               )}
-
               {/* Step 5: Animais - SIMPLIFICADO */}
               {currentStep === 5 && (
                 <ClientesNovoPetsStep
@@ -2149,7 +1822,7 @@ const Pessoas = () => {
                   onClick={nextStep}
                   className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                 >
-                  Avançar <FiArrowRight />
+                  AvanÃ§ar <FiArrowRight />
                 </button>
               ) : (
                 <button
@@ -2176,7 +1849,7 @@ const Pessoas = () => {
         />
       )}
 
-      {/* Modal de Importação */}
+      {/* Modal de ImportaÃ§Ã£o */}
       <ModalImportacaoPessoas
         isOpen={showModalImportacao}
         onClose={() => {
@@ -2185,7 +1858,7 @@ const Pessoas = () => {
         }}
       />
 
-      {/* Modal de Adicionar Crédito */}
+      {/* Modal de Adicionar CrÃ©dito */}
       {mostrarModalAdicionarCredito && editingCliente && (
         <ModalAdicionarCredito
           cliente={editingCliente}
@@ -2198,7 +1871,7 @@ const Pessoas = () => {
         />
       )}
 
-      {/* Modal de Remover Crédito */}
+      {/* Modal de Remover CrÃ©dito */}
       {mostrarModalRemoverCredito && editingCliente && (
         <ModalRemoverCredito
           cliente={editingCliente}
@@ -2211,7 +1884,7 @@ const Pessoas = () => {
         />
       )}
 
-      {/* Estilos para animação do badge de parceiro */}
+      {/* Estilos para animaÃ§Ã£o do badge de parceiro */}
       <style>{`
         @keyframes fadeIn {
           from {
@@ -2233,4 +1906,5 @@ const Pessoas = () => {
 };
 
 export default Pessoas;
+
 
