@@ -774,6 +774,10 @@ Proximas tarefas sugeridas para execucao continua:
   - os utilitarios de busca, composicao de kit, texto quebrado e estoque visual foram movidos para `frontend/src/components/produtos/produtosUtils.js`
   - o estado de expansao da tabela e a configuracao de colunas visiveis foram movidos para `frontend/src/hooks/useProdutosTabela.js`
   - `Produtos.jsx` caiu para `860` linhas e ficou concentrado em hooks de dominio, composicao e a definicao das colunas da grade
+- [x] extrair a definicao de colunas da grade de `Produtos.jsx` para um modulo dedicado
+  - a configuracao de colunas da listagem foi movida para `frontend/src/components/produtos/produtosColumns.jsx`
+  - `Produtos.jsx` deixou de concentrar renderizacao de celulas e caiu para `275` linhas
+  - a pagina ficou focada em hooks, composicao e orquestracao da tela, sem carregar a definicao inteira da tabela
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
