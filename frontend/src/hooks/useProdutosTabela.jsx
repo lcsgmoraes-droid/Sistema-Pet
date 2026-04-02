@@ -3,16 +3,23 @@ import toast from "react-hot-toast";
 import { formatarData } from "../api/produtos";
 import { obterEstoqueVisualProduto } from "../components/produtos/produtosUtils";
 
-export default function useProdutosTabela({ colunasTabela, produtosVisiveisRef }) {
+export default function useProdutosTabela({
+  colunasTabela,
+  paisExpandidos: paisExpandidosExterno,
+  produtosVisiveisRef,
+  setPaisExpandidos: setPaisExpandidosExterno,
+}) {
   const linhaProdutoRefs = useRef({});
   const [kitsExpandidos, setKitsExpandidos] = useState([]);
-  const [paisExpandidos, setPaisExpandidos] = useState([]);
+  const [paisExpandidosInterno, setPaisExpandidosInterno] = useState([]);
   const [colunasVisiveis, setColunasVisiveis] = useState(() => {
     const salvo = localStorage.getItem("produtos_colunas_visiveis");
     return salvo ? JSON.parse(salvo) : null;
   });
   const [modalColunas, setModalColunas] = useState(false);
   const [colunasTemporarias, setColunasTemporarias] = useState([]);
+  const paisExpandidos = paisExpandidosExterno ?? paisExpandidosInterno;
+  const setPaisExpandidos = setPaisExpandidosExterno ?? setPaisExpandidosInterno;
 
   const getCorEstoque = (produto) => {
     if (!produto.controlar_estoque) return "text-gray-500";

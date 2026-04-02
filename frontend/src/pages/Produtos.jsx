@@ -627,6 +627,7 @@ export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const [modalImportacao, setModalImportacao] = useState(false);
+  const [paisExpandidos, setPaisExpandidos] = useState([]);
   const {
     carregarDados,
     filtros,
@@ -649,12 +650,14 @@ export default function Produtos() {
     totalPaginas,
   } = useProdutosListagem({
     normalizeSearchText,
-    onOcultarPaisVariacoes: () => produtosTabela.resetPaisExpandidos(),
-    paisExpandidos: produtosTabela.paisExpandidos,
+    onOcultarPaisVariacoes: () => setPaisExpandidos([]),
+    paisExpandidos,
   });
   const produtosTabela = useProdutosTabela({
     colunasTabela: PRODUTOS_COLUNAS,
+    paisExpandidos,
     produtosVisiveisRef,
+    setPaisExpandidos,
   });
   const {
     colunasRelatorio,
@@ -685,7 +688,6 @@ export default function Produtos() {
     linhaProdutoRefs,
     modalColunas,
     onCloseModalColunas,
-    paisExpandidos,
     restaurarColunasPadrao,
     salvarColunas,
     toggleColuna,
