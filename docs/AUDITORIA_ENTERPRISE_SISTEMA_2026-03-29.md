@@ -708,6 +708,13 @@ Itens executados nesta etapa:
   - a carga de dashboard, campanhas, ranking, cupons, destaque, sorteios, sugestoes, relatorios, retencao e configuracoes foi movida para `frontend/src/hooks/useCampanhasConsultas.js`
   - os `useEffect` e loaders principais sairam da pagina e passaram a ficar centralizados em um hook de consulta/composicao
   - `Campanhas.jsx` caiu de `6134` para `5959` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pelos blocos visuais mais densos do topo da pagina:
+  - a barra de abas foi movida para `frontend/src/components/campanhas/CampanhasTabsBar.jsx`
+  - a aba de dashboard foi movida para `frontend/src/components/campanhas/CampanhasDashboardTab.jsx`
+  - `Campanhas.jsx` caiu de `5959` para `5558` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pela listagem principal de campanhas:
+  - a aba de campanhas cadastradas foi movida para `frontend/src/components/campanhas/CampanhasListTab.jsx`
+  - `Campanhas.jsx` caiu de `5558` para `5464` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
