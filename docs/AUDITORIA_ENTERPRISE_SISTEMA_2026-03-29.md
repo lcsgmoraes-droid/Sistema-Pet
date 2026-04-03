@@ -820,6 +820,9 @@ Proximas tarefas sugeridas para execucao continua:
   - a paginacao foi movida para `frontend/src/components/clientes/ClientesNovoPaginationControls.jsx`
   - a tabela principal foi movida para `frontend/src/components/clientes/ClientesNovoTabelaSection.jsx`
   - `ClientesNovo.jsx` caiu de `1729` para `1039` linhas e ficou mais focado na orquestracao da pagina
+- [x] concluir a decomposicao do fluxo de cadastro/modal de `ClientesNovo.jsx`
+  - o dominio do wizard, duplicidade, CEP, pets e financeiro foi movido para `frontend/src/hooks/useClientesNovoCadastro.js`
+  - `ClientesNovo.jsx` caiu de `1039` para `153` linhas e ficou focado so na listagem, exclusoes e composicao da tela
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
