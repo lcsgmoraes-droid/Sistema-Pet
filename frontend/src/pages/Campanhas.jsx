@@ -112,7 +112,17 @@ export default function Campanhas() {
     primeiroDiaMes,
   });
   const campanhasGestor = useCampanhasGestor();
-  const campanhasConfiguracoes = useCampanhasConfiguracoes({
+  const {
+    rankingConfig: rankingConfigState,
+    setRankingConfig: setRankingConfigState,
+    rankingConfigSalvando,
+    schedulerConfig: schedulerConfigState,
+    setSchedulerConfig: setSchedulerConfigState,
+    schedulerConfigSalvando,
+    salvarRankingConfig,
+    salvarSchedulerConfig,
+    recalcularRanking,
+  } = useCampanhasConfiguracoes({
     rankingConfig,
     setRankingConfig,
     schedulerConfig,
@@ -344,17 +354,17 @@ export default function Campanhas() {
           rankLabels={RANK_LABELS}
           filtroNivel={filtroNivel}
           setFiltroNivel={setFiltroNivel}
-          onRecalcularRanking={campanhasConfiguracoes.recalcularRanking}
+          onRecalcularRanking={recalcularRanking}
           loadingRanking={loadingRanking}
           ranking={ranking}
           formatBRL={formatBRL}
           setResultadoLote={setResultadoLote}
           setModalLote={setModalLote}
-          rankingConfig={rankingConfig}
-          setRankingConfig={setRankingConfig}
+          rankingConfig={rankingConfigState}
+          setRankingConfig={setRankingConfigState}
           rankingConfigLoading={rankingConfigLoading}
-          salvarRankingConfig={campanhasConfiguracoes.salvarRankingConfig}
-          rankingConfigSalvando={campanhasConfiguracoes.rankingConfigSalvando}
+          salvarRankingConfig={salvarRankingConfig}
+          rankingConfigSalvando={rankingConfigSalvando}
           campanhas={campanhas}
           filtroCupomBusca={filtroCupomBusca}
           setFiltroCupomBusca={setFiltroCupomBusca}
@@ -475,12 +485,10 @@ export default function Campanhas() {
       {aba === "config" && (
         <CampanhasConfigTab
           schedulerConfigLoading={schedulerConfigLoading}
-          schedulerConfig={campanhasConfiguracoes.schedulerConfig}
-          setSchedulerConfig={campanhasConfiguracoes.setSchedulerConfig}
-          salvarSchedulerConfig={campanhasConfiguracoes.salvarSchedulerConfig}
-          schedulerConfigSalvando={
-            campanhasConfiguracoes.schedulerConfigSalvando
-          }
+          schedulerConfig={schedulerConfigState}
+          setSchedulerConfig={setSchedulerConfigState}
+          onSalvarSchedulerConfig={salvarSchedulerConfig}
+          schedulerConfigSalvando={schedulerConfigSalvando}
         />
       )}
 

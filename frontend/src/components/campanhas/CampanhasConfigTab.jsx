@@ -2,15 +2,15 @@ export default function CampanhasConfigTab({
   schedulerConfigLoading,
   schedulerConfig,
   setSchedulerConfig,
-  salvarSchedulerConfig = null,
+  onSalvarSchedulerConfig = null,
   schedulerConfigSalvando,
 }) {
   const handleSalvarSchedulerConfig =
-    typeof salvarSchedulerConfig === "function"
-      ? salvarSchedulerConfig
+    typeof onSalvarSchedulerConfig === "function"
+      ? onSalvarSchedulerConfig
       : () => {};
   const salvarDesabilitado =
-    schedulerConfigSalvando || typeof salvarSchedulerConfig !== "function";
+    schedulerConfigSalvando || typeof onSalvarSchedulerConfig !== "function";
 
   return (
 
