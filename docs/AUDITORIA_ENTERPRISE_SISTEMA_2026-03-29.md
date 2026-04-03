@@ -719,6 +719,9 @@ Itens executados nesta etapa:
   - a aba de retencao foi movida para `frontend/src/components/campanhas/CampanhasRetencaoTab.jsx`
   - o formulario de criacao/edicao foi movido para `frontend/src/components/campanhas/CampanhasRetencaoForm.jsx`
   - `Campanhas.jsx` caiu de `5464` para `5240` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pela aba de destaque mensal:
+  - a aba de destaque foi movida para `frontend/src/components/campanhas/CampanhasDestaqueTab.jsx`
+  - `Campanhas.jsx` caiu de `5240` para `4884` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
