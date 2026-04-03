@@ -17,201 +17,18 @@ import CampanhasConfigTab from "../components/campanhas/CampanhasConfigTab";
 import CampanhasModalsLayer from "../components/campanhas/CampanhasModalsLayer";
 import useCampanhasGestor from "../hooks/useCampanhasGestor";
 import useCampanhasConfiguracoes from "../hooks/useCampanhasConfiguracoes";
-
-const TIPO_LABELS = {
-  loyalty_stamp: {
-    label: "Cartão Fidelidade",
-    color: "bg-purple-100 text-purple-800",
-    emoji: "🏷️",
-  },
-  cashback: {
-    label: "Cashback",
-    color: "bg-green-100 text-green-800",
-    emoji: "💰",
-  },
-  birthday: {
-    label: "Aniversário",
-    color: "bg-pink-100 text-pink-800",
-    emoji: "🎂",
-  },
-  birthday_customer: {
-    label: "Aniversário Cliente",
-    color: "bg-pink-100 text-pink-800",
-    emoji: "🎂",
-  },
-  birthday_pet: {
-    label: "Aniversário Pet",
-    color: "bg-orange-100 text-orange-800",
-    emoji: "🐾",
-  },
-  welcome: {
-    label: "Boas-vindas",
-    color: "bg-blue-100 text-blue-800",
-    emoji: "👋",
-  },
-  welcome_app: {
-    label: "Boas-vindas App",
-    color: "bg-blue-100 text-blue-800",
-    emoji: "👋",
-  },
-  inactivity: {
-    label: "Clientes Inativos",
-    color: "bg-red-100 text-red-800",
-    emoji: "😴",
-  },
-  ranking_monthly: {
-    label: "Ranking Mensal",
-    color: "bg-yellow-100 text-yellow-800",
-    emoji: "🏆",
-  },
-  quick_repurchase: {
-    label: "Recompra Rápida",
-    color: "bg-teal-100 text-teal-800",
-    emoji: "🔁",
-  },
-  monthly_highlight: {
-    label: "Destaque Mensal",
-    color: "bg-amber-100 text-amber-800",
-    emoji: "🌟",
-  },
-  win_back: {
-    label: "Reativação",
-    color: "bg-red-100 text-red-800",
-    emoji: "🔄",
-  },
-  raffle: {
-    label: "Sorteio",
-    color: "bg-yellow-100 text-yellow-800",
-    emoji: "🎲",
-  },
-};
-
-const USER_CREATABLE_TYPES = new Set([
-  "inactivity",
-  "quick_repurchase",
-  "bulk_segment",
-]);
-
-const CUPOM_STATUS = {
-  active: { label: "Ativo", color: "bg-green-100 text-green-700" },
-  used: { label: "Usado", color: "bg-gray-100 text-gray-600" },
-  expired: { label: "Expirado", color: "bg-red-100 text-red-600" },
-  voided: { label: "Cancelado", color: "bg-red-100 text-red-600" },
-};
-
-const RANK_LABELS = {
-  bronze: {
-    label: "Bronze",
-    color: "bg-amber-100 text-amber-800",
-    border: "border-amber-300",
-    emoji: "🥉",
-  },
-  silver: {
-    label: "Prata",
-    color: "bg-gray-100 text-gray-700",
-    border: "border-gray-400",
-    emoji: "🥈",
-  },
-  gold: {
-    label: "Ouro",
-    color: "bg-yellow-100 text-yellow-800",
-    border: "border-yellow-400",
-    emoji: "🥇",
-  },
-  diamond: {
-    label: "Platina",
-    color: "bg-purple-100 text-purple-800",
-    border: "border-purple-400",
-    emoji: "👑",
-  },
-  platinum: {
-    label: "Diamante",
-    color: "bg-cyan-100 text-cyan-800",
-    border: "border-cyan-400",
-    emoji: "💎",
-  },
-};
-
-// Frases sugeridas para campanhas de aniversário (por tipo de campanha e tipo de presente)
-const FRASES_ANIVERSARIO = {
-  birthday_customer: {
-    brinde:
-      "🎂 Feliz aniversário, {nome}! Seu carinho merece uma celebração especial! Apareça na nossa loja para retirar seu presente surpresa. Será um prazer ver você! 🎁",
-    cupom:
-      "🎉 Feliz aniversário, {nome}! Neste dia tão especial preparamos um cupom de {desconto} de desconto pra você celebrar com muito mimo pro seu pet! Use o código {code}. 🐾",
-  },
-  birthday_pet: {
-    brinde:
-      "🐾🎂 Que dia mais fofo! {nome_pet} está fazendo aniversário e a gente não podia deixar passar em branco! Venha buscar o mimo especial que separamos pro seu melhor amigo — tem muito carinho esperando por vocês! Um beijo nas patinhas! 🥳",
-    cupom:
-      "🎈 O {nome_pet} tá de parabéns hoje, {nome}! Para comemorar esse dia tão especial, preparamos um cupom de {desconto} de desconto pra mimar o(a) aniversariante! Use o código {code} e vai fundo nos mimos! 🐕🎁",
-  },
-};
-
-const hoje = new Date().toISOString().slice(0, 10);
-const primeiroDiaMes = hoje.slice(0, 7) + "-01";
-
-function CampanhaField({
-  label,
-  id,
-  type = "number",
-  step = "any",
-  min,
-  value,
-  onChange,
-  placeholder,
-  colSpan,
-}) {
-  return (
-    <div className={colSpan ? `col-span-${colSpan}` : ""}>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-600 mb-1"
-      >
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        step={step}
-        min={min}
-        value={value}
-        placeholder={placeholder}
-        onChange={onChange}
-        className="w-full border rounded-lg px-3 py-1.5 text-sm"
-      />
-    </div>
-  );
-}
-
-function CampanhaSel({ label, id, value, onChange, children }) {
-  return (
-    <div>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-600 mb-1"
-      >
-        {label}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={onChange}
-        className="w-full border rounded-lg px-3 py-1.5 text-sm"
-      >
-        {children}
-      </select>
-    </div>
-  );
-}
+import useCampanhasGestao from "../hooks/useCampanhasGestao";
+import {
+  TIPO_LABELS,
+  USER_CREATABLE_TYPES,
+  CUPOM_STATUS,
+  RANK_LABELS,
+  hoje,
+  primeiroDiaMes,
+  createDefaultPremio,
+} from "../components/campanhas/campanhasConstants";
 
 export default function Campanhas() {
-
-  // Campanhas
-  const [toggling, setToggling] = useState(null);
-  const [campanhaEditando, setCampanhaEditando] = useState(null);
-  const [paramsEditando, setParamsEditando] = useState({});
-  const [salvandoParams, setSalvandoParams] = useState(false);
 
   // Envio escalonado de inativos
   const [modalEnvioInativos, setModalEnvioInativos] = useState(null); // null | 30 | 60 | 90
@@ -248,17 +65,6 @@ export default function Campanhas() {
   const [enviandoDestaque, setEnviandoDestaque] = useState(false);
   const [destaqueResultado, setDestaqueResultado] = useState(null);
   // premiosPorVencedor: { maior_gasto: { tipo_premio, coupon_value, coupon_valid_days, mensagem, mensagem_brinde, retirar_de, retirar_ate }, ... }
-
-  const _defaultPremio = () => ({
-    tipo_premio: "cupom",
-    coupon_value: 50,
-    coupon_valid_days: 10,
-    mensagem: "Parabéns! Você foi um dos nossos melhores clientes do mês! 🏆",
-    mensagem_brinde:
-      "Parabéns! Você foi um dos nossos melhores clientes do mês. Passe em nossa loja e retire seu brinde especial — será um prazer recebê-lo! 🎁",
-    retirar_de: "",
-    retirar_ate: "",
-  });
 
   const {
     aba,
@@ -334,21 +140,10 @@ export default function Campanhas() {
     carregarRankingConfig,
     carregarSchedulerConfig,
   } = useCampanhasConsultas({
-    createDefaultPremio: _defaultPremio,
+    createDefaultPremio,
     hoje,
     primeiroDiaMes,
   });
-
-  // Criar campanha
-  const [modalCriarCampanha, setModalCriarCampanha] = useState(false);
-  const [novaCampanha, setNovaCampanha] = useState({
-    name: "",
-    campaign_type: "inactivity",
-    params: {},
-  });
-  const [criandoCampanha, setCriandoCampanha] = useState(false);
-  const [erroCriarCampanha, setErroCriarCampanha] = useState("");
-  const [arquivando, setArquivando] = useState(null);
 
   // Sorteios
   const [modalSorteio, setModalSorteio] = useState(false);
@@ -401,6 +196,10 @@ export default function Campanhas() {
     setSchedulerConfig,
     carregarRanking,
     carregarSchedulerConfig,
+  });
+  const campanhasGestao = useCampanhasGestao({
+    setCampanhas,
+    carregarCampanhas,
   });
 
   const enviarParaInativos = async () => {
@@ -457,7 +256,7 @@ export default function Campanhas() {
       const vencedoresComPremio = {};
       for (const [cat, info] of Object.entries(destaque.vencedores)) {
         if (!vencedoresSelecionados[cat]) continue;
-        const premio = premiosPorVencedor[cat] || _defaultPremio();
+        const premio = premiosPorVencedor[cat] || createDefaultPremio();
         vencedoresComPremio[cat] = {
           ...info,
           tipo_premio: premio.tipo_premio,
@@ -482,55 +281,6 @@ export default function Campanhas() {
       );
     } finally {
       setEnviandoDestaque(false);
-    }
-  };
-
-  const criarCampanha = async () => {
-    setErroCriarCampanha("");
-    if (!novaCampanha.name.trim()) {
-      setErroCriarCampanha("Nome obrigatório.");
-      return;
-    }
-    setCriandoCampanha(true);
-    try {
-      await api.post("/campanhas", {
-        name: novaCampanha.name,
-        campaign_type: novaCampanha.campaign_type,
-        params: {},
-        priority: 50,
-      });
-      setModalCriarCampanha(false);
-      setNovaCampanha({ name: "", campaign_type: "inactivity", params: {} });
-      carregarCampanhas();
-    } catch (e) {
-      setErroCriarCampanha(
-        e?.response?.data?.detail || "Erro ao criar campanha.",
-      );
-    } finally {
-      setCriandoCampanha(false);
-    }
-  };
-
-  const arquivarCampanha = async (c) => {
-    if (
-      !window.confirm(
-        `Arquivar a campanha "${c.name}"? Ela ficará inativa e não poderá ser reativada pela interface.`,
-      )
-    )
-      return;
-    setArquivando(c.id);
-    try {
-      await api.delete(`/campanhas/${c.id}`);
-      setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
-    } catch (e) {
-      if (e?.response?.status === 404) {
-        // Campanha já não existe no servidor — remove da lista localmente
-        setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
-        return;
-      }
-      alert("Erro ao arquivar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setArquivando(null);
     }
   };
 
@@ -775,62 +525,6 @@ export default function Campanhas() {
     }
   };
 
-  const toggleCampanha = async (campanha) => {
-    setToggling(campanha.id);
-    try {
-      const res = await api.post(`/campanhas/${campanha.id}/pausar`);
-      setCampanhas((prev) =>
-        prev.map((c) =>
-          c.id === campanha.id ? { ...c, status: res.data.status } : c,
-        ),
-      );
-    } catch (e) {
-      console.error("Erro ao alterar status:", e);
-    } finally {
-      setToggling(null);
-    }
-  };
-
-  const abrirEdicao = (c) => {
-    setCampanhaEditando(c.id);
-    const params = { ...c.params };
-    // Para campanhas de aniversário, pré-preenche a mensagem sugerida se ainda não foi configurada
-    if (
-      ["birthday_customer", "birthday_pet"].includes(c.campaign_type) &&
-      !params.notification_message
-    ) {
-      const tipoPresente = params.tipo_presente || "cupom";
-      const frases =
-        FRASES_ANIVERSARIO[c.campaign_type] ||
-        FRASES_ANIVERSARIO.birthday_customer;
-      params.notification_message = frases[tipoPresente] || "";
-    }
-    setParamsEditando(params);
-  };
-
-  const fecharEdicao = () => {
-    setCampanhaEditando(null);
-    setParamsEditando({});
-  };
-
-  const salvarParametros = async (c) => {
-    setSalvandoParams(true);
-    try {
-      await api.put(`/campanhas/${c.id}/parametros`, {
-        params: paramsEditando,
-      });
-      setCampanhas((prev) =>
-        prev.map((x) => (x.id === c.id ? { ...x, params: paramsEditando } : x)),
-      );
-      fecharEdicao();
-    } catch (e) {
-      console.error("Erro ao salvar parâmetros:", e);
-      alert("Erro ao salvar os parâmetros.");
-    } finally {
-      setSalvandoParams(false);
-    }
-  };
-
   const criarCupomManual = async () => {
     setErroCupom("");
     setCriandoCupom(true);
@@ -875,40 +569,6 @@ export default function Campanhas() {
     }
   };
 
-  const formatarParams = (tipo, params) => {
-    if (!params) return "—";
-    if (tipo === "loyalty_stamp")
-      return `${params.stamps_to_complete || "?"} carimbos → R$ ${formatBRL(params.reward_value || 0)} de recompensa`;
-    if (tipo === "cashback")
-      return `Bronze ${params.bronze_percent || 0}% / Prata ${params.silver_percent || 0}% / Ouro ${params.gold_percent || 0}%`;
-    if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
-      const tipoPresente = params.tipo_presente || "cupom";
-      if (tipoPresente === "brinde") return "🎁 Brinde na loja";
-      return params.coupon_type === "percent"
-        ? `🎫 Cupom ${params.coupon_value || "?"}% de desconto · ${params.coupon_valid_days || "?"} dias`
-        : `🎫 Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto · ${params.coupon_valid_days || "?"} dias`;
-    }
-    if (tipo === "inactivity") {
-      const valInact =
-        params.coupon_type === "fixed"
-          ? `R$ ${formatBRL(params.coupon_value || 0)}`
-          : `${params.coupon_value || "?"}%`;
-      return `Inativo ${params.inactivity_days || "?"} dias → ${valInact} desconto`;
-    }
-    if (tipo === "welcome" || tipo === "welcome_app")
-      return `Boas-vindas: R$ ${formatBRL(params.coupon_value || 0)} de bônus`;
-    if (tipo === "ranking_monthly")
-      return `${Object.keys(params).length} níveis configurados`;
-    if (tipo === "quick_repurchase") {
-      const val =
-        params.coupon_type === "fixed"
-          ? `R$ ${formatBRL(params.coupon_value || 0)}`
-          : `${params.coupon_value || "?"}%`;
-      return `Pós-compra: ${val} desconto • ${params.coupon_valid_days || "?"} dias`;
-    }
-    return JSON.stringify(params).slice(0, 60) + "...";
-  };
-
   const formatarValorCupom = (cupom) => {
     if (cupom.coupon_type === "percent" && cupom.discount_percent)
       return `${cupom.discount_percent}% off`;
@@ -921,660 +581,6 @@ export default function Campanhas() {
     if (!iso) return "—";
     const d = iso.split("T")[0].split("-");
     return `${d[2]}/${d[1]}/${d[0]}`;
-  };
-
-  // ── Formulários de parâmetros por tipo de campanha ──
-  const renderFormCampaign = (c) => {
-    const tipo = c.campaign_type;
-    const set = (key, val) => setParamsEditando((p) => ({ ...p, [key]: val }));
-    const num = (key) => paramsEditando[key] ?? "";
-    const str = (key) => paramsEditando[key] ?? "";
-
-    if (tipo === "loyalty_stamp")
-      return (
-        <div className="grid grid-cols-2 gap-3">
-          <CampanhaField
-            label="Compra mínima (R$)"
-            id="p-min"
-            value={num("min_purchase_value")}
-            onChange={(e) =>
-              set("min_purchase_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Carimbos para completar"
-            id="p-stamps"
-            step="1"
-            min="1"
-            value={num("stamps_to_complete")}
-            onChange={(e) =>
-              set(
-                "stamps_to_complete",
-                Number.parseInt(e.target.value, 10) || 0,
-              )
-            }
-          />
-          <CampanhaSel
-            label="Tipo de recompensa"
-            id="p-reward-type"
-            value={str("reward_type") || "coupon"}
-            onChange={(e) => set("reward_type", e.target.value)}
-          >
-            <option value="coupon">Cupom de desconto</option>
-            <option value="credit">Crédito cashback</option>
-          </CampanhaSel>
-          <CampanhaField
-            label="Valor da recompensa (R$)"
-            id="p-reward-val"
-            value={num("reward_value")}
-            onChange={(e) =>
-              set("reward_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Carimbo intermediário (0 = sem)"
-            id="p-inter"
-            step="1"
-            min="0"
-            value={num("intermediate_stamp") || 0}
-            onChange={(e) =>
-              set(
-                "intermediate_stamp",
-                Number.parseInt(e.target.value, 10) || 0,
-              )
-            }
-          />
-          <CampanhaField
-            label="Recompensa intermediária (R$)"
-            id="p-inter-val"
-            value={num("intermediate_reward_value") || 0}
-            onChange={(e) =>
-              set(
-                "intermediate_reward_value",
-                Number.parseFloat(e.target.value) || 0,
-              )
-            }
-          />
-          <CampanhaField
-            label="Validade do cupom (dias)"
-            id="p-validity"
-            step="1"
-            min="1"
-            value={num("coupon_days_valid") || 30}
-            onChange={(e) =>
-              set(
-                "coupon_days_valid",
-                Number.parseInt(e.target.value, 10) || 30,
-              )
-            }
-          />
-          <div className="col-span-2">
-            <CampanhaSel
-              label="Quem participa?"
-              id="p-rank-filter"
-              value={str("rank_filter") || "all"}
-              onChange={(e) => set("rank_filter", e.target.value)}
-            >
-              <option value="all">Todos os clientes</option>
-              <option value="sem_rank">Sem classificação</option>
-              <option value="bronze">Bronze</option>
-              <option value="silver">Prata</option>
-              <option value="gold">Ouro</option>
-              <option value="diamond">Diamante</option>
-              <option value="platinum">Platina</option>
-            </CampanhaSel>
-          </div>
-        </div>
-      );
-
-    if (tipo === "cashback") {
-      const levels = [
-        { key: "bronze_percent", label: "🥉 Bronze" },
-        { key: "silver_percent", label: "🥈 Prata" },
-        { key: "gold_percent", label: "🥇 Ouro" },
-        { key: "diamond_percent", label: "👑 Platina" },
-        { key: "platinum_percent", label: "💎 Diamante" },
-      ];
-      const canais = [
-        { key: "pdv_bonus_percent", label: "🖥️ PDV (bônus %)" },
-        { key: "app_bonus_percent", label: "📱 App (bônus %)" },
-        { key: "ecommerce_bonus_percent", label: "🛒 Ecommerce (bônus %)" },
-      ];
-      return (
-        <div className="space-y-4">
-          <div>
-            <p className="text-xs text-gray-500 mb-2">
-              % base por nível de ranking (crédito automático em toda compra).
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {levels.map((lv) => (
-                <CampanhaField
-                  key={lv.key}
-                  label={`${lv.label} (%)`}
-                  id={`p-${lv.key}`}
-                  value={num(lv.key)}
-                  onChange={(e) =>
-                    set(lv.key, Number.parseFloat(e.target.value) || 0)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-2">
-              Bônus adicional por canal (somado ao % do nível). Ex: App +1%
-              incentiva uso do aplicativo.
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {canais.map((c) => (
-                <CampanhaField
-                  key={c.key}
-                  label={c.label}
-                  id={`p-${c.key}`}
-                  value={num(c.key)}
-                  onChange={(e) =>
-                    set(c.key, Number.parseFloat(e.target.value) || 0)
-                  }
-                />
-              ))}
-            </div>
-          </div>
-          <div className="border-t pt-4">
-            <p className="text-xs font-semibold text-gray-700 mb-2">
-              ⏰ Validade e Alertas
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <CampanhaField
-                label="Validade do cashback (dias, 0 = sem prazo)"
-                id="p-cashback_valid_days"
-                value={num("cashback_valid_days")}
-                onChange={(e) =>
-                  set(
-                    "cashback_valid_days",
-                    Number.parseInt(e.target.value) || 0,
-                  )
-                }
-              />
-              <CampanhaField
-                label="Alertar cliente X dias antes de expirar"
-                id="p-cashback_alerta_dias"
-                value={num("cashback_alerta_dias") || 7}
-                onChange={(e) =>
-                  set(
-                    "cashback_alerta_dias",
-                    Number.parseInt(e.target.value) || 7,
-                  )
-                }
-              />
-            </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Se validade = 0, o cashback nunca expira. O alerta envia e-mail ou
-              push ao cliente quando faltar X dias para o vencimento.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
-      const frases =
-        FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
-      const tipoPresente = str("tipo_presente") || "cupom";
-      const fraseSugerida = frases[tipoPresente] || "";
-      const ehPet = tipo === "birthday_pet";
-
-      return (
-        <div className="space-y-4">
-          {/* Tipo de presente */}
-          <div>
-            <p className="text-xs font-semibold text-gray-700 mb-2">
-              🎁 O que o cliente recebe no aniversário?
-            </p>
-            <div className="flex gap-4">
-              {[
-                { value: "cupom", label: "🎫 Cupom de desconto" },
-                { value: "brinde", label: "🎁 Brinde na loja" },
-              ].map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-lg border-2 transition-colors ${
-                    tipoPresente === opt.value
-                      ? "border-blue-500 bg-blue-50 text-blue-800 font-semibold"
-                      : "border-gray-200 bg-white text-gray-600 hover:border-blue-300"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`tipo_presente_${tipo}`}
-                    value={opt.value}
-                    checked={tipoPresente === opt.value}
-                    onChange={() => {
-                      set("tipo_presente", opt.value);
-                      // Atualiza a frase automaticamente ao trocar o tipo
-                      set("notification_message", frases[opt.value] || "");
-                    }}
-                    className="accent-blue-600 w-4 h-4"
-                  />
-                  <span className="text-sm">{opt.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Campos do cupom (visível apenas se tipo_presente = cupom) */}
-          {tipoPresente === "cupom" && (
-            <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-              <CampanhaSel
-                label="Tipo de desconto"
-                id="p-bday-type"
-                value={str("coupon_type") || "fixed"}
-                onChange={(e) => set("coupon_type", e.target.value)}
-              >
-                <option value="fixed">Valor fixo (R$)</option>
-                <option value="percent">Percentual (%)</option>
-              </CampanhaSel>
-              <CampanhaField
-                label={
-                  str("coupon_type") === "percent"
-                    ? "Percentual (%)"
-                    : "Valor (R$)"
-                }
-                id="p-bday-val"
-                value={num("coupon_value")}
-                onChange={(e) =>
-                  set("coupon_value", Number.parseFloat(e.target.value) || 0)
-                }
-              />
-              <CampanhaField
-                label="Validade (dias)"
-                id="p-bday-days"
-                step="1"
-                min="1"
-                value={num("coupon_valid_days") || 3}
-                onChange={(e) =>
-                  set(
-                    "coupon_valid_days",
-                    Number.parseInt(e.target.value, 10) || 3,
-                  )
-                }
-              />
-              <CampanhaSel
-                label="Canal"
-                id="p-bday-canal"
-                value={str("coupon_channel") || "all"}
-                onChange={(e) => set("coupon_channel", e.target.value)}
-              >
-                <option value="all">Todos os canais</option>
-                <option value="pdv">PDV</option>
-                <option value="app">App</option>
-                <option value="ecommerce">Ecommerce</option>
-              </CampanhaSel>
-            </div>
-          )}
-
-          {/* Mensagem personalizada */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label
-                htmlFor="p-bday-msg"
-                className="block text-xs font-semibold text-gray-700"
-              >
-                ✉️ Mensagem enviada ao cliente
-              </label>
-              <button
-                type="button"
-                onClick={() => set("notification_message", fraseSugerida)}
-                className="text-xs text-blue-600 hover:text-blue-800 underline"
-              >
-                🔄 Usar frase sugerida
-              </button>
-            </div>
-            <textarea
-              id="p-bday-msg"
-              rows={4}
-              value={str("notification_message")}
-              onChange={(e) => set("notification_message", e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-            />
-            <p className="text-xs text-gray-400 mt-1">
-              Variáveis disponíveis:{" "}
-              <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
-              {ehPet && (
-                <>
-                  {" "}
-                  <code className="bg-gray-100 px-1 rounded">
-                    {"{nome_pet}"}
-                  </code>
-                </>
-              )}
-              {tipoPresente === "cupom" && (
-                <>
-                  {" "}
-                  <code className="bg-gray-100 px-1 rounded">
-                    {"{code}"}
-                  </code>{" "}
-                  <code className="bg-gray-100 px-1 rounded">
-                    {"{desconto}"}
-                  </code>
-                </>
-              )}
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    if (tipo === "quick_repurchase")
-      return (
-        <div className="grid grid-cols-2 gap-3">
-          <CampanhaField
-            label="Compra mínima (R$)"
-            id="p-qr-min"
-            value={num("min_purchase_value")}
-            onChange={(e) =>
-              set("min_purchase_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaSel
-            label="Tipo de desconto"
-            id="p-qr-type"
-            value={str("coupon_type") || "percent"}
-            onChange={(e) => set("coupon_type", e.target.value)}
-          >
-            <option value="percent">Percentual (%)</option>
-            <option value="fixed">Valor fixo (R$)</option>
-          </CampanhaSel>
-          <CampanhaField
-            label={
-              str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"
-            }
-            id="p-qr-val"
-            value={num("coupon_value")}
-            onChange={(e) =>
-              set("coupon_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Validade do cupom (dias)"
-            id="p-qr-days"
-            step="1"
-            min="1"
-            value={num("coupon_valid_days") || 15}
-            onChange={(e) =>
-              set(
-                "coupon_valid_days",
-                Number.parseInt(e.target.value, 10) || 15,
-              )
-            }
-          />
-          <CampanhaSel
-            label="Canal"
-            id="p-qr-chan"
-            value={str("coupon_channel") || "pdv"}
-            onChange={(e) => set("coupon_channel", e.target.value)}
-          >
-            <option value="pdv">PDV</option>
-            <option value="app">App</option>
-            <option value="ecommerce">E-commerce</option>
-            <option value="all">Todos</option>
-          </CampanhaSel>
-          <div className="col-span-2">
-            <label
-              htmlFor="p-qr-msg"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
-              Mensagem personalizada
-            </label>
-            <input
-              id="p-qr-msg"
-              type="text"
-              value={str("notification_message")}
-              onChange={(e) => set("notification_message", e.target.value)}
-              placeholder="Ex: Obrigado pela compra! Use o cupom {code} na próxima visita."
-              className="w-full border rounded-lg px-3 py-1.5 text-sm"
-            />
-          </div>
-        </div>
-      );
-
-    if (tipo === "inactivity")
-      return (
-        <div className="grid grid-cols-2 gap-3">
-          <CampanhaField
-            label="Dias de inatividade"
-            id="p-inact-days"
-            step="1"
-            min="1"
-            value={num("inactivity_days") || 30}
-            onChange={(e) =>
-              set("inactivity_days", Number.parseInt(e.target.value, 10) || 30)
-            }
-          />
-          <CampanhaSel
-            label="Tipo de desconto"
-            id="p-inact-type"
-            value={str("coupon_type") || "percent"}
-            onChange={(e) => set("coupon_type", e.target.value)}
-          >
-            <option value="fixed">Valor fixo (R$)</option>
-            <option value="percent">Percentual (%)</option>
-          </CampanhaSel>
-          <CampanhaField
-            label={
-              str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"
-            }
-            id="p-inact-val"
-            value={num("coupon_value")}
-            onChange={(e) =>
-              set("coupon_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Validade do cupom (dias)"
-            id="p-inact-valid"
-            step="1"
-            min="1"
-            value={num("coupon_valid_days") || 7}
-            onChange={(e) =>
-              set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 7)
-            }
-          />
-          <div className="col-span-2">
-            <label
-              htmlFor="p-inact-msg"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
-              Mensagem
-            </label>
-            <input
-              id="p-inact-msg"
-              type="text"
-              value={str("notification_message")}
-              onChange={(e) => set("notification_message", e.target.value)}
-              placeholder="Ex: Sentimos sua falta! Use este cupom."
-              className="w-full border rounded-lg px-3 py-1.5 text-sm"
-            />
-          </div>
-        </div>
-      );
-
-    if (tipo === "welcome" || tipo === "welcome_app")
-      return (
-        <div className="grid grid-cols-2 gap-3">
-          <CampanhaSel
-            label="Tipo de desconto"
-            id="p-wel-type"
-            value={str("coupon_type") || "fixed"}
-            onChange={(e) => set("coupon_type", e.target.value)}
-          >
-            <option value="fixed">Valor fixo (R$)</option>
-            <option value="percent">Percentual (%)</option>
-          </CampanhaSel>
-          <CampanhaField
-            label={
-              str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"
-            }
-            id="p-wel-val"
-            value={num("coupon_value")}
-            onChange={(e) =>
-              set("coupon_value", Number.parseFloat(e.target.value) || 0)
-            }
-          />
-          <CampanhaField
-            label="Validade (dias)"
-            id="p-wel-days"
-            step="1"
-            min="1"
-            value={num("coupon_valid_days") || 30}
-            onChange={(e) =>
-              set(
-                "coupon_valid_days",
-                Number.parseInt(e.target.value, 10) || 30,
-              )
-            }
-          />
-          <CampanhaSel
-            label="Canal"
-            id="p-wel-chan"
-            value={str("coupon_channel") || "app"}
-            onChange={(e) => set("coupon_channel", e.target.value)}
-          >
-            <option value="app">App</option>
-            <option value="pdv">PDV</option>
-            <option value="ecommerce">E-commerce</option>
-          </CampanhaSel>
-        </div>
-      );
-
-    if (tipo === "ranking_monthly") {
-      const levels = ["bronze", "silver", "gold", "diamond", "platinum"];
-      const lvLabels = {
-        bronze: "🥉 Bronze",
-        silver: "🥈 Prata",
-        gold: "🥇 Ouro",
-        diamond: "👑 Platina",
-        platinum: "💎 Diamante",
-      };
-      const getLv = (lv) => paramsEditando[lv] || {};
-      const setLv = (lv, key, val) =>
-        setParamsEditando((p) => ({ ...p, [lv]: { ...p[lv], [key]: val } }));
-      return (
-        <div>
-          <p className="text-xs text-gray-500 mb-2">
-            Critérios mínimos para cada nível. Recalculado mensalmente.
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Nível
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Gasto mín. (R$)
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Compras mín.
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Meses ativos mín.
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {levels.map((lv) => (
-                  <tr key={lv}>
-                    <td className="px-3 py-2 font-medium text-sm">
-                      {lvLabels[lv]}
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={getLv(lv).min_spent ?? ""}
-                        onChange={(e) =>
-                          setLv(
-                            lv,
-                            "min_spent",
-                            Number.parseFloat(e.target.value) || 0,
-                          )
-                        }
-                        className="w-24 border rounded px-2 py-1 text-xs"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        value={getLv(lv).min_purchases ?? ""}
-                        onChange={(e) =>
-                          setLv(
-                            lv,
-                            "min_purchases",
-                            Number.parseInt(e.target.value, 10) || 0,
-                          )
-                        }
-                        className="w-20 border rounded px-2 py-1 text-xs"
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        value={getLv(lv).min_active_months ?? ""}
-                        onChange={(e) =>
-                          setLv(
-                            lv,
-                            "min_active_months",
-                            Number.parseInt(e.target.value, 10) || 0,
-                          )
-                        }
-                        className="w-20 border rounded px-2 py-1 text-xs"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
-    }
-
-    // fallback: editor genérico
-    return (
-      <div className="grid grid-cols-2 gap-3">
-        {Object.entries(paramsEditando).map(([chave, valor]) => (
-          <div key={chave}>
-            <label
-              htmlFor={`param-${chave}`}
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
-              {chave}
-            </label>
-            <input
-              id={`param-${chave}`}
-              type="text"
-              value={
-                typeof valor === "object"
-                  ? JSON.stringify(valor)
-                  : String(valor ?? "")
-              }
-              onChange={(e) =>
-                setParamsEditando((prev) => ({
-                  ...prev,
-                  [chave]: e.target.value,
-                }))
-              }
-              className="w-full border rounded-lg px-3 py-1.5 text-sm"
-            />
-          </div>
-        ))}
-      </div>
-    );
   };
 
   return (
@@ -1612,23 +618,24 @@ export default function Campanhas() {
         <CampanhasListTab
           campanhas={campanhas}
           loadingCampanhas={loadingCampanhas}
-          campanhaEditando={campanhaEditando}
-          arquivando={arquivando}
-          toggling={toggling}
-          salvandoParams={salvandoParams}
+          campanhaEditando={campanhasGestao.campanhaEditando}
+          paramsEditando={campanhasGestao.paramsEditando}
+          setParamsEditando={campanhasGestao.setParamsEditando}
+          arquivando={campanhasGestao.arquivando}
+          toggling={campanhasGestao.toggling}
+          salvandoParams={campanhasGestao.salvandoParams}
           tipoLabels={TIPO_LABELS}
           userCreatableTypes={USER_CREATABLE_TYPES}
-          formatarParams={formatarParams}
-          renderFormCampaign={renderFormCampaign}
+          formatarParams={campanhasGestao.formatarParams}
           onNovaCampanha={() => {
-            setErroCriarCampanha("");
-            setModalCriarCampanha(true);
+            campanhasGestao.setErroCriarCampanha("");
+            campanhasGestao.setModalCriarCampanha(true);
           }}
-          onAbrirEdicao={abrirEdicao}
-          onFecharEdicao={fecharEdicao}
-          onArquivarCampanha={arquivarCampanha}
-          onToggleCampanha={toggleCampanha}
-          onSalvarParametros={salvarParametros}
+          onAbrirEdicao={campanhasGestao.abrirEdicao}
+          onFecharEdicao={campanhasGestao.fecharEdicao}
+          onArquivarCampanha={campanhasGestao.arquivarCampanha}
+          onToggleCampanha={campanhasGestao.toggleCampanha}
+          onSalvarParametros={campanhasGestao.salvarParametros}
         />
       )}
 
@@ -1652,7 +659,7 @@ export default function Campanhas() {
               coupon_valid_days: 7,
               coupon_channel: "all",
               notification_message:
-                "Ol?, {nome}! Sentimos sua falta. Use o cupom {code} e ganhe {value}% de desconto.",
+                "Olá, {nome}! Sentimos sua falta. Use o cupom {code} e ganhe {value}% de desconto.",
               priority: 50,
             })
           }
@@ -1670,7 +677,7 @@ export default function Campanhas() {
           setPremiosPorVencedor={setPremiosPorVencedor}
           vencedoresSelecionados={vencedoresSelecionados}
           setVencedoresSelecionados={setVencedoresSelecionados}
-          createDefaultPremio={_defaultPremio}
+          createDefaultPremio={createDefaultPremio}
           destaqueResultado={destaqueResultado}
           setDestaqueResultado={setDestaqueResultado}
           enviarDestaque={enviarDestaque}
@@ -1802,13 +809,13 @@ export default function Campanhas() {
           resultadoLote,
           enviarLote,
           enviandoLote,
-          modalCriarCampanha,
-          setModalCriarCampanha,
-          novaCampanha,
-          setNovaCampanha,
-          erroCriarCampanha,
-          criarCampanha,
-          criandoCampanha,
+          modalCriarCampanha: campanhasGestao.modalCriarCampanha,
+          setModalCriarCampanha: campanhasGestao.setModalCriarCampanha,
+          novaCampanha: campanhasGestao.novaCampanha,
+          setNovaCampanha: campanhasGestao.setNovaCampanha,
+          erroCriarCampanha: campanhasGestao.erroCriarCampanha,
+          criarCampanha: campanhasGestao.criarCampanha,
+          criandoCampanha: campanhasGestao.criandoCampanha,
           modalCupomAberto,
           setModalCupomAberto,
           setErroCupom,

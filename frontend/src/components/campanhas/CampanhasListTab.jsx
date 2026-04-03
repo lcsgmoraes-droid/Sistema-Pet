@@ -1,3 +1,5 @@
+import CampanhasParametrosForm from "./CampanhasParametrosForm";
+
 const FALLBACK_TIPO = {
   color: "bg-gray-100 text-gray-700",
   emoji: "📋",
@@ -7,13 +9,14 @@ export default function CampanhasListTab({
   campanhas,
   loadingCampanhas,
   campanhaEditando,
+  paramsEditando,
+  setParamsEditando,
   arquivando,
   toggling,
   salvandoParams,
   tipoLabels,
   userCreatableTypes,
   formatarParams,
-  renderFormCampaign,
   onNovaCampanha,
   onAbrirEdicao,
   onFecharEdicao,
@@ -127,7 +130,11 @@ export default function CampanhasListTab({
                       {tipoLabels[campanha.campaign_type]?.label ||
                         campanha.campaign_type}
                     </p>
-                    {renderFormCampaign(campanha)}
+                    <CampanhasParametrosForm
+                      campanha={campanha}
+                      paramsEditando={paramsEditando}
+                      setParamsEditando={setParamsEditando}
+                    />
                     <button
                       onClick={() => onSalvarParametros(campanha)}
                       disabled={salvandoParams}
