@@ -722,6 +722,10 @@ Itens executados nesta etapa:
 - [x] continuar a decomposicao de `Campanhas.jsx` pela aba de destaque mensal:
   - a aba de destaque foi movida para `frontend/src/components/campanhas/CampanhasDestaqueTab.jsx`
   - `Campanhas.jsx` caiu de `5240` para `4884` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pelas abas de sorteios e ranking:
+  - a aba de sorteios foi movida para `frontend/src/components/campanhas/CampanhasSorteiosTab.jsx`
+  - a aba de ranking foi movida para `frontend/src/components/campanhas/CampanhasRankingTab.jsx`
+  - `Campanhas.jsx` caiu de `4884` para `3878` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
