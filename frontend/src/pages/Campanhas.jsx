@@ -15,6 +15,8 @@ import CampanhasUnificacaoTab from "../components/campanhas/CampanhasUnificacaoT
 import CampanhasGestorTab from "../components/campanhas/CampanhasGestorTab";
 import CampanhasConfigTab from "../components/campanhas/CampanhasConfigTab";
 import CampanhasModalsLayer from "../components/campanhas/CampanhasModalsLayer";
+import useCampanhasGestor from "../hooks/useCampanhasGestor";
+import useCampanhasConfiguracoes from "../hooks/useCampanhasConfiguracoes";
 
 const TIPO_LABELS = {
   loyalty_stamp: {
@@ -391,37 +393,15 @@ export default function Campanhas() {
   const [fidLancandoManual, setFidLancandoManual] = useState(false);
   const [fidManualNota, setFidManualNota] = useState("");
 
-  // Gestor de Benefícios
-  const [gestorSearch, setGestorSearch] = useState("");
-  const [gestorSugestoes, setGestorSugestoes] = useState([]);
-  const [gestorBuscando, setGestorBuscando] = useState(false);
-  const [gestorCliente, setGestorCliente] = useState(null);
-  const [gestorSaldo, setGestorSaldo] = useState(null);
-  const [gestorCarimbos, setGestorCarimbos] = useState(null);
-  const [gestorCupons, setGestorCupons] = useState(null);
-  const [gestorCarregando, setGestorCarregando] = useState(false);
-  const [gestorSecao, setGestorSecao] = useState(null);
-  const [gestorIncluirEstornados, setGestorIncluirEstornados] = useState(false);
-  const [gestorCarimboNota, setGestorCarimboNota] = useState("");
-  const [gestorLancandoCarimbo, setGestorLancandoCarimbo] = useState(false);
-  const [gestorRemovendo, setGestorRemovendo] = useState(null);
-  const [gestorCashbackTipo, setGestorCashbackTipo] = useState("credito");
-  const [gestorCashbackValor, setGestorCashbackValor] = useState("");
-  const [gestorCashbackDesc, setGestorCashbackDesc] = useState("");
-  const [gestorLancandoCashback, setGestorLancandoCashback] = useState(false);
-  const [gestorAnulando, setGestorAnulando] = useState(null);
-  // Gestor — modo Por Campanha
-  const [gestorModo, setGestorModo] = useState("cliente"); // 'cliente' | 'campanha'
-  const [gestorCampanhaTipo, setGestorCampanhaTipo] = useState("carimbos");
-  const [gestorCampanhaLista, setGestorCampanhaLista] = useState(null);
-  const [gestorCampanhaCarregando, setGestorCampanhaCarregando] =
-    useState(false);
-
-  // Config de ranking
-  const [rankingConfigSalvando, setRankingConfigSalvando] = useState(false);
-
-  // Config de horários do scheduler
-  const [schedulerConfigSalvando, setSchedulerConfigSalvando] = useState(false);
+  const campanhasGestor = useCampanhasGestor();
+  const campanhasConfiguracoes = useCampanhasConfiguracoes({
+    rankingConfig,
+    setRankingConfig,
+    schedulerConfig,
+    setSchedulerConfig,
+    carregarRanking,
+    carregarSchedulerConfig,
+  });
 
   const enviarParaInativos = async () => {
     if (
@@ -762,185 +742,6 @@ export default function Campanhas() {
       alert("Erro: " + (e?.response?.data?.detail || e.message));
     } finally {
       setFidLancandoManual(false);
-    }
-  };
-
-  const carregarClientesPorCampanha = async (tipo) => {
-    setGestorCampanhaCarregando(true);
-    setGestorCampanhaLista(null);
-    try {
-      const res = await api.get(
-        `/campanhas/gestor/clientes-por-tipo?tipo=${tipo}`,
-      );
-      setGestorCampanhaLista(res.data?.clientes || []);
-    } catch (e) {
-      alert("Erro ao carregar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setGestorCampanhaCarregando(false);
-    }
-  };
-
-  const abrirClienteNoGestor = (cliente) => {
-    setGestorModo("cliente");
-    selecionarClienteGestor(cliente);
-  };
-
-  // ── Gestor de Benefícios ──────────────────────────────────────────────
-  const buscarClientesGestor = async (termo) => {
-    if (!termo || termo.length < 2) {
-      setGestorSugestoes([]);
-      return;
-    }
-    setGestorBuscando(true);
-    try {
-      const res = await api.get(
-        `/campanhas/clientes/buscar?search=${encodeURIComponent(termo)}&limit=10`,
-      );
-      setGestorSugestoes(res.data?.clientes || []);
-    } catch {
-      setGestorSugestoes([]);
-    } finally {
-      setGestorBuscando(false);
-    }
-  };
-
-  const selecionarClienteGestor = async (cliente) => {
-    setGestorCliente(cliente);
-    setGestorSearch(cliente.nome);
-    setGestorSugestoes([]);
-    setGestorCarregando(true);
-    setGestorSecao(null);
-    try {
-      const [saldoRes, carimbosRes, cuponsRes] = await Promise.all([
-        api.get(`/campanhas/clientes/${cliente.id}/saldo`),
-        api.get(
-          `/campanhas/clientes/${cliente.id}/carimbos?incluir_estornados=true`,
-        ),
-        api.get(`/campanhas/cupons?customer_id=${cliente.id}`),
-      ]);
-      setGestorSaldo(saldoRes.data);
-      setGestorCarimbos(carimbosRes.data);
-      setGestorCupons(cuponsRes.data);
-    } catch (e) {
-      alert(
-        "Erro ao carregar dados: " + (e?.response?.data?.detail || e.message),
-      );
-    } finally {
-      setGestorCarregando(false);
-    }
-  };
-
-  const recarregarGestor = async () => {
-    if (gestorCliente) await selecionarClienteGestor(gestorCliente);
-  };
-
-  const lancarCarimboGestor = async () => {
-    if (!gestorCliente) return;
-    setGestorLancandoCarimbo(true);
-    try {
-      await api.post("/campanhas/carimbos/manual", {
-        customer_id: gestorCliente.id,
-        nota: gestorCarimboNota || "Carimbo lançado manualmente pelo operador",
-      });
-      setGestorCarimboNota("");
-      await recarregarGestor();
-    } catch (e) {
-      alert("Erro: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setGestorLancandoCarimbo(false);
-    }
-  };
-
-  const estornarCarimboGestor = async (stampId) => {
-    const motivo = window.prompt("Motivo do estorno (opcional):");
-    if (motivo === null) return;
-    setGestorRemovendo(stampId);
-    try {
-      const qs = motivo ? `?motivo=${encodeURIComponent(motivo)}` : "";
-      await api.delete(`/campanhas/carimbos/${stampId}${qs}`);
-      await recarregarGestor();
-    } catch (e) {
-      alert("Erro ao estornar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setGestorRemovendo(null);
-    }
-  };
-
-  const ajustarCashbackGestor = async () => {
-    const valor = parseFloat(gestorCashbackValor);
-    if (!valor || valor <= 0) {
-      alert("Informe um valor maior que zero.");
-      return;
-    }
-    setGestorLancandoCashback(true);
-    try {
-      const amount = gestorCashbackTipo === "debito" ? -valor : valor;
-      await api.post("/campanhas/cashback/manual", {
-        customer_id: gestorCliente.id,
-        amount,
-        description:
-          gestorCashbackDesc ||
-          (gestorCashbackTipo === "debito"
-            ? "Débito manual de cashback"
-            : "Crédito manual de cashback"),
-      });
-      setGestorCashbackValor("");
-      setGestorCashbackDesc("");
-      await recarregarGestor();
-    } catch (e) {
-      alert("Erro: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setGestorLancandoCashback(false);
-    }
-  };
-
-  const anularCupomGestor = async (code) => {
-    if (!window.confirm(`Anular o cupom ${code}?`)) return;
-    setGestorAnulando(code);
-    try {
-      await api.delete(`/campanhas/cupons/${code}`);
-      await recarregarGestor();
-    } catch (e) {
-      alert("Erro ao anular: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setGestorAnulando(null);
-    }
-  };
-
-  const salvarRankingConfig = async () => {
-    setRankingConfigSalvando(true);
-    try {
-      await api.put("/campanhas/ranking/config", rankingConfig);
-      alert("Critérios de ranking salvos!");
-    } catch (e) {
-      alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setRankingConfigSalvando(false);
-    }
-  };
-
-  const salvarSchedulerConfig = async () => {
-    setSchedulerConfigSalvando(true);
-    try {
-      await api.put("/campanhas/config/horarios", schedulerConfig);
-      await carregarSchedulerConfig();
-      alert("Configurações de envio salvas!");
-    } catch (e) {
-      alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setSchedulerConfigSalvando(false);
-    }
-  };
-
-  const recalcularRanking = async () => {
-    try {
-      await api.post("/campanhas/ranking/recalcular");
-      alert(
-        "Recálculo de ranking enfileirado! O worker processará em até 10 segundos.",
-      );
-      setTimeout(() => carregarRanking(), 3000);
-    } catch (e) {
-      alert("Erro: " + (e?.response?.data?.detail || e.message));
     }
   };
 
@@ -1901,7 +1702,7 @@ export default function Campanhas() {
           rankLabels={RANK_LABELS}
           filtroNivel={filtroNivel}
           setFiltroNivel={setFiltroNivel}
-          onRecalcularRanking={recalcularRanking}
+          onRecalcularRanking={campanhasConfiguracoes.recalcularRanking}
           loadingRanking={loadingRanking}
           ranking={ranking}
           formatBRL={formatBRL}
@@ -1910,8 +1711,8 @@ export default function Campanhas() {
           rankingConfig={rankingConfig}
           setRankingConfig={setRankingConfig}
           rankingConfigLoading={rankingConfigLoading}
-          salvarRankingConfig={salvarRankingConfig}
-          rankingConfigSalvando={rankingConfigSalvando}
+          salvarRankingConfig={campanhasConfiguracoes.salvarRankingConfig}
+          rankingConfigSalvando={campanhasConfiguracoes.rankingConfigSalvando}
           campanhas={campanhas}
           filtroCupomBusca={filtroCupomBusca}
           setFiltroCupomBusca={setFiltroCupomBusca}
@@ -2021,49 +1822,10 @@ export default function Campanhas() {
 
       {aba === "gestor" && (
         <CampanhasGestorTab
-          gestorModo={gestorModo}
-          setGestorModo={setGestorModo}
-          gestorSearch={gestorSearch}
-          setGestorSearch={setGestorSearch}
-          buscarClientesGestor={buscarClientesGestor}
-          setGestorSugestoes={setGestorSugestoes}
-          gestorBuscando={gestorBuscando}
-          gestorSugestoes={gestorSugestoes}
-          selecionarClienteGestor={selecionarClienteGestor}
-          gestorCampanhaTipo={gestorCampanhaTipo}
-          setGestorCampanhaTipo={setGestorCampanhaTipo}
-          carregarClientesPorCampanha={carregarClientesPorCampanha}
-          gestorCampanhaCarregando={gestorCampanhaCarregando}
-          gestorCampanhaLista={gestorCampanhaLista}
-          abrirClienteNoGestor={abrirClienteNoGestor}
-          gestorCarregando={gestorCarregando}
-          gestorCliente={gestorCliente}
-          gestorSaldo={gestorSaldo}
-          gestorCarimbos={gestorCarimbos}
-          gestorSecao={gestorSecao}
-          setGestorSecao={setGestorSecao}
-          gestorIncluirEstornados={gestorIncluirEstornados}
-          setGestorIncluirEstornados={setGestorIncluirEstornados}
-          gestorCarimboNota={gestorCarimboNota}
-          setGestorCarimboNota={setGestorCarimboNota}
-          gestorLancandoCarimbo={gestorLancandoCarimbo}
-          lancarCarimboGestor={lancarCarimboGestor}
-          gestorRemovendo={gestorRemovendo}
-          estornarCarimboGestor={estornarCarimboGestor}
+          {...campanhasGestor}
           formatBRL={formatBRL}
           RANK_LABELS={RANK_LABELS}
-          gestorCashbackTipo={gestorCashbackTipo}
-          setGestorCashbackTipo={setGestorCashbackTipo}
-          gestorCashbackValor={gestorCashbackValor}
-          setGestorCashbackValor={setGestorCashbackValor}
-          gestorCashbackDesc={gestorCashbackDesc}
-          setGestorCashbackDesc={setGestorCashbackDesc}
-          gestorLancandoCashback={gestorLancandoCashback}
-          ajustarCashbackGestor={ajustarCashbackGestor}
-          gestorCupons={gestorCupons}
           CUPOM_STATUS={CUPOM_STATUS}
-          anularCupomGestor={anularCupomGestor}
-          gestorAnulando={gestorAnulando}
         />
       )}
 
@@ -2071,10 +1833,12 @@ export default function Campanhas() {
       {aba === "config" && (
         <CampanhasConfigTab
           schedulerConfigLoading={schedulerConfigLoading}
-          schedulerConfig={schedulerConfig}
-          setSchedulerConfig={setSchedulerConfig}
-          salvarSchedulerConfig={salvarSchedulerConfig}
-          schedulerConfigSalvando={schedulerConfigSalvando}
+          schedulerConfig={campanhasConfiguracoes.schedulerConfig}
+          setSchedulerConfig={campanhasConfiguracoes.setSchedulerConfig}
+          salvarSchedulerConfig={campanhasConfiguracoes.salvarSchedulerConfig}
+          schedulerConfigSalvando={
+            campanhasConfiguracoes.schedulerConfigSalvando
+          }
         />
       )}
 

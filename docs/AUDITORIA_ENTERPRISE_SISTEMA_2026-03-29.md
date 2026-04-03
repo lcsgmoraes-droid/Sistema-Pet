@@ -851,6 +851,10 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] concluir a decomposicao do fluxo de cadastro/modal de `ClientesNovo.jsx`
   - o dominio do wizard, duplicidade, CEP, pets e financeiro foi movido para `frontend/src/hooks/useClientesNovoCadastro.js`
   - `ClientesNovo.jsx` caiu de `1039` para `153` linhas e ficou focado so na listagem, exclusoes e composicao da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pelos fluxos operacionais de gestor e configuracoes
+  - o dominio do gestor de beneficios foi movido para `frontend/src/hooks/useCampanhasGestor.js`
+  - o dominio de ranking/configuracoes de envio foi movido para `frontend/src/hooks/useCampanhasConfiguracoes.js`
+  - `Campanhas.jsx` caiu de `1981` para `1771` linhas e ficou mais focado na orquestracao das abas e modais
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
