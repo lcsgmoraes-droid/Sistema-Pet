@@ -814,6 +814,12 @@ Proximas tarefas sugeridas para execucao continua:
   - o wizard principal foi movido para `frontend/src/components/clientes/ClientesNovoWizardModal.jsx`
   - a composicao dos modais foi movida para `frontend/src/components/clientes/ClientesNovoModalsLayer.jsx`
   - `ClientesNovo.jsx` caiu de `1910` para `1729` linhas e ficou mais focado na listagem, acoes e fluxo de dominio
+- [x] continuar a decomposicao de `ClientesNovo.jsx` pela listagem principal
+  - a barra de abas foi movida para `frontend/src/components/clientes/ClientesNovoTabsBar.jsx`
+  - a barra de acoes da listagem foi movida para `frontend/src/components/clientes/ClientesNovoActionsBar.jsx`
+  - a paginacao foi movida para `frontend/src/components/clientes/ClientesNovoPaginationControls.jsx`
+  - a tabela principal foi movida para `frontend/src/components/clientes/ClientesNovoTabelaSection.jsx`
+  - `ClientesNovo.jsx` caiu de `1729` para `1039` linhas e ficou mais focado na orquestracao da pagina
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
