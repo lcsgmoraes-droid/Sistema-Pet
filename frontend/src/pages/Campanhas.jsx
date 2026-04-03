@@ -1,7 +1,8 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import api from "../api";
 import CanalDescontos from "./CanalDescontos";
 import { formatBRL } from "../utils/formatters";
+import { useCampanhasConsultas } from "../hooks/useCampanhasConsultas";
 
 const TIPO_LABELS = {
   loyalty_stamp: {
@@ -310,19 +311,12 @@ function RetencaoForm({ inicial, salvando, onSalvar, onCancelar }) {
 
 export default function Campanhas() {
 
-  const [aba, setAba] = useState("dashboard");
-
   // Campanhas
-  const [campanhas, setCampanhas] = useState([]);
-  const [loadingCampanhas, setLoadingCampanhas] = useState(true);
   const [toggling, setToggling] = useState(null);
   const [campanhaEditando, setCampanhaEditando] = useState(null);
   const [paramsEditando, setParamsEditando] = useState({});
   const [salvandoParams, setSalvandoParams] = useState(false);
 
-  // Dashboard
-  const [dashboard, setDashboard] = useState(null);
-  const [loadingDashboard, setLoadingDashboard] = useState(true);
   // Envio escalonado de inativos
   const [modalEnvioInativos, setModalEnvioInativos] = useState(null); // null | 30 | 60 | 90
   const [envioInativosForm, setEnvioInativosForm] = useState({
@@ -333,26 +327,12 @@ export default function Campanhas() {
   const [resultadoEnvioInativos, setResultadoEnvioInativos] = useState(null);
 
   // Retenção Dinâmica
-  const [retencaoRegras, setRetencaoRegras] = useState([]);
-  const [loadingRetencao, setLoadingRetencao] = useState(false);
   const [retencaoEditando, setRetencaoEditando] = useState(null); // null | {} (nova) | {id,...} (existente)
   const [salvandoRetencao, setSalvandoRetencao] = useState(false);
   const [deletandoRetencao, setDeletandoRetencao] = useState(null);
 
   // Ranking
-  const [ranking, setRanking] = useState(null);
-  const [loadingRanking, setLoadingRanking] = useState(false);
-  const [filtroNivel, setFiltroNivel] = useState("todos");
-
   // Cupons
-  const [cupons, setCupons] = useState([]);
-  const [loadingCupons, setLoadingCupons] = useState(true);
-  const [filtroCupomStatus, setFiltroCupomStatus] = useState("active");
-  const [filtroCupomBusca, setFiltroCupomBusca] = useState("");
-  const [filtroCupomDataInicio, setFiltroCupomDataInicio] = useState("");
-  const [filtroCupomDataFim, setFiltroCupomDataFim] = useState("");
-  const [filtroCupomCampanha, setFiltroCupomCampanha] = useState("");
-  const [cupomDetalhes, setCupomDetalhes] = useState(null);
   const [anulando, setAnulando] = useState(null);
   const [modalCupomAberto, setModalCupomAberto] = useState(false);
   const [novoCupom, setNovoCupom] = useState({
@@ -369,12 +349,8 @@ export default function Campanhas() {
   const [erroCupom, setErroCupom] = useState("");
 
   // Destaque mensal
-  const [destaque, setDestaque] = useState(null);
-  const [loadingDestaque, setLoadingDestaque] = useState(false);
   const [enviandoDestaque, setEnviandoDestaque] = useState(false);
   const [destaqueResultado, setDestaqueResultado] = useState(null);
-  const [premiosPorVencedor, setPremiosPorVencedor] = useState({});
-  const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
   // premiosPorVencedor: { maior_gasto: { tipo_premio, coupon_value, coupon_valid_days, mensagem, mensagem_brinde, retirar_de, retirar_ate }, ... }
 
   const _defaultPremio = () => ({
@@ -386,6 +362,85 @@ export default function Campanhas() {
       "Parabéns! Você foi um dos nossos melhores clientes do mês. Passe em nossa loja e retire seu brinde especial — será um prazer recebê-lo! 🎁",
     retirar_de: "",
     retirar_ate: "",
+  });
+
+  const {
+    aba,
+    setAba,
+    campanhas,
+    setCampanhas,
+    loadingCampanhas,
+    dashboard,
+    loadingDashboard,
+    retencaoRegras,
+    setRetencaoRegras,
+    loadingRetencao,
+    ranking,
+    setRanking,
+    loadingRanking,
+    filtroNivel,
+    setFiltroNivel,
+    cupons,
+    setCupons,
+    loadingCupons,
+    filtroCupomStatus,
+    setFiltroCupomStatus,
+    filtroCupomBusca,
+    setFiltroCupomBusca,
+    filtroCupomDataInicio,
+    setFiltroCupomDataInicio,
+    filtroCupomDataFim,
+    setFiltroCupomDataFim,
+    filtroCupomCampanha,
+    setFiltroCupomCampanha,
+    cupomDetalhes,
+    setCupomDetalhes,
+    destaque,
+    setDestaque,
+    loadingDestaque,
+    premiosPorVencedor,
+    setPremiosPorVencedor,
+    vencedoresSelecionados,
+    setVencedoresSelecionados,
+    sorteios,
+    setSorteios,
+    loadingSorteios,
+    codigosOffline,
+    setCodigosOffline,
+    loadingCodigosOffline,
+    setLoadingCodigosOffline,
+    sugestoes,
+    setSugestoes,
+    loadingSugestoes,
+    relatorio,
+    setRelatorio,
+    loadingRelatorio,
+    relDataInicio,
+    setRelDataInicio,
+    relDataFim,
+    setRelDataFim,
+    relTipo,
+    setRelTipo,
+    rankingConfig,
+    setRankingConfig,
+    rankingConfigLoading,
+    schedulerConfig,
+    setSchedulerConfig,
+    schedulerConfigLoading,
+    carregarCampanhas,
+    carregarCupons,
+    carregarRetencao,
+    carregarRanking,
+    carregarDestaque,
+    carregarSorteios,
+    carregarSugestoes,
+    carregarRelatorio,
+    carregarRankingConfig,
+    carregarSchedulerConfig,
+  } = useCampanhasConsultas({
+    createDefaultPremio: _defaultPremio,
+    hoje,
+    primeiroDiaMes,
   });
 
   // Criar campanha
@@ -400,8 +455,6 @@ export default function Campanhas() {
   const [arquivando, setArquivando] = useState(null);
 
   // Sorteios
-  const [sorteios, setSorteios] = useState([]);
-  const [loadingSorteios, setLoadingSorteios] = useState(false);
   const [modalSorteio, setModalSorteio] = useState(false);
   const [novoSorteio, setNovoSorteio] = useState({
     name: "",
@@ -417,8 +470,6 @@ export default function Campanhas() {
   const [inscrevendo, setInscrevendo] = useState(null);
   const [sorteioResultado, setSorteioResultado] = useState(null);
   const [modalCodigosOffline, setModalCodigosOffline] = useState(null); // sorteio obj
-  const [codigosOffline, setCodigosOffline] = useState([]);
-  const [loadingCodigosOffline, setLoadingCodigosOffline] = useState(false);
 
   // Envio em lote
   const [modalLote, setModalLote] = useState(false);
@@ -431,17 +482,10 @@ export default function Campanhas() {
   const [resultadoLote, setResultadoLote] = useState(null);
 
   // Unificação cross-canal
-  const [sugestoes, setSugestoes] = useState([]);
-  const [loadingSugestoes, setLoadingSugestoes] = useState(false);
   const [confirmandoMerge, setConfirmandoMerge] = useState(null);
   const [resultadoMerge, setResultadoMerge] = useState(null);
 
   // Relatórios
-  const [relatorio, setRelatorio] = useState(null);
-  const [loadingRelatorio, setLoadingRelatorio] = useState(false);
-  const [relDataInicio, setRelDataInicio] = useState(primeiroDiaMes);
-  const [relDataFim, setRelDataFim] = useState(hoje);
-  const [relTipo, setRelTipo] = useState("todos");
 
   // Fidelidade — carimbos por cliente (legado — mantido para modal existente)
   const [fidClienteId, setFidClienteId] = useState("");
@@ -480,26 +524,10 @@ export default function Campanhas() {
     useState(false);
 
   // Config de ranking
-  const [rankingConfig, setRankingConfig] = useState(null);
-  const [rankingConfigLoading, setRankingConfigLoading] = useState(false);
   const [rankingConfigSalvando, setRankingConfigSalvando] = useState(false);
 
   // Config de horários do scheduler
-  const [schedulerConfig, setSchedulerConfig] = useState(null);
-  const [schedulerConfigLoading, setSchedulerConfigLoading] = useState(false);
   const [schedulerConfigSalvando, setSchedulerConfigSalvando] = useState(false);
-
-  const carregarDashboard = useCallback(async () => {
-    setLoadingDashboard(true);
-    try {
-      const res = await api.get("/campanhas/dashboard");
-      setDashboard(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar dashboard:", e);
-    } finally {
-      setLoadingDashboard(false);
-    }
-  }, []);
 
   const enviarParaInativos = async () => {
     if (
@@ -525,64 +553,6 @@ export default function Campanhas() {
     }
   };
 
-  const carregarCampanhas = useCallback(async () => {
-    setLoadingCampanhas(true);
-    try {
-      // Seed é idempotente: garante que todos os tipos padrão (aniversário, cashback, etc.) existam
-      try {
-        await api.post("/campanhas/seed");
-      } catch {
-        /* ignora se já existem */
-      }
-      const res = await api.get("/campanhas");
-      setCampanhas(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar campanhas:", e);
-    } finally {
-      setLoadingCampanhas(false);
-    }
-  }, []);
-
-  const carregarRanking = useCallback(async () => {
-    setLoadingRanking(true);
-    try {
-      const params = filtroNivel !== "todos" ? `?nivel=${filtroNivel}` : "";
-      const res = await api.get(`/campanhas/ranking${params}`);
-      setRanking(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar ranking:", e);
-    } finally {
-      setLoadingRanking(false);
-    }
-  }, [filtroNivel]);
-
-  const carregarCupons = useCallback(async () => {
-    setLoadingCupons(true);
-    try {
-      const params = new URLSearchParams();
-      if (filtroCupomStatus !== "todos")
-        params.set("status", filtroCupomStatus);
-      if (filtroCupomBusca.trim()) params.set("busca", filtroCupomBusca.trim());
-      if (filtroCupomDataInicio)
-        params.set("data_inicio", filtroCupomDataInicio);
-      if (filtroCupomDataFim) params.set("data_fim", filtroCupomDataFim);
-      if (filtroCupomCampanha) params.set("campaign_id", filtroCupomCampanha);
-      const qs = params.toString() ? `?${params.toString()}` : "";
-      const res = await api.get(`/campanhas/cupons${qs}`);
-      setCupons(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar cupons:", e);
-    } finally {
-      setLoadingCupons(false);
-    }
-  }, [
-    filtroCupomStatus,
-    filtroCupomBusca,
-    filtroCupomDataInicio,
-    filtroCupomDataFim,
-    filtroCupomCampanha,
-  ]);
-
   const anularCupom = useCallback(async (code) => {
     if (
       !window.confirm(
@@ -600,43 +570,6 @@ export default function Campanhas() {
       alert(e?.response?.data?.detail || "Erro ao anular cupão.");
     } finally {
       setAnulando(null);
-    }
-  }, []);
-
-  const carregarRelatorio = useCallback(async () => {
-    setLoadingRelatorio(true);
-    try {
-      const params = new URLSearchParams();
-      if (relDataInicio) params.set("data_inicio", relDataInicio);
-      if (relDataFim) params.set("data_fim", relDataFim);
-      if (relTipo !== "todos") params.set("tipo", relTipo);
-      const res = await api.get(`/campanhas/relatorio?${params}`);
-      setRelatorio(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar relatório:", e);
-    } finally {
-      setLoadingRelatorio(false);
-    }
-  }, [relDataInicio, relDataFim, relTipo]);
-
-  const carregarDestaque = useCallback(async () => {
-    setLoadingDestaque(true);
-    try {
-      const res = await api.get("/campanhas/destaque-mensal");
-      setDestaque(res.data);
-      // Inicializa config de prêmio individual para cada vencedor
-      const inicial = {};
-      const selecionados = {};
-      for (const cat of Object.keys(res.data.vencedores || {})) {
-        inicial[cat] = _defaultPremio();
-        selecionados[cat] = true;
-      }
-      setPremiosPorVencedor(inicial);
-      setVencedoresSelecionados(selecionados);
-    } catch (e) {
-      console.error("Erro ao carregar destaque:", e);
-    } finally {
-      setLoadingDestaque(false);
     }
   }, []);
 
@@ -726,31 +659,6 @@ export default function Campanhas() {
       setArquivando(null);
     }
   };
-
-  const carregarSorteios = useCallback(async () => {
-    setLoadingSorteios(true);
-    try {
-      const res = await api.get("/campanhas/sorteios");
-      setSorteios(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar sorteios:", e);
-    } finally {
-      setLoadingSorteios(false);
-    }
-  }, []);
-
-  const carregarSugestoes = useCallback(async () => {
-    setLoadingSugestoes(true);
-    setResultadoMerge(null);
-    try {
-      const res = await api.get("/campanhas/unificacao/sugestoes");
-      setSugestoes(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar sugestões:", e);
-    } finally {
-      setLoadingSugestoes(false);
-    }
-  }, []);
 
   const confirmarMerge = async (keepId, removeId, motivo) => {
     if (
@@ -1105,18 +1013,6 @@ export default function Campanhas() {
     }
   };
 
-  const carregarRankingConfig = useCallback(async () => {
-    setRankingConfigLoading(true);
-    try {
-      const res = await api.get("/campanhas/ranking/config");
-      setRankingConfig(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar config de ranking:", e);
-    } finally {
-      setRankingConfigLoading(false);
-    }
-  }, []);
-
   const salvarRankingConfig = async () => {
     setRankingConfigSalvando(true);
     try {
@@ -1128,77 +1024,6 @@ export default function Campanhas() {
       setRankingConfigSalvando(false);
     }
   };
-
-  const carregarSchedulerConfig = useCallback(async () => {
-    setSchedulerConfigLoading(true);
-    try {
-      const res = await api.get("/campanhas/config/horarios");
-      setSchedulerConfig(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar config de horários:", e);
-    } finally {
-      setSchedulerConfigLoading(false);
-    }
-  }, []);
-
-  const salvarSchedulerConfig = async () => {
-    setSchedulerConfigSalvando(true);
-    try {
-      await api.put("/campanhas/config/horarios", schedulerConfig);
-      alert("Horários de envio salvos com sucesso!");
-    } catch (e) {
-      alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
-    } finally {
-      setSchedulerConfigSalvando(false);
-    }
-  };
-
-  useEffect(() => {
-    carregarDashboard();
-  }, [carregarDashboard]);
-  useEffect(() => {
-    carregarCampanhas();
-  }, [carregarCampanhas]);
-  useEffect(() => {
-    if (aba === "ranking") {
-      carregarRanking();
-      carregarRankingConfig();
-    }
-  }, [aba, carregarRanking, carregarRankingConfig]);
-  useEffect(() => {
-    if (aba === "config") carregarSchedulerConfig();
-  }, [aba, carregarSchedulerConfig]);
-  useEffect(() => {
-    if (aba === "destaque") carregarDestaque();
-  }, [aba, carregarDestaque]);
-  useEffect(() => {
-    if (aba === "sorteios") carregarSorteios();
-  }, [aba, carregarSorteios]);
-  useEffect(() => {
-    if (aba === "unificacao") carregarSugestoes();
-  }, [aba, carregarSugestoes]);
-  useEffect(() => {
-    carregarCupons();
-  }, [carregarCupons]);
-  useEffect(() => {
-    if (aba === "relatorios") carregarRelatorio();
-  }, [aba, carregarRelatorio]);
-
-  // Retenção — carrega ao entrar na aba
-  const carregarRetencao = useCallback(async () => {
-    setLoadingRetencao(true);
-    try {
-      const res = await api.get("/campanhas/retencao");
-      setRetencaoRegras(res.data);
-    } catch (e) {
-      console.error("Erro ao carregar regras de retenção", e);
-    } finally {
-      setLoadingRetencao(false);
-    }
-  }, []);
-  useEffect(() => {
-    if (aba === "retencao") carregarRetencao();
-  }, [aba, carregarRetencao]);
 
   const salvarRetencao = async (form) => {
     setSalvandoRetencao(true);
@@ -6131,3 +5956,4 @@ export default function Campanhas() {
     </div>
   );
 }
+

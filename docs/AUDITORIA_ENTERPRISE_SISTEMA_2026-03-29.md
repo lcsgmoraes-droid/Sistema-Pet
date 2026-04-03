@@ -704,6 +704,10 @@ Itens executados nesta etapa:
   - a aba de composicao passou a usar `frontend/src/components/produto/ProdutosNovoComposicaoTab.jsx`
   - os modais residuais de entrada, lote e fornecedor foram extraidos para `frontend/src/components/produto/ProdutosNovoEntradaModal.jsx`, `frontend/src/components/produto/ProdutosNovoLoteModal.jsx` e `frontend/src/components/produto/ProdutosNovoFornecedorModal.jsx`
   - `ProdutosNovo.jsx` caiu de `2361` para `1603` linhas sem alterar a experiencia da tela
+- [x] iniciar a decomposicao de `Campanhas.jsx` pelo fluxo de consultas e efeitos de carregamento:
+  - a carga de dashboard, campanhas, ranking, cupons, destaque, sorteios, sugestoes, relatorios, retencao e configuracoes foi movida para `frontend/src/hooks/useCampanhasConsultas.js`
+  - os `useEffect` e loaders principais sairam da pagina e passaram a ficar centralizados em um hook de consulta/composicao
+  - `Campanhas.jsx` caiu de `6134` para `5959` linhas sem alterar a experiencia da tela
 
 Itens deliberadamente adiados por agora:
 
