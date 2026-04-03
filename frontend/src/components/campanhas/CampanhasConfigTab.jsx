@@ -2,9 +2,16 @@ export default function CampanhasConfigTab({
   schedulerConfigLoading,
   schedulerConfig,
   setSchedulerConfig,
-  salvarSchedulerConfig,
+  salvarSchedulerConfig = null,
   schedulerConfigSalvando,
 }) {
+  const handleSalvarSchedulerConfig =
+    typeof salvarSchedulerConfig === "function"
+      ? salvarSchedulerConfig
+      : () => {};
+  const salvarDesabilitado =
+    schedulerConfigSalvando || typeof salvarSchedulerConfig !== "function";
+
   return (
 
         <div className="space-y-6">
@@ -211,8 +218,8 @@ export default function CampanhasConfigTab({
               {/* Botão salvar */}
               <div className="flex justify-end">
                 <button
-                  onClick={salvarSchedulerConfig}
-                  disabled={schedulerConfigSalvando}
+                  onClick={handleSalvarSchedulerConfig}
+                  disabled={salvarDesabilitado}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {schedulerConfigSalvando
