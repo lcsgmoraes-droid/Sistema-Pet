@@ -51,11 +51,11 @@ export default function CampanhasGestorTab({
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div>
                 <h2 className="font-semibold text-gray-800">
-                  Ã°Å¸â€ºÂ Ã¯Â¸Â Gestor de BenefÃƒÂ­cios
+                  🛠️ Gestor de Benefícios
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {gestorModo === "cliente"
-                    ? "Busque um cliente para gerenciar seus benefÃƒÂ­cios."
+                    ? "Busque um cliente para gerenciar seus benefícios."
                     : "Selecione um tipo e veja todos os clientes participantes."}
                 </p>
               </div>
@@ -68,7 +68,7 @@ export default function CampanhasGestorTab({
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  Ã°Å¸â€Â Por Cliente
+                  🔍 Por Cliente
                 </button>
                 <button
                   onClick={() => setGestorModo("campanha")}
@@ -78,7 +78,7 @@ export default function CampanhasGestorTab({
                       : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  Ã°Å¸ÂÂ·Ã¯Â¸Â Por Campanha
+                  🏷️ Por Campanha
                 </button>
               </div>
             </div>
@@ -118,7 +118,7 @@ export default function CampanhasGestorTab({
                         </p>
                         <p className="text-xs text-gray-400">
                           {c.cpf ? `CPF: ${c.cpf}` : ""}
-                          {c.cpf && c.telefone ? " Ã‚Â· " : ""}
+                          {c.cpf && c.telefone ? " · " : ""}
                           {c.telefone || ""}
                         </p>
                       </button>
@@ -136,10 +136,10 @@ export default function CampanhasGestorTab({
                   onChange={(e) => setGestorCampanhaTipo(e.target.value)}
                   className="border rounded-lg px-3 py-2 text-sm min-w-[200px]"
                 >
-                  <option value="carimbos">Ã°Å¸ÂÂ·Ã¯Â¸Â CartÃƒÂ£o Fidelidade</option>
-                  <option value="cashback">Ã°Å¸â€™Â° Cashback (saldo positivo)</option>
-                  <option value="cupons">Ã°Å¸Å½Å¸Ã¯Â¸Â Cupons Ativos</option>
-                  <option value="ranking">Ã°Å¸Ââ€  Ranking (mÃƒÂªs atual)</option>
+                  <option value="carimbos">🏷️ Cartão Fidelidade</option>
+                  <option value="cashback">💰 Cashback (saldo positivo)</option>
+                  <option value="cupons">🎟️ Cupons Ativos</option>
+                  <option value="ranking">🏆 Ranking (mês atual)</option>
                 </select>
                 <button
                   onClick={() =>
@@ -174,7 +174,7 @@ export default function CampanhasGestorTab({
                       : `${gestorCampanhaLista.length} cliente(s) encontrado(s)`}
                   </p>
                   <p className="text-xs text-gray-400">
-                    Clique em Ã¢â‚¬Å“Ver detalhesÃ¢â‚¬Â para gerenciar
+                    Clique em "Ver detalhes" para gerenciar
                   </p>
                 </div>
                 {gestorCampanhaLista.length === 0 ? (
@@ -197,7 +197,7 @@ export default function CampanhasGestorTab({
                           </p>
                           <p className="text-xs text-gray-400">
                             {c.cpf ? `CPF: ${c.cpf}` : ""}
-                            {c.cpf && c.telefone ? " Ã‚Â· " : ""}
+                            {c.cpf && c.telefone ? " · " : ""}
                             {c.telefone || ""}
                           </p>
                         </div>
@@ -208,7 +208,7 @@ export default function CampanhasGestorTab({
                           onClick={() => abrirClienteNoGestor(c)}
                           className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-medium shrink-0"
                         >
-                          Ver detalhes Ã¢â€ â€™
+                          Ver detalhes →
                         </button>
                       </div>
                     ))}
@@ -240,7 +240,7 @@ export default function CampanhasGestorTab({
                       {gestorCliente.nome}
                     </p>
                     <p className="text-xs text-gray-400">
-                      ID #{gestorCliente.id} Ã‚Â·{" "}
+                      ID #{gestorCliente.id} ·{" "}
                       {gestorCliente.telefone ||
                         gestorCliente.celular ||
                         "Sem telefone"}
@@ -259,7 +259,7 @@ export default function CampanhasGestorTab({
                   })()}
                 </div>
 
-                {/* Ã¢â€â‚¬Ã¢â€â‚¬ SeÃƒÂ§ÃƒÂ£o: Carimbos Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                {/* ── Seção: Carimbos ── */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <button
                     onClick={() =>
@@ -270,10 +270,10 @@ export default function CampanhasGestorTab({
                     className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">Ã°Å¸ÂÂ·Ã¯Â¸Â</span>
+                      <span className="text-xl">🏷️</span>
                       <div className="text-left">
                         <p className="font-semibold text-gray-800">
-                          CartÃƒÂ£o Fidelidade
+                          Cartão Fidelidade
                         </p>
                         <p className="text-xs text-gray-500">
                           {gestorSaldo.total_carimbos} carimbo(s) ativo(s)
@@ -281,19 +281,19 @@ export default function CampanhasGestorTab({
                       </div>
                     </div>
                     <span className="text-gray-400 text-sm">
-                      {gestorSecao === "carimbos" ? "Ã¢â€“Â²" : "Ã¢â€“Â¼"}
+                      {gestorSecao === "carimbos" ? "▲" : "▼"}
                     </span>
                   </button>
                   {gestorSecao === "carimbos" && (
                     <div className="border-t p-6 space-y-4">
                       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <p className="text-sm font-medium text-green-800 mb-3">
-                          Ã¢Å¾â€¢ LanÃƒÂ§ar Carimbo Manual
+                          ➕ Lançar Carimbo Manual
                         </p>
                         <div className="flex gap-3 flex-wrap items-end">
                           <div className="flex-1 min-w-[200px]">
                             <label className="block text-xs font-medium text-gray-600 mb-1">
-                              ObservaÃƒÂ§ÃƒÂ£o (opcional)
+                              Observação (opcional)
                             </label>
                             <input
                               type="text"
@@ -301,7 +301,7 @@ export default function CampanhasGestorTab({
                               onChange={(e) =>
                                 setGestorCarimboNota(e.target.value)
                               }
-                              placeholder="Ex: ConversÃƒÂ£o de cartÃƒÂ£o fÃƒÂ­sico"
+                              placeholder="Ex: Conversão de cartão físico"
                               className="w-full border rounded-lg px-3 py-2 text-sm"
                             />
                           </div>
@@ -311,8 +311,8 @@ export default function CampanhasGestorTab({
                             className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                           >
                             {gestorLancandoCarimbo
-                              ? "LanÃƒÂ§ando..."
-                              : "Ã¢Å“â€¦ LanÃƒÂ§ar Carimbo"}
+                              ? "Lançando..."
+                              : "✅ Lançar Carimbo"}
                           </button>
                         </div>
                       </div>
@@ -337,7 +337,7 @@ export default function CampanhasGestorTab({
                                   Status
                                 </th>
                                 <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
-                                  AÃƒÂ§ÃƒÂ£o
+                                  Ação
                                 </th>
                               </tr>
                             </thead>
@@ -371,12 +371,12 @@ export default function CampanhasGestorTab({
                                         </span>
                                       ) : (
                                         <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                                          AutomÃƒÂ¡tico
+                                          Automático
                                         </span>
                                       )}
                                     </td>
                                     <td className="px-4 py-2 text-gray-500 text-xs max-w-[180px] truncate">
-                                      {s.notes || "Ã¢â‚¬â€"}
+                                      {s.notes || "—"}
                                     </td>
                                     <td className="px-4 py-2 text-center">
                                       {s.voided_at ? (
@@ -400,7 +400,7 @@ export default function CampanhasGestorTab({
                                         >
                                           {gestorRemovendo === s.id
                                             ? "..."
-                                            : "Ã¢ÂÅ’ Remover"}
+                                            : "❌ Remover"}
                                         </button>
                                       )}
                                     </td>
@@ -429,7 +429,7 @@ export default function CampanhasGestorTab({
                   )}
                 </div>
 
-                {/* Ã¢â€â‚¬Ã¢â€â‚¬ SeÃƒÂ§ÃƒÂ£o: Cashback Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                {/* ── Seção: Cashback ── */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <button
                     onClick={() =>
@@ -440,7 +440,7 @@ export default function CampanhasGestorTab({
                     className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">Ã°Å¸â€™Â°</span>
+                      <span className="text-xl">💰</span>
                       <div className="text-left">
                         <p className="font-semibold text-gray-800">Cashback</p>
                         <p className="text-xs text-gray-500">
@@ -449,7 +449,7 @@ export default function CampanhasGestorTab({
                       </div>
                     </div>
                     <span className="text-gray-400 text-sm">
-                      {gestorSecao === "cashback" ? "Ã¢â€“Â²" : "Ã¢â€“Â¼"}
+                      {gestorSecao === "cashback" ? "▲" : "▼"}
                     </span>
                   </button>
                   {gestorSecao === "cashback" && (
@@ -466,7 +466,7 @@ export default function CampanhasGestorTab({
                         className={`border rounded-lg p-4 space-y-3 ${gestorCashbackTipo === "debito" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}
                       >
                         <p className="text-sm font-medium text-gray-700">
-                          Ã¢Å“ÂÃ¯Â¸Â Ajuste Manual
+                          ✏️ Ajuste Manual
                         </p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
@@ -481,10 +481,10 @@ export default function CampanhasGestorTab({
                               className="w-full border rounded-lg px-3 py-2 text-sm"
                             >
                               <option value="credito">
-                                Ã¢Å¾â€¢ CrÃƒÂ©dito (adicionar)
+                                ➕ Crédito (adicionar)
                               </option>
                               <option value="debito">
-                                Ã¢Å¾â€“ DÃƒÂ©bito (remover)
+                                ➖ Débito (remover)
                               </option>
                             </select>
                           </div>
@@ -514,7 +514,7 @@ export default function CampanhasGestorTab({
                               onChange={(e) =>
                                 setGestorCashbackDesc(e.target.value)
                               }
-                              placeholder="Ex: CorreÃƒÂ§ÃƒÂ£o de campanha"
+                              placeholder="Ex: Correção de campanha"
                               className="w-full border rounded-lg px-3 py-2 text-sm"
                             />
                           </div>
@@ -529,15 +529,15 @@ export default function CampanhasGestorTab({
                           {gestorLancandoCashback
                             ? "Salvando..."
                             : gestorCashbackTipo === "debito"
-                              ? "Ã¢Å¾â€“ Confirmar DÃƒÂ©bito"
-                              : "Ã¢Å¾â€¢ Confirmar CrÃƒÂ©dito"}
+                              ? "➖ Confirmar Débito"
+                              : "➕ Confirmar Crédito"}
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Ã¢â€â‚¬Ã¢â€â‚¬ SeÃƒÂ§ÃƒÂ£o: Cupons Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                {/* ── Seção: Cupons ── */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <button
                     onClick={() =>
@@ -546,18 +546,18 @@ export default function CampanhasGestorTab({
                     className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">Ã°Å¸Å½Å¸Ã¯Â¸Â</span>
+                      <span className="text-xl">🎟️</span>
                       <div className="text-left">
                         <p className="font-semibold text-gray-800">Cupons</p>
                         <p className="text-xs text-gray-500">
                           {gestorCupons?.filter((c) => c.status === "active")
                             .length || 0}{" "}
-                          ativo(s) Ã‚Â· {gestorCupons?.length || 0} no total
+                          ativo(s) · {gestorCupons?.length || 0} no total
                         </p>
                       </div>
                     </div>
                     <span className="text-gray-400 text-sm">
-                      {gestorSecao === "cupons" ? "Ã¢â€“Â²" : "Ã¢â€“Â¼"}
+                      {gestorSecao === "cupons" ? "▲" : "▼"}
                     </span>
                   </button>
                   {gestorSecao === "cupons" && (
@@ -568,7 +568,7 @@ export default function CampanhasGestorTab({
                             <thead className="bg-gray-50">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
-                                  CÃƒÂ³digo
+                                  Código
                                 </th>
                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                                   Desconto
@@ -580,7 +580,7 @@ export default function CampanhasGestorTab({
                                   Status
                                 </th>
                                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">
-                                  AÃƒÂ§ÃƒÂ£o
+                                  Ação
                                 </th>
                               </tr>
                             </thead>
@@ -599,7 +599,7 @@ export default function CampanhasGestorTab({
                                   </td>
                                   <td className="px-4 py-3 text-xs text-gray-700">
                                     {c.coupon_type === "gift"
-                                      ? "Ã°Å¸Å½Â Brinde"
+                                      ? "🎁 Brinde"
                                       : c.coupon_type === "percent"
                                         ? `${c.discount_percent}%`
                                         : `R$ ${formatBRL(c.discount_value)}`}
@@ -630,7 +630,7 @@ export default function CampanhasGestorTab({
                                       >
                                         {gestorAnulando === c.code
                                           ? "..."
-                                          : "Ã°Å¸Å¡Â« Anular"}
+                                          : "🚫 Anular"}
                                       </button>
                                     )}
                                   </td>
@@ -648,7 +648,7 @@ export default function CampanhasGestorTab({
                   )}
                 </div>
 
-                {/* Ã¢â€â‚¬Ã¢â€â‚¬ SeÃƒÂ§ÃƒÂ£o: Ranking Ã¢â€â‚¬Ã¢â€â‚¬ */}
+                {/* ── Seção: Ranking ── */}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <button
                     onClick={() =>
@@ -659,7 +659,7 @@ export default function CampanhasGestorTab({
                     className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">Ã°Å¸Ââ€ </span>
+                      <span className="text-xl">🏆</span>
                       <div className="text-left">
                         <p className="font-semibold text-gray-800">Ranking</p>
                         <p className="text-xs text-gray-500">
@@ -670,13 +670,13 @@ export default function CampanhasGestorTab({
                             return `${r.emoji} ${r.label}`;
                           })()}
                           {gestorSaldo.rank_period
-                            ? ` Ã‚Â· ${gestorSaldo.rank_period}`
+                            ? ` · ${gestorSaldo.rank_period}`
                             : ""}
                         </p>
                       </div>
                     </div>
                     <span className="text-gray-400 text-sm">
-                      {gestorSecao === "ranking" ? "Ã¢â€“Â²" : "Ã¢â€“Â¼"}
+                      {gestorSecao === "ranking" ? "▲" : "▼"}
                     </span>
                   </button>
                   {gestorSecao === "ranking" && (
@@ -684,7 +684,7 @@ export default function CampanhasGestorTab({
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[
                           {
-                            label: "NÃƒÂ­vel",
+                            label: "Nível",
                             value: (() => {
                               const r =
                                 RANK_LABELS[gestorSaldo.rank_level] ||
@@ -693,8 +693,8 @@ export default function CampanhasGestorTab({
                             })(),
                           },
                           {
-                            label: "PerÃƒÂ­odo",
-                            value: gestorSaldo.rank_period || "Ã¢â‚¬â€",
+                            label: "Período",
+                            value: gestorSaldo.rank_period || "—",
                           },
                           {
                             label: "Total Gasto (12m)",
@@ -721,8 +721,8 @@ export default function CampanhasGestorTab({
                         ))}
                       </div>
                       <p className="text-xs text-gray-400 mt-4 text-center">
-                        O nÃƒÂ­vel de ranking ÃƒÂ© recalculado automaticamente no dia
-                        1 de cada mÃƒÂªs.
+                        O nível de ranking é recalculado automaticamente no dia
+                        1 de cada mês.
                       </p>
                     </div>
                   )}

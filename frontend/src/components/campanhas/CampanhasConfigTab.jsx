@@ -11,10 +11,10 @@ export default function CampanhasConfigTab({
           {/* Header */}
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <h2 className="font-semibold text-gray-800 mb-1">
-              Ã¢Å¡â„¢Ã¯Â¸Â ConfiguraÃƒÂ§ÃƒÂµes de Envio
+              ⚙️ Configurações de Envio
             </h2>
             <p className="text-xs text-gray-500">
-              Defina os horÃƒÂ¡rios em que o sistema envia as mensagens automÃƒÂ¡ticas
+              Defina os horários em que o sistema envia as mensagens automáticas
               de cada campanha.
             </p>
           </div>
@@ -23,20 +23,20 @@ export default function CampanhasConfigTab({
           {schedulerConfigLoading && (
             <div className="text-center py-12 text-gray-400">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3" />
-              <p className="text-sm">Carregando configuraÃƒÂ§ÃƒÂµes...</p>
+              <p className="text-sm">Carregando configurações...</p>
             </div>
           )}
 
-          {/* FormulÃƒÂ¡rio */}
+          {/* Formulário */}
           {schedulerConfig && !schedulerConfigLoading && (
             <div className="space-y-4">
-              {/* Card: AniversÃƒÂ¡rios */}
+              {/* Card: Aniversários */}
               <div className="bg-white rounded-xl border shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <span className="text-2xl">Ã°Å¸Å½â€š</span>
+                  <span className="text-2xl">🎂</span>
                   <div>
                     <h3 className="font-medium text-gray-800">
-                      Mensagens de AniversÃƒÂ¡rio
+                      Mensagens de Aniversário
                     </h3>
                     <p className="text-xs text-gray-500">
                       Enviadas todos os dias para aniversariantes do dia
@@ -69,13 +69,13 @@ export default function CampanhasConfigTab({
               {/* Card: Inatividade */}
               <div className="bg-white rounded-xl border shadow-sm p-6">
                 <div className="flex items-center gap-3 mb-5">
-                  <span className="text-2xl">Ã°Å¸ËœÂ´</span>
+                  <span className="text-2xl">😴</span>
                   <div>
                     <h3 className="font-medium text-gray-800">
-                      Mensagens de ReativaÃƒÂ§ÃƒÂ£o (Clientes Inativos)
+                      Mensagens de Reativação (Clientes Inativos)
                     </h3>
                     <p className="text-xs text-gray-500">
-                      Enviadas uma vez por semana para clientes sem compras hÃƒÂ¡
+                      Enviadas uma vez por semana para clientes sem compras há
                       muito tempo
                     </p>
                   </div>
@@ -96,11 +96,11 @@ export default function CampanhasConfigTab({
                       className="border rounded-lg px-3 py-2 text-sm"
                     >
                       <option value="mon">Segunda-feira</option>
-                      <option value="tue">TerÃƒÂ§a-feira</option>
+                      <option value="tue">Terça-feira</option>
                       <option value="wed">Quarta-feira</option>
                       <option value="thu">Quinta-feira</option>
                       <option value="fri">Sexta-feira</option>
-                      <option value="sat">SÃƒÂ¡bado</option>
+                      <option value="sat">Sábado</option>
                       <option value="sun">Domingo</option>
                     </select>
                   </div>
@@ -131,14 +131,14 @@ export default function CampanhasConfigTab({
               {/* Auto-envio do Destaque Mensal */}
               <div className="border rounded-xl p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className="text-2xl">Ã°Å¸Ââ€¦</span>
+                  <span className="text-2xl">🏅</span>
                   <div>
                     <h3 className="font-medium text-gray-800">
                       Auto-envio do Destaque Mensal
                     </h3>
                     <p className="text-xs text-gray-500">
-                      Calcula e envia automaticamente o cupom ao vencedor do mÃƒÂªs
-                      no dia 1 ÃƒÂ s 08:00
+                      Calcula e envia automaticamente o cupom ao vencedor do mês
+                      no dia 1 às 08:00
                     </p>
                   </div>
                 </div>
@@ -156,7 +156,7 @@ export default function CampanhasConfigTab({
                       className="w-4 h-4 rounded"
                     />
                     <span className="text-sm text-gray-700">
-                      Ativar envio automÃƒÂ¡tico do Destaque Mensal
+                      Ativar envio automático do Destaque Mensal
                     </span>
                   </label>
                   {schedulerConfig.auto_destaque_mensal && (
@@ -208,7 +208,7 @@ export default function CampanhasConfigTab({
                 </div>
               </div>
 
-              {/* BotÃƒÂ£o salvar */}
+              {/* Botão salvar */}
               <div className="flex justify-end">
                 <button
                   onClick={salvarSchedulerConfig}
@@ -217,17 +217,17 @@ export default function CampanhasConfigTab({
                 >
                   {schedulerConfigSalvando
                     ? "Salvando..."
-                    : "Ã°Å¸â€™Â¾ Salvar ConfiguraÃƒÂ§ÃƒÂµes"}
+                    : "💾 Salvar Configurações"}
                 </button>
               </div>
 
               {/* Nota informativa */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                 <p className="text-xs text-amber-700">
-                  Ã¢Å¡Â Ã¯Â¸Â <strong>AtenÃƒÂ§ÃƒÂ£o:</strong> Os horÃƒÂ¡rios aqui salvos sÃƒÂ£o
-                  registrados no sistema. O scheduler usarÃƒÂ¡ os novos valores a
-                  partir do prÃƒÂ³ximo reinÃƒÂ­cio do servidor. Para aplicar
-                  imediatamente em produÃƒÂ§ÃƒÂ£o, avise o suporte tÃƒÂ©cnico.
+                  ⚠️ <strong>Atenção:</strong> Os horários aqui salvos são
+                  registrados no sistema. O scheduler usará os novos valores a
+                  partir do próximo reinício do servidor. Para aplicar
+                  imediatamente em produção, avise o suporte técnico.
                 </p>
               </div>
             </div>
@@ -237,11 +237,11 @@ export default function CampanhasConfigTab({
           {!schedulerConfig && !schedulerConfigLoading && (
             <div className="bg-white rounded-xl border shadow-sm p-6 text-center">
               <p className="text-sm text-gray-500 mb-2">
-                NÃƒÂ£o foi possÃƒÂ­vel carregar as configuraÃƒÂ§ÃƒÂµes.
+                Não foi possível carregar as configurações.
               </p>
               <p className="text-xs text-gray-400">
-                Certifique-se de que as campanhas padrÃƒÂ£o foram inicializadas
-                (botÃƒÂ£o &quot;Inicializar Campanhas&quot; na aba Campanhas).
+                Certifique-se de que as campanhas padrão foram inicializadas
+                (botão &quot;Inicializar Campanhas&quot; na aba Campanhas).
               </p>
             </div>
           )}

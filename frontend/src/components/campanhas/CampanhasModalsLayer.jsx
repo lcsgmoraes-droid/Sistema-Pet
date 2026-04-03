@@ -59,11 +59,11 @@ export default function CampanhasModalsLayer(props) {
                   <div className="px-6 py-4 border-b flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        Ã¢Å“â€°Ã¯Â¸Â Enviar e-mail de reativaÃƒÂ§ÃƒÂ£o
+                        ✉️ Enviar e-mail de reativação
                       </h3>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Clientes sem compra hÃƒÂ¡ mais de {modalEnvioInativos} dias Ã‚Â· Os
-                        e-mails sÃƒÂ£o enfileirados e enviados em lotes
+                        Clientes sem compra há mais de {modalEnvioInativos} dias · Os
+                        e-mails são enfileirados e enviados em lotes
                       </p>
                     </div>
                     <button
@@ -73,22 +73,22 @@ export default function CampanhasModalsLayer(props) {
                       }}
                       className="text-gray-400 hover:text-gray-600 text-xl font-bold"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="p-6 space-y-4">
                     {resultadoEnvioInativos ? (
                       <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1">
                         <p className="font-semibold text-green-800">
-                          Ã¢Å“â€¦ E-mails enfileirados com sucesso!
+                          ✅ E-mails enfileirados com sucesso!
                         </p>
                         <p className="text-sm text-green-700">
                           {resultadoEnvioInativos.enfileirados} e-mail(s)
-                          adicionado(s) ÃƒÂ  fila.
+                          adicionado(s) à fila.
                         </p>
                         {resultadoEnvioInativos.sem_email > 0 && (
                           <p className="text-xs text-gray-500">
-                            {resultadoEnvioInativos.sem_email} cliente(s) nÃƒÂ£o tÃƒÂªm
+                            {resultadoEnvioInativos.sem_email} cliente(s) não têm
                             e-mail cadastrado e foram ignorados.
                           </p>
                         )}
@@ -118,7 +118,7 @@ export default function CampanhasModalsLayer(props) {
                               }))
                             }
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                            placeholder="Ex: Sentimos sua falta! Ã°Å¸ÂÂ¾"
+                            placeholder="Ex: Sentimos sua falta! 🐾"
                           />
                         </div>
                         <div>
@@ -156,7 +156,7 @@ export default function CampanhasModalsLayer(props) {
                           >
                             {enviandoInativos
                               ? "Enfileirando..."
-                              : "Ã¢Å“â€°Ã¯Â¸Â Enfileirar e-mails"}
+                              : "✉️ Enfileirar e-mails"}
                           </button>
                         </div>
                       </>
@@ -166,18 +166,18 @@ export default function CampanhasModalsLayer(props) {
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: CAMPANHAS Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── ABA: CAMPANHAS ── */}
 
       {modalSorteio && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
                   <div className="px-6 py-4 border-b flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Ã°Å¸Å½Â² Novo Sorteio</h3>
+                    <h3 className="font-semibold text-gray-900">🎲 Novo Sorteio</h3>
                     <button
                       onClick={() => setModalSorteio(false)}
                       className="text-gray-400 hover:text-gray-600 text-xl"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="px-6 py-4 space-y-3">
@@ -191,7 +191,7 @@ export default function CampanhasModalsLayer(props) {
                       <input
                         id="s-nome"
                         type="text"
-                        placeholder="Ex: Sorteio de MarÃƒÂ§o"
+                        placeholder="Ex: Sorteio de Março"
                         value={novoSorteio.name}
                         onChange={(e) =>
                           setNovoSorteio((p) => ({ ...p, name: e.target.value }))
@@ -204,12 +204,12 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="s-premio"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        PrÃƒÂªmio
+                        Prêmio
                       </label>
                       <input
                         id="s-premio"
                         type="text"
-                        placeholder="Ex: Kit banho + tosa grÃƒÂ¡tis"
+                        placeholder="Ex: Kit banho + tosa grátis"
                         value={novoSorteio.prize_description}
                         onChange={(e) =>
                           setNovoSorteio((p) => ({
@@ -225,7 +225,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="s-nivel"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        NÃƒÂ­vel mÃƒÂ­nimo elegantÃƒÂ­vel (opcional)
+                        Nível mínimo elegantível (opcional)
                       </label>
                       <select
                         id="s-nivel"
@@ -239,11 +239,11 @@ export default function CampanhasModalsLayer(props) {
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                       >
                         <option value="">Todos os clientes</option>
-                        <option value="bronze">Ã°Å¸Â¥â€° Bronze+</option>
-                        <option value="silver">Ã°Å¸Â¥Ë† Prata+</option>
-                        <option value="gold">Ã°Å¸Â¥â€¡ Ouro+</option>
-                        <option value="platinum">Ã°Å¸â€™Å½ Diamante+</option>
-                        <option value="diamond">Ã°Å¸â€˜â€˜ Platina</option>
+                        <option value="bronze">🥉 Bronze+</option>
+                        <option value="silver">🥈 Prata+</option>
+                        <option value="gold">🥇 Ouro+</option>
+                        <option value="platinum">💎 Diamante+</option>
+                        <option value="diamond">👑 Platina</option>
                       </select>
                     </div>
                     <div>
@@ -268,7 +268,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="s-desc"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        DescriÃƒÂ§ÃƒÂ£o (opcional)
+                        Descrição (opcional)
                       </label>
                       <textarea
                         id="s-desc"
@@ -296,7 +296,7 @@ export default function CampanhasModalsLayer(props) {
                         className="w-4 h-4 rounded"
                       />
                       <span className="text-sm text-gray-700">
-                        Ã°Å¸Â¤â€“ Executar automaticamente na data do sorteio
+                        🤖 Executar automaticamente na data do sorteio
                       </span>
                     </label>
                     {erroCriarSorteio && (
@@ -322,7 +322,7 @@ export default function CampanhasModalsLayer(props) {
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: CÃƒâ€œDIGOS OFFLINE (SORTEIO) Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── MODAL: CÓDIGOS OFFLINE (SORTEIO) ── */}
 
       {modalCodigosOffline && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -330,10 +330,10 @@ export default function CampanhasModalsLayer(props) {
                   <div className="px-6 py-4 border-b flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-gray-900">
-                        Ã°Å¸â€œâ€¹ CÃƒÂ³digos Offline Ã¢â‚¬â€ {modalCodigosOffline.name}
+                        📋 Códigos Offline — {modalCodigosOffline.name}
                       </h3>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        Lista de participantes para sorteio fÃƒÂ­sico
+                        Lista de participantes para sorteio físico
                       </p>
                     </div>
                     <div className="flex gap-2 items-center">
@@ -341,13 +341,13 @@ export default function CampanhasModalsLayer(props) {
                         onClick={() => window.print()}
                         className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200"
                       >
-                        Ã°Å¸â€“Â¨Ã¯Â¸Â Imprimir
+                        🖨️ Imprimir
                       </button>
                       <button
                         onClick={() => setModalCodigosOffline(null)}
                         className="text-gray-400 hover:text-gray-600 text-xl ml-2"
                       >
-                        Ãƒâ€”
+                        ×
                       </button>
                     </div>
                   </div>
@@ -364,9 +364,9 @@ export default function CampanhasModalsLayer(props) {
                       <table className="w-full text-sm border-collapse">
                         <thead>
                           <tr className="bg-gray-50 text-gray-600 text-xs uppercase">
-                            <th className="text-center p-2 border-b w-16">NÃ‚Âº</th>
+                            <th className="text-center p-2 border-b w-16">Nº</th>
                             <th className="text-left p-2 border-b">Cliente</th>
-                            <th className="text-center p-2 border-b">NÃƒÂ­vel</th>
+                            <th className="text-center p-2 border-b">Nível</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -384,7 +384,7 @@ export default function CampanhasModalsLayer(props) {
                               <td className="p-2 text-center text-xs text-gray-500">
                                 {c.rank_level
                                   ? `${RANK_LABELS[c.rank_level]?.emoji || ""} ${RANK_LABELS[c.rank_level]?.label || c.rank_level}`
-                                  : "Ã¢â‚¬â€"}
+                                  : "—"}
                               </td>
                             </tr>
                           ))}
@@ -393,47 +393,47 @@ export default function CampanhasModalsLayer(props) {
                     )}
                   </div>
                   <div className="px-6 py-3 border-t text-xs text-gray-400">
-                    {codigosOffline.length} participante(s) Ã‚Â· Sorteio:{" "}
+                    {codigosOffline.length} participante(s) · Sorteio:{" "}
                     {modalCodigosOffline.name}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: LANÃƒâ€¡AR CARIMBO MANUAL Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── MODAL: LANÇAR CARIMBO MANUAL ── */}
 
       {fidModalManual && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
                   <div className="px-6 py-4 border-b flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">
-                      Ã°Å¸ÂÂ·Ã¯Â¸Â LanÃƒÂ§ar Carimbo Manual
+                      🏷️ Lançar Carimbo Manual
                     </h3>
                     <button
                       onClick={() => setFidModalManual(false)}
                       className="text-gray-400 hover:text-gray-600 text-xl"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="px-6 py-4 space-y-3">
                     <p className="text-sm text-gray-500">
-                      Cliente <strong>#{fidClienteId}</strong> Ã¢â‚¬â€ Esse carimbo serÃƒÂ¡
-                      registrado como manual (sem vÃƒÂ­nculo com uma venda).
+                      Cliente <strong>#{fidClienteId}</strong> — Esse carimbo será
+                      registrado como manual (sem vínculo com uma venda).
                     </p>
                     <div>
                       <label
                         htmlFor="fid-nota"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        ObservaÃƒÂ§ÃƒÂ£o (opcional)
+                        Observação (opcional)
                       </label>
                       <input
                         id="fid-nota"
                         type="text"
                         value={fidManualNota}
                         onChange={(e) => setFidManualNota(e.target.value)}
-                        placeholder="Ex: ConversÃƒÂ£o de cartÃƒÂ£o fÃƒÂ­sico"
+                        placeholder="Ex: Conversão de cartão físico"
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                       />
                     </div>
@@ -450,25 +450,25 @@ export default function CampanhasModalsLayer(props) {
                       disabled={fidLancandoManual}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
                     >
-                      {fidLancandoManual ? "LanÃƒÂ§ando..." : "Confirmar Carimbo"}
+                      {fidLancandoManual ? "Lançando..." : "Confirmar Carimbo"}
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: ENVIO EM LOTE Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── MODAL: ENVIO EM LOTE ── */}
 
       {modalLote && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
                   <div className="px-6 py-4 border-b flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Ã°Å¸â€œÂ§ Envio em Lote</h3>
+                    <h3 className="font-semibold text-gray-900">📧 Envio em Lote</h3>
                     <button
                       onClick={() => setModalLote(false)}
                       className="text-gray-400 hover:text-gray-600 text-xl"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="px-6 py-4 space-y-3">
@@ -477,7 +477,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="lote-nivel"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        NÃƒÂ­vel de ranking
+                        Nível de ranking
                       </label>
                       <select
                         id="lote-nivel"
@@ -487,12 +487,12 @@ export default function CampanhasModalsLayer(props) {
                         }
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                       >
-                        <option value="todos">Todos os nÃƒÂ­veis</option>
-                        <option value="platinum">Ã°Å¸â€™Å½ Diamante</option>
-                        <option value="diamond">Ã°Å¸â€˜â€˜ Platina</option>
-                        <option value="gold">Ã°Å¸Â¥â€¡ Ouro</option>
-                        <option value="silver">Ã°Å¸Â¥Ë† Prata</option>
-                        <option value="bronze">Ã°Å¸Â¥â€° Bronze</option>
+                        <option value="todos">Todos os níveis</option>
+                        <option value="platinum">💎 Diamante</option>
+                        <option value="diamond">👑 Platina</option>
+                        <option value="gold">🥇 Ouro</option>
+                        <option value="silver">🥈 Prata</option>
+                        <option value="bronze">🥉 Bronze</option>
                       </select>
                     </div>
                     <div>
@@ -505,7 +505,7 @@ export default function CampanhasModalsLayer(props) {
                       <input
                         id="lote-assunto"
                         type="text"
-                        placeholder="Ex: PromoÃƒÂ§ÃƒÂ£o exclusiva para clientes Ouro!"
+                        placeholder="Ex: Promoção exclusiva para clientes Ouro!"
                         value={loteForm.assunto}
                         onChange={(e) =>
                           setLoteForm((p) => ({ ...p, assunto: e.target.value }))
@@ -523,7 +523,7 @@ export default function CampanhasModalsLayer(props) {
                       <textarea
                         id="lote-msg"
                         rows={4}
-                        placeholder="Escreva a mensagem que serÃƒÂ¡ enviada para os clientes..."
+                        placeholder="Escreva a mensagem que será enviada para os clientes..."
                         value={loteForm.mensagem}
                         onChange={(e) =>
                           setLoteForm((p) => ({ ...p, mensagem: e.target.value }))
@@ -534,7 +534,7 @@ export default function CampanhasModalsLayer(props) {
                     {resultadoLote && (
                       <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
                         <p className="font-semibold text-green-800">
-                          Ã¢Å“â€¦ {resultadoLote.enfileirados} e-mail(s) enfileirado(s)!
+                          ✅ {resultadoLote.enfileirados} e-mail(s) enfileirado(s)!
                         </p>
                         {resultadoLote.sem_email > 0 && (
                           <p className="text-green-600">
@@ -564,18 +564,18 @@ export default function CampanhasModalsLayer(props) {
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: NOVA CAMPANHA Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── MODAL: NOVA CAMPANHA ── */}
 
       {modalCriarCampanha && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
                   <div className="px-6 py-4 border-b flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Ã¢Å¾â€¢ Nova Campanha</h3>
+                    <h3 className="font-semibold text-gray-900">➕ Nova Campanha</h3>
                     <button
                       onClick={() => setModalCriarCampanha(false)}
                       className="text-gray-400 hover:text-gray-600 text-xl"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="px-6 py-4 space-y-4">
@@ -589,7 +589,7 @@ export default function CampanhasModalsLayer(props) {
                       <input
                         id="nc-nome"
                         type="text"
-                        placeholder="Ex: Recompra RÃƒÂ¡pida VerÃƒÂ£o"
+                        placeholder="Ex: Recompra Rápida Verão"
                         value={novaCampanha.name}
                         onChange={(e) =>
                           setNovaCampanha((p) => ({ ...p, name: e.target.value }))
@@ -615,12 +615,12 @@ export default function CampanhasModalsLayer(props) {
                         }
                         className="w-full border rounded-lg px-3 py-2 text-sm"
                       >
-                        <option value="inactivity">Ã°Å¸ËœÂ´ Clientes Inativos</option>
-                        <option value="quick_repurchase">Ã°Å¸â€Â Recompra RÃƒÂ¡pida</option>
+                        <option value="inactivity">😴 Clientes Inativos</option>
+                        <option value="quick_repurchase">🔁 Recompra Rápida</option>
                       </select>
                     </div>
                     <p className="text-xs text-gray-500">
-                      Os parÃƒÂ¢metros poderÃƒÂ£o ser configurados depois de criar a
+                      Os parâmetros poderão ser configurados depois de criar a
                       campanha.
                     </p>
                     {erroCriarCampanha && (
@@ -646,14 +646,14 @@ export default function CampanhasModalsLayer(props) {
               </div>
             )}
 
-            {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: CRIAR CUPOM MANUAL Ã¢â€â‚¬Ã¢â€â‚¬ */}
+            {/* ── MODAL: CRIAR CUPOM MANUAL ── */}
 
       {modalCupomAberto && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
                   <div className="px-6 py-4 border-b flex items-center justify-between">
                     <h3 className="font-semibold text-gray-900">
-                      Ã°Å¸Å½Å¸Ã¯Â¸Â Criar Cupom Manual
+                      🎟️ Criar Cupom Manual
                     </h3>
                     <button
                       onClick={() => {
@@ -662,7 +662,7 @@ export default function CampanhasModalsLayer(props) {
                       }}
                       className="text-gray-400 hover:text-gray-600 text-xl"
                     >
-                      Ãƒâ€”
+                      ×
                     </button>
                   </div>
                   <div className="px-6 py-4 space-y-3">
@@ -759,7 +759,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="cupom-validade"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        VÃƒÂ¡lido atÃƒÂ© (opcional)
+                        Válido até (opcional)
                       </label>
                       <input
                         id="cupom-validade"
@@ -776,7 +776,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="cupom-mincompra"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        Compra mÃƒÂ­nima (R$, opcional)
+                        Compra mínima (R$, opcional)
                       </label>
                       <input
                         id="cupom-mincompra"
@@ -802,7 +802,7 @@ export default function CampanhasModalsLayer(props) {
                       <input
                         id="cupom-cliente"
                         type="number"
-                        placeholder="Deixe vazio para cupom genÃƒÂ©rico"
+                        placeholder="Deixe vazio para cupom genérico"
                         value={novoCupom.customer_id}
                         onChange={(e) =>
                           setNovoCupom((p) => ({ ...p, customer_id: e.target.value }))
@@ -815,7 +815,7 @@ export default function CampanhasModalsLayer(props) {
                         htmlFor="cupom-descricao"
                         className="block text-xs font-medium text-gray-600 mb-1"
                       >
-                        DescriÃƒÂ§ÃƒÂ£o (opcional)
+                        Descrição (opcional)
                       </label>
                       <input
                         id="cupom-descricao"

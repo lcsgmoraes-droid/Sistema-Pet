@@ -18,69 +18,69 @@ import CampanhasModalsLayer from "../components/campanhas/CampanhasModalsLayer";
 
 const TIPO_LABELS = {
   loyalty_stamp: {
-    label: "CartÃƒÂ£o Fidelidade",
+    label: "Cartão Fidelidade",
     color: "bg-purple-100 text-purple-800",
-    emoji: "Ã°Å¸ÂÂ·Ã¯Â¸Â",
+    emoji: "🏷️",
   },
   cashback: {
     label: "Cashback",
     color: "bg-green-100 text-green-800",
-    emoji: "Ã°Å¸â€™Â°",
+    emoji: "💰",
   },
   birthday: {
-    label: "AniversÃƒÂ¡rio",
+    label: "Aniversário",
     color: "bg-pink-100 text-pink-800",
-    emoji: "Ã°Å¸Å½â€š",
+    emoji: "🎂",
   },
   birthday_customer: {
-    label: "AniversÃƒÂ¡rio Cliente",
+    label: "Aniversário Cliente",
     color: "bg-pink-100 text-pink-800",
-    emoji: "Ã°Å¸Å½â€š",
+    emoji: "🎂",
   },
   birthday_pet: {
-    label: "AniversÃƒÂ¡rio Pet",
+    label: "Aniversário Pet",
     color: "bg-orange-100 text-orange-800",
-    emoji: "Ã°Å¸ÂÂ¾",
+    emoji: "🐾",
   },
   welcome: {
     label: "Boas-vindas",
     color: "bg-blue-100 text-blue-800",
-    emoji: "Ã°Å¸â€˜â€¹",
+    emoji: "👋",
   },
   welcome_app: {
     label: "Boas-vindas App",
     color: "bg-blue-100 text-blue-800",
-    emoji: "Ã°Å¸â€˜â€¹",
+    emoji: "👋",
   },
   inactivity: {
     label: "Clientes Inativos",
     color: "bg-red-100 text-red-800",
-    emoji: "Ã°Å¸ËœÂ´",
+    emoji: "😴",
   },
   ranking_monthly: {
     label: "Ranking Mensal",
     color: "bg-yellow-100 text-yellow-800",
-    emoji: "Ã°Å¸Ââ€ ",
+    emoji: "🏆",
   },
   quick_repurchase: {
-    label: "Recompra RÃƒÂ¡pida",
+    label: "Recompra Rápida",
     color: "bg-teal-100 text-teal-800",
-    emoji: "Ã°Å¸â€Â",
+    emoji: "🔁",
   },
   monthly_highlight: {
     label: "Destaque Mensal",
     color: "bg-amber-100 text-amber-800",
-    emoji: "Ã°Å¸Å’Å¸",
+    emoji: "🌟",
   },
   win_back: {
-    label: "ReativaÃƒÂ§ÃƒÂ£o",
+    label: "Reativação",
     color: "bg-red-100 text-red-800",
-    emoji: "Ã°Å¸â€â€ž",
+    emoji: "🔄",
   },
   raffle: {
     label: "Sorteio",
     color: "bg-yellow-100 text-yellow-800",
-    emoji: "Ã°Å¸Å½Â²",
+    emoji: "🎲",
   },
 };
 
@@ -102,47 +102,47 @@ const RANK_LABELS = {
     label: "Bronze",
     color: "bg-amber-100 text-amber-800",
     border: "border-amber-300",
-    emoji: "Ã°Å¸Â¥â€°",
+    emoji: "🥉",
   },
   silver: {
     label: "Prata",
     color: "bg-gray-100 text-gray-700",
     border: "border-gray-400",
-    emoji: "Ã°Å¸Â¥Ë†",
+    emoji: "🥈",
   },
   gold: {
     label: "Ouro",
     color: "bg-yellow-100 text-yellow-800",
     border: "border-yellow-400",
-    emoji: "Ã°Å¸Â¥â€¡",
+    emoji: "🥇",
   },
   diamond: {
     label: "Platina",
     color: "bg-purple-100 text-purple-800",
     border: "border-purple-400",
-    emoji: "Ã°Å¸â€˜â€˜",
+    emoji: "👑",
   },
   platinum: {
     label: "Diamante",
     color: "bg-cyan-100 text-cyan-800",
     border: "border-cyan-400",
-    emoji: "Ã°Å¸â€™Å½",
+    emoji: "💎",
   },
 };
 
-// Frases sugeridas para campanhas de aniversÃƒÂ¡rio (por tipo de campanha e tipo de presente)
+// Frases sugeridas para campanhas de aniversário (por tipo de campanha e tipo de presente)
 const FRASES_ANIVERSARIO = {
   birthday_customer: {
     brinde:
-      "Ã°Å¸Å½â€š Feliz aniversÃƒÂ¡rio, {nome}! Seu carinho merece uma celebraÃƒÂ§ÃƒÂ£o especial! ApareÃƒÂ§a na nossa loja para retirar seu presente surpresa. SerÃƒÂ¡ um prazer ver vocÃƒÂª! Ã°Å¸Å½Â",
+      "🎂 Feliz aniversário, {nome}! Seu carinho merece uma celebração especial! Apareça na nossa loja para retirar seu presente surpresa. Será um prazer ver você! 🎁",
     cupom:
-      "Ã°Å¸Å½â€° Feliz aniversÃƒÂ¡rio, {nome}! Neste dia tÃƒÂ£o especial preparamos um cupom de {desconto} de desconto pra vocÃƒÂª celebrar com muito mimo pro seu pet! Use o cÃƒÂ³digo {code}. Ã°Å¸ÂÂ¾",
+      "🎉 Feliz aniversário, {nome}! Neste dia tão especial preparamos um cupom de {desconto} de desconto pra você celebrar com muito mimo pro seu pet! Use o código {code}. 🐾",
   },
   birthday_pet: {
     brinde:
-      "Ã°Å¸ÂÂ¾Ã°Å¸Å½â€š Que dia mais fofo! {nome_pet} estÃƒÂ¡ fazendo aniversÃƒÂ¡rio e a gente nÃƒÂ£o podia deixar passar em branco! Venha buscar o mimo especial que separamos pro seu melhor amigo Ã¢â‚¬â€ tem muito carinho esperando por vocÃƒÂªs! Um beijo nas patinhas! Ã°Å¸Â¥Â³",
+      "🐾🎂 Que dia mais fofo! {nome_pet} está fazendo aniversário e a gente não podia deixar passar em branco! Venha buscar o mimo especial que separamos pro seu melhor amigo — tem muito carinho esperando por vocês! Um beijo nas patinhas! 🥳",
     cupom:
-      "Ã°Å¸Å½Ë† O {nome_pet} tÃƒÂ¡ de parabÃƒÂ©ns hoje, {nome}! Para comemorar esse dia tÃƒÂ£o especial, preparamos um cupom de {desconto} de desconto pra mimar o(a) aniversariante! Use o cÃƒÂ³digo {code} e vai fundo nos mimos! Ã°Å¸Ââ€¢Ã°Å¸Å½Â",
+      "🎈 O {nome_pet} tá de parabéns hoje, {nome}! Para comemorar esse dia tão especial, preparamos um cupom de {desconto} de desconto pra mimar o(a) aniversariante! Use o código {code} e vai fundo nos mimos! 🐕🎁",
   },
 };
 
@@ -214,13 +214,13 @@ export default function Campanhas() {
   // Envio escalonado de inativos
   const [modalEnvioInativos, setModalEnvioInativos] = useState(null); // null | 30 | 60 | 90
   const [envioInativosForm, setEnvioInativosForm] = useState({
-    assunto: "Sentimos sua falta! Ã°Å¸ÂÂ¾",
+    assunto: "Sentimos sua falta! 🐾",
     mensagem: "",
   });
   const [enviandoInativos, setEnviandoInativos] = useState(false);
   const [resultadoEnvioInativos, setResultadoEnvioInativos] = useState(null);
 
-  // RetenÃƒÂ§ÃƒÂ£o DinÃƒÂ¢mica
+  // Retenção Dinâmica
   const [retencaoEditando, setRetencaoEditando] = useState(null); // null | {} (nova) | {id,...} (existente)
   const [salvandoRetencao, setSalvandoRetencao] = useState(false);
   const [deletandoRetencao, setDeletandoRetencao] = useState(null);
@@ -251,9 +251,9 @@ export default function Campanhas() {
     tipo_premio: "cupom",
     coupon_value: 50,
     coupon_valid_days: 10,
-    mensagem: "ParabÃƒÂ©ns! VocÃƒÂª foi um dos nossos melhores clientes do mÃƒÂªs! Ã°Å¸Ââ€ ",
+    mensagem: "Parabéns! Você foi um dos nossos melhores clientes do mês! 🏆",
     mensagem_brinde:
-      "ParabÃƒÂ©ns! VocÃƒÂª foi um dos nossos melhores clientes do mÃƒÂªs. Passe em nossa loja e retire seu brinde especial Ã¢â‚¬â€ serÃƒÂ¡ um prazer recebÃƒÂª-lo! Ã°Å¸Å½Â",
+      "Parabéns! Você foi um dos nossos melhores clientes do mês. Passe em nossa loja e retire seu brinde especial — será um prazer recebê-lo! 🎁",
     retirar_de: "",
     retirar_ate: "",
   });
@@ -375,13 +375,13 @@ export default function Campanhas() {
   const [enviandoLote, setEnviandoLote] = useState(false);
   const [resultadoLote, setResultadoLote] = useState(null);
 
-  // UnificaÃƒÂ§ÃƒÂ£o cross-canal
+  // Unificação cross-canal
   const [confirmandoMerge, setConfirmandoMerge] = useState(null);
   const [resultadoMerge, setResultadoMerge] = useState(null);
 
-  // RelatÃƒÂ³rios
+  // Relatórios
 
-  // Fidelidade Ã¢â‚¬â€ carimbos por cliente (legado Ã¢â‚¬â€ mantido para modal existente)
+  // Fidelidade — carimbos por cliente (legado — mantido para modal existente)
   const [fidClienteId, setFidClienteId] = useState("");
   const [fidCarimbos, setFidCarimbos] = useState(null);
   const [fidLoadingCarimbos, setFidLoadingCarimbos] = useState(false);
@@ -391,7 +391,7 @@ export default function Campanhas() {
   const [fidLancandoManual, setFidLancandoManual] = useState(false);
   const [fidManualNota, setFidManualNota] = useState("");
 
-  // Gestor de BenefÃƒÂ­cios
+  // Gestor de Benefícios
   const [gestorSearch, setGestorSearch] = useState("");
   const [gestorSugestoes, setGestorSugestoes] = useState([]);
   const [gestorBuscando, setGestorBuscando] = useState(false);
@@ -410,7 +410,7 @@ export default function Campanhas() {
   const [gestorCashbackDesc, setGestorCashbackDesc] = useState("");
   const [gestorLancandoCashback, setGestorLancandoCashback] = useState(false);
   const [gestorAnulando, setGestorAnulando] = useState(null);
-  // Gestor Ã¢â‚¬â€ modo Por Campanha
+  // Gestor — modo Por Campanha
   const [gestorModo, setGestorModo] = useState("cliente"); // 'cliente' | 'campanha'
   const [gestorCampanhaTipo, setGestorCampanhaTipo] = useState("carimbos");
   const [gestorCampanhaLista, setGestorCampanhaLista] = useState(null);
@@ -420,7 +420,7 @@ export default function Campanhas() {
   // Config de ranking
   const [rankingConfigSalvando, setRankingConfigSalvando] = useState(false);
 
-  // Config de horÃƒÂ¡rios do scheduler
+  // Config de horários do scheduler
   const [schedulerConfigSalvando, setSchedulerConfigSalvando] = useState(false);
 
   const enviarParaInativos = async () => {
@@ -450,7 +450,7 @@ export default function Campanhas() {
   const anularCupom = useCallback(async (code) => {
     if (
       !window.confirm(
-        `Anular o cupÃƒÂ£o ${code}? Esta aÃƒÂ§ÃƒÂ£o nÃƒÂ£o pode ser desfeita.`,
+        `Anular o cupão ${code}? Esta ação não pode ser desfeita.`,
       )
     )
       return;
@@ -461,7 +461,7 @@ export default function Campanhas() {
         prev.map((c) => (c.code === code ? { ...c, status: "voided" } : c)),
       );
     } catch (e) {
-      alert(e?.response?.data?.detail || "Erro ao anular cupÃƒÂ£o.");
+      alert(e?.response?.data?.detail || "Erro ao anular cupão.");
     } finally {
       setAnulando(null);
     }
@@ -473,7 +473,7 @@ export default function Campanhas() {
     setEnviandoDestaque(true);
     setDestaqueResultado(null);
     try {
-      // Monta vencedores com config individual de prÃƒÂªmio (sÃƒÂ³ os selecionados)
+      // Monta vencedores com config individual de prêmio (só os selecionados)
       const vencedoresComPremio = {};
       for (const [cat, info] of Object.entries(destaque.vencedores)) {
         if (!vencedoresSelecionados[cat]) continue;
@@ -498,7 +498,7 @@ export default function Campanhas() {
       setDestaqueResultado(res.data);
     } catch (e) {
       alert(
-        "Erro ao enviar prÃƒÂªmios: " + (e?.response?.data?.detail || e.message),
+        "Erro ao enviar prêmios: " + (e?.response?.data?.detail || e.message),
       );
     } finally {
       setEnviandoDestaque(false);
@@ -508,7 +508,7 @@ export default function Campanhas() {
   const criarCampanha = async () => {
     setErroCriarCampanha("");
     if (!novaCampanha.name.trim()) {
-      setErroCriarCampanha("Nome obrigatÃƒÂ³rio.");
+      setErroCriarCampanha("Nome obrigatório.");
       return;
     }
     setCriandoCampanha(true);
@@ -534,7 +534,7 @@ export default function Campanhas() {
   const arquivarCampanha = async (c) => {
     if (
       !window.confirm(
-        `Arquivar a campanha "${c.name}"? Ela ficarÃƒÂ¡ inativa e nÃƒÂ£o poderÃƒÂ¡ ser reativada pela interface.`,
+        `Arquivar a campanha "${c.name}"? Ela ficará inativa e não poderá ser reativada pela interface.`,
       )
     )
       return;
@@ -544,7 +544,7 @@ export default function Campanhas() {
       setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
     } catch (e) {
       if (e?.response?.status === 404) {
-        // Campanha jÃƒÂ¡ nÃƒÂ£o existe no servidor Ã¢â‚¬â€ remove da lista localmente
+        // Campanha já não existe no servidor — remove da lista localmente
         setCampanhas((prev) => prev.filter((x) => x.id !== c.id));
         return;
       }
@@ -557,7 +557,7 @@ export default function Campanhas() {
   const confirmarMerge = async (keepId, removeId, motivo) => {
     if (
       !globalThis.confirm(
-        `Unificar clientes? O cliente #${removeId} serÃƒÂ¡ mesclado no #${keepId}. Os dados de campanhas serÃƒÂ£o transferidos.`,
+        `Unificar clientes? O cliente #${removeId} será mesclado no #${keepId}. Os dados de campanhas serão transferidos.`,
       )
     )
       return;
@@ -586,7 +586,7 @@ export default function Campanhas() {
   const desfazerMerge = async (mergeId) => {
     if (
       !globalThis.confirm(
-        "Desfazer esta unificaÃƒÂ§ÃƒÂ£o? Os dados de campanhas serÃƒÂ£o restaurados.",
+        "Desfazer esta unificação? Os dados de campanhas serão restaurados.",
       )
     )
       return;
@@ -602,7 +602,7 @@ export default function Campanhas() {
   const criarSorteio = async () => {
     setErroCriarSorteio("");
     if (!novoSorteio.name.trim()) {
-      setErroCriarSorteio("Nome obrigatÃƒÂ³rio.");
+      setErroCriarSorteio("Nome obrigatório.");
       return;
     }
     setCriandoSorteio(true);
@@ -650,7 +650,7 @@ export default function Campanhas() {
   };
 
   const executarSorteio = async (drawingId) => {
-    if (!window.confirm("Executar o sorteio agora? Esta aÃƒÂ§ÃƒÂ£o ÃƒÂ© irreversÃƒÂ­vel."))
+    if (!window.confirm("Executar o sorteio agora? Esta ação é irreversível."))
       return;
     setExecutandoSorteio(drawingId);
     try {
@@ -686,7 +686,7 @@ export default function Campanhas() {
       setCodigosOffline(res.data.codigos || res.data);
     } catch (e) {
       alert(
-        "Erro ao carregar cÃƒÂ³digos: " + (e?.response?.data?.detail || e.message),
+        "Erro ao carregar códigos: " + (e?.response?.data?.detail || e.message),
       );
       setModalCodigosOffline(null);
     } finally {
@@ -752,12 +752,12 @@ export default function Campanhas() {
     try {
       await api.post("/campanhas/carimbos/manual", {
         customer_id: Number(fidClienteId),
-        nota: fidManualNota || "Carimbo lanÃƒÂ§ado manualmente pelo operador",
+        nota: fidManualNota || "Carimbo lançado manualmente pelo operador",
       });
       setFidModalManual(false);
       setFidManualNota("");
       await carregarCarimbosCliente();
-      alert("Ã¢Å“â€¦ Carimbo lanÃƒÂ§ado com sucesso!");
+      alert("✅ Carimbo lançado com sucesso!");
     } catch (e) {
       alert("Erro: " + (e?.response?.data?.detail || e.message));
     } finally {
@@ -785,7 +785,7 @@ export default function Campanhas() {
     selecionarClienteGestor(cliente);
   };
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ Gestor de BenefÃƒÂ­cios Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Gestor de Benefícios ──────────────────────────────────────────────
   const buscarClientesGestor = async (termo) => {
     if (!termo || termo.length < 2) {
       setGestorSugestoes([]);
@@ -840,7 +840,7 @@ export default function Campanhas() {
     try {
       await api.post("/campanhas/carimbos/manual", {
         customer_id: gestorCliente.id,
-        nota: gestorCarimboNota || "Carimbo lanÃƒÂ§ado manualmente pelo operador",
+        nota: gestorCarimboNota || "Carimbo lançado manualmente pelo operador",
       });
       setGestorCarimboNota("");
       await recarregarGestor();
@@ -881,8 +881,8 @@ export default function Campanhas() {
         description:
           gestorCashbackDesc ||
           (gestorCashbackTipo === "debito"
-            ? "DÃƒÂ©bito manual de cashback"
-            : "CrÃƒÂ©dito manual de cashback"),
+            ? "Débito manual de cashback"
+            : "Crédito manual de cashback"),
       });
       setGestorCashbackValor("");
       setGestorCashbackDesc("");
@@ -911,7 +911,7 @@ export default function Campanhas() {
     setRankingConfigSalvando(true);
     try {
       await api.put("/campanhas/ranking/config", rankingConfig);
-      alert("CritÃƒÂ©rios de ranking salvos!");
+      alert("Critérios de ranking salvos!");
     } catch (e) {
       alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
     } finally {
@@ -919,11 +919,24 @@ export default function Campanhas() {
     }
   };
 
+  const salvarSchedulerConfig = async () => {
+    setSchedulerConfigSalvando(true);
+    try {
+      await api.put("/campanhas/config/horarios", schedulerConfig);
+      await carregarSchedulerConfig();
+      alert("Configurações de envio salvas!");
+    } catch (e) {
+      alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
+    } finally {
+      setSchedulerConfigSalvando(false);
+    }
+  };
+
   const recalcularRanking = async () => {
     try {
       await api.post("/campanhas/ranking/recalcular");
       alert(
-        "RecÃƒÂ¡lculo de ranking enfileirado! O worker processarÃƒÂ¡ em atÃƒÂ© 10 segundos.",
+        "Recálculo de ranking enfileirado! O worker processará em até 10 segundos.",
       );
       setTimeout(() => carregarRanking(), 3000);
     } catch (e) {
@@ -949,7 +962,7 @@ export default function Campanhas() {
   };
 
   const deletarRetencao = async (id) => {
-    if (!window.confirm("Remover esta regra de retenÃƒÂ§ÃƒÂ£o?")) return;
+    if (!window.confirm("Remover esta regra de retenção?")) return;
     setDeletandoRetencao(id);
     try {
       await api.delete(`/campanhas/retencao/${id}`);
@@ -980,7 +993,7 @@ export default function Campanhas() {
   const abrirEdicao = (c) => {
     setCampanhaEditando(c.id);
     const params = { ...c.params };
-    // Para campanhas de aniversÃƒÂ¡rio, prÃƒÂ©-preenche a mensagem sugerida se ainda nÃƒÂ£o foi configurada
+    // Para campanhas de aniversário, pré-preenche a mensagem sugerida se ainda não foi configurada
     if (
       ["birthday_customer", "birthday_pet"].includes(c.campaign_type) &&
       !params.notification_message
@@ -1010,8 +1023,8 @@ export default function Campanhas() {
       );
       fecharEdicao();
     } catch (e) {
-      console.error("Erro ao salvar parÃƒÂ¢metros:", e);
-      alert("Erro ao salvar os parÃƒÂ¢metros.");
+      console.error("Erro ao salvar parâmetros:", e);
+      alert("Erro ao salvar os parâmetros.");
     } finally {
       setSalvandoParams(false);
     }
@@ -1062,35 +1075,35 @@ export default function Campanhas() {
   };
 
   const formatarParams = (tipo, params) => {
-    if (!params) return "Ã¢â‚¬â€";
+    if (!params) return "—";
     if (tipo === "loyalty_stamp")
-      return `${params.stamps_to_complete || "?"} carimbos Ã¢â€ â€™ R$ ${formatBRL(params.reward_value || 0)} de recompensa`;
+      return `${params.stamps_to_complete || "?"} carimbos → R$ ${formatBRL(params.reward_value || 0)} de recompensa`;
     if (tipo === "cashback")
       return `Bronze ${params.bronze_percent || 0}% / Prata ${params.silver_percent || 0}% / Ouro ${params.gold_percent || 0}%`;
     if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
       const tipoPresente = params.tipo_presente || "cupom";
-      if (tipoPresente === "brinde") return "Ã°Å¸Å½Â Brinde na loja";
+      if (tipoPresente === "brinde") return "🎁 Brinde na loja";
       return params.coupon_type === "percent"
-        ? `Ã°Å¸Å½Â« Cupom ${params.coupon_value || "?"}% de desconto Ã‚Â· ${params.coupon_valid_days || "?"} dias`
-        : `Ã°Å¸Å½Â« Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto Ã‚Â· ${params.coupon_valid_days || "?"} dias`;
+        ? `🎫 Cupom ${params.coupon_value || "?"}% de desconto · ${params.coupon_valid_days || "?"} dias`
+        : `🎫 Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto · ${params.coupon_valid_days || "?"} dias`;
     }
     if (tipo === "inactivity") {
       const valInact =
         params.coupon_type === "fixed"
           ? `R$ ${formatBRL(params.coupon_value || 0)}`
           : `${params.coupon_value || "?"}%`;
-      return `Inativo ${params.inactivity_days || "?"} dias Ã¢â€ â€™ ${valInact} desconto`;
+      return `Inativo ${params.inactivity_days || "?"} dias → ${valInact} desconto`;
     }
     if (tipo === "welcome" || tipo === "welcome_app")
-      return `Boas-vindas: R$ ${formatBRL(params.coupon_value || 0)} de bÃƒÂ´nus`;
+      return `Boas-vindas: R$ ${formatBRL(params.coupon_value || 0)} de bônus`;
     if (tipo === "ranking_monthly")
-      return `${Object.keys(params).length} nÃƒÂ­veis configurados`;
+      return `${Object.keys(params).length} níveis configurados`;
     if (tipo === "quick_repurchase") {
       const val =
         params.coupon_type === "fixed"
           ? `R$ ${formatBRL(params.coupon_value || 0)}`
           : `${params.coupon_value || "?"}%`;
-      return `PÃƒÂ³s-compra: ${val} desconto Ã¢â‚¬Â¢ ${params.coupon_valid_days || "?"} dias`;
+      return `Pós-compra: ${val} desconto • ${params.coupon_valid_days || "?"} dias`;
     }
     return JSON.stringify(params).slice(0, 60) + "...";
   };
@@ -1100,16 +1113,16 @@ export default function Campanhas() {
       return `${cupom.discount_percent}% off`;
     if (cupom.coupon_type === "fixed" && cupom.discount_value)
       return `R$ ${formatBRL(cupom.discount_value)} off`;
-    return "Ã¢â‚¬â€";
+    return "—";
   };
 
   const formatarData = (iso) => {
-    if (!iso) return "Ã¢â‚¬â€";
+    if (!iso) return "—";
     const d = iso.split("T")[0].split("-");
     return `${d[2]}/${d[1]}/${d[0]}`;
   };
 
-  // Ã¢â€â‚¬Ã¢â€â‚¬ FormulÃƒÂ¡rios de parÃƒÂ¢metros por tipo de campanha Ã¢â€â‚¬Ã¢â€â‚¬
+  // ── Formulários de parâmetros por tipo de campanha ──
   const renderFormCampaign = (c) => {
     const tipo = c.campaign_type;
     const set = (key, val) => setParamsEditando((p) => ({ ...p, [key]: val }));
@@ -1120,7 +1133,7 @@ export default function Campanhas() {
       return (
         <div className="grid grid-cols-2 gap-3">
           <CampanhaField
-            label="Compra mÃƒÂ­nima (R$)"
+            label="Compra mínima (R$)"
             id="p-min"
             value={num("min_purchase_value")}
             onChange={(e) =>
@@ -1147,7 +1160,7 @@ export default function Campanhas() {
             onChange={(e) => set("reward_type", e.target.value)}
           >
             <option value="coupon">Cupom de desconto</option>
-            <option value="credit">CrÃƒÂ©dito cashback</option>
+            <option value="credit">Crédito cashback</option>
           </CampanhaSel>
           <CampanhaField
             label="Valor da recompensa (R$)"
@@ -1158,7 +1171,7 @@ export default function Campanhas() {
             }
           />
           <CampanhaField
-            label="Carimbo intermediÃƒÂ¡rio (0 = sem)"
+            label="Carimbo intermediário (0 = sem)"
             id="p-inter"
             step="1"
             min="0"
@@ -1171,7 +1184,7 @@ export default function Campanhas() {
             }
           />
           <CampanhaField
-            label="Recompensa intermediÃƒÂ¡ria (R$)"
+            label="Recompensa intermediária (R$)"
             id="p-inter-val"
             value={num("intermediate_reward_value") || 0}
             onChange={(e) =>
@@ -1202,7 +1215,7 @@ export default function Campanhas() {
               onChange={(e) => set("rank_filter", e.target.value)}
             >
               <option value="all">Todos os clientes</option>
-              <option value="sem_rank">Sem classificaÃƒÂ§ÃƒÂ£o</option>
+              <option value="sem_rank">Sem classificação</option>
               <option value="bronze">Bronze</option>
               <option value="silver">Prata</option>
               <option value="gold">Ouro</option>
@@ -1215,22 +1228,22 @@ export default function Campanhas() {
 
     if (tipo === "cashback") {
       const levels = [
-        { key: "bronze_percent", label: "Ã°Å¸Â¥â€° Bronze" },
-        { key: "silver_percent", label: "Ã°Å¸Â¥Ë† Prata" },
-        { key: "gold_percent", label: "Ã°Å¸Â¥â€¡ Ouro" },
-        { key: "diamond_percent", label: "Ã°Å¸â€˜â€˜ Platina" },
-        { key: "platinum_percent", label: "Ã°Å¸â€™Å½ Diamante" },
+        { key: "bronze_percent", label: "🥉 Bronze" },
+        { key: "silver_percent", label: "🥈 Prata" },
+        { key: "gold_percent", label: "🥇 Ouro" },
+        { key: "diamond_percent", label: "👑 Platina" },
+        { key: "platinum_percent", label: "💎 Diamante" },
       ];
       const canais = [
-        { key: "pdv_bonus_percent", label: "Ã°Å¸â€“Â¥Ã¯Â¸Â PDV (bÃƒÂ´nus %)" },
-        { key: "app_bonus_percent", label: "Ã°Å¸â€œÂ± App (bÃƒÂ´nus %)" },
-        { key: "ecommerce_bonus_percent", label: "Ã°Å¸â€ºâ€™ Ecommerce (bÃƒÂ´nus %)" },
+        { key: "pdv_bonus_percent", label: "🖥️ PDV (bônus %)" },
+        { key: "app_bonus_percent", label: "📱 App (bônus %)" },
+        { key: "ecommerce_bonus_percent", label: "🛒 Ecommerce (bônus %)" },
       ];
       return (
         <div className="space-y-4">
           <div>
             <p className="text-xs text-gray-500 mb-2">
-              % base por nÃƒÂ­vel de ranking (crÃƒÂ©dito automÃƒÂ¡tico em toda compra).
+              % base por nível de ranking (crédito automático em toda compra).
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {levels.map((lv) => (
@@ -1248,7 +1261,7 @@ export default function Campanhas() {
           </div>
           <div>
             <p className="text-xs text-gray-500 mb-2">
-              BÃƒÂ´nus adicional por canal (somado ao % do nÃƒÂ­vel). Ex: App +1%
+              Bônus adicional por canal (somado ao % do nível). Ex: App +1%
               incentiva uso do aplicativo.
             </p>
             <div className="grid grid-cols-3 gap-3">
@@ -1267,7 +1280,7 @@ export default function Campanhas() {
           </div>
           <div className="border-t pt-4">
             <p className="text-xs font-semibold text-gray-700 mb-2">
-              Ã¢ÂÂ° Validade e Alertas
+              ⏰ Validade e Alertas
             </p>
             <div className="grid grid-cols-2 gap-3">
               <CampanhaField
@@ -1314,12 +1327,12 @@ export default function Campanhas() {
           {/* Tipo de presente */}
           <div>
             <p className="text-xs font-semibold text-gray-700 mb-2">
-              Ã°Å¸Å½Â O que o cliente recebe no aniversÃƒÂ¡rio?
+              🎁 O que o cliente recebe no aniversário?
             </p>
             <div className="flex gap-4">
               {[
-                { value: "cupom", label: "Ã°Å¸Å½Â« Cupom de desconto" },
-                { value: "brinde", label: "Ã°Å¸Å½Â Brinde na loja" },
+                { value: "cupom", label: "🎫 Cupom de desconto" },
+                { value: "brinde", label: "🎁 Brinde na loja" },
               ].map((opt) => (
                 <label
                   key={opt.value}
@@ -1347,7 +1360,7 @@ export default function Campanhas() {
             </div>
           </div>
 
-          {/* Campos do cupom (visÃƒÂ­vel apenas se tipo_presente = cupom) */}
+          {/* Campos do cupom (visível apenas se tipo_presente = cupom) */}
           {tipoPresente === "cupom" && (
             <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
               <CampanhaSel
@@ -1405,14 +1418,14 @@ export default function Campanhas() {
                 htmlFor="p-bday-msg"
                 className="block text-xs font-semibold text-gray-700"
               >
-                Ã¢Å“â€°Ã¯Â¸Â Mensagem enviada ao cliente
+                ✉️ Mensagem enviada ao cliente
               </label>
               <button
                 type="button"
                 onClick={() => set("notification_message", fraseSugerida)}
                 className="text-xs text-blue-600 hover:text-blue-800 underline"
               >
-                Ã°Å¸â€â€ž Usar frase sugerida
+                🔄 Usar frase sugerida
               </button>
             </div>
             <textarea
@@ -1423,7 +1436,7 @@ export default function Campanhas() {
               className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
             <p className="text-xs text-gray-400 mt-1">
-              VariÃƒÂ¡veis disponÃƒÂ­veis:{" "}
+              Variáveis disponíveis:{" "}
               <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
               {ehPet && (
                 <>
@@ -1454,7 +1467,7 @@ export default function Campanhas() {
       return (
         <div className="grid grid-cols-2 gap-3">
           <CampanhaField
-            label="Compra mÃƒÂ­nima (R$)"
+            label="Compra mínima (R$)"
             id="p-qr-min"
             value={num("min_purchase_value")}
             onChange={(e) =>
@@ -1516,7 +1529,7 @@ export default function Campanhas() {
               type="text"
               value={str("notification_message")}
               onChange={(e) => set("notification_message", e.target.value)}
-              placeholder="Ex: Obrigado pela compra! Use o cupom {code} na prÃƒÂ³xima visita."
+              placeholder="Ex: Obrigado pela compra! Use o cupom {code} na próxima visita."
               className="w-full border rounded-lg px-3 py-1.5 text-sm"
             />
           </div>
@@ -1635,11 +1648,11 @@ export default function Campanhas() {
     if (tipo === "ranking_monthly") {
       const levels = ["bronze", "silver", "gold", "diamond", "platinum"];
       const lvLabels = {
-        bronze: "Ã°Å¸Â¥â€° Bronze",
-        silver: "Ã°Å¸Â¥Ë† Prata",
-        gold: "Ã°Å¸Â¥â€¡ Ouro",
-        diamond: "Ã¯Â¿Â½ Platina",
-        platinum: "Ã°Å¸â€™Å½ Diamante",
+        bronze: "🥉 Bronze",
+        silver: "🥈 Prata",
+        gold: "🥇 Ouro",
+        diamond: "👑 Platina",
+        platinum: "💎 Diamante",
       };
       const getLv = (lv) => paramsEditando[lv] || {};
       const setLv = (lv, key, val) =>
@@ -1647,23 +1660,23 @@ export default function Campanhas() {
       return (
         <div>
           <p className="text-xs text-gray-500 mb-2">
-            CritÃƒÂ©rios mÃƒÂ­nimos para cada nÃƒÂ­vel. Recalculado mensalmente.
+            Critérios mínimos para cada nível. Recalculado mensalmente.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    NÃƒÂ­vel
+                    Nível
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Gasto mÃƒÂ­n. (R$)
+                    Gasto mín. (R$)
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Compras mÃƒÂ­n.
+                    Compras mín.
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                    Meses ativos mÃƒÂ­n.
+                    Meses ativos mín.
                   </th>
                 </tr>
               </thead>
@@ -1730,7 +1743,7 @@ export default function Campanhas() {
       );
     }
 
-    // fallback: editor genÃƒÂ©rico
+    // fallback: editor genérico
     return (
       <div className="grid grid-cols-2 gap-3">
         {Object.entries(paramsEditando).map(([chave, valor]) => (
@@ -1769,10 +1782,10 @@ export default function Campanhas() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            Ã°Å¸Å½Â¯ Campanhas de Fidelidade
+            🎯 Campanhas de Fidelidade
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gerencie campanhas automÃƒÂ¡ticas, ranking de clientes e cupons.
+            Gerencie campanhas automáticas, ranking de clientes e cupons.
           </p>
         </div>
 
@@ -1780,7 +1793,7 @@ export default function Campanhas() {
 
       <CampanhasTabsBar aba={aba} onChange={setAba} />
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: DASHBOARD Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: DASHBOARD ── */}
       {aba === "dashboard" && (
         <CampanhasDashboardTab
           loadingDashboard={loadingDashboard}
@@ -1793,7 +1806,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Modal: Envio para Inativos Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── Modal: Envio para Inativos ── */}
       {aba === "campanhas" && (
         <CampanhasListTab
           campanhas={campanhas}
@@ -1819,7 +1832,7 @@ export default function Campanhas() {
       )}
 
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: RETENÃƒâ€¡ÃƒÆ’O DINÃƒâ€šMICA Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: RETENÇÃO DINÂMICA ── */}
       {aba === "retencao" && (
         <CampanhasRetencaoTab
           retencaoEditando={retencaoEditando}
@@ -1882,7 +1895,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: RANKING Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: RANKING ── */}
       {aba === "ranking" && (
         <CampanhasRankingTab
           rankLabels={RANK_LABELS}
@@ -1922,7 +1935,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: RELATÃƒâ€œRIOS Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: RELATÓRIOS ── */}
       {aba === "relatorios" && (
         <CampanhasRelatoriosTab
           relDataInicio={relDataInicio}
@@ -1938,7 +1951,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: UNIFICAÃƒâ€¡ÃƒÆ’O CROSS-CANAL Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: UNIFICAÇÃO CROSS-CANAL ── */}
       {aba === "unificacao" && (
         <CampanhasUnificacaoTab
           carregarSugestoes={carregarSugestoes}
@@ -1951,7 +1964,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ MODAL: CRIAR SORTEIO Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── MODAL: CRIAR SORTEIO ── */}
       <CampanhasModalsLayer
         {...{
           modalEnvioInativos,
@@ -2054,7 +2067,7 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: CONFIGURAÃƒâ€¡Ãƒâ€¢ES Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: CONFIGURAÇÕES ── */}
       {aba === "config" && (
         <CampanhasConfigTab
           schedulerConfigLoading={schedulerConfigLoading}
@@ -2065,9 +2078,8 @@ export default function Campanhas() {
         />
       )}
 
-      {/* Ã¢â€â‚¬Ã¢â€â‚¬ ABA: DESCONTOS POR CANAL Ã¢â€â‚¬Ã¢â€â‚¬ */}
+      {/* ── ABA: DESCONTOS POR CANAL ── */}
       {aba === "canais" && <CanalDescontos />}
     </div>
   );
 }
-
