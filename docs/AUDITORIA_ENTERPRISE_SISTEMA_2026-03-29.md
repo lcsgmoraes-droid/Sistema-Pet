@@ -726,6 +726,12 @@ Itens executados nesta etapa:
   - a aba de sorteios foi movida para `frontend/src/components/campanhas/CampanhasSorteiosTab.jsx`
   - a aba de ranking foi movida para `frontend/src/components/campanhas/CampanhasRankingTab.jsx`
   - `Campanhas.jsx` caiu de `4884` para `3878` linhas sem alterar a experiencia da tela
+- [x] continuar a decomposicao de `Campanhas.jsx` pelas abas residuais de relatorios, unificacao, gestor e configuracoes
+  - as abas foram movidas para `frontend/src/components/campanhas/CampanhasRelatoriosTab.jsx`, `CampanhasUnificacaoTab.jsx`, `CampanhasGestorTab.jsx` e `CampanhasConfigTab.jsx`
+  - `Campanhas.jsx` caiu para `2713` linhas, concentrando menos JSX inline nas areas operacionais e administrativas
+- [x] extrair a camada de modais de `Campanhas.jsx` para composicao propria
+  - os modais de envio para inativos, sorteio, codigos offline, carimbo manual, envio em lote, nova campanha e cupom manual foram movidos para `frontend/src/components/campanhas/CampanhasModalsLayer.jsx`
+  - `Campanhas.jsx` caiu de `2713` para `1981` linhas e ficou mais focado na orquestracao das abas e estados de dominio
 
 Itens deliberadamente adiados por agora:
 
