@@ -867,6 +867,18 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] quebrar internamente `CampanhasGestorTab.jsx` em secoes visuais menores
   - o cabecalho, a lista por campanha, o resumo do cliente e as secoes de carimbos, cashback, cupons e ranking foram separados em componentes dedicados dentro de `frontend/src/components/campanhas/`
   - `CampanhasGestorTab.jsx` deixou de concentrar o miolo operacional do gestor e virou uma composicao mais fina das secoes
+- [x] quebrar internamente `CampanhasRankingTab.jsx` e `CampanhasParametrosForm.jsx`
+  - o ranking foi separado em componentes dedicados para filtros, clientes, configuracoes, distribuicao, cupons e lote em `frontend/src/components/campanhas/CampanhasRankingFiltrosBar.jsx`, `CampanhasRankingClientesTable.jsx`, `CampanhasRankingConfigPanels.jsx`, `CampanhasRankingDistribuicao.jsx`, `CampanhasRankingCuponsSection.jsx` e `CampanhasRankingLoteCard.jsx`
+  - o formulario de parametros foi reorganizado em `frontend/src/components/campanhas/CampanhasParametrosFields.jsx` e `CampanhasParametrosSections.jsx`
+  - `CampanhasRankingTab.jsx` e `CampanhasParametrosForm.jsx` viraram componentes de composicao fina
+- [x] quebrar internamente `CampanhasConfigTab.jsx` e `CampanhasDashboardTab.jsx`
+  - a aba de configuracoes foi separada em `frontend/src/components/campanhas/CampanhasConfigSchedulerHeader.jsx`, `CampanhasConfigBirthdaySection.jsx`, `CampanhasConfigInactivitySection.jsx` e `CampanhasConfigDestaqueSection.jsx`
+  - o dashboard foi separado em `frontend/src/components/campanhas/CampanhasDashboardMetricasGrid.jsx`, `CampanhasDashboardAniversariosCard.jsx`, `CampanhasDashboardAlertasSection.jsx` e `CampanhasDashboardProximosEventosSection.jsx`
+  - `CampanhasConfigTab.jsx` e `CampanhasDashboardTab.jsx` ficaram focados apenas em loading, estados vazios e composicao das secoes
+- [x] reduzir a orquestracao residual de `Campanhas.jsx` com compositor de pagina e grupos de modais
+  - a montagem das props de abas e modais foi movida para `frontend/src/hooks/useCampanhasPageComposition.js`
+  - a camada de modais foi separada em `frontend/src/components/campanhas/CampanhasOperacionaisModals.jsx` e `CampanhasGestaoModals.jsx`
+  - `CampanhasModalsLayer.jsx` caiu para `10` linhas e `Campanhas.jsx` ficou em `274` linhas
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

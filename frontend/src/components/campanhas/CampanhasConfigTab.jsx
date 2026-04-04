@@ -1,3 +1,8 @@
+import CampanhasConfigBirthdaySection from "./CampanhasConfigBirthdaySection";
+import CampanhasConfigDestaqueSection from "./CampanhasConfigDestaqueSection";
+import CampanhasConfigInactivitySection from "./CampanhasConfigInactivitySection";
+import CampanhasConfigSchedulerHeader from "./CampanhasConfigSchedulerHeader";
+
 export default function CampanhasConfigTab({
   schedulerConfigLoading,
   schedulerConfig,
@@ -15,15 +20,7 @@ export default function CampanhasConfigTab({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl border shadow-sm p-6">
-        <h2 className="font-semibold text-gray-800 mb-1">
-          {"\u2699\uFE0F"} Configuracoes de Envio
-        </h2>
-        <p className="text-xs text-gray-500">
-          Defina os horarios em que o sistema envia as mensagens automaticas de
-          cada campanha.
-        </p>
-      </div>
+      <CampanhasConfigSchedulerHeader />
 
       {schedulerConfigLoading && (
         <div className="text-center py-12 text-gray-400">
@@ -34,176 +31,18 @@ export default function CampanhasConfigTab({
 
       {schedulerConfig && !schedulerConfigLoading && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="text-2xl">{"\u{1F382}"}</span>
-              <div>
-                <h3 className="font-medium text-gray-800">
-                  Mensagens de Aniversario
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Enviadas todos os dias para aniversariantes do dia
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-600 w-44">
-                Hora de envio:
-              </label>
-              <select
-                value={schedulerConfig.birthday_send_hour}
-                onChange={(e) =>
-                  setSchedulerConfig({
-                    ...schedulerConfig,
-                    birthday_send_hour: Number(e.target.value),
-                  })
-                }
-                className="border rounded-lg px-3 py-2 text-sm"
-              >
-                {Array.from({ length: 24 }, (_, i) => (
-                  <option key={i} value={i}>
-                    {String(i).padStart(2, "0")}:00
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border shadow-sm p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="text-2xl">{"\u{1F634}"}</span>
-              <div>
-                <h3 className="font-medium text-gray-800">
-                  Mensagens de Reativacao (Clientes Inativos)
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Enviadas uma vez por semana para clientes sem compras ha muito
-                  tempo
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-600 w-44">
-                  Dia da semana:
-                </label>
-                <select
-                  value={schedulerConfig.inactivity_day_of_week}
-                  onChange={(e) =>
-                    setSchedulerConfig({
-                      ...schedulerConfig,
-                      inactivity_day_of_week: e.target.value,
-                    })
-                  }
-                  className="border rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="mon">Segunda-feira</option>
-                  <option value="tue">Terca-feira</option>
-                  <option value="wed">Quarta-feira</option>
-                  <option value="thu">Quinta-feira</option>
-                  <option value="fri">Sexta-feira</option>
-                  <option value="sat">Sabado</option>
-                  <option value="sun">Domingo</option>
-                </select>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-600 w-44">
-                  Hora de envio:
-                </label>
-                <select
-                  value={schedulerConfig.inactivity_send_hour}
-                  onChange={(e) =>
-                    setSchedulerConfig({
-                      ...schedulerConfig,
-                      inactivity_send_hour: Number(e.target.value),
-                    })
-                  }
-                  className="border rounded-lg px-3 py-2 text-sm"
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {String(i).padStart(2, "0")}:00
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="border rounded-xl p-5 bg-white shadow-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">{"\u{1F3C5}"}</span>
-              <div>
-                <h3 className="font-medium text-gray-800">
-                  Auto-envio do Destaque Mensal
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Calcula e envia automaticamente o cupom ao vencedor do mes no
-                  dia 1 as 08:00
-                </p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={schedulerConfig.auto_destaque_mensal ?? false}
-                  onChange={(e) =>
-                    setSchedulerConfig({
-                      ...schedulerConfig,
-                      auto_destaque_mensal: e.target.checked,
-                    })
-                  }
-                  className="w-4 h-4 rounded"
-                />
-                <span className="text-sm text-gray-700">
-                  Ativar envio automatico do Destaque Mensal
-                </span>
-              </label>
-              {schedulerConfig.auto_destaque_mensal && (
-                <div className="flex flex-col sm:flex-row gap-4 pl-6">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-600 w-44">
-                      Valor do cupom (R$):
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={schedulerConfig.auto_destaque_coupon_value ?? 50}
-                      onChange={(e) =>
-                        setSchedulerConfig({
-                          ...schedulerConfig,
-                          auto_destaque_coupon_value:
-                            parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      className="border rounded-lg px-3 py-2 text-sm w-28"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm text-gray-600 w-44">
-                      Validade (dias):
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={schedulerConfig.auto_destaque_coupon_days ?? 10}
-                      onChange={(e) =>
-                        setSchedulerConfig({
-                          ...schedulerConfig,
-                          auto_destaque_coupon_days:
-                            parseInt(e.target.value, 10) || 10,
-                        })
-                      }
-                      className="border rounded-lg px-3 py-2 text-sm w-28"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <CampanhasConfigBirthdaySection
+            schedulerConfig={schedulerConfig}
+            setSchedulerConfig={setSchedulerConfig}
+          />
+          <CampanhasConfigInactivitySection
+            schedulerConfig={schedulerConfig}
+            setSchedulerConfig={setSchedulerConfig}
+          />
+          <CampanhasConfigDestaqueSection
+            schedulerConfig={schedulerConfig}
+            setSchedulerConfig={setSchedulerConfig}
+          />
 
           <div className="flex justify-end">
             <button

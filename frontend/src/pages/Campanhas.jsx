@@ -15,12 +15,8 @@ import useCampanhasSorteios from "../hooks/useCampanhasSorteios";
 import useCampanhasLote from "../hooks/useCampanhasLote";
 import useCampanhasUnificacao from "../hooks/useCampanhasUnificacao";
 import useCampanhasFidelidade from "../hooks/useCampanhasFidelidade";
-import {
-  RANK_LABELS,
-  hoje,
-  primeiroDiaMes,
-  createDefaultPremio,
-} from "../components/campanhas/campanhasConstants";
+import { hoje, primeiroDiaMes, createDefaultPremio } from "../components/campanhas/campanhasConstants";
+import useCampanhasPageComposition from "../hooks/useCampanhasPageComposition";
 
 export default function Campanhas() {
   const campanhasConsultas = useCampanhasConsultas({
@@ -170,58 +166,96 @@ export default function Campanhas() {
     setFidManualNota,
     lancarCarimboManual,
   } = useCampanhasFidelidade();
-
-  const campanhasConfiguracoes = {
-    rankingConfig: rankingConfigState,
-    setRankingConfig: setRankingConfigState,
-    rankingConfigSalvando,
-    schedulerConfig: schedulerConfigState,
-    setSchedulerConfig: setSchedulerConfigState,
-    schedulerConfigSalvando,
-    salvarRankingConfig,
-    salvarSchedulerConfig,
-    recalcularRanking,
-    setResultadoLote,
-    setModalLote,
-  };
-  const campanhasRetencao = {
-    retencaoEditando,
-    setRetencaoEditando,
-    salvandoRetencao,
-    deletandoRetencao,
-    salvarRetencao,
-    deletarRetencao,
-    novaRegraPadrao: NOVA_REGRA_RETENCAO_PADRAO,
-  };
-  const campanhasCupons = {
-    anulando,
-    anularCupom,
-    formatarValorCupom,
-  };
-  const campanhasDestaque = {
-    destaqueResultado,
-    setDestaqueResultado,
-    enviarDestaque,
-    enviandoDestaque,
-  };
-  const campanhasSorteios = {
-    setErroCriarSorteio,
-    setModalSorteio,
-    inscrevendo,
-    inscreverSorteio,
-    executandoSorteio,
-    executarSorteio,
-    cancelarSorteio,
-    abrirCodigosOffline,
-    sorteioResultado,
-    setSorteioResultado,
-  };
-  const campanhasUnificacao = {
-    confirmandoMerge,
-    resultadoMerge,
-    confirmarMerge,
-    desfazerMerge,
-  };
+  const { mainContentProps, modalsLayerProps } = useCampanhasPageComposition({
+    aba,
+    setAba,
+    consultas: campanhasConsultas,
+    gestao: campanhasGestao,
+    gestor: {
+      ...campanhasGestor,
+      fidClienteId,
+      fidModalManual,
+      setFidModalManual,
+      fidLancandoManual,
+      fidManualNota,
+      setFidManualNota,
+      lancarCarimboManual,
+    },
+    configuracoes: {
+      rankingConfig: rankingConfigState,
+      setRankingConfig: setRankingConfigState,
+      rankingConfigSalvando,
+      schedulerConfig: schedulerConfigState,
+      setSchedulerConfig: setSchedulerConfigState,
+      schedulerConfigSalvando,
+      salvarRankingConfig,
+      salvarSchedulerConfig,
+      recalcularRanking,
+      modalLote,
+      setModalLote,
+      loteForm,
+      setLoteForm,
+      resultadoLote,
+      setResultadoLote,
+      enviarLote,
+      enviandoLote,
+    },
+    inativos: campanhasInativos,
+    retencao: {
+      retencaoEditando,
+      setRetencaoEditando,
+      salvandoRetencao,
+      deletandoRetencao,
+      salvarRetencao,
+      deletarRetencao,
+      novaRegraPadrao: NOVA_REGRA_RETENCAO_PADRAO,
+    },
+    cupons: {
+      anulando,
+      anularCupom,
+      formatarValorCupom,
+      modalCupomAberto,
+      setModalCupomAberto,
+      novoCupom,
+      setNovoCupom,
+      criandoCupom,
+      erroCupom,
+      setErroCupom,
+      criarCupomManual,
+    },
+    destaque: {
+      enviandoDestaque,
+      destaqueResultado,
+      setDestaqueResultado,
+      enviarDestaque,
+    },
+    sorteios: {
+      modalSorteio,
+      setModalSorteio,
+      novoSorteio,
+      setNovoSorteio,
+      criandoSorteio,
+      erroCriarSorteio,
+      setErroCriarSorteio,
+      executandoSorteio,
+      inscrevendo,
+      sorteioResultado,
+      setSorteioResultado,
+      modalCodigosOffline,
+      setModalCodigosOffline,
+      criarSorteio,
+      inscreverSorteio,
+      executarSorteio,
+      cancelarSorteio,
+      abrirCodigosOffline,
+    },
+    unificacao: {
+      confirmandoMerge,
+      resultadoMerge,
+      confirmarMerge,
+      desfazerMerge,
+    },
+  });
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -238,74 +272,9 @@ export default function Campanhas() {
 
       <CampanhasTabsBar aba={aba} onChange={setAba} />
 
-      <CampanhasMainContent
-        aba={aba}
-        onAbrirAba={setAba}
-        consultas={campanhasConsultas}
-        gestao={campanhasGestao}
-        gestor={campanhasGestor}
-        configuracoes={campanhasConfiguracoes}
-        inativos={campanhasInativos}
-        retencao={campanhasRetencao}
-        cupons={campanhasCupons}
-        destaque={campanhasDestaque}
-        sorteios={campanhasSorteios}
-        unificacao={campanhasUnificacao}
-      />
+      <CampanhasMainContent {...mainContentProps} />
 
-      <CampanhasModalsLayer
-        {...{
-          modalEnvioInativos: campanhasInativos.modalEnvioInativos,
-          setModalEnvioInativos: campanhasInativos.setModalEnvioInativos,
-          resultadoEnvioInativos: campanhasInativos.resultadoEnvioInativos,
-          setResultadoEnvioInativos: campanhasInativos.setResultadoEnvioInativos,
-          envioInativosForm: campanhasInativos.envioInativosForm,
-          setEnvioInativosForm: campanhasInativos.setEnvioInativosForm,
-          enviandoInativos: campanhasInativos.enviandoInativos,
-          enviarParaInativos: campanhasInativos.enviarParaInativos,
-          modalSorteio,
-          setModalSorteio,
-          novoSorteio,
-          setNovoSorteio,
-          erroCriarSorteio,
-          criarSorteio,
-          criandoSorteio,
-          modalCodigosOffline,
-          setModalCodigosOffline,
-          loadingCodigosOffline,
-          codigosOffline,
-          RANK_LABELS,
-          fidModalManual,
-          setFidModalManual,
-          fidClienteId,
-          fidManualNota,
-          setFidManualNota,
-          lancarCarimboManual,
-          fidLancandoManual,
-          modalLote,
-          setModalLote,
-          loteForm,
-          setLoteForm,
-          resultadoLote,
-          enviarLote,
-          enviandoLote,
-          modalCriarCampanha: campanhasGestao.modalCriarCampanha,
-          setModalCriarCampanha: campanhasGestao.setModalCriarCampanha,
-          novaCampanha: campanhasGestao.novaCampanha,
-          setNovaCampanha: campanhasGestao.setNovaCampanha,
-          erroCriarCampanha: campanhasGestao.erroCriarCampanha,
-          criarCampanha: campanhasGestao.criarCampanha,
-          criandoCampanha: campanhasGestao.criandoCampanha,
-          modalCupomAberto,
-          setModalCupomAberto,
-          setErroCupom,
-          novoCupom,
-          setNovoCupom,
-          erroCupom,
-          criarCupomManual,
-          criandoCupom,
-        }}
-      />
+      <CampanhasModalsLayer {...modalsLayerProps} />
     </div>
   );
 }
