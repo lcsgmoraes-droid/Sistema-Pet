@@ -732,6 +732,9 @@ Itens executados nesta etapa:
 - [x] extrair a camada de modais de `Campanhas.jsx` para composicao propria
   - os modais de envio para inativos, sorteio, codigos offline, carimbo manual, envio em lote, nova campanha e cupom manual foram movidos para `frontend/src/components/campanhas/CampanhasModalsLayer.jsx`
   - `Campanhas.jsx` caiu de `2713` para `1981` linhas e ficou mais focado na orquestracao das abas e estados de dominio
+- [x] concluir a quebra interna de `CampanhasModalsLayer.jsx` em modais dedicados
+  - os modais foram separados em `frontend/src/components/campanhas/CampanhasEnvioInativosModal.jsx`, `CampanhasSorteioModal.jsx`, `CampanhasCodigosOfflineModal.jsx`, `CampanhasCarimboManualModal.jsx`, `CampanhasLoteModal.jsx`, `CampanhasNovaCampanhaModal.jsx` e `CampanhasCupomManualModal.jsx`
+  - `CampanhasModalsLayer.jsx` deixou de concentrar JSX pesado e virou apenas uma camada de composicao entre os estados de dominio e os modais visuais
 
 Itens deliberadamente adiados por agora:
 
