@@ -69,7 +69,7 @@ export default function CampanhasParametrosForm({
     return (
       <div className="grid grid-cols-2 gap-3">
         <CampanhaField
-          label="Compra mínima (R$)"
+          label="Compra minima (R$)"
           id="p-min"
           value={num("min_purchase_value")}
           onChange={(e) =>
@@ -93,7 +93,7 @@ export default function CampanhasParametrosForm({
           onChange={(e) => set("reward_type", e.target.value)}
         >
           <option value="coupon">Cupom de desconto</option>
-          <option value="credit">Crédito cashback</option>
+          <option value="credit">Credito cashback</option>
         </CampanhaSel>
         <CampanhaField
           label="Valor da recompensa (R$)"
@@ -104,7 +104,7 @@ export default function CampanhasParametrosForm({
           }
         />
         <CampanhaField
-          label="Carimbo intermediário (0 = sem)"
+          label="Carimbo intermediario (0 = sem)"
           id="p-inter"
           step="1"
           min="0"
@@ -114,7 +114,7 @@ export default function CampanhasParametrosForm({
           }
         />
         <CampanhaField
-          label="Recompensa intermediária (R$)"
+          label="Recompensa intermediaria (R$)"
           id="p-inter-val"
           value={num("intermediate_reward_value") || 0}
           onChange={(e) =>
@@ -142,7 +142,7 @@ export default function CampanhasParametrosForm({
             onChange={(e) => set("rank_filter", e.target.value)}
           >
             <option value="all">Todos os clientes</option>
-            <option value="sem_rank">Sem classificação</option>
+            <option value="sem_rank">Sem classificacao</option>
             <option value="bronze">Bronze</option>
             <option value="silver">Prata</option>
             <option value="gold">Ouro</option>
@@ -156,23 +156,23 @@ export default function CampanhasParametrosForm({
 
   if (tipo === "cashback") {
     const levels = [
-      { key: "bronze_percent", label: "🥉 Bronze" },
-      { key: "silver_percent", label: "🥈 Prata" },
-      { key: "gold_percent", label: "🥇 Ouro" },
-      { key: "diamond_percent", label: "👑 Platina" },
-      { key: "platinum_percent", label: "💎 Diamante" },
+      { key: "bronze_percent", label: "Bronze" },
+      { key: "silver_percent", label: "Prata" },
+      { key: "gold_percent", label: "Ouro" },
+      { key: "diamond_percent", label: "Diamante" },
+      { key: "platinum_percent", label: "Platina" },
     ];
     const canais = [
-      { key: "pdv_bonus_percent", label: "🖥️ PDV (bônus %)" },
-      { key: "app_bonus_percent", label: "📱 App (bônus %)" },
-      { key: "ecommerce_bonus_percent", label: "🛒 Ecommerce (bônus %)" },
+      { key: "pdv_bonus_percent", label: "PDV (bonus %)" },
+      { key: "app_bonus_percent", label: "App (bonus %)" },
+      { key: "ecommerce_bonus_percent", label: "E-commerce (bonus %)" },
     ];
 
     return (
       <div className="space-y-4">
         <div>
           <p className="text-xs text-gray-500 mb-2">
-            % base por nível de ranking (crédito automático em toda compra).
+            % base por nivel de ranking (credito automatico em toda compra).
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {levels.map((lv) => (
@@ -190,8 +190,8 @@ export default function CampanhasParametrosForm({
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-2">
-            Bônus adicional por canal (somado ao % do nível). Ex: App +1%
-            incentiva uso do aplicativo.
+            Bonus adicional por canal (somado ao % do nivel). Ex.: App +1%
+            incentiva o uso do aplicativo.
           </p>
           <div className="grid grid-cols-3 gap-3">
             {canais.map((canal) => (
@@ -209,7 +209,7 @@ export default function CampanhasParametrosForm({
         </div>
         <div className="border-t pt-4">
           <p className="text-xs font-semibold text-gray-700 mb-2">
-            ⏰ Validade e Alertas
+            Validade e alertas
           </p>
           <div className="grid grid-cols-2 gap-3">
             <CampanhaField
@@ -255,12 +255,12 @@ export default function CampanhasParametrosForm({
       <div className="space-y-4">
         <div>
           <p className="text-xs font-semibold text-gray-700 mb-2">
-            🎁 O que o cliente recebe no aniversário?
+            O que o cliente recebe no aniversario?
           </p>
           <div className="flex gap-4">
             {[
-              { value: "cupom", label: "🎫 Cupom de desconto" },
-              { value: "brinde", label: "🎁 Brinde na loja" },
+              { value: "cupom", label: "Cupom de desconto" },
+              { value: "brinde", label: "Brinde na loja" },
             ].map((opt) => (
               <label
                 key={opt.value}
@@ -332,7 +332,7 @@ export default function CampanhasParametrosForm({
               <option value="all">Todos os canais</option>
               <option value="pdv">PDV</option>
               <option value="app">App</option>
-              <option value="ecommerce">Ecommerce</option>
+              <option value="ecommerce">E-commerce</option>
             </CampanhaSel>
           </div>
         )}
@@ -343,14 +343,14 @@ export default function CampanhasParametrosForm({
               htmlFor="p-bday-msg"
               className="block text-xs font-semibold text-gray-700"
             >
-              ✉️ Mensagem enviada ao cliente
+              Mensagem enviada ao cliente
             </label>
             <button
               type="button"
               onClick={() => set("notification_message", fraseSugerida)}
               className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
-              🔄 Usar frase sugerida
+              Usar frase sugerida
             </button>
           </div>
           <textarea
@@ -361,7 +361,7 @@ export default function CampanhasParametrosForm({
             className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
           />
           <p className="text-xs text-gray-400 mt-1">
-            Variáveis disponíveis:{" "}
+            Variaveis disponiveis:{" "}
             <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
             {ehPet && (
               <>
@@ -388,7 +388,7 @@ export default function CampanhasParametrosForm({
     return (
       <div className="grid grid-cols-2 gap-3">
         <CampanhaField
-          label="Compra mínima (R$)"
+          label="Compra minima (R$)"
           id="p-qr-min"
           value={num("min_purchase_value")}
           onChange={(e) =>
@@ -450,7 +450,7 @@ export default function CampanhasParametrosForm({
             type="text"
             value={str("notification_message")}
             onChange={(e) => set("notification_message", e.target.value)}
-            placeholder="Ex: Obrigado pela compra! Use o cupom {code} na próxima visita."
+            placeholder="Ex: Obrigado pela compra! Use o cupom {code} na proxima visita."
             className="w-full border rounded-lg px-3 py-1.5 text-sm"
           />
         </div>
@@ -572,11 +572,11 @@ export default function CampanhasParametrosForm({
   if (tipo === "ranking_monthly") {
     const levels = ["bronze", "silver", "gold", "diamond", "platinum"];
     const lvLabels = {
-      bronze: "🥉 Bronze",
-      silver: "🥈 Prata",
-      gold: "🥇 Ouro",
-      diamond: "👑 Platina",
-      platinum: "💎 Diamante",
+      bronze: "Bronze",
+      silver: "Prata",
+      gold: "Ouro",
+      diamond: "Diamante",
+      platinum: "Platina",
     };
     const getLv = (lv) => paramsEditando[lv] || {};
     const setLv = (lv, key, val) =>
@@ -585,23 +585,23 @@ export default function CampanhasParametrosForm({
     return (
       <div>
         <p className="text-xs text-gray-500 mb-2">
-          Critérios mínimos para cada nível. Recalculado mensalmente.
+          Criterios minimos para cada nivel. Recalculado mensalmente.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-100">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                  Nível
+                  Nivel
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                  Gasto mín. (R$)
+                  Gasto minimo (R$)
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                  Compras mín.
+                  Compras minimas
                 </th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                  Meses ativos mín.
+                  Meses ativos minimos
                 </th>
               </tr>
             </thead>

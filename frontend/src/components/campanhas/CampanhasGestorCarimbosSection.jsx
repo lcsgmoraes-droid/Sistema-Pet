@@ -18,8 +18,8 @@ export default function CampanhasGestorCarimbosSection({
 
   return (
     <CampanhasGestorSection
-      icon="🏷️"
-      title="Cartão Fidelidade"
+      icon="\u{1F3F7}\uFE0F"
+      title="Cartao Fidelidade"
       subtitle={`${gestorSaldo.total_carimbos} carimbo(s) ativo(s)`}
       isOpen={isOpen}
       onToggle={() => setGestorSecao(isOpen ? null : "carimbos")}
@@ -27,18 +27,18 @@ export default function CampanhasGestorCarimbosSection({
       <div className="p-6 space-y-4">
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-sm font-medium text-green-800 mb-3">
-            Lançar carimbo manual
+            Lancar carimbo manual
           </p>
           <div className="flex gap-3 flex-wrap items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Observação (opcional)
+                Observacao (opcional)
               </label>
               <input
                 type="text"
                 value={gestorCarimboNota}
                 onChange={(e) => setGestorCarimboNota(e.target.value)}
-                placeholder="Ex: Conversão de cartão físico"
+                placeholder="Ex: Conversao de cartao fisico"
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               />
             </div>
@@ -47,7 +47,7 @@ export default function CampanhasGestorCarimbosSection({
               disabled={gestorLancandoCarimbo}
               className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
             >
-              {gestorLancandoCarimbo ? "Lançando..." : "Lançar Carimbo"}
+              {gestorLancandoCarimbo ? "Lancando..." : "Lancar Carimbo"}
             </button>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function CampanhasGestorCarimbosSection({
                     Status
                   </th>
                   <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
-                    Ação
+                    Acao
                   </th>
                 </tr>
               </thead>
@@ -104,12 +104,12 @@ export default function CampanhasGestorCarimbosSection({
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
-                            Automático
+                            Automatico
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-gray-500 text-xs max-w-[180px] truncate">
-                        {stamp.notes || "—"}
+                        {stamp.notes || "-"}
                       </td>
                       <td className="px-4 py-2 text-center">
                         {stamp.voided_at ? (

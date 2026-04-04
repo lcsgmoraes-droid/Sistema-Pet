@@ -24,7 +24,7 @@ export default function useCampanhasGestao({
   const criarCampanha = async () => {
     setErroCriarCampanha("");
     if (!novaCampanha.name.trim()) {
-      setErroCriarCampanha("Nome obrigatório.");
+      setErroCriarCampanha("Nome obrigatorio.");
       return;
     }
     setCriandoCampanha(true);
@@ -50,7 +50,7 @@ export default function useCampanhasGestao({
   const arquivarCampanha = async (campanha) => {
     if (
       !window.confirm(
-        `Arquivar a campanha "${campanha.name}"? Ela ficará inativa e não poderá ser reativada pela interface.`,
+        `Arquivar a campanha "${campanha.name}"? Ela ficara inativa e nao podera ser reativada pela interface.`,
       )
     ) {
       return;
@@ -120,15 +120,15 @@ export default function useCampanhasGestao({
       );
       fecharEdicao();
     } catch (e) {
-      console.error("Erro ao salvar parâmetros:", e);
-      alert("Erro ao salvar os parâmetros.");
+      console.error("Erro ao salvar parametros:", e);
+      alert("Erro ao salvar os parametros.");
     } finally {
       setSalvandoParams(false);
     }
   };
 
   const formatarParams = (tipo, params) => {
-    if (!params) return "—";
+    if (!params) return "-";
     if (tipo === "loyalty_stamp") {
       return `${params.stamps_to_complete || "?"} carimbos -> R$ ${formatBRL(params.reward_value || 0)} de recompensa`;
     }
@@ -139,8 +139,8 @@ export default function useCampanhasGestao({
       const tipoPresente = params.tipo_presente || "cupom";
       if (tipoPresente === "brinde") return "Brinde na loja";
       return params.coupon_type === "percent"
-        ? `Cupom ${params.coupon_value || "?"}% de desconto · ${params.coupon_valid_days || "?"} dias`
-        : `Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto · ${params.coupon_valid_days || "?"} dias`;
+        ? `Cupom ${params.coupon_value || "?"}% de desconto em ${params.coupon_valid_days || "?"} dias`
+        : `Cupom R$ ${formatBRL(params.coupon_value || 0)} de desconto em ${params.coupon_valid_days || "?"} dias`;
     }
     if (tipo === "inactivity") {
       const valor =
@@ -150,17 +150,17 @@ export default function useCampanhasGestao({
       return `Inativo ${params.inactivity_days || "?"} dias -> ${valor} desconto`;
     }
     if (tipo === "welcome" || tipo === "welcome_app") {
-      return `Boas-vindas: R$ ${formatBRL(params.coupon_value || 0)} de bônus`;
+      return `Boas-vindas: R$ ${formatBRL(params.coupon_value || 0)} de bonus`;
     }
     if (tipo === "ranking_monthly") {
-      return `${Object.keys(params).length} níveis configurados`;
+      return `${Object.keys(params).length} niveis configurados`;
     }
     if (tipo === "quick_repurchase") {
       const valor =
         params.coupon_type === "fixed"
           ? `R$ ${formatBRL(params.coupon_value || 0)}`
           : `${params.coupon_value || "?"}%`;
-      return `Pós-compra: ${valor} desconto · ${params.coupon_valid_days || "?"} dias`;
+      return `Pos-compra: ${valor} desconto em ${params.coupon_valid_days || "?"} dias`;
     }
     return `${JSON.stringify(params).slice(0, 60)}...`;
   };

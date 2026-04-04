@@ -105,7 +105,7 @@ export default function useCampanhasGestor() {
     try {
       await api.post("/campanhas/carimbos/manual", {
         customer_id: gestorCliente.id,
-        nota: gestorCarimboNota || "Carimbo lançado manualmente pelo operador",
+        nota: gestorCarimboNota || "Carimbo lancado manualmente pelo operador",
       });
       setGestorCarimboNota("");
       await recarregarGestor();
@@ -148,8 +148,8 @@ export default function useCampanhasGestor() {
         description:
           gestorCashbackDesc ||
           (gestorCashbackTipo === "debito"
-            ? "Débito manual de cashback"
-            : "Crédito manual de cashback"),
+            ? "Debito manual de cashback"
+            : "Credito manual de cashback"),
       });
       setGestorCashbackValor("");
       setGestorCashbackDesc("");

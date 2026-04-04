@@ -15,13 +15,13 @@ export default function CampanhasRetencaoTab({
   return (
     <div className="space-y-4">
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
-        <span className="text-2xl">🔄</span>
+        <span className="text-2xl">♻️</span>
         <div>
-          <p className="font-semibold text-orange-800">Retenção Dinâmica</p>
+          <p className="font-semibold text-orange-800">Retencao Dinamica</p>
           <p className="text-sm text-orange-700 mt-0.5">
-            Cada regra detecta clientes que não compraram há X dias e envia
-            automaticamente um cupom de incentivo. Você pode ter múltiplas
-            réguas: 30 dias, 60 dias, 90 dias, cada uma com desconto e
+            Cada regra detecta clientes que nao compraram ha X dias e envia
+            automaticamente um cupom de incentivo. Voce pode ter multiplas
+            reguas: 30 dias, 60 dias, 90 dias, cada uma com desconto e
             mensagem diferentes.
           </p>
         </div>
@@ -41,7 +41,7 @@ export default function CampanhasRetencaoTab({
           onClick={onNovaRegra}
           className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium"
         >
-          <span>➕</span> Nova Regra de Retenção
+          <span>+</span> Nova Regra de Retencao
         </button>
       )}
 
@@ -49,12 +49,12 @@ export default function CampanhasRetencaoTab({
         <p className="text-gray-500 text-sm">Carregando...</p>
       ) : retencaoRegras.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-500">
-          <p className="text-3xl mb-2">😴</p>
+          <p className="text-3xl mb-2">🧭</p>
           <p className="font-medium">
-            Nenhuma regra de retenção cadastrada ainda.
+            Nenhuma regra de retencao cadastrada ainda.
           </p>
           <p className="text-sm mt-1">
-            Crie sua primeira regra para começar a recuperar clientes inativos.
+            Crie sua primeira regra para comecar a recuperar clientes inativos.
           </p>
         </div>
       ) : (
@@ -70,7 +70,8 @@ export default function CampanhasRetencaoTab({
                 </p>
                 <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-600">
                   <span>
-                    ⏱️ <strong>{regra.params?.inactivity_days ?? "?"} dias</strong>{" "}
+                    🕒{" "}
+                    <strong>{regra.params?.inactivity_days ?? "?"} dias</strong>{" "}
                     sem compra
                   </span>
                   <span>
@@ -92,7 +93,7 @@ export default function CampanhasRetencaoTab({
                         : "bg-gray-100 text-gray-500"
                     }`}
                   >
-                    {regra.status === "active" ? "✅ Ativa" : "⏸️ Pausada"}
+                    {regra.status === "active" ? "Ativa" : "Pausada"}
                   </span>
                 </div>
                 {regra.params?.notification_message && (
@@ -114,14 +115,14 @@ export default function CampanhasRetencaoTab({
                   }
                   className="px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50"
                 >
-                  ✏️ Editar
+                  Editar
                 </button>
                 <button
                   onClick={() => onDeletarRegra(regra.id)}
                   disabled={deletandoRetencao === regra.id}
                   className="px-3 py-1.5 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
                 >
-                  {deletandoRetencao === regra.id ? "..." : "🗑️"}
+                  {deletandoRetencao === regra.id ? "..." : "Excluir"}
                 </button>
               </div>
             </div>

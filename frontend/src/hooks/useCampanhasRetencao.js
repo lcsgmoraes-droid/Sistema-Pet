@@ -9,7 +9,7 @@ export const NOVA_REGRA_RETENCAO_PADRAO = {
   coupon_valid_days: 7,
   coupon_channel: "all",
   notification_message:
-    "Olá, {nome}! Sentimos sua falta. Use o cupom {code} e ganhe {value}% de desconto.",
+    "Ola, {nome}! Sentimos sua falta. Use o cupom {code} e ganhe {value}% de desconto.",
   priority: 50,
 };
 
@@ -36,7 +36,7 @@ export default function useCampanhasRetencao({ carregarRetencao }) {
   };
 
   const deletarRetencao = async (id) => {
-    if (!window.confirm("Remover esta regra de retenção?")) return;
+    if (!window.confirm("Remover esta regra de retencao?")) return;
     setDeletandoRetencao(id);
     try {
       await api.delete(`/campanhas/retencao/${id}`);

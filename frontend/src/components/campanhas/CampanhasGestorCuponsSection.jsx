@@ -15,9 +15,9 @@ export default function CampanhasGestorCuponsSection({
 
   return (
     <CampanhasGestorSection
-      icon="🎟️"
+      icon="\u{1F39F}\uFE0F"
       title="Cupons"
-      subtitle={`${ativos} ativo(s) · ${gestorCupons?.length || 0} no total`}
+      subtitle={`${ativos} ativo(s) de ${gestorCupons?.length || 0} no total`}
       isOpen={isOpen}
       onToggle={() => setGestorSecao(isOpen ? null : "cupons")}
     >
@@ -27,7 +27,7 @@ export default function CampanhasGestorCuponsSection({
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
-                  Código
+                  Codigo
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
                   Desconto
@@ -39,7 +39,7 @@ export default function CampanhasGestorCuponsSection({
                   Status
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">
-                  Ação
+                  Acao
                 </th>
               </tr>
             </thead>

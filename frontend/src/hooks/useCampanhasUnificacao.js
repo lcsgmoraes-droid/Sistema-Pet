@@ -11,7 +11,7 @@ export default function useCampanhasUnificacao({
   const confirmarMerge = async (keepId, removeId, motivo) => {
     if (
       !globalThis.confirm(
-        `Unificar clientes? O cliente #${removeId} será mesclado no #${keepId}. Os dados de campanhas serão transferidos.`,
+        `Unificar clientes? O cliente #${removeId} sera mesclado no #${keepId}. Os dados de campanhas serao transferidos.`,
       )
     ) {
       return;
@@ -42,7 +42,7 @@ export default function useCampanhasUnificacao({
   const desfazerMerge = async (mergeId) => {
     if (
       !globalThis.confirm(
-        "Desfazer esta unificação? Os dados de campanhas serão restaurados.",
+        "Desfazer esta unificacao? Os dados de campanhas serao restaurados.",
       )
     ) {
       return;

@@ -28,7 +28,7 @@ export default function CampanhasRetencaoForm({
             type="text"
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="Ex: Retenção 30 dias"
+            placeholder="Ex: Retencao 30 dias"
             className="w-full border rounded-lg px-3 py-1.5 text-sm"
           />
         </div>

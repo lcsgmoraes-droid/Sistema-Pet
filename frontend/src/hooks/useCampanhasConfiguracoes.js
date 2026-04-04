@@ -16,7 +16,7 @@ export default function useCampanhasConfiguracoes({
     setRankingConfigSalvando(true);
     try {
       await api.put("/campanhas/ranking/config", rankingConfig);
-      alert("Critérios de ranking salvos!");
+      alert("Criterios de ranking salvos!");
     } catch (e) {
       alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
     } finally {
@@ -29,7 +29,7 @@ export default function useCampanhasConfiguracoes({
     try {
       await api.put("/campanhas/config/horarios", schedulerConfig);
       await carregarSchedulerConfig();
-      alert("Configurações de envio salvas!");
+      alert("Configuracoes de envio salvas!");
     } catch (e) {
       alert("Erro ao salvar: " + (e?.response?.data?.detail || e.message));
     } finally {
@@ -41,7 +41,7 @@ export default function useCampanhasConfiguracoes({
     try {
       await api.post("/campanhas/ranking/recalcular");
       alert(
-        "Recálculo de ranking enfileirado! O worker processará em até 10 segundos.",
+        "Recalculo de ranking enfileirado! O worker processara em ate 10 segundos.",
       );
       setTimeout(() => carregarRanking(), 3000);
     } catch (e) {

@@ -2,7 +2,7 @@ import CampanhasParametrosForm from "./CampanhasParametrosForm";
 
 const FALLBACK_TIPO = {
   color: "bg-gray-100 text-gray-700",
-  emoji: "📋",
+  emoji: "\u{1F4CB}",
 };
 
 export default function CampanhasListTab({
@@ -51,7 +51,7 @@ export default function CampanhasListTab({
         </div>
       ) : campanhas.length === 0 ? (
         <div className="p-8 text-center text-gray-400">
-          <p className="text-2xl mb-2">🎪</p>
+          <p className="text-2xl mb-2">{"\u{1F3AA}"}</p>
           <p>Nenhuma campanha cadastrada ainda.</p>
         </div>
       ) : (
@@ -86,13 +86,11 @@ export default function CampanhasListTab({
 
                   <button
                     onClick={() =>
-                      editando
-                        ? onFecharEdicao()
-                        : onAbrirEdicao(campanha)
+                      editando ? onFecharEdicao() : onAbrirEdicao(campanha)
                     }
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                   >
-                    {editando ? "Cancelar" : "⚙️ Configurar"}
+                    {editando ? "Cancelar" : "\u2699\uFE0F Configurar"}
                   </button>
 
                   {userCreatableTypes.has(campanha.campaign_type) && (
@@ -102,7 +100,7 @@ export default function CampanhasListTab({
                       className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors disabled:opacity-50"
                       title="Arquivar campanha"
                     >
-                      {arquivando === campanha.id ? "..." : "🗑️"}
+                      {arquivando === campanha.id ? "..." : "\u{1F5D1}\uFE0F"}
                     </button>
                   )}
 
@@ -118,15 +116,15 @@ export default function CampanhasListTab({
                     {toggling === campanha.id
                       ? "..."
                       : ativa
-                        ? "✅ Ativa"
-                        : "⏸️ Pausada"}
+                        ? "\u2705 Ativa"
+                        : "\u23F8\uFE0F Pausada"}
                   </button>
                 </div>
 
                 {editando && (
                   <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <p className="text-xs font-semibold text-blue-700 mb-3">
-                      ⚙️ Parâmetros —{" "}
+                      {"\u2699\uFE0F"} Parametros -{" "}
                       {tipoLabels[campanha.campaign_type]?.label ||
                         campanha.campaign_type}
                     </p>
@@ -140,7 +138,9 @@ export default function CampanhasListTab({
                       disabled={salvandoParams}
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {salvandoParams ? "Salvando..." : "💾 Salvar Parâmetros"}
+                      {salvandoParams
+                        ? "Salvando..."
+                        : "\u{1F4BE} Salvar Parametros"}
                     </button>
                   </div>
                 )}

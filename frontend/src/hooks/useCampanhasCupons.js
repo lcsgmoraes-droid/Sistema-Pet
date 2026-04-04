@@ -29,7 +29,7 @@ export default function useCampanhasCupons({
     async (code) => {
       if (
         !window.confirm(
-          `Anular o cupom ${code}? Esta ação não pode ser desfeita.`,
+          `Anular o cupom ${code}? Esta acao nao pode ser desfeita.`,
         )
       ) {
         return;
@@ -95,7 +95,7 @@ export default function useCampanhasCupons({
     if (cupom.coupon_type === "fixed" && cupom.discount_value) {
       return `R$ ${formatBRL(cupom.discount_value)} off`;
     }
-    return "—";
+    return "-";
   };
 
   return {

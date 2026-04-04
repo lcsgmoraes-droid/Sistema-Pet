@@ -18,7 +18,7 @@ export default function CampanhasGestorCashbackSection({
 
   return (
     <CampanhasGestorSection
-      icon="💰"
+      icon="\u{1F4B8}"
       title="Cashback"
       subtitle={`Saldo: R$ ${formatBRL(gestorSaldo.saldo_cashback)}`}
       isOpen={isOpen}
@@ -51,8 +51,8 @@ export default function CampanhasGestorCashbackSection({
                 onChange={(e) => setGestorCashbackTipo(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               >
-                <option value="credito">Crédito (adicionar)</option>
-                <option value="debito">Débito (remover)</option>
+                <option value="credito">Credito (adicionar)</option>
+                <option value="debito">Debito (remover)</option>
               </select>
             </div>
 
@@ -79,7 +79,7 @@ export default function CampanhasGestorCashbackSection({
                 type="text"
                 value={gestorCashbackDesc}
                 onChange={(e) => setGestorCashbackDesc(e.target.value)}
-                placeholder="Ex: Correção de campanha"
+                placeholder="Ex: Correcao de campanha"
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               />
             </div>
@@ -97,8 +97,8 @@ export default function CampanhasGestorCashbackSection({
             {gestorLancandoCashback
               ? "Salvando..."
               : gestorCashbackTipo === "debito"
-                ? "Confirmar débito"
-                : "Confirmar crédito"}
+                ? "Confirmar debito"
+                : "Confirmar credito"}
           </button>
         </div>
       </div>

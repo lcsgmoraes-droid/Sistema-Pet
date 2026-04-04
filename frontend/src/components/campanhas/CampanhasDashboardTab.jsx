@@ -1,6 +1,11 @@
 import { formatBRL } from "../../utils/formatters";
 
-function DashboardMetricCard({ value, label, className = "text-blue-700", extra }) {
+function DashboardMetricCard({
+  value,
+  label,
+  className = "text-blue-700",
+  extra,
+}) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
       <p className={`text-3xl font-bold ${className}`}>{value}</p>
@@ -18,7 +23,9 @@ export default function CampanhasDashboardTab({
 }) {
   if (loadingDashboard) {
     return (
-      <div className="p-8 text-center text-gray-400">Carregando dashboard...</div>
+      <div className="p-8 text-center text-gray-400">
+        Carregando dashboard...
+      </div>
     );
   }
 
@@ -35,7 +42,7 @@ export default function CampanhasDashboardTab({
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <DashboardMetricCard
           value={dashboard.campanhas_ativas?.total ?? dashboard.campanhas_ativas}
-          label="📢 Campanhas ativas"
+          label="\u{1F4E2} Campanhas ativas"
           extra={
             dashboard.campanhas_ativas?.nomes?.length > 0 ? (
               <div className="mt-2 text-left space-y-0.5">
@@ -50,17 +57,17 @@ export default function CampanhasDashboardTab({
         />
         <DashboardMetricCard
           value={dashboard.cupons_emitidos_hoje}
-          label="🎟️ Cupons emitidos hoje"
+          label="\u{1F39F}\uFE0F Cupons emitidos hoje"
           className="text-green-700"
         />
         <DashboardMetricCard
           value={dashboard.cupons_usados_hoje}
-          label="✅ Cupons usados hoje"
+          label="\u2705 Cupons usados hoje"
           className="text-orange-700"
         />
         <DashboardMetricCard
           value={`R$ ${formatBRL(dashboard.saldo_passivo_cashback || 0)}`}
-          label="💰 Saldo passivo (cashback)"
+          label="\u{1F4B0} Saldo passivo (cashback)"
           className="text-2xl text-purple-700"
         />
         <div
@@ -77,12 +84,12 @@ export default function CampanhasDashboardTab({
                 : "text-indigo-700"
             }`}
           >
-            {dashboard.proximos_eventos?.dias_ate_fim_mes ?? "—"}
+            {dashboard.proximos_eventos?.dias_ate_fim_mes ?? "-"}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            🌟{" "}
+            {"\u{1F31F}"}{" "}
             {dashboard.proximos_eventos?.dias_ate_fim_mes === 0
-              ? "Último dia — calcule o destaque!"
+              ? "Ultimo dia - calcule o destaque!"
               : "dia(s) p/ Destaque Mensal"}
           </p>
         </div>
@@ -91,32 +98,38 @@ export default function CampanhasDashboardTab({
             <p className="text-3xl font-bold text-red-700">
               {dashboard.cupons_expirados_hoje}
             </p>
-            <p className="text-xs text-gray-500 mt-1">⏰ Cupons expiram hoje</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {"\u23F0"} Cupons expiram hoje
+            </p>
           </div>
         )}
         <DashboardMetricCard
           value={dashboard.cupons_ativos_total ?? 0}
-          label="📦 Cupons ativos no total"
+          label="\u{1F4E6} Cupons ativos no total"
           className="text-teal-700"
         />
       </div>
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b bg-pink-50 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800">🎂 Aniversários de Hoje</h2>
+          <h2 className="font-semibold text-gray-800">
+            {"\u{1F382}"} Aniversarios de Hoje
+          </h2>
           <span className="text-sm text-pink-600 font-medium">
-            {dashboard.total_aniversarios} aniversário(s)
+            {dashboard.total_aniversarios} aniversario(s)
           </span>
         </div>
         {dashboard.aniversarios_hoje.length === 0 ? (
           <div className="p-6 text-center text-gray-400 text-sm">
-            Nenhum aniversário hoje.
+            Nenhum aniversario hoje.
           </div>
         ) : (
           <div className="divide-y">
             {dashboard.aniversarios_hoje.map((a, i) => (
               <div key={i} className="px-6 py-3 flex items-center gap-3">
-                <span className="text-xl">{a.tipo === "pet" ? "🐕" : "👤"}</span>
+                <span className="text-xl">
+                  {a.tipo === "pet" ? "\u{1F415}" : "\u{1F464}"}
+                </span>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{a.nome}</p>
                   <p className="text-xs text-gray-500">
@@ -125,7 +138,7 @@ export default function CampanhasDashboardTab({
                   </p>
                 </div>
                 <span className="text-xs bg-pink-100 text-pink-700 px-2 py-0.5 rounded-full">
-                  🎂 Hoje!
+                  {"\u{1F382}"} Hoje!
                 </span>
               </div>
             ))}
@@ -135,20 +148,22 @@ export default function CampanhasDashboardTab({
 
       {dashboard.alertas && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-gray-800">⚠️ Alertas do Dia</h2>
+          <h2 className="font-semibold text-gray-800">
+            {"\u26A0\uFE0F"} Alertas do Dia
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
               {
                 dias: 30,
                 count: dashboard.alertas.inativos_30d,
-                label: "😴 Clientes sem compra há +30 dias",
+                label: "\u{1F634} Clientes sem compra ha +30 dias",
                 colors: "bg-orange-50 border-orange-200",
                 textColor: "text-orange-700",
               },
               {
                 dias: 60,
                 count: dashboard.alertas.inativos_60d,
-                label: "🚨 Clientes sem compra há +60 dias",
+                label: "\u{1F6A8} Clientes sem compra ha +60 dias",
                 colors: "bg-red-50 border-red-200",
                 textColor: "text-red-700",
               },
@@ -172,7 +187,7 @@ export default function CampanhasDashboardTab({
                     onClick={() => onAbrirEnvioInativos(dias)}
                     className="mt-2 text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1 rounded-lg transition-colors"
                   >
-                    ✉️ Enviar e-mail de reativação
+                    {"\u2709\uFE0F"} Enviar e-mail de reativacao
                   </button>
                 )}
               </div>
@@ -193,14 +208,18 @@ export default function CampanhasDashboardTab({
               >
                 {dashboard.alertas.total_sorteios_pendentes}
               </p>
-              <p className="text-xs text-gray-500 mt-1">🎲 Sorteio(s) não executado(s)</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {"\u{1F3B2}"} Sorteio(s) nao executado(s)
+              </p>
             </div>
           </div>
 
           {dashboard.alertas.sorteios_pendentes?.length > 0 && (
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b bg-yellow-50">
-                <p className="text-sm font-medium text-yellow-800">🎲 Sorteios Pendentes</p>
+                <p className="text-sm font-medium text-yellow-800">
+                  {"\u{1F3B2}"} Sorteios Pendentes
+                </p>
               </div>
               <div className="divide-y">
                 {dashboard.alertas.sorteios_pendentes.map((s) => (
@@ -209,7 +228,9 @@ export default function CampanhasDashboardTab({
                     className="px-4 py-3 flex items-center justify-between"
                   >
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{s.name}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {s.name}
+                      </p>
                       <p className="text-xs text-gray-500">
                         Status: {s.status}
                         {s.draw_date
@@ -233,7 +254,8 @@ export default function CampanhasDashboardTab({
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b bg-amber-50 flex items-center justify-between">
                 <p className="text-sm font-medium text-amber-800">
-                  🎁 Brindes Pendentes de Retirada ({dashboard.alertas.total_brindes_pendentes})
+                  {"\u{1F381}"} Brindes Pendentes de Retirada (
+                  {dashboard.alertas.total_brindes_pendentes})
                 </p>
                 <button
                   onClick={() => onAbrirAba("cupons")}
@@ -254,9 +276,9 @@ export default function CampanhasDashboardTab({
                       </p>
                       <p className="text-xs text-gray-500">
                         {b.categoria === "maior_gasto"
-                          ? "💰 Maior Gasto"
+                          ? "\u{1F4B0} Maior Gasto"
                           : b.categoria === "mais_compras"
-                            ? "🛒 Mais Compras"
+                            ? "\u{1F6D2} Mais Compras"
                             : b.categoria}
                         {b.periodo ? ` • ${b.periodo}` : ""}
                       </p>
@@ -268,7 +290,7 @@ export default function CampanhasDashboardTab({
                     </div>
                     {b.retirar_ate && (
                       <span className="text-xs text-gray-400 shrink-0">
-                        até {new Date(b.retirar_ate).toLocaleDateString("pt-BR")}
+                        ate {new Date(b.retirar_ate).toLocaleDateString("pt-BR")}
                       </span>
                     )}
                   </div>
@@ -286,12 +308,14 @@ export default function CampanhasDashboardTab({
 
       {dashboard.proximos_eventos && (
         <div className="space-y-3">
-          <h2 className="font-semibold text-gray-800">📅 Próximos Eventos</h2>
+          <h2 className="font-semibold text-gray-800">
+            {"\u{1F4C5}"} Proximos Eventos
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b bg-pink-50 flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-800">
-                  🎂 Aniversários Amanhã
+                  {"\u{1F382}"} Aniversarios Amanha
                 </p>
                 <span className="text-xs text-pink-600 font-medium">
                   {dashboard.proximos_eventos.total_aniversarios_amanha} pessoa(s)
@@ -299,13 +323,13 @@ export default function CampanhasDashboardTab({
               </div>
               {dashboard.proximos_eventos.aniversarios_amanha.length === 0 ? (
                 <div className="px-4 py-4 text-xs text-gray-400 text-center">
-                  Nenhum aniversário amanhã.
+                  Nenhum aniversario amanha.
                 </div>
               ) : (
                 <div className="divide-y">
                   {dashboard.proximos_eventos.aniversarios_amanha.map((a, i) => (
                     <div key={i} className="px-4 py-2.5 flex items-center gap-2">
-                      <span>{a.tipo === "pet" ? "🐕" : "👤"}</span>
+                      <span>{a.tipo === "pet" ? "\u{1F415}" : "\u{1F464}"}</span>
                       <span className="text-sm text-gray-800">{a.nome}</span>
                       <span className="ml-auto text-xs text-gray-400">
                         {a.tipo === "pet" ? "Pet" : "Cliente"}
@@ -318,13 +342,15 @@ export default function CampanhasDashboardTab({
 
             <div className="space-y-3">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-4">
-                <span className="text-3xl">🌟</span>
+                <span className="text-3xl">{"\u{1F31F}"}</span>
                 <div>
-                  <p className="font-semibold text-amber-900">Destaque Mensal</p>
+                  <p className="font-semibold text-amber-900">
+                    Destaque Mensal
+                  </p>
                   <p className="text-sm text-amber-700">
                     {dashboard.proximos_eventos.dias_ate_fim_mes === 0
-                      ? "Hoje é o último dia do mês!"
-                      : `Faltam ${dashboard.proximos_eventos.dias_ate_fim_mes} dia(s) para o fim do mês`}
+                      ? "Hoje e o ultimo dia do mes!"
+                      : `Faltam ${dashboard.proximos_eventos.dias_ate_fim_mes} dia(s) para o fim do mes`}
                   </p>
                 </div>
               </div>
@@ -333,7 +359,7 @@ export default function CampanhasDashboardTab({
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                   <div className="px-4 py-3 border-b bg-yellow-50">
                     <p className="text-sm font-medium text-gray-800">
-                      🎲 Sorteios Esta Semana
+                      {"\u{1F3B2}"} Sorteios Esta Semana
                     </p>
                   </div>
                   <div className="divide-y">
@@ -346,7 +372,7 @@ export default function CampanhasDashboardTab({
                         <span className="text-xs text-gray-500">
                           {s.draw_date
                             ? new Date(s.draw_date).toLocaleDateString("pt-BR")
-                            : "—"}
+                            : "-"}
                         </span>
                       </div>
                     ))}

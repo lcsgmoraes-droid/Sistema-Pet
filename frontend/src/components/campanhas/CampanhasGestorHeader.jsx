@@ -17,10 +17,10 @@ export default function CampanhasGestorHeader({
     <div className="bg-white rounded-xl border shadow-sm p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
-          <h2 className="font-semibold text-gray-800">Gestor de Benefícios</h2>
+          <h2 className="font-semibold text-gray-800">Gestor de Beneficios</h2>
           <p className="text-xs text-gray-500 mt-0.5">
             {gestorModo === "cliente"
-              ? "Busque um cliente para gerenciar seus benefícios."
+              ? "Busque um cliente para gerenciar seus beneficios."
               : "Selecione um tipo e veja todos os clientes participantes."}
           </p>
         </div>
@@ -83,7 +83,7 @@ export default function CampanhasGestorHeader({
                   </p>
                   <p className="text-xs text-gray-400">
                     {cliente.cpf ? `CPF: ${cliente.cpf}` : ""}
-                    {cliente.cpf && cliente.telefone ? " · " : ""}
+                    {cliente.cpf && cliente.telefone ? " • " : ""}
                     {cliente.telefone || ""}
                   </p>
                 </button>
@@ -100,10 +100,10 @@ export default function CampanhasGestorHeader({
             onChange={(e) => setGestorCampanhaTipo(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm min-w-[200px]"
           >
-            <option value="carimbos">Cartão Fidelidade</option>
+            <option value="carimbos">Cartao Fidelidade</option>
             <option value="cashback">Cashback (saldo positivo)</option>
             <option value="cupons">Cupons Ativos</option>
-            <option value="ranking">Ranking (mês atual)</option>
+            <option value="ranking">Ranking (mes atual)</option>
           </select>
           <button
             onClick={() => carregarClientesPorCampanha(gestorCampanhaTipo)}

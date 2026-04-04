@@ -28,7 +28,7 @@ export default function useCampanhasSorteios({
   const criarSorteio = async () => {
     setErroCriarSorteio("");
     if (!novoSorteio.name.trim()) {
-      setErroCriarSorteio("Nome obrigatório.");
+      setErroCriarSorteio("Nome obrigatorio.");
       return;
     }
     setCriandoSorteio(true);
@@ -69,7 +69,7 @@ export default function useCampanhasSorteios({
   };
 
   const executarSorteio = async (drawingId) => {
-    if (!window.confirm("Executar o sorteio agora? Esta ação é irreversível.")) {
+    if (!window.confirm("Executar o sorteio agora? Esta acao e irreversivel.")) {
       return;
     }
     setExecutandoSorteio(drawingId);
@@ -105,7 +105,9 @@ export default function useCampanhasSorteios({
       );
       setCodigosOffline(res.data.codigos || res.data);
     } catch (e) {
-      alert("Erro ao carregar códigos: " + (e?.response?.data?.detail || e.message));
+      alert(
+        "Erro ao carregar codigos: " + (e?.response?.data?.detail || e.message),
+      );
       setModalCodigosOffline(null);
     } finally {
       setLoadingCodigosOffline(false);

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 
-export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMes }) {
+export function useCampanhasConsultas({
+  createDefaultPremio,
+  hoje,
+  primeiroDiaMes,
+}) {
   const [aba, setAba] = useState("dashboard");
 
   const [campanhas, setCampanhas] = useState([]);
@@ -69,7 +73,7 @@ export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMe
       try {
         await api.post("/campanhas/seed");
       } catch {
-        // seed é idempotente
+        // O seed e idempotente.
       }
       const res = await api.get("/campanhas");
       setCampanhas(res.data);
@@ -128,7 +132,7 @@ export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMe
       const res = await api.get(`/campanhas/relatorio?${params}`);
       setRelatorio(res.data);
     } catch (e) {
-      console.error("Erro ao carregar relatório:", e);
+      console.error("Erro ao carregar relatorio:", e);
     } finally {
       setLoadingRelatorio(false);
     }
@@ -172,7 +176,7 @@ export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMe
       const res = await api.get("/campanhas/unificacao/sugestoes");
       setSugestoes(res.data);
     } catch (e) {
-      console.error("Erro ao carregar sugestões:", e);
+      console.error("Erro ao carregar sugestoes:", e);
     } finally {
       setLoadingSugestoes(false);
     }
@@ -184,7 +188,7 @@ export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMe
       const res = await api.get("/campanhas/retencao");
       setRetencaoRegras(res.data);
     } catch (e) {
-      console.error("Erro ao carregar regras de retenção", e);
+      console.error("Erro ao carregar regras de retencao:", e);
     } finally {
       setLoadingRetencao(false);
     }
@@ -208,7 +212,7 @@ export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMe
       const res = await api.get("/campanhas/config/horarios");
       setSchedulerConfig(res.data);
     } catch (e) {
-      console.error("Erro ao carregar config de horários:", e);
+      console.error("Erro ao carregar config de horarios:", e);
     } finally {
       setSchedulerConfigLoading(false);
     }
