@@ -864,6 +864,9 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] extrair a composicao residual das abas de `Campanhas.jsx` para um componente dedicado
   - a renderizacao condicional das abas foi movida para `frontend/src/components/campanhas/CampanhasMainContent.jsx`
   - `Campanhas.jsx` caiu de `473` para `311` linhas e ficou focado em hooks, composicao de dominio e camada de modais
+- [x] quebrar internamente `CampanhasGestorTab.jsx` em secoes visuais menores
+  - o cabecalho, a lista por campanha, o resumo do cliente e as secoes de carimbos, cashback, cupons e ranking foram separados em componentes dedicados dentro de `frontend/src/components/campanhas/`
+  - `CampanhasGestorTab.jsx` deixou de concentrar o miolo operacional do gestor e virou uma composicao mais fina das secoes
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
