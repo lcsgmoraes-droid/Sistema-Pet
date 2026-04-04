@@ -858,6 +858,9 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] concluir a decomposicao dos dominios residuais de `Campanhas.jsx`
   - os fluxos de inativos, retencao, cupons, destaque, sorteios, envio em lote, unificacao e fidelidade foram movidos para hooks dedicados em `frontend/src/hooks/useCampanhasInativos.js`, `useCampanhasRetencao.js`, `useCampanhasCupons.js`, `useCampanhasDestaque.js`, `useCampanhasSorteios.js`, `useCampanhasLote.js`, `useCampanhasUnificacao.js` e `useCampanhasFidelidade.js`
   - `Campanhas.jsx` caiu de `1771` para `473` linhas e ficou basicamente como orquestrador das abas e modais
+- [x] extrair a composicao residual das abas de `Campanhas.jsx` para um componente dedicado
+  - a renderizacao condicional das abas foi movida para `frontend/src/components/campanhas/CampanhasMainContent.jsx`
+  - `Campanhas.jsx` caiu de `473` para `311` linhas e ficou focado em hooks, composicao de dominio e camada de modais
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 

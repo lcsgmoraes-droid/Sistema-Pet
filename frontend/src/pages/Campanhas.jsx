@@ -1,17 +1,6 @@
-import CanalDescontos from "./CanalDescontos";
-import { formatBRL } from "../utils/formatters";
 import { useCampanhasConsultas } from "../hooks/useCampanhasConsultas";
 import CampanhasTabsBar from "../components/campanhas/CampanhasTabsBar";
-import CampanhasDashboardTab from "../components/campanhas/CampanhasDashboardTab";
-import CampanhasListTab from "../components/campanhas/CampanhasListTab";
-import CampanhasRetencaoTab from "../components/campanhas/CampanhasRetencaoTab";
-import CampanhasDestaqueTab from "../components/campanhas/CampanhasDestaqueTab";
-import CampanhasSorteiosTab from "../components/campanhas/CampanhasSorteiosTab";
-import CampanhasRankingTab from "../components/campanhas/CampanhasRankingTab";
-import CampanhasRelatoriosTab from "../components/campanhas/CampanhasRelatoriosTab";
-import CampanhasUnificacaoTab from "../components/campanhas/CampanhasUnificacaoTab";
-import CampanhasGestorTab from "../components/campanhas/CampanhasGestorTab";
-import CampanhasConfigTab from "../components/campanhas/CampanhasConfigTab";
+import CampanhasMainContent from "../components/campanhas/CampanhasMainContent";
 import CampanhasModalsLayer from "../components/campanhas/CampanhasModalsLayer";
 import useCampanhasGestor from "../hooks/useCampanhasGestor";
 import useCampanhasConfiguracoes from "../hooks/useCampanhasConfiguracoes";
@@ -27,9 +16,6 @@ import useCampanhasLote from "../hooks/useCampanhasLote";
 import useCampanhasUnificacao from "../hooks/useCampanhasUnificacao";
 import useCampanhasFidelidade from "../hooks/useCampanhasFidelidade";
 import {
-  TIPO_LABELS,
-  USER_CREATABLE_TYPES,
-  CUPOM_STATUS,
   RANK_LABELS,
   hoje,
   primeiroDiaMes,
@@ -37,81 +23,47 @@ import {
 } from "../components/campanhas/campanhasConstants";
 
 export default function Campanhas() {
+  const campanhasConsultas = useCampanhasConsultas({
+    createDefaultPremio,
+    hoje,
+    primeiroDiaMes,
+  });
   const {
     aba,
     setAba,
     campanhas,
     setCampanhas,
-    loadingCampanhas,
-    dashboard,
-    loadingDashboard,
-    retencaoRegras,
-    loadingRetencao,
-    ranking,
-    loadingRanking,
-    filtroNivel,
-    setFiltroNivel,
     cupons,
     setCupons,
-    loadingCupons,
-    filtroCupomStatus,
-    setFiltroCupomStatus,
-    filtroCupomBusca,
-    setFiltroCupomBusca,
-    filtroCupomDataInicio,
-    setFiltroCupomDataInicio,
-    filtroCupomDataFim,
-    setFiltroCupomDataFim,
-    filtroCupomCampanha,
-    setFiltroCupomCampanha,
-    cupomDetalhes,
-    setCupomDetalhes,
     destaque,
-    setDestaque,
-    loadingDestaque,
     premiosPorVencedor,
-    setPremiosPorVencedor,
     vencedoresSelecionados,
-    setVencedoresSelecionados,
     sorteios,
     setSorteios,
-    loadingSorteios,
     codigosOffline,
     setCodigosOffline,
     loadingCodigosOffline,
     setLoadingCodigosOffline,
     sugestoes,
     setSugestoes,
-    loadingSugestoes,
-    relatorio,
-    loadingRelatorio,
-    relDataInicio,
-    setRelDataInicio,
-    relDataFim,
-    setRelDataFim,
-    relTipo,
-    setRelTipo,
     rankingConfig,
     setRankingConfig,
-    rankingConfigLoading,
     schedulerConfig,
     setSchedulerConfig,
-    schedulerConfigLoading,
     carregarCampanhas,
     carregarCupons,
     carregarRetencao,
     carregarRanking,
-    carregarDestaque,
     carregarSorteios,
     carregarSugestoes,
-    carregarRelatorio,
     carregarSchedulerConfig,
-  } = useCampanhasConsultas({
-    createDefaultPremio,
-    hoje,
-    primeiroDiaMes,
-  });
+  } = campanhasConsultas;
+
   const campanhasGestor = useCampanhasGestor();
+  const campanhasGestao = useCampanhasGestao({
+    setCampanhas,
+    carregarCampanhas,
+  });
   const {
     rankingConfig: rankingConfigState,
     setRankingConfig: setRankingConfigState,
@@ -130,20 +82,7 @@ export default function Campanhas() {
     carregarRanking,
     carregarSchedulerConfig,
   });
-  const campanhasGestao = useCampanhasGestao({
-    setCampanhas,
-    carregarCampanhas,
-  });
-  const {
-    modalEnvioInativos,
-    setModalEnvioInativos,
-    envioInativosForm,
-    setEnvioInativosForm,
-    enviandoInativos,
-    resultadoEnvioInativos,
-    setResultadoEnvioInativos,
-    enviarParaInativos,
-  } = useCampanhasInativos();
+  const campanhasInativos = useCampanhasInativos();
   const {
     retencaoEditando,
     setRetencaoEditando,
@@ -179,8 +118,8 @@ export default function Campanhas() {
     enviarDestaque,
   } = useCampanhasDestaque({
     destaque,
-    premiosPorVencedor,
-    vencedoresSelecionados,
+    premiosPorVencedor: campanhasConsultas.premiosPorVencedor,
+    vencedoresSelecionados: campanhasConsultas.vencedoresSelecionados,
   });
   const {
     modalSorteio,
@@ -232,202 +171,98 @@ export default function Campanhas() {
     lancarCarimboManual,
   } = useCampanhasFidelidade();
 
-  const formatarData = (iso) => {
-    if (!iso) return "—";
-    const d = iso.split("T")[0].split("-");
-    return `${d[2]}/${d[1]}/${d[0]}`;
+  const campanhasConfiguracoes = {
+    rankingConfig: rankingConfigState,
+    setRankingConfig: setRankingConfigState,
+    rankingConfigSalvando,
+    schedulerConfig: schedulerConfigState,
+    setSchedulerConfig: setSchedulerConfigState,
+    schedulerConfigSalvando,
+    salvarRankingConfig,
+    salvarSchedulerConfig,
+    recalcularRanking,
+    setResultadoLote,
+    setModalLote,
+  };
+  const campanhasRetencao = {
+    retencaoEditando,
+    setRetencaoEditando,
+    salvandoRetencao,
+    deletandoRetencao,
+    salvarRetencao,
+    deletarRetencao,
+    novaRegraPadrao: NOVA_REGRA_RETENCAO_PADRAO,
+  };
+  const campanhasCupons = {
+    anulando,
+    anularCupom,
+    formatarValorCupom,
+  };
+  const campanhasDestaque = {
+    destaqueResultado,
+    setDestaqueResultado,
+    enviarDestaque,
+    enviandoDestaque,
+  };
+  const campanhasSorteios = {
+    setErroCriarSorteio,
+    setModalSorteio,
+    inscrevendo,
+    inscreverSorteio,
+    executandoSorteio,
+    executarSorteio,
+    cancelarSorteio,
+    abrirCodigosOffline,
+    sorteioResultado,
+    setSorteioResultado,
+  };
+  const campanhasUnificacao = {
+    confirmandoMerge,
+    resultadoMerge,
+    confirmarMerge,
+    desfazerMerge,
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            🎯 Campanhas de Fidelidade
+            Campanhas de Fidelidade
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Gerencie campanhas automáticas, ranking de clientes e cupons.
+            Gerencie campanhas automaticas, ranking de clientes e cupons.
           </p>
         </div>
-
       </div>
 
       <CampanhasTabsBar aba={aba} onChange={setAba} />
 
-      {/* ── ABA: DASHBOARD ── */}
-      {aba === "dashboard" && (
-        <CampanhasDashboardTab
-          loadingDashboard={loadingDashboard}
-          dashboard={dashboard}
-          onAbrirEnvioInativos={(dias) => {
-            setModalEnvioInativos(dias);
-            setResultadoEnvioInativos(null);
-          }}
-          onAbrirAba={setAba}
-        />
-      )}
+      <CampanhasMainContent
+        aba={aba}
+        onAbrirAba={setAba}
+        consultas={campanhasConsultas}
+        gestao={campanhasGestao}
+        gestor={campanhasGestor}
+        configuracoes={campanhasConfiguracoes}
+        inativos={campanhasInativos}
+        retencao={campanhasRetencao}
+        cupons={campanhasCupons}
+        destaque={campanhasDestaque}
+        sorteios={campanhasSorteios}
+        unificacao={campanhasUnificacao}
+      />
 
-      {/* ── Modal: Envio para Inativos ── */}
-      {aba === "campanhas" && (
-        <CampanhasListTab
-          campanhas={campanhas}
-          loadingCampanhas={loadingCampanhas}
-          campanhaEditando={campanhasGestao.campanhaEditando}
-          paramsEditando={campanhasGestao.paramsEditando}
-          setParamsEditando={campanhasGestao.setParamsEditando}
-          arquivando={campanhasGestao.arquivando}
-          toggling={campanhasGestao.toggling}
-          salvandoParams={campanhasGestao.salvandoParams}
-          tipoLabels={TIPO_LABELS}
-          userCreatableTypes={USER_CREATABLE_TYPES}
-          formatarParams={campanhasGestao.formatarParams}
-          onNovaCampanha={() => {
-            campanhasGestao.setErroCriarCampanha("");
-            campanhasGestao.setModalCriarCampanha(true);
-          }}
-          onAbrirEdicao={campanhasGestao.abrirEdicao}
-          onFecharEdicao={campanhasGestao.fecharEdicao}
-          onArquivarCampanha={campanhasGestao.arquivarCampanha}
-          onToggleCampanha={campanhasGestao.toggleCampanha}
-          onSalvarParametros={campanhasGestao.salvarParametros}
-        />
-      )}
-
-
-      {/* ── ABA: RETENÇÃO DINÂMICA ── */}
-      {aba === "retencao" && (
-        <CampanhasRetencaoTab
-          retencaoEditando={retencaoEditando}
-          salvandoRetencao={salvandoRetencao}
-          loadingRetencao={loadingRetencao}
-          retencaoRegras={retencaoRegras}
-          deletandoRetencao={deletandoRetencao}
-          onSalvarRetencao={salvarRetencao}
-          onCancelarEdicao={() => setRetencaoEditando(null)}
-          onNovaRegra={() =>
-            setRetencaoEditando({ ...NOVA_REGRA_RETENCAO_PADRAO })
-          }
-          onEditarRegra={setRetencaoEditando}
-          onDeletarRegra={deletarRetencao}
-        />
-      )}
-
-      {aba === "destaque" && (
-        <CampanhasDestaqueTab
-          loadingDestaque={loadingDestaque}
-          destaque={destaque}
-          carregarDestaque={carregarDestaque}
-          premiosPorVencedor={premiosPorVencedor}
-          setPremiosPorVencedor={setPremiosPorVencedor}
-          vencedoresSelecionados={vencedoresSelecionados}
-          setVencedoresSelecionados={setVencedoresSelecionados}
-          createDefaultPremio={createDefaultPremio}
-          destaqueResultado={destaqueResultado}
-          setDestaqueResultado={setDestaqueResultado}
-          enviarDestaque={enviarDestaque}
-          enviandoDestaque={enviandoDestaque}
-        />
-      )}
-
-      {aba === "sorteios" && (
-        <CampanhasSorteiosTab
-          loadingSorteios={loadingSorteios}
-          sorteios={sorteios}
-          sorteioResultado={sorteioResultado}
-          setSorteioResultado={setSorteioResultado}
-          setErroCriarSorteio={setErroCriarSorteio}
-          setModalSorteio={setModalSorteio}
-          inscrevendo={inscrevendo}
-          inscreverSorteio={inscreverSorteio}
-          executandoSorteio={executandoSorteio}
-          executarSorteio={executarSorteio}
-          cancelarSorteio={cancelarSorteio}
-          abrirCodigosOffline={abrirCodigosOffline}
-          rankLabels={RANK_LABELS}
-        />
-      )}
-
-      {/* ── ABA: RANKING ── */}
-      {aba === "ranking" && (
-        <CampanhasRankingTab
-          rankLabels={RANK_LABELS}
-          filtroNivel={filtroNivel}
-          setFiltroNivel={setFiltroNivel}
-          onRecalcularRanking={recalcularRanking}
-          loadingRanking={loadingRanking}
-          ranking={ranking}
-          formatBRL={formatBRL}
-          setResultadoLote={setResultadoLote}
-          setModalLote={setModalLote}
-          rankingConfig={rankingConfigState}
-          setRankingConfig={setRankingConfigState}
-          rankingConfigLoading={rankingConfigLoading}
-          salvarRankingConfig={salvarRankingConfig}
-          rankingConfigSalvando={rankingConfigSalvando}
-          campanhas={campanhas}
-          filtroCupomBusca={filtroCupomBusca}
-          setFiltroCupomBusca={setFiltroCupomBusca}
-          filtroCupomDataInicio={filtroCupomDataInicio}
-          setFiltroCupomDataInicio={setFiltroCupomDataInicio}
-          filtroCupomDataFim={filtroCupomDataFim}
-          setFiltroCupomDataFim={setFiltroCupomDataFim}
-          filtroCupomCampanha={filtroCupomCampanha}
-          setFiltroCupomCampanha={setFiltroCupomCampanha}
-          carregarCupons={carregarCupons}
-          filtroCupomStatus={filtroCupomStatus}
-          setFiltroCupomStatus={setFiltroCupomStatus}
-          loadingCupons={loadingCupons}
-          cupons={cupons}
-          cupomStatus={CUPOM_STATUS}
-          cupomDetalhes={cupomDetalhes}
-          setCupomDetalhes={setCupomDetalhes}
-          anularCupom={anularCupom}
-          anulando={anulando}
-          formatarValorCupom={formatarValorCupom}
-        />
-      )}
-
-      {/* ── ABA: RELATÓRIOS ── */}
-      {aba === "relatorios" && (
-        <CampanhasRelatoriosTab
-          relDataInicio={relDataInicio}
-          setRelDataInicio={setRelDataInicio}
-          relDataFim={relDataFim}
-          setRelDataFim={setRelDataFim}
-          relTipo={relTipo}
-          setRelTipo={setRelTipo}
-          relatorio={relatorio}
-          loadingRelatorio={loadingRelatorio}
-          formatBRL={formatBRL}
-          formatarData={formatarData}
-        />
-      )}
-
-      {/* ── ABA: UNIFICAÇÃO CROSS-CANAL ── */}
-      {aba === "unificacao" && (
-        <CampanhasUnificacaoTab
-          carregarSugestoes={carregarSugestoes}
-          loadingSugestoes={loadingSugestoes}
-          resultadoMerge={resultadoMerge}
-          desfazerMerge={desfazerMerge}
-          sugestoes={sugestoes}
-          confirmarMerge={confirmarMerge}
-          confirmandoMerge={confirmandoMerge}
-        />
-      )}
-
-      {/* ── MODAL: CRIAR SORTEIO ── */}
       <CampanhasModalsLayer
         {...{
-          modalEnvioInativos,
-          setModalEnvioInativos,
-          resultadoEnvioInativos,
-          setResultadoEnvioInativos,
-          envioInativosForm,
-          setEnvioInativosForm,
-          enviandoInativos,
-          enviarParaInativos,
+          modalEnvioInativos: campanhasInativos.modalEnvioInativos,
+          setModalEnvioInativos: campanhasInativos.setModalEnvioInativos,
+          resultadoEnvioInativos: campanhasInativos.resultadoEnvioInativos,
+          setResultadoEnvioInativos: campanhasInativos.setResultadoEnvioInativos,
+          envioInativosForm: campanhasInativos.envioInativosForm,
+          setEnvioInativosForm: campanhasInativos.setEnvioInativosForm,
+          enviandoInativos: campanhasInativos.enviandoInativos,
+          enviarParaInativos: campanhasInativos.enviarParaInativos,
           modalSorteio,
           setModalSorteio,
           novoSorteio,
@@ -471,29 +306,6 @@ export default function Campanhas() {
           criandoCupom,
         }}
       />
-
-      {aba === "gestor" && (
-        <CampanhasGestorTab
-          {...campanhasGestor}
-          formatBRL={formatBRL}
-          RANK_LABELS={RANK_LABELS}
-          CUPOM_STATUS={CUPOM_STATUS}
-        />
-      )}
-
-      {/* ── ABA: CONFIGURAÇÕES ── */}
-      {aba === "config" && (
-        <CampanhasConfigTab
-          schedulerConfigLoading={schedulerConfigLoading}
-          schedulerConfig={schedulerConfigState}
-          setSchedulerConfig={setSchedulerConfigState}
-          onSalvarSchedulerConfig={salvarSchedulerConfig}
-          schedulerConfigSalvando={schedulerConfigSalvando}
-        />
-      )}
-
-      {/* ── ABA: DESCONTOS POR CANAL ── */}
-      {aba === "canais" && <CanalDescontos />}
     </div>
   );
 }
