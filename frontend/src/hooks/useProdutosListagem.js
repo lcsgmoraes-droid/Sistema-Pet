@@ -1,6 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
 
+function ordenarProdutosAgrupados(produtos, paisExpandidos, buscaAtiva) {
+  const produtosPorId = new Map(produtos.map((produto) => [produto.id, produto]));
+  const filhosPorPai = new Map();
+  const linhaPrincipal = [];
+  const variacoesOrfas = [];
+
+  produtos.forEach((produto) => {
+    if (produto.tipo_produto === "VARIACAO") {
+      if (produto.produto_pai_id && produtosPorId.has(produto.produto_pai_id)) {
+        if (!filhosPorPai.has(produto.produto_pai_id)) {
+          filhosPorPai.set(produto.produto_pai_id, []);
+        }
+        filhosPorPai.get(produto.produto_pai_id).push(produto);
+      } else {
+        variacoesOrfas.push(produto);
+      }
+      return;
+    }
+
+    linhaPrincipal.push(produto);
+  });
+
+  const ordenados = [];
+  const adicionados = new Set();
+
+  linhaPrincipal.forEach((produto) => {
+    if (adicionados.has(produto.id)) return;
+
+    ordenados.push(produto);
+    adicionados.add(produto.id);
+
+    const filhos = filhosPorPai.get(produto.id) || [];
+    const deveExibirFilhos =
+      filhos.length > 0 && (buscaAtiva || paisExpandidos.includes(produto.id));
+
+    if (!deveExibirFilhos) return;
+
+    filhos.forEach((filho) => {
+      if (adicionados.has(filho.id)) return;
+      ordenados.push(filho);
+      adicionados.add(filho.id);
+    });
+  });
+
+  variacoesOrfas.forEach((produto) => {
+    if (adicionados.has(produto.id)) return;
+    ordenados.push(produto);
+    adicionados.add(produto.id);
+  });
+
+  return ordenados;
+}
+
 export default function useProdutosListagem({
   normalizeSearchText,
   onOcultarPaisVariacoes,
@@ -36,26 +89,59 @@ export default function useProdutosListagem({
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
     const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
+    const buscaAtiva = Boolean(buscaNormalizada);
+    const produtoCorrespondeBusca = (produto) => {
+      const codigo = normalizeSearchText(produto.codigo || produto.sku || "");
+      const nome = normalizeSearchText(produto.nome || "");
+      return codigo.includes(buscaNormalizada) || nome.includes(buscaNormalizada);
+    };
 
     if (!filtros.mostrarPaisVariacoes) {
       return produtosTemp.filter((p) => (p.tipo_produto || "SIMPLES") === "SIMPLES");
     }
 
+    const paisVisiveisPorBusca = new Set();
+
+    if (buscaAtiva) {
+      produtosTemp.forEach((produto) => {
+        if (!produtoCorrespondeBusca(produto)) return;
+
+        if (produto.tipo_produto === "PAI") {
+          paisVisiveisPorBusca.add(produto.id);
+          return;
+        }
+
+        if (produto.tipo_produto === "VARIACAO" && produto.produto_pai_id) {
+          paisVisiveisPorBusca.add(produto.produto_pai_id);
+        }
+      });
+    }
+
     produtosTemp = produtosTemp.filter((p) => {
+      if (!buscaAtiva) {
+        if (p.tipo_produto !== "VARIACAO") {
+          return true;
+        }
+
+        return paisExpandidos.includes(p.produto_pai_id);
+      }
+
+      if (p.tipo_produto === "PAI") {
+        return paisVisiveisPorBusca.has(p.id) || produtoCorrespondeBusca(p);
+      }
+
       if (p.tipo_produto !== "VARIACAO") {
+        return produtoCorrespondeBusca(p);
+      }
+
+      if (paisVisiveisPorBusca.has(p.produto_pai_id)) {
         return true;
       }
 
-      if (buscaNormalizada) {
-        const codigo = normalizeSearchText(p.codigo || p.sku || "");
-        const nome = normalizeSearchText(p.nome || "");
-        return codigo.includes(buscaNormalizada) || nome.includes(buscaNormalizada);
-      }
-
-      return paisExpandidos.includes(p.produto_pai_id);
+      return produtoCorrespondeBusca(p);
     });
 
-    return produtosTemp;
+    return ordenarProdutosAgrupados(produtosTemp, paisExpandidos, buscaAtiva);
   }, [
     filtros.busca,
     filtros.mostrarPaisVariacoes,
