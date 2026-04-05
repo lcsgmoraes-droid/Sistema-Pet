@@ -95,11 +95,11 @@ export function createProdutosColunas() {
   },
   {
     key: "descricao",
-    label: "DescriÃ§Ã£o",
+    label: "Descrição",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-        DescriÃ§Ã£o
+        Descrição
       </th>
     ),
     renderCell: (produto, props) => {
@@ -138,7 +138,7 @@ export function createProdutosColunas() {
                     }}
                     className="flex items-center text-blue-600 hover:text-blue-700 transition-colors mr-1"
                     title={
-                      isPaiExpandido ? "Ocultar variaÃ§Ãµes" : "Ver variaÃ§Ãµes"
+                      isPaiExpandido ? "Ocultar variações" : "Ver variações"
                     }
                   >
                     <svg
@@ -169,7 +169,7 @@ export function createProdutosColunas() {
                         : "text-green-600 hover:text-green-700"
                     }`}
                     title={
-                      isKitExpandido ? "Ocultar composiÃ§Ã£o" : "Ver composiÃ§Ã£o"
+                      isKitExpandido ? "Ocultar composição" : "Ver composição"
                     }
                   >
                     <svg
@@ -196,17 +196,17 @@ export function createProdutosColunas() {
                   )}
                   {isKitVirtualProduto(produto) && (
                     <span className="ml-2 text-xs text-indigo-600">
-                      (Kit â€¢ Virtual)
+                      (Kit • Virtual)
                     </span>
                   )}
                   {isKitFisicoProduto(produto) && (
                     <span className="ml-2 text-xs text-green-600">
-                      (Kit â€¢ FÃ­sico)
+                      (Kit • Físico)
                     </span>
                   )}
                   {produto.data_descontinuacao && (
                     <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                      âš ï¸ Descontinuado
+                      Descontinuado
                     </span>
                   )}
                   {produto.de_parceiro && (
@@ -251,11 +251,11 @@ export function createProdutosColunas() {
   },
   {
     key: "codigo",
-    label: "CÃ³digo",
+    label: "Código",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-        CÃ³digo
+        Código
       </th>
     ),
     renderCell: (produto, props) => (
@@ -403,7 +403,7 @@ export function createProdutosColunas() {
                 props.handleEditarPreco(produto.id, produto.preco_venda);
               }}
               className="text-blue-600 hover:text-blue-800"
-              title="Editar preÃ§o"
+              title="Editar preço"
             >
               <svg
                 className="w-4 h-4"
@@ -484,11 +484,11 @@ export function createProdutosColunas() {
   },
   {
     key: "acoes",
-    label: "AÃ§Ãµes",
+    label: "Ações",
     visible: true,
     renderHeader: () => (
       <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-        AÃ§Ãµes
+        Ações
       </th>
     ),
     renderCell: (produto, props) => {
@@ -526,7 +526,7 @@ export function createProdutosColunas() {
               props.navigate(`/produtos/${produto.id}/movimentacoes`);
             }}
             className={`rounded-lg p-1.5 border transition-all duration-200 ${classeMovimentacao}`}
-            title="Ver movimentaÃ§Ãµes de estoque"
+            title="Ver movimentações de estoque"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
