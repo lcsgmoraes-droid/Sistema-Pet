@@ -879,6 +879,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a montagem das props de abas e modais foi movida para `frontend/src/hooks/useCampanhasPageComposition.js`
   - a camada de modais foi separada em `frontend/src/components/campanhas/CampanhasOperacionaisModals.jsx` e `CampanhasGestaoModals.jsx`
   - `CampanhasModalsLayer.jsx` caiu para `10` linhas e `Campanhas.jsx` ficou em `274` linhas
+- [x] continuar a decomposicao interna das abas residuais de `Campanhas`
+  - a aba de unificacao foi quebrada em `frontend/src/components/campanhas/CampanhasUnificacaoResultadoBanner.jsx` e `CampanhasUnificacaoSugestoesTable.jsx`
+  - a aba de sorteios foi quebrada em `frontend/src/components/campanhas/CampanhasSorteioResultadoBanner.jsx` e `CampanhasSorteioCard.jsx`
+  - `CampanhasUnificacaoTab.jsx` e `CampanhasSorteiosTab.jsx` ficaram focadas em composicao fina
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
