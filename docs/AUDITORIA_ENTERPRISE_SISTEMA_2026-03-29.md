@@ -883,6 +883,9 @@ Proximas tarefas sugeridas para execucao continua:
   - a aba de unificacao foi quebrada em `frontend/src/components/campanhas/CampanhasUnificacaoResultadoBanner.jsx` e `CampanhasUnificacaoSugestoesTable.jsx`
   - a aba de sorteios foi quebrada em `frontend/src/components/campanhas/CampanhasSorteioResultadoBanner.jsx` e `CampanhasSorteioCard.jsx`
   - `CampanhasUnificacaoTab.jsx` e `CampanhasSorteiosTab.jsx` ficaram focadas em composicao fina
+- [x] quebrar internamente `CampanhasDestaqueTab.jsx`
+  - a introducao, card de vencedor, desempate, resultado e top 5 foram separados em componentes dedicados
+  - `CampanhasDestaqueTab.jsx` virou uma composicao fina da aba de destaque mensal
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
