@@ -886,6 +886,10 @@ Proximas tarefas sugeridas para execucao continua:
 - [x] quebrar internamente `CampanhasDestaqueTab.jsx`
   - a introducao, card de vencedor, desempate, resultado e top 5 foram separados em componentes dedicados
   - `CampanhasDestaqueTab.jsx` virou uma composicao fina da aba de destaque mensal
+- [x] continuar a decomposicao interna do formulario de parametros e dos cupons do ranking em `Campanhas`
+  - os parametros foram reorganizados em `frontend/src/components/campanhas/CampanhasParametrosProgramaSections.jsx` e `CampanhasParametrosRelacionamentoSections.jsx`, deixando `CampanhasParametrosSections.jsx` como camada fina de reexportacao
+  - os filtros e a tabela de cupons do ranking foram separados em `frontend/src/components/campanhas/CampanhasRankingCuponsFiltrosBar.jsx` e `CampanhasRankingCuponsTable.jsx`
+  - `CampanhasRankingCuponsSection.jsx` ficou focado apenas na composicao do bloco de cupons
 
 ## 9. Ferramentas que melhorariam meu trabalho e o desenvolvimento do sistema
 
