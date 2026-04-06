@@ -7,6 +7,8 @@ import {
   obterEstoqueVisualProduto,
 } from "./produtosUtils";
 
+const normalizeExpandId = (value) => String(value ?? "");
+
 // ====================================================
 // DEFINICAO DE COLUNAS DA LISTAGEM
 // ====================================================
@@ -106,8 +108,12 @@ export function createProdutosColunas() {
       const isVariacao = produto.tipo_produto === "VARIACAO";
       const isPai = produto.tipo_produto === "PAI";
       const isKit = isProdutoComComposicao(produto);
-      const isKitExpandido = (props.kitsExpandidos || []).includes(produto.id);
-      const isPaiExpandido = (props.paisExpandidos || []).includes(produto.id);
+      const isKitExpandido = (props.kitsExpandidos || []).includes(
+        normalizeExpandId(produto.id),
+      );
+      const isPaiExpandido = (props.paisExpandidos || []).includes(
+        normalizeExpandId(produto.id),
+      );
 
       return (
         <td className="px-4 py-3">

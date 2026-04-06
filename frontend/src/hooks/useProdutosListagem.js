@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
 
+const normalizeExpandId = (value) => String(value ?? "");
+
 function ordenarProdutosAgrupados(produtos, paisExpandidos) {
+  const paisExpandidosSet = new Set((paisExpandidos || []).map(normalizeExpandId));
   const produtosPorId = new Map(produtos.map((produto) => [produto.id, produto]));
   const filhosPorPai = new Map();
   const linhaPrincipal = [];
@@ -34,7 +37,7 @@ function ordenarProdutosAgrupados(produtos, paisExpandidos) {
 
     const filhos = filhosPorPai.get(produto.id) || [];
     const deveExibirFilhos =
-      filhos.length > 0 && paisExpandidos.includes(produto.id);
+      filhos.length > 0 && paisExpandidosSet.has(normalizeExpandId(produto.id));
 
     if (!deveExibirFilhos) return;
 
@@ -101,18 +104,19 @@ export default function useProdutosListagem({
     }
 
     const paisVisiveisPorBusca = new Set();
+    const paisExpandidosSet = new Set((paisExpandidos || []).map(normalizeExpandId));
 
     if (buscaAtiva) {
       produtosTemp.forEach((produto) => {
         if (!produtoCorrespondeBusca(produto)) return;
 
         if (produto.tipo_produto === "PAI") {
-          paisVisiveisPorBusca.add(produto.id);
+          paisVisiveisPorBusca.add(normalizeExpandId(produto.id));
           return;
         }
 
         if (produto.tipo_produto === "VARIACAO" && produto.produto_pai_id) {
-          paisVisiveisPorBusca.add(produto.produto_pai_id);
+          paisVisiveisPorBusca.add(normalizeExpandId(produto.produto_pai_id));
         }
       });
     }
@@ -123,22 +127,22 @@ export default function useProdutosListagem({
           return true;
         }
 
-        return paisExpandidos.includes(p.produto_pai_id);
+        return paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id));
       }
 
       if (p.tipo_produto === "PAI") {
-        return paisVisiveisPorBusca.has(p.id) || produtoCorrespondeBusca(p);
+        return paisVisiveisPorBusca.has(normalizeExpandId(p.id)) || produtoCorrespondeBusca(p);
       }
 
       if (p.tipo_produto !== "VARIACAO") {
         return produtoCorrespondeBusca(p);
       }
 
-      if (!p.produto_pai_id || !paisVisiveisPorBusca.has(p.produto_pai_id)) {
+      if (!p.produto_pai_id || !paisVisiveisPorBusca.has(normalizeExpandId(p.produto_pai_id))) {
         return produtoCorrespondeBusca(p);
       }
 
-      return paisExpandidos.includes(p.produto_pai_id);
+      return paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id));
     });
 
     return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);

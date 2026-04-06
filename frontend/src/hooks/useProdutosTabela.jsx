@@ -3,6 +3,8 @@ import toast from "react-hot-toast";
 import { formatarData } from "../api/produtos";
 import { obterEstoqueVisualProduto } from "../components/produtos/produtosUtils";
 
+const normalizeExpandId = (value) => String(value ?? "");
+
 export default function useProdutosTabela({
   colunasTabela,
   paisExpandidos: paisExpandidosExterno,
@@ -95,11 +97,12 @@ export default function useProdutosTabela({
   };
 
   const toggleKitExpandido = (produtoId) => {
-    const vaiExpandir = !kitsExpandidos.includes(produtoId);
+    const produtoIdNormalizado = normalizeExpandId(produtoId);
+    const vaiExpandir = !kitsExpandidos.includes(produtoIdNormalizado);
     setKitsExpandidos((prev) =>
-      prev.includes(produtoId)
-        ? prev.filter((id) => id !== produtoId)
-        : [...prev, produtoId],
+      prev.includes(produtoIdNormalizado)
+        ? prev.filter((id) => id !== produtoIdNormalizado)
+        : [...prev, produtoIdNormalizado],
     );
 
     if (vaiExpandir) {
@@ -108,11 +111,12 @@ export default function useProdutosTabela({
   };
 
   const togglePaiExpandido = (produtoId) => {
-    const vaiExpandir = !paisExpandidos.includes(produtoId);
+    const produtoIdNormalizado = normalizeExpandId(produtoId);
+    const vaiExpandir = !paisExpandidos.includes(produtoIdNormalizado);
     setPaisExpandidos((prev) =>
-      prev.includes(produtoId)
-        ? prev.filter((id) => id !== produtoId)
-        : [...prev, produtoId],
+      prev.includes(produtoIdNormalizado)
+        ? prev.filter((id) => id !== produtoIdNormalizado)
+        : [...prev, produtoIdNormalizado],
     );
 
     if (vaiExpandir) {
