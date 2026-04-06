@@ -155,9 +155,7 @@ const ConfiguracaoEstoque = lazy(
 const ConfiguracaoGeralNegocio = lazy(
   () => import("./pages/configuracoes/ConfiguracaoGeralNegocio"),
 );
-const StoneIntegracao = lazy(
-  () => import("./pages/configuracoes/StoneIntegracao"),
-);
+const Integracoes = lazy(() => import("./pages/configuracoes/Integracoes"));
 // import FechamentoSimples from './pages/FechamentoSimples'; // TODO: Criar arquivo
 const AuditoriaMensal = lazy(() => import("./pages/AuditoriaMensal"));
 const ProjecaoCaixa = lazy(() => import("./pages/ProjecaoCaixa"));
@@ -718,7 +716,7 @@ function App() {
                   />
                   <Route
                     path="configuracoes/integracoes"
-                    element={<StoneIntegracao />}
+                    element={<Integracoes />}
                   />
                   {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
                   <Route

@@ -96,12 +96,16 @@ function EstoqueBling() {
         ...(currentSearch ? { busca: currentSearch } : {}),
       },
     }));
-    const healthRequest = api.get('/estoque/sync/health');
+    const healthRequest = requestWithRetry(() => api.get('/estoque/sync/health', {
+      timeout: HEAVY_REQUEST_TIMEOUT_MS,
+    }));
     const syncRequest = requestWithRetry(() => api.get('/estoque/sync/status', {
       timeout: HEAVY_REQUEST_TIMEOUT_MS,
       params: currentSearch ? { busca: currentSearch } : {},
     }));
-    const coberturaRequest = api.get('/estoque/sync/resumo-cobertura');
+    const coberturaRequest = requestWithRetry(() => api.get('/estoque/sync/resumo-cobertura', {
+      timeout: HEAVY_REQUEST_TIMEOUT_MS,
+    }));
 
     productsRequest
       .then((response) => {
@@ -178,7 +182,13 @@ function EstoqueBling() {
 
     // Itens de pedidos Bling cujo SKU não tem produto cadastrado
     setLoadingItensSemProduto(true);
-    api.get('/integracoes/bling/nf/itens-sem-produto', { params: { por_pagina: 50 } })
+    requestWithRetry(() => api.get('/integracoes/bling/nf/itens-sem-produto', {
+      timeout: HEAVY_REQUEST_TIMEOUT_MS,
+      params: {
+        por_pagina: 50,
+        autocriar_automaticamente: false,
+      },
+    }))
       .then((response) => {
         const data = response?.data || {};
         setItensSemProduto(data.items || []);

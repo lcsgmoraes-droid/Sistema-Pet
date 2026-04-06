@@ -134,11 +134,11 @@ export default function useProdutosListagem({
         return produtoCorrespondeBusca(p);
       }
 
-      if (paisVisiveisPorBusca.has(p.produto_pai_id)) {
-        return true;
+      if (!p.produto_pai_id || !paisVisiveisPorBusca.has(p.produto_pai_id)) {
+        return produtoCorrespondeBusca(p);
       }
 
-      return produtoCorrespondeBusca(p);
+      return paisExpandidos.includes(p.produto_pai_id);
     });
 
     return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);
