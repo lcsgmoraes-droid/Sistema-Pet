@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
 
-function ordenarProdutosAgrupados(produtos, paisExpandidos, buscaAtiva) {
+function ordenarProdutosAgrupados(produtos, paisExpandidos) {
   const produtosPorId = new Map(produtos.map((produto) => [produto.id, produto]));
   const filhosPorPai = new Map();
   const linhaPrincipal = [];
@@ -34,7 +34,7 @@ function ordenarProdutosAgrupados(produtos, paisExpandidos, buscaAtiva) {
 
     const filhos = filhosPorPai.get(produto.id) || [];
     const deveExibirFilhos =
-      filhos.length > 0 && (buscaAtiva || paisExpandidos.includes(produto.id));
+      filhos.length > 0 && paisExpandidos.includes(produto.id);
 
     if (!deveExibirFilhos) return;
 
@@ -141,7 +141,7 @@ export default function useProdutosListagem({
       return produtoCorrespondeBusca(p);
     });
 
-    return ordenarProdutosAgrupados(produtosTemp, paisExpandidos, buscaAtiva);
+    return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);
   }, [
     filtros.busca,
     filtros.mostrarPaisVariacoes,
