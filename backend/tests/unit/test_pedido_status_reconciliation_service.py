@@ -26,6 +26,7 @@ def test_reconciliar_status_pedido_local_cancelado_reaplica_cancelamento(monkeyp
     )
     item = SimpleNamespace(sku="SKU-1")
     cancelamentos = []
+    sincronizacoes_nf = []
 
     monkeypatch.setattr(
         service,
@@ -35,7 +36,7 @@ def test_reconciliar_status_pedido_local_cancelado_reaplica_cancelamento(monkeyp
     monkeypatch.setattr(service, "_carregar_itens_pedido", lambda *args, **kwargs: [item])
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
-        lambda **kwargs: {"numero": "011200"},
+        lambda **kwargs: (sincronizacoes_nf.append(kwargs), {"numero": "011200"})[1],
     )
 
     def fake_cancelar_pedido(*, db, pedido, itens, processed_at=None):
@@ -55,6 +56,7 @@ def test_reconciliar_status_pedido_local_cancelado_reaplica_cancelamento(monkeyp
     assert resultado["nf_numero"] == "011200"
     assert pedido.status == "cancelado"
     assert cancelamentos == [(10, 1)]
+    assert sincronizacoes_nf[0]["enriquecer_via_api"] is True
 
 
 def test_reconciliar_status_pedido_local_confirmado_reaplica_confirmacao_sem_baixa(monkeypatch):
@@ -68,6 +70,7 @@ def test_reconciliar_status_pedido_local_confirmado_reaplica_confirmacao_sem_bai
     )
     item = SimpleNamespace(sku="SKU-2")
     confirmacoes = []
+    sincronizacoes_nf = []
 
     monkeypatch.setattr(
         service,
@@ -77,7 +80,7 @@ def test_reconciliar_status_pedido_local_confirmado_reaplica_confirmacao_sem_bai
     monkeypatch.setattr(service, "_carregar_itens_pedido", lambda *args, **kwargs: [item])
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
-        lambda **kwargs: {"numero": "011201"},
+        lambda **kwargs: (sincronizacoes_nf.append(kwargs), {"numero": "011201"})[1],
     )
 
     def fake_confirmar_pedido(*, db, pedido, itens, motivo, observacao, processed_at=None, aplicar_baixa_estoque=False):
@@ -112,6 +115,7 @@ def test_reconciliar_status_pedido_local_confirmado_reaplica_confirmacao_sem_bai
             "aplicar_baixa_estoque": False,
         }
     ]
+    assert sincronizacoes_nf[0]["enriquecer_via_api"] is True
 
 
 def test_reconciliar_status_pedidos_recentes_agrega_resultados(monkeypatch):

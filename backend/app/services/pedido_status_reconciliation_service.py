@@ -130,6 +130,7 @@ def reconciliar_status_pedido_local(
         _montar_payload_pedido,
         _sincronizar_nf_do_pedido,
         _situacao_codigo_bling,
+        _ultima_nf_payload_efetiva,
     )
 
     pedido_bling_id = str(getattr(pedido, "pedido_bling_id", "") or "").strip()
@@ -144,7 +145,7 @@ def reconciliar_status_pedido_local(
     pedido_api = _consultar_pedido_bling(pedido_bling_id)
     payload_atual = _dict(getattr(pedido, "payload", None))
     webhook_atual = _dict(payload_atual.get("webhook")) or None
-    ultima_nf_atual = _dict(payload_atual.get("ultima_nf")) or None
+    ultima_nf_atual = _ultima_nf_payload_efetiva(payload_atual) or None
 
     pedido.payload = _montar_payload_pedido(
         webhook_data=webhook_atual,
@@ -163,7 +164,7 @@ def reconciliar_status_pedido_local(
         source="scheduler",
         message="NF identificada na reconciliacao automatica do pedido.",
         link_source="pedido.status_reconciliation",
-        enriquecer_via_api=False,
+        enriquecer_via_api=True,
     )
 
     situacao_id = _situacao_codigo_bling(_dict(pedido_api).get("situacao"))

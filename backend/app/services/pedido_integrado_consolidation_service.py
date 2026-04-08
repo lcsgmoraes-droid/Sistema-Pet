@@ -19,6 +19,49 @@ def _dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
 
 
+def _nf_id_valido(value: Any) -> str | None:
+    texto = _text(value)
+    if not texto or texto in {"0", "-1"}:
+        return None
+    return texto
+
+
+def _normalizar_resumo_nf(resumo_nf: Any) -> dict:
+    resumo_nf = dict(_dict(resumo_nf))
+    if not resumo_nf:
+        return {}
+
+    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    if nf_id:
+        if "id" in resumo_nf or "nfe_id" not in resumo_nf:
+            resumo_nf["id"] = nf_id
+        else:
+            resumo_nf["nfe_id"] = nf_id
+    else:
+        resumo_nf.pop("id", None)
+        resumo_nf.pop("nfe_id", None)
+
+    possui_referencia_util = bool(
+        nf_id
+        or _text(resumo_nf.get("numero"))
+        or _text(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
+        or _text(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
+        or _text(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
+        or resumo_nf.get("valor_total") not in (None, "")
+    )
+    return resumo_nf if possui_referencia_util else {}
+
+
+def _primeiro_preenchido(*values: Any) -> Any:
+    for value in values:
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
 def numero_pedido_loja_do_payload(payload_or_pedido: Any) -> str | None:
     payload = _dict(getattr(payload_or_pedido, "payload", payload_or_pedido))
     pedido_payload = _dict(payload.get("pedido"))
@@ -59,12 +102,16 @@ def loja_id_do_payload(payload_or_pedido: Any) -> str | None:
 def ultima_nf_do_payload(payload_or_pedido: Any) -> dict:
     payload = _dict(getattr(payload_or_pedido, "payload", payload_or_pedido))
     pedido_payload = _dict(payload.get("pedido"))
-    return _dict(
-        payload.get("ultima_nf")
-        or pedido_payload.get("notaFiscal")
-        or pedido_payload.get("nota")
-        or pedido_payload.get("nfe")
-    )
+    for candidato in (
+        payload.get("ultima_nf"),
+        pedido_payload.get("notaFiscal"),
+        pedido_payload.get("nota"),
+        pedido_payload.get("nfe"),
+    ):
+        resumo_nf = _normalizar_resumo_nf(candidato)
+        if resumo_nf:
+            return resumo_nf
+    return {}
 
 
 def pedido_tem_nf_deterministica(payload_or_pedido: Any) -> bool:

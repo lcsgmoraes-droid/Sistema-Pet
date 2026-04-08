@@ -17,6 +17,7 @@ from app.services.pedido_integrado_consolidation_service import (
     numero_pedido_loja_do_payload,
     pedido_esta_mesclado,
     registrar_alias_bling_no_payload,
+    ultima_nf_do_payload,
 )
 
 
@@ -142,9 +143,43 @@ def test_montar_payload_pedido_preserva_ultima_nf_mais_recente():
     assert payload["ultima_nf"]["numero"] == "011089"
 
 
+def test_montar_payload_pedido_substitui_placeholder_ultima_nf_por_nf_real():
+    payload = _montar_payload_pedido(
+        webhook_data={"pedido": {"numero": "12168"}},
+        pedido_completo={"numero": "12168", "notaFiscal": {"id": "25513413824"}},
+        payload_atual={
+            "ultima_nf": {
+                "id": "0",
+                "numero": None,
+                "serie": None,
+                "situacao": None,
+                "data_emissao": None,
+            }
+        },
+        ultima_nf={"id": "25513413824"},
+    )
+
+    assert payload["ultima_nf"]["id"] == "25513413824"
+
+
 def test_numero_pedido_loja_do_payload_prioriza_pedido_e_faz_fallback():
     assert numero_pedido_loja_do_payload({"pedido": {"numeroPedidoLoja": "LOJA-1"}}) == "LOJA-1"
     assert numero_pedido_loja_do_payload({"webhook": {"numeroLoja": "LOJA-2"}}) == "LOJA-2"
+
+
+def test_ultima_nf_do_payload_ignora_placeholder_e_faz_fallback_para_nota_fiscal_do_pedido():
+    payload = {
+        "pedido": {"notaFiscal": {"id": "25513413824"}},
+        "ultima_nf": {
+            "id": "0",
+            "numero": None,
+            "serie": None,
+            "situacao": None,
+            "data_emissao": None,
+        },
+    }
+
+    assert ultima_nf_do_payload(payload)["id"] == "25513413824"
 
 
 def test_registrar_alias_bling_no_payload_evita_duplicidade():
@@ -273,6 +308,39 @@ def test_serializar_pedido_bling_expoe_campos_enriquecidos():
     assert serializado["financeiro"]["total"] == 439.30
     assert serializado["nota_fiscal"]["numero"] == "10971"
     assert serializado["itens"][0]["valor_unitario"] == 15.5
+
+
+def test_serializar_pedido_bling_ignora_placeholder_ultima_nf():
+    pedido = SimpleNamespace(
+        id=11,
+        pedido_bling_id="25513398915",
+        pedido_bling_numero="12168",
+        canal="shopee",
+        status="confirmado",
+        criado_em=None,
+        expira_em=None,
+        confirmado_em=None,
+        cancelado_em=None,
+        payload={
+            "pedido": {
+                "numero": "12168",
+                "numeroLoja": "260408AF627Y4R",
+                "notaFiscal": {"id": "25513413824"},
+                "itens": [],
+            },
+            "ultima_nf": {
+                "id": "0",
+                "numero": None,
+                "serie": None,
+                "situacao": None,
+                "data_emissao": None,
+            },
+        },
+    )
+
+    serializado = _serializar_pedido_bling(pedido, [])
+
+    assert serializado["nota_fiscal"]["id"] == "25513413824"
 
 
 def test_serializar_pedido_bling_expoe_contexto_duplicidade_e_acoes():

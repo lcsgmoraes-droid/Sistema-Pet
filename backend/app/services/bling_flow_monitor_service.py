@@ -158,6 +158,32 @@ def _nf_bling_id_valido(value: Any) -> str | None:
     return texto
 
 
+def _normalizar_contexto_nf(nf: dict | None) -> dict:
+    nf = dict(_dict(nf))
+    if not nf:
+        return {}
+
+    nf_id = _nf_bling_id_valido(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+    if nf_id:
+        if "id" in nf or "nfe_id" not in nf:
+            nf["id"] = nf_id
+        else:
+            nf["nfe_id"] = nf_id
+    else:
+        nf.pop("id", None)
+        nf.pop("nfe_id", None)
+
+    possui_referencia_util = bool(
+        nf_id
+        or _text(nf.get("numero"))
+        or _text(_primeiro_preenchido(nf.get("chaveAcesso"), nf.get("chave")))
+        or _text(_primeiro_preenchido(nf.get("situacao"), nf.get("status")))
+        or _text(_primeiro_preenchido(nf.get("data_emissao"), nf.get("dataEmissao")))
+        or nf.get("valor_total") not in (None, "")
+    )
+    return nf if possui_referencia_util else {}
+
+
 def registrar_vinculo_nf_pedido(
     *,
     pedido: PedidoIntegrado,
@@ -232,12 +258,16 @@ def _coerce_int(value: Any, default: int = 0) -> int:
 def _ultima_nf(payload: dict | None) -> dict:
     payload = _dict(payload)
     pedido = _dict(payload.get("pedido"))
-    return _dict(
-        payload.get("ultima_nf")
-        or pedido.get("notaFiscal")
-        or pedido.get("nota")
-        or pedido.get("nfe")
-    )
+    for candidato in (
+        payload.get("ultima_nf"),
+        pedido.get("notaFiscal"),
+        pedido.get("nota"),
+        pedido.get("nfe"),
+    ):
+        nf = _normalizar_contexto_nf(candidato)
+        if nf:
+            return nf
+    return {}
 
 
 def _nf_autorizada(payload: dict | None) -> bool:

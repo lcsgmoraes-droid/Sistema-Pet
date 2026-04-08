@@ -582,6 +582,7 @@ def reconciliar_fluxo_pedido_integrado(
 ) -> dict:
     from app.pedido_integrado_item_models import PedidoIntegradoItem
     from app.services.bling_flow_monitor_service import _reconciliar_pedido_confirmado, registrar_evento, resolver_incidentes_relacionados
+    from app.services.pedido_status_reconciliation_service import reconciliar_status_pedido_local
 
     pedido_base = (
         db.query(PedidoIntegrado)
@@ -597,6 +598,17 @@ def reconciliar_fluxo_pedido_integrado(
     pedido = resolver_pedido_canonico(db, pedido_base) or pedido_base
     consolidacao = consolidar_duplicidades_seguras_pedido(db, tenant_id=tenant_id, pedido_id=pedido.id)
     if consolidacao.get("success"):
+        pedido = (
+            db.query(PedidoIntegrado)
+            .filter(
+                PedidoIntegrado.id == pedido.id,
+                PedidoIntegrado.tenant_id == tenant_id,
+            )
+            .first()
+        ) or pedido
+
+    if getattr(pedido, "pedido_bling_id", None):
+        reconciliar_status_pedido_local(db, pedido)
         pedido = (
             db.query(PedidoIntegrado)
             .filter(

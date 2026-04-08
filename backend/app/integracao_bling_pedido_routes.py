@@ -163,9 +163,59 @@ def _payload_principal(payload: dict | None) -> dict:
     return payload
 
 
+def _nf_id_valido(value) -> str | None:
+    texto = _texto(value)
+    if not texto or texto in {"0", "-1"}:
+        return None
+    return texto
+
+
+def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
+    resumo_nf = dict(_dict(resumo_nf))
+    if not resumo_nf:
+        return None
+
+    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    if nf_id:
+        if "id" in resumo_nf or "nfe_id" not in resumo_nf:
+            resumo_nf["id"] = nf_id
+        else:
+            resumo_nf["nfe_id"] = nf_id
+    else:
+        resumo_nf.pop("id", None)
+        resumo_nf.pop("nfe_id", None)
+
+    possui_referencia_util = bool(
+        nf_id
+        or _texto(resumo_nf.get("numero"))
+        or _texto(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
+        or resumo_nf.get("valor_total") not in (None, "")
+    )
+
+    return resumo_nf if possui_referencia_util else None
+
+
+def _ultima_nf_payload_efetiva(payload: dict | None) -> dict:
+    payload = _dict(payload)
+    pedido_payload = _payload_principal(payload)
+
+    for candidato in (
+        payload.get("ultima_nf"),
+        pedido_payload.get("notaFiscal"),
+        pedido_payload.get("nota"),
+        pedido_payload.get("nfe"),
+    ):
+        resumo_nf = _normalizar_resumo_nf(candidato)
+        if resumo_nf:
+            return resumo_nf
+    return {}
+
+
 def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
-    atual = _dict(atual)
-    nova = _dict(nova)
+    atual = _normalizar_resumo_nf(atual) or {}
+    nova = _normalizar_resumo_nf(nova) or {}
     if not atual and not nova:
         return None
 
@@ -204,15 +254,15 @@ def _numero_nf_int(nf: dict | None) -> int | None:
 
 
 def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
-    atual = _dict(atual)
-    nova = _dict(nova)
+    atual = _normalizar_resumo_nf(atual) or {}
+    nova = _normalizar_resumo_nf(nova) or {}
     if not atual:
         return True
     if not nova:
         return False
 
-    atual_id = _texto(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
-    nova_id = _texto(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
+    atual_id = _nf_id_valido(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
+    nova_id = _nf_id_valido(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
     atual_numero = _texto(atual.get("numero"))
     nova_numero = _texto(nova.get("numero"))
 
@@ -331,15 +381,7 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquece
 
 def _pedido_tem_nf_deterministica(payload: dict | None) -> bool:
     payload = _dict(payload)
-    pedido_payload = _payload_principal(payload)
-    ultima_nf = _dict(
-        _primeiro_preenchido(
-            payload.get("ultima_nf"),
-            pedido_payload.get("notaFiscal"),
-            pedido_payload.get("nota"),
-            pedido_payload.get("nfe"),
-        )
-    )
+    ultima_nf = _ultima_nf_payload_efetiva(payload)
     nf_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
     nf_numero = _texto(ultima_nf.get("numero"))
     return bool(nf_numero or (nf_id and nf_id not in {"0", "-1"}))
@@ -365,7 +407,7 @@ def _sincronizar_nf_do_pedido(
         return None
 
     payload_atual = _dict(pedido.payload)
-    ultima_nf_atual = _dict(payload_atual.get("ultima_nf"))
+    ultima_nf_atual = _ultima_nf_payload_efetiva(payload_atual)
     mesma_nf = (
         _texto(ultima_nf_atual.get("id")) == _texto(resumo_nf.get("id"))
         and _texto(ultima_nf_atual.get("numero")) == _texto(resumo_nf.get("numero"))
@@ -715,7 +757,7 @@ def _serializar_pedido_bling(
     pedido_payload = _payload_principal(payload)
     contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
     loja = _dict(pedido_payload.get("loja"))
-    ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
+    ultima_nf = _ultima_nf_payload_efetiva(payload)
     situacao = _dict(pedido_payload.get("situacao"))
     canal, canal_label, canal_origem = _resolver_canal_pedido(payload, pedido.canal)
     duplicidade = _dict(duplicidade)
@@ -1653,7 +1695,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     webhook_data=data,
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
-                    ultima_nf=_dict(_dict(pedido.payload).get("ultima_nf")) or None,
+                    ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
                 )
                 _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
                 logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})")
@@ -1684,7 +1726,7 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
                     webhook_data=data,
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
-                    ultima_nf=_dict(_dict(pedido.payload).get("ultima_nf")) or None,
+                    ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
                 )
                 erros_estoque = _confirmar_pedido(
                     db=db,

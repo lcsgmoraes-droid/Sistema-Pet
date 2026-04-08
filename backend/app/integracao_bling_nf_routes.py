@@ -70,9 +70,43 @@ def _primeiro_preenchido(*valores):
     return None
 
 
+def _nf_id_valido(value) -> str | None:
+    texto = _texto(value)
+    if not texto or texto in {"0", "-1"}:
+        return None
+    return texto
+
+
+def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
+    resumo_nf = dict(_dict(resumo_nf))
+    if not resumo_nf:
+        return None
+
+    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    if nf_id:
+        if "id" in resumo_nf or "nfe_id" not in resumo_nf:
+            resumo_nf["id"] = nf_id
+        else:
+            resumo_nf["nfe_id"] = nf_id
+    else:
+        resumo_nf.pop("id", None)
+        resumo_nf.pop("nfe_id", None)
+
+    possui_referencia_util = bool(
+        nf_id
+        or _texto(resumo_nf.get("numero"))
+        or _texto(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
+        or resumo_nf.get("valor_total") not in (None, "")
+    )
+
+    return resumo_nf if possui_referencia_util else None
+
+
 def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
-    atual = _dict(atual)
-    nova = _dict(nova)
+    atual = _normalizar_resumo_nf(atual) or {}
+    nova = _normalizar_resumo_nf(nova) or {}
     mesclada = dict(atual)
     for chave, valor in nova.items():
         if valor in (None, "", [], {}):
@@ -108,15 +142,15 @@ def _numero_nf_int(nf: dict | None) -> int | None:
 
 
 def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
-    atual = _dict(atual)
-    nova = _dict(nova)
+    atual = _normalizar_resumo_nf(atual) or {}
+    nova = _normalizar_resumo_nf(nova) or {}
     if not atual:
         return True
     if not nova:
         return False
 
-    atual_id = _texto(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
-    nova_id = _texto(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
+    atual_id = _nf_id_valido(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
+    nova_id = _nf_id_valido(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
     atual_numero = _texto(atual.get("numero"))
     nova_numero = _texto(nova.get("numero"))
 
@@ -141,6 +175,10 @@ def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
 
 
 def _consolidar_ultima_nf(atual: dict | None, nova: dict | None) -> dict:
+    atual = _normalizar_resumo_nf(atual)
+    nova = _normalizar_resumo_nf(nova)
+    if not atual and not nova:
+        return {}
     if _nova_nf_deve_substituir(atual, nova):
         return _mesclar_ultima_nf(atual, nova)
     return _mesclar_ultima_nf(nova, atual)
