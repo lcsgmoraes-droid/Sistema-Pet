@@ -200,13 +200,14 @@ def registrar_vinculo_nf_pedido(
 ) -> int | None:
     payload_extra = _dict(_json_safe(payload or {}))
     nf_contexto = _ultima_nf(getattr(pedido, "payload", None))
+    nf_bling_id_resolvido = _nf_bling_id_valido(nf_bling_id) or _nf_bling_id_valido(nf_contexto.get("id"))
     payload_base = {
         "pedido_bling_numero": _text(getattr(pedido, "pedido_bling_numero", None)),
         "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
         "pedido_status_atual": _text(getattr(pedido, "status", None)),
         "nf_numero": _text(nf_numero) or _text(nf_contexto.get("numero")),
     }
-    return registrar_evento(
+    evento_id = registrar_evento(
         tenant_id=pedido.tenant_id,
         source=source,
         event_type="invoice.linked_to_order",
@@ -216,12 +217,27 @@ def registrar_vinculo_nf_pedido(
         message=message or "NF vinculada ao pedido durante o processamento do evento",
         pedido_integrado_id=pedido.id,
         pedido_bling_id=pedido.pedido_bling_id,
-        nf_bling_id=_nf_bling_id_valido(nf_bling_id) or _nf_bling_id_valido(nf_contexto.get("id")),
+        nf_bling_id=nf_bling_id_resolvido,
         payload={**payload_base, **payload_extra},
         processed_at=processed_at,
         db=db,
         auto_fix_applied=auto_fix_applied,
     )
+    if db is not None:
+        resolver_incidentes_relacionados(
+            db,
+            tenant_id=pedido.tenant_id,
+            codes=[
+                "NF_SEM_PEDIDO_VINCULADO",
+                "NF_SEM_PEDIDO_LOCAL",
+                "NF_ENCONTRADA_SEM_VINCULO_NO_PEDIDO",
+            ],
+            pedido_integrado_id=pedido.id,
+            pedido_bling_id=pedido.pedido_bling_id,
+            nf_bling_id=nf_bling_id_resolvido,
+            resolution_note="NF vinculada posteriormente ao pedido correspondente.",
+        )
+    return evento_id
 
 
 def _build_incident_key(

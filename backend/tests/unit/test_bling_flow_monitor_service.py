@@ -362,6 +362,59 @@ def test_registrar_vinculo_nf_pedido_monta_payload_com_relacao(monkeypatch):
     assert capturado["payload"]["link_source"] == "nf.webhook"
 
 
+def test_registrar_vinculo_nf_pedido_resolve_incidentes_quando_recebe_db(monkeypatch):
+    capturado_evento = {}
+    capturado_resolucao = {}
+
+    def _fake_registrar_evento(**kwargs):
+        capturado_evento.update(kwargs)
+        return 91
+
+    def _fake_resolver_incidentes_relacionados(db, **kwargs):
+        capturado_resolucao["db"] = db
+        capturado_resolucao.update(kwargs)
+        return 3
+
+    monkeypatch.setattr("app.services.bling_flow_monitor_service.registrar_evento", _fake_registrar_evento)
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.resolver_incidentes_relacionados",
+        _fake_resolver_incidentes_relacionados,
+    )
+    db = Mock()
+    pedido = SimpleNamespace(
+        id=16,
+        tenant_id="tenant-1",
+        pedido_bling_id="25430581958",
+        pedido_bling_numero="11602",
+        status="confirmado",
+        payload={
+            "pedido": {"numeroLoja": "260329D3XB4GNX"},
+            "ultima_nf": {"id": "25427303471", "numero": "010985"},
+        },
+    )
+
+    resultado = registrar_vinculo_nf_pedido(
+        pedido=pedido,
+        source="scheduler",
+        nf_bling_id="25427303471",
+        nf_numero="010985",
+        db=db,
+    )
+
+    assert resultado == 91
+    assert capturado_evento["nf_bling_id"] == "25427303471"
+    assert capturado_resolucao["db"] is db
+    assert capturado_resolucao["tenant_id"] == "tenant-1"
+    assert capturado_resolucao["pedido_integrado_id"] == 16
+    assert capturado_resolucao["pedido_bling_id"] == "25430581958"
+    assert capturado_resolucao["nf_bling_id"] == "25427303471"
+    assert capturado_resolucao["codes"] == [
+        "NF_SEM_PEDIDO_VINCULADO",
+        "NF_SEM_PEDIDO_LOCAL",
+        "NF_ENCONTRADA_SEM_VINCULO_NO_PEDIDO",
+    ]
+
+
 def test_reconciliar_pedido_confirmado_so_confirma_item_apos_baixa(monkeypatch):
     db = Mock()
     pedido = SimpleNamespace(
