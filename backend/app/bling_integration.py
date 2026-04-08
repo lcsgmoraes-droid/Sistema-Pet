@@ -10,6 +10,7 @@ from typing import Dict, Optional
 from sqlalchemy.orm import Session
 import json
 from pathlib import Path
+from dotenv import dotenv_values
 from app.utils.logger import logger
 
 # Configurações da API Bling
@@ -18,24 +19,64 @@ BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
 # Arquivo para controle de expiração do token
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
 
+ENV_PATHS = [
+    Path("/opt/petshop/.env"),
+    Path(__file__).parent.parent / ".env",
+    Path(__file__).parent.parent.parent / ".env",
+]
+
+
+def _get_shared_env_path() -> Optional[Path]:
+    for path in ENV_PATHS:
+        if path.exists():
+            return path
+    return None
+
+
+def _load_bling_runtime_config() -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    env_path = _get_shared_env_path()
+
+    if env_path:
+        try:
+            values = {
+                key: str(value)
+                for key, value in dotenv_values(env_path).items()
+                if value is not None
+            }
+        except Exception as error:
+            logger.warning("Nao foi possivel reler configuracao compartilhada do Bling em %s: %s", env_path, error)
+
+    def pick(name: str, default: str = "") -> str:
+        return (values.get(name) or os.getenv(name) or default).strip()
+
+    return {
+        "access_token": pick("BLING_ACCESS_TOKEN"),
+        "refresh_token": pick("BLING_REFRESH_TOKEN"),
+        "client_id": pick("BLING_CLIENT_ID"),
+        "client_secret": pick("BLING_CLIENT_SECRET"),
+        "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
+        "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
+    }
+
 
 class BlingAPI:
     """Cliente para integração com Bling API v3"""
     
     def __init__(self):
+        runtime_config = _load_bling_runtime_config()
         self.base_url = BLING_API_BASE_URL
-        self.access_token = os.getenv("BLING_ACCESS_TOKEN")
-        self.client_id = os.getenv("BLING_CLIENT_ID")
-        self.client_secret = os.getenv("BLING_CLIENT_SECRET")
-        self.enable_jwt = os.getenv("BLING_ENABLE_JWT", "1")
+        self.access_token = runtime_config["access_token"]
+        self.refresh_token = runtime_config["refresh_token"]
+        self.client_id = runtime_config["client_id"]
+        self.client_secret = runtime_config["client_secret"]
+        self.enable_jwt = runtime_config["enable_jwt"]
         # Ambiente: 'rascunho', 'homologacao' ou 'producao'
-        self.ambiente = os.getenv("BLING_NFE_AMBIENTE", "rascunho")
+        self.ambiente = runtime_config["ambiente"]
         
         if not self.access_token:
             raise ValueError("BLING_ACCESS_TOKEN não configurado no .env")
         
-        # Verificar se precisa renovar o token automaticamente
-        self._verificar_e_renovar_token()
     
     def _verificar_e_renovar_token(self):
         """
@@ -605,7 +646,7 @@ class BlingAPI:
         """
         import base64
         
-        refresh = refresh_token or os.getenv("BLING_REFRESH_TOKEN")
+        refresh = (refresh_token or self.refresh_token or _load_bling_runtime_config().get("refresh_token") or "").strip()
         if not refresh:
             raise ValueError("BLING_REFRESH_TOKEN não configurado")
         
@@ -635,6 +676,7 @@ class BlingAPI:
             
             # Atualizar token na instância
             self.access_token = tokens['access_token']
+            self.refresh_token = tokens['refresh_token']
             
             # Atualizar .env e variáveis em memória
             try:

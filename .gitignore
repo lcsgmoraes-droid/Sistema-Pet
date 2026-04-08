@@ -78,6 +78,8 @@ $RECYCLE.BIN/
 *.swo
 *~
 .cache/
+tmp/
+.deploy-*/
 
 # IDEs
 .idea/

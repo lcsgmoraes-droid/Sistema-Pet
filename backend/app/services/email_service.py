@@ -1,4 +1,4 @@
-"""Serviço de envio de e-mail via SMTP.
+"""Servico de envio de e-mail via SMTP.
 
 Configuração via variáveis de ambiente:
   SMTP_HOST        — ex.: smtp.gmail.com
@@ -14,28 +14,84 @@ Se nenhuma variável estiver configurada, o envio é apenas simulado
 import logging
 import os
 import smtplib
+from pathlib import Path
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Iterable, Mapping, Any
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
 
+for env_path in (Path("/opt/petshop/.env"), Path(".env")):
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
+
+
+def _env_first(*keys: str, default: str = "") -> str:
+    for key in keys:
+        value = os.getenv(key)
+        if value:
+            return value
+    return default
+
+
+def _smtp_settings() -> dict[str, object]:
+    host = _env_first("SMTP_HOST", "SMTP_SERVER", default="smtp.gmail.com")
+    user = _env_first("SMTP_USER", "SMTP_EMAIL")
+    password = _env_first("SMTP_PASSWORD")
+    from_addr = _env_first("SMTP_FROM", "SMTP_EMAIL", "SMTP_USER", default=user)
+    port_raw = _env_first("SMTP_PORT", default="587")
+    use_tls_raw = _env_first("SMTP_TLS", default="true")
+
+    try:
+        port = int(port_raw)
+    except (TypeError, ValueError):
+        port = 587
+
+    return {
+        "host": host,
+        "port": port,
+        "user": user,
+        "password": password,
+        "from_addr": from_addr,
+        "use_tls": str(use_tls_raw).lower() != "false",
+    }
+
+
 def _smtp_configured() -> bool:
-    return bool(os.getenv("SMTP_HOST") and os.getenv("SMTP_USER") and os.getenv("SMTP_PASSWORD"))
+    config = _smtp_settings()
+    return bool(config["host"] and config["user"] and config["password"])
 
 
-def send_email(to: str, subject: str, html_body: str, text_body: str | None = None) -> bool:
-    """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrário."""
+def is_email_configured() -> bool:
+    return _smtp_configured()
+
+
+def send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    text_body: str | None = None,
+    attachments: Iterable[Mapping[str, Any]] | None = None,
+    simulate_if_unconfigured: bool = True,
+) -> bool:
+    """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
     if not _smtp_configured():
-        logger.info("[EMAIL-SIMULADO] Para: %s | Assunto: %s", to, subject)
-        return True  # Simula sucesso para não quebrar o fluxo
+        if simulate_if_unconfigured:
+            logger.info("[EMAIL-SIMULADO] Para: %s | Assunto: %s", to, subject)
+            return True
+        logger.warning("[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s", to, subject)
+        return False
 
-    host = os.getenv("SMTP_HOST", "")
-    port = int(os.getenv("SMTP_PORT", "587"))
-    user = os.getenv("SMTP_USER", "")
-    password = os.getenv("SMTP_PASSWORD", "")
-    from_addr = os.getenv("SMTP_FROM", user)
-    use_tls = os.getenv("SMTP_TLS", "true").lower() != "false"
+    config = _smtp_settings()
+    host = str(config["host"])
+    port = int(config["port"])
+    user = str(config["user"])
+    password = str(config["password"])
+    from_addr = str(config["from_addr"])
+    use_tls = bool(config["use_tls"])
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -45,6 +101,14 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     if text_body:
         msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    for attachment in attachments or []:
+        filename = str(attachment.get("filename") or "anexo.bin")
+        content = attachment.get("content") or b""
+        mime_subtype = str(attachment.get("mime_subtype") or "octet-stream")
+        part = MIMEApplication(content, _subtype=mime_subtype)
+        part.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(part)
 
     try:
         with smtplib.SMTP(host, port, timeout=10) as server:

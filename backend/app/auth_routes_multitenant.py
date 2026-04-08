@@ -442,36 +442,42 @@ def get_me_multitenant(
     3. Endpoint usa current_user + tenant_id
     """
     current_user, tenant_id = user_and_tenant
-    
-    user_tenant = db.query(UserTenant).filter(
-        UserTenant.user_id == current_user.id,
-        UserTenant.tenant_id == tenant_id
-    ).first()
-    
-    if not user_tenant:
+    tenant_id_str = str(tenant_id)
+
+    user_tenant_info = (
+        db.query(UserTenant, Tenant, Role)
+        .join(Tenant, Tenant.id == UserTenant.tenant_id)
+        .outerjoin(Role, Role.id == UserTenant.role_id)
+        .filter(
+            UserTenant.user_id == current_user.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active == True,
+        )
+        .first()
+    )
+
+    if not user_tenant_info:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário não tem acesso ao tenant selecionado"
         )
-    
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    
-    role = None
-    if user_tenant.role_id:
-        role = db.query(Role).filter(Role.id == user_tenant.role_id).first()
-    
+
+    _user_tenant, tenant, role = user_tenant_info
+
     permissions = []
     if role:
-        role_permissions = db.query(RolePermission).filter(
-            RolePermission.role_id == role.id
-        ).all()
-        
-        for rp in role_permissions:
-            perm = db.query(Permission).filter(
-                Permission.id == rp.permission_id
-            ).first()
-            if perm:
-                permissions.append(perm.code)
+        permissions = [
+            codigo
+            for codigo, in (
+                db.query(Permission.code)
+                .join(RolePermission, RolePermission.permission_id == Permission.id)
+                .filter(
+                    RolePermission.role_id == role.id,
+                    RolePermission.tenant_id == tenant_id,
+                )
+                .all()
+            )
+        ]
     
     # 🔑 EXPANSÃO AUTOMÁTICA: Adicionar dependências implícitas
     permissions = expand_permissions(permissions)

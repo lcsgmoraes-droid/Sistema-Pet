@@ -34,10 +34,12 @@ class BlingSyncScheduler:
     def _configure_jobs(self) -> None:
         self.scheduler.add_job(
             func=self.processar_fila,
-            trigger=IntervalTrigger(minutes=1),
+            trigger=IntervalTrigger(seconds=20),
             id="bling_sync_queue",
             name="Bling Sync Queue",
             replace_existing=True,
+            max_instances=1,
+            coalesce=True,
         )
         self.scheduler.add_job(
             func=self.reconciliar_recentes,
@@ -90,7 +92,7 @@ class BlingSyncScheduler:
         )
 
         logger.info("[BLING SYNC] Jobs configurados:")
-        logger.info("   - Fila pendente: a cada 1 minuto")
+        logger.info("   - Fila pendente: a cada 20 segundos")
         logger.info("   - Reconciliacao recente: a cada 15 minutos")
         logger.info("   - NFs pendentes recentes: a cada 15 minutos")
         logger.info("   - NFs autorizadas sem baixa: a cada 15 minutos")
@@ -110,7 +112,7 @@ class BlingSyncScheduler:
             logger.info("[BLING SYNC] Scheduler parado")
 
     def processar_fila(self) -> None:
-        result = BlingSyncService.process_pending_queue(limit=30)
+        result = BlingSyncService.process_pending_queue(limit=10)
         if result.get("processados"):
             logger.info("[BLING SYNC] Fila processada: %s", result)
 

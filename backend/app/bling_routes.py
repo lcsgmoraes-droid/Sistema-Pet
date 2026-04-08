@@ -123,6 +123,13 @@ async def testar_conexao(
     except Exception as e:
         # Verificar se é erro de token expirado
         error_msg = str(e)
+        if "429" in error_msg or "TOO_MANY_REQUESTS" in error_msg or "Limite de requisi" in error_msg:
+            return {
+                "conectado": True,
+                "rate_limited": True,
+                "message": "Conexao com o Bling valida, mas a API pediu uma pausa temporaria.",
+                "detail": "A API do Bling respondeu com limite temporario de requisicoes. Isso nao significa token vencido."
+            }
         if "401" in error_msg or "Unauthorized" in error_msg or "invalid_token" in error_msg:
             return {
                 "conectado": False,

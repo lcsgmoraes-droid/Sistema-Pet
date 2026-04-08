@@ -44,6 +44,7 @@ from .produtos_models import (
     PedidoCompra, PedidoCompraItem, ProdutoFornecedor
 )
 from .vendas_models import VendaItem, Venda
+from .services.email_service import is_email_configured, send_email
 
 import logging
 logger = logging.getLogger(__name__)
@@ -111,6 +112,267 @@ class PedidoCompraResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PedidoCompraEnvioFormatos(BaseModel):
+    pdf: bool = True
+    excel: bool = False
+
+
+class PedidoCompraEnviarRequest(BaseModel):
+    email: Optional[str] = None
+    whatsapp: Optional[str] = None
+    formatos: PedidoCompraEnvioFormatos = Field(default_factory=PedidoCompraEnvioFormatos)
+    envio_manual: bool = False
+
+
+def _buscar_fornecedor_pedido(db: Session, tenant_id: int, pedido: PedidoCompra) -> Optional[Cliente]:
+    return db.query(Cliente).filter(
+        Cliente.id == pedido.fornecedor_id,
+        Cliente.tenant_id == tenant_id
+    ).first()
+
+
+def _gerar_excel_pedido_bytes(
+    pedido: PedidoCompra,
+    fornecedor_nome: str,
+    db: Session,
+    tenant_id: int,
+) -> bytes:
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Biblioteca openpyxl nao instalada. Execute: pip install openpyxl"
+        )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Pedido de Compra"
+
+    ws["A1"] = "PEDIDO DE COMPRA"
+    ws["A1"].font = Font(size=16, bold=True)
+    ws.merge_cells("A1:F1")
+
+    row = 3
+    ws[f"A{row}"] = "Numero do Pedido:"
+    ws[f"B{row}"] = pedido.numero_pedido
+    ws[f"B{row}"].font = Font(bold=True)
+
+    row += 1
+    ws[f"A{row}"] = "Fornecedor:"
+    ws[f"B{row}"] = fornecedor_nome
+
+    row += 1
+    ws[f"A{row}"] = "Data do Pedido:"
+    ws[f"B{row}"] = pedido.data_pedido.strftime("%d/%m/%Y")
+
+    row += 1
+    ws[f"A{row}"] = "Status:"
+    ws[f"B{row}"] = pedido.status.replace("_", " ").upper()
+
+    row += 2
+    headers = ["Codigo", "Produto", "Quantidade", "Preco Unit.", "Desconto", "Total"]
+    for col, header in enumerate(headers, start=1):
+        cell = ws.cell(row=row, column=col)
+        cell.value = header
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+
+    row += 1
+    for item in pedido.itens:
+        produto = db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_id
+        ).first()
+        ws.cell(row=row, column=1).value = produto.codigo if produto else ""
+        ws.cell(row=row, column=2).value = produto.nome if produto else f"Produto {item.produto_id}"
+        ws.cell(row=row, column=3).value = item.quantidade_pedida
+        ws.cell(row=row, column=4).value = item.preco_unitario
+        ws.cell(row=row, column=5).value = item.desconto_item
+        ws.cell(row=row, column=6).value = item.valor_total
+        row += 1
+
+    row += 1
+    ws[f"E{row}"] = "Frete:"
+    ws[f"F{row}"] = pedido.valor_frete
+    row += 1
+    ws[f"E{row}"] = "Desconto:"
+    ws[f"F{row}"] = pedido.valor_desconto
+    row += 1
+    ws[f"E{row}"] = "TOTAL:"
+    ws[f"E{row}"].font = Font(bold=True, size=12)
+    ws[f"F{row}"] = pedido.valor_final
+    ws[f"F{row}"].font = Font(bold=True, size=12)
+
+    ws.column_dimensions["A"].width = 12
+    ws.column_dimensions["B"].width = 40
+    ws.column_dimensions["C"].width = 12
+    ws.column_dimensions["D"].width = 12
+    ws.column_dimensions["E"].width = 12
+    ws.column_dimensions["F"].width = 12
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
+
+
+def _gerar_pdf_pedido_bytes(
+    pedido: PedidoCompra,
+    fornecedor_nome: str,
+    db: Session,
+    tenant_id: int,
+) -> bytes:
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="Biblioteca reportlab nao instalada. Execute: pip install reportlab"
+        )
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Heading1"],
+        fontSize=18,
+        textColor=colors.HexColor("#1a56db"),
+        spaceAfter=12,
+        alignment=TA_CENTER
+    )
+    elements.append(Paragraph("PEDIDO DE COMPRA", title_style))
+    elements.append(Spacer(1, 10 * mm))
+
+    info_data = [
+        ["Numero do Pedido:", pedido.numero_pedido],
+        ["Fornecedor:", fornecedor_nome],
+        ["Data do Pedido:", pedido.data_pedido.strftime("%d/%m/%Y %H:%M")],
+        ["Status:", pedido.status.replace("_", " ").upper()],
+    ]
+
+    info_table = Table(info_data, colWidths=[40 * mm, 120 * mm])
+    info_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 10 * mm))
+
+    table_data = [["Codigo", "Produto", "Qtd", "Preco Unit.", "Desc.", "Total"]]
+
+    produto_style = ParagraphStyle(
+        "ProdutoStyle",
+        parent=styles["Normal"],
+        fontSize=8,
+        leading=10,
+    )
+
+    for item in pedido.itens:
+        produto = db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_id
+        ).first()
+        nome_produto = produto.nome if produto else f"Produto {item.produto_id}"
+        table_data.append([
+            produto.codigo if produto else "",
+            Paragraph(nome_produto, produto_style),
+            f"{item.quantidade_pedida:.0f}",
+            f"R$ {item.preco_unitario:.2f}",
+            f"R$ {item.desconto_item:.2f}",
+            f"R$ {item.valor_total:.2f}",
+        ])
+
+    items_table = Table(table_data, colWidths=[20 * mm, 70 * mm, 15 * mm, 23 * mm, 18 * mm, 23 * mm])
+    items_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (1, 1), (1, -1), "LEFT"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 5 * mm))
+
+    totals_data = [
+        ["", "", "", "", "Frete:", f"R$ {pedido.valor_frete:.2f}"],
+        ["", "", "", "", "Desconto:", f"R$ {pedido.valor_desconto:.2f}"],
+        ["", "", "", "", "TOTAL:", f"R$ {pedido.valor_final:.2f}"],
+    ]
+
+    totals_table = Table(totals_data, colWidths=[20 * mm, 70 * mm, 20 * mm, 25 * mm, 20 * mm, 25 * mm])
+    totals_table.setStyle(TableStyle([
+        ("ALIGN", (4, 0), (-1, -1), "RIGHT"),
+        ("FONTNAME", (4, -1), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (4, -1), (-1, -1), 12),
+        ("LINEABOVE", (4, -1), (-1, -1), 2, colors.black),
+    ]))
+    elements.append(totals_table)
+
+    if pedido.observacoes:
+        elements.append(Spacer(1, 10 * mm))
+        elements.append(Paragraph("<b>Observacoes:</b>", styles["Normal"]))
+        elements.append(Paragraph(pedido.observacoes, styles["Normal"]))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _montar_email_pedido(pedido: PedidoCompra, fornecedor_nome: str) -> tuple[str, str, str]:
+    assunto = f"Pedido de compra {pedido.numero_pedido} - {fornecedor_nome}"
+    data_pedido = pedido.data_pedido.strftime("%d/%m/%Y %H:%M")
+    observacoes = pedido.observacoes or "Sem observacoes adicionais."
+    total_itens = len(pedido.itens or [])
+
+    html_body = f"""
+    <html>
+      <body style="font-family:Arial,sans-serif;color:#1f2937;max-width:640px;margin:0 auto;">
+        <div style="background:#4f46e5;padding:20px;border-radius:12px 12px 0 0;color:#ffffff;">
+          <h1 style="margin:0;font-size:22px;">Pedido de Compra {pedido.numero_pedido}</h1>
+          <p style="margin:8px 0 0;opacity:0.9;">Fornecedor: {fornecedor_nome}</p>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
+          <p>Ola,</p>
+          <p>Segue em anexo o pedido de compra <strong>{pedido.numero_pedido}</strong> gerado em {data_pedido}.</p>
+          <ul>
+            <li><strong>Itens:</strong> {total_itens}</li>
+            <li><strong>Valor final:</strong> R$ {pedido.valor_final:.2f}</li>
+            <li><strong>Status:</strong> {pedido.status.replace("_", " ").upper()}</li>
+          </ul>
+          <p><strong>Observacoes:</strong><br />{observacoes}</p>
+          <p>Se precisar de qualquer ajuste, responda este e-mail.</p>
+        </div>
+      </body>
+    </html>
+    """
+
+    text_body = (
+        f"Pedido de compra {pedido.numero_pedido}\n"
+        f"Fornecedor: {fornecedor_nome}\n"
+        f"Data: {data_pedido}\n"
+        f"Itens: {total_itens}\n"
+        f"Valor final: R$ {pedido.valor_final:.2f}\n\n"
+        f"Observacoes: {observacoes}"
+    )
+
+    return assunto, html_body, text_body
+
+
 # ============================================================================
 # LISTAR PEDIDOS
 # ============================================================================
@@ -173,6 +435,21 @@ def listar_pedidos(
     
     logger.info(f"✅ {len(resultado)} pedidos encontrados (total: {total})")
     return resultado
+
+
+# ============================================================================
+# STATUS DE ENVIO
+# ============================================================================
+
+@router.get("/envio/status")
+def status_envio_pedidos(
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Informa se o servidor está apto a enviar pedidos por e-mail."""
+    current_user, tenant_id = current_user_and_tenant
+    return {
+        "email_configurado": is_email_configured()
+    }
 
 
 # ============================================================================
@@ -428,6 +705,7 @@ def atualizar_pedido(
 @router.post("/{pedido_id}/enviar")
 def enviar_pedido(
     pedido_id: int,
+    request: PedidoCompraEnviarRequest,
     db: Session = Depends(get_session),
     current_user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -448,11 +726,82 @@ def enviar_pedido(
             detail=f"Pedido não pode ser enviado no status '{pedido.status}'"
         )
     
+    fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
+    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+
+    if request.envio_manual:
+        pedido.status = "enviado"
+        pedido.data_envio = datetime.utcnow()
+        pedido.updated_at = datetime.utcnow()
+        db.commit()
+
+        logger.info(f"Pedido {pedido.numero_pedido} marcado como enviado manualmente")
+        return {
+            "message": "Pedido marcado como enviado manualmente",
+            "pedido_id": pedido.id,
+            "numero_pedido": pedido.numero_pedido,
+            "status": pedido.status,
+            "tipo_envio": "manual"
+        }
+
+    email_destino = (request.email or "").strip()
+    if not email_destino:
+        raise HTTPException(status_code=400, detail="Informe o e-mail do fornecedor")
+
+    formatos = request.formatos or PedidoCompraEnvioFormatos()
+    if not formatos.pdf and not formatos.excel:
+        raise HTTPException(status_code=400, detail="Selecione pelo menos um formato para envio")
+
+    if not is_email_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="O envio de e-mail nao esta configurado no servidor"
+        )
+
+    anexos = []
+    if formatos.pdf:
+        anexos.append({
+            "filename": f"pedido_{pedido.numero_pedido}.pdf",
+            "content": _gerar_pdf_pedido_bytes(pedido, fornecedor_nome, db, tenant_id),
+            "mime_subtype": "pdf"
+        })
+    if formatos.excel:
+        anexos.append({
+            "filename": f"pedido_{pedido.numero_pedido}.xlsx",
+            "content": _gerar_excel_pedido_bytes(pedido, fornecedor_nome, db, tenant_id),
+            "mime_subtype": "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        })
+
+    assunto, html_body, text_body = _montar_email_pedido(pedido, fornecedor_nome)
+    enviado = send_email(
+        to=email_destino,
+        subject=assunto,
+        html_body=html_body,
+        text_body=text_body,
+        attachments=anexos,
+        simulate_if_unconfigured=False
+    )
+
+    if not enviado:
+        raise HTTPException(
+            status_code=502,
+            detail="Nao foi possivel enviar o e-mail do pedido. Revise a configuracao SMTP."
+        )
+
     pedido.status = "enviado"
     pedido.data_envio = datetime.utcnow()
     pedido.updated_at = datetime.utcnow()
     
     db.commit()
+    logger.info(f"Pedido {pedido.numero_pedido} enviado por e-mail para {email_destino}")
+    return {
+        "message": "Pedido enviado por e-mail com sucesso",
+        "pedido_id": pedido.id,
+        "numero_pedido": pedido.numero_pedido,
+        "status": pedido.status,
+        "tipo_envio": "email",
+        "email": email_destino
+    }
     
     logger.info(f"✅ Pedido {pedido.numero_pedido} enviado")
     

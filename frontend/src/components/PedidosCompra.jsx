@@ -16,6 +16,7 @@ const PedidosCompra = () => {
   // Modal de envio
   const [mostrarModalEnvio, setMostrarModalEnvio] = useState(false);
   const [pedidoParaEnviar, setPedidoParaEnviar] = useState(null);
+  const [emailEnvioDisponivel, setEmailEnvioDisponivel] = useState(false);
   const [dadosEnvio, setDadosEnvio] = useState({
     email: '',
     whatsapp: '',
@@ -129,9 +130,10 @@ const PedidosCompra = () => {
 
   const carregarDados = async () => {
     try {
-      const [pedidosRes, fornecedoresRes] = await Promise.all([
+      const [pedidosRes, fornecedoresRes, envioStatusRes] = await Promise.all([
         api.get('/pedidos-compra/'),
-        api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true')
+        api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true'),
+        api.get('/pedidos-compra/envio/status').catch(() => ({ data: { email_configurado: false } }))
       ]);
 
       // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
@@ -146,6 +148,7 @@ const PedidosCompra = () => {
 
       setPedidos(pedidosData);
       setFornecedores(fornecedoresData);
+      setEmailEnvioDisponivel(Boolean(envioStatusRes?.data?.email_configurado));
       // NÃO carregar produtos aqui - apenas quando fornecedor for selecionado
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -348,10 +351,15 @@ const PedidosCompra = () => {
     );
   };
 
+  const sanitizarQuantidadeInteira = (valor) => {
+    const somenteDigitos = String(valor ?? '').replace(/\D+/g, '');
+    return somenteDigitos ? parseInt(somenteDigitos, 10) : 0;
+  };
+
   const atualizarQuantidadeSugerida = (produtoId, novaQuantidade) => {
     setQuantidadesEditadas(prev => ({
       ...prev,
-      [produtoId]: parseFloat(novaQuantidade) || 0
+      [produtoId]: sanitizarQuantidadeInteira(novaQuantidade)
     }));
   };
 
@@ -523,6 +531,11 @@ const PedidosCompra = () => {
       toast.error('Informe um e-mail ou WhatsApp');
       return;
     }
+
+    if (!emailEnvioDisponivel) {
+      toast.error('O servidor ainda não está configurado para enviar e-mails');
+      return;
+    }
     
     if (!dadosEnvio.formatos.pdf && !dadosEnvio.formatos.excel) {
       toast.error('Selecione pelo menos um formato (PDF ou Excel)');
@@ -532,13 +545,21 @@ const PedidosCompra = () => {
     try {
             // Aqui você pode implementar o envio real por e-mail/WhatsApp no futuro
       // Por enquanto, apenas marca como enviado
-      await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
+      const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
         email: dadosEnvio.email,
         whatsapp: dadosEnvio.whatsapp,
         formatos: dadosEnvio.formatos
       });
-      
-      toast.success('✅ Pedido marcado como enviado!');
+
+      const tipoEnvio = response?.data?.tipo_envio;
+      if (tipoEnvio === 'email') {
+        toast.success('Pedido enviado por e-mail com sucesso');
+      } else if (tipoEnvio === 'manual') {
+        toast.success('Pedido marcado como enviado manualmente');
+      } else {
+        toast.success(response?.data?.message || 'Pedido processado com sucesso');
+      }
+
       setMostrarModalEnvio(false);
       carregarDados();
     } catch (error) {
@@ -548,7 +569,7 @@ const PedidosCompra = () => {
   
   const marcarComoEnviadoManualmente = async () => {
     try {
-      await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
+      const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
         envio_manual: true
       });
       
@@ -1227,6 +1248,7 @@ const PedidosCompra = () => {
           onClose={() => setMostrarModalEnvio(false)}
           onEnviar={confirmarEnvioPedido}
           onEnvioManual={marcarComoEnviadoManualmente}
+          emailEnvioDisponivel={emailEnvioDisponivel}
           dadosEnvio={dadosEnvio}
           setDadosEnvio={setDadosEnvio}
         />
@@ -1488,11 +1510,12 @@ const PedidosCompra = () => {
                             </td>
                             <td className="px-4 py-3 text-right">
                               <input
-                                type="number"
-                                min="0"
-                                step="1"
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={obterQuantidadeInteira(sugestao)}
                                 onChange={(e) => atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)}
+                                onWheel={(e) => e.currentTarget.blur()}
                                 className="w-20 px-2 py-1 text-right font-bold text-purple-600 border rounded focus:ring-2 focus:ring-purple-300"
                               />
                             </td>
@@ -1663,7 +1686,15 @@ const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
 };
 
 // Modal de Envio de Pedido
-const ModalEnvioPedido = ({ pedidoId, onClose, onEnviar, onEnvioManual, dadosEnvio, setDadosEnvio }) => {
+const ModalEnvioPedido = ({
+  pedidoId,
+  onClose,
+  onEnviar,
+  onEnvioManual,
+  emailEnvioDisponivel,
+  dadosEnvio,
+  setDadosEnvio
+}) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -1743,11 +1774,19 @@ const ModalEnvioPedido = ({ pedidoId, onClose, onEnviar, onEnvioManual, dadosEnv
             </div>
           </div>
 
+          {emailEnvioDisponivel === false && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              O servidor ainda não está configurado para enviar e-mails automaticamente.
+              Você pode marcar este pedido como enviado manualmente por enquanto.
+            </div>
+          )}
+
           {/* Botões de Ação */}
           <div className="flex flex-col gap-3 pt-4">
             <button
               onClick={onEnviar}
-              className="w-full border border-blue-200 bg-blue-50 text-blue-700 py-3 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
+              disabled={!emailEnvioDisponivel}
+              className="w-full border border-blue-200 bg-blue-50 text-blue-700 py-3 rounded-lg font-semibold hover:bg-blue-100 transition-colors disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             >
               📧 Enviar por E-mail
             </button>

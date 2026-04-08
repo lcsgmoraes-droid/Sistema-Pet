@@ -3,14 +3,15 @@ Bling OAuth2 - Callback e renovação automática de tokens
 """
 import os
 import base64
+import json
 import logging
 from pathlib import Path
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
 import requests
-from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,14 @@ ENV_PATHS = [
     Path(__file__).parent.parent / ".env",
 ]
 
+TOKEN_CONTROL_PATHS = [
+    Path("/app/bling_token_control.json"),
+    Path(__file__).parent.parent.parent / "bling_token_control.json",
+    Path(__file__).parent.parent / "bling_token_control.json",
+]
+
+LAST_RENEWAL_PATH = Path("/tmp/bling_token_last_renewal.txt")
+
 
 def _get_env_path() -> Path:
     for p in ENV_PATHS:
@@ -32,7 +41,44 @@ def _get_env_path() -> Path:
     return Path(".env")
 
 
-def _salvar_tokens(access_token: str, refresh_token: str):
+def _get_token_control_path() -> Path:
+    for path in TOKEN_CONTROL_PATHS:
+        if path.exists():
+            return path
+    return TOKEN_CONTROL_PATHS[0]
+
+
+def _sincronizar_controle_token(expires_in: int = 21600) -> None:
+    agora = datetime.now()
+    proxima_renovacao = agora + timedelta(seconds=max(expires_in - 1800, 60))
+    token_control_path = _get_token_control_path()
+    token_control_path.parent.mkdir(parents=True, exist_ok=True)
+
+    renovacoes_automaticas = 0
+    if token_control_path.exists():
+        try:
+            dados_atuais = json.loads(token_control_path.read_text(encoding="utf-8"))
+            renovacoes_automaticas = int(dados_atuais.get("renovacoes_automaticas") or 0)
+        except Exception:
+            renovacoes_automaticas = 0
+
+    token_control_path.write_text(
+        json.dumps(
+            {
+                "ultima_renovacao": agora.isoformat(),
+                "proxima_renovacao": proxima_renovacao.isoformat(),
+                "renovacoes_automaticas": renovacoes_automaticas,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    LAST_RENEWAL_PATH.write_text(str(agora.timestamp()), encoding="utf-8")
+    logger.info("Controle local do token Bling sincronizado para a nova autorizacao")
+
+
+def _salvar_tokens(access_token: str, refresh_token: str, expires_in: int = 21600):
     """Salva tokens no arquivo .env"""
     env_path = _get_env_path()
     logger.info(f"Salvando tokens em: {env_path}")
@@ -66,6 +112,7 @@ def _salvar_tokens(access_token: str, refresh_token: str):
     # Atualizar variáveis de ambiente em memória para uso imediato
     os.environ["BLING_ACCESS_TOKEN"] = access_token
     os.environ["BLING_REFRESH_TOKEN"] = refresh_token
+    _sincronizar_controle_token(expires_in=expires_in)
 
     logger.info("✅ Tokens Bling salvos com sucesso")
 
@@ -129,7 +176,7 @@ async def bling_oauth_callback(request: Request, code: str = None, error: str = 
         if not access_token or not refresh_token:
             raise Exception(f"Resposta inválida: {tokens}")
 
-        _salvar_tokens(access_token, refresh_token)
+        _salvar_tokens(access_token, refresh_token, expires_in=expires_in)
 
         expira_em = datetime.now() + timedelta(seconds=expires_in)
         logger.info(f"✅ Bling OAuth concluído. Token expira em: {expira_em.strftime('%d/%m/%Y %H:%M')}")
@@ -142,7 +189,10 @@ async def bling_oauth_callback(request: Request, code: str = None, error: str = 
 
 
 @router.get("/link-autorizacao")
-async def gerar_link_autorizacao(request: Request):
+async def gerar_link_autorizacao(
+    request: Request,
+    redirect: bool = Query(False, description="Quando true, redireciona direto para a autorizacao do Bling."),
+):
     """
     Retorna o link para o usuário autorizar o aplicativo no Bling.
     Acesse este endpoint para obter a URL de autorização.
@@ -164,6 +214,9 @@ async def gerar_link_autorizacao(request: Request):
         f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&state={state}"
     )
+
+    if redirect:
+        return RedirectResponse(url=auth_url, status_code=307)
 
     return {
         "instrucao": "Acesse a URL abaixo no navegador para autorizar o Bling",

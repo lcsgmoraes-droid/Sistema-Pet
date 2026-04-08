@@ -123,8 +123,8 @@ export default function MenuCaixa({ onAbrirCaixa }) {
 
   if (loading) {
     return (
-      <div className="px-4 py-2 bg-gray-100 rounded-lg">
-        <div className="animate-pulse h-10 bg-gray-200 rounded"></div>
+      <div className="flex h-14 min-w-[176px] items-center rounded-2xl bg-slate-100 px-4 shadow-sm">
+        <div className="h-6 w-full animate-pulse rounded-xl bg-slate-200"></div>
       </div>
     );
   }
@@ -133,7 +133,7 @@ export default function MenuCaixa({ onAbrirCaixa }) {
     return (
       <button
         onClick={handleCaixaAberto}
-        className="flex items-center space-x-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+        className="inline-flex h-14 min-w-[176px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md"
       >
         <DollarSign className="w-5 h-5" />
         <span>Abrir Caixa</span>
@@ -146,9 +146,9 @@ export default function MenuCaixa({ onAbrirCaixa }) {
       <div className="relative">
         <button
           onClick={() => setMenuAberto(!menuAberto)}
-          className="flex items-center space-x-3 px-4 py-2 bg-white border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors"
+          className="inline-flex h-14 min-w-[196px] items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white hover:shadow-md"
         >
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
             <span className="font-semibold text-gray-900">
               Caixa #{caixaAberto.numero_caixa}

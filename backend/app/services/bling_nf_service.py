@@ -595,9 +595,10 @@ def _texto(valor, default: str = "") -> str:
 
 
 def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sku_padrao: str) -> Produto:
-    codigo = _texto(item_bling.get("codigo") or item_bling.get("sku"), sku_padrao)[:50]
+    codigo = _texto(item_bling.get("sku") or item_bling.get("codigo"), sku_padrao)[:50]
     nome = _texto(item_bling.get("nome") or item_bling.get("descricao"), f"Produto {codigo}")[:200]
-    codigo_barras = _texto(item_bling.get("codigoBarras"))[:20] or None
+    codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))[:20] or None
+    gtin = _texto(item_bling.get("gtin"))[:13] or None
     unidade = _texto(item_bling.get("unidade"), "UN")[:10] or "UN"
 
     preco_venda = max(
@@ -615,6 +616,7 @@ def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sk
         codigo=codigo,
         nome=nome,
         codigo_barras=codigo_barras,
+        gtin_ean=gtin,
         tipo="produto",
         tipo_produto="SIMPLES",
         is_parent=False,
@@ -632,6 +634,67 @@ def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sk
             f"criado_em={datetime.now(timezone.utc).isoformat()}"
         ),
     )
+
+
+def criar_produto_automatico_do_bling_por_item(
+    db: Session,
+    tenant_id,
+    item_bling: dict | None,
+    sku_preferencial: str | None = None,
+):
+    item_bling = item_bling or {}
+    sku_limpo = _texto(sku_preferencial or item_bling.get("sku") or item_bling.get("codigo"))
+    codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))
+
+    if sku_limpo:
+        existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
+        if existente:
+            return existente
+
+    if codigo_barras:
+        existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=codigo_barras)
+        if existente:
+            return existente
+
+    usuario = _obter_usuario_padrao_tenant(db=db, tenant_id=tenant_id)
+    if not usuario:
+        logger.warning("Produto Bling sem usuario padrao no tenant %s para autocadastro", tenant_id)
+        return None
+
+    chave_base = sku_limpo or codigo_barras or _texto(item_bling.get("id"), "BLING")
+    novo_produto = _montar_produto_local_do_bling(
+        item_bling=item_bling,
+        tenant_id=tenant_id,
+        user_id=usuario.id,
+        sku_padrao=chave_base,
+    )
+
+    if _codigo_ja_existe_global(db, novo_produto.codigo):
+        codigo_original = novo_produto.codigo
+        novo_produto.codigo = _gerar_codigo_fallback(db=db, sku=chave_base, tenant_id=tenant_id)
+        if not (novo_produto.codigo_barras or "").strip():
+            novo_produto.codigo_barras = chave_base[:20]
+        logger.info(
+            "[AUTO-BLING-NF] Ajuste de codigo por colisao global: '%s' -> '%s'",
+            codigo_original,
+            novo_produto.codigo,
+        )
+
+    try:
+        with db.begin_nested():
+            db.add(novo_produto)
+            db.flush()
+        logger.info("Produto Bling criado automaticamente com id=%s", novo_produto.id)
+        return novo_produto
+    except Exception as e:
+        logger.warning("Falha no autocadastro por item do Bling: %s", e)
+        if sku_limpo:
+            existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
+            if existente:
+                return existente
+        if codigo_barras:
+            return buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=codigo_barras)
+        return None
 
 
 def _slug_codigo(valor: str) -> str:

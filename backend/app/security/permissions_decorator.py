@@ -38,7 +38,13 @@ def require_permission(permission: str):
             
             # Verifica a permissão (passa tenant_id se disponível)
             try:
-                check_permission(db, current_user.id, permission, tenant_id)
+                check_permission(
+                    db,
+                    current_user.id,
+                    permission,
+                    tenant_id,
+                    current_user=current_user,
+                )
             except HTTPException:
                 raise
             except Exception as e:
@@ -75,7 +81,13 @@ def require_permission(permission: str):
             
             # Verifica a permissão (passa tenant_id se disponível)
             try:
-                check_permission(db, current_user.id, permission, tenant_id)
+                check_permission(
+                    db,
+                    current_user.id,
+                    permission,
+                    tenant_id,
+                    current_user=current_user,
+                )
             except HTTPException:
                 raise
             except Exception as e:

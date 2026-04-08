@@ -181,12 +181,8 @@ export default function StoneIntegracao() {
       if (isInvalidGrant) {
         mostrarMensagem("info", "Abrindo autorização no Bling...");
         try {
-          const linkResp = await api.get("/auth/bling/link-autorizacao");
-          const url = linkResp.data?.url_autorizacao || linkResp.data?.url;
-          if (url) {
-            window.location.href = url;
-            return;
-          }
+          window.location.assign("/api/auth/bling/link-autorizacao?redirect=1");
+          return;
         } catch {
           // fallback abaixo
         }

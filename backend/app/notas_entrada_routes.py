@@ -2090,13 +2090,15 @@ def processar_entrada_estoque(
         composicao_custo = composicoes_custo.get(item.id, {})
 
         # Verificar override manual antes de usar auto-deteccao
-        override_raw = config.multiplicadores_override.get(str(item.id)) or config.multiplicadores_override.get(item.id)
+        override_raw = config.multiplicadores_override.get(str(item.id))
+        if override_raw is None:
+            override_raw = config.multiplicadores_override.get(item.id)
         try:
             override_mult = int(override_raw) if override_raw is not None else None
         except (ValueError, TypeError):
             override_mult = None
 
-        if override_mult and 1 < override_mult <= 200:
+        if override_mult is not None and 1 <= override_mult <= 200:
             multiplicador_pack = override_mult
             quantidade_entrada = item.quantidade * override_mult
             custo_total_aquisicao = composicao_custo.get("custo_aquisicao_total", item.valor_total)

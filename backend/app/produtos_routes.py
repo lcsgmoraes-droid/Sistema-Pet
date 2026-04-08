@@ -752,9 +752,65 @@ def listar_categorias(
         Categoria.ativo == True
     )
 
-    categorias = query.order_by(Categoria.ordem, Categoria.nome).all()
+    categorias = (
+        query
+        .options(joinedload(Categoria.departamento))
+        .order_by(Categoria.ordem, Categoria.nome)
+        .all()
+    )
 
-    # Calcular nÃ­vel e contadores para cada categoria
+    categoria_por_id = {cat.id: cat for cat in categorias}
+    categoria_ids = list(categoria_por_id.keys())
+
+    total_filhos_por_categoria = {
+        categoria_pai_id: total_filhos
+        for categoria_pai_id, total_filhos in (
+            db.query(Categoria.categoria_pai_id, func.count(Categoria.id))
+            .filter(
+                Categoria.tenant_id == tenant_id,
+                Categoria.ativo == True,
+                Categoria.categoria_pai_id.isnot(None),
+            )
+            .group_by(Categoria.categoria_pai_id)
+            .all()
+        )
+    }
+
+    total_produtos_por_categoria = {}
+    if categoria_ids:
+        total_produtos_por_categoria = {
+            categoria_id: total_produtos
+            for categoria_id, total_produtos in (
+                db.query(Produto.categoria_id, func.count(Produto.id))
+                .filter(
+                    Produto.tenant_id == tenant_id,
+                    Produto.categoria_id.in_(categoria_ids),
+                )
+                .group_by(Produto.categoria_id)
+                .all()
+            )
+        }
+
+    niveis_cache: dict[int, int] = {}
+
+    def calcular_nivel_em_memoria(categoria_id: int) -> int:
+        nivel_cache = niveis_cache.get(categoria_id)
+        if nivel_cache is not None:
+            return nivel_cache
+
+        nivel = 1
+        atual = categoria_por_id.get(categoria_id)
+        visitados = set()
+
+        while atual and atual.categoria_pai_id and atual.categoria_pai_id not in visitados:
+            visitados.add(atual.id)
+            nivel += 1
+            atual = categoria_por_id.get(atual.categoria_pai_id)
+
+        niveis_cache[categoria_id] = nivel
+        return nivel
+
+    # Calcular nÃ­vel e contadores para cada categoria sem N+1
     resultado = []
     for cat in categorias:
         cat_dict = {
@@ -770,14 +826,9 @@ def listar_categorias(
             "ativo": cat.ativo,
             "created_at": cat.created_at,
             "updated_at": cat.updated_at,
-            "nivel": calcular_nivel(db, cat.id),
-            "total_filhos": db.query(Categoria).filter(
-                Categoria.categoria_pai_id == cat.id,
-                Categoria.ativo == True
-            ).count(),
-            "total_produtos": db.query(Produto).filter(
-                Produto.categoria_id == cat.id
-            ).count()
+            "nivel": calcular_nivel_em_memoria(cat.id),
+            "total_filhos": int(total_filhos_por_categoria.get(cat.id, 0) or 0),
+            "total_produtos": int(total_produtos_por_categoria.get(cat.id, 0) or 0),
         }
         resultado.append(CategoriaResponse(**cat_dict))
 

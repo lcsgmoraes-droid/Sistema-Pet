@@ -26,6 +26,7 @@ from app.audit_log import log_create, log_update, log_delete
 from app.pet_clinical_utils import normalize_pet_clinical_payload
 from app.security.permissions_decorator import require_permission
 from app.partner_utils import get_all_accessible_tenant_ids
+from app.services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -2240,6 +2241,14 @@ async def baixar_vendas_lote(
                     'saldo_restante': novo_saldo,
                     'saldo_anterior': saldo_devedor
                 })
+
+            get_or_build_venda_rentabilidade_snapshot(
+                venda,
+                db,
+                tenant_id,
+                persist_if_missing=True,
+                force_refresh=True,
+            )
             
             # Registrar movimentaÃ§Ã£o no caixa (apenas para formas que movimentam caixa)
             formas_que_movimentam_caixa = ['dinheiro', 'Dinheiro', 'pix', 'PIX', 'cartao_debito', 'CartÃ£o de DÃ©bito']
@@ -2794,4 +2803,3 @@ def obter_custo_operacional_entregador(
         "custo_por_entrega": round(custo_por_entrega, 2),
         "detalhes": detalhes
     }
-

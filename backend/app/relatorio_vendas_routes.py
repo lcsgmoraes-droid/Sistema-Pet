@@ -16,11 +16,12 @@ import logging
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .vendas_models import Venda, VendaItem, VendaPagamento
-from .produtos_models import Produto
+from .produtos_models import Produto, EstoqueMovimentacao
 from .models import User, Cliente
 from .comissoes_models import ComissaoItem
 from .empresa_config_fiscal_models import EmpresaConfigFiscal
 from .financeiro_models import FormaPagamento
+from .services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,48 @@ async def obter_relatorio_vendas(
             cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
         except Exception as e:
             logger.warning(f"Erro ao buscar cashback por venda (tabela pode não existir): {e}")
+
+    comissao_total_por_venda = {
+        venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
+        for venda_id, itens in comissoes_map.items()
+    }
+
+    entregadores_map = {}
+    entregador_ids = {v.entregador_id for v in vendas if v.tem_entrega and v.entregador_id}
+    if entregador_ids:
+        try:
+            entregadores = db.query(Cliente.id, Cliente.taxa_fixa_entrega).filter(
+                and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
+            ).all()
+            entregadores_map = {
+                entregador_id: float(taxa_fixa_entrega or 0)
+                for entregador_id, taxa_fixa_entrega in entregadores
+            }
+        except Exception as e:
+            logger.warning(f"Erro ao buscar entregadores para rentabilidade: {e}")
+
+    estoque_custos_por_venda = {}
+    if venda_ids:
+        try:
+            movimentos_estoque = db.query(EstoqueMovimentacao).filter(
+                and_(
+                    EstoqueMovimentacao.tenant_id == tenant_id,
+                    EstoqueMovimentacao.referencia_tipo == 'venda',
+                    EstoqueMovimentacao.referencia_id.in_(venda_ids),
+                    EstoqueMovimentacao.tipo == 'saida'
+                )
+            ).all()
+
+            for movimento in movimentos_estoque:
+                mapa_venda = estoque_custos_por_venda.setdefault(movimento.referencia_id, {})
+                mapa_produto = mapa_venda.setdefault(
+                    movimento.produto_id,
+                    {"quantidade": 0.0, "valor_total": 0.0}
+                )
+                mapa_produto["quantidade"] += abs(float(movimento.quantidade or 0))
+                mapa_produto["valor_total"] += abs(float(movimento.valor_total or 0))
+        except Exception as e:
+            logger.warning(f"Erro ao buscar movimentacoes de estoque para rentabilidade: {e}")
 
     # ==============================================
     # RESUMO (Cards no topo)
@@ -487,257 +530,47 @@ async def obter_relatorio_vendas(
     lucro_total_geral = 0
     venda_liquida_geral = 0
 
-    # Taxas de cartão (parametrizável futuramente)
-    TAXAS_CARTAO = {
-        'Dinheiro': 0,
-        'dinheiro': 0,
-        '1': 0,  # Dinheiro (código do PDV)
-        'PIX': 0,
-        'pix': 0,
-        '2': 0,  # PIX (código do PDV)
-        'Débito': 1.5,
-        'debito': 1.5,
-        'cartao_debito': 1.5,
-        '3': 1.5,  # Débito (código do PDV)
-        'Crédito à Vista': 2.5,
-        'credito': 2.5,
-        'cartao_credito': 2.5,
-        '4': 2.5,  # Crédito à Vista (código do PDV)
-        'Crédito Parcelado': 3.5,
-        '5': 3.5,  # Crédito Parcelado (código do PDV)
-        'credito_cliente': 0  # Crédito do cliente (sem taxa)
-    }
-
-    # Comissão padrão (será parametrizado por funcionário futuramente)
-    COMISSAO_PADRAO = 5.0  # 5%
-
     for venda in vendas:
-        # OTIMIZAÇÃO: usar itens já carregados em vez de query ao BD
-        itens = venda.itens
-
-        # ==============================
-        # CALCULO DE RENTABILIDADE (safe)
-        # ==============================
-        taxa_total = 0.0
-        comissao = 0.0
-        impostos_percentual = impostos_percentual_global  # OTIMIZAÇÃO: usar valor já carregado
-        taxa_operacional_entrega = 0.0
-
-        # Taxa de cartao por FormaPagamento (JSON taxas_por_parcela)
-        # OTIMIZAÇÃO: usar pagamentos já carregados
-        for pag in venda.pagamentos:
-            taxa_percentual = 0.0
-            if pag.forma_pagamento:
-                # OTIMIZAÇÃO: usar map pré-carregado em vez de query ao BD
-                forma_pag = formas_pagamento_map.get(pag.forma_pagamento.lower().strip())
-                if not forma_pag:
-                    logger.warning(
-                        "FormaPagamento nao encontrada: %s (venda_id=%s)",
-                        pag.forma_pagamento,
-                        venda.id
-                    )
-                else:
-                    taxas_por_parcela = forma_pag.taxas_por_parcela
-                    if isinstance(taxas_por_parcela, str):
-                        try:
-                            taxas_por_parcela = json.loads(taxas_por_parcela)
-                        except Exception:
-                            logger.warning(
-                                "taxas_por_parcela invalido para FormaPagamento %s",
-                                forma_pag.nome
-                            )
-                            taxas_por_parcela = None
-
-                    if isinstance(taxas_por_parcela, dict) and pag.numero_parcelas:
-                        taxa_percentual = float(
-                            taxas_por_parcela.get(str(pag.numero_parcelas), 0) or 0
-                        )
-                    elif forma_pag.taxa_percentual:
-                        taxa_percentual = float(forma_pag.taxa_percentual)
-            else:
-                logger.warning("Pagamento sem forma_pagamento (venda_id=%s)", venda.id)
-
-            taxa_total += (float(pag.valor or 0) * taxa_percentual / 100.0)
-
-        # OTIMIZAÇÃO: Comissao real da tabela comissoes_itens (usar map pré-carregado)
-        comissoes_itens = comissoes_map.get(venda.id, [])
-        if not comissoes_itens:
-            logger.warning("Sem comissao para venda_id=%s", venda.id)
-        for com_item in comissoes_itens:
-            comissao += float(com_item.valor_comissao or 0)
-
-        # OTIMIZAÇÃO: Imposto já foi carregado globalmente (impostos_percentual_global)
-
-        # Taxa operacional de entrega
-        if venda.tem_entrega and venda.entregador_id:
-            # OTIMIZAÇÃO: Carregar entregador apenas se necessário
-            # Idealmente, isso deveria ser eager-loaded também, mas é menos comum
-            try:
-                entregador = db.query(Cliente).filter(
-                    and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
-                ).first()
-                if not entregador:
-                    logger.warning("Entregador nao encontrado (id=%s)", venda.entregador_id)
-                elif entregador.taxa_fixa_entrega:
-                    taxa_operacional_entrega = float(entregador.taxa_fixa_entrega)
-            except Exception as e:
-                logger.warning(f"Erro ao buscar entregador: {e}")
-        else:
-            pass  # Sem warning se não tem entrega
-
-        # Separar valores de entrega:
-        # - taxa_entrega_total: valor cobrado do cliente (receita bruta de entrega)
-        # - taxa_entrega_entregador: repasse ao entregador (custo)
-        taxa_entrega_total = float(venda.taxa_entrega or 0)
-        taxa_entrega_entregador = float(venda.valor_taxa_entregador or 0)
-        if taxa_entrega_entregador < 0:
-            taxa_entrega_entregador = 0.0
-        if taxa_entrega_entregador > taxa_entrega_total:
-            taxa_entrega_entregador = taxa_entrega_total
-
-        # Calcular CUSTO TOTAL e SUBTOTAL dos produtos para rateio
-        custo_total = 0
-        subtotal_itens = 0
-        itens_detalhados = []
-
-        # Primeiro loop: calcular totais
-        for item in itens:
-            # OTIMIZAÇÃO: usar relacionamento produto já carregado
-            produto = item.produto
-            custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
-            custo_item = custo_unitario * float(item.quantidade)
-            subtotal_item = float(item.quantidade) * float(item.preco_unitario)
-
-            custo_total += custo_item
-            subtotal_itens += subtotal_item
-
-        # Custo de campanha (cashback/cupom) desta venda — necessário para rateio por item
-        custo_campanha = cashback_por_venda.get(venda.id, 0.0)
-
-        # Segundo loop: calcular rateio para cada item
-        for item in itens:
-            # OTIMIZAÇÃO: usar relacionamento produto já carregado
-            produto = item.produto
-            custo_unitario = float(produto.preco_custo) if produto and produto.preco_custo else 0
-            quantidade = float(item.quantidade)
-            preco_unit = float(item.preco_unitario)
-
-            # Valores do item
-            subtotal_item = quantidade * preco_unit
-            custo_item = custo_unitario * quantidade
-
-            # Calcular percentual do item no total da venda (para rateio proporcional)
-            percentual_item = (subtotal_item / subtotal_itens) if subtotal_itens > 0 else 0
-
-            # RATEIO PROPORCIONAL de despesas
-            desconto_rateado = float(venda.desconto_valor or 0) * percentual_item
-            taxa_loja_rateada = taxa_entrega_total * percentual_item
-            taxa_entrega_entregador_rateada = taxa_entrega_entregador * percentual_item
-            taxa_cartao_rateada = taxa_total * percentual_item
-            comissao_rateada = comissao * percentual_item
-            # Imposto por item: base = venda bruta do item + taxa de entrega total rateada
-            imposto_rateado = (subtotal_item + taxa_loja_rateada) * (impostos_percentual / 100.0)
-            taxa_operacional_rateada = taxa_operacional_entrega * percentual_item
-            campanha_rateada = custo_campanha * percentual_item
-
-            # Valor líquido do item (mesma lógica da venda: bruta + tx loja - deduções)
-            valor_liquido_item = (
-                subtotal_item
-                + taxa_loja_rateada
-                - desconto_rateado
-                - taxa_entrega_entregador_rateada
-                - taxa_operacional_rateada
-                - taxa_cartao_rateada
-                - comissao_rateada
-                - imposto_rateado
-                - campanha_rateada
-            )
-
-            # Lucro do item = líquido - custo
-            lucro_item = valor_liquido_item - custo_item
-
-            # Margens do item (divisor = bruta do item, consistente com nível da venda)
-            margem_sobre_venda_item = (lucro_item / subtotal_item * 100) if subtotal_item > 0 else 0
-            margem_sobre_custo_item = (lucro_item / custo_item * 100) if custo_item > 0 else 0
-
-            # Valores unitários (para tooltip)
-            lucro_unitario = lucro_item / quantidade if quantidade > 0 else 0
-
-            itens_detalhados.append({
-                "produto_nome": produto.nome if produto else "Produto removido",
-                "quantidade": quantidade,
-                "preco_unitario": round(preco_unit, 2),
-                "venda_bruta": round(subtotal_item, 2),
-                "taxa_loja": round(taxa_loja_rateada, 2),
-                "desconto": round(desconto_rateado, 2),
-                "taxa_entrega": round(taxa_entrega_entregador_rateada, 2),
-                "taxa_cartao": round(taxa_cartao_rateada, 2),
-                "comissao": round(comissao_rateada, 2),
-                "imposto": round(imposto_rateado, 2),
-                "taxa_operacional": round(taxa_operacional_rateada, 2),
-                "campanha": round(campanha_rateada, 2),
-                "valor_liquido": round(valor_liquido_item, 2),
-                "custo_unitario": round(custo_unitario, 2),
-                "custo_total": round(custo_item, 2),
-                "lucro": round(lucro_item, 2),
-                "lucro_unitario": round(lucro_unitario, 2),
-                "margem_sobre_venda": round(margem_sobre_venda_item, 1),
-                "margem_sobre_custo": round(margem_sobre_custo_item, 1)
-            })
-
-        # Calcular LÍQUIDA, LUCRO e MARGENS da venda (nível venda)
-        # Fórmula: líquida = bruta + tx_loja - desconto - tx_entregador - operacional - cartão - comissão - imposto - campanha
-        #          lucro   = líquida - custo
-        venda_bruta_val = float(venda.subtotal) + float(venda.desconto_valor or 0)
-        desconto_val = float(venda.desconto_valor or 0)
-        taxa_loja_val = taxa_entrega_total
-        taxa_entrega_val = taxa_entrega_entregador
-        imposto_total = (venda_bruta_val + taxa_loja_val) * (impostos_percentual / 100.0)
-
-        venda_liquida_calc = (
-            venda_bruta_val
-            + taxa_loja_val
-            - desconto_val
-            - taxa_entrega_val
-            - taxa_operacional_entrega
-            - taxa_total
-            - comissao
-            - imposto_total
-            - custo_campanha
+        snapshot = get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_id,
+            persist_if_missing=True,
+            impostos_percentual=impostos_percentual_global,
+            formas_pagamento_map=formas_pagamento_map,
+            custo_campanha=cashback_por_venda.get(venda.id, 0.0),
+            comissao_total=comissao_total_por_venda.get(venda.id, 0.0),
+            taxa_operacional_entrega=entregadores_map.get(venda.entregador_id, 0.0),
+            estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
         )
-        lucro = venda_liquida_calc - custo_total
 
-        margem_sobre_venda = (lucro / venda_bruta_val * 100) if venda_bruta_val > 0 else 0
-        margem_sobre_custo = (lucro / custo_total * 100) if custo_total > 0 else 0
-
-        # Acumular totais gerais
-        custo_total_geral += custo_total
-        taxa_total_geral += taxa_total
-        comissao_total_geral += comissao
-        lucro_total_geral += lucro
-        venda_liquida_geral += venda_liquida_calc
+        custo_total_geral += float(snapshot.get("custo_produtos", 0) or 0)
+        taxa_total_geral += float(snapshot.get("taxa_cartao", 0) or 0)
+        comissao_total_geral += float(snapshot.get("comissao", 0) or 0)
+        lucro_total_geral += float(snapshot.get("lucro", 0) or 0)
+        venda_liquida_geral += float(snapshot.get("venda_liquida", 0) or 0)
 
         lista_vendas.append({
             "id": venda.id,
             "numero_venda": venda.numero_venda,
             "data_venda": venda.data_venda.isoformat(),
             "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
-            "venda_bruta": round(float(venda.subtotal) + float(venda.desconto_valor or 0), 2),
-            "taxa_loja": round(taxa_loja_val, 2),
-            "desconto": round(float(venda.desconto_valor or 0), 2),
-            "taxa_entrega": round(taxa_entrega_val, 2),
-            "taxa_cartao": round(taxa_total, 2),
-            "comissao": round(comissao, 2),
-            "imposto": round(imposto_total, 2),
-            "taxa_operacional": round(taxa_operacional_entrega, 2),
-            "custo_produtos": round(custo_total, 2),
-            "custo_campanha": round(custo_campanha, 2),
-            "venda_liquida": round(venda_liquida_calc, 2),
-            "lucro": round(lucro, 2),
-            "margem_sobre_venda": round(margem_sobre_venda, 1),
-            "margem_sobre_custo": round(margem_sobre_custo, 1),
+            "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
+            "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
+            "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),
+            "taxa_entrega": round(float(snapshot.get("taxa_entrega", 0) or 0), 2),
+            "taxa_cartao": round(float(snapshot.get("taxa_cartao", 0) or 0), 2),
+            "comissao": round(float(snapshot.get("comissao", 0) or 0), 2),
+            "imposto": round(float(snapshot.get("imposto", 0) or 0), 2),
+            "taxa_operacional": round(float(snapshot.get("taxa_operacional", 0) or 0), 2),
+            "custo_produtos": round(float(snapshot.get("custo_produtos", 0) or 0), 2),
+            "custo_campanha": round(float(snapshot.get("custo_campanha", 0) or 0), 2),
+            "venda_liquida": round(float(snapshot.get("venda_liquida", 0) or 0), 2),
+            "lucro": round(float(snapshot.get("lucro", 0) or 0), 2),
+            "margem_sobre_venda": round(float(snapshot.get("margem_sobre_venda", 0) or 0), 1),
+            "margem_sobre_custo": round(float(snapshot.get("margem_sobre_custo", 0) or 0), 1),
             "status": venda.status,
-            "itens": itens_detalhados
+            "itens": list(snapshot.get("itens", []) or []),
         })
 
     lista_vendas = sorted(lista_vendas, key=lambda x: x["data_venda"], reverse=True)
@@ -748,39 +581,38 @@ async def obter_relatorio_vendas(
     resumo["comissao_total"] = round(comissao_total_geral, 2)
     resumo["lucro_total"] = round(lucro_total_geral, 2)
     resumo["venda_liquida"] = round(venda_liquida_geral, 2)
-    resumo["margem_media"] = round((lucro_total_geral / venda_liquida * 100) if venda_liquida > 0 else 0, 1)
+    resumo["margem_media"] = round((lucro_total_geral / venda_liquida_geral * 100) if venda_liquida_geral > 0 else 0, 1)
 
     # ==============================================
     # PRODUTOS PARA ANÁLISE INTELIGENTE (flat list)
     # ==============================================
     produtos_analise = {}
-    for venda in vendas:
-        # OTIMIZAÇÃO: usar itens já carregados
-        for item in venda.itens:
-            # OTIMIZAÇÃO: usar relacionamento produto já carregado
-            produto = item.produto
-            if not produto:
-                continue
+    vendas_por_id = {venda.id: venda for venda in vendas}
+    for venda_snapshot in lista_vendas:
+        venda_obj = vendas_por_id.get(venda_snapshot["id"])
+        produtos_relacao = {
+            item.produto_id: item.produto
+            for item in list(getattr(venda_obj, "itens", []) or [])
+            if getattr(item, "produto", None)
+        }
 
-            prod_nome = produto.nome
+        for item_snapshot in venda_snapshot["itens"]:
+            produto_rel = produtos_relacao.get(item_snapshot.get("produto_id"))
+            prod_nome = item_snapshot.get("produto_nome") or "Produto removido"
             if prod_nome not in produtos_analise:
                 produtos_analise[prod_nome] = {
-                    'nome': prod_nome,
-                    'produto': prod_nome,
-                    'marca': produto.marca.nome if produto.marca else None,
-                    'categoria': produto.categoria.nome if produto.categoria else None,
-                    'quantidade': 0,
-                    'valor_total': 0,
-                    'custo_total': 0
+                    "nome": prod_nome,
+                    "produto": prod_nome,
+                    "marca": produto_rel.marca.nome if produto_rel and produto_rel.marca else None,
+                    "categoria": produto_rel.categoria.nome if produto_rel and produto_rel.categoria else None,
+                    "quantidade": 0,
+                    "valor_total": 0,
+                    "custo_total": 0,
                 }
 
-            produtos_analise[prod_nome]['quantidade'] += float(item.quantidade or 0)
-            produtos_analise[prod_nome]['valor_total'] += float(item.subtotal or 0)
-
-            # Calcular custo
-            if produto.preco_custo:
-                produtos_analise[prod_nome]['custo_total'] += float(produto.preco_custo) * float(item.quantidade or 0)
-
+            produtos_analise[prod_nome]["quantidade"] += float(item_snapshot.get("quantidade", 0) or 0)
+            produtos_analise[prod_nome]["valor_total"] += float(item_snapshot.get("venda_bruta", 0) or 0)
+            produtos_analise[prod_nome]["custo_total"] += float(item_snapshot.get("custo_total", 0) or 0)
     # Converter para lista e ordenar por valor
     produtos_analise_lista = sorted(
         list(produtos_analise.values()),
@@ -1182,3 +1014,4 @@ async def exportar_vendas_pdf(
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+

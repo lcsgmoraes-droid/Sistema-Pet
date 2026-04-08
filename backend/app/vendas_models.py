@@ -3,7 +3,7 @@
 Models para o módulo de Vendas (PDV)
 """
 
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -90,6 +90,10 @@ class Venda(BaseTenantModel):
     # DRE por Competência (PASSO 1 - Sprint 5)
     dre_gerada = Column(Boolean, default=False, nullable=False)  # Controla se DRE já foi gerada (receita, CMV, desconto)
     data_geracao_dre = Column(DateTime, nullable=True)  # Quando a DRE foi gerada pela primeira vez
+
+    # Snapshot financeiro imutável para rentabilidade da venda
+    rentabilidade_snapshot = Column(JSON, nullable=True)
+    rentabilidade_snapshot_em = Column(DateTime, nullable=True)
     
     # Nota Fiscal Eletrônica (NF-e e NFC-e)
     nfe_tipo = Column(String(10), nullable=True)  # 'nfe' ou 'nfce'

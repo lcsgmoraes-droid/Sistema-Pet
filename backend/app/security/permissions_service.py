@@ -24,7 +24,13 @@ def get_user_permissions(db: Session, user_id: int, tenant_id: UUID) -> set[str]
     return {p[0] for p in perms}
 
 
-def check_permission(db: Session, user_id: int, permission: str, tenant_id: Optional[UUID] = None):
+def check_permission(
+    db: Session,
+    user_id: int,
+    permission: str,
+    tenant_id: Optional[UUID] = None,
+    current_user: Optional[User] = None,
+):
     """
     Verifica se o usuário tem a permissão especificada.
     
@@ -35,7 +41,9 @@ def check_permission(db: Session, user_id: int, permission: str, tenant_id: Opti
         tenant_id: UUID do tenant (opcional, usa contexto se não fornecido)
     """
     # Verifica se o usuário é admin - admins têm todas as permissões
-    user = db.query(User).filter(User.id == user_id).first()
+    user = current_user
+    if user is None:
+        user = db.query(User).filter(User.id == user_id).first()
     if user and user.is_admin:
         return  # Admin tem acesso total, não precisa verificar permissões
     

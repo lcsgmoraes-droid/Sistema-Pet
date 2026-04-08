@@ -39,6 +39,10 @@ from .caixa.service import CaixaService
 from .financeiro import ContasReceberService
 from .utils.security_helpers import safe_get_produto, safe_get_cliente, safe_get_conta_bancaria, get_by_id_user
 from .services.opportunity_background_processor import get_opportunity_processor
+from .services.venda_rentabilidade_snapshot_service import (
+    get_or_build_venda_rentabilidade_snapshot,
+    invalidate_venda_rentabilidade_snapshot,
+)
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
 
@@ -672,6 +676,13 @@ def atualizar_venda(
                 status_anterior = venda.status
                 venda.status = 'finalizada'
                 venda.updated_at = datetime.now()
+                get_or_build_venda_rentabilidade_snapshot(
+                    venda,
+                    db,
+                    tenant_id,
+                    persist_if_missing=True,
+                    force_refresh=True,
+                )
                 db.commit()
                 db.refresh(venda)
 
@@ -1309,6 +1320,7 @@ def reabrir_venda(
     venda.status = 'aberta'
     venda.data_finalizacao = None
     venda.updated_at = datetime.now()
+    invalidate_venda_rentabilidade_snapshot(venda)
 
     db.commit()
     db.refresh(venda)
@@ -1353,6 +1365,16 @@ def atualizar_status_venda(
     venda.status = novo_status
     venda.updated_at = datetime.now()
 
+    if novo_status in ['finalizada', 'baixa_parcial']:
+        get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_id,
+            persist_if_missing=True,
+            force_refresh=True,
+        )
+    elif novo_status == 'aberta':
+        invalidate_venda_rentabilidade_snapshot(venda)
     # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
     if novo_status == 'finalizada' and status_anterior != 'finalizada' and venda.funcionario_id:
         try:
@@ -1663,12 +1685,27 @@ def excluir_pagamento(
     if total_pago == 0:
         venda.status = 'aberta'
         logger.info(f"DEBUG: Mudou status para ABERTA (total_pago = 0)")
+        invalidate_venda_rentabilidade_snapshot(venda)
     elif total_pago >= total_venda:
         venda.status = 'finalizada'
         logger.info(f"DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
+        get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_id,
+            persist_if_missing=True,
+            force_refresh=True,
+        )
     else:
         venda.status = 'baixa_parcial'
         logger.info(f"DEBUG: Mudou status para BAIXA_PARCIAL")
+        get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_id,
+            persist_if_missing=True,
+            force_refresh=True,
+        )
 
     db.commit()
 
@@ -2408,3 +2445,4 @@ def relatorio_resumo(
             'fim': data_fim if data_fim else None
         }
     }
+

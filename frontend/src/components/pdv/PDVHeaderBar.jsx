@@ -2,6 +2,7 @@ import {
   Bell,
   Bot,
   CreditCard,
+  Lock,
   Save,
   Search,
   ShoppingCart,
@@ -40,53 +41,70 @@ export default function PDVHeaderBar({
   onSalvarVenda,
   onAbrirModalPagamento,
 }) {
+  const actionBase =
+    "inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-transparent px-5 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm";
+  const iconActionBase =
+    "relative inline-flex h-14 w-14 items-center justify-center rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md";
+
+  const secondaryAction = `${actionBase} border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100`;
+  const successAction = `${actionBase} bg-emerald-600 text-white hover:bg-emerald-700`;
+  const primaryAction = `${actionBase} bg-blue-600 text-white hover:bg-blue-700`;
+  const accentAction = `${actionBase} border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100`;
+  const destructiveAction = `${actionBase} border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100`;
+
   return (
-    <div className="bg-white border-b px-6 py-4">
+    <div className="border-b bg-white px-6 py-5">
       {(destaqueAbrirCaixa || destaqueVenda) && (
-        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 text-sm">
+        <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           {destaqueAbrirCaixa
             ? "Etapa da introducao guiada: abra o caixa para liberar salvamento e finalizacao de vendas."
             : "Etapa da introducao guiada: use esta tela para concluir a venda e validar o fluxo operacional."}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <ShoppingCart className="w-8 h-8 text-blue-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
-            <p className="text-sm text-gray-500">
-              {new Date().toLocaleDateString("pt-BR", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
-          </div>
-          <button
-            onClick={iniciarTour}
-            title="Ver tour guiado do PDV"
-            className="flex items-center gap-1 px-2 py-1 text-sm text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="hidden sm:inline text-xs">Tour</span>
-          </button>
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm">
+              <ShoppingCart className="h-8 w-8" />
+            </div>
 
-          <div className="flex items-center gap-2 ml-6">
-            <div className="relative">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
+              <p className="text-sm text-gray-500">
+                {new Date().toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+
+            <button
+              onClick={iniciarTour}
+              title="Ver tour guiado do PDV"
+              className="inline-flex h-10 items-center gap-1 rounded-xl px-3 text-sm text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="hidden text-xs sm:inline">Tour</span>
+            </button>
+          </div>
+
+          <div className="flex w-full max-w-xl items-center gap-3">
+            <div className="relative flex-1">
               <input
                 type="text"
                 placeholder="Buscar venda (Ex: 0011)"
@@ -97,30 +115,30 @@ export default function PDVHeaderBar({
                     onBuscarVenda();
                   }
                 }}
-                className="pl-10 pr-4 py-2 w-64 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
               />
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" />
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             </div>
             <button
               onClick={onBuscarVenda}
               disabled={!searchVendaQuery.trim() || loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`${primaryAction} min-w-[108px]`}
             >
               Buscar
             </button>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center justify-end gap-3 xl:max-w-[54rem] xl:self-end">
           {vendaAtual.cliente && (
             <button
               onClick={onAbrirPendenciasEstoque}
-              className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-orange-50 border-2 border-orange-400 rounded-lg transition-colors relative"
+              className={`${iconActionBase} border-orange-200 text-orange-500 hover:border-orange-300 hover:bg-orange-50`}
               title="Lista de espera - Produtos sem estoque"
             >
-              <Bell className="w-5 h-5 text-orange-500" />
+              <Bell className="h-5 w-5" />
               {pendenciasCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
                   {pendenciasCount}
                 </span>
               )}
@@ -130,10 +148,10 @@ export default function PDVHeaderBar({
           {vendaAtual.cliente && (
             <button
               onClick={onAbrirOportunidades}
-              className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-yellow-50 border-2 border-yellow-400 rounded-lg transition-colors"
+              className={`${iconActionBase} border-yellow-200 text-yellow-500 hover:border-yellow-300 hover:bg-yellow-50`}
               title="Ver oportunidades de venda"
             >
-              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+              <Star className="h-5 w-5 fill-yellow-500" />
               {opportunitiesCount > 0 && (
                 <span className="font-semibold text-yellow-600">
                   {Math.min(opportunitiesCount, 6)}
@@ -145,25 +163,23 @@ export default function PDVHeaderBar({
           {vendaAtual.cliente && (
             <button
               onClick={onToggleAssistente}
-              className={`flex items-center space-x-1 px-3 py-2 rounded-lg border-2 transition-colors ${
+              className={`inline-flex h-14 min-w-[56px] items-center justify-center gap-2 rounded-2xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                 painelAssistenteAberto
-                  ? "bg-indigo-100 border-indigo-500 text-indigo-700"
-                  : "bg-white hover:bg-indigo-50 border-indigo-300 text-indigo-600"
+                  ? "border-indigo-400 bg-indigo-100 text-indigo-700"
+                  : "border-indigo-200 bg-white text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50"
               }`}
               title="Assistente IA do cliente"
             >
-              <Bot className="w-5 h-5" />
+              <Bot className="h-5 w-5" />
               {mensagensAssistenteLength > 1 && !painelAssistenteAberto && (
-                <span className="w-2 h-2 bg-indigo-500 rounded-full" />
+                <span className="h-2 w-2 rounded-full bg-indigo-500" />
               )}
             </button>
           )}
 
           <div
             className={
-              destaqueAbrirCaixa
-                ? `rounded-lg ${caixaGuiaClasses.action}`
-                : ""
+              destaqueAbrirCaixa ? `rounded-2xl ${caixaGuiaClasses.action}` : ""
             }
           >
             <MenuCaixa key={menuCaixaKey} onAbrirCaixa={onAbrirCaixa} />
@@ -171,10 +187,10 @@ export default function PDVHeaderBar({
 
           <button
             onClick={onNavigateMeusCaixas}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg transition-colors"
-            title="Ver histórico de caixas"
+            className={`${accentAction} min-w-[148px]`}
+            title="Ver historico de caixas"
           >
-            <Wallet className="w-5 h-5" />
+            <Wallet className="h-5 w-5" />
             <span>Meus Caixas</span>
           </button>
 
@@ -183,17 +199,17 @@ export default function PDVHeaderBar({
               <button
                 onClick={onCancelarEdicao}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${secondaryAction} min-w-[170px]`}
               >
-                <X className="w-5 h-5" />
-                <span>Cancelar Edição</span>
+                <X className="h-5 w-5" />
+                <span>Cancelar Edicao</span>
               </button>
               <button
                 onClick={onExcluirVenda}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`${destructiveAction} min-w-[118px]`}
               >
-                <Trash2 className="w-5 h-5" />
+                <Trash2 className="h-5 w-5" />
                 <span>Excluir</span>
               </button>
             </>
@@ -202,17 +218,18 @@ export default function PDVHeaderBar({
           <button
             onClick={onSalvarVenda}
             disabled={loading || modoVisualizacao || !temCaixaAberto}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${secondaryAction} min-w-[136px]`}
             title={
               !temCaixaAberto
-                ? "🔒 Caixa fechado - Abra o caixa para salvar vendas"
+                ? "Caixa fechado - Abra o caixa para salvar vendas"
                 : "Salvar venda atual"
             }
           >
-            <Save className="w-5 h-5" />
+            <Save className="h-5 w-5" />
             <span>Salvar</span>
-            {!temCaixaAberto && <span className="text-xs">🔒</span>}
+            {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
           </button>
+
           <button
             onClick={onAbrirModalPagamento}
             disabled={
@@ -221,16 +238,16 @@ export default function PDVHeaderBar({
               vendaAtual.status === "pago_nf" ||
               !temCaixaAberto
             }
-            className="flex items-center space-x-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${successAction} min-w-[260px]`}
             title={
               !temCaixaAberto
-                ? "🔒 Caixa fechado - Abra o caixa para registrar recebimentos"
+                ? "Caixa fechado - Abra o caixa para registrar recebimentos"
                 : "Registrar pagamento da venda"
             }
           >
-            <CreditCard className="w-5 h-5" />
+            <CreditCard className="h-5 w-5" />
             <span>Registrar Recebimento</span>
-            {!temCaixaAberto && <span className="text-xs">🔒</span>}
+            {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
           </button>
         </div>
       </div>

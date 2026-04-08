@@ -2,6 +2,44 @@ import { useEffect, useState } from "react";
 import api from "../api";
 import { getCategorias, getMarcas } from "../api/produtos";
 
+const CATALOGOS_CACHE_KEY = "produtos_catalogos_cache_v1";
+const CATALOGOS_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readCatalogosCache() {
+  try {
+    const raw = sessionStorage.getItem(CATALOGOS_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.savedAt || !parsed?.data) {
+      return null;
+    }
+
+    if (Date.now() - Number(parsed.savedAt) > CATALOGOS_CACHE_TTL_MS) {
+      sessionStorage.removeItem(CATALOGOS_CACHE_KEY);
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCatalogosCache(data) {
+  try {
+    sessionStorage.setItem(
+      CATALOGOS_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        data,
+      }),
+    );
+  } catch {
+    // Cache é apenas otimização; falhas aqui não devem afetar a tela.
+  }
+}
+
 export default function useProdutosCatalogos() {
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
@@ -9,58 +47,81 @@ export default function useProdutosCatalogos() {
   const [departamentos, setDepartamentos] = useState([]);
 
   useEffect(() => {
+    const cached = readCatalogosCache();
+    if (cached) {
+      setCategorias(cached.categorias || []);
+      setMarcas(cached.marcas || []);
+      setFornecedores(cached.fornecedores || []);
+      setDepartamentos(cached.departamentos || []);
+      return;
+    }
+
     void carregarCatalogos();
   }, []);
 
-  const carregarCategorias = async () => {
-    try {
-      const response = await getCategorias();
-      setCategorias(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar categorias:", error);
+  const carregarCatalogos = async ({ force = false } = {}) => {
+    if (!force) {
+      const cached = readCatalogosCache();
+      if (cached) {
+        setCategorias(cached.categorias || []);
+        setMarcas(cached.marcas || []);
+        setFornecedores(cached.fornecedores || []);
+        setDepartamentos(cached.departamentos || []);
+        return cached;
+      }
     }
-  };
 
-  const carregarMarcas = async () => {
-    try {
-      const response = await getMarcas();
-      setMarcas(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar marcas:", error);
+    const [categoriasResult, marcasResult, fornecedoresResult, departamentosResult] =
+      await Promise.allSettled([
+        getCategorias(),
+        getMarcas(),
+        api.get("/clientes/", {
+          params: {
+            tipo_cadastro: "fornecedor",
+            ativo: true,
+            limit: 200,
+          },
+        }),
+        api.get("/produtos/departamentos"),
+      ]);
+
+    if (categoriasResult.status === "rejected") {
+      console.error("Erro ao carregar categorias:", categoriasResult.reason);
     }
-  };
-
-  const carregarFornecedores = async () => {
-    try {
-      const response = await api.get(
-        "/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true",
-      );
-      const dados = response.data;
-      const lista = Array.isArray(dados)
-        ? dados
-        : dados.items || dados.clientes || dados.data || [];
-      setFornecedores(lista);
-    } catch (error) {
-      console.error("Erro ao carregar fornecedores:", error);
+    if (marcasResult.status === "rejected") {
+      console.error("Erro ao carregar marcas:", marcasResult.reason);
     }
-  };
-
-  const carregarDepartamentos = async () => {
-    try {
-      const response = await api.get("/produtos/departamentos");
-      setDepartamentos(response.data);
-    } catch (error) {
-      console.error("Erro ao carregar departamentos:", error);
+    if (fornecedoresResult.status === "rejected") {
+      console.error("Erro ao carregar fornecedores:", fornecedoresResult.reason);
     }
-  };
+    if (departamentosResult.status === "rejected") {
+      console.error("Erro ao carregar departamentos:", departamentosResult.reason);
+    }
 
-  const carregarCatalogos = async () => {
-    await Promise.allSettled([
-      carregarCategorias(),
-      carregarMarcas(),
-      carregarFornecedores(),
-      carregarDepartamentos(),
-    ]);
+    const categoriasData =
+      categoriasResult.status === "fulfilled" ? categoriasResult.value.data || [] : [];
+    const marcasData =
+      marcasResult.status === "fulfilled" ? marcasResult.value.data || [] : [];
+    const fornecedoresPayload =
+      fornecedoresResult.status === "fulfilled" ? fornecedoresResult.value.data : [];
+    const departamentosData =
+      departamentosResult.status === "fulfilled" ? departamentosResult.value.data || [] : [];
+
+    const fornecedoresData = Array.isArray(fornecedoresPayload)
+      ? fornecedoresPayload
+      : fornecedoresPayload.items || fornecedoresPayload.clientes || fornecedoresPayload.data || [];
+
+    setCategorias(categoriasData);
+    setMarcas(marcasData);
+    setFornecedores(fornecedoresData);
+    setDepartamentos(departamentosData);
+
+    writeCatalogosCache({
+      categorias: categoriasData,
+      marcas: marcasData,
+      fornecedores: fornecedoresData,
+      departamentos: departamentosData,
+    });
   };
 
   return {
@@ -68,6 +129,6 @@ export default function useProdutosCatalogos() {
     departamentos,
     fornecedores,
     marcas,
-    recarregarCatalogos: carregarCatalogos,
+    recarregarCatalogos: (options = {}) => carregarCatalogos({ force: true, ...options }),
   };
 }

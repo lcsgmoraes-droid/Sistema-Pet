@@ -116,6 +116,10 @@ from uuid import UUID
 
 # Timezone Brasília
 from app.utils.timezone import now_brasilia
+from app.services.venda_rentabilidade_snapshot_service import (
+    get_or_build_venda_rentabilidade_snapshot,
+    invalidate_venda_rentabilidade_snapshot,
+)
 
 # Services
 from app.estoque.service import EstoqueService
@@ -1014,6 +1018,17 @@ class VendaService:
             venda.motivo_cancelamento = motivo
             venda.data_cancelamento = now_brasilia()
             venda.updated_at = now_brasilia()
+
+            if venda.status in ['baixa_parcial', 'finalizada']:
+                get_or_build_venda_rentabilidade_snapshot(
+                    venda,
+                    db,
+                    tenant_id,
+                    persist_if_missing=True,
+                    force_refresh=True,
+                )
+            else:
+                invalidate_venda_rentabilidade_snapshot(venda)
             
             db.flush()
             
@@ -1505,6 +1520,17 @@ class VendaService:
                 venda.status = 'aberta'
             
             venda.updated_at = now_brasilia()
+
+            if venda.status in ['baixa_parcial', 'finalizada']:
+                get_or_build_venda_rentabilidade_snapshot(
+                    venda,
+                    db,
+                    tenant_id,
+                    persist_if_missing=True,
+                    force_refresh=True,
+                )
+            else:
+                invalidate_venda_rentabilidade_snapshot(venda)
             
             # ============================================================
             # ETAPA 3.5: GERAR DRE POR COMPETÊNCIA (PASSO 1 - Sprint 5)
@@ -2763,25 +2789,18 @@ def gerar_dre_competencia_venda(
         # ETAPA 3: CALCULAR VALORES
         # ============================================================
         
-        # Receita bruta = subtotal da venda (antes de descontos)
-        receita_bruta = Decimal(str(venda.subtotal))
-        
-        # CMV = somar custo de todos os produtos vendidos
-        cmv_total = Decimal('0')
-        
-        for item in venda.itens:
-            if item.tipo == 'produto' and item.produto_id:
-                produto = db.query(Produto).filter_by(
-                    id=item.produto_id,
-                    user_id=user_id
-                ).first()
-                
-                if produto and produto.preco_custo:
-                    custo_item = Decimal(str(produto.preco_custo)) * Decimal(str(item.quantidade))
-                    cmv_total += custo_item
-        
-        # Desconto = desconto concedido na venda
-        desconto_total = Decimal(str(venda.desconto_valor or 0))
+        snapshot = get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_uuid,
+            persist_if_missing=True,
+            force_refresh=True,
+        )
+
+        # Receita, CMV e desconto passam a seguir a fotografia financeira da venda.
+        receita_bruta = Decimal(str(snapshot.get('venda_bruta', 0) or 0))
+        cmv_total = Decimal(str(snapshot.get('custo_produtos', 0) or 0))
+        desconto_total = Decimal(str(snapshot.get('desconto', 0) or 0))
         
         # Canal da venda (para DRE por canal)
         canal = venda.canal or 'loja_fisica'
@@ -2894,3 +2913,4 @@ def gerar_dre_competencia_venda(
             status_code=500,
             detail=f"Erro ao gerar DRE: {str(e)}"
         )
+

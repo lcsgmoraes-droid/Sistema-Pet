@@ -46,69 +46,163 @@ function obterCustoAquisicaoItem(item) {
   );
 }
 
+function normalizarMultiplicadorPack(valor, fallback = 1) {
+  const parsed = Number.parseInt(valor, 10);
+
+  if (!Number.isInteger(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(1, Math.min(200, parsed));
+}
+
+function obterChavePackItem(item) {
+  return item?.id ?? item?.item_id ?? null;
+}
+
+function itemTemOverridePack(item, multiplicadoresOverride = {}) {
+  const chaveItem = obterChavePackItem(item);
+
+  if (chaveItem === null || chaveItem === undefined) {
+    return false;
+  }
+
+  return (
+    Object.prototype.hasOwnProperty.call(multiplicadoresOverride, chaveItem) ||
+    Object.prototype.hasOwnProperty.call(multiplicadoresOverride, String(chaveItem))
+  );
+}
+
+function obterConfiguracaoPackItem(item, multiplicadoresOverride = {}) {
+  const chaveItem = obterChavePackItem(item);
+  const multiplicadorDetectado = normalizarMultiplicadorPack(item?.pack_multiplicador_detectado, 1);
+  const overrideManual = itemTemOverridePack(item, multiplicadoresOverride);
+  const overrideRaw = overrideManual
+    ? (multiplicadoresOverride[chaveItem] ?? multiplicadoresOverride[String(chaveItem)])
+    : null;
+  const multiplicador = overrideManual
+    ? normalizarMultiplicadorPack(overrideRaw, multiplicadorDetectado)
+    : multiplicadorDetectado;
+  const sugestaoAutomaticaDiferenteDoPadrao = multiplicadorDetectado > 1;
+
+  return {
+    chaveItem,
+    multiplicador,
+    multiplicadorDetectado,
+    overrideManual,
+    packDetectadoAutomatico: Boolean(item?.pack_detectado_automatico || sugestaoAutomaticaDiferenteDoPadrao),
+    sugestaoAutomaticaDiferenteDoPadrao,
+    usandoSugestaoAutomatica: sugestaoAutomaticaDiferenteDoPadrao && !overrideManual,
+  };
+}
+
+function ajustarComposicaoCustoParaMultiplicador(composicao, quantidadeBase, multiplicador) {
+  if (!composicao) {
+    return composicao;
+  }
+
+  const quantidadeEfetiva = Number(quantidadeBase || 0) * multiplicador;
+  const componentesTotal = composicao.componentes_total || {};
+  const valorUnitario = (valorTotal) => (quantidadeEfetiva > 0 ? Number(valorTotal || 0) / quantidadeEfetiva : 0);
+
+  return {
+    ...composicao,
+    quantidade_efetiva: quantidadeEfetiva,
+    custo_bruto_unitario: valorUnitario(componentesTotal.valor_produtos),
+    custo_aquisicao_unitario: valorUnitario(composicao.custo_aquisicao_total),
+    componentes_unitario: {
+      ...(composicao.componentes_unitario || {}),
+      valor_frete: valorUnitario(componentesTotal.valor_frete),
+      valor_seguro: valorUnitario(componentesTotal.valor_seguro),
+      valor_outras_despesas: valorUnitario(componentesTotal.valor_outras_despesas),
+      valor_desconto: valorUnitario(componentesTotal.valor_desconto),
+      valor_icms_st: valorUnitario(componentesTotal.valor_icms_st),
+      valor_ipi: valorUnitario(componentesTotal.valor_ipi),
+      valor_icms: valorUnitario(componentesTotal.valor_icms),
+      valor_pis: valorUnitario(componentesTotal.valor_pis),
+      valor_cofins: valorUnitario(componentesTotal.valor_cofins),
+    },
+  };
+}
+
+function aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride = {}) {
+  if (!item) {
+    return item;
+  }
+
+  const configPack = obterConfiguracaoPackItem(item, multiplicadoresOverride);
+  const quantidadeNF = Number(item.quantidade_nf ?? item.quantidade ?? 0);
+  const quantidadeEfetiva = quantidadeNF * configPack.multiplicador;
+  const custoTotal = Number(
+    item.custo_aquisicao_total_nf ??
+    item.custo_aquisicao_total ??
+    item.composicao_custo?.custo_aquisicao_total ??
+    item.valor_total_nf ??
+    item.valor_total ??
+    0,
+  );
+  const custoUnitarioFallback = Number(
+    item.custo_aquisicao_unitario_nf ??
+    item.custo_aquisicao_unitario ??
+    item.composicao_custo?.custo_aquisicao_unitario ??
+    item.custo_unitario_efetivo_nf ??
+    item.custo_unitario_efetivo ??
+    item.valor_unitario_nf ??
+    item.valor_unitario ??
+    0,
+  );
+  const custoUnitarioEfetivo = quantidadeEfetiva > 0
+    ? (custoTotal / quantidadeEfetiva)
+    : custoUnitarioFallback;
+
+  let produtoVinculadoAjustado = item.produto_vinculado;
+  if (item.produto_vinculado) {
+    const custoAnterior = Number(item.produto_vinculado.custo_anterior || 0);
+    const variacaoCusto = custoAnterior > 0
+      ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100
+      : 0;
+    const precoVendaAtual = Number(item.produto_vinculado.preco_venda_atual || 0);
+    const margemAtual = precoVendaAtual > 0
+      ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100
+      : 0;
+
+    produtoVinculadoAjustado = {
+      ...item.produto_vinculado,
+      custo_novo: custoUnitarioEfetivo,
+      variacao_custo_percentual: Number(variacaoCusto.toFixed(2)),
+      margem_atual: Number(margemAtual.toFixed(2)),
+    };
+  }
+
+  return {
+    ...item,
+    pack_multiplicador_usado: configPack.multiplicador,
+    pack_override_manual: configPack.overrideManual,
+    pack_usa_sugestao_automatica: configPack.usandoSugestaoAutomatica,
+    pack_sugestao_destacada: configPack.sugestaoAutomaticaDiferenteDoPadrao,
+    quantidade_efetiva_nf: quantidadeEfetiva,
+    quantidade_efetiva: quantidadeEfetiva,
+    custo_unitario_efetivo_nf: custoUnitarioEfetivo,
+    custo_unitario_efetivo: custoUnitarioEfetivo,
+    custo_aquisicao_unitario_nf: custoUnitarioEfetivo,
+    custo_aquisicao_unitario: custoUnitarioEfetivo,
+    composicao_custo: ajustarComposicaoCustoParaMultiplicador(
+      item.composicao_custo,
+      quantidadeNF,
+      configPack.multiplicador,
+    ),
+    produto_vinculado: produtoVinculadoAjustado,
+  };
+}
+
 function aplicarOverridesPackNoPreview(preview, multiplicadoresOverride = {}) {
   if (!preview || !Array.isArray(preview.itens)) {
     return preview;
   }
 
-  const itensAjustados = preview.itens.map((item) => {
-    const overrideRaw = multiplicadoresOverride[item.item_id] ?? multiplicadoresOverride[String(item.item_id)];
-    const override = Number.parseInt(overrideRaw, 10);
-    const multiplicador = Number.isInteger(override) && override > 1 ? override : (item.pack_multiplicador_detectado || 1);
-
-    if (multiplicador <= 1) {
-      return {
-        ...item,
-        pack_multiplicador_usado: item.pack_multiplicador_detectado || 1,
-      };
-    }
-
-    const quantidadeNF = Number(item.quantidade_nf ?? item.quantidade ?? 0);
-    const quantidadeEfetiva = quantidadeNF * multiplicador;
-    const custoTotal = Number(
-      item.custo_aquisicao_total_nf ??
-      item.composicao_custo?.custo_aquisicao_total ??
-      item.valor_total_nf ??
-      item.valor_total ??
-      0,
-    );
-
-    const custoUnitarioEfetivo = quantidadeEfetiva > 0
-      ? (custoTotal / quantidadeEfetiva)
-      : Number(item.custo_aquisicao_unitario_nf ?? item.custo_unitario_efetivo_nf ?? 0);
-
-    let produtoVinculadoAjustado = item.produto_vinculado;
-    if (item.produto_vinculado) {
-      const custoAnterior = Number(item.produto_vinculado.custo_anterior || 0);
-      const variacaoCusto = custoAnterior > 0
-        ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100
-        : 0;
-      const precoVendaAtual = Number(item.produto_vinculado.preco_venda_atual || 0);
-      const margemAtual = precoVendaAtual > 0
-        ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100
-        : 0;
-
-      produtoVinculadoAjustado = {
-        ...item.produto_vinculado,
-        custo_novo: custoUnitarioEfetivo,
-        variacao_custo_percentual: Number(variacaoCusto.toFixed(2)),
-        margem_atual: Number(margemAtual.toFixed(2)),
-      };
-    }
-
-    return {
-      ...item,
-      pack_multiplicador_usado: multiplicador,
-      quantidade_efetiva_nf: quantidadeEfetiva,
-      custo_unitario_efetivo_nf: custoUnitarioEfetivo,
-      custo_aquisicao_unitario_nf: custoUnitarioEfetivo,
-      produto_vinculado: produtoVinculadoAjustado,
-    };
-  });
-
   return {
     ...preview,
-    itens: itensAjustados,
+    itens: preview.itens.map((item) => aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride)),
   };
 }
 
@@ -660,7 +754,15 @@ const EntradaXML = () => {
       
       // Processar a nota (enviar overrides de multiplicador manual quando existirem)
       const overridesNaoDefault = Object.fromEntries(
-        Object.entries(multiplicadoresPack).filter(([, v]) => v > 1)
+        Object.entries(multiplicadoresPack).flatMap(([itemId, valor]) => {
+          const multiplicador = Number.parseInt(valor, 10);
+
+          if (!Number.isInteger(multiplicador) || multiplicador < 1 || multiplicador > 200) {
+            return [];
+          }
+
+          return [[itemId, multiplicador]];
+        })
       );
       const response = await api.post(
         `/notas-entrada/${previewProcessamento.nota_id}/processar`,
@@ -1196,7 +1298,9 @@ const EntradaXML = () => {
   };
 
   const abrirModalCriarProduto = async (item) => {
-    setItemSelecionadoParaCriar(item);
+    const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
+
+    setItemSelecionadoParaCriar(itemAjustado);
     setMostrarModalCriarProduto(true);
     setCarregandoSugestao(true);
     
@@ -1214,13 +1318,13 @@ const EntradaXML = () => {
     
     try {
             const response = await api.get(
-        `/notas-entrada/${notaSelecionada.id}/itens/${item.id}/sugerir-sku`
+        `/notas-entrada/${notaSelecionada.id}/itens/${itemAjustado.id}/sugerir-sku`
       );
       
       setSugestaoSku(response.data);
       
       // Determinar qual SKU usar
-      let skuParaUsar = response.data.sku_proposto || item.codigo_produto || 'PROD-' + item.id;
+      let skuParaUsar = response.data.sku_proposto || itemAjustado.codigo_produto || 'PROD-' + itemAjustado.id;
       
       // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com ⭐)
       if (response.data.ja_existe && response.data.sugestoes && response.data.sugestoes.length > 0) {
@@ -1229,11 +1333,11 @@ const EntradaXML = () => {
       }
       
       // Preencher formulario com dados do item
-      const custoBase = obterCustoAquisicaoItem(item);
+      const custoBase = obterCustoAquisicaoItem(itemAjustado);
       setFormProduto({
         sku: skuParaUsar,
-        nome: item.descricao || item.descricao_produto || 'Produto sem nome',
-        descricao: item.descricao || item.descricao_produto || '',
+        nome: itemAjustado.descricao || itemAjustado.descricao_produto || 'Produto sem nome',
+        descricao: itemAjustado.descricao || itemAjustado.descricao_produto || '',
         preco_custo: custoBase.toString(),
         preco_venda: (custoBase * 1.5).toFixed(2),
         margem_lucro: '50',
@@ -1243,7 +1347,7 @@ const EntradaXML = () => {
       
       console.log('✅ Formulário preenchido:', {
         sku: skuParaUsar,
-        nome: item.descricao,
+        nome: itemAjustado.descricao,
         preco_custo: custoBase
       });
       
@@ -1252,11 +1356,11 @@ const EntradaXML = () => {
       console.error('Erro ao buscar SKU:', error);
       
       // Preencher mesmo com erro
-      const custoBase = obterCustoAquisicaoItem(item);
+      const custoBase = obterCustoAquisicaoItem(itemAjustado);
       setFormProduto({
-        sku: item.codigo_produto || 'PROD-' + item.id,
-        nome: item.descricao || 'Produto sem nome',
-        descricao: item.descricao || '',
+        sku: itemAjustado.codigo_produto || 'PROD-' + itemAjustado.id,
+        nome: itemAjustado.descricao || 'Produto sem nome',
+        descricao: itemAjustado.descricao || '',
         preco_custo: custoBase.toString(),
         preco_venda: (custoBase * 1.5).toFixed(2),
         margem_lucro: '50',
@@ -2017,6 +2121,8 @@ const EntradaXML = () => {
                 {notaSelecionada.itens.map(item => {
                   const divergencias = detectarDivergencias(item);
                   const temDivergencia = divergencias.length > 0;
+                  const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
+                  const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
                   
                   return (
                     <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
@@ -2056,7 +2162,7 @@ const EntradaXML = () => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Custo Aquisição:</span>
-                              <span className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}</span>
+                              <span className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemAjustado), 4)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Total:</span>
@@ -2070,46 +2176,69 @@ const EntradaXML = () => {
                             {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
                             {notaSelecionada.status === 'pendente' && (
                               <div className="mt-2 pt-2 border-t border-blue-200">
-                                <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
                                   <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
-                                  {item.pack_detectado_automatico && (
-                                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">📦 auto</span>
-                                  )}
+                                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                    {packConfig.packDetectadoAutomatico && (
+                                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">📦 auto</span>
+                                    )}
+                                    {packConfig.sugestaoAutomaticaDiferenteDoPadrao && (
+                                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">
+                                        Conferir sugestão x{packConfig.multiplicadorDetectado}
+                                      </span>
+                                    )}
+                                    {packConfig.overrideManual && (
+                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                                        Usando x{packConfig.multiplicador} digitado
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"
                                     min="1"
                                     max="200"
-                                    value={item.id in multiplicadoresPack ? multiplicadoresPack[item.id] : (item.pack_multiplicador_detectado || 1)}
+                                    value={packConfig.multiplicador}
                                     onChange={(e) => {
                                       const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
                                       setMultiplicadoresPack(prev => ({ ...prev, [item.id]: v }));
                                     }}
-                                    className="w-20 px-2 py-1 border-2 border-blue-300 rounded text-sm text-right font-semibold focus:ring-2 focus:ring-blue-500"
+                                    className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
+                                      packConfig.overrideManual
+                                        ? 'border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500'
+                                        : packConfig.sugestaoAutomaticaDiferenteDoPadrao
+                                          ? 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500'
+                                          : 'border-blue-300 focus:ring-blue-500'
+                                    }`}
                                   />
                                   <span className="text-xs text-gray-500">unid. por caixa</span>
                                 </div>
-                                {(() => {
-                                  const mult = item.id in multiplicadoresPack
-                                    ? multiplicadoresPack[item.id]
-                                    : (item.pack_multiplicador_detectado || 1);
-                                  if (mult > 1) {
-                                    const qtdReal = item.quantidade * mult;
-                                    const custoReal = obterCustoAquisicaoItem(item);
-                                    return (
-                                      <div className="mt-1.5 bg-green-50 border border-green-300 rounded p-2 text-xs text-green-800 space-y-0.5">
-                                        <div>🔢 Qtd real: <strong>{qtdReal}</strong> unid. ({item.quantidade} cx × {mult})</div>
-                                        <div>💰 Custo unit.: <strong>R$ {custoReal.toFixed(4)}</strong></div>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })()}
+                                {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
+                                  <div
+                                    className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
+                                      packConfig.overrideManual
+                                        ? 'bg-blue-50 border-blue-200 text-blue-800'
+                                        : 'bg-amber-50 border-amber-200 text-amber-800'
+                                    }`}
+                                  >
+                                    <div>
+                                      {packConfig.overrideManual
+                                        ? '✏️ Valor digitado considerado nos cálculos.'
+                                        : '🤖 Sugestão automática aplicada nos cálculos.'}
+                                    </div>
+                                    <div>
+                                      🔢 Qtd efetiva: <strong>{itemAjustado.quantidade_efetiva}</strong> unid. ({item.quantidade} cx × {packConfig.multiplicador})
+                                    </div>
+                                    <div>
+                                      💰 Custo unit.: <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
 
-                            <CardFiscal nota={notaSelecionada} item={item} composicao={item.composicao_custo} />
+                            <CardFiscal nota={notaSelecionada} item={itemAjustado} composicao={itemAjustado.composicao_custo} />
                           </div>
 
                           {/* Lote e Validade */}
