@@ -15,6 +15,7 @@ from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Cliente, User, UserTenant
+from app.services.email_service import send_email
 
 
 router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
@@ -41,6 +42,7 @@ class EcommerceForgotPasswordRequest(BaseModel):
 
 class EcommerceResetPasswordRequest(BaseModel):
     token: str
+    email: EmailStr | None = None
     nova_senha: str = Field(min_length=6)
 
 
@@ -115,6 +117,39 @@ def _extract_tenant_id_from_request(request: Request) -> UUID:
             detail="X-Tenant-ID obrigatório e deve ser UUID válido",
         )
     return tenant_id
+
+
+def _build_reset_password_email(user: User, reset_token: str) -> tuple[str, str, str]:
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Recuperacao de senha - Pet Shop Pro"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+        <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">Recuperar senha</h1>
+        </div>
+        <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+          <p>Ola{saudacao}.</p>
+          <p>Recebemos um pedido para redefinir a sua senha no app mobile.</p>
+          <p>Use o token abaixo na tela <strong>Recuperar senha</strong> do app:</p>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
+            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+          </div>
+          <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+          <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
+        </div>
+      </body>
+    </html>
+    """
+    text_body = (
+        "Recuperacao de senha - Pet Shop Pro\n\n"
+        "Use este token no app mobile para redefinir sua senha:\n"
+        f"{reset_token}\n\n"
+        f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+        "Se voce nao pediu essa alteracao, ignore este e-mail."
+    )
+    return subject, html_body, text_body
 
 
 def _get_current_ecommerce_user(
@@ -406,10 +441,11 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
 @router.post("/login")
 def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
+    email = payload.email.strip().lower()
 
     user = (
         db.query(User)
-        .filter(User.email == payload.email, User.tenant_id == tenant_id)
+        .filter(User.email == email, User.tenant_id == tenant_id)
         .first()
     )
 
@@ -462,10 +498,11 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
 @router.post("/esqueci-senha")
 def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
+    email = payload.email.strip().lower()
 
     user = (
         db.query(User)
-        .filter(User.email == payload.email, User.tenant_id == tenant_id)
+        .filter(User.email == email, User.tenant_id == tenant_id)
         .first()
     )
 
@@ -473,10 +510,23 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
         reset_token = secrets.token_urlsafe(32)
         user.reset_token = reset_token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
+        subject, html_body, text_body = _build_reset_password_email(user, reset_token)
+        enviado = send_email(
+            to=user.email,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+            simulate_if_unconfigured=False,
+        )
+        if not enviado:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Não foi possível enviar o e-mail de recuperação agora. Tente novamente em instantes.",
+            )
         db.commit()
         return {
             "message": "Se o email existir, enviaremos instruções de recuperação.",
-            "reset_token": reset_token,
             "expires_in_minutes": RESET_TOKEN_MINUTES,
         }
 
@@ -485,7 +535,10 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
 
 @router.post("/resetar-senha")
 def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(get_session)):
-    user = db.query(User).filter(User.reset_token == payload.token).first()
+    query = db.query(User).filter(User.reset_token == payload.token)
+    if payload.email:
+        query = query.filter(User.email == payload.email.strip().lower())
+    user = query.first()
 
     if not user or not user.reset_token_expires:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido")

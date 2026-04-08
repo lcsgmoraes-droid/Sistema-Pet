@@ -9,7 +9,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,6 +95,13 @@ export default function LoginScreen({ navigation }: any) {
             ) : (
               <Text style={styles.botaoTexto}>Entrar</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkSecundario}
+            onPress={() => navigation.navigate('ForgotPassword')}
+          >
+            <Text style={styles.linkSecundarioTexto}>Esqueci minha senha</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -210,6 +216,15 @@ const styles = StyleSheet.create({
   linkCadastro: {
     alignItems: 'center',
     marginTop: ESPACO.md,
+  },
+  linkSecundario: {
+    alignItems: 'center',
+    marginTop: ESPACO.md,
+  },
+  linkSecundarioTexto: {
+    fontSize: FONTE.normal,
+    color: CORES.primario,
+    fontWeight: '600',
   },
   linkTexto: {
     fontSize: FONTE.normal,

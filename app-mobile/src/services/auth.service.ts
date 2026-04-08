@@ -43,6 +43,27 @@ export async function updateProfile(updates: Partial<EcommerceUser>): Promise<Ec
   return data;
 }
 
+export async function requestPasswordReset(email: string): Promise<{ message: string; expires_in_minutes?: number }> {
+  const { data } = await api.post<{ message: string; expires_in_minutes?: number }>(
+    '/ecommerce/auth/esqueci-senha',
+    { email },
+  );
+  return data;
+}
+
+export async function resetPassword(
+  email: string,
+  token: string,
+  novaSenha: string,
+): Promise<{ message: string }> {
+  const { data } = await api.post<{ message: string }>('/ecommerce/auth/resetar-senha', {
+    email,
+    token,
+    nova_senha: novaSenha,
+  });
+  return data;
+}
+
 export async function getStoredToken(): Promise<string | null> {
   return SecureStore.getItemAsync('auth_token');
 }
