@@ -113,8 +113,12 @@ export default function ProfileScreen() {
       updateUser(updated);
       setEditando(false);
       Alert.alert('Salvo', 'Seus dados foram atualizados.');
-    } catch {
-      Alert.alert('Erro', 'Nao foi possivel salvar seus dados.');
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Nao foi possivel salvar seus dados.';
+      Alert.alert('Erro', String(mensagem));
     } finally {
       setSalvando(false);
     }
@@ -134,8 +138,12 @@ export default function ProfileScreen() {
       updateUser(updated);
       setEditandoEndereco(false);
       Alert.alert('Salvo', 'Endereco atualizado com sucesso.');
-    } catch {
-      Alert.alert('Erro', 'Nao foi possivel salvar o endereco.');
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Nao foi possivel salvar o endereco.';
+      Alert.alert('Erro', String(mensagem));
     } finally {
       setSalvando(false);
     }
