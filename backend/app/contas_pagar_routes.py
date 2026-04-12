@@ -500,7 +500,16 @@ def listar_contas_pagar(
     
     # Filtros
     if status:
-        query = query.filter(ContaPagar.status == status)
+        status_normalizado = status.strip().lower()
+        if status_normalizado == 'vencido':
+            query = query.filter(
+                and_(
+                    ContaPagar.status != 'pago',
+                    ContaPagar.data_vencimento < date.today(),
+                )
+            )
+        else:
+            query = query.filter(ContaPagar.status == status_normalizado)
     if fornecedor_id:
         query = query.filter(ContaPagar.fornecedor_id == fornecedor_id)
     if categoria_id:
@@ -519,14 +528,14 @@ def listar_contas_pagar(
     if apenas_vencidas:
         query = query.filter(
             and_(
-                ContaPagar.status == 'pendente',
+                ContaPagar.status != 'pago',
                 ContaPagar.data_vencimento < date.today()
             )
         )
     if apenas_vencer:
         query = query.filter(
             and_(
-                ContaPagar.status == 'pendente',
+                ContaPagar.status != 'pago',
                 ContaPagar.data_vencimento >= date.today()
             )
         )
@@ -603,6 +612,7 @@ def listar_contas_pagar(
 def classificar_conta_pagar(
     conta_id: int,
     payload: ContaPagarClassificacaoUpdate,
+    aplicar_fornecedor: bool = Query(False),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -657,6 +667,25 @@ def classificar_conta_pagar(
     if payload.canal is not None:
         conta.canal = payload.canal
 
+    fornecedor_atualizadas = 0
+    if aplicar_fornecedor and conta.fornecedor_id:
+        outras_contas = db.query(ContaPagar).filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.fornecedor_id == conta.fornecedor_id,
+            ContaPagar.id != conta.id,
+        ).all()
+
+        for outra_conta in outras_contas:
+            if payload.categoria_id is not None:
+                outra_conta.categoria_id = payload.categoria_id
+            if payload.dre_subcategoria_id is not None:
+                outra_conta.dre_subcategoria_id = payload.dre_subcategoria_id
+            if payload.tipo_despesa_id is not None:
+                outra_conta.tipo_despesa_id = payload.tipo_despesa_id
+            if payload.canal is not None:
+                outra_conta.canal = payload.canal
+            fornecedor_atualizadas += 1
+
     db.commit()
     db.refresh(conta)
 
@@ -668,6 +697,7 @@ def classificar_conta_pagar(
         "dre_subcategoria_id": conta.dre_subcategoria_id,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
+        "fornecedor_atualizadas": fornecedor_atualizadas,
     }
 
 

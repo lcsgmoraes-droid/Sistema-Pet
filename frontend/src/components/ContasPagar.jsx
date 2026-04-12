@@ -33,11 +33,6 @@ const ContasPagar = () => {
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
   const [novaFormaData, setNovaFormaData] = useState({ nome: '', tipo: 'dinheiro', conta_bancaria_destino_id: null });
-  const [similaresParaClassificar, setSimilaresParaClassificar] = useState([]);
-  const [mostrarModalSimilares, setMostrarModalSimilares] = useState(false);
-  const [ultimaClassificacao, setUltimaClassificacao] = useState(null);
-  const [aplicandoEmLote, setAplicandoEmLote] = useState(false);
-  const [selecionadosLote, setSelecionadosLote] = useState(new Set());
   const [dadosClassificacao, setDadosClassificacao] = useState({
     categoria_id: null,
     dre_subcategoria_id: null,
@@ -188,32 +183,19 @@ const ContasPagar = () => {
     setMostrarModalClassificacao(true);
   };
 
-  const extrairBaseDescricao = (descricao) => {
-    if (!descricao) return '';
-    // Remove código/número final (ex: "Taxa Débito - Venda 202603030001" → "Taxa Débito - Venda")
-    return descricao.replace(/\s+[\dA-Z]{6,}$/i, '').trim();
-  };
-
   const salvarClassificacao = async () => {
     if (!contaSelecionada) return;
     try {
-      await api.patch(`/contas-pagar/${contaSelecionada.id}/classificacao`, dadosClassificacao);
+      const response = await api.patch(
+        `/contas-pagar/${contaSelecionada.id}/classificacao?aplicar_fornecedor=true`,
+        dadosClassificacao
+      );
       setMostrarModalClassificacao(false);
       await carregarDados();
 
-      // Detectar lançamentos similares ainda não classificados
-      const base = extrairBaseDescricao(contaSelecionada.descricao);
-      const similares = contas.filter(c =>
-        c.id !== contaSelecionada.id &&
-        !c.categoria_id &&
-        base.length > 3 &&
-        extrairBaseDescricao(c.descricao) === base
-      );
-      if (similares.length > 0) {
-        setUltimaClassificacao({ ...dadosClassificacao });
-        setSimilaresParaClassificar(similares);
-        setSelecionadosLote(new Set(similares.map(c => c.id)));
-        setMostrarModalSimilares(true);
+      const outrasAtualizadas = Number(response?.data?.fornecedor_atualizadas || 0);
+      if (outrasAtualizadas > 0) {
+        toast.success(`Classificação aplicada automaticamente em ${outrasAtualizadas + 1} lançamentos do fornecedor`);
       } else {
         toast.success('Classificação salva com sucesso');
       }
@@ -221,25 +203,6 @@ const ContasPagar = () => {
       console.error('Erro ao classificar conta:', error);
       toast.error(error.response?.data?.detail || 'Erro ao classificar conta');
     }
-  };
-
-  const aplicarClassificacaoEmLote = async () => {
-    if (!ultimaClassificacao || similaresParaClassificar.length === 0) return;
-    setAplicandoEmLote(true);
-    let ok = 0;
-    const selecionados = similaresParaClassificar.filter(c => selecionadosLote.has(c.id));
-    for (const conta of selecionados) {
-      try {
-        await api.patch(`/contas-pagar/${conta.id}/classificacao`, ultimaClassificacao);
-        ok++;
-      } catch (e) {
-        console.error('Erro ao classificar lote:', e);
-      }
-    }
-    setAplicandoEmLote(false);
-    setMostrarModalSimilares(false);
-    await carregarDados();
-    toast.success(`Classificação aplicada em ${ok + 1} lançamentos!`);
   };
 
   const abrirNotaFiscal = (conta) => {
@@ -989,63 +952,6 @@ const ContasPagar = () => {
                 onClick={salvarClassificacao}
               >
                 Salvar Classificação
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Classificação em Lote */}
-      {mostrarModalSimilares && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => { setMostrarModalSimilares(false); toast.success('Classificação salva com sucesso'); }}
-        >
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b p-4">
-              <h2 className="text-lg font-semibold">⚡ Classificação Automática</h2>
-              <button
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
-                onClick={() => { setMostrarModalSimilares(false); toast.success('Classificação salva com sucesso'); }}
-              >✕</button>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-700 mb-3">
-                Encontrei <strong>{similaresParaClassificar.length}</strong> lançamento{similaresParaClassificar.length > 1 ? 's' : ''} similar{similaresParaClassificar.length > 1 ? 'es' : ''} ainda sem classificação:
-              </p>
-              <ul className="bg-gray-50 rounded p-3 max-h-48 overflow-y-auto text-sm text-gray-700 mb-4 space-y-2">
-                {similaresParaClassificar.map(c => (
-                  <li key={c.id} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`lote-${c.id}`}
-                      checked={selecionadosLote.has(c.id)}
-                      onChange={(e) => {
-                        const next = new Set(selecionadosLote);
-                        if (e.target.checked) next.add(c.id); else next.delete(c.id);
-                        setSelecionadosLote(next);
-                      }}
-                      className="accent-green-600 w-4 h-4 cursor-pointer"
-                    />
-                    <label htmlFor={`lote-${c.id}`} className="truncate cursor-pointer">{c.descricao}</label>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-sm text-gray-500">Deseja aplicar a mesma classificação a todos eles?</p>
-            </div>
-            <div className="flex justify-end gap-3 border-t p-4">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
-                onClick={() => { setMostrarModalSimilares(false); toast.success('Classificação salva com sucesso'); }}
-              >
-                Não, só este
-              </button>
-              <button
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                onClick={aplicarClassificacaoEmLote}
-                disabled={aplicandoEmLote || selecionadosLote.size === 0}
-              >
-                {aplicandoEmLote ? 'Aplicando...' : `Sim, aplicar a selecionados (${selecionadosLote.size + 1})`}
               </button>
             </div>
           </div>
