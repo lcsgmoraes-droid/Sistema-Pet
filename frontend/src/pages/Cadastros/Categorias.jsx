@@ -56,6 +56,10 @@ const Categorias = () => {
     setExpandidas(novasExpandidas);
   };
 
+  const limparCachesCatalogos = () => {
+    sessionStorage.removeItem('produtos_catalogos_cache_v1');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -66,6 +70,7 @@ const Categorias = () => {
         await api.post('/produtos/categorias', formData);
       }
       
+      limparCachesCatalogos();
       setShowModal(false);
       setEditando(null);
       setFormData({ nome: '', descricao: '', categoria_pai_id: null, departamento_id: null, ordem: 0 });
@@ -106,6 +111,7 @@ const Categorias = () => {
 
     try {
       await api.delete(`/produtos/categorias/${categoria.id}`);
+      limparCachesCatalogos();
       carregarCategorias();
     } catch (error) {
       console.error('Erro ao excluir categoria:', error);
