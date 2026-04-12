@@ -131,6 +131,7 @@ def _registrar_bloqueio_rate_limit_diario() -> datetime:
 
 def _consultar_pedido_bling(pedido_bling_id: str) -> dict:
     from app.bling_integration import BlingAPI
+    from app.services.bling_sync_service import BlingSyncService
 
     ultima_falha = None
     for espera in (0.0, 0.8, 1.4):
@@ -143,6 +144,12 @@ def _consultar_pedido_bling(pedido_bling_id: str) -> dict:
             ultima_falha = exc
             if "TOO_MANY_REQUESTS" not in str(exc):
                 raise
+
+    if ultima_falha and "TOO_MANY_REQUESTS" in str(ultima_falha):
+        try:
+            BlingSyncService.register_rate_limit_cooldown(ultima_falha)
+        except Exception:
+            pass
 
     raise ultima_falha
 

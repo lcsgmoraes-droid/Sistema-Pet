@@ -33,6 +33,8 @@ DIVERGENCIA_MINIMA = 0.01
 BLING_STOCK_MIN_INTERVAL_SECONDS = float(os.getenv("BLING_STOCK_MIN_INTERVAL_SECONDS", "0.45"))
 BLING_RATE_LIMIT_COOLDOWN_SECONDS = float(os.getenv("BLING_RATE_LIMIT_COOLDOWN_SECONDS", "4"))
 BLING_REPROCESS_IMMEDIATE_LIMIT = int(os.getenv("BLING_REPROCESS_IMMEDIATE_LIMIT", "8"))
+BLING_SECONDARY_READY_DEFER_THRESHOLD = int(os.getenv("BLING_SECONDARY_READY_DEFER_THRESHOLD", "1"))
+BLING_SECONDARY_TOTAL_DEFER_THRESHOLD = int(os.getenv("BLING_SECONDARY_TOTAL_DEFER_THRESHOLD", "5"))
 BLING_RATE_LIMIT_STATE_FILE = Path(
     os.getenv("BLING_RATE_LIMIT_STATE_FILE")
     or (Path(tempfile.gettempdir()) / "petshop_bling_stock_rate_limit.json")
@@ -160,6 +162,24 @@ def _cooldown_daily_limit_seconds() -> float:
 def _format_retry_eta(cooldown_seconds: float) -> str:
     retry_at = datetime.now().astimezone() + timedelta(seconds=max(cooldown_seconds, 0))
     return retry_at.strftime("%H:%M")
+
+
+def _secondary_jobs_defer_reason(
+    *,
+    cooldown_active: bool,
+    ready_queue: int,
+    total_queue: int,
+    forced_queue: int,
+) -> str | None:
+    if cooldown_active:
+        return "bling_cooldown_active"
+    if forced_queue > 0:
+        return "manual_stock_sync_pending"
+    if ready_queue >= max(BLING_SECONDARY_READY_DEFER_THRESHOLD, 1):
+        return "stock_queue_ready"
+    if total_queue >= max(BLING_SECONDARY_TOTAL_DEFER_THRESHOLD, 1):
+        return "stock_queue_backlog"
+    return None
 
 
 def _rate_limit_state_path() -> Path:
@@ -348,6 +368,97 @@ class BlingSyncService:
     def _retry_delay_minutes(tentativas: int) -> int:
         index = min(max(tentativas - 1, 0), len(RETRY_BACKOFF_MINUTES) - 1)
         return RETRY_BACKOFF_MINUTES[index]
+
+    @staticmethod
+    def register_rate_limit_cooldown(error: Any) -> float:
+        return _registrar_cooldown_rate_limit(error)
+
+    @staticmethod
+    def get_rate_limit_snapshot() -> Dict[str, Any]:
+        with _SharedRateLimitState() as shared:
+            now = time.time()
+            cooldown_until = float(shared.state.get("cooldown_until") or 0.0)
+            next_allowed_at = float(shared.state.get("next_allowed_at") or 0.0)
+
+        cooldown_remaining = max(cooldown_until - now, 0.0)
+        next_allowed_remaining = max(next_allowed_at - now, 0.0)
+
+        return {
+            "cooldown_active": cooldown_remaining > 0,
+            "cooldown_seconds": cooldown_remaining,
+            "cooldown_until": (
+                datetime.fromtimestamp(cooldown_until).astimezone().isoformat()
+                if cooldown_until > 0
+                else None
+            ),
+            "next_allowed_in_seconds": next_allowed_remaining,
+        }
+
+    @staticmethod
+    def get_pending_queue_snapshot(db: Optional[Session] = None) -> Dict[str, int]:
+        own_session = db is None
+        db_session = db or SessionLocal()
+        now = utc_now()
+        try:
+            total_pending = int(
+                db_session.query(func.count(ProdutoBlingSyncQueue.id))
+                .filter(
+                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"]),
+                )
+                .scalar()
+                or 0
+            )
+            ready_pending = int(
+                db_session.query(func.count(ProdutoBlingSyncQueue.id))
+                .filter(
+                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
+                    ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
+                    ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
+                )
+                .scalar()
+                or 0
+            )
+            forced_pending = int(
+                db_session.query(func.count(ProdutoBlingSyncQueue.id))
+                .filter(
+                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"]),
+                    ProdutoBlingSyncQueue.forcar_sync.is_(True),
+                )
+                .scalar()
+                or 0
+            )
+            processing = int(
+                db_session.query(func.count(ProdutoBlingSyncQueue.id))
+                .filter(ProdutoBlingSyncQueue.status == "processando")
+                .scalar()
+                or 0
+            )
+            return {
+                "total_pending": total_pending,
+                "ready_pending": ready_pending,
+                "forced_pending": forced_pending,
+                "processing": processing,
+            }
+        finally:
+            if own_session:
+                db_session.close()
+
+    @staticmethod
+    def get_secondary_job_guard_snapshot(db: Optional[Session] = None) -> Dict[str, Any]:
+        rate_limit = BlingSyncService.get_rate_limit_snapshot()
+        queue = BlingSyncService.get_pending_queue_snapshot(db=db)
+        reason = _secondary_jobs_defer_reason(
+            cooldown_active=bool(rate_limit["cooldown_active"]),
+            ready_queue=int(queue["ready_pending"] or 0),
+            total_queue=int(queue["total_pending"] or 0),
+            forced_queue=int(queue["forced_pending"] or 0),
+        )
+        return {
+            **rate_limit,
+            **queue,
+            "defer_secondary_jobs": bool(reason),
+            "reason": reason,
+        }
 
     @staticmethod
     def _load_produto_sync(db: Session, produto_id: int) -> tuple[Optional[Produto], Optional[ProdutoBlingSync]]:
@@ -984,6 +1095,14 @@ class BlingSyncService:
             return result
         except Exception as error:
             db.rollback()
+            if _erro_rate_limit_bling(error):
+                cooldown_seconds = _registrar_cooldown_rate_limit(error)
+                return {
+                    "ok": False,
+                    "detail": _mensagem_rate_limit_bling(error, cooldown_seconds),
+                    "rate_limited": True,
+                    "cooldown_seconds": cooldown_seconds,
+                }
             return {"ok": False, "detail": str(error)}
         finally:
             db.close()
@@ -1007,12 +1126,23 @@ class BlingSyncService:
             db.close()
 
         divergencias = 0
+        rate_limited = False
+        cooldown_seconds = 0.0
         for produto_id in produto_ids:
             result = BlingSyncService.reconcile_product(produto_id)
+            if result.get("rate_limited"):
+                rate_limited = True
+                cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                break
             if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
                 divergencias += 1
 
-        return {"avaliados": len(produto_ids), "divergencias": divergencias}
+        return {
+            "avaliados": len(produto_ids),
+            "divergencias": divergencias,
+            "rate_limited": rate_limited,
+            "cooldown_seconds": cooldown_seconds,
+        }
 
     @staticmethod
     def reconcile_all_products(limit: Optional[int] = None, force_sync: bool = False) -> Dict[str, Any]:
@@ -1029,12 +1159,23 @@ class BlingSyncService:
             db.close()
 
         divergencias = 0
+        rate_limited = False
+        cooldown_seconds = 0.0
         for produto_id in produto_ids:
             result = BlingSyncService.reconcile_product(produto_id, force_sync=force_sync)
+            if result.get("rate_limited"):
+                rate_limited = True
+                cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                break
             if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
                 divergencias += 1
 
-        return {"avaliados": len(produto_ids), "divergencias": divergencias}
+        return {
+            "avaliados": len(produto_ids),
+            "divergencias": divergencias,
+            "rate_limited": rate_limited,
+            "cooldown_seconds": cooldown_seconds,
+        }
 
     @staticmethod
     def auto_link_by_sku(limit: int = 500) -> Dict[str, Any]:
@@ -1097,7 +1238,10 @@ class BlingSyncService:
                     sync.erro_mensagem = None
                     sync.updated_at = utc_now()
                     vinculados += 1
-                except Exception:
+                except Exception as error:
+                    if _erro_rate_limit_bling(error):
+                        _registrar_cooldown_rate_limit(error)
+                        break
                     erros += 1
 
             db.commit()

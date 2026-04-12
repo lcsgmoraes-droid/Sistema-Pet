@@ -1,6 +1,7 @@
 from app.services.bling_sync_service import (
     _cooldown_rate_limit_segundos,
     _mensagem_rate_limit_bling,
+    _secondary_jobs_defer_reason,
 )
 
 
@@ -29,3 +30,36 @@ def test_mensagem_rate_limit_bling_daily_limit_mentions_tomorrow():
 
     assert "limite diario" in message.lower()
     assert "amanha" in message.lower()
+
+
+def test_secondary_jobs_defer_when_stock_queue_is_ready():
+    reason = _secondary_jobs_defer_reason(
+        cooldown_active=False,
+        ready_queue=1,
+        total_queue=1,
+        forced_queue=0,
+    )
+
+    assert reason == "stock_queue_ready"
+
+
+def test_secondary_jobs_defer_when_manual_stock_sync_is_pending():
+    reason = _secondary_jobs_defer_reason(
+        cooldown_active=False,
+        ready_queue=0,
+        total_queue=1,
+        forced_queue=1,
+    )
+
+    assert reason == "manual_stock_sync_pending"
+
+
+def test_secondary_jobs_do_not_defer_without_pressure():
+    reason = _secondary_jobs_defer_reason(
+        cooldown_active=False,
+        ready_queue=0,
+        total_queue=0,
+        forced_queue=0,
+    )
+
+    assert reason is None

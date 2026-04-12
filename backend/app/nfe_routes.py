@@ -1682,6 +1682,9 @@ def _sincronizar_cache_nfes_com_bling(
         bling_ok = True
     except Exception as e:
         logger.warning("listar_nfes", f"Bling NF-e nao disponivel para sincronizacao incremental: {e}")
+        if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
+            BlingSyncService.register_rate_limit_cooldown(e)
+            return False, []
 
     try:
         resp_nfce = bling.listar_nfces(
@@ -1703,6 +1706,9 @@ def _sincronizar_cache_nfes_com_bling(
         bling_ok = True
     except Exception as e:
         logger.warning("listar_nfes", f"Bling NFC-e nao disponivel para sincronizacao incremental: {e}")
+        if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
+            BlingSyncService.register_rate_limit_cooldown(e)
+            return False, []
 
     if not notas_sincronizadas:
         return bling_ok, []
