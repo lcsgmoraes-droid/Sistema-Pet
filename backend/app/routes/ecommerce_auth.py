@@ -40,6 +40,7 @@ class EcommerceLoginRequest(BaseModel):
 
 class EcommerceForgotPasswordRequest(BaseModel):
     email: EmailStr
+    canal: str | None = None
 
 
 class EcommerceResetPasswordRequest(BaseModel):
@@ -139,46 +140,98 @@ def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_t
     )
 
 
-def _build_reset_password_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
+def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
+        canal = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
+        if canal in {"app", "mobile", "site", "web", "loja"}:
+                return "app" if canal in {"app", "mobile"} else "site"
+
+        origin = (request.headers.get("origin") or "").lower()
+        referer = (request.headers.get("referer") or "").lower()
+        if origin or referer:
+                return "site"
+
+        user_agent = (request.headers.get("user-agent") or "").lower()
+        if "okhttp" in user_agent or "expo" in user_agent or "reactnative" in user_agent:
+                return "app"
+
+        return "app"
+
+
+def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-    subject = "Recuperacao de senha - Pet Shop Pro"
+        subject = "Recuperacao de senha do app - Pet Shop Pro"
     html_body = f"""
     <html>
       <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
         <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
-          <h1 style="margin: 0; font-size: 22px;">Recuperar senha</h1>
+                    <h1 style="margin: 0; font-size: 22px;">Recuperar senha no app</h1>
         </div>
         <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
           <p>Ola{saudacao}.</p>
-          <p>Recebemos um pedido para redefinir a sua senha.</p>
-          <p>Voce pode abrir a recuperacao direto pela loja online:</p>
-          <p style="margin: 18px 0;">
-            <a href="{reset_link}"
-               style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
-              Recuperar senha agora
-            </a>
-          </p>
-          <p>Se preferir, use o token abaixo na tela <strong>Recuperar senha</strong> do app ou da loja:</p>
+                    <p>Recebemos um pedido para redefinir a sua senha no aplicativo.</p>
+                    <p>Abra o app, entre na tela <strong>Recuperar senha</strong> e use o token abaixo:</p>
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
             <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
             <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
           </div>
           <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+                    <p>Este e-mail e valido apenas para a recuperacao dentro do app.</p>
           <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
         </div>
       </body>
     </html>
     """
     text_body = (
-        "Recuperacao de senha - Pet Shop Pro\n\n"
-        "Abra a recuperacao no link abaixo:\n"
-        f"{reset_link}\n\n"
-        "Ou use este token no app ou na loja online:\n"
+                "Recuperacao de senha do app - Pet Shop Pro\n\n"
+                "Abra o app e use este token na tela Recuperar senha:\n"
         f"{reset_token}\n\n"
         f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
         "Se voce nao pediu essa alteracao, ignore este e-mail."
     )
     return subject, html_body, text_body
+
+
+def _build_reset_password_email_for_site(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
+        saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+        subject = "Recuperacao de senha da loja - Pet Shop Pro"
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+                <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+                    <h1 style="margin: 0; font-size: 22px;">Recuperar senha na loja online</h1>
+                </div>
+                <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+                    <p>Ola{saudacao}.</p>
+                    <p>Recebemos um pedido para redefinir a sua senha na loja online.</p>
+                    <p>Abra a recuperacao direto pela loja:</p>
+                    <p style="margin: 18px 0;">
+                        <a href="{reset_link}"
+                             style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
+                            Recuperar senha agora
+                        </a>
+                    </p>
+                    <p>Se preferir, voce tambem pode usar este token na tela de recuperacao da propria loja online:</p>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
+                        <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+                    </div>
+                    <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+                    <p>Este e-mail e valido apenas para a recuperacao pela loja online.</p>
+                    <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
+                </div>
+            </body>
+        </html>
+        """
+        text_body = (
+                "Recuperacao de senha da loja - Pet Shop Pro\n\n"
+                "Abra a recuperacao no link abaixo:\n"
+                f"{reset_link}\n\n"
+                "Ou use este token na tela de recuperacao da loja online:\n"
+                f"{reset_token}\n\n"
+                f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+                "Se voce nao pediu essa alteracao, ignore este e-mail."
+        )
+        return subject, html_body, text_body
 
 
 def _get_current_ecommerce_user(
@@ -575,7 +628,11 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
         user.reset_token = reset_token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
         reset_link = _build_storefront_reset_link(tenant, user.email, reset_token)
-        subject, html_body, text_body = _build_reset_password_email(user, reset_token, reset_link)
+        canal = _resolve_password_recovery_channel(request, payload)
+        if canal == "site":
+            subject, html_body, text_body = _build_reset_password_email_for_site(user, reset_token, reset_link)
+        else:
+            subject, html_body, text_body = _build_reset_password_email_for_app(user, reset_token)
         enviado = send_email(
             to=user.email,
             subject=subject,

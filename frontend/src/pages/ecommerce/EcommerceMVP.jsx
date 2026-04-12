@@ -941,7 +941,7 @@ export default function EcommerceMVP() {
     try {
       const response = await ecommerceApi.post(
         '/api/ecommerce/auth/esqueci-senha',
-        { email: normalizedEmail },
+        { email: normalizedEmail, canal: 'site' },
         { headers: tenantHeaders }
       );
       const minutes = response?.data?.expires_in_minutes;

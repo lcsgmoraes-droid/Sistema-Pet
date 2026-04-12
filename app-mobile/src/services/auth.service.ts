@@ -46,7 +46,7 @@ export async function updateProfile(updates: Partial<EcommerceUser>): Promise<Ec
 export async function requestPasswordReset(email: string): Promise<{ message: string; expires_in_minutes?: number }> {
   const { data } = await api.post<{ message: string; expires_in_minutes?: number }>(
     '/ecommerce/auth/esqueci-senha',
-    { email },
+    { email, canal: 'app' },
   );
   return data;
 }
