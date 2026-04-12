@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 
 from sqlalchemy import func
@@ -14,10 +14,15 @@ from app.utils.logger import logger
 _STATUS_PEDIDOS_RECONCILIAVEIS = ("aberto", "confirmado", "expirado")
 _INTERVALO_MINIMO_CONSULTA_SEGUNDOS = 0.45
 _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = 0.0
+_RATE_LIMIT_DIARIO_BLOQUEADO_ATE: datetime | None = None
 
 
 def _utc_now() -> datetime:
     return datetime.utcnow()
+
+
+def _utc_now_tz() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _limite_data_recentes(dias: int) -> datetime:
@@ -87,6 +92,41 @@ def _aguardar_janela_rate_limit() -> None:
     if restante > 0:
         time.sleep(restante)
     _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = time.monotonic()
+
+
+def _mensagem_rate_limit_diario(texto: str | None) -> bool:
+    mensagem = str(texto or "").lower()
+    return (
+        "too_many_requests" in mensagem
+        and (
+            "period': 'day'" in mensagem
+            or '"period": "day"' in mensagem
+            or "por dia" in mensagem
+            or "amanhã" in mensagem
+            or "amanha" in mensagem
+        )
+    )
+
+
+def _rate_limit_diario_ativo() -> bool:
+    return (
+        _RATE_LIMIT_DIARIO_BLOQUEADO_ATE is not None
+        and _RATE_LIMIT_DIARIO_BLOQUEADO_ATE > _utc_now_tz()
+    )
+
+
+def _registrar_bloqueio_rate_limit_diario() -> datetime:
+    global _RATE_LIMIT_DIARIO_BLOQUEADO_ATE
+
+    agora_local = datetime.now().astimezone()
+    proxima_janela = (agora_local + timedelta(days=1)).replace(
+        hour=0,
+        minute=5,
+        second=0,
+        microsecond=0,
+    )
+    _RATE_LIMIT_DIARIO_BLOQUEADO_ATE = proxima_janela.astimezone(timezone.utc)
+    return _RATE_LIMIT_DIARIO_BLOQUEADO_ATE
 
 
 def _consultar_pedido_bling(pedido_bling_id: str) -> dict:
@@ -253,6 +293,23 @@ def reconciliar_status_pedidos_recentes(
     dias: int = 7,
     limite_pedidos: int = 60,
 ) -> dict:
+    if _rate_limit_diario_ativo():
+        return {
+            "tenant_id": str(tenant_id),
+            "executada": False,
+            "motivo": "bling_rate_limit_diario_ativo",
+            "dias": dias,
+            "limite_pedidos": limite_pedidos,
+            "pedidos_antes": _contar_pedidos_recentes_reconciliaveis(db, tenant_id, dias=dias),
+            "pedidos_processados": 0,
+            "confirmados": 0,
+            "cancelados": 0,
+            "sem_mudanca": 0,
+            "erros": [],
+            "resultados": [],
+            "bloqueado_ate": _RATE_LIMIT_DIARIO_BLOQUEADO_ATE.isoformat() if _RATE_LIMIT_DIARIO_BLOQUEADO_ATE else None,
+        }
+
     pedidos_antes = _contar_pedidos_recentes_reconciliaveis(db, tenant_id, dias=dias)
     pedidos = _buscar_pedidos_recentes_reconciliaveis(
         db,
@@ -282,6 +339,8 @@ def reconciliar_status_pedidos_recentes(
     cancelados = 0
     sem_mudanca = 0
     erros: list[dict] = []
+    interrompido_por_rate_limit = False
+    bloqueado_ate_iso = None
 
     for pedido in pedidos:
         try:
@@ -307,6 +366,18 @@ def reconciliar_status_pedidos_recentes(
             }
             erros.append(erro)
             resultados.append({"success": False, "executada": False, **erro})
+            if _mensagem_rate_limit_diario(str(exc)):
+                bloqueado_ate = _registrar_bloqueio_rate_limit_diario()
+                bloqueado_ate_iso = bloqueado_ate.isoformat()
+                interrompido_por_rate_limit = True
+                logger.warning(
+                    "pedido_status_reconciliacao",
+                    (
+                        "Rate limit diario do Bling detectado; "
+                        f"reconciliacao pausada ate {bloqueado_ate_iso}"
+                    ),
+                )
+                break
 
     return {
         "tenant_id": str(tenant_id),
@@ -320,6 +391,8 @@ def reconciliar_status_pedidos_recentes(
         "sem_mudanca": sem_mudanca,
         "erros": erros,
         "resultados": resultados,
+        "interrompido_por_rate_limit": interrompido_por_rate_limit,
+        "bloqueado_ate": bloqueado_ate_iso,
     }
 
 

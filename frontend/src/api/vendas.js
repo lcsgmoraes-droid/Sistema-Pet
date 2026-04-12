@@ -39,9 +39,15 @@ export const atualizarVenda = async (vendaId, dados) => {
 /**
  * Finalizar venda (com pagamentos)
  */
-export const finalizarVenda = async (vendaId, pagamentos) => {
+export const finalizarVenda = async (
+  vendaId,
+  pagamentos,
+  options = {},
+) => {
   const response = await api.post(`/vendas/${vendaId}/finalizar`, {
-    pagamentos
+    pagamentos,
+    cupom_code: options.cupom_code || null,
+    cupom_discount_applied: options.cupom_discount_applied ?? null,
   });
   return response.data;
 };

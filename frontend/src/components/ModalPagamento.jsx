@@ -46,7 +46,14 @@ const BANDEIRAS = [
   'Outros'
 ];
 
-export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtualizada, onAnalisarVenda }) {
+export default function ModalPagamento({
+  venda,
+  cupomAplicado,
+  onClose,
+  onConfirmar,
+  onVendaAtualizada,
+  onAnalisarVenda,
+}) {
   const [pagamentos, setPagamentos] = useState([]);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
@@ -702,7 +709,10 @@ export default function ModalPagamento({ venda, onClose, onConfirmar, onVendaAtu
       }
 
       // Finalizar a venda com os pagamentos
-      const resultado = await finalizarVenda(vendaId, pagamentos);
+      const resultado = await finalizarVenda(vendaId, pagamentos, {
+        cupom_code: cupomAplicado?.code || null,
+        cupom_discount_applied: cupomAplicado?.discount_applied ?? null,
+      });
 
       // Mostrar pergunta sobre NF-e APENAS se pagamento completo
       setVendaFinalizadaId(vendaId);

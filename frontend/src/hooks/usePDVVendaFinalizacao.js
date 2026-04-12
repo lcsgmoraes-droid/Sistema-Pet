@@ -100,6 +100,7 @@ export function usePDVVendaFinalizacao({
   limparVenda,
   carregarVendaEspecifica,
   carregarVendasRecentes,
+  recarregarContextoClienteAtual,
 }) {
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);
 
@@ -181,6 +182,9 @@ export function usePDVVendaFinalizacao({
 
       setVendaAtual(montarVendaReaberta(vendaAtualizada, clienteCompleto));
       setModoVisualizacao(false);
+      if (clienteCompleto?.id) {
+        await recarregarContextoClienteAtual?.();
+      }
 
       alert(
         "Venda reaberta com sucesso! Agora voc\u00ea pode edit\u00e1-la.\n\nATEN\u00c7\u00c3O: Se voc\u00ea n\u00e3o fizer altera\u00e7\u00f5es e sair, a venda voltar\u00e1 ao status anterior.",
@@ -249,6 +253,7 @@ export function usePDVVendaFinalizacao({
         const vendaAtualizada = await recarregarVendaAtualComPagamentos(
           vendaAtual.id,
         );
+        await recarregarContextoClienteAtual?.();
         debugLog("\u2705 Venda recarregada:", vendaAtualizada);
       } catch (error) {
         console.error("Erro ao recarregar venda:", error);
@@ -268,6 +273,7 @@ export function usePDVVendaFinalizacao({
     const vendaAtualizada = await recarregarVendaAtualComPagamentos(
       vendaAtual.id,
     );
+    await recarregarContextoClienteAtual?.();
     setModoVisualizacao(
       vendaAtualizada.status === "finalizada" ||
         vendaAtualizada.status === "baixa_parcial",

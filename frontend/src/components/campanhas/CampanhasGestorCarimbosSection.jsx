@@ -15,29 +15,40 @@ export default function CampanhasGestorCarimbosSection({
   estornarCarimboGestor,
 }) {
   const isOpen = gestorSecao === "carimbos";
-  const carimbosDisponiveis = Number(gestorSaldo?.total_carimbos || 0);
-  const carimbosConvertidos = Number(gestorSaldo?.carimbos_convertidos || 0);
-  const carimbosBrutos = Number(gestorSaldo?.total_carimbos_brutos || 0);
+  const saldoAtual = Number(gestorSaldo?.total_carimbos || 0);
+  const carimbosAtivos = Number(gestorSaldo?.total_carimbos_brutos || 0);
+  const carimbosComprometidos = Number(
+    gestorSaldo?.carimbos_comprometidos_total ||
+      gestorSaldo?.carimbos_convertidos ||
+      0,
+  );
+  const carimbosEmDebito = Number(gestorSaldo?.carimbos_em_debito || 0);
 
   return (
     <CampanhasGestorSection
       icon={"\uD83C\uDFF7\uFE0F"}
       title="Cartao Fidelidade"
-      subtitle={`${carimbosDisponiveis} carimbo(s) disponivel(is)`}
+      subtitle={`${saldoAtual} carimbo(s) no saldo atual`}
       isOpen={isOpen}
       onToggle={() => setGestorSecao(isOpen ? null : "carimbos")}
     >
       <div className="p-6 space-y-4">
-        {(carimbosConvertidos > 0 || carimbosBrutos > carimbosDisponiveis) && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
-            <p className="font-medium">
-              {carimbosDisponiveis} disponivel(is) para o cliente agora.
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 space-y-1">
+          <p className="font-medium">
+            Saldo atual de carimbos: {saldoAtual}
+          </p>
+          <p className="text-amber-800">
+            Carimbos ativos no historico: {carimbosAtivos}
+          </p>
+          <p className="text-amber-800">
+            Carimbos comprometidos por recompensa: {carimbosComprometidos}
+          </p>
+          {carimbosEmDebito > 0 && (
+            <p className="text-red-700 font-medium">
+              Debito fidelidade: {carimbosEmDebito} carimbo(s)
             </p>
-            <p className="mt-1 text-amber-800">
-              {carimbosConvertidos} ja convertido(s) em cupom, dentro de {carimbosBrutos} carimbo(s) conquistado(s) no total.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <p className="text-sm font-medium text-green-800 mb-3">
@@ -132,7 +143,7 @@ export default function CampanhasGestorCarimbosSection({
                           </span>
                         ) : stamp.is_converted ? (
                           <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">
-                            Convertido em cupom
+                            Comprometido em recompensa
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">

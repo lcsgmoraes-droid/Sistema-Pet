@@ -11,6 +11,7 @@ export function usePDVAnalisePagamento({
   limparVenda,
   carregarVendaEspecifica,
   carregarVendasRecentes,
+  recarregarContextoClienteAtual,
 }) {
   const analiseState = usePDVVendaAnalise(vendaAtual);
   const finalizacaoState = usePDVVendaFinalizacao({
@@ -23,6 +24,7 @@ export function usePDVAnalisePagamento({
     limparVenda,
     carregarVendaEspecifica,
     carregarVendasRecentes,
+    recarregarContextoClienteAtual,
   });
 
   return {

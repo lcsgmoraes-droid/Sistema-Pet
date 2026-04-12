@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
@@ -64,6 +64,37 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     await carregarVendasEmAbertoCliente(vendaAtual.cliente?.id);
   };
 
+  const recarregarSaldoCampanhasClienteAtual = async () => {
+    await carregarSaldoCampanhasCliente(vendaAtual.cliente?.id);
+  };
+
+  const recarregarContextoClientePorId = async (clienteId) => {
+    if (!clienteId) {
+      setSaldoCampanhas(null);
+      setVendasEmAbertoInfo(null);
+      return;
+    }
+    await Promise.all([
+      carregarVendasEmAbertoCliente(clienteId),
+      carregarSaldoCampanhasCliente(clienteId),
+    ]);
+  };
+
+  const recarregarContextoClienteAtual = async () => {
+    await recarregarContextoClientePorId(vendaAtual.cliente?.id);
+  };
+
+  useEffect(() => {
+    const clienteId = vendaAtual.cliente?.id;
+    if (!clienteId) {
+      setSaldoCampanhas(null);
+      setVendasEmAbertoInfo(null);
+      return;
+    }
+
+    void recarregarContextoClientePorId(clienteId);
+  }, [vendaAtual.cliente?.id]);
+
   return {
     copiadoClienteCampo,
     vendasEmAbertoInfo,
@@ -75,5 +106,8 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     selecionarPet,
     copiarCampoCliente,
     recarregarVendasEmAbertoClienteAtual,
+    recarregarSaldoCampanhasClienteAtual,
+    recarregarContextoClientePorId,
+    recarregarContextoClienteAtual,
   };
 }

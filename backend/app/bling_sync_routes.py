@@ -1936,7 +1936,8 @@ def enviar_estoque_para_bling(
             )
         if resultado.get("rate_limited"):
             return {
-                "message": "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
+                "message": resultado.get("erro")
+                or "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
                 **resultado,
             }
         raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao sincronizar")
@@ -1966,7 +1967,8 @@ def forcar_sincronizacao_produto(
             )
         if resultado.get("rate_limited"):
             return {
-                "message": "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
+                "message": resultado.get("erro")
+                or "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
                 **resultado,
             }
         raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao forçar sincronização")

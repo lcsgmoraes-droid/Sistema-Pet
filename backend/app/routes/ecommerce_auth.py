@@ -800,8 +800,8 @@ def meus_beneficios(
         Coupon,
         CouponStatusEnum,
         CustomerRankHistory,
-        LoyaltyStamp,
     )
+    from app.campaigns.loyalty_service import summarize_loyalty_balances_for_customer
 
     cliente = _get_or_create_cliente_for_user(db, current_user)
     tenant_id = current_user.tenant_id
@@ -824,14 +824,10 @@ def meus_beneficios(
     saldo_cashback = float(saldo_raw or 0)
 
     # --- Carimbos ---
-    total_carimbos = (
-        db.query(LoyaltyStamp)
-        .filter(
-            LoyaltyStamp.tenant_id == tenant_id,
-            LoyaltyStamp.customer_id == cliente.id,
-            LoyaltyStamp.voided_at.is_(None),
-        )
-        .count()
+    loyalty_summary = summarize_loyalty_balances_for_customer(
+        db,
+        tenant_id=tenant_id,
+        customer_id=cliente.id,
     )
     loyalty_campaign = (
         db.query(Campaign)
@@ -843,7 +839,8 @@ def meus_beneficios(
     )
     stamps_to_complete = int((loyalty_campaign.params or {}).get("stamps_to_complete", 10)) if loyalty_campaign else 10
     min_purchase_value = float((loyalty_campaign.params or {}).get("min_purchase_value", 0) or 0) if loyalty_campaign else 0.0
-    carimbos_no_cartao = total_carimbos % stamps_to_complete if stamps_to_complete > 0 else 0
+    saldo_total_carimbos = int(loyalty_summary.get("total_carimbos") or 0)
+    carimbos_no_cartao = max(saldo_total_carimbos, 0)
 
     # --- Ranking ---
     rank_atual = (
@@ -913,8 +910,12 @@ def meus_beneficios(
             "saldo": saldo_cashback,
         },
         "carimbos": {
-            "total_geral": total_carimbos,
+            "total_geral": saldo_total_carimbos,
             "carimbos_no_cartao": carimbos_no_cartao,
+            "carimbos_ativos_brutos": int(loyalty_summary.get("total_carimbos_brutos") or 0),
+            "carimbos_comprometidos_total": int(loyalty_summary.get("carimbos_comprometidos_total") or 0),
+            "carimbos_convertidos": int(loyalty_summary.get("carimbos_convertidos") or 0),
+            "carimbos_em_debito": int(loyalty_summary.get("carimbos_em_debito") or 0),
             "meta": stamps_to_complete,
             "min_purchase_value": min_purchase_value,
         },

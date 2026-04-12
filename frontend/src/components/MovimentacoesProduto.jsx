@@ -129,8 +129,13 @@ export default function MovimentacoesProduto() {
 
     try {
       setForcandoSync(true);
-      await api.post(`/estoque/sync/forcar/${id}`);
-      toast.success('Sincronização manual enviada para este produto.');
+      const response = await api.post(`/estoque/sync/forcar/${id}`);
+      const data = response?.data || {};
+      if (data.rate_limited) {
+        toast(data.message || 'O Bling pediu uma pausa. O item ficou reagendado automaticamente.');
+      } else {
+        toast.success(data.message || 'Sincronização manual enviada para este produto.');
+      }
       await carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao forçar sincronização do produto.');

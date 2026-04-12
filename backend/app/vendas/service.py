@@ -1030,7 +1030,15 @@ class VendaService:
             else:
                 invalidate_venda_rentabilidade_snapshot(venda)
 
+            from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
             from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+            reverse_coupon_redemptions_for_sale(
+                db,
+                tenant_id=tenant_id,
+                venda_id=venda_id,
+                reason=f"Venda cancelada: {motivo}",
+            )
 
             void_loyalty_stamps_for_sale(
                 db,
@@ -1163,7 +1171,9 @@ class VendaService:
         user_id: int,
         user_nome: str,
         tenant_id: str,
-        db: Session
+        db: Session,
+        cupom_code: Optional[str] = None,
+        cupom_discount_applied: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Finaliza uma venda com transação atômica.
@@ -1231,6 +1241,7 @@ class VendaService:
             >>> logger.info(f"Venda {resultado['venda']['numero_venda']} finalizada!")
         """
         # Imports locais
+        from app.campaigns.coupon_service import consume_coupon_redemption
         from app.vendas_models import Venda, VendaPagamento
         from app.models import Cliente
         from app.estoque.service import EstoqueService
@@ -1283,6 +1294,21 @@ class VendaService:
                 f"Já pago=R$ {total_ja_pago:.2f}, "
                 f"Novos=R$ {total_novos_pagamentos:.2f}"
             )
+
+            cupom_consumido = None
+            if cupom_code:
+                venda_total_para_cupom = float(venda.total or 0)
+                if cupom_discount_applied:
+                    venda_total_para_cupom += float(cupom_discount_applied or 0)
+                cupom_consumido = consume_coupon_redemption(
+                    db,
+                    tenant_id=tenant_id,
+                    code=cupom_code,
+                    venda_total=venda_total_para_cupom,
+                    customer_id=venda.cliente_id,
+                    venda_id=venda.id,
+                    expected_discount_applied=cupom_discount_applied,
+                )
             
             # ============================================================
             # ETAPA 2: PROCESSAR PAGAMENTOS
@@ -2006,7 +2032,8 @@ class VendaService:
                     'estoque_baixado': estoque_baixado,
                     'caixa_movimentacoes': movimentacoes_caixa_ids,
                     'contas_baixadas': contas_baixadas,
-                    'contas_criadas': contas_criadas_ids
+                    'contas_criadas': contas_criadas_ids,
+                    'cupom_consumido': cupom_consumido,
                 },
                 'pos_commit': {
                     'contas_novas': len(contas_criadas_ids),

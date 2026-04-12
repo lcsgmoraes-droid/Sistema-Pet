@@ -136,6 +136,8 @@ class CriarVendaRequest(BaseModel):
 
 class FinalizarVendaRequest(BaseModel):
     pagamentos: List[VendaPagamentoSchema]
+    cupom_code: Optional[str] = None
+    cupom_discount_applied: Optional[float] = None
 
 class CancelarVendaRequest(BaseModel):
     motivo: str
@@ -834,6 +836,8 @@ async def finalizar_venda(
         user_id=current_user.id,
         user_nome=current_user.nome or current_user.email or 'Usuário',
         tenant_id=tenant_id,
+        cupom_code=dados.cupom_code,
+        cupom_discount_applied=dados.cupom_discount_applied,
         db=db
     )
 
@@ -1322,7 +1326,15 @@ def reabrir_venda(
     venda.updated_at = datetime.now()
     invalidate_venda_rentabilidade_snapshot(venda)
 
+    from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+    reverse_coupon_redemptions_for_sale(
+        db,
+        tenant_id=tenant_id,
+        venda_id=venda.id,
+        reason="Venda reaberta para edicao",
+    )
 
     void_loyalty_stamps_for_sale(
         db,
@@ -1389,8 +1401,15 @@ def atualizar_status_venda(
         status_anterior in ['finalizada', 'baixa_parcial']
         and novo_status not in ['finalizada', 'baixa_parcial']
     ):
+        from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
 
+        reverse_coupon_redemptions_for_sale(
+            db,
+            tenant_id=tenant_id,
+            venda_id=venda.id,
+            reason=f"Status alterado para {novo_status}",
+        )
         void_loyalty_stamps_for_sale(
             db,
             tenant_id=tenant_id,
@@ -1890,7 +1909,15 @@ def excluir_venda(
         # Excluir itens
         db.query(VendaItem).filter_by(venda_id=venda_id).delete()
 
+        from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+        reverse_coupon_redemptions_for_sale(
+            db,
+            tenant_id=tenant_id,
+            venda_id=venda_id,
+            reason="Venda excluida",
+        )
 
         void_loyalty_stamps_for_sale(
             db,

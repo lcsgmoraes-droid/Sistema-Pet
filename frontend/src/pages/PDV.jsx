@@ -110,6 +110,8 @@ export default function PDV() {
     limparClienteSelecionado,
     handleClienteCriadoRapido: handleClienteCriadoRapidoHook,
     recarregarVendasEmAbertoClienteAtual,
+    recarregarContextoClientePorId,
+    recarregarContextoClienteAtual,
   } = usePDVCliente({
     vendaAtual,
     setVendaAtual,
@@ -229,6 +231,7 @@ export default function PDV() {
     limparComissao,
     sincronizarComissaoDaVenda,
     sincronizarEntregadorDaVenda,
+    recarregarContextoClientePorId,
   });
   const { salvarVenda } = usePDVSalvarVenda({
     vendaAtual,
@@ -330,6 +333,7 @@ export default function PDV() {
     limparVenda,
     carregarVendaEspecifica,
     carregarVendasRecentes: () => carregarVendasRecentes(),
+    recarregarContextoClienteAtual,
   });
   const {
     handleNovaVenda,

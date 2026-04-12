@@ -13,6 +13,9 @@ export function usePDVCliente({ vendaAtual, setVendaAtual }) {
     selecionarPet,
     copiarCampoCliente,
     recarregarVendasEmAbertoClienteAtual,
+    recarregarSaldoCampanhasClienteAtual,
+    recarregarContextoClientePorId,
+    recarregarContextoClienteAtual,
   } = usePDVClienteContexto({
     vendaAtual,
     setVendaAtual,
@@ -46,5 +49,8 @@ export function usePDVCliente({ vendaAtual, setVendaAtual }) {
     limparClienteSelecionado,
     handleClienteCriadoRapido,
     recarregarVendasEmAbertoClienteAtual,
+    recarregarSaldoCampanhasClienteAtual,
+    recarregarContextoClientePorId,
+    recarregarContextoClienteAtual,
   };
 }

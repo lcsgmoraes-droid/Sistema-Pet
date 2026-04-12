@@ -13,6 +13,7 @@ export function usePDVVendaAtual({
   limparComissao,
   sincronizarComissaoDaVenda,
   sincronizarEntregadorDaVenda,
+  recarregarContextoClientePorId,
 }) {
   const { carregarVendaEspecifica, handleBuscarVenda, reabrirVenda } =
     usePDVVendaCarregamento({
@@ -24,6 +25,7 @@ export function usePDVVendaAtual({
       setMostrarModalPagamento,
       sincronizarComissaoDaVenda,
       sincronizarEntregadorDaVenda,
+      recarregarContextoClientePorId,
     });
   const { abrirModalPagamento, limparVenda } = usePDVVendaAcoes({
     vendaAtual,

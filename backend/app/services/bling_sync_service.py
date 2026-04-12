@@ -99,30 +99,67 @@ def _cooldown_rate_limit_segundos(valor: Any, default: float = BLING_RATE_LIMIT_
         if match_retry:
             cooldown = max(cooldown, float(match_retry.group(1)))
 
+    period_kind = None
     match_period = re.search(r"'period':\s*'([^']+)'", mensagem)
     if match_period:
-        periodo = match_period.group(1).strip().lower()
-        if periodo == "second":
+        period_kind = match_period.group(1).strip().lower()
+        if period_kind == "second":
             cooldown = max(cooldown, 2.0)
-        elif periodo == "minute":
+        elif period_kind == "minute":
             cooldown = max(cooldown, 60.0)
-        elif periodo == "hour":
+        elif period_kind == "hour":
             cooldown = max(cooldown, 3600.0)
+        elif period_kind == "day":
+            cooldown = max(cooldown, _cooldown_daily_limit_seconds())
 
     if "por segundo" in mensagem:
         cooldown = max(cooldown, 2.0)
     elif "por minuto" in mensagem:
         cooldown = max(cooldown, 60.0)
+    elif "por hora" in mensagem:
+        cooldown = max(cooldown, 3600.0)
+    elif "por dia" in mensagem or "amanha" in mensagem or "amanhã" in mensagem:
+        cooldown = max(cooldown, _cooldown_daily_limit_seconds())
 
     return cooldown
 
 
 def _mensagem_rate_limit_bling(valor: Any, cooldown_seconds: float) -> str:
+    mensagem = _normalizar_texto(str(valor or "")).lower()
+    if (
+        "'period': 'day'" in mensagem
+        or "\"period\": \"day\"" in mensagem
+        or "por dia" in mensagem
+        or "amanha" in mensagem
+        or "amanhã" in mensagem
+    ):
+        return (
+            "Bling atingiu o limite diario de requisicoes. "
+            f"Nova tentativa automatica amanha, por volta de {_format_retry_eta(cooldown_seconds)}. "
+            f"Detalhe: {_normalizar_texto(str(valor or 'rate limit diario do Bling'))[:320]}"
+        )
+
     return (
         "Bling limitou as requisicoes agora. "
         f"Nova tentativa automatica em cerca de {int(max(cooldown_seconds, 1))}s. "
         f"Detalhe: {_normalizar_texto(str(valor or 'rate limit do Bling'))[:320]}"
     )
+
+
+def _cooldown_daily_limit_seconds() -> float:
+    now = datetime.now().astimezone()
+    retry_at = (now + timedelta(days=1)).replace(
+        hour=0,
+        minute=5,
+        second=0,
+        microsecond=0,
+    )
+    return max((retry_at - now).total_seconds(), 3600.0)
+
+
+def _format_retry_eta(cooldown_seconds: float) -> str:
+    retry_at = datetime.now().astimezone() + timedelta(seconds=max(cooldown_seconds, 0))
+    return retry_at.strftime("%H:%M")
 
 
 def _rate_limit_state_path() -> Path:

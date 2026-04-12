@@ -354,6 +354,7 @@ export function usePDVPageComposition({
     mostrarVendasEmAberto,
     podeVerMargem,
     racaoIdFechada,
+    cupomAplicado,
     setTipoDescontoTotal,
     setValorDescontoTotal,
     tipoDescontoTotal,

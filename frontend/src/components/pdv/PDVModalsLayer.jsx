@@ -32,6 +32,7 @@ export default function PDVModalsLayer({
   mostrarVendasEmAberto,
   podeVerMargem,
   racaoIdFechada,
+  cupomAplicado,
   setTipoDescontoTotal,
   setValorDescontoTotal,
   tipoDescontoTotal,
@@ -130,6 +131,7 @@ export default function PDVModalsLayer({
       {mostrarModalPagamento && (
         <ModalPagamento
           venda={vendaAtual}
+          cupomAplicado={cupomAplicado}
           onClose={onCloseModalPagamento}
           onAnalisarVenda={onAnalisarVenda}
           onConfirmar={onConfirmarPagamento}

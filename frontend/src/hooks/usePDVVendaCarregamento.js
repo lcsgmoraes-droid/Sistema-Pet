@@ -38,6 +38,7 @@ export function usePDVVendaCarregamento({
   setMostrarModalPagamento,
   sincronizarComissaoDaVenda,
   sincronizarEntregadorDaVenda,
+  recarregarContextoClientePorId,
 }) {
   const carregarVendaEspecifica = async (
     vendaId,
@@ -90,6 +91,7 @@ export function usePDVVendaCarregamento({
       setModoVisualizacao(true);
 
       await sincronizarEntregadorDaVenda(venda.entregador_id);
+      await recarregarContextoClientePorId?.(clienteCompleto?.id || venda.cliente_id);
 
       if (abrirModalPagamento) {
         setTimeout(() => {
@@ -232,6 +234,9 @@ export function usePDVVendaCarregamento({
 
       setVendaAtual(vendaParaSetar);
       setModoVisualizacao(true);
+      await recarregarContextoClientePorId?.(
+        clienteCompleto?.id || vendaCompleta.cliente_id,
+      );
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Erro ao reabrir venda:", error);

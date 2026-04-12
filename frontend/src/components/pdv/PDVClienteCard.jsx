@@ -32,6 +32,12 @@ export default function PDVClienteCard({
   vendaGuiaClasses,
   vendasEmAbertoInfo,
 }) {
+  const saldoCarimbos = Number(saldoCampanhas?.total_carimbos || 0);
+  const debitoFidelidade = Math.max(
+    Number(saldoCampanhas?.carimbos_em_debito || 0),
+    saldoCarimbos < 0 ? Math.abs(saldoCarimbos) : 0,
+  );
+
   return (
     <div
       id="tour-pdv-cliente"
@@ -243,7 +249,8 @@ export default function PDVClienteCard({
 
             {saldoCampanhas &&
               (saldoCampanhas.saldo_cashback > 0 ||
-                saldoCampanhas.total_carimbos > 0 ||
+                saldoCarimbos > 0 ||
+                debitoFidelidade > 0 ||
                 saldoCampanhas.cupons_ativos?.length > 0 ||
                 (saldoCampanhas.rank_level &&
                   saldoCampanhas.rank_level !== "bronze")) && (
@@ -275,13 +282,23 @@ export default function PDVClienteCard({
                         </span>
                       </div>
                     )}
-                  {saldoCampanhas.total_carimbos > 0 && (
+                  {saldoCarimbos > 0 && (
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-blue-800">
                         🏷️ Carimbos fidelidade:
                       </span>
                       <span className="font-semibold text-blue-900">
-                        {saldoCampanhas.total_carimbos} carimbo(s)
+                        {saldoCarimbos} carimbo(s)
+                      </span>
+                    </div>
+                  )}
+                  {debitoFidelidade > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-blue-800">
+                        Debito fidelidade:
+                      </span>
+                      <span className="font-semibold text-red-600">
+                        {debitoFidelidade} carimbo(s)
                       </span>
                     </div>
                   )}

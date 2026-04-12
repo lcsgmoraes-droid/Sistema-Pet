@@ -70,11 +70,29 @@ def calculate_loyalty_available_stamps(
     completed_cycles: int,
     stamps_to_complete: Any,
 ) -> int:
-    available = int(total_stamps or 0) - calculate_loyalty_consumed_stamps(
+    return int(total_stamps or 0) - calculate_loyalty_consumed_stamps(
         completed_cycles,
         stamps_to_complete,
     )
-    return max(available, 0)
+
+
+def calculate_loyalty_signed_balance_components(
+    total_stamps: int,
+    committed_stamps: int,
+) -> dict[str, int]:
+    raw_total = max(int(total_stamps or 0), 0)
+    committed_total = max(int(committed_stamps or 0), 0)
+    available_stamps = raw_total - committed_total
+    visible_committed = min(raw_total, committed_total)
+    debt_stamps = max(committed_total - raw_total, 0)
+
+    return {
+        "raw_stamps": raw_total,
+        "committed_stamps": committed_total,
+        "available_stamps": available_stamps,
+        "visible_committed_stamps": visible_committed,
+        "debt_stamps": debt_stamps,
+    }
 
 
 def count_active_loyalty_stamps(
@@ -104,17 +122,13 @@ def count_loyalty_completed_cycles(
     campaign_id: int,
     customer_id: int,
 ) -> int:
-    total = (
-        db.query(func.count(CampaignExecution.id))
-        .filter(
-            CampaignExecution.tenant_id == tenant_id,
-            CampaignExecution.campaign_id == campaign_id,
-            CampaignExecution.customer_id == customer_id,
-            CampaignExecution.reference_period.like("cycle-%"),
-        )
-        .scalar()
+    executions = _load_loyalty_executions(
+        db,
+        tenant_id=tenant_id,
+        campaign_id=campaign_id,
+        customer_id=customer_id,
     )
-    return int(total or 0)
+    return sum(1 for execution in executions if _is_effective_cycle_execution(execution))
 
 
 def get_loyalty_balance_for_campaign(
@@ -131,28 +145,37 @@ def get_loyalty_balance_for_campaign(
         campaign_id=campaign.id,
         customer_id=customer_id,
     )
-    completed_cycles = count_loyalty_completed_cycles(
+    executions = _load_loyalty_executions(
         db,
         tenant_id=campaign.tenant_id,
         campaign_id=campaign.id,
         customer_id=customer_id,
     )
-    consumed_total = calculate_loyalty_consumed_stamps(
-        completed_cycles,
-        stamps_to_complete,
+    cycle_executions = [
+        execution
+        for execution in executions
+        if _is_effective_cycle_execution(execution)
+    ]
+    consumed_total = sum(
+        _resolve_consumed_stamps(
+            execution,
+            default_stamps_to_complete=stamps_to_complete,
+        )
+        for execution in cycle_executions
     )
-    available_stamps = calculate_loyalty_available_stamps(
+    components = calculate_loyalty_signed_balance_components(
         total_stamps,
-        completed_cycles,
-        stamps_to_complete,
+        consumed_total,
     )
 
     return {
         "total_stamps": total_stamps,
-        "completed_cycles": completed_cycles,
+        "completed_cycles": len(cycle_executions),
         "consumed_stamps": consumed_total,
-        "converted_stamps": min(total_stamps, consumed_total),
-        "available_stamps": available_stamps,
+        "committed_stamps": components["committed_stamps"],
+        "converted_stamps": components["visible_committed_stamps"],
+        "available_stamps": components["available_stamps"],
+        "debt_stamps": components["debt_stamps"],
     }
 
 
@@ -162,28 +185,43 @@ def summarize_loyalty_balances_for_customer(
     tenant_id,
     customer_id: int,
 ) -> dict[str, int]:
-    stamp_rows = (
-        db.query(
-            LoyaltyStamp.campaign_id,
-            func.count(LoyaltyStamp.id).label("total_stamps"),
+    stamp_campaign_ids = {
+        int(campaign_id)
+        for (campaign_id,) in (
+            db.query(LoyaltyStamp.campaign_id)
+            .filter(
+                LoyaltyStamp.tenant_id == tenant_id,
+                LoyaltyStamp.customer_id == customer_id,
+                LoyaltyStamp.voided_at.is_(None),
+            )
+            .distinct()
+            .all()
         )
-        .filter(
-            LoyaltyStamp.tenant_id == tenant_id,
-            LoyaltyStamp.customer_id == customer_id,
-            LoyaltyStamp.voided_at.is_(None),
+    }
+    execution_campaign_ids = {
+        int(campaign_id)
+        for (campaign_id,) in (
+            db.query(CampaignExecution.campaign_id)
+            .filter(
+                CampaignExecution.tenant_id == tenant_id,
+                CampaignExecution.customer_id == customer_id,
+                CampaignExecution.reference_period.like("cycle-%"),
+            )
+            .distinct()
+            .all()
         )
-        .group_by(LoyaltyStamp.campaign_id)
-        .all()
-    )
-    if not stamp_rows:
+    }
+    campaign_ids = sorted(stamp_campaign_ids | execution_campaign_ids)
+    if not campaign_ids:
         return {
             "total_carimbos": 0,
             "total_carimbos_brutos": 0,
+            "carimbos_comprometidos_total": 0,
+            "carimbos_em_debito": 0,
             "carimbos_convertidos": 0,
             "ciclos_concluidos": 0,
         }
 
-    campaign_ids = [int(row.campaign_id) for row in stamp_rows]
     campaigns = (
         db.query(Campaign)
         .filter(
@@ -192,40 +230,32 @@ def summarize_loyalty_balances_for_customer(
         )
         .all()
     )
-    campaign_map = {int(campaign.id): campaign for campaign in campaigns}
 
     total_raw = 0
     total_available = 0
+    total_committed = 0
     total_converted = 0
+    total_debt = 0
     total_cycles = 0
 
-    for row in stamp_rows:
-        campaign_id = int(row.campaign_id)
-        raw_total = int(row.total_stamps or 0)
-        total_raw += raw_total
-
-        campaign = campaign_map.get(campaign_id)
-        stamps_to_complete = int(((campaign.params if campaign else {}) or {}).get("stamps_to_complete", 10) or 0)
-        completed_cycles = count_loyalty_completed_cycles(
+    for campaign in campaigns:
+        balance = get_loyalty_balance_for_campaign(
             db,
-            tenant_id=tenant_id,
-            campaign_id=campaign_id,
+            campaign=campaign,
             customer_id=customer_id,
         )
-        total_cycles += completed_cycles
-        total_converted += min(
-            raw_total,
-            calculate_loyalty_consumed_stamps(completed_cycles, stamps_to_complete),
-        )
-        total_available += calculate_loyalty_available_stamps(
-            raw_total,
-            completed_cycles,
-            stamps_to_complete,
-        )
+        total_raw += balance["total_stamps"]
+        total_available += balance["available_stamps"]
+        total_committed += balance["committed_stamps"]
+        total_converted += balance["converted_stamps"]
+        total_debt += balance["debt_stamps"]
+        total_cycles += balance["completed_cycles"]
 
     return {
         "total_carimbos": total_available,
         "total_carimbos_brutos": total_raw,
+        "carimbos_comprometidos_total": total_committed,
+        "carimbos_em_debito": total_debt,
         "carimbos_convertidos": total_converted,
         "ciclos_concluidos": total_cycles,
     }
@@ -234,21 +264,14 @@ def summarize_loyalty_balances_for_customer(
 def build_consumed_loyalty_stamp_ids(
     stamps: list[LoyaltyStamp],
     *,
-    completed_cycles: int,
-    stamps_to_complete: Any,
+    consumed_count: int,
 ) -> set[int]:
     active_stamps = sorted(
         [stamp for stamp in stamps if stamp.voided_at is None],
         key=lambda stamp: (stamp.created_at, stamp.id),
     )
-    consumed_visible = min(
-        len(active_stamps),
-        calculate_loyalty_consumed_stamps(completed_cycles, stamps_to_complete),
-    )
-    return {
-        int(stamp.id)
-        for stamp in active_stamps[:consumed_visible]
-    }
+    visible_count = min(len(active_stamps), max(int(consumed_count or 0), 0))
+    return {int(stamp.id) for stamp in active_stamps[:visible_count]}
 
 
 def sync_loyalty_stamps_for_sale(
@@ -335,6 +358,7 @@ def sync_loyalty_stamps_for_sale(
         "total_stamps": reward_sync["total_stamps"],
         "available_stamps": reward_sync["available_stamps"],
         "converted_stamps": reward_sync["converted_stamps"],
+        "debt_stamps": reward_sync["debt_stamps"],
         "awarded": reward_sync["awarded"],
         "revoked": reward_sync["revoked"],
     }
@@ -350,87 +374,140 @@ def sync_loyalty_rewards_for_customer(
     params = campaign.params or {}
     stamps_to_complete = int(params.get("stamps_to_complete", 10) or 0)
     intermediate_stamp = int(params.get("intermediate_stamp") or 0)
-    balance = get_loyalty_balance_for_campaign(
+    raw_total_stamps = count_active_loyalty_stamps(
         db,
-        campaign=campaign,
+        tenant_id=campaign.tenant_id,
+        campaign_id=campaign.id,
         customer_id=customer_id,
     )
-    total_stamps = balance["total_stamps"]
-    desired_refs: dict[str, dict[str, Any]] = {}
-
-    if stamps_to_complete > 0 and _is_reward_configured(
-        params.get("reward_type", "coupon"),
-        params.get("reward_value", 0),
-    ):
-        for cycle in range(1, (total_stamps // stamps_to_complete) + 1):
-            ref = f"cycle-{cycle}"
-            desired_refs[ref] = {
-                "reward_tp": params.get("reward_type", "coupon"),
-                "reward_val": params.get("reward_value", 0),
-                "prefix": "FIEL",
-                "notif_msg": params.get(
-                    "notification_message",
-                    "Parabens! Seu cartao de fidelidade completou um ciclo. Recompensa: {code}",
-                ),
-            }
-
-    if intermediate_stamp > 0 and _is_reward_configured(
-        params.get("intermediate_reward_type", "coupon"),
-        params.get("intermediate_reward_value", 0),
-    ):
-        for mid_cycle in range(1, (total_stamps // intermediate_stamp) + 1):
-            reached_stamps = mid_cycle * intermediate_stamp
-            if stamps_to_complete > 0 and reached_stamps % stamps_to_complete == 0:
-                continue
-
-            ref = f"mid-{mid_cycle}"
-            desired_refs[ref] = {
-                "reward_tp": params.get("intermediate_reward_type", "coupon"),
-                "reward_val": params.get("intermediate_reward_value", 0),
-                "prefix": "FIELMID",
-                "notif_msg": params.get(
-                    "notification_message_intermediate",
-                    "Voce atingiu um marco da fidelidade. Recompensa: {code}",
-                ),
-            }
-
-    existing_executions = (
-        db.query(CampaignExecution)
-        .filter(
-            CampaignExecution.tenant_id == campaign.tenant_id,
-            CampaignExecution.campaign_id == campaign.id,
-            CampaignExecution.customer_id == customer_id,
-        )
-        .all()
+    executions = _load_loyalty_executions(
+        db,
+        tenant_id=campaign.tenant_id,
+        campaign_id=campaign.id,
+        customer_id=customer_id,
     )
-    existing_map = {
+
+    cycle_executions = [
+        execution
+        for execution in executions
+        if _is_effective_cycle_execution(execution)
+    ]
+    suppressed_cycle_executions = [
+        execution
+        for execution in executions
+        if str(execution.reference_period or "").startswith("cycle-")
+        and _is_execution_suppressed(execution)
+    ]
+    mid_executions = {
         execution.reference_period: execution
-        for execution in existing_executions
-        if _is_loyalty_ref(execution.reference_period)
+        for execution in executions
+        if str(execution.reference_period or "").startswith("mid-")
     }
 
     awarded = 0
     revoked = 0
 
-    for ref_period in _sort_loyalty_refs(desired_refs.keys()):
-        if ref_period in existing_map:
-            continue
+    cycle_reward_enabled = _is_reward_configured(
+        params.get("reward_type", "coupon"),
+        params.get("reward_value", 0),
+    )
+    funded_cycles = (
+        raw_total_stamps // stamps_to_complete
+        if stamps_to_complete > 0 and cycle_reward_enabled
+        else 0
+    )
 
-        reward = desired_refs[ref_period]
+    locked_cycles: list[CampaignExecution] = []
+    removable_cycles: list[CampaignExecution] = []
+    max_cycle_index = 0
+    current_cycle_count = len(cycle_executions)
+    suppressed_cycle_count = len(suppressed_cycle_executions)
+
+    for execution in [*cycle_executions, *suppressed_cycle_executions]:
+        max_cycle_index = max(
+            max_cycle_index,
+            _extract_loyalty_ref_index(execution.reference_period),
+        )
+    for execution in cycle_executions:
+        if _loyalty_execution_is_locked(db, campaign=campaign, execution=execution):
+            locked_cycles.append(execution)
+        else:
+            removable_cycles.append(execution)
+
+    target_cycle_count = max(
+        max(funded_cycles - suppressed_cycle_count, 0),
+        len(locked_cycles),
+    )
+    removable_cycles.sort(
+        key=lambda execution: _extract_loyalty_ref_index(execution.reference_period),
+        reverse=True,
+    )
+    while current_cycle_count > target_cycle_count and removable_cycles:
+        execution = removable_cycles.pop(0)
+        revoked += _revoke_loyalty_reward(
+            db,
+            campaign=campaign,
+            execution=execution,
+        )
+        current_cycle_count -= 1
+
+    while current_cycle_count < target_cycle_count:
+        max_cycle_index += 1
+        ref_period = f"cycle-{max_cycle_index}"
         awarded += _give_loyalty_reward(
             db,
             campaign=campaign,
             customer_id=customer_id,
             ref_period=ref_period,
-            reward_tp=reward["reward_tp"],
-            reward_val=reward["reward_val"],
+            reward_tp=params.get("reward_type", "coupon"),
+            reward_val=params.get("reward_value", 0),
             source_event_id=source_event_id,
-            prefix=reward["prefix"],
-            notif_msg=reward["notif_msg"],
+            prefix="FIEL",
+            notif_msg=params.get(
+                "notification_message",
+                "Parabens! Seu cartao de fidelidade completou um ciclo. Recompensa: {code}",
+            ),
+            consumed_stamps=stamps_to_complete,
+            stamps_to_complete_snapshot=stamps_to_complete,
         )
+        current_cycle_count += 1
 
-    for ref_period, execution in existing_map.items():
-        if ref_period in desired_refs:
+    desired_mid_refs = {
+        ref
+        for ref in build_loyalty_reward_refs(
+            total_stamps=raw_total_stamps,
+            stamps_to_complete=stamps_to_complete,
+            intermediate_stamp=intermediate_stamp,
+        )
+        if ref.startswith("mid-")
+    }
+
+    if intermediate_stamp > 0 and _is_reward_configured(
+        params.get("intermediate_reward_type", "coupon"),
+        params.get("intermediate_reward_value", 0),
+    ):
+        for ref_period in sorted(desired_mid_refs, key=_sort_loyalty_ref_key):
+            if ref_period in mid_executions:
+                continue
+            awarded += _give_loyalty_reward(
+                db,
+                campaign=campaign,
+                customer_id=customer_id,
+                ref_period=ref_period,
+                reward_tp=params.get("intermediate_reward_type", "coupon"),
+                reward_val=params.get("intermediate_reward_value", 0),
+                source_event_id=source_event_id,
+                prefix="FIELMID",
+                notif_msg=params.get(
+                    "notification_message_intermediate",
+                    "Voce atingiu um marco da fidelidade. Recompensa: {code}",
+                ),
+                consumed_stamps=0,
+                stamps_to_complete_snapshot=stamps_to_complete,
+            )
+
+    for ref_period, execution in mid_executions.items():
+        if ref_period in desired_mid_refs:
             continue
         revoked += _revoke_loyalty_reward(
             db,
@@ -438,10 +515,16 @@ def sync_loyalty_rewards_for_customer(
             execution=execution,
         )
 
+    balance = get_loyalty_balance_for_campaign(
+        db,
+        campaign=campaign,
+        customer_id=customer_id,
+    )
     return {
-        "total_stamps": total_stamps,
+        "total_stamps": balance["total_stamps"],
         "available_stamps": balance["available_stamps"],
         "converted_stamps": balance["converted_stamps"],
+        "debt_stamps": balance["debt_stamps"],
         "completed_cycles": balance["completed_cycles"],
         "awarded": awarded,
         "revoked": revoked,
@@ -523,6 +606,95 @@ def void_loyalty_stamps_for_sale(
     }
 
 
+def revoke_loyalty_reward_by_coupon(
+    db: Session,
+    *,
+    tenant_id,
+    coupon_id: int,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    matching_execution = None
+    for execution in (
+        db.query(CampaignExecution)
+        .filter(CampaignExecution.tenant_id == tenant_id)
+        .all()
+    ):
+        reward_meta = execution.reward_meta or {}
+        if int(reward_meta.get("coupon_id") or 0) == int(coupon_id):
+            matching_execution = execution
+            break
+
+    if matching_execution is None:
+        return {"matched": False, "revoked": False}
+
+    campaign = (
+        db.query(Campaign)
+        .filter(
+            Campaign.id == matching_execution.campaign_id,
+            Campaign.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if campaign is None:
+        return {"matched": True, "revoked": False}
+
+    revoked = _revoke_loyalty_reward(
+        db,
+        campaign=campaign,
+        execution=matching_execution,
+        force=True,
+        reason=reason,
+    )
+    if revoked:
+        sync_loyalty_rewards_for_customer(
+            db,
+            campaign=campaign,
+            customer_id=matching_execution.customer_id,
+            source_event_id=None,
+        )
+
+    return {"matched": True, "revoked": bool(revoked)}
+
+
+def backfill_loyalty_reward_consumption_meta(
+    db: Session,
+    *,
+    tenant_id=None,
+) -> dict[str, int]:
+    query = db.query(CampaignExecution).filter(
+        CampaignExecution.reference_period.like("cycle-%"),
+    )
+    if tenant_id is not None:
+        query = query.filter(CampaignExecution.tenant_id == tenant_id)
+
+    executions = query.order_by(CampaignExecution.id.asc()).all()
+    updated = 0
+
+    for execution in executions:
+        reward_meta = dict(execution.reward_meta or {})
+        if "consumed_stamps" in reward_meta and "stamps_to_complete_snapshot" in reward_meta:
+            continue
+
+        campaign = (
+            db.query(Campaign)
+            .filter(
+                Campaign.id == execution.campaign_id,
+                Campaign.tenant_id == execution.tenant_id,
+            )
+            .first()
+        )
+        stamps_to_complete = int(
+            ((campaign.params if campaign else {}) or {}).get("stamps_to_complete", 10) or 0
+        )
+        reward_meta["consumed_stamps"] = max(stamps_to_complete, 0)
+        reward_meta["stamps_to_complete_snapshot"] = max(stamps_to_complete, 0)
+        execution.reward_meta = reward_meta
+        updated += 1
+
+    db.flush()
+    return {"updated": updated}
+
+
 def _give_loyalty_reward(
     db: Session,
     *,
@@ -534,6 +706,8 @@ def _give_loyalty_reward(
     source_event_id: int | None,
     prefix: str,
     notif_msg: str,
+    consumed_stamps: int = 0,
+    stamps_to_complete_snapshot: int = 0,
 ) -> int:
     existing = (
         db.query(CampaignExecution.id)
@@ -549,7 +723,10 @@ def _give_loyalty_reward(
         return 0
 
     cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
-    reward_meta: dict[str, Any] = {}
+    reward_meta: dict[str, Any] = {
+        "consumed_stamps": max(int(consumed_stamps or 0), 0),
+        "stamps_to_complete_snapshot": max(int(stamps_to_complete_snapshot or 0), 0),
+    }
     reward_value = Decimal(str(reward_val or 0)).quantize(Decimal("0.01"))
     reward_type = reward_tp
     code = None
@@ -565,10 +742,14 @@ def _give_loyalty_reward(
             channel="all",
             valid_days=int((campaign.params or {}).get("coupon_days_valid") or 30),
             prefix=prefix,
-            meta={"reference_period": ref_period},
+            meta={
+                "reference_period": ref_period,
+                "consumed_stamps": reward_meta["consumed_stamps"],
+                "stamps_to_complete_snapshot": reward_meta["stamps_to_complete_snapshot"],
+            },
         )
         code = coupon.code
-        reward_meta = {"coupon_id": coupon.id, "coupon_code": code}
+        reward_meta.update({"coupon_id": coupon.id, "coupon_code": code})
         reward_type = "coupon:fixed"
     elif reward_tp == "credit":
         tx = CashbackTransaction(
@@ -582,11 +763,11 @@ def _give_loyalty_reward(
         )
         db.add(tx)
         db.flush()
-        reward_meta = {"cashback_tx_id": tx.id}
+        reward_meta["cashback_tx_id"] = tx.id
         reward_type = "cashback"
         code = f"R$ {reward_value:.2f}"
     elif reward_tp == "brinde":
-        reward_meta = {"tipo": "brinde", "reference_period": ref_period}
+        reward_meta.update({"tipo": "brinde", "reference_period": ref_period})
         reward_type = "brinde"
         code = "brinde"
     else:
@@ -647,6 +828,8 @@ def _revoke_loyalty_reward(
     *,
     campaign: Campaign,
     execution: CampaignExecution,
+    force: bool = False,
+    reason: str | None = None,
 ) -> int:
     reward_meta = execution.reward_meta or {}
     coupon_id = reward_meta.get("coupon_id")
@@ -665,7 +848,7 @@ def _revoke_loyalty_reward(
             db.delete(execution)
             return 1
 
-        if coupon.status == CouponStatusEnum.used:
+        if coupon.status == CouponStatusEnum.used and not force:
             logger.info(
                 "[loyalty_service] Mantendo recompensa %s porque o cupom %s ja foi usado",
                 execution.reference_period,
@@ -673,8 +856,27 @@ def _revoke_loyalty_reward(
             )
             return 0
 
-        if coupon.status == CouponStatusEnum.active:
+        if force and coupon.status == CouponStatusEnum.used:
+            reward_meta = dict(execution.reward_meta or {})
+            reward_meta["revoked_after_use"] = True
+            reward_meta["revoked_reason"] = reason or "cupom_revertido"
+            reward_meta["revoked_at"] = datetime.now(timezone.utc).isoformat()
+            reward_meta["original_consumed_stamps"] = reward_meta.get(
+                "original_consumed_stamps",
+                reward_meta.get("consumed_stamps"),
+            )
+            reward_meta["consumed_stamps"] = 0
+            execution.reward_meta = reward_meta
             coupon.status = CouponStatusEnum.voided
+            return 1
+
+        if coupon.status in (CouponStatusEnum.active, CouponStatusEnum.used, CouponStatusEnum.expired) or force:
+            coupon.status = CouponStatusEnum.voided
+            if reason:
+                coupon.meta = {
+                    **(coupon.meta or {}),
+                    "voided_reason": reason,
+                }
 
         db.delete(execution)
         return 1
@@ -731,10 +933,73 @@ def _append_note(existing: str | None, message: str) -> str:
     return f"{base} | {message}"
 
 
-def _is_loyalty_ref(reference_period: str | None) -> bool:
-    if not reference_period:
+def _load_loyalty_executions(
+    db: Session,
+    *,
+    tenant_id,
+    campaign_id: int,
+    customer_id: int,
+) -> list[CampaignExecution]:
+    return (
+        db.query(CampaignExecution)
+        .filter(
+            CampaignExecution.tenant_id == tenant_id,
+            CampaignExecution.campaign_id == campaign_id,
+            CampaignExecution.customer_id == customer_id,
+        )
+        .all()
+    )
+
+
+def _resolve_consumed_stamps(
+    execution: CampaignExecution,
+    *,
+    default_stamps_to_complete: int,
+) -> int:
+    reward_meta = dict(execution.reward_meta or {})
+    if reward_meta.get("revoked_after_use"):
+        return 0
+    if "consumed_stamps" in reward_meta:
+        return max(int(reward_meta.get("consumed_stamps") or 0), 0)
+
+    if str(execution.reference_period or "").startswith("cycle-"):
+        return max(int(reward_meta.get("stamps_to_complete_snapshot") or default_stamps_to_complete or 0), 0)
+
+    return 0
+
+
+def _extract_loyalty_ref_index(reference_period: str | None) -> int:
+    if not reference_period or "-" not in reference_period:
+        return 0
+    try:
+        return int(str(reference_period).split("-", 1)[1])
+    except (TypeError, ValueError):
+        return 0
+
+
+def _loyalty_execution_is_locked(
+    db: Session,
+    *,
+    campaign: Campaign,
+    execution: CampaignExecution,
+) -> bool:
+    if _is_execution_suppressed(execution):
         return False
-    return reference_period.startswith("cycle-") or reference_period.startswith("mid-")
+
+    reward_meta = execution.reward_meta or {}
+    coupon_id = reward_meta.get("coupon_id")
+    if not coupon_id:
+        return False
+
+    coupon = (
+        db.query(Coupon)
+        .filter(
+            Coupon.id == coupon_id,
+            Coupon.tenant_id == campaign.tenant_id,
+        )
+        .first()
+    )
+    return bool(coupon and coupon.status == CouponStatusEnum.used)
 
 
 def _is_reward_configured(reward_tp: str | None, reward_val: Any) -> bool:
@@ -743,10 +1008,19 @@ def _is_reward_configured(reward_tp: str | None, reward_val: Any) -> bool:
     return Decimal(str(reward_val or 0)) > 0
 
 
-def _sort_loyalty_refs(refs) -> list[str]:
-    def key(ref: str) -> tuple[int, int]:
-        if ref.startswith("mid-"):
-            return (0, int(ref.split("-", 1)[1]))
-        return (1, int(ref.split("-", 1)[1]))
+def _is_execution_suppressed(execution: CampaignExecution) -> bool:
+    reward_meta = execution.reward_meta or {}
+    return bool(reward_meta.get("revoked_after_use"))
 
-    return sorted(refs, key=key)
+
+def _is_effective_cycle_execution(execution: CampaignExecution) -> bool:
+    return (
+        str(execution.reference_period or "").startswith("cycle-")
+        and not _is_execution_suppressed(execution)
+    )
+
+
+def _sort_loyalty_ref_key(ref: str) -> tuple[int, int]:
+    if ref.startswith("mid-"):
+        return (0, _extract_loyalty_ref_index(ref))
+    return (1, _extract_loyalty_ref_index(ref))

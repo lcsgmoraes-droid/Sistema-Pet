@@ -73,9 +73,10 @@ from app.campaigns.models import (
     CustomerMergeLog,
 )
 from app.campaigns.models import CampaignTypeEnum, CampaignExecution, CampaignEventQueue, EventStatusEnum
+from app.campaigns.coupon_service import preview_coupon_redemption
 from app.campaigns.loyalty_service import (
     build_consumed_loyalty_stamp_ids,
-    count_loyalty_completed_cycles,
+    get_loyalty_balance_for_campaign,
     summarize_loyalty_balances_for_customer,
 )
 from app.db import SessionLocal
@@ -405,89 +406,25 @@ def resgatar_cupom(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Valida e resgata um cupom no PDV.
+    Valida um cupom no PDV e retorna a previa do desconto.
 
-    - Verifica se o cupom existe, está ativo e não expirado
-    - Verifica se o canal é pdv ou all
-    - Aplica a regra de valor mínimo (se houver)
-    - Calcula e retorna o desconto a aplicar
-    - Marca o cupom como usado e registra o resgate
+    O consumo efetivo acontece apenas no fechamento atomico da venda.
     """
     _, tenant_id = user_and_tenant
-
-    cupom = (
-        db.query(Coupon)
-        .filter(Coupon.tenant_id == tenant_id, Coupon.code == code.upper().strip())
-        .first()
-    )
-
-    if not cupom:
-        raise HTTPException(status_code=404, detail="Cupom não encontrado")
-
-    if cupom.status != CouponStatusEnum.active:
-        if cupom.status == CouponStatusEnum.used:
-            raise HTTPException(status_code=400, detail="Este cupom já foi utilizado")
-        if cupom.status == CouponStatusEnum.expired:
-            raise HTTPException(status_code=400, detail="Este cupom está expirado")
-        if cupom.status == CouponStatusEnum.voided:
-            raise HTTPException(status_code=400, detail="Este cupom foi cancelado")
-        raise HTTPException(status_code=400, detail=f"Cupom inválido (status: {cupom.status.value})")
-
-    now = datetime.now(timezone.utc)
-    if cupom.valid_until and cupom.valid_until < now:
-        cupom.status = CouponStatusEnum.expired
-        db.commit()
-        raise HTTPException(status_code=400, detail="Este cupom expirou")
-
-    if cupom.channel.value not in ("pdv", "all"):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Este cupom não é válido no PDV (canal permitido: {cupom.channel.value})",
-        )
-
-    venda_total = body.venda_total or 0.0
-    if cupom.min_purchase_value and venda_total < float(cupom.min_purchase_value):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Valor mínimo de compra não atingido. Mínimo: R$ {float(cupom.min_purchase_value):.2f}",
-        )
-
-    # Calcular desconto
-    discount_applied = 0.0
-    if cupom.coupon_type.value == "percent" and cupom.discount_percent:
-        discount_applied = round(venda_total * float(cupom.discount_percent) / 100, 2)
-    elif cupom.coupon_type.value == "fixed" and cupom.discount_value:
-        discount_applied = float(cupom.discount_value)
-    elif cupom.coupon_type.value == "gift":
-        discount_applied = 0.0  # Brindes são tratados separadamente
-
-    # Marcar como usado e registrar resgate
-    cupom.status = CouponStatusEnum.used
-    redemption = CouponRedemption(
+    preview = preview_coupon_redemption(
+        db,
         tenant_id=tenant_id,
-        coupon_id=cupom.id,
+        code=code,
+        venda_total=body.venda_total or 0.0,
         customer_id=body.customer_id,
-        venda_id=None,
-        discount_applied=discount_applied,
     )
-    db.add(redemption)
-    db.commit()
-
     logger.info(
-        "[Campanhas] Cupom resgatado: code=%s tenant=%s discount=R$%.2f",
-        cupom.code,
+        "[Campanhas] Cupom validado em previa: code=%s tenant=%s discount=R$%.2f",
+        preview["code"],
         tenant_id,
-        discount_applied,
+        float(preview["discount_applied"] or 0),
     )
-
-    return {
-        "code": cupom.code,
-        "coupon_type": cupom.coupon_type.value,
-        "discount_value": float(cupom.discount_value) if cupom.discount_value else None,
-        "discount_percent": float(cupom.discount_percent) if cupom.discount_percent else None,
-        "discount_applied": discount_applied,
-        "message": f"Cupom aplicado! Desconto de R$ {discount_applied:.2f}",
-    }
+    return preview
 
 
 # ---------------------------------------------------------------------------
@@ -743,6 +680,8 @@ def saldo_cliente(
         "saldo_cashback": saldo_cashback,
         "total_carimbos": loyalty_summary["total_carimbos"],
         "total_carimbos_brutos": loyalty_summary["total_carimbos_brutos"],
+        "carimbos_comprometidos_total": loyalty_summary["carimbos_comprometidos_total"],
+        "carimbos_em_debito": loyalty_summary["carimbos_em_debito"],
         "carimbos_convertidos": loyalty_summary["carimbos_convertidos"],
         "ciclos_concluidos": loyalty_summary["ciclos_concluidos"],
         "rank_level": rank_atual.rank_level.value if rank_atual else "bronze",
@@ -960,18 +899,15 @@ def listar_carimbos_cliente(
             campaign = campaign_map.get(campaign_id)
             if campaign is None:
                 continue
-            stamps_to_complete = int(((campaign.params or {}).get("stamps_to_complete", 10)) or 0)
-            completed_cycles = count_loyalty_completed_cycles(
+            loyalty_balance = get_loyalty_balance_for_campaign(
                 db,
-                tenant_id=tenant_id,
-                campaign_id=campaign_id,
+                campaign=campaign,
                 customer_id=customer_id,
             )
             converted_stamp_ids.update(
                 build_consumed_loyalty_stamp_ids(
                     campaign_stamps,
-                    completed_cycles=completed_cycles,
-                    stamps_to_complete=stamps_to_complete,
+                    consumed_count=loyalty_balance["converted_stamps"],
                 )
             )
 
@@ -1648,6 +1584,8 @@ def lancar_carimbo_manual(
                 "novo": False,
                 "total_carimbos": saldo["total_carimbos"],
                 "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+                "carimbos_comprometidos_total": saldo["carimbos_comprometidos_total"],
+                "carimbos_em_debito": saldo["carimbos_em_debito"],
                 "carimbos_convertidos": saldo["carimbos_convertidos"],
                 "stamp_id": existing.id,
             }
@@ -1682,6 +1620,8 @@ def lancar_carimbo_manual(
         "stamp_id": stamp.id,
         "total_carimbos": saldo["total_carimbos"],
         "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+        "carimbos_comprometidos_total": saldo["carimbos_comprometidos_total"],
+        "carimbos_em_debito": saldo["carimbos_em_debito"],
         "carimbos_convertidos": saldo["carimbos_convertidos"],
         "params": campanha.params,
         "stamps_to_complete": campanha.params.get("stamps_to_complete", 10),
@@ -1754,6 +1694,8 @@ def estornar_carimbo(
         "stamp_id": stamp_id,
         "total_carimbos_ativos": saldo["total_carimbos"],
         "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+        "carimbos_comprometidos_total": saldo["carimbos_comprometidos_total"],
+        "carimbos_em_debito": saldo["carimbos_em_debito"],
         "carimbos_convertidos": saldo["carimbos_convertidos"],
     }
 

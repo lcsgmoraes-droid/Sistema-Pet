@@ -66,6 +66,10 @@ interface Beneficios {
   carimbos: {
     total_geral: number;
     carimbos_no_cartao: number;
+    carimbos_ativos_brutos: number;
+    carimbos_comprometidos_total: number;
+    carimbos_convertidos: number;
+    carimbos_em_debito: number;
     meta: number;
     min_purchase_value: number;
   };
@@ -257,8 +261,17 @@ function SecaoRanking({ ranking }: { ranking: Beneficios["ranking"] }) {
 }
 
 function SecaoCarimbos({ carimbos }: { carimbos: Beneficios["carimbos"] }) {
-  const { carimbos_no_cartao, meta, min_purchase_value } = carimbos;
-  const filled = Math.min(carimbos_no_cartao, meta);
+  const {
+    total_geral,
+    carimbos_no_cartao,
+    carimbos_ativos_brutos,
+    carimbos_comprometidos_total,
+    carimbos_em_debito,
+    meta,
+    min_purchase_value,
+  } = carimbos;
+  const saldoNoCartao = Math.max(carimbos_no_cartao || 0, 0);
+  const filled = Math.min(saldoNoCartao, meta);
   const stamps = Array.from({ length: meta });
 
   return (
@@ -287,6 +300,18 @@ function SecaoCarimbos({ carimbos }: { carimbos: Beneficios["carimbos"] }) {
         {meta - filled === 0
           ? "🎉 Cartão completo!"
           : `faltam ${meta - filled} para ganhar a recompensa`}
+      </Text>
+
+      {carimbos_em_debito > 0 && (
+        <Text
+          style={[styles.carimbosInfo, { color: CORES.erro, fontWeight: "700" }]}
+        >
+          Debito fidelidade: {carimbos_em_debito} carimbo(s)
+        </Text>
+      )}
+
+      <Text style={styles.carimbosInfo}>
+        Saldo atual: {total_geral} · Ativos: {carimbos_ativos_brutos} · Comprometidos: {carimbos_comprometidos_total}
       </Text>
 
       {min_purchase_value > 0 && (
