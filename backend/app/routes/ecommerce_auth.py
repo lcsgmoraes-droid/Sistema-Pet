@@ -141,20 +141,20 @@ def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_t
 
 
 def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
-        canal = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
-        if canal in {"app", "mobile", "site", "web", "loja"}:
-                return "app" if canal in {"app", "mobile"} else "site"
+    canal = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
+    if canal in {"app", "mobile", "site", "web", "loja"}:
+        return "app" if canal in {"app", "mobile"} else "site"
 
-        origin = (request.headers.get("origin") or "").lower()
-        referer = (request.headers.get("referer") or "").lower()
-        if origin or referer:
-                return "site"
+    origin = (request.headers.get("origin") or "").lower()
+    referer = (request.headers.get("referer") or "").lower()
+    if origin or referer:
+        return "site"
 
-        user_agent = (request.headers.get("user-agent") or "").lower()
-        if "okhttp" in user_agent or "expo" in user_agent or "reactnative" in user_agent:
-                return "app"
-
+    user_agent = (request.headers.get("user-agent") or "").lower()
+    if "okhttp" in user_agent or "expo" in user_agent or "reactnative" in user_agent:
         return "app"
+
+    return "app"
 
 
 def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[str, str, str]:
@@ -704,10 +704,12 @@ def atualizar_perfil(
 ):
     cliente = _get_or_create_cliente_for_user(db, current_user)
 
-    nome_final = (payload.nome or current_user.nome or "").strip()
+    nome_informado = (payload.nome or "").strip()
+    nome_atual = (current_user.nome or "").strip()
+    nome_final = nome_informado or nome_atual
     if not nome_final:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nome completo obrigatório")
-    if " " not in nome_final:
+    if nome_informado and nome_informado != nome_atual and " " not in nome_final:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe nome completo (nome e sobrenome)")
 
     current_user.nome = nome_final
