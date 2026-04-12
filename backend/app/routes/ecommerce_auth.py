@@ -16,7 +16,7 @@ from app.auth import create_access_token, hash_password, verify_password
 from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
-from app.models import Cliente, Tenant, User, UserTenant
+from app.models import Cliente, Role, Tenant, User, UserTenant
 from app.services.email_service import send_email
 
 
@@ -361,6 +361,52 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     return cliente
 
 
+def _get_or_create_customer_role(db: Session, tenant_id: str) -> Role:
+    role = (
+        db.query(Role)
+        .filter(Role.tenant_id == tenant_id, Role.name == "Cliente")
+        .first()
+    )
+    if role:
+        return role
+
+    role = Role(name="Cliente", tenant_id=tenant_id)
+    db.add(role)
+    db.flush()
+    return role
+
+
+def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> UserTenant:
+    vinculo = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user.id,
+            UserTenant.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
+    if vinculo and vinculo.is_active:
+        return vinculo
+
+    role = _get_or_create_customer_role(db, tenant_id)
+
+    if vinculo:
+        vinculo.role_id = role.id
+        vinculo.is_active = True
+        return vinculo
+
+    vinculo = UserTenant(
+        user_id=user.id,
+        tenant_id=tenant_id,
+        role_id=role.id,
+        is_active=True,
+    )
+    db.add(vinculo)
+    db.flush()
+    return vinculo
+
+
 def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
     delivery = _extract_ecommerce_delivery_details(cliente)
     return {
@@ -425,6 +471,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         cliente.nome = payload.nome
     if cpf_normalizado and not cliente.cpf:
         cliente.cpf = cpf_normalizado
+    _ensure_active_store_access(db, user, str(tenant_id))
     db.commit()
     db.refresh(cliente)
 
@@ -488,21 +535,8 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa")
 
-    vinculo_ativo = (
-        db.query(UserTenant)
-        .filter(
-            UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
-        )
-        .first()
-    )
-
-    if not vinculo_ativo:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso inativo para esta loja",
-        )
+    _ensure_active_store_access(db, user, str(tenant_id))
+    db.commit()
 
     access_token = create_access_token(
         data={
@@ -580,6 +614,7 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None
     user.reset_token_expires = None
+    _ensure_active_store_access(db, user, str(user.tenant_id))
     db.commit()
 
     return {"message": "Senha atualizada com sucesso"}
