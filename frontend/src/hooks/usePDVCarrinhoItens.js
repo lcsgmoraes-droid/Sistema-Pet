@@ -32,12 +32,12 @@ export function usePDVCarrinhoItens({
   const adicionarProdutoAoCarrinho = (produto) => {
     if (!temCaixaAberto) {
       alert(
-        "âŒ NÃ£o Ã© possÃ­vel adicionar produtos sem caixa aberto. Abra um caixa primeiro.",
+        "\u274c N\u00e3o \u00e9 poss\u00edvel adicionar produtos sem caixa aberto. Abra um caixa primeiro.",
       );
       return false;
     }
 
-    debugLog("ðŸ›’ Produto sendo adicionado:", {
+    debugLog("\ud83d\uded2 Produto sendo adicionado:", {
       nome: produto.nome,
       categoria_id: produto.categoria_id,
       categoria_nome: produto.categoria_nome,

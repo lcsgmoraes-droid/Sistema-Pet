@@ -456,6 +456,11 @@ const Layout = () => {
           permission: "produtos.visualizar",
         },
         {
+          path: "/produtos/valorizacao-estoque",
+          label: "Valorizacao de Estoque",
+          permission: "produtos.visualizar",
+        },
+        {
           path: "/produtos/balanco",
           label: "Balanço",
           permission: "produtos.editar",

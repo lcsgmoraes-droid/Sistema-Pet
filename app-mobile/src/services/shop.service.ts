@@ -43,15 +43,28 @@ export async function registrarAviseme(
 // PRODUTOS - endpoints públicos do e-commerce
 // ─────────────────────────────────────────────────────────────
 
+export type CatalogOrder = 'prontos' | 'nome' | 'menor_preco' | 'maior_preco';
+
 export async function listarProdutos(params?: {
   pagina?: number;
   busca?: string;
   categoria_id?: number;
+  somenteComEstoque?: boolean;
+  somenteComImagem?: boolean;
+  ordenacao?: CatalogOrder;
 }): Promise<{ produtos: Produto[]; total: number }> {
+  const paginaAtual = Math.max(1, Number(params?.pagina || 1));
+  const limit = 40;
+  const offset = (paginaAtual - 1) * limit;
+
   const { data } = await api.get('/ecommerce/produtos', {
     params: {
       busca: params?.busca,
-      limit: 100,
+      limit,
+      offset,
+      apenas_com_estoque: params?.somenteComEstoque || undefined,
+      apenas_com_imagem: params?.somenteComImagem || undefined,
+      ordenacao: params?.ordenacao || 'prontos',
     },
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
@@ -72,7 +85,7 @@ export async function listarProdutos(params?: {
     descricao: p.descricao ?? null,
     peso_embalagem_kg: p.peso_embalagem ?? null,
   }));
-  return { produtos, total: produtos.length };
+  return { produtos, total: Number(data?.total ?? produtos.length) };
 }
 
 export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto | null> {

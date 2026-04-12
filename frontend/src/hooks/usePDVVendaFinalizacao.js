@@ -23,22 +23,22 @@ async function carregarPagamentosDaVenda(vendaId) {
 
 function montarMensagemErroExclusao(errorData) {
   if (errorData && typeof errorData === "object") {
-    let mensagem = `âŒ ${errorData.erro || "Erro ao excluir venda"}\n\n`;
+    let mensagem = `\u274c ${errorData.erro || "Erro ao excluir venda"}\n\n`;
     mensagem += `${errorData.mensagem || ""}\n\n`;
 
     if (errorData.solucao) {
-      mensagem += `ðŸ’¡ SoluÃ§Ã£o:\n${errorData.solucao}\n\n`;
+      mensagem += `\ud83d\udca1 Solu\u00e7\u00e3o:\n${errorData.solucao}\n\n`;
     }
 
     if (errorData.passos && Array.isArray(errorData.passos)) {
-      mensagem += "ðŸ“‹ Passos para resolver:\n";
+      mensagem += "\ud83d\udccb Passos para resolver:\n";
       errorData.passos.forEach((passo) => {
         mensagem += `${passo}\n`;
       });
     }
 
     if (errorData.rota_id) {
-      mensagem += `\nðŸšš Rota ID: ${errorData.rota_id}`;
+      mensagem += `\n\ud83d\ude9a Rota ID: ${errorData.rota_id}`;
       if (errorData.rota_status) {
         mensagem += ` (${errorData.rota_status})`;
       }
@@ -51,7 +51,7 @@ function montarMensagemErroExclusao(errorData) {
     return errorData;
   }
 
-  return "Erro ao excluir venda. Verifique se nÃ£o hÃ¡ vÃ­nculos pendentes.";
+  return "Erro ao excluir venda. Verifique se n\u00e3o h\u00e1 v\u00ednculos pendentes.";
 }
 
 function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
@@ -121,7 +121,7 @@ export function usePDVVendaFinalizacao({
         });
 
         debugLog(
-          `âœ… Status restaurado para: ${statusOriginalVenda} (alteraÃ§Ãµes descartadas)`,
+          `\u2705 Status restaurado para: ${statusOriginalVenda} (altera\u00e7\u00f5es descartadas)`,
         );
       } catch (error) {
         console.error("Erro ao restaurar status:", error);
@@ -138,7 +138,7 @@ export function usePDVVendaFinalizacao({
     if (!vendaAtual.id) return;
 
     const confirmar = window.confirm(
-      "Deseja realmente excluir esta venda?\n\nEsta aÃ§Ã£o nÃ£o pode ser desfeita e o estoque serÃ¡ devolvido.",
+      "Deseja realmente excluir esta venda?\n\nEsta a\u00e7\u00e3o n\u00e3o pode ser desfeita e o estoque ser\u00e1 devolvido.",
     );
 
     if (!confirmar) return;
@@ -148,7 +148,7 @@ export function usePDVVendaFinalizacao({
       await api.delete(`/vendas/${vendaAtual.id}`);
       limparVenda();
       carregarVendasRecentes();
-      alert("Venda excluÃ­da com sucesso!");
+      alert("Venda exclu\u00edda com sucesso!");
     } catch (error) {
       console.error("Erro ao excluir venda:", error);
       alert(montarMensagemErroExclusao(error.response?.data?.detail));
@@ -161,7 +161,7 @@ export function usePDVVendaFinalizacao({
     if (!vendaAtual.id) return;
 
     const confirmar = window.confirm(
-      'Deseja reabrir esta venda?\n\nOs pagamentos serÃ£o mantidos e o status mudarÃ¡ para "aberta".',
+      'Deseja reabrir esta venda?\n\nOs pagamentos ser\u00e3o mantidos e o status mudar\u00e1 para "aberta".',
     );
 
     if (!confirmar) return;
@@ -183,7 +183,7 @@ export function usePDVVendaFinalizacao({
       setModoVisualizacao(false);
 
       alert(
-        "Venda reaberta com sucesso! Agora vocÃª pode editÃ¡-la.\n\nATENÃ‡ÃƒO: Se vocÃª nÃ£o fizer alteraÃ§Ãµes e sair, a venda voltarÃ¡ ao status anterior.",
+        "Venda reaberta com sucesso! Agora voc\u00ea pode edit\u00e1-la.\n\nATEN\u00c7\u00c3O: Se voc\u00ea n\u00e3o fizer altera\u00e7\u00f5es e sair, a venda voltar\u00e1 ao status anterior.",
       );
     } catch (error) {
       console.error("Erro ao reabrir venda:", error);
@@ -249,7 +249,7 @@ export function usePDVVendaFinalizacao({
         const vendaAtualizada = await recarregarVendaAtualComPagamentos(
           vendaAtual.id,
         );
-        debugLog("âœ… Venda recarregada:", vendaAtualizada);
+        debugLog("\u2705 Venda recarregada:", vendaAtualizada);
       } catch (error) {
         console.error("Erro ao recarregar venda:", error);
       }

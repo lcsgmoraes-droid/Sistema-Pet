@@ -16,6 +16,7 @@ function encontrarProdutoPorCodigo(produtos, termo) {
 export function usePDVProdutoBusca({
   modoVisualizacao,
   adicionarProdutoAoCarrinho,
+  vendaContextKey,
 }) {
   const [buscarProduto, setBuscarProduto] = useState("");
   const [produtosSugeridos, setProdutosSugeridos] = useState([]);
@@ -30,6 +31,41 @@ export function usePDVProdutoBusca({
   const leituraScannerDetectadaRef = useRef(false);
   const adicionandoProdutoPorEnterRef = useRef(false);
   const buscaProdutoAtualRef = useRef("");
+  const focoProdutoTimeoutRef = useRef(null);
+
+  const buscarProdutosAtualizados = async (termo) => {
+    const response = await getProdutosVendaveis({
+      busca: termo,
+      _ts: Date.now(),
+    });
+
+    return response.data.items || [];
+  };
+
+  const focarInputProduto = () => {
+    const aplicarFoco = () => {
+      const input = inputProdutoRef.current;
+      if (!input) return;
+      input.focus();
+      if (typeof input.select === "function") {
+        input.select();
+      }
+    };
+
+    if (focoProdutoTimeoutRef.current) {
+      clearTimeout(focoProdutoTimeoutRef.current);
+    }
+
+    if (typeof window !== "undefined" && window.requestAnimationFrame) {
+      window.requestAnimationFrame(() => {
+        aplicarFoco();
+        window.requestAnimationFrame(aplicarFoco);
+      });
+      return;
+    }
+
+    focoProdutoTimeoutRef.current = setTimeout(aplicarFoco, 0);
+  };
 
   const resetScannerState = () => {
     ultimoAutoAddProdutoRef.current = "";
@@ -44,7 +80,7 @@ export function usePDVProdutoBusca({
     resetScannerState();
 
     if (focarInput) {
-      inputProdutoRef.current?.focus();
+      focarInputProduto();
     }
   };
 
@@ -60,6 +96,13 @@ export function usePDVProdutoBusca({
   };
 
   useEffect(() => {
+    setBuscarProduto("");
+    setProdutosSugeridos([]);
+    setMostrarSugestoesProduto(false);
+    resetScannerState();
+  }, [vendaContextKey]);
+
+  useEffect(() => {
     const termoAtual = String(buscarProduto || "").trim();
     buscaProdutoAtualRef.current = termoAtual;
 
@@ -67,13 +110,12 @@ export function usePDVProdutoBusca({
       setMostrarSugestoesProduto(true);
       const timer = setTimeout(async () => {
         try {
-          const response = await getProdutosVendaveis({ busca: termoAtual });
+          const produtos = await buscarProdutosAtualizados(termoAtual);
 
           if (buscaProdutoAtualRef.current !== termoAtual) {
             return;
           }
 
-          const produtos = response.data.items || [];
           const matchExato = encontrarProdutoPorCodigo(produtos, termoAtual);
 
           if (
@@ -115,6 +157,15 @@ export function usePDVProdutoBusca({
     return () => document.removeEventListener("mousedown", handleCliqueFora);
   }, []);
 
+  useEffect(
+    () => () => {
+      if (focoProdutoTimeoutRef.current) {
+        clearTimeout(focoProdutoTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
   const registrarPossivelLeituraScanner = (evento) => {
     if (
       evento.key.length !== 1 ||
@@ -146,20 +197,9 @@ export function usePDVProdutoBusca({
 
     adicionandoProdutoPorEnterRef.current = true;
     try {
-      let produtoSelecionado = null;
-
-      if (produtosSugeridos.length > 0) {
-        produtoSelecionado =
-          encontrarProdutoPorCodigo(produtosSugeridos, termo) ||
-          produtosSugeridos[0];
-      }
-
-      if (!produtoSelecionado) {
-        const response = await getProdutosVendaveis({ busca: termo });
-        const produtos = response.data.items || [];
-        produtoSelecionado =
-          encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
-      }
+      const produtos = await buscarProdutosAtualizados(termo);
+      const produtoSelecionado =
+        encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
 
       if (produtoSelecionado) {
         adicionarProduto(produtoSelecionado, { focarInput: true });
@@ -182,12 +222,28 @@ export function usePDVProdutoBusca({
   };
 
   const handleBuscarProdutoFocus = () => {
-    if (
-      String(buscarProduto || "").trim().length >= 2 &&
-      produtosSugeridos.length > 0
-    ) {
-      setMostrarSugestoesProduto(true);
+    const termo = String(buscarProduto || "").trim();
+
+    if (termo.length < 2) {
+      return;
     }
+
+    setMostrarSugestoesProduto(true);
+
+    void (async () => {
+      try {
+        buscaProdutoAtualRef.current = termo;
+        const produtos = await buscarProdutosAtualizados(termo);
+
+        if (buscaProdutoAtualRef.current !== termo) {
+          return;
+        }
+
+        setProdutosSugeridos(produtos);
+      } catch (error) {
+        console.error("Erro ao atualizar sugestoes de produtos:", error);
+      }
+    })();
   };
 
   const handleBuscarProdutoKeyDown = async (event) => {

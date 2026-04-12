@@ -23,7 +23,7 @@ export default function CampanhasGestorClienteResumo({
           {gestorCliente.nome}
         </p>
         <p className="text-xs text-gray-400">
-          ID #{gestorCliente.id} ·{" "}
+          ID #{gestorCliente.id} -{" "}
           {gestorCliente.telefone || gestorCliente.celular || "Sem telefone"}
         </p>
       </div>

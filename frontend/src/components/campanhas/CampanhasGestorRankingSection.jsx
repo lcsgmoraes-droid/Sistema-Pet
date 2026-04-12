@@ -16,9 +16,9 @@ export default function CampanhasGestorRankingSection({
 
   return (
     <CampanhasGestorSection
-      icon="🏆"
+      icon={"\uD83C\uDFC6"}
       title="Ranking"
-      subtitle={`${rank.emoji} ${rank.label}${gestorSaldo.rank_period ? ` · ${gestorSaldo.rank_period}` : ""}`}
+      subtitle={`${rank.emoji} ${rank.label}${gestorSaldo.rank_period ? ` - ${gestorSaldo.rank_period}` : ""}`}
       isOpen={isOpen}
       onToggle={() => setGestorSecao(isOpen ? null : "ranking")}
     >
@@ -26,12 +26,12 @@ export default function CampanhasGestorRankingSection({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
-              label: "Nível",
+              label: "Nivel",
               value: `${rank.emoji} ${rank.label}`,
             },
             {
-              label: "Período",
-              value: gestorSaldo.rank_period || "—",
+              label: "Periodo",
+              value: gestorSaldo.rank_period || "-",
             },
             {
               label: "Total Gasto (12m)",
@@ -55,8 +55,8 @@ export default function CampanhasGestorRankingSection({
         </div>
 
         <p className="text-xs text-gray-400 mt-4 text-center">
-          O nível de ranking é recalculado automaticamente no dia 1 de cada
-          mês.
+          O nivel de ranking e recalculado automaticamente no dia 1 de cada
+          mes.
         </p>
       </div>
     </CampanhasGestorSection>

@@ -1,15 +1,19 @@
 """
 Rotas de Autenticação Multi-Tenant
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime, timedelta, timezone
-from jose import jwt
-import uuid
 import logging
+import os
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import jwt
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import User, Tenant, Role, Permission, RolePermission, UserTenant
@@ -24,12 +28,14 @@ from app.config import JWT_SECRET_KEY as SECRET_KEY
 from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
 from app.session_manager import create_session, validate_session, revoke_session, get_active_sessions, get_session_by_jti
 from app.auth.dependencies import get_current_user_and_tenant
+from app.services.email_service import send_email
 from app.tenancy.context import set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer()
 router = APIRouter(prefix="/auth", tags=["auth-multitenant"])
+RESET_TOKEN_MINUTES = 30
 
 
 # =============================================================================
@@ -114,6 +120,65 @@ class SelectTenantResponse(BaseModel):
     access_token: str
     token_type: str
     tenant: dict
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    email: EmailStr | None = None
+    nova_senha: str = Field(min_length=6)
+
+
+def _resolve_frontend_base_url(request: Request) -> str:
+    configured_url = (os.getenv("FRONTEND_URL") or "").strip()
+    if configured_url:
+        return configured_url.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Recuperacao de senha - Pet Shop Pro"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+        <div style="background: #7c3aed; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">Recuperar senha</h1>
+        </div>
+        <div style="border: 1px solid #ddd6fe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+          <p>Ola{saudacao}.</p>
+          <p>Recebemos um pedido para redefinir a sua senha no sistema.</p>
+          <p>Clique no botao abaixo para abrir a tela de recuperacao ja com os dados preenchidos:</p>
+          <p style="margin: 18px 0;">
+            <a href="{reset_link}"
+               style="display: inline-block; background: #7c3aed; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
+              Redefinir minha senha
+            </a>
+          </p>
+          <p>Se preferir, use este token manualmente na tela de recuperacao:</p>
+          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+            <div style="font-size: 13px; color: #6d28d9; margin-bottom: 6px;">Token de recuperacao</div>
+            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+          </div>
+          <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+          <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
+        </div>
+      </body>
+    </html>
+    """
+    text_body = (
+        "Recuperacao de senha - Pet Shop Pro\n\n"
+        "Acesse o link abaixo para redefinir sua senha:\n"
+        f"{reset_link}\n\n"
+        "Ou use este token manualmente na tela de recuperacao:\n"
+        f"{reset_token}\n\n"
+        f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+        "Se voce nao pediu essa alteracao, ignore este e-mail."
+    )
+    return subject, html_body, text_body
 
 
 @router.post("/register", response_model=LoginResponse)
@@ -331,6 +396,80 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
         },
         tenants=tenants_list
     )
+
+
+@router.post("/forgot-password")
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    generic_response = {"message": "Se o email existir, enviaremos instrucoes de recuperacao."}
+    email = payload.email.strip().lower()
+
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user or not user.is_active:
+        return generic_response
+
+    reset_token = secrets.token_urlsafe(32)
+    user.reset_token = reset_token
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
+
+    reset_link = (
+        f"{_resolve_frontend_base_url(request)}/recuperar-senha"
+        f"?email={quote(user.email)}&token={quote(reset_token)}"
+    )
+    subject, html_body, text_body = _build_password_reset_email(user, reset_token, reset_link)
+    enviado = send_email(
+        to=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        simulate_if_unconfigured=False,
+    )
+
+    if not enviado:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nao foi possivel enviar o e-mail de recuperacao agora. Tente novamente em instantes.",
+        )
+
+    db.commit()
+
+    return {
+        **generic_response,
+        "expires_in_minutes": RESET_TOKEN_MINUTES,
+    }
+
+
+@router.post("/reset-password")
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_session),
+):
+    query = db.query(User).filter(User.reset_token == payload.token)
+    if payload.email:
+        query = query.filter(User.email == payload.email.strip().lower())
+    user = query.first()
+
+    if not user or not user.reset_token_expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalido")
+
+    expires_at = user.reset_token_expires
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado")
+
+    user.hashed_password = hash_password(payload.nova_senha)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+
+    return {"message": "Senha atualizada com sucesso"}
 
 
 @router.post("/select-tenant", response_model=SelectTenantResponse)

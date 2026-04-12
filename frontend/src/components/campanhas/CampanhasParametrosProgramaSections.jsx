@@ -25,8 +25,9 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       <CampanhaField
-        label="Compra minima (R$)"
+        label="1 carimbo a cada (R$)"
         id="p-min"
+        min="0.01"
         value={num("min_purchase_value")}
         onChange={(e) =>
           set("min_purchase_value", Number.parseFloat(e.target.value) || 0)
@@ -90,6 +91,12 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
           set("coupon_days_valid", Number.parseInt(e.target.value, 10) || 30)
         }
       />
+      <div className="col-span-2">
+        <p className="text-xs text-gray-500 -mt-1">
+          Ex.: com valor 50, compras de R$ 49,90 geram 0 carimbo, R$ 58,00
+          geram 1 e R$ 100,00 geram 2.
+        </p>
+      </div>
       <div className="col-span-2">
         <CampanhaSelect
           label="Quem participa?"

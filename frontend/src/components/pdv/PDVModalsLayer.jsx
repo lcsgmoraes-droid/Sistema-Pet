@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import AnaliseVendaDrawer from "../AnaliseVendaDrawer";
 import ModalAbrirCaixa from "../ModalAbrirCaixa";
 import ModalAdicionarCredito from "../ModalAdicionarCredito";
@@ -65,6 +66,64 @@ export default function PDVModalsLayer({
   onVendasEmAbertoSucesso,
 }) {
   const clienteAtual = vendaAtual.cliente;
+
+  useEffect(() => {
+    const modalCloseStack = [
+      mostrarModalPagamento && onCloseModalPagamento,
+      mostrarModalDescontoTotal && onCloseModalDescontoTotal,
+      mostrarModalDescontoItem && onCloseModalDescontoItem,
+      mostrarModalEndereco && onCloseModalEndereco,
+      mostrarModalCliente && onCloseModalCliente,
+      mostrarModalAdicionarCredito && onCloseModalAdicionarCredito,
+      mostrarVendasEmAberto && onCloseVendasEmAberto,
+      mostrarHistoricoCliente && onCloseHistoricoCliente,
+      mostrarPendenciasEstoque && onClosePendenciasEstoque,
+      mostrarCalculadoraRacao && onCloseCalculadoraRacao,
+      mostrarModalAbrirCaixa && onCloseModalAbrirCaixa,
+      mostrarAnaliseVenda && onCloseAnalise,
+    ].filter(Boolean);
+
+    if (modalCloseStack.length === 0) {
+      return undefined;
+    }
+
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      modalCloseStack[0]?.();
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [
+    mostrarModalPagamento,
+    onCloseModalPagamento,
+    mostrarModalDescontoTotal,
+    onCloseModalDescontoTotal,
+    mostrarModalDescontoItem,
+    onCloseModalDescontoItem,
+    mostrarModalEndereco,
+    onCloseModalEndereco,
+    mostrarModalCliente,
+    onCloseModalCliente,
+    mostrarModalAdicionarCredito,
+    onCloseModalAdicionarCredito,
+    mostrarVendasEmAberto,
+    onCloseVendasEmAberto,
+    mostrarHistoricoCliente,
+    onCloseHistoricoCliente,
+    mostrarPendenciasEstoque,
+    onClosePendenciasEstoque,
+    mostrarCalculadoraRacao,
+    onCloseCalculadoraRacao,
+    mostrarModalAbrirCaixa,
+    onCloseModalAbrirCaixa,
+    mostrarAnaliseVenda,
+    onCloseAnalise,
+  ]);
 
   return (
     <>

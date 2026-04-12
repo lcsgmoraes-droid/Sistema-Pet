@@ -18,7 +18,7 @@ export default function CampanhasGestorCashbackSection({
 
   return (
     <CampanhasGestorSection
-      icon="\u{1F4B8}"
+      icon={"\uD83D\uDCB8"}
       title="Cashback"
       subtitle={`Saldo: R$ ${formatBRL(gestorSaldo.saldo_cashback)}`}
       isOpen={isOpen}

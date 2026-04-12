@@ -2,8 +2,8 @@ import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from sqlalchemy import func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, func, or_
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
 from app.models import Tenant
@@ -12,6 +12,7 @@ from app.produtos_models import Produto
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_CATALOG_ORDER_OPTIONS = {"prontos", "nome", "menor_preco", "maior_preco"}
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> str | None:
@@ -156,15 +157,52 @@ def tenant_context(
 def listar_produtos_publicos(
     tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
     busca: str | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
+    apenas_com_estoque: bool = Query(default=False),
+    apenas_com_imagem: bool = Query(default=False),
+    ordenacao: str = Query(default="prontos"),
     db: Session = Depends(get_session),
 ):
     tenant = _get_active_tenant(db, tenant_ref)
+    ordenacao_normalizada = str(ordenacao or "prontos").strip().lower()
 
-    query = db.query(Produto).filter(
-        Produto.tenant_id == tenant.id,
-        Produto.ativo == True,
-        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+    if ordenacao_normalizada not in _CATALOG_ORDER_OPTIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ordenação inválida. Use: prontos, nome, menor_preco ou maior_preco.",
+        )
+
+    estoque_catalogo = case(
+        (
+            func.coalesce(Produto.estoque_ecommerce, 0) > 0,
+            func.coalesce(Produto.estoque_ecommerce, 0),
+        ),
+        else_=func.coalesce(Produto.estoque_atual, Produto.estoque_ecommerce, 0),
+    )
+    tem_imagem_expr = or_(
+        and_(
+            Produto.imagem_principal.is_not(None),
+            func.length(func.trim(Produto.imagem_principal)) > 0,
+        ),
+        Produto.imagens.any(),
+    )
+    prioridade_estoque = case((estoque_catalogo > 0, 0), else_=1)
+    prioridade_imagem = case((tem_imagem_expr, 0), else_=1)
+    preco_catalogo = func.coalesce(Produto.preco_venda, 0)
+
+    query = (
+        db.query(Produto)
+        .options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca),
+            selectinload(Produto.imagens),
+        )
+        .filter(
+            Produto.tenant_id == tenant.id,
+            Produto.ativo == True,
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        )
     )
 
     if busca:
@@ -178,14 +216,41 @@ def listar_produtos_publicos(
             )
         )
 
-    itens = query.order_by(Produto.nome.asc()).limit(limit).all()
+    if apenas_com_estoque:
+        query = query.filter(estoque_catalogo > 0)
+
+    if apenas_com_imagem:
+        query = query.filter(tem_imagem_expr)
+
+    total = query.count()
+
+    if ordenacao_normalizada == "nome":
+        query = query.order_by(func.lower(Produto.nome).asc(), Produto.id.asc())
+    elif ordenacao_normalizada == "menor_preco":
+        query = query.order_by(preco_catalogo.asc(), func.lower(Produto.nome).asc(), Produto.id.asc())
+    elif ordenacao_normalizada == "maior_preco":
+        query = query.order_by(preco_catalogo.desc(), func.lower(Produto.nome).asc(), Produto.id.asc())
+    else:
+        query = query.order_by(
+            prioridade_estoque.asc(),
+            prioridade_imagem.asc(),
+            estoque_catalogo.desc(),
+            func.lower(Produto.nome).asc(),
+            Produto.id.asc(),
+        )
+
+    itens = query.offset(offset).limit(limit).all()
 
     return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
         "items": [
             {
                 "id": produto.id,
                 "nome": produto.nome,
                 "codigo": produto.codigo,
+                "codigo_barras": produto.codigo_barras,
                 "preco_venda": produto.preco_venda,
                 "preco_promocional": produto.preco_promocional,
                 "promocao_ativa": produto.promocao_ativa,
@@ -195,10 +260,20 @@ def listar_produtos_publicos(
                 "estoque_ecommerce": produto.estoque_ecommerce,
                 "estoque_atual": produto.estoque_atual,
                 "imagem_principal": produto.imagem_principal,
+                "imagens": [
+                    {
+                        "id": imagem.id,
+                        "url": imagem.url,
+                        "ordem": imagem.ordem,
+                        "e_principal": imagem.e_principal,
+                    }
+                    for imagem in sorted(produto.imagens or [], key=lambda item: (item.ordem or 0, item.id or 0))
+                ],
+                "descricao": produto.descricao_curta or produto.descricao_completa,
                 "peso_embalagem": produto.peso_embalagem,
                 "classificacao_racao": produto.classificacao_racao,
                 "categoria_racao": produto.categoria_racao,
             }
             for produto in itens
-        ]
+        ],
     }

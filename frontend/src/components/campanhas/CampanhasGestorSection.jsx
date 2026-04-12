@@ -19,7 +19,9 @@ export default function CampanhasGestorSection({
             <p className="text-xs text-gray-500">{subtitle}</p>
           </div>
         </div>
-        <span className="text-gray-400 text-sm">{isOpen ? "▲" : "▼"}</span>
+        <span className="text-gray-400 text-sm">
+          {isOpen ? "\u25B2" : "\u25BC"}
+        </span>
       </button>
 
       {isOpen && <div className="border-t">{children}</div>}

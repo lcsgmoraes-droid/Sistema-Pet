@@ -348,8 +348,8 @@ class LoyaltyStamp(Base):
     """
     Cada linha representa 1 carimbo ganho pelo cliente.
 
-    UNIQUE(tenant_id, customer_id, venda_id) previne dupla contagem
-    se a venda for reprocessada.
+    UNIQUE(tenant_id, campaign_id, customer_id, venda_id, stamp_index)
+    previne dupla contagem do mesmo carimbo quando a venda for reprocessada.
 
     - is_manual: carimbo lançado manualmente pelo operador (cartão físico)
     - campaign_execution_id: FK para rastreabilidade da recompensa gerada
@@ -361,6 +361,7 @@ class LoyaltyStamp(Base):
     customer_id = Column(BigInteger, nullable=False)
     venda_id = Column(BigInteger, nullable=True)
     campaign_id = Column(BigInteger, nullable=False)
+    stamp_index = Column(Integer, nullable=False, default=1)
     is_manual = Column(Boolean, nullable=False, default=False)
     notes = Column(String(500), nullable=True)
     created_at = Column(
@@ -370,7 +371,7 @@ class LoyaltyStamp(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "customer_id", "venda_id",
+            "tenant_id", "campaign_id", "customer_id", "venda_id", "stamp_index",
             name="uq_loyalty_stamp_venda",
         ),
         Index("ix_ls_tenant_customer_created", "tenant_id", "customer_id", "created_at"),

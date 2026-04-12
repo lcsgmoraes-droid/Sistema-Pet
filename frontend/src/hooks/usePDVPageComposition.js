@@ -65,6 +65,7 @@ export function usePDVPageComposition({
   toggleKitExpansion,
   pendenciasProdutoIds,
   produtosSugeridos,
+  setVendaAtual,
   entregadorSelecionado,
   entregadores,
   abrirModalEndereco,
@@ -261,10 +262,10 @@ export function usePDVPageComposition({
     pendenciasProdutoIds,
     produtosSugeridos,
     onObservacoesChange: (observacoes) =>
-      setVendaAtual({
-        ...vendaAtual,
+      setVendaAtual((prev) => ({
+        ...prev,
         observacoes,
-      }),
+      })),
     entregadorSelecionado,
     entregadores,
     onAbrirModalEndereco: abrirModalEndereco,

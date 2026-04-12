@@ -15,7 +15,7 @@ export default function CampanhasGestorCuponsSection({
 
   return (
     <CampanhasGestorSection
-      icon="\u{1F39F}\uFE0F"
+      icon={"\uD83C\uDF9F\uFE0F"}
       title="Cupons"
       subtitle={`${ativos} ativo(s) de ${gestorCupons?.length || 0} no total`}
       isOpen={isOpen}

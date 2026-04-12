@@ -327,13 +327,19 @@ export default function EcommerceMVP() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [categoria, setCategoria] = useState('todas');
+  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
+  const [somenteComImagem, setSomenteComImagem] = useState(false);
+  const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState('prontos');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [showRecoveryConfirmPassword, setShowRecoveryConfirmPassword] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || '');
   const [customer, setCustomer] = useState(null);
@@ -363,6 +369,14 @@ export default function EcommerceMVP() {
 
   const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '', cpf: '' });
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
+  const [recoveryStep, setRecoveryStep] = useState('request');
+  const [recoveryForm, setRecoveryForm] = useState({
+    email: '',
+    token: '',
+    novaSenha: '',
+    confirmarSenha: '',
+  });
 
   const [cart, setCart] = useState(() => getGuestCart());
   const [cupom, setCupom] = useState('');
@@ -453,17 +467,79 @@ export default function EcommerceMVP() {
     return ['todas', ...Array.from(new Set(all))];
   }, [products]);
 
+  const catalogMetrics = useMemo(() => {
+    return products.reduce(
+      (acc, item) => {
+        const hasImage = getProductImages(item).length > 0;
+        const inStock = !isProductOutOfStock(item);
+
+        if (hasImage) acc.comImagem += 1;
+        if (inStock) acc.emEstoque += 1;
+        if (hasImage && inStock) acc.prontos += 1;
+
+        return acc;
+      },
+      {
+        total: products.length,
+        comImagem: 0,
+        emEstoque: 0,
+        prontos: 0,
+      }
+    );
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return products.filter((item) => {
-      const nome = String(item?.nome || '').toLowerCase();
-      const codigo = String(item?.codigo || '').toLowerCase();
-      const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
-      const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
-      const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
-      return matchesSearch && matchesCategoria;
+    const sorted = products
+      .filter((item) => {
+        const nome = String(item?.nome || '').toLowerCase();
+        const codigo = String(item?.codigo || '').toLowerCase();
+        const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
+        const hasImage = getProductImages(item).length > 0;
+        const inStock = !isProductOutOfStock(item);
+        const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
+        const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
+        const matchesStock = !somenteComEstoque || inStock;
+        const matchesImage = !somenteComImagem || hasImage;
+        return matchesSearch && matchesCategoria && matchesStock && matchesImage;
+      })
+      .slice();
+
+    sorted.sort((left, right) => {
+      const leftName = String(left?.nome || '');
+      const rightName = String(right?.nome || '');
+      const leftPrice = resolveProductPrice(left);
+      const rightPrice = resolveProductPrice(right);
+      const leftStock = resolveProductStock(left);
+      const rightStock = resolveProductStock(right);
+      const leftHasImage = getProductImages(left).length > 0;
+      const rightHasImage = getProductImages(right).length > 0;
+      const leftInStock = !isProductOutOfStock(left);
+      const rightInStock = !isProductOutOfStock(right);
+      const leftReadyScore = Number(leftInStock) * 2 + Number(leftHasImage);
+      const rightReadyScore = Number(rightInStock) * 2 + Number(rightHasImage);
+
+      if (ordenacaoCatalogo === 'menor_preco') {
+        return leftPrice - rightPrice || leftName.localeCompare(rightName, 'pt-BR');
+      }
+
+      if (ordenacaoCatalogo === 'maior_preco') {
+        return rightPrice - leftPrice || leftName.localeCompare(rightName, 'pt-BR');
+      }
+
+      if (ordenacaoCatalogo === 'nome') {
+        return leftName.localeCompare(rightName, 'pt-BR');
+      }
+
+      return (
+        rightReadyScore - leftReadyScore ||
+        Number(rightStock || 0) - Number(leftStock || 0) ||
+        leftName.localeCompare(rightName, 'pt-BR')
+      );
     });
-  }, [products, search, categoria]);
+
+    return sorted;
+  }, [products, search, categoria, somenteComEstoque, somenteComImagem, ordenacaoCatalogo]);
 
   const productMap = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
@@ -487,6 +563,26 @@ export default function EcommerceMVP() {
     if (buscaParam) {
       setSearch(buscaParam);
     }
+  }, [location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const recoveryFlag = params.get('recovery');
+    const emailParam = params.get('email') || '';
+    const tokenParam = params.get('token') || '';
+
+    if (recoveryFlag !== '1' && !emailParam && !tokenParam) {
+      return;
+    }
+
+    setView('conta');
+    setPasswordRecoveryMode(true);
+    setRecoveryStep(tokenParam ? 'reset' : 'request');
+    setRecoveryForm((prev) => ({
+      ...prev,
+      email: emailParam || prev.email,
+      token: tokenParam || prev.token,
+    }));
   }, [location.search]);
 
   useEffect(() => {
@@ -624,7 +720,7 @@ export default function EcommerceMVP() {
     setError('');
     try {
       const response = await ecommerceApi.get('/api/ecommerce/produtos', {
-        params: { tenant: tenantRef, limit: 100, busca: search || undefined },
+        params: { tenant: tenantRef, limit: 500, ordenacao: 'prontos' },
       });
       setProducts(normalizeProductPayload(response?.data));
     } catch (err) {
@@ -640,7 +736,7 @@ export default function EcommerceMVP() {
     setError('');
     try {
       const response = await ecommerceApi.get('/api/ecommerce/produtos', {
-        params: { tenant: tenantId, limit: 100, busca: search || undefined },
+        params: { tenant: tenantId, limit: 500, ordenacao: 'prontos' },
       });
       setProducts(normalizeProductPayload(response?.data));
     } catch (err) {
@@ -649,6 +745,14 @@ export default function EcommerceMVP() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function clearCatalogFilters() {
+    setSearch('');
+    setCategoria('todas');
+    setSomenteComEstoque(false);
+    setSomenteComImagem(false);
+    setOrdenacaoCatalogo('prontos');
   }
 
   async function loadMe() {
@@ -780,6 +884,145 @@ export default function EcommerceMVP() {
     localStorage.removeItem(STORAGE_GUEST_CART_KEY);
   }
 
+  function clearRecoveryParamsFromUrl() {
+    const params = new URLSearchParams(location.search);
+    params.delete('recovery');
+    params.delete('email');
+    params.delete('token');
+    const nextSearch = params.toString();
+    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
+  }
+
+  function openPasswordRecovery(nextStep = 'request') {
+    setView('conta');
+    setPasswordRecoveryMode(true);
+    setRecoveryStep(nextStep);
+    setError('');
+    setSuccess('');
+    setRecoveryForm((prev) => ({
+      ...prev,
+      email: prev.email || loginForm.email || registerForm.email || customer?.email || '',
+      token: nextStep === 'request' ? '' : prev.token,
+      novaSenha: '',
+      confirmarSenha: '',
+    }));
+  }
+
+  function closePasswordRecovery() {
+    setPasswordRecoveryMode(false);
+    setRecoveryStep('request');
+    setShowRecoveryPassword(false);
+    setShowRecoveryConfirmPassword(false);
+    setRecoveryForm((prev) => ({
+      ...prev,
+      token: '',
+      novaSenha: '',
+      confirmarSenha: '',
+    }));
+    clearRecoveryParamsFromUrl();
+  }
+
+  async function handlePasswordRecoveryRequest(e) {
+    e.preventDefault();
+    if (!tenantContext?.id) {
+      setError('Loja não identificada na URL.');
+      return;
+    }
+
+    const normalizedEmail = recoveryForm.email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Informe o e-mail da conta para continuar.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await ecommerceApi.post(
+        '/api/ecommerce/auth/esqueci-senha',
+        { email: normalizedEmail },
+        { headers: tenantHeaders }
+      );
+      const minutes = response?.data?.expires_in_minutes;
+      setRecoveryStep('reset');
+      setRecoveryForm((prev) => ({
+        ...prev,
+        email: normalizedEmail,
+        token: '',
+        novaSenha: '',
+        confirmarSenha: '',
+      }));
+      setSuccess(
+        minutes
+          ? `Se o e-mail existir, enviamos as instruções. O token expira em ${minutes} minutos.`
+          : 'Se o e-mail existir, enviamos as instruções de recuperação.'
+      );
+    } catch (err) {
+      setError(extractApiErrorMessage(err, 'Não foi possível iniciar a recuperação agora.'));
+    } finally {
+      setRecoveryLoading(false);
+    }
+  }
+
+  async function handlePasswordRecoveryReset(e) {
+    e.preventDefault();
+    if (!tenantContext?.id) {
+      setError('Loja não identificada na URL.');
+      return;
+    }
+
+    const normalizedEmail = recoveryForm.email.trim().toLowerCase();
+    const token = recoveryForm.token.trim();
+
+    if (!normalizedEmail || !token) {
+      setError('Preencha o e-mail e o token recebido.');
+      return;
+    }
+
+    if ((recoveryForm.novaSenha || '').length < 6) {
+      setError('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    if (recoveryForm.novaSenha !== recoveryForm.confirmarSenha) {
+      setError('A confirmação da senha não confere.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      await ecommerceApi.post(
+        '/api/ecommerce/auth/resetar-senha',
+        {
+          email: normalizedEmail,
+          token,
+          nova_senha: recoveryForm.novaSenha,
+        },
+        { headers: tenantHeaders }
+      );
+      setLoginForm({ email: normalizedEmail, password: '' });
+      setRecoveryForm({
+        email: normalizedEmail,
+        token: '',
+        novaSenha: '',
+        confirmarSenha: '',
+      });
+      setPasswordRecoveryMode(false);
+      setRecoveryStep('request');
+      setShowRecoveryPassword(false);
+      setShowRecoveryConfirmPassword(false);
+      clearRecoveryParamsFromUrl();
+      setSuccess('Senha atualizada com sucesso. Agora é só entrar com a nova senha.');
+    } catch (err) {
+      setError(extractApiErrorMessage(err, 'Não foi possível redefinir a senha.'));
+    } finally {
+      setRecoveryLoading(false);
+    }
+  }
+
   async function handleRegister(e) {
     e.preventDefault();
     if (!tenantContext?.id) {
@@ -805,6 +1048,9 @@ export default function EcommerceMVP() {
       setCustomerToken(token);
       await syncGuestCartToServer(token);
       setRegisterForm({ email: '', password: '', nome: '', cpf: '' });
+      setPasswordRecoveryMode(false);
+      setRecoveryStep('request');
+      clearRecoveryParamsFromUrl();
       setSuccess('Cadastro realizado com sucesso!');
       setView('conta');
     } catch (err) {
@@ -834,6 +1080,9 @@ export default function EcommerceMVP() {
       setCustomerToken(token);
       await syncGuestCartToServer(token);
       setLoginForm({ email: '', password: '' });
+      setPasswordRecoveryMode(false);
+      setRecoveryStep('request');
+      clearRecoveryParamsFromUrl();
       setSuccess('Login realizado com sucesso. Confira seus dados cadastrais.');
       setView('conta');
     } catch (err) {
@@ -1466,6 +1715,31 @@ export default function EcommerceMVP() {
             <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
           </div>
 
+          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+              {[
+                { label: 'Prontos para vender', value: catalogMetrics.prontos, color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
+                { label: 'Com estoque', value: catalogMetrics.emEstoque, color: '#2563eb', border: '#bfdbfe', bg: '#eff6ff' },
+                { label: 'Com foto', value: catalogMetrics.comImagem, color: '#ea580c', border: '#fed7aa', bg: '#fff7ed' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    minWidth: isMobile ? 'calc(50% - 8px)' : 180,
+                    background: item.bg,
+                    color: item.color,
+                    border: `1px solid ${item.border}`,
+                    borderRadius: 14,
+                    padding: '10px 14px',
+                  }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>{item.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
           {/* PRODUTOS */}
           <div>
@@ -1486,12 +1760,59 @@ export default function EcommerceMVP() {
                   <option key={item} value={item}>{item === 'todas' ? 'Todas as categorias' : item}</option>
                 ))}
               </select>
+              <select value={ordenacaoCatalogo} onChange={(e) => setOrdenacaoCatalogo(e.target.value)} style={{ ...S.formInput, width: 'auto', minWidth: 190, paddingRight: 30 }}>
+                <option value="prontos">Mais prontos para vender</option>
+                <option value="nome">Ordem alfabética</option>
+                <option value="menor_preco">Menor preço</option>
+                <option value="maior_preco">Maior preço</option>
+              </select>
               <button onClick={loadProducts} disabled={loading} style={{ padding: '10px 16px', border: '1.5px solid #e7e5e4', borderRadius: 9, fontSize: 13, fontWeight: 600, background: '#fff', color: '#f97316', cursor: 'pointer' }}>
                 {loading ? '...' : '↺ Atualizar'}
               </button>
             </div>
 
             {/* Chips de categorias */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              {[
+                { label: 'Somente com estoque', active: somenteComEstoque, onClick: () => setSomenteComEstoque((value) => !value) },
+                { label: 'Somente com foto', active: somenteComImagem, onClick: () => setSomenteComImagem((value) => !value) },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={item.onClick}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: item.active ? '1.5px solid #16a34a' : '1.5px solid #e7e5e4',
+                    background: item.active ? '#f0fdf4' : '#fff',
+                    color: item.active ? '#166534' : '#57534e',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+              {(somenteComEstoque || somenteComImagem || ordenacaoCatalogo !== 'prontos' || categoria !== 'todas' || search) && (
+                <button
+                  onClick={clearCatalogFilters}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: '1.5px solid #fed7aa',
+                    background: '#fff7ed',
+                    color: '#c2410c',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+
             {categorias.length > 2 && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, justifyContent: 'space-between' }}>
                 {categorias.map((cat) => (
@@ -1577,7 +1898,7 @@ export default function EcommerceMVP() {
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
                   <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
-                  <button onClick={() => { setSearch(''); setCategoria('todas'); }} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
+                  <button onClick={clearCatalogFilters} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
                     Limpar filtros
                   </button>
                 </div>
@@ -2121,7 +2442,7 @@ export default function EcommerceMVP() {
               </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20 }}>
               {/* Cadastro */}
               <div style={S.accountCard}>
                 <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 14 }}>Criar conta</div>
@@ -2139,19 +2460,144 @@ export default function EcommerceMVP() {
                 </form>
               </div>
 
-              {/* Login */}
+              {/* Login / Recuperação */}
               <div style={S.accountCard}>
-                <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 14 }}>Entrar</div>
-                <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
-                  <input name="ecommerce_login_email" autoComplete="off" value={loginForm.email} onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
-                  <div style={{ position: 'relative' }}>
-                    <input name="ecommerce_login_password" autoComplete="new-password" value={loginForm.password} onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showLoginPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
-                    <button type="button" onClick={() => setShowLoginPassword((prev) => !prev)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
-                      {showLoginPassword ? 'Ocultar' : '👁 Ver'}
+                <div style={{ fontWeight: 800, fontSize: 20, color: '#1c1917', marginBottom: 10 }}>
+                  {passwordRecoveryMode ? 'Recuperar senha' : 'Entrar'}
+                </div>
+                <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>
+                  {passwordRecoveryMode
+                    ? (recoveryStep === 'request'
+                        ? 'Informe o e-mail da conta e enviaremos as instruções.'
+                        : 'Cole o token recebido e escolha uma nova senha.')
+                    : 'Acesse sua conta para acompanhar pedidos e finalizar a compra mais rápido.'}
+                </div>
+
+                {passwordRecoveryMode ? (
+                  <form
+                    onSubmit={recoveryStep === 'request' ? handlePasswordRecoveryRequest : handlePasswordRecoveryReset}
+                    autoComplete="off"
+                    style={{ display: 'grid', gap: 10 }}
+                  >
+                    <input
+                      name="ecommerce_recovery_email"
+                      autoComplete="off"
+                      value={recoveryForm.email}
+                      onChange={(e) => setRecoveryForm((prev) => ({ ...prev, email: e.target.value }))}
+                      placeholder="Email"
+                      type="email"
+                      style={S.formInput}
+                    />
+
+                    {recoveryStep === 'reset' && (
+                      <>
+                        <input
+                          name="ecommerce_recovery_token"
+                          autoComplete="off"
+                          value={recoveryForm.token}
+                          onChange={(e) => setRecoveryForm((prev) => ({ ...prev, token: e.target.value }))}
+                          placeholder="Token de recuperação"
+                          type="text"
+                          style={S.formInput}
+                        />
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            name="ecommerce_recovery_password"
+                            autoComplete="new-password"
+                            value={recoveryForm.novaSenha}
+                            onChange={(e) => setRecoveryForm((prev) => ({ ...prev, novaSenha: e.target.value }))}
+                            placeholder="Nova senha"
+                            type={showRecoveryPassword ? 'text' : 'password'}
+                            style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRecoveryPassword((prev) => !prev)}
+                            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}
+                          >
+                            {showRecoveryPassword ? 'Ocultar' : '👁 Ver'}
+                          </button>
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            name="ecommerce_recovery_password_confirm"
+                            autoComplete="new-password"
+                            value={recoveryForm.confirmarSenha}
+                            onChange={(e) => setRecoveryForm((prev) => ({ ...prev, confirmarSenha: e.target.value }))}
+                            placeholder="Confirmar nova senha"
+                            type={showRecoveryConfirmPassword ? 'text' : 'password'}
+                            style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowRecoveryConfirmPassword((prev) => !prev)}
+                            style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}
+                          >
+                            {showRecoveryConfirmPassword ? 'Ocultar' : '👁 Ver'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    <button type="submit" disabled={recoveryLoading} style={S.saveBtn}>
+                      {recoveryLoading
+                        ? 'Processando...'
+                        : recoveryStep === 'request'
+                          ? 'Enviar instruções'
+                          : 'Salvar nova senha'}
                     </button>
-                  </div>
-                  <button type="submit" disabled={authLoading} style={S.saveBtn}>{authLoading ? 'Entrando...' : 'Entrar'}</button>
-                </form>
+
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {recoveryStep === 'request' ? (
+                        <button
+                          type="button"
+                          onClick={() => setRecoveryStep('reset')}
+                          style={{ background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 10, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                        >
+                          Já tenho token
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRecoveryStep('request');
+                            setError('');
+                            setSuccess('');
+                          }}
+                          style={{ background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 10, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+                        >
+                          Reenviar token
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={closePasswordRecovery}
+                        style={{ background: 'transparent', border: 'none', color: '#2563eb', fontWeight: 700, fontSize: 13, cursor: 'pointer', padding: '10px 0' }}
+                      >
+                        Voltar para login
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
+                    <input name="ecommerce_login_email" autoComplete="off" value={loginForm.email} onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
+                    <div style={{ position: 'relative' }}>
+                      <input name="ecommerce_login_password" autoComplete="new-password" value={loginForm.password} onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showLoginPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
+                      <button type="button" onClick={() => setShowLoginPassword((prev) => !prev)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
+                        {showLoginPassword ? 'Ocultar' : '👁 Ver'}
+                      </button>
+                    </div>
+                    <button type="submit" disabled={authLoading} style={S.saveBtn}>{authLoading ? 'Entrando...' : 'Entrar'}</button>
+                    <button
+                      type="button"
+                      onClick={() => openPasswordRecovery('request')}
+                      style={{ background: 'transparent', border: 'none', color: '#2563eb', fontWeight: 700, fontSize: 13, cursor: 'pointer', justifySelf: 'start', padding: 0 }}
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </form>
+                )}
               </div>
             </div>
           )}

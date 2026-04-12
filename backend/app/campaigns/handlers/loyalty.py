@@ -1,49 +1,23 @@
 """
-Handler: Cartão Fidelidade (Carimbos)
-======================================
+Handler: Cartao Fidelidade (Carimbos)
+====================================
 
-Disparo:  purchase_completed (evento em tempo real)
+Disparo: purchase_completed
 Campanha: loyalty_stamp
 
-Lógica:
-  1. Extrai customer_id e venda_id do payload do evento
-  2. Verifica se o valor da venda ≥ params["min_purchase_value"]
-  3. Usa INSERT INTO loyalty_stamps ... ON CONFLICT DO NOTHING (idempotência)
-  4. Conta carimbos válidos do cliente para esta campanha
-  5. Se atingiu params["stamps_to_complete"]:
-     gera recompensa (crédito ou cupom) + registra campaign_execution
-     + enfileira notificação de "cartão completo"
-  6. Se atingiu params["intermediate_stamp"] (opcional):
-     gera recompensa intermediária
-
-Parâmetros esperados em campaign.params:
-  {
-    "min_purchase_value": 50.00,     # R$ mínimo para ganhar carimbo
-    "stamps_to_complete": 10,        # carimbos para completar cartão
-    "reward_type": "credit",         # "credit" ou "coupon"
-    "reward_value": 50.00,           # valor da recompensa ao completar
-    "intermediate_stamp": 5,         # null = sem recompensa intermediária
-    "intermediate_reward_type": "coupon",
-    "intermediate_reward_value": 10.00
-  }
+Regra:
+- usa a venda atual como fonte da verdade
+- so contabiliza carimbos se a venda ainda estiver finalizada
+- sincroniza a quantidade de carimbos da venda com a regra "1 carimbo a cada X reais"
+- sincroniza recompensas emitidas de acordo com o total ativo do cliente
 """
 
 import logging
-from datetime import datetime, timezone
 
-from sqlalchemy import func
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.campaigns.coupon_service import create_coupon
-from app.campaigns.models import (
-    Campaign,
-    CampaignEventQueue,
-    CampaignExecution,
-    CampaignTypeEnum,
-    LoyaltyStamp,
-)
-from app.campaigns.notification_service import enqueue_email
+from app.campaigns.loyalty_service import sync_loyalty_stamps_for_sale
+from app.campaigns.models import Campaign, CampaignEventQueue, CampaignTypeEnum
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +25,7 @@ _SUPPORTED_EVENTS = frozenset({"purchase_completed"})
 
 
 class LoyaltyHandler:
-    """Handler para o cartão fidelidade virtual (carimbos)."""
+    """Handler para o cartao fidelidade virtual."""
 
     def run(
         self,
@@ -59,31 +33,36 @@ class LoyaltyHandler:
         campaign: Campaign,
         event: CampaignEventQueue,
     ) -> dict:
-        """
-        Processa carimbo de fidelidade a cada compra elegível.
-
-        payload esperado: {"customer_id": N, "venda_id": N, "venda_total": N}
-        Retorna {"evaluated", "rewarded", "errors"}.
-        Não commita — o commit fica no CampaignEngine.
-        """
         if event.event_type not in _SUPPORTED_EVENTS:
             return {"evaluated": 0, "rewarded": 0, "errors": 0}
         if campaign.campaign_type != CampaignTypeEnum.loyalty_stamp:
             return {"evaluated": 0, "rewarded": 0, "errors": 0}
 
         payload = event.payload or {}
-        customer_id = payload.get("customer_id")
         venda_id = payload.get("venda_id")
-        venda_total = float(payload.get("venda_total", 0) or 0)
-
-        if not customer_id or not venda_id:
+        if not venda_id:
             logger.warning(
-                "[LoyaltyHandler] Payload incompleto event_id=%d: %s", event.id, payload
+                "[LoyaltyHandler] Payload incompleto event_id=%d: %s",
+                event.id,
+                payload,
             )
             return {"evaluated": 0, "rewarded": 0, "errors": 1}
 
-        customer_id = int(customer_id)
-        venda_id = int(venda_id)
+        from app.vendas_models import Venda
+
+        venda = (
+            db.query(Venda)
+            .filter(Venda.id == int(venda_id), Venda.tenant_id == campaign.tenant_id)
+            .first()
+        )
+        if venda is None or venda.status != "finalizada" or not venda.cliente_id:
+            logger.info(
+                "[LoyaltyHandler] Ignorando venda=%s porque nao esta finalizada ou nao possui cliente",
+                venda_id,
+            )
+            return {"evaluated": 1, "rewarded": 0, "errors": 0}
+
+        customer_id = int(venda.cliente_id)
         params = campaign.params or {}
 
         try:
@@ -91,8 +70,8 @@ class LoyaltyHandler:
                 db=db,
                 campaign=campaign,
                 customer_id=customer_id,
-                venda_id=venda_id,
-                venda_total=venda_total,
+                venda_id=int(venda.id),
+                venda_total=float(venda.total or 0),
                 params=params,
                 source_event_id=event.id,
             )
@@ -103,25 +82,27 @@ class LoyaltyHandler:
         return {"evaluated": 1, "rewarded": rewarded, "errors": 0}
 
     def _process(
-        self, db, campaign, customer_id, venda_id, venda_total, params, source_event_id
+        self,
+        db,
+        campaign,
+        customer_id,
+        venda_id,
+        venda_total,
+        params,
+        source_event_id,
     ) -> int:
-        min_value = float(params.get("min_purchase_value", 0) or 0)
-        stamps_to_complete = int(params.get("stamps_to_complete", 10))
-        reward_type = params.get("reward_type", "coupon")
-        reward_value = float(params.get("reward_value", 0) or 0)
-        intermediate_stamp = params.get("intermediate_stamp")  # None = sem recompensa intermediária
-        intermediate_type = params.get("intermediate_reward_type", "coupon")
-        intermediate_value = float(params.get("intermediate_reward_value", 0) or 0)
-
-        # Compra atinge o valor mínimo?
-        if min_value > 0 and venda_total < min_value:
-            return 0
-
-        # Filtro por nível de ranking do cliente?
         rank_filter = params.get("rank_filter", "all")
         if rank_filter and rank_filter != "all":
             from app.campaigns.models import CustomerRankHistory
-            _RANK_ORDER = ["sem_rank", "bronze", "silver", "gold", "diamond", "platinum"]
+
+            rank_order = [
+                "sem_rank",
+                "bronze",
+                "silver",
+                "gold",
+                "diamond",
+                "platinum",
+            ]
             latest = (
                 db.query(CustomerRankHistory)
                 .filter(
@@ -133,143 +114,21 @@ class LoyaltyHandler:
             )
             customer_rank = latest.rank_level.value if latest else "sem_rank"
             if rank_filter == "sem_rank":
-                # Só clientes sem histórico de ranking
                 if latest is not None:
                     return 0
             else:
-                req_idx = _RANK_ORDER.index(rank_filter) if rank_filter in _RANK_ORDER else 0
-                cust_idx = _RANK_ORDER.index(customer_rank) if customer_rank in _RANK_ORDER else 0
+                req_idx = rank_order.index(rank_filter) if rank_filter in rank_order else 0
+                cust_idx = rank_order.index(customer_rank) if customer_rank in rank_order else 0
                 if cust_idx < req_idx:
                     return 0
 
-        # Tenta inserir carimbo (idempotente por UNIQUE tenant+customer+venda)
-        stamp = LoyaltyStamp(
-            tenant_id=campaign.tenant_id,
+        result = sync_loyalty_stamps_for_sale(
+            db,
+            campaign=campaign,
             customer_id=customer_id,
             venda_id=venda_id,
-            campaign_id=campaign.id,
+            venda_total=venda_total,
+            source_event_id=source_event_id,
+            reason=f"Evento purchase_completed #{source_event_id}",
         )
-        try:
-            db.add(stamp)
-            db.flush()  # Dispara o UNIQUE constraint imediatamente
-        except IntegrityError:
-            db.rollback()
-            logger.debug(
-                "[LoyaltyHandler] Carimbo já existe customer=%d venda=%d",
-                customer_id, venda_id,
-            )
-            return 0  # Venda já foi contabilizada antes
-
-        # Conta carimbos válidos deste cliente para esta campanha
-        total_stamps = (
-            db.query(func.count(LoyaltyStamp.id))
-            .filter(
-                LoyaltyStamp.tenant_id == campaign.tenant_id,
-                LoyaltyStamp.campaign_id == campaign.id,
-                LoyaltyStamp.customer_id == customer_id,
-                LoyaltyStamp.voided_at.is_(None),
-            )
-            .scalar()
-        ) or 0
-
-        rewarded = 0
-
-        # Recompensa de cartão completo (a cada N carimbos)
-        if total_stamps > 0 and total_stamps % stamps_to_complete == 0:
-            cycle = total_stamps // stamps_to_complete
-            ref_period = f"cycle-{cycle}"
-            rewarded += self._give_reward(
-                db=db, campaign=campaign, customer_id=customer_id,
-                ref_period=ref_period, reward_tp=reward_type, reward_val=reward_value,
-                source_event_id=source_event_id, prefix="FIEL",
-                notif_msg=params.get(
-                    "notification_message",
-                    "Parabéns! Seu cartão está completo 🎉 Recompensa: {code}",
-                ),
-            )
-
-        # Recompensa intermediária (se configurada)
-        if (
-            intermediate_stamp
-            and intermediate_value > 0
-            and total_stamps > 0
-            and total_stamps % int(intermediate_stamp) == 0
-            and total_stamps % stamps_to_complete != 0  # Não duplica com cartão completo
-        ):
-            mid_cycle = total_stamps // int(intermediate_stamp)
-            ref_period = f"mid-{mid_cycle}"
-            rewarded += self._give_reward(
-                db=db, campaign=campaign, customer_id=customer_id,
-                ref_period=ref_period, reward_tp=intermediate_type, reward_val=intermediate_value,
-                source_event_id=source_event_id, prefix="FIELMID",
-                notif_msg=params.get(
-                    "notification_message_intermediate",
-                    "Você está na metade! Ganhou: {code}",
-                ),
-            )
-
-        return rewarded
-
-    def _give_reward(self, db, campaign, customer_id, ref_period, reward_tp,
-                     reward_val, source_event_id, prefix, notif_msg) -> int:
-        from app.models import Cliente
-
-        existing = (
-            db.query(CampaignExecution.id)
-            .filter(
-                CampaignExecution.tenant_id == campaign.tenant_id,
-                CampaignExecution.campaign_id == campaign.id,
-                CampaignExecution.customer_id == customer_id,
-                CampaignExecution.reference_period == ref_period,
-            )
-            .first()
-        )
-        if existing:
-            return 0
-
-        reward_meta = {}
-        code = None
-        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
-
-        if reward_tp == "brinde":
-            # Brinde na loja: sem cupom, apenas registra execução e notifica
-            reward_meta = {"tipo": "brinde", "reference_period": ref_period}
-            mensagem = notif_msg
-            if cliente:
-                from collections import defaultdict
-                mensagem = notif_msg.format_map(defaultdict(str, nome=cliente.nome))
-        elif reward_tp == "coupon":
-            coupon = create_coupon(
-                db, tenant_id=campaign.tenant_id, campaign=campaign,
-                customer_id=customer_id, coupon_type="fixed",
-                discount_value=reward_val, channel="all",
-                valid_days=30, prefix=prefix,
-                meta={"reference_period": ref_period},
-            )
-            code = coupon.code
-            reward_meta = {"coupon_id": coupon.id, "coupon_code": code}
-
-        db.add(CampaignExecution(
-            tenant_id=campaign.tenant_id, campaign_id=campaign.id,
-            customer_id=customer_id, reference_period=ref_period,
-            reward_type=f"{reward_tp}:fixed", reward_value=reward_val,
-            reward_meta=reward_meta, source_event_id=source_event_id,
-        ))
-
-        # Notificação por e-mail
-        if cliente and cliente.email:
-            if reward_tp == "brinde":
-                body = mensagem
-            elif code:
-                from collections import defaultdict
-                body = notif_msg.format_map(defaultdict(str, code=code, nome=cliente.nome if cliente else ""))
-            else:
-                body = None
-            if body:
-                enqueue_email(
-                    db, tenant_id=campaign.tenant_id, customer_id=customer_id,
-                    subject="Sua recompensa de fidelidade chegou! 🎁",
-                    body=body, email_address=cliente.email,
-                    idempotency_key=f"loyalty:{campaign.id}:{customer_id}:{ref_period}:email",
-                )
-        return 1
+        return result["awarded"]

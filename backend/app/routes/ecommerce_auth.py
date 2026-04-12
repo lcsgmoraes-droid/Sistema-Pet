@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+import os
 import secrets
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -14,7 +16,7 @@ from app.auth import create_access_token, hash_password, verify_password
 from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
-from app.models import Cliente, User, UserTenant
+from app.models import Cliente, Tenant, User, UserTenant
 from app.services.email_service import send_email
 
 
@@ -119,7 +121,25 @@ def _extract_tenant_id_from_request(request: Request) -> UUID:
     return tenant_id
 
 
-def _build_reset_password_email(user: User, reset_token: str) -> tuple[str, str, str]:
+def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_token: str) -> str:
+    base_url = (os.getenv("ECOMMERCE_BASE_URL") or "https://mlprohub.com.br").rstrip("/")
+    store_ref = None
+    if tenant:
+        store_ref = tenant.ecommerce_slug or tenant.id
+
+    if store_ref:
+        return (
+            f"{base_url}/ecommerce?tenant={quote(str(store_ref))}"
+            f"&recovery=1&email={quote(user_email)}&token={quote(reset_token)}"
+        )
+
+    return (
+        f"{base_url}/ecommerce"
+        f"?recovery=1&email={quote(user_email)}&token={quote(reset_token)}"
+    )
+
+
+def _build_reset_password_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
     subject = "Recuperacao de senha - Pet Shop Pro"
     html_body = f"""
@@ -130,8 +150,15 @@ def _build_reset_password_email(user: User, reset_token: str) -> tuple[str, str,
         </div>
         <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
           <p>Ola{saudacao}.</p>
-          <p>Recebemos um pedido para redefinir a sua senha no app mobile.</p>
-          <p>Use o token abaixo na tela <strong>Recuperar senha</strong> do app:</p>
+          <p>Recebemos um pedido para redefinir a sua senha.</p>
+          <p>Voce pode abrir a recuperacao direto pela loja online:</p>
+          <p style="margin: 18px 0;">
+            <a href="{reset_link}"
+               style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
+              Recuperar senha agora
+            </a>
+          </p>
+          <p>Se preferir, use o token abaixo na tela <strong>Recuperar senha</strong> do app ou da loja:</p>
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
             <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
             <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
@@ -144,7 +171,9 @@ def _build_reset_password_email(user: User, reset_token: str) -> tuple[str, str,
     """
     text_body = (
         "Recuperacao de senha - Pet Shop Pro\n\n"
-        "Use este token no app mobile para redefinir sua senha:\n"
+        "Abra a recuperacao no link abaixo:\n"
+        f"{reset_link}\n\n"
+        "Ou use este token no app ou na loja online:\n"
         f"{reset_token}\n\n"
         f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
         "Se voce nao pediu essa alteracao, ignore este e-mail."
@@ -499,6 +528,7 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
 def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     user = (
         db.query(User)
@@ -510,7 +540,8 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
         reset_token = secrets.token_urlsafe(32)
         user.reset_token = reset_token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
-        subject, html_body, text_body = _build_reset_password_email(user, reset_token)
+        reset_link = _build_storefront_reset_link(tenant, user.email, reset_token)
+        subject, html_body, text_body = _build_reset_password_email(user, reset_token, reset_link)
         enviado = send_email(
             to=user.email,
             subject=subject,

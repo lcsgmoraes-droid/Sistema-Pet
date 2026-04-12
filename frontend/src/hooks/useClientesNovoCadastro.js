@@ -126,6 +126,7 @@ export function useClientesNovoCadastro({
   tipoFiltro,
   clientes,
   loadClientes,
+  onClienteCriado,
   error,
   setError,
 }) {
@@ -409,6 +410,7 @@ export function useClientesNovoCadastro({
     setError("");
 
     try {
+      const isEdicao = Boolean(editingCliente);
       const errosValidacao = [];
 
       if (!formData.nome || formData.nome.trim() === "") {
@@ -492,13 +494,16 @@ export function useClientesNovoCadastro({
       }
 
       let clienteId;
+      let clienteSalvo = null;
 
-      if (editingCliente) {
-        await api.put(`/clientes/${editingCliente.id}`, clienteData);
+      if (isEdicao) {
+        const response = await api.put(`/clientes/${editingCliente.id}`, clienteData);
         clienteId = editingCliente.id;
+        clienteSalvo = response.data;
       } else {
         const clienteResponse = await api.post("/clientes/", clienteData);
         clienteId = clienteResponse.data.id;
+        clienteSalvo = clienteResponse.data;
       }
 
       for (const pet of pets) {
@@ -532,8 +537,13 @@ export function useClientesNovoCadastro({
         }
       }
 
-      await loadClientes();
       closeModal();
+
+      if (!isEdicao && typeof onClienteCriado === "function") {
+        await Promise.resolve(onClienteCriado(clienteSalvo));
+      } else {
+        await loadClientes();
+      }
     } catch (err) {
       const errorDetails = err.response?.data?.details;
       console.error("Erro completo:", err.response?.data);
@@ -706,6 +716,7 @@ export function useClientesNovoCadastro({
       showDuplicadoWarning,
       showModal,
       showModalImportacao,
+      onClienteCriado,
     ],
   );
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 
 export function useClientesNovoListagem({ tipoFiltro, setError }) {
@@ -10,58 +10,76 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(20);
+  const [searchTermAplicado, setSearchTermAplicado] = useState("");
 
-  const loadClientes = useCallback(async () => {
-    try {
-      setLoading(true);
-      const skip = (paginaAtual - 1) * registrosPorPagina;
-      const params = new URLSearchParams({
-        skip: skip.toString(),
-        limit: registrosPorPagina.toString(),
-      });
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setSearchTermAplicado(searchTerm.trim());
+    }, 250);
 
-      if (tipoFiltro !== "todos") {
-        params.append("tipo_cadastro", tipoFiltro);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm]);
+
+  const loadClientes = useCallback(
+    async (options = {}) => {
+      const paginaDesejada = options.paginaAtual ?? paginaAtual;
+      const limiteDesejado = options.registrosPorPagina ?? registrosPorPagina;
+      const termoBusca =
+        typeof options.searchTerm === "string"
+          ? options.searchTerm.trim()
+          : searchTermAplicado;
+
+      try {
+        setLoading(true);
+        const skip = (paginaDesejada - 1) * limiteDesejado;
+        const params = new URLSearchParams({
+          skip: skip.toString(),
+          limit: limiteDesejado.toString(),
+        });
+
+        if (tipoFiltro !== "todos") {
+          params.append("tipo_cadastro", tipoFiltro);
+        }
+
+        if (termoBusca) {
+          params.append("search", termoBusca);
+        }
+
+        const response = await api.get(`/clientes/?${params.toString()}`);
+
+        if (response.data.items) {
+          setClientes(response.data.items);
+          setTotalRegistros(response.data.total);
+          return response.data.items;
+        }
+
+        const listaClientes = Array.isArray(response.data) ? response.data : [];
+        setClientes(listaClientes);
+        setTotalRegistros(listaClientes.length);
+        return listaClientes;
+      } catch (err) {
+        setError("Erro ao carregar pessoas");
+        console.error(err);
+        return [];
+      } finally {
+        setLoading(false);
+        setCarregamentoInicialConcluido(true);
       }
-
-      if (searchTerm && searchTerm.trim()) {
-        params.append("search", searchTerm.trim());
-      }
-
-      const response = await api.get(`/clientes/?${params.toString()}`);
-
-      if (response.data.items) {
-        setClientes(response.data.items);
-        setTotalRegistros(response.data.total);
-      } else {
-        setClientes(response.data);
-        setTotalRegistros(response.data.length);
-      }
-    } catch (err) {
-      setError("Erro ao carregar pessoas");
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setCarregamentoInicialConcluido(true);
-    }
-  }, [paginaAtual, registrosPorPagina, searchTerm, setError, tipoFiltro]);
+    },
+    [
+      paginaAtual,
+      registrosPorPagina,
+      searchTermAplicado,
+      setError,
+      tipoFiltro,
+    ],
+  );
 
   useEffect(() => {
     loadClientes();
-  }, [tipoFiltro, paginaAtual, registrosPorPagina]);
-
-  const filteredClientes = useMemo(
-    () =>
-      clientes.filter(
-        (cliente) =>
-          cliente.codigo?.includes(searchTerm) ||
-          cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          cliente.cpf?.includes(searchTerm) ||
-          cliente.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          cliente.celular?.includes(searchTerm),
-      ),
-    [clientes, searchTerm],
-  );
+  }, [loadClientes]);
 
   const getClientePorCodigoExato = useCallback(
     (termo) => {
@@ -71,12 +89,12 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
       }
 
       return (
-        filteredClientes.find(
+        clientes.find(
           (cliente) => String(cliente?.codigo || "").trim() === termoNormalizado,
         ) || null
       );
     },
-    [filteredClientes],
+    [clientes],
   );
 
   return {
@@ -90,7 +108,7 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
     totalRegistros,
     registrosPorPagina,
     setRegistrosPorPagina,
-    filteredClientes,
+    filteredClientes: clientes,
     loadClientes,
     getClientePorCodigoExato,
   };

@@ -3,8 +3,8 @@ const ClientesNovoTabsBar = ({ tipoFiltro, setTipoFiltro, setPaginaAtual }) => {
     { value: "todos", label: "Todos" },
     { value: "cliente", label: "Clientes" },
     { value: "fornecedor", label: "Fornecedores" },
-    { value: "veterinario", label: "Veterinários" },
-    { value: "funcionario", label: "Funcionários" },
+    { value: "veterinario", label: "Veterinarios" },
+    { value: "funcionario", label: "Funcionarios" },
   ];
 
   return (

@@ -73,6 +73,11 @@ from app.campaigns.models import (
     CustomerMergeLog,
 )
 from app.campaigns.models import CampaignTypeEnum, CampaignExecution, CampaignEventQueue, EventStatusEnum
+from app.campaigns.loyalty_service import (
+    build_consumed_loyalty_stamp_ids,
+    count_loyalty_completed_cycles,
+    summarize_loyalty_balances_for_customer,
+)
 from app.db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -546,23 +551,44 @@ def gestor_clientes_por_tipo(
     _, tenant_id = user_and_tenant
 
     if tipo == "carimbos":
-        subq = (
-            db.query(
-                LoyaltyStamp.customer_id,
-                sqlfunc.count(LoyaltyStamp.id).label("total"),
+        customer_ids = [
+            row[0]
+            for row in (
+                db.query(LoyaltyStamp.customer_id)
+                .filter(
+                    LoyaltyStamp.tenant_id == tenant_id,
+                    LoyaltyStamp.voided_at.is_(None),
+                )
+                .distinct()
+                .all()
             )
-            .filter(LoyaltyStamp.tenant_id == tenant_id, LoyaltyStamp.voided_at == None)
-            .group_by(LoyaltyStamp.customer_id)
-            .subquery()
-        )
-        rows = (
-            db.query(Cliente, subq.c.total)
-            .join(subq, Cliente.id == subq.c.customer_id)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo == True)
-            .order_by(subq.c.total.desc())
-            .limit(limit)
+        ]
+        if not customer_ids:
+            return {"clientes": []}
+
+        clientes = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.ativo == True,
+                Cliente.id.in_(customer_ids),
+            )
             .all()
         )
+        rows = []
+        for cliente in clientes:
+            saldo = summarize_loyalty_balances_for_customer(
+                db,
+                tenant_id=tenant_id,
+                customer_id=cliente.id,
+            )
+            total_disponivel = int(saldo.get("total_carimbos") or 0)
+            if total_disponivel <= 0:
+                continue
+            rows.append((cliente, total_disponivel))
+
+        rows.sort(key=lambda item: (-item[1], (item[0].nome or "").lower()))
+        rows = rows[:limit]
         return {
             "clientes": [
                 {"id": c.id, "nome": c.nome, "cpf": c.cpf, "telefone": c.telefone or c.celular, "detalhe": f"{total} carimbo(s)"}
@@ -682,15 +708,10 @@ def saldo_cliente(
     )
     saldo_cashback = float(saldo_raw or 0)
 
-    # Total de carimbos ativos (não estornados)
-    total_carimbos = (
-        db.query(LoyaltyStamp)
-        .filter(
-            LoyaltyStamp.tenant_id == tenant_id,
-            LoyaltyStamp.customer_id == customer_id,
-            LoyaltyStamp.voided_at.is_(None),
-        )
-        .count()
+    loyalty_summary = summarize_loyalty_balances_for_customer(
+        db,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
     )
 
     # Cupons ativos do cliente
@@ -720,7 +741,10 @@ def saldo_cliente(
     return {
         "customer_id": customer_id,
         "saldo_cashback": saldo_cashback,
-        "total_carimbos": total_carimbos,
+        "total_carimbos": loyalty_summary["total_carimbos"],
+        "total_carimbos_brutos": loyalty_summary["total_carimbos_brutos"],
+        "carimbos_convertidos": loyalty_summary["carimbos_convertidos"],
+        "ciclos_concluidos": loyalty_summary["ciclos_concluidos"],
         "rank_level": rank_atual.rank_level.value if rank_atual else "bronze",
         "rank_period": rank_atual.period if rank_atual else None,
         "rank_total_spent": float(rank_atual.total_spent) if rank_atual else 0.0,
@@ -917,6 +941,39 @@ def listar_carimbos_cliente(
     if not incluir_estornados:
         q = q.filter(LoyaltyStamp.voided_at.is_(None))
     stamps = q.order_by(LoyaltyStamp.created_at.desc()).all()
+    stamps_by_campaign: dict[int, list[LoyaltyStamp]] = {}
+    for stamp in stamps:
+        stamps_by_campaign.setdefault(int(stamp.campaign_id), []).append(stamp)
+
+    converted_stamp_ids: set[int] = set()
+    if stamps_by_campaign:
+        campaigns = (
+            db.query(Campaign)
+            .filter(
+                Campaign.tenant_id == tenant_id,
+                Campaign.id.in_(list(stamps_by_campaign.keys())),
+            )
+            .all()
+        )
+        campaign_map = {int(c.id): c for c in campaigns}
+        for campaign_id, campaign_stamps in stamps_by_campaign.items():
+            campaign = campaign_map.get(campaign_id)
+            if campaign is None:
+                continue
+            stamps_to_complete = int(((campaign.params or {}).get("stamps_to_complete", 10)) or 0)
+            completed_cycles = count_loyalty_completed_cycles(
+                db,
+                tenant_id=tenant_id,
+                campaign_id=campaign_id,
+                customer_id=customer_id,
+            )
+            converted_stamp_ids.update(
+                build_consumed_loyalty_stamp_ids(
+                    campaign_stamps,
+                    completed_cycles=completed_cycles,
+                    stamps_to_complete=stamps_to_complete,
+                )
+            )
 
     return [
         {
@@ -928,6 +985,14 @@ def listar_carimbos_cliente(
             "notes": s.notes,
             "created_at": s.created_at.isoformat(),
             "voided_at": s.voided_at.isoformat() if s.voided_at else None,
+            "is_converted": s.id in converted_stamp_ids and s.voided_at is None,
+            "status": (
+                "estornado"
+                if s.voided_at
+                else "convertido"
+                if s.id in converted_stamp_ids
+                else "ativo"
+            ),
         }
         for s in stamps
     ]
@@ -1552,6 +1617,7 @@ def lancar_carimbo_manual(
         customer_id=body.customer_id,
         venda_id=body.venda_id,
         campaign_id=campanha.id,
+        stamp_index=1,
         is_manual=True,
         notes=body.nota or "Carimbo lançado manualmente",
     )
@@ -1565,47 +1631,58 @@ def lancar_carimbo_manual(
             db.query(LoyaltyStamp)
             .filter(
                 LoyaltyStamp.tenant_id == tenant_id,
+                LoyaltyStamp.campaign_id == campanha.id,
                 LoyaltyStamp.customer_id == body.customer_id,
                 LoyaltyStamp.venda_id == body.venda_id,
             )
             .first()
         )
         if existing:
-            total = (
-                db.query(LoyaltyStamp)
-                .filter(
-                    LoyaltyStamp.tenant_id == tenant_id,
-                    LoyaltyStamp.customer_id == body.customer_id,
-                    LoyaltyStamp.voided_at.is_(None),
-                )
-                .count()
+            saldo = summarize_loyalty_balances_for_customer(
+                db,
+                tenant_id=tenant_id,
+                customer_id=body.customer_id,
             )
-            return {"ok": True, "novo": False, "total_carimbos": total, "stamp_id": existing.id}
+            return {
+                "ok": True,
+                "novo": False,
+                "total_carimbos": saldo["total_carimbos"],
+                "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+                "carimbos_convertidos": saldo["carimbos_convertidos"],
+                "stamp_id": existing.id,
+            }
         raise HTTPException(status_code=500, detail="Erro ao lançar carimbo")
+
+    from app.campaigns.loyalty_service import sync_loyalty_rewards_for_customer
+
+    sync_loyalty_rewards_for_customer(
+        db,
+        campaign=campanha,
+        customer_id=body.customer_id,
+        source_event_id=None,
+    )
 
     db.commit()
     db.refresh(stamp)
 
-    total = (
-        db.query(LoyaltyStamp)
-        .filter(
-            LoyaltyStamp.tenant_id == tenant_id,
-            LoyaltyStamp.customer_id == body.customer_id,
-            LoyaltyStamp.voided_at.is_(None),
-        )
-        .count()
+    saldo = summarize_loyalty_balances_for_customer(
+        db,
+        tenant_id=tenant_id,
+        customer_id=body.customer_id,
     )
 
     logger.info(
         "[Campanhas] Carimbo manual lançado customer_id=%d tenant=%s total=%d",
-        body.customer_id, tenant_id, total,
+        body.customer_id, tenant_id, saldo["total_carimbos"],
     )
 
     return {
         "ok": True,
         "novo": True,
         "stamp_id": stamp.id,
-        "total_carimbos": total,
+        "total_carimbos": saldo["total_carimbos"],
+        "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+        "carimbos_convertidos": saldo["carimbos_convertidos"],
         "params": campanha.params,
         "stamps_to_complete": campanha.params.get("stamps_to_complete", 10),
     }
@@ -1641,23 +1718,44 @@ def estornar_carimbo(
     stamp.voided_at = datetime.now(timezone.utc)
     if motivo:
         stamp.notes = f"{stamp.notes or ''} [ESTORNO: {motivo}]".strip()
+
+    campanha = (
+        db.query(Campaign)
+        .filter(
+            Campaign.id == stamp.campaign_id,
+            Campaign.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if campanha is not None:
+        from app.campaigns.loyalty_service import sync_loyalty_rewards_for_customer
+
+        sync_loyalty_rewards_for_customer(
+            db,
+            campaign=campanha,
+            customer_id=stamp.customer_id,
+            source_event_id=None,
+        )
+
     db.commit()
 
-    total_ativos = (
-        db.query(LoyaltyStamp)
-        .filter(
-            LoyaltyStamp.tenant_id == tenant_id,
-            LoyaltyStamp.customer_id == stamp.customer_id,
-            LoyaltyStamp.voided_at.is_(None),
-        )
-        .count()
+    saldo = summarize_loyalty_balances_for_customer(
+        db,
+        tenant_id=tenant_id,
+        customer_id=stamp.customer_id,
     )
 
     logger.info(
         "[Campanhas] Carimbo #%d estornado customer_id=%d tenant=%s restantes=%d",
-        stamp_id, stamp.customer_id, tenant_id, total_ativos,
+        stamp_id, stamp.customer_id, tenant_id, saldo["total_carimbos"],
     )
-    return {"ok": True, "stamp_id": stamp_id, "total_carimbos_ativos": total_ativos}
+    return {
+        "ok": True,
+        "stamp_id": stamp_id,
+        "total_carimbos_ativos": saldo["total_carimbos"],
+        "total_carimbos_brutos": saldo["total_carimbos_brutos"],
+        "carimbos_convertidos": saldo["carimbos_convertidos"],
+    }
 
 
 # ---------------------------------------------------------------------------

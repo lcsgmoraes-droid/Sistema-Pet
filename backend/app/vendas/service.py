@@ -1029,6 +1029,15 @@ class VendaService:
                 )
             else:
                 invalidate_venda_rentabilidade_snapshot(venda)
+
+            from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+            void_loyalty_stamps_for_sale(
+                db,
+                tenant_id=tenant_id,
+                venda_id=venda_id,
+                reason=f"Venda cancelada: {motivo}",
+            )
             
             db.flush()
             

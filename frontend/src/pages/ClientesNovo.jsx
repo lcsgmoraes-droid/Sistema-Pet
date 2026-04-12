@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FiAlertCircle } from "react-icons/fi";
+import toast from "react-hot-toast";
 import api from "../api";
 import ClientesNovoActionsBar from "../components/clientes/ClientesNovoActionsBar";
+import ClientesNovoCadastroRecenteBanner from "../components/clientes/ClientesNovoCadastroRecenteBanner";
 import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLayer";
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
 import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
@@ -13,6 +15,8 @@ const Pessoas = () => {
   const [error, setError] = useState("");
   const [tipoFiltro, setTipoFiltro] = useState("todos"); // Filtro por tipo: todos, cliente, fornecedor, veterinario, funcionario
   const [expandedPets, setExpandedPets] = useState({});
+  const [clienteRecemCriado, setClienteRecemCriado] = useState(null);
+  const [campoCopiadoRecente, setCampoCopiadoRecente] = useState("");
   const {
     clientes,
     loading,
@@ -29,11 +33,37 @@ const Pessoas = () => {
     getClientePorCodigoExato,
   } = useClientesNovoListagem({ tipoFiltro, setError });
 
+  const handleSearchTermChange = (value) => {
+    setPaginaAtual(1);
+    setSearchTerm(value);
+  };
+
+  const handleClienteCriado = async (cliente) => {
+    const termoFiltro = String(cliente?.codigo || cliente?.nome || "").trim();
+
+    setError("");
+    setExpandedPets({});
+    setCampoCopiadoRecente("");
+    setClienteRecemCriado({
+      ...cliente,
+      termoFiltro,
+    });
+
+    if (!termoFiltro) {
+      await loadClientes({ paginaAtual: 1 });
+      return;
+    }
+
+    setPaginaAtual(1);
+    setSearchTerm(termoFiltro);
+    await loadClientes({ searchTerm: termoFiltro, paginaAtual: 1 });
+  };
 
   const cadastro = useClientesNovoCadastro({
     tipoFiltro,
     clientes,
     loadClientes,
+    onClienteCriado: handleClienteCriado,
     error,
     setError,
   });
@@ -74,16 +104,84 @@ const Pessoas = () => {
     }
   };
 
-  const abrirPessoaPorCodigoNoEnter = () => {
+  const abrirPessoaPorCodigoNoEnter = async () => {
     const termo = String(searchTerm || "").trim();
     if (!termo) return;
 
-    const clienteCodigoExato = getClientePorCodigoExato(termo);
+    const clientesEncontrados = await loadClientes({
+      searchTerm: termo,
+      paginaAtual: 1,
+    });
+    const clienteCodigoExato =
+      clientesEncontrados.find(
+        (cliente) => String(cliente?.codigo || "").trim() === termo,
+      ) || getClientePorCodigoExato(termo);
 
     if (clienteCodigoExato) {
+      setPaginaAtual(1);
       cadastro.openModal(clienteCodigoExato);
     }
   };
+
+  const handleCopiarCampoRecente = async (valor, campo) => {
+    if (!valor) return;
+
+    try {
+      await navigator.clipboard.writeText(String(valor));
+      setCampoCopiadoRecente(campo);
+      toast.success(
+        campo === "codigo" ? "Codigo copiado com sucesso!" : "Nome copiado com sucesso!",
+      );
+    } catch (err) {
+      console.error("Erro ao copiar dados do cliente:", err);
+      toast.error("Nao foi possivel copiar os dados do cliente.");
+    }
+  };
+
+  const handleLimparFiltroRecente = async () => {
+    setClienteRecemCriado(null);
+    setCampoCopiadoRecente("");
+    handleSearchTermChange("");
+    await loadClientes({ searchTerm: "", paginaAtual: 1 });
+  };
+
+  useEffect(() => {
+    if (!campoCopiadoRecente) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setCampoCopiadoRecente("");
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [campoCopiadoRecente]);
+
+  useEffect(() => {
+    if (!clienteRecemCriado?.termoFiltro) return;
+
+    const termoAtual = String(searchTerm || "").trim();
+    if (termoAtual && termoAtual === clienteRecemCriado.termoFiltro) return;
+
+    setClienteRecemCriado(null);
+    setCampoCopiadoRecente("");
+  }, [clienteRecemCriado?.termoFiltro, searchTerm]);
+
+  useEffect(() => {
+    if (!clienteRecemCriado?.id || loading) return;
+
+    const clienteNaLista = filteredClientes.some(
+      (cliente) => cliente.id === clienteRecemCriado.id,
+    );
+    if (!clienteNaLista) return;
+
+    const elemento = document.getElementById(
+      `cliente-${clienteRecemCriado.id}`,
+    );
+    if (!elemento) return;
+
+    elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [clienteRecemCriado?.id, filteredClientes, loading]);
 
   // ============================================================================
   // COMPONENTE: ClienteSegmentoBadgeWrapper (lazy load badge na lista)
@@ -118,11 +216,17 @@ const Pessoas = () => {
       />
       <ClientesNovoActionsBar
         searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
+        setSearchTerm={handleSearchTermChange}
         abrirPessoaPorCodigoNoEnter={abrirPessoaPorCodigoNoEnter}
         setShowModalImportacao={cadastro.setShowModalImportacao}
         openModal={cadastro.openModal}
         tipoFiltro={tipoFiltro}
+      />
+      <ClientesNovoCadastroRecenteBanner
+        cliente={clienteRecemCriado}
+        campoCopiado={campoCopiadoRecente}
+        onCopiarCampo={handleCopiarCampoRecente}
+        onLimparFiltro={handleLimparFiltroRecente}
       />
       {error && !cadastro.showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
@@ -138,6 +242,7 @@ const Pessoas = () => {
         setRegistrosPorPagina={setRegistrosPorPagina}
         setPaginaAtual={setPaginaAtual}
         filteredClientes={filteredClientes}
+        highlightedClienteId={clienteRecemCriado?.id}
         expandedPets={expandedPets}
         setExpandedPets={setExpandedPets}
         highlightedPetId={cadastro.highlightedPetId}

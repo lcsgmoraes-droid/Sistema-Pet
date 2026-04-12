@@ -640,6 +640,39 @@ class ProdutosPaginadosResponse(BaseModel):
     pages: int
 
 
+class RelatorioValorizacaoEstoqueItem(BaseModel):
+    id: int
+    codigo: Optional[str] = None
+    sku: Optional[str] = None
+    nome: str
+    categoria_nome: Optional[str] = None
+    marca_nome: Optional[str] = None
+    departamento_nome: Optional[str] = None
+    fornecedor_nome: Optional[str] = None
+    estoque_atual: float = 0
+    preco_custo: float = 0
+    preco_venda: float = 0
+    valor_custo_total: float = 0
+    valor_venda_total: float = 0
+
+
+class RelatorioValorizacaoEstoqueTotais(BaseModel):
+    total_produtos: int = 0
+    total_itens_estoque: float = 0
+    valor_custo_total: float = 0
+    valor_venda_total: float = 0
+    margem_potencial_total: float = 0
+
+
+class RelatorioValorizacaoEstoqueResponse(BaseModel):
+    items: List[RelatorioValorizacaoEstoqueItem]
+    totais: RelatorioValorizacaoEstoqueTotais
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
 # ==========================================
 # SCHEMAS - LOTES
 # ==========================================
@@ -3147,6 +3180,192 @@ def relatorio_movimentacoes(
         "agrupado_por_mes": False,
         "movimentacoes": resultado
     }
+
+
+@router.get(
+    "/relatorio/valorizacao-estoque",
+    response_model=RelatorioValorizacaoEstoqueResponse,
+)
+@require_permission("produtos.visualizar")
+def relatorio_valorizacao_estoque(
+    page: int = 1,
+    page_size: int = 50,
+    busca: Optional[str] = None,
+    categoria_id: Optional[int] = None,
+    marca_id: Optional[int] = None,
+    departamento_id: Optional[int] = None,
+    fornecedor_id: Optional[int] = None,
+    ativo: Optional[bool] = True,
+    apenas_com_estoque: bool = True,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Relatorio de valorizacao do estoque com totais agregados.
+
+    Retorna os produtos filtrados com:
+    - custo total em estoque
+    - potencial de venda do estoque
+    - margem potencial consolidada
+    """
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    termo_busca = (busca or "").strip()
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 200)
+
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    estoque_expr = func.coalesce(Produto.estoque_atual, 0.0)
+    preco_custo_expr = func.coalesce(Produto.preco_custo, 0.0)
+    preco_venda_expr = func.coalesce(Produto.preco_venda, 0.0)
+    valor_custo_expr = estoque_expr * preco_custo_expr
+    valor_venda_expr = estoque_expr * preco_venda_expr
+
+    query = db.query(Produto).filter(
+        Produto.tenant_id.in_(access_ids),
+        or_(Produto.tipo_produto.is_(None), Produto.tipo_produto.in_(["SIMPLES", "KIT", "VARIACAO"])),
+    )
+
+    if ativo is not None:
+        if ativo:
+            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
+        else:
+            query = query.filter(Produto.ativo.is_(False))
+
+    if termo_busca:
+        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
+        for palavra in palavras:
+            busca_pattern = f"%{palavra}%"
+            query = query.filter(
+                or_(
+                    Produto.nome.ilike(busca_pattern),
+                    Produto.codigo.ilike(busca_pattern),
+                    Produto.sku.ilike(busca_pattern),
+                    Produto.codigo_barras.ilike(busca_pattern),
+                )
+            )
+
+    if categoria_id:
+        query = query.filter(Produto.categoria_id == categoria_id)
+
+    if marca_id:
+        query = query.filter(Produto.marca_id == marca_id)
+
+    if departamento_id:
+        query = query.filter(
+            or_(
+                Produto.departamento_id == departamento_id,
+                Produto.categoria.has(Categoria.departamento_id == departamento_id),
+            )
+        )
+
+    if fornecedor_id:
+        query = query.join(
+            ProdutoFornecedor,
+            Produto.id == ProdutoFornecedor.produto_id,
+        ).filter(
+            ProdutoFornecedor.fornecedor_id == fornecedor_id,
+            ProdutoFornecedor.ativo == True,
+        )
+
+    if apenas_com_estoque:
+        query = query.filter(estoque_expr > 0)
+
+    total = query.count()
+    totais_db = query.with_entities(
+        func.count(Produto.id),
+        func.coalesce(func.sum(estoque_expr), 0.0),
+        func.coalesce(func.sum(valor_custo_expr), 0.0),
+        func.coalesce(func.sum(valor_venda_expr), 0.0),
+    ).first()
+
+    offset = (page - 1) * page_size
+    produtos = (
+        query.options(
+            joinedload(Produto.categoria).joinedload(Categoria.departamento),
+            joinedload(Produto.marca),
+            joinedload(Produto.departamento),
+            joinedload(Produto.fornecedor),
+            joinedload(Produto.fornecedores_alternativos).joinedload(ProdutoFornecedor.fornecedor),
+        )
+        .order_by(valor_custo_expr.desc(), Produto.nome.asc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    items = []
+    for produto in produtos:
+        fornecedor = produto.fornecedor
+        if not fornecedor and produto.fornecedores_alternativos:
+            vinculo_principal = next(
+                (
+                    vinculo
+                    for vinculo in produto.fornecedores_alternativos
+                    if vinculo.ativo and vinculo.e_principal and vinculo.fornecedor
+                ),
+                None,
+            )
+            vinculo_secundario = next(
+                (
+                    vinculo
+                    for vinculo in produto.fornecedores_alternativos
+                    if vinculo.ativo and vinculo.fornecedor
+                ),
+                None,
+            )
+            fornecedor = (
+                vinculo_principal.fornecedor
+                if vinculo_principal
+                else vinculo_secundario.fornecedor if vinculo_secundario else None
+            )
+
+        estoque_atual = float(produto.estoque_atual or 0)
+        preco_custo = float(produto.preco_custo or 0)
+        preco_venda = float(produto.preco_venda or 0)
+        departamento_nome = None
+        if produto.departamento:
+            departamento_nome = produto.departamento.nome
+        elif produto.categoria and produto.categoria.departamento:
+            departamento_nome = produto.categoria.departamento.nome
+
+        items.append(
+            RelatorioValorizacaoEstoqueItem(
+                id=produto.id,
+                codigo=produto.codigo,
+                sku=produto.sku,
+                nome=produto.nome,
+                categoria_nome=produto.categoria.nome if produto.categoria else None,
+                marca_nome=produto.marca.nome if produto.marca else None,
+                departamento_nome=departamento_nome,
+                fornecedor_nome=fornecedor.nome if fornecedor else None,
+                estoque_atual=estoque_atual,
+                preco_custo=preco_custo,
+                preco_venda=preco_venda,
+                valor_custo_total=estoque_atual * preco_custo,
+                valor_venda_total=estoque_atual * preco_venda,
+            )
+        )
+
+    total_produtos = int((totais_db[0] or 0) if totais_db else 0)
+    total_itens_estoque = float((totais_db[1] or 0) if totais_db else 0)
+    valor_custo_total = float((totais_db[2] or 0) if totais_db else 0)
+    valor_venda_total = float((totais_db[3] or 0) if totais_db else 0)
+    pages = (total + page_size - 1) // page_size if total else 0
+
+    return RelatorioValorizacaoEstoqueResponse(
+        items=items,
+        totais=RelatorioValorizacaoEstoqueTotais(
+            total_produtos=total_produtos,
+            total_itens_estoque=total_itens_estoque,
+            valor_custo_total=valor_custo_total,
+            valor_venda_total=valor_venda_total,
+            margem_potencial_total=valor_venda_total - valor_custo_total,
+        ),
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 # ==========================================

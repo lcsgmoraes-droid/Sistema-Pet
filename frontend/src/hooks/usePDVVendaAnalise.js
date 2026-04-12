@@ -24,8 +24,8 @@ export function usePDVVendaAnalise(vendaAtual) {
       const response = await api.post("/formas-pagamento/analisar-venda", payload);
       setDadosAnalise(response.data);
     } catch (error) {
-      console.error("Erro ao buscar anÃ¡lise:", error);
-      alert("Erro ao carregar anÃ¡lise da venda");
+      console.error("Erro ao buscar an\u00e1lise:", error);
+      alert("Erro ao carregar an\u00e1lise da venda");
       setMostrarAnaliseVenda(false);
     } finally {
       setCarregandoAnalise(false);
@@ -34,7 +34,7 @@ export function usePDVVendaAnalise(vendaAtual) {
 
   const buscarAnaliseVenda = async () => {
     if (vendaAtual.itens.length === 0) {
-      alert("Adicione pelo menos um produto para ver a anÃ¡lise");
+      alert("Adicione pelo menos um produto para ver a an\u00e1lise");
       return;
     }
 
@@ -67,8 +67,8 @@ export function usePDVVendaAnalise(vendaAtual) {
 
       setDadosAnalise(response.data);
     } catch (error) {
-      console.error("Erro ao buscar anÃ¡lise:", error);
-      alert("Erro ao carregar anÃ¡lise da venda");
+      console.error("Erro ao buscar an\u00e1lise:", error);
+      alert("Erro ao carregar an\u00e1lise da venda");
       setMostrarAnaliseVenda(false);
     } finally {
       setCarregandoAnalise(false);
@@ -76,8 +76,11 @@ export function usePDVVendaAnalise(vendaAtual) {
   };
 
   const analisarVendaComFormasPagamento = async (formasPagamento) => {
-    debugLog("ðŸ” DEBUG formasPagamento recebidas:", formasPagamento);
-    debugLog("ðŸ’° Enviando anÃ¡lise com mÃºltiplas formas:", formasPagamento);
+    debugLog("\ud83d\udd0d DEBUG formasPagamento recebidas:", formasPagamento);
+    debugLog(
+      "\ud83d\udcb0 Enviando an\u00e1lise com m\u00faltiplas formas:",
+      formasPagamento,
+    );
 
     await executarAnalise({
       items: montarItensAnalise(vendaAtual.itens),

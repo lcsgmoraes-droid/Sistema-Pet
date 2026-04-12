@@ -13,25 +13,25 @@ function getCanalInfo(canal) {
       ecommerce: {
         cor: "border-l-purple-500",
         bg: "bg-purple-50",
-        icon: "🛒",
+        icon: "\uD83D\uDED2",
         label: "Ecommerce",
       },
       aplicativo: {
         cor: "border-l-green-500",
         bg: "bg-green-50",
-        icon: "📱",
+        icon: "\uD83D\uDCF1",
         label: "App",
       },
       loja_fisica: {
         cor: "border-l-blue-500",
         bg: "bg-blue-50",
-        icon: "🏪",
+        icon: "\uD83C\uDFEA",
         label: "PDV",
       },
     }[canal] || {
       cor: "border-l-gray-400",
       bg: "bg-gray-50",
-      icon: "🏪",
+      icon: "\uD83C\uDFEA",
       label: "PDV",
     }
   );
@@ -52,6 +52,31 @@ function formatarDataVenda(dataStr) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function getEntregaStatusInfo(venda) {
+  if (venda.status_entrega !== "entregue") {
+    return null;
+  }
+
+  if (venda.tem_entrega) {
+    return {
+      label: "Entregue",
+      title: "Pedido entregue ao cliente",
+    };
+  }
+
+  if (venda.retirado_por) {
+    return {
+      label: venda.retirado_por,
+      title: `Retirado por: ${venda.retirado_por}`,
+    };
+  }
+
+  return {
+    label: "Retirado",
+    title: "Pedido retirado na loja",
+  };
 }
 
 export default function PDVVendasRecentesSidebar({
@@ -104,7 +129,7 @@ export default function PDVVendasRecentesSidebar({
                   }`}
                   type="button"
                 >
-                  {periodo === "24h" && "Últimas 24h"}
+                  {periodo === "24h" && "Ultimas 24h"}
                   {periodo === "7d" && "7 dias"}
                   {periodo === "30d" && "30 dias"}
                 </button>
@@ -149,7 +174,7 @@ export default function PDVVendasRecentesSidebar({
                 type="text"
                 value={buscaNumeroVenda}
                 onChange={(e) => setBuscaNumeroVenda(e.target.value)}
-                placeholder="Buscar por número..."
+                placeholder="Buscar por numero..."
                 className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -164,6 +189,7 @@ export default function PDVVendasRecentesSidebar({
             ) : (
               vendasRecentes.map((venda) => {
                 const canalInfo = getCanalInfo(venda.canal);
+                const entregaStatus = getEntregaStatusInfo(venda);
 
                 return (
                   <div
@@ -177,7 +203,7 @@ export default function PDVVendasRecentesSidebar({
                         <span>{canalInfo.label}</span>
                         {venda.tem_entrega && (
                           <span className="ml-1" title="Entrega">
-                            🚚
+                            {"\uD83D\uDE9A"}
                           </span>
                         )}
                       </span>
@@ -186,7 +212,7 @@ export default function PDVVendasRecentesSidebar({
                           className="text-[10px] bg-orange-100 text-orange-700 font-semibold px-1.5 py-0.5 rounded-full border border-orange-200"
                           title="Senha de retirada"
                         >
-                          🔑 {venda.palavra_chave_retirada}
+                          {"\uD83D\uDD11"} {venda.palavra_chave_retirada}
                         </span>
                       )}
                     </div>
@@ -194,7 +220,7 @@ export default function PDVVendasRecentesSidebar({
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">
-                          {venda.cliente_nome || "Cliente não informado"}
+                          {venda.cliente_nome || "Cliente nao informado"}
                         </div>
                         <div className="text-xs text-gray-500">
                           #{venda.numero_venda}
@@ -248,30 +274,21 @@ export default function PDVVendasRecentesSidebar({
                         venda.status_entrega !== "entregue" &&
                         confirmandoRetirada.vendaId !== venda.id && (
                           <button
-                            onClick={(e) =>
-                              abrirConfirmacaoRetirada(e, venda.id)
-                            }
+                            onClick={(e) => abrirConfirmacaoRetirada(e, venda.id)}
                             className="text-[10px] bg-white hover:bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded border border-green-600 transition-colors"
                             type="button"
                           >
                             Confirmar retirada
                           </button>
                         )}
-                      {venda.status_entrega === "entregue" &&
-                        venda.retirado_por && (
-                          <span
-                            className="text-[10px] text-green-600 font-medium"
-                            title={`Retirado por: ${venda.retirado_por}`}
-                          >
-                            ✅ {venda.retirado_por}
-                          </span>
-                        )}
-                      {venda.status_entrega === "entregue" &&
-                        !venda.retirado_por && (
-                          <span className="text-[10px] text-green-600 font-medium">
-                            ✅ Retirado
-                          </span>
-                        )}
+                      {entregaStatus && (
+                        <span
+                          className="text-[10px] text-green-600 font-medium"
+                          title={entregaStatus.title}
+                        >
+                          {"\u2705"} {entregaStatus.label}
+                        </span>
+                      )}
                     </div>
 
                     {confirmandoRetirada.vendaId === venda.id && (
@@ -282,7 +299,7 @@ export default function PDVVendasRecentesSidebar({
                         <input
                           autoFocus
                           type="text"
-                          placeholder="Nome de quem está retirando (opcional)"
+                          placeholder="Nome de quem esta retirando (opcional)"
                           value={confirmandoRetirada.nome}
                           onChange={(e) =>
                             setConfirmandoRetirada((prev) => ({
@@ -309,7 +326,7 @@ export default function PDVVendasRecentesSidebar({
                             className="flex-1 text-[10px] bg-green-600 hover:bg-green-700 text-white font-semibold py-1 rounded transition-colors"
                             type="button"
                           >
-                            ✅ Confirmar
+                            {"\u2705"} Confirmar
                           </button>
                           <button
                             onClick={(e) => {
@@ -322,7 +339,7 @@ export default function PDVVendasRecentesSidebar({
                             className="text-[10px] bg-gray-200 hover:bg-gray-300 text-gray-600 font-semibold px-2 py-1 rounded transition-colors"
                             type="button"
                           >
-                            ✕
+                            {"\u2715"}
                           </button>
                         </div>
                       </div>

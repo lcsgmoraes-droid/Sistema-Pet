@@ -83,7 +83,7 @@ export default function CampanhasGestorHeader({
                   </p>
                   <p className="text-xs text-gray-400">
                     {cliente.cpf ? `CPF: ${cliente.cpf}` : ""}
-                    {cliente.cpf && cliente.telefone ? " • " : ""}
+                    {cliente.cpf && cliente.telefone ? " - " : ""}
                     {cliente.telefone || ""}
                   </p>
                 </button>

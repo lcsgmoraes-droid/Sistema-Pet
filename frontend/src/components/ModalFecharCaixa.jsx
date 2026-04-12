@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
-import { fecharCaixa, obterResumoCaixa, obterVendasCaixa } from '../api/caixa';
+import { fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from '../api/caixa';
 import CurrencyInput from './CurrencyInput';
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
@@ -33,6 +33,8 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
 
   const carregarResumo = async () => {
     try {
+      setErro(null);
+      await validarCaixaAtual(caixaId);
       const data = await obterResumoCaixa(caixaId);
       setResumo(data);
       // Campo vazio — o funcionário deve contar e preencher manualmente
@@ -71,11 +73,13 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     if (vendasDetalhe[forma]) return;
     setLoadingVendas(forma);
     try {
+      await validarCaixaAtual(caixaId);
       const data = await obterVendasCaixa(caixaId, forma);
       setVendasDetalhe(prev => ({ ...prev, [forma]: data }));
     } catch (err) {
       console.error('Erro ao carregar vendas:', err);
       setVendasDetalhe(prev => ({ ...prev, [forma]: [] }));
+      setErro(prev => prev || err.response?.data?.detail || err.message || 'Erro ao carregar vendas do caixa.');
     } finally {
       setLoadingVendas(null);
     }
@@ -118,6 +122,7 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     setSalvando(true);
     setErro(null);
     try {
+      await validarCaixaAtual(caixaId);
       await fecharCaixa(caixaId, {
         valor_informado: valorContado,
         observacoes_fechamento: observacoes || null
@@ -130,7 +135,10 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
       }, 800);
     } catch (error) {
       console.error('Erro ao fechar caixa:', error);
-      const mensagem = error.response?.data?.detail || 'Erro ao fechar caixa. Tente novamente.';
+      const mensagem =
+        error.response?.data?.detail ||
+        error.message ||
+        'Erro ao fechar caixa. Tente novamente.';
       setErro(mensagem);
     } finally {
       setSalvando(false);
@@ -150,7 +158,51 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   }
 
   if (!resumo) {
-    return null;
+    const mensagemErroResumo =
+      erro && /Ã|â/.test(erro)
+        ? 'Nao foi possivel carregar os dados do caixa. Feche e tente novamente.'
+        : erro;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg w-full max-w-lg shadow-xl">
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Nao foi possivel abrir o fechamento</h2>
+                  <p className="text-sm text-gray-500">Confira o status do caixa e tente novamente.</p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              {mensagemErroResumo || 'Nao foi possivel carregar os dados do caixa.'}
+            </div>
+          </div>
+
+          <div className="px-6 pb-6 flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white rounded-lg font-medium transition-colors"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const diferenca = calcularDiferenca();

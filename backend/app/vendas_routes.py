@@ -1322,6 +1322,15 @@ def reabrir_venda(
     venda.updated_at = datetime.now()
     invalidate_venda_rentabilidade_snapshot(venda)
 
+    from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+    void_loyalty_stamps_for_sale(
+        db,
+        tenant_id=tenant_id,
+        venda_id=venda.id,
+        reason="Venda reaberta para edicao",
+    )
+
     db.commit()
     db.refresh(venda)
 
@@ -1375,6 +1384,19 @@ def atualizar_status_venda(
         )
     elif novo_status == 'aberta':
         invalidate_venda_rentabilidade_snapshot(venda)
+
+    if (
+        status_anterior in ['finalizada', 'baixa_parcial']
+        and novo_status not in ['finalizada', 'baixa_parcial']
+    ):
+        from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+        void_loyalty_stamps_for_sale(
+            db,
+            tenant_id=tenant_id,
+            venda_id=venda.id,
+            reason=f"Status alterado para {novo_status}",
+        )
     # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
     if novo_status == 'finalizada' and status_anterior != 'finalizada' and venda.funcionario_id:
         try:
@@ -1867,6 +1889,15 @@ def excluir_venda(
 
         # Excluir itens
         db.query(VendaItem).filter_by(venda_id=venda_id).delete()
+
+        from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+
+        void_loyalty_stamps_for_sale(
+            db,
+            tenant_id=tenant_id,
+            venda_id=venda_id,
+            reason="Venda excluida",
+        )
 
         # Excluir venda
         logger.info(f"🗑️  DELETANDO venda do banco: ID={venda_id}, Numero={venda.numero_venda}")

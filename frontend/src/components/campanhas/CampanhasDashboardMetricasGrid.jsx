@@ -20,7 +20,7 @@ export default function CampanhasDashboardMetricasGrid({ dashboard }) {
     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
       <DashboardMetricCard
         value={dashboard.campanhas_ativas?.total ?? dashboard.campanhas_ativas}
-        label="\u{1F4E2} Campanhas ativas"
+        label={"\uD83D\uDCE2 Campanhas ativas"}
         extra={
           dashboard.campanhas_ativas?.nomes?.length > 0 ? (
             <div className="mt-2 text-left space-y-0.5">
@@ -35,17 +35,17 @@ export default function CampanhasDashboardMetricasGrid({ dashboard }) {
       />
       <DashboardMetricCard
         value={dashboard.cupons_emitidos_hoje}
-        label="\u{1F39F}\uFE0F Cupons emitidos hoje"
+        label={"\uD83C\uDF9F\uFE0F Cupons emitidos hoje"}
         className="text-green-700"
       />
       <DashboardMetricCard
         value={dashboard.cupons_usados_hoje}
-        label="\u2705 Cupons usados hoje"
+        label={"\u2705 Cupons usados hoje"}
         className="text-orange-700"
       />
       <DashboardMetricCard
         value={`R$ ${formatBRL(dashboard.saldo_passivo_cashback || 0)}`}
-        label="\u{1F4B0} Saldo passivo (cashback)"
+        label={"\uD83D\uDCB0 Saldo passivo (cashback)"}
         className="text-2xl text-purple-700"
       />
       <div
@@ -83,7 +83,7 @@ export default function CampanhasDashboardMetricasGrid({ dashboard }) {
       )}
       <DashboardMetricCard
         value={dashboard.cupons_ativos_total ?? 0}
-        label="\u{1F4E6} Cupons ativos no total"
+        label={"\uD83D\uDCE6 Cupons ativos no total"}
         className="text-teal-700"
       />
     </div>

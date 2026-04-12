@@ -34,8 +34,13 @@ RATE_LIMIT_API_WINDOW = 60
 AUTH_ROUTES = [
     "/auth/login-multitenant",
     "/auth/login",
+    "/auth/forgot-password",
+    "/auth/reset-password",
     "/auth/refresh",
-    "/auth/select-tenant"
+    "/auth/select-tenant",
+    "/ecommerce/auth/login",
+    "/ecommerce/auth/esqueci-senha",
+    "/ecommerce/auth/resetar-senha",
 ]
 
 # Rotas de API (limite menos restritivo)

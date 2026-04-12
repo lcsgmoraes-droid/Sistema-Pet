@@ -136,6 +136,12 @@ const Login = () => {
           </button>
         </form>
 
+        <div className="mt-4 text-center">
+          <Link to="/recuperar-senha" className="text-sm text-purple-600 hover:text-purple-700 font-semibold">
+            Esqueci minha senha
+          </Link>
+        </div>
+
         {/* Register Link */}
         <div className="mt-6 text-center">
           <p className="text-gray-600">

@@ -57,6 +57,20 @@ const ClientesNovoWizardModal = ({
 }) => {
   if (!showModal) return null;
 
+  const tipoTituloEdicao =
+    editingCliente?.tipo_cadastro === "cliente"
+      ? "Cliente"
+      : editingCliente?.tipo_cadastro === "fornecedor"
+        ? "Fornecedor"
+        : "Veterinario";
+
+  const tipoTituloNovo =
+    formData?.tipo_cadastro === "cliente"
+      ? "Cliente"
+      : formData?.tipo_cadastro === "fornecedor"
+        ? "Fornecedor"
+        : "Veterinario";
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -64,8 +78,8 @@ const ClientesNovoWizardModal = ({
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">
               {editingCliente
-                ? `Editar ${editingCliente.tipo_cadastro === "cliente" ? "Cliente" : editingCliente.tipo_cadastro === "fornecedor" ? "Fornecedor" : "Veterinário"}`
-                : `Adicionar ${formData.tipo_cadastro === "cliente" ? "Cliente" : formData.tipo_cadastro === "fornecedor" ? "Fornecedor" : "Veterinário"}`}
+                ? `Editar ${tipoTituloEdicao}`
+                : `Adicionar ${tipoTituloNovo}`}
             </h2>
             <button
               onClick={closeModal}
@@ -99,7 +113,9 @@ const ClientesNovoWizardModal = ({
                 </div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`h-0.5 flex-1 ${currentStep > step.number ? "bg-green-500" : "bg-gray-300"}`}
+                    className={`h-0.5 flex-1 ${
+                      currentStep > step.number ? "bg-green-500" : "bg-gray-300"
+                    }`}
                   />
                 )}
               </div>
@@ -208,7 +224,7 @@ const ClientesNovoWizardModal = ({
               onClick={nextStep}
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
-              Avançar <FiArrowRight />
+              Avancar <FiArrowRight />
             </button>
           ) : (
             <button

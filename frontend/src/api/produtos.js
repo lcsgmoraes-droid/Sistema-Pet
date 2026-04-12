@@ -393,6 +393,10 @@ export const getRelatorioMovimentacoes = (params = {}) => {
   return api.get('/produtos/relatorio/movimentacoes', { params });
 };
 
+export const getRelatorioValorizacaoEstoque = (params = {}) => {
+  return api.get('/produtos/relatorio/valorizacao-estoque', { params });
+};
+
 /**
  * Relatório de estoque baixo
  */
@@ -516,6 +520,7 @@ export default {
   addProdutoListaPreco,
   // Relatórios
   getRelatorioMovimentacoes,
+  getRelatorioValorizacaoEstoque,
   getRelatorioEstoqueBaixo,
   getRelatorioMaisVendidos,
   getRelatorioValidadeProxima,

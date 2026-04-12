@@ -21,6 +21,27 @@ export const obterCaixaAberto = async () => {
 };
 
 /**
+ * Valida se o caixa informado ainda e o caixa aberto atual do usuario.
+ */
+export const validarCaixaAtual = async (caixaIdEsperado) => {
+  const caixaAtual = await obterCaixaAberto();
+
+  if (!caixaAtual) {
+    throw new Error(
+      'Seu caixa foi fechado em outra aba. Atualize a pagina e tente novamente.',
+    );
+  }
+
+  if (caixaAtual.id !== caixaIdEsperado) {
+    throw new Error(
+      'O caixa ativo mudou em outra aba. Atualize a pagina e tente novamente.',
+    );
+  }
+
+  return caixaAtual;
+};
+
+/**
  * Listar caixas
  */
 export const listarCaixas = async (params = {}) => {

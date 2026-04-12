@@ -38,11 +38,11 @@ const ClientesNovoPaginationControls = ({
           }}
           className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
         >
-          <option value={10}>10 por página</option>
-          <option value={20}>20 por página</option>
-          <option value={30}>30 por página</option>
-          <option value={50}>50 por página</option>
-          <option value={100}>100 por página</option>
+          <option value={10}>10 por pagina</option>
+          <option value={20}>20 por pagina</option>
+          <option value={30}>30 por pagina</option>
+          <option value={50}>50 por pagina</option>
+          <option value={100}>100 por pagina</option>
         </select>
       </div>
 
@@ -85,14 +85,14 @@ const ClientesNovoPaginationControls = ({
           disabled={paginaAtual === totalPaginas}
           className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Próxima
+          Proxima
         </button>
         <button
           onClick={() => setPaginaAtual(totalPaginas)}
           disabled={paginaAtual === totalPaginas}
           className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Última
+          Ultima
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,26 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { listarProdutos, registrarAviseme } from '../../services/shop.service';
+import { CatalogOrder, listarProdutos, registrarAviseme } from '../../services/shop.service';
 import { useCartStore } from '../../store/cart.store';
 import { useWishlistStore } from '../../store/wishlist.store';
 import { useAuthStore } from '../../store/auth.store';
 import { Produto } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { formatarMoeda } from '../../utils/format';
+
+const ORDER_OPTIONS: Array<{ value: CatalogOrder; label: string }> = [
+  { value: 'prontos', label: 'Mais prontos' },
+  { value: 'nome', label: 'A-Z' },
+  { value: 'menor_preco', label: 'Menor preço' },
+  { value: 'maior_preco', label: 'Maior preço' },
+];
+
+function nextCatalogOrder(current: CatalogOrder): CatalogOrder {
+  const currentIndex = ORDER_OPTIONS.findIndex((item) => item.value === current);
+  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ORDER_OPTIONS.length : 0;
+  return ORDER_OPTIONS[nextIndex].value;
+}
 
 export default function CatalogScreen() {
   const navigation = useNavigation<any>();
@@ -32,29 +45,55 @@ export default function CatalogScreen() {
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
+  const [somenteComImagem, setSomenteComImagem] = useState(false);
+  const [ordenacao, setOrdenacao] = useState<CatalogOrder>('prontos');
+
+  const ordenacaoLabel = useMemo(
+    () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Mais prontos',
+    [ordenacao]
+  );
+
+  const carregar = useCallback(
+    async (pg: number, q: string) => {
+      if (pg === 1) setCarregando(true);
+
+      try {
+        const { produtos: novos, total: totalRecebido } = await listarProdutos({
+          pagina: pg,
+          busca: q || undefined,
+          somenteComEstoque,
+          somenteComImagem,
+          ordenacao,
+        });
+
+        if (pg === 1) {
+          setProdutos(novos);
+        } else {
+          setProdutos((prev) => [...prev, ...novos]);
+        }
+
+        setTotal(totalRecebido);
+        setPagina(pg);
+      } catch {
+        if (pg === 1) {
+          setProdutos([]);
+          setTotal(0);
+        }
+      } finally {
+        setCarregando(false);
+      }
+    },
+    [ordenacao, somenteComEstoque, somenteComImagem]
+  );
 
   useEffect(() => {
     carregarWishlist();
-    carregar(1, '');
   }, []);
 
-  async function carregar(pg: number, q: string) {
-    if (pg === 1) setCarregando(true);
-    try {
-      const { produtos: novos, total: tot } = await listarProdutos({ pagina: pg, busca: q || undefined });
-      if (pg === 1) {
-        setProdutos(novos);
-      } else {
-        setProdutos((prev) => [...prev, ...novos]);
-      }
-      setTotal(tot);
-      setPagina(pg);
-    } catch {
-      // silencioso
-    } finally {
-      setCarregando(false);
-    }
-  }
+  useEffect(() => {
+    carregar(1, busca);
+  }, [carregar]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -70,16 +109,15 @@ export default function CatalogScreen() {
   }
 
   function carregarMais() {
-    if (produtos.length < total) {
+    if (!carregando && produtos.length < total) {
       carregar(pagina + 1, busca);
     }
   }
 
   function renderProduto({ item }: { item: Produto }) {
-    const semEstoque = Number(item.estoque ?? 0) <= 0;
-    const preco = item.promocao_ativa && item.preco_promocional
-      ? item.preco_promocional
-      : item.preco;
+    const estoqueDisponivel = Number(item.estoque ?? 0);
+    const semEstoque = Number.isFinite(estoqueDisponivel) && estoqueDisponivel <= 0;
+    const preco = item.promocao_ativa && item.preco_promocional ? item.preco_promocional : item.preco;
     const temPromocao = item.promocao_ativa && !!item.preco_promocional;
     const naWishlist = wishlistIds.includes(item.id);
 
@@ -88,71 +126,63 @@ export default function CatalogScreen() {
         <TouchableOpacity
           style={styles.cardTopo}
           onPress={() => navigation.navigate('DetalhesProduto', { produto: item })}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           {item.foto_url ? (
             <Image source={{ uri: item.foto_url }} style={styles.foto} resizeMode="contain" />
           ) : (
             <View style={[styles.foto, styles.fotoPlaceholder]}>
-              <Text style={{ fontSize: 32 }}>🛍️</Text>
+              <Ionicons name="image-outline" size={34} color={CORES.textoClaro} />
             </View>
           )}
-          {/* Badge promoção */}
+
           {temPromocao && !semEstoque && (
             <View style={styles.badgePromocao}>
               <Text style={styles.badgeTexto}>Oferta</Text>
             </View>
           )}
-          {/* Badge indisponível */}
+
           {semEstoque && (
             <View style={styles.badgeIndisponivel}>
               <Text style={styles.badgeTexto}>Indisponível</Text>
             </View>
           )}
-          {/* Botão wishlist */}
+
           <TouchableOpacity
             style={styles.botaoWishlist}
             onPress={() => {
               toggleWishlist(item.id);
             }}
           >
-            <Text style={{ fontSize: 16 }}>{naWishlist ? '❤️' : '🤍'}</Text>
+            <Ionicons
+              name={naWishlist ? 'heart' : 'heart-outline'}
+              size={16}
+              color={naWishlist ? '#DC2626' : CORES.primario}
+            />
           </TouchableOpacity>
         </TouchableOpacity>
 
         <View style={styles.cardInfo}>
-          <Text style={styles.produtoNome} numberOfLines={2}>{item.nome}</Text>
-
-          {/* Categoria */}
-          {item.categoria_nome ? (
-            <Text style={styles.categoriaTexto}>{item.categoria_nome}</Text>
-          ) : null}
-
-          {/* SKU */}
-          {item.codigo ? (
-            <Text style={styles.skuTexto}>SKU: {item.codigo}</Text>
-          ) : null}
-
-          {/* Status estoque */}
-          <Text style={[styles.estoqueTexto, semEstoque && styles.estoqueZero]}>
-            {semEstoque
-              ? 'Volto em breve'
-              : Number.isFinite(Number(item.estoque)) && Number(item.estoque) > 0
-              ? `Em estoque: ${item.estoque}`
-              : 'Disponível'}
+          <Text style={styles.produtoNome} numberOfLines={2}>
+            {item.nome}
           </Text>
 
-          {/* Preço */}
+          {item.categoria_nome ? <Text style={styles.categoriaTexto}>{item.categoria_nome}</Text> : null}
+          {item.codigo ? <Text style={styles.skuTexto}>SKU: {item.codigo}</Text> : null}
+
+          <Text style={[styles.estoqueTexto, semEstoque && styles.estoqueZero]}>
+            {semEstoque
+              ? 'Volta em breve'
+              : Number.isFinite(estoqueDisponivel) && estoqueDisponivel > 0
+                ? `Em estoque: ${estoqueDisponivel}`
+                : 'Disponível'}
+          </Text>
+
           <View style={styles.precoRow}>
-            {temPromocao && (
-              <Text style={styles.precoOriginal}>{formatarMoeda(item.preco)}</Text>
-            )}
-            <Text style={[styles.preco, semEstoque && styles.precoIndisponivel]}>
-              {formatarMoeda(preco)}
-            </Text>
+            {temPromocao && <Text style={styles.precoOriginal}>{formatarMoeda(item.preco)}</Text>}
+            <Text style={[styles.preco, semEstoque && styles.precoIndisponivel]}>{formatarMoeda(preco)}</Text>
           </View>
 
-          {/* Botão adicionar / Avise-me */}
           {semEstoque ? (
             <TouchableOpacity
               style={styles.botaoAviseme}
@@ -165,15 +195,17 @@ export default function CatalogScreen() {
                   );
                   return;
                 }
+
                 try {
                   const res = await registrarAviseme(user.email, item.id, item.nome);
-                  Alert.alert('✅ Pronto!', res.message || 'Você será avisado por e-mail quando o produto voltar.');
+                  Alert.alert('Tudo certo', res.message || 'Você será avisado por e-mail quando o produto voltar.');
                 } catch {
                   Alert.alert('Erro', 'Não foi possível registrar o aviso. Tente novamente.');
                 }
               }}
             >
-              <Text style={styles.botaoAvisemeTexto}>📧 Avise-me quando chegar</Text>
+              <Ionicons name="notifications-outline" size={14} color="#D97706" />
+              <Text style={styles.botaoAvisemeTexto}>Avise-me quando chegar</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -197,7 +229,6 @@ export default function CatalogScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Barra de busca + scanner */}
       <View style={styles.buscaRow}>
         <View style={styles.buscaContainer}>
           <Ionicons name="search-outline" size={18} color={CORES.textoClaro} style={{ marginRight: 6 }} />
@@ -215,12 +246,11 @@ export default function CatalogScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity
-          style={styles.botaoScanner}
-          onPress={() => navigation.navigate('BarcodeScanner')}
-        >
+
+        <TouchableOpacity style={styles.botaoScanner} onPress={() => navigation.navigate('BarcodeScanner')}>
           <Ionicons name="barcode-outline" size={22} color={CORES.primario} />
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.botaoScanner, { backgroundColor: CORES.primario }]}
           onPress={() => navigation.navigate('Carrinho')}
@@ -234,7 +264,36 @@ export default function CatalogScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Lista de produtos */}
+      <View style={styles.filtrosContainer}>
+        <View style={styles.filtrosRow}>
+          <TouchableOpacity
+            style={[styles.filtroChip, somenteComEstoque && styles.filtroChipAtivo]}
+            onPress={() => setSomenteComEstoque((value) => !value)}
+          >
+            <Text style={[styles.filtroChipTexto, somenteComEstoque && styles.filtroChipTextoAtivo]}>
+              Em estoque
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filtroChip, somenteComImagem && styles.filtroChipAtivo]}
+            onPress={() => setSomenteComImagem((value) => !value)}
+          >
+            <Text style={[styles.filtroChipTexto, somenteComImagem && styles.filtroChipTextoAtivo]}>
+              Com foto
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.filtroChip} onPress={() => setOrdenacao((value) => nextCatalogOrder(value))}>
+            <Text style={styles.filtroChipTexto}>{ordenacaoLabel}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.resumoCatalogo}>
+          Mostrando {produtos.length} de {total || produtos.length} produtos
+        </Text>
+      </View>
+
       {carregando && pagina === 1 ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={CORES.primario} />
@@ -247,15 +306,14 @@ export default function CatalogScreen() {
           numColumns={2}
           columnWrapperStyle={styles.colunaPar}
           contentContainerStyle={styles.lista}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CORES.primario} />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CORES.primario} />}
           onEndReached={carregarMais}
           onEndReachedThreshold={0.5}
           ListEmptyComponent={
             <View style={styles.vazio}>
-              <Text style={{ fontSize: 40 }}>🔍</Text>
+              <Ionicons name="search-outline" size={36} color={CORES.textoClaro} />
               <Text style={styles.vazioTexto}>Nenhum produto encontrado.</Text>
+              <Text style={styles.vazioSubtexto}>Tente buscar com outro termo ou ajustar os filtros.</Text>
             </View>
           }
         />
@@ -307,7 +365,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeNum: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  lista: { padding: ESPACO.sm },
+  filtrosContainer: {
+    paddingHorizontal: ESPACO.md,
+    paddingBottom: ESPACO.sm,
+    backgroundColor: CORES.superficie,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.borda,
+  },
+  filtrosRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.xs,
+  },
+  filtroChip: {
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+  },
+  filtroChipAtivo: {
+    borderColor: '#16A34A',
+    backgroundColor: '#F0FDF4',
+  },
+  filtroChipTexto: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: CORES.textoSecundario,
+  },
+  filtroChipTextoAtivo: {
+    color: '#166534',
+  },
+  resumoCatalogo: {
+    marginTop: ESPACO.xs,
+    fontSize: 12,
+    color: CORES.textoClaro,
+  },
+  lista: { padding: ESPACO.sm, paddingBottom: ESPACO.lg },
   colunaPar: { justifyContent: 'space-between', paddingHorizontal: ESPACO.xs },
   card: {
     width: '48%',
@@ -317,7 +412,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...SOMBRA,
   },
-  cardIndisponivel: { opacity: 0.8 },
+  cardIndisponivel: { opacity: 0.86 },
   cardTopo: { position: 'relative' },
   foto: { width: '100%', height: 130 },
   fotoPlaceholder: {
@@ -361,7 +456,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardInfo: { padding: ESPACO.sm },
-  produtoNome: { fontSize: FONTE.normal, fontWeight: '600', color: CORES.texto, marginBottom: 2, lineHeight: 18 },
+  produtoNome: {
+    fontSize: FONTE.normal,
+    fontWeight: '600',
+    color: CORES.texto,
+    marginBottom: 2,
+    lineHeight: 18,
+  },
   categoriaTexto: { fontSize: 10, color: CORES.textoClaro, marginBottom: 1 },
   skuTexto: { fontSize: 10, color: CORES.textoClaro, marginBottom: 2 },
   estoqueTexto: { fontSize: 10, color: '#10B981', fontWeight: '500', marginBottom: 4 },
@@ -385,14 +486,18 @@ const styles = StyleSheet.create({
   },
   botaoAdicionarTexto: { color: '#fff', fontSize: FONTE.pequena, fontWeight: '600' },
   botaoAviseme: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     borderWidth: 1,
     borderColor: '#D97706',
     borderRadius: RAIO.sm,
     paddingVertical: 7,
-    alignItems: 'center',
   },
   botaoAvisemeTexto: { color: '#D97706', fontSize: 10, fontWeight: '600' },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  vazio: { alignItems: 'center', paddingTop: 60, gap: 12 },
-  vazioTexto: { fontSize: FONTE.grande, color: CORES.textoSecundario },
+  vazio: { alignItems: 'center', paddingTop: 60, gap: 8 },
+  vazioTexto: { fontSize: FONTE.grande, fontWeight: '600', color: CORES.textoSecundario },
+  vazioSubtexto: { fontSize: FONTE.normal, color: CORES.textoClaro, textAlign: 'center' },
 });

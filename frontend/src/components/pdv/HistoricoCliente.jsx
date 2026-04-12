@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard } from 'lucide-react';
+import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard, Copy, Check } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
 
@@ -16,6 +16,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
   const [expandidos, setExpandidos] = useState({});
   const [detalhesVenda, setDetalhesVenda] = useState({});
   const [loadingDetalhes, setLoadingDetalhes] = useState({});
+  const [copiadoSku, setCopiadoSku] = useState('');
 
   useEffect(() => {
     carregarHistorico();
@@ -98,7 +99,29 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
     return origem.map((item) => ({
       ...item,
       nome: item?.nome || item?.produto_nome || item?.produto?.nome || item?.servico_descricao || 'Item',
+      sku:
+        item?.sku ||
+        item?.produto_codigo ||
+        item?.codigo ||
+        item?.produto?.codigo ||
+        item?.produto?.sku ||
+        '',
     }));
+  };
+
+  const copiarSkuItem = async (sku, chave) => {
+    if (!sku) return;
+
+    try {
+      await navigator.clipboard.writeText(String(sku));
+      setCopiadoSku(chave);
+      window.setTimeout(() => {
+        setCopiadoSku((atual) => (atual === chave ? '' : atual));
+      }, 1800);
+    } catch (error) {
+      console.error('Erro ao copiar SKU:', error);
+      toast.error('Nao foi possivel copiar o codigo do item');
+    }
   };
 
   const obterPagamentosVenda = (venda) => {
@@ -381,9 +404,34 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                                 </tr>
                               </thead>
                               <tbody>
-                                {itensDaVenda.map((item) => (
-                                  <tr key={`${item.nome}-${item.quantidade}-${item.preco_unitario}-${item.subtotal}`} className="border-t border-gray-100">
-                                    <td className="px-3 py-2 text-gray-900">{item.nome}</td>
+                                {itensDaVenda.map((item, index) => {
+                                  const itemSku = String(item.sku || '').trim();
+                                  const chaveSku = `${venda.id}-${itemSku || item.nome}-${index}`;
+
+                                  return (
+                                  <tr key={`${item.nome}-${item.quantidade}-${item.preco_unitario}-${item.subtotal}-${index}`} className="border-t border-gray-100">
+                                    <td className="px-3 py-2 text-gray-900">
+                                      <div className="space-y-1">
+                                        <div>{item.nome}</div>
+                                        {itemSku && (
+                                          <div className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                                            <span className="font-mono">SKU: {itemSku}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => copiarSkuItem(itemSku, chaveSku)}
+                                              className="text-gray-400 hover:text-gray-700 transition-colors"
+                                              title="Copiar SKU"
+                                            >
+                                              {copiadoSku === chaveSku ? (
+                                                <Check className="w-3.5 h-3.5 text-green-600" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5" />
+                                              )}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
                                     <td className="px-3 py-2 text-right text-gray-700">
                                       {Number(item.quantidade) % 1 === 0
                                         ? Number(item.quantidade).toFixed(0)
@@ -392,7 +440,8 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                                     <td className="px-3 py-2 text-right text-gray-700">{formatBRL(item.preco_unitario)}</td>
                                     <td className="px-3 py-2 text-right font-medium text-gray-900">{formatBRL(item.subtotal)}</td>
                                   </tr>
-                                ))}
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>

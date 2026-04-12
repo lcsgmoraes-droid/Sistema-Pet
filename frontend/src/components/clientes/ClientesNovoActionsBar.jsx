@@ -14,9 +14,9 @@ const ClientesNovoActionsBar = ({
       : tipoFiltro === "fornecedor"
         ? "Fornecedor"
         : tipoFiltro === "veterinario"
-          ? "Veterinário"
+          ? "Veterinario"
           : tipoFiltro === "funcionario"
-            ? "Funcionário"
+            ? "Funcionario"
             : "Cadastro";
 
   return (
@@ -25,7 +25,7 @@ const ClientesNovoActionsBar = ({
         <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           type="text"
-          placeholder="Buscar por código, nome, CPF/CNPJ, email ou telefone..."
+          placeholder="Buscar por codigo, nome, CPF/CNPJ, email ou telefone..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => {

@@ -8,6 +8,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ModulosProvider } from "./contexts/ModulosContext";
 const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Register = lazy(() => import("./pages/Register"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const preloadPessoas = () => import("./pages/ClientesNovo");
@@ -27,6 +28,9 @@ const preloadProdutos = () => import("./pages/Produtos");
 const Produtos = lazy(preloadProdutos);
 const ProdutosNovo = lazy(() => import("./pages/ProdutosNovo"));
 const ProdutosRelatorio = lazy(() => import("./pages/ProdutosRelatorio"));
+const ProdutosValorizacaoEstoque = lazy(
+  () => import("./pages/ProdutosValorizacaoEstoque"),
+);
 const ProdutosBalanco = lazy(() => import("./pages/ProdutosBalanco"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
 const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
@@ -266,6 +270,7 @@ function App() {
               <Routes>
                 {/* Rotas Públicas */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/recuperar-senha" element={<ForgotPassword />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/rastreio/:token" element={<RastreioPublico />} />
@@ -391,6 +396,14 @@ function App() {
                   <Route
                     path="produtos/relatorio"
                     element={<ProdutosRelatorio />}
+                  />
+                  <Route
+                    path="produtos/valorizacao-estoque"
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <ProdutosValorizacaoEstoque />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="produtos/balanco"

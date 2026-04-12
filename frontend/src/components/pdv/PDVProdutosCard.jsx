@@ -47,7 +47,7 @@ export default function PDVProdutosCard({
     >
       <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
         <Package className="w-5 h-5 mr-2 text-blue-600" />
-        Produtos e Serviços
+        Produtos e Servicos
       </h2>
 
       <div
@@ -63,7 +63,7 @@ export default function PDVProdutosCard({
             onChange={(e) => onBuscarProdutoChange(e.target.value)}
             onFocus={onBuscarProdutoFocus}
             onKeyDown={onBuscarProdutoKeyDown}
-            placeholder="Digite o nome do produto, código de barras ou serviço..."
+            placeholder="Digite o nome do produto, codigo de barras ou servico..."
             disabled={modoVisualizacao}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
             autoFocus={!modoVisualizacao}
@@ -87,6 +87,8 @@ export default function PDVProdutosCard({
                 return (
                   <button
                     key={produto.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => onSelecionarProdutoSugerido(produto)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
                   >
@@ -110,17 +112,17 @@ export default function PDVProdutosCard({
                         {produto.tipo_produto === "VARIACAO" &&
                           formatarVariacao(produto) && (
                             <div className="text-xs text-blue-600 font-medium mt-0.5">
-                              🔹 {formatarVariacao(produto)}
+                              Variacao: {formatarVariacao(produto)}
                             </div>
                           )}
                         <div className="text-sm text-gray-500">
-                          {produto.codigo && `Cód: ${produto.codigo}`}
+                          {produto.codigo && `Cod: ${produto.codigo}`}
                           {produto.tipo_produto === "KIT" &&
                           produto.tipo_kit === "VIRTUAL"
                             ? produto.estoque_virtual !== undefined &&
-                              ` • Estoque: ${Math.floor(produto.estoque_virtual)}`
+                              ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
                             : produto.estoque_atual !== undefined &&
-                              ` • Estoque: ${Math.floor(produto.estoque_atual)}`}
+                              ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
                         </div>
                       </div>
                       <div className="text-lg font-semibold text-green-600">
@@ -138,7 +140,7 @@ export default function PDVProdutosCard({
         <div className="text-center py-12 text-gray-400">
           <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
           <p>Nenhum item adicionado</p>
-          <p className="text-sm mt-1">Busque e adicione produtos ou serviços</p>
+          <p className="text-sm mt-1">Busque e adicione produtos ou servicos</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -153,7 +155,7 @@ export default function PDVProdutosCard({
               item.composicao_kit &&
               item.composicao_kit.length > 0;
             const itemSemEstoque =
-              item.tipo_produto === "KIT VIRTUAL"
+              item.tipo_produto === "KIT" && item.tipo_kit === "VIRTUAL"
                 ? item.estoque_virtual !== undefined &&
                   Math.floor(item.estoque_virtual) <= 0
                 : item.estoque_atual !== undefined &&
@@ -173,6 +175,7 @@ export default function PDVProdutosCard({
                   <div className="flex-1 flex items-start gap-2">
                     {hasComposicao && (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onToggleKitExpansion(index);
@@ -194,8 +197,9 @@ export default function PDVProdutosCard({
                         </div>
                         {codigoProdutoExibicao && (
                           <div className="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <span>Cód: {codigoProdutoExibicao}</span>
+                            <span>Cod: {codigoProdutoExibicao}</span>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onCopiarCodigoProdutoCarrinho(
@@ -204,7 +208,7 @@ export default function PDVProdutosCard({
                                 );
                               }}
                               className="text-gray-400 hover:text-gray-700"
-                              title="Copiar código do produto"
+                              title="Copiar codigo do produto"
                             >
                               {copiadoCodigoItem === chaveCodigoItem ? (
                                 <Check className="w-3.5 h-3.5 text-green-600" />
@@ -216,9 +220,12 @@ export default function PDVProdutosCard({
                         )}
                         {vendaAtual.cliente && itemSemEstoque && (
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (!pendenciasProdutoIds.includes(item.produto_id)) {
+                              if (
+                                !pendenciasProdutoIds.includes(item.produto_id)
+                              ) {
                                 onAdicionarNaListaEsperaRapido(
                                   {
                                     id: item.produto_id,
@@ -230,7 +237,7 @@ export default function PDVProdutosCard({
                             }}
                             title={
                               pendenciasProdutoIds.includes(item.produto_id)
-                                ? "Já na lista de espera"
+                                ? "Ja na lista de espera"
                                 : "Adicionar a lista de espera"
                             }
                             className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium transition-colors ${
@@ -269,6 +276,7 @@ export default function PDVProdutosCard({
                   >
                     <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg">
                       <button
+                        type="button"
                         onClick={() => onAlterarQuantidade(index, -1)}
                         disabled={modoVisualizacao}
                         className="p-2 hover:bg-gray-100 rounded-l-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -284,6 +292,7 @@ export default function PDVProdutosCard({
                         className="w-20 px-2 py-1 text-center font-medium border-none focus:ring-0 disabled:bg-gray-50"
                       />
                       <button
+                        type="button"
                         onClick={() => onAlterarQuantidade(index, 1)}
                         disabled={modoVisualizacao}
                         className="p-2 hover:bg-gray-100 rounded-r-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -302,6 +311,7 @@ export default function PDVProdutosCard({
                     />
 
                     <button
+                      type="button"
                       onClick={() => onRemoverItem(index)}
                       disabled={modoVisualizacao}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
@@ -314,7 +324,7 @@ export default function PDVProdutosCard({
                 {hasComposicao && isExpanded && (
                   <div className="ml-7 mt-3 p-3 bg-white rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
-                      Composição do KIT
+                      Composicao do KIT
                     </div>
                     <div className="space-y-1.5">
                       {item.composicao_kit.map((componente, compIndex) => (
@@ -335,7 +345,7 @@ export default function PDVProdutosCard({
                       ))}
                     </div>
                     <div className="mt-2 text-xs text-gray-500 italic">
-                      Componentes apenas informativos (não editáveis)
+                      Componentes apenas informativos (nao editaveis)
                     </div>
                   </div>
                 )}
@@ -353,13 +363,13 @@ export default function PDVProdutosCard({
                       onChange={(e) =>
                         onAtualizarPetItem(
                           index,
-                          e.target.value ? parseInt(e.target.value) : null,
+                          e.target.value ? parseInt(e.target.value, 10) : null,
                         )
                       }
                       disabled={modoVisualizacao}
                       className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
                     >
-                      <option value="">Não especificado</option>
+                      <option value="">Nao especificado</option>
                       {vendaAtual.cliente.pets.map((pet) => (
                         <option key={pet.id} value={pet.id}>
                           {pet.codigo} - {pet.nome}
