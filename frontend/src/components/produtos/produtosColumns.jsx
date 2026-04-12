@@ -459,13 +459,14 @@ export function createProdutosColunas() {
       const estoqueAtual = obterEstoqueVisualProduto(produto);
       const reservado = produto.estoque_reservado || 0;
       const estoqueDisponivel = estoqueAtual - reservado;
+      const estoqueFormatado = parseFloat(estoqueDisponivel.toFixed(2));
 
       return (
         <td className="px-4 py-3 text-center">
           {produto.controlar_estoque ? (
             <div className="flex flex-col items-center">
               <span className={`text-sm ${props.getCorEstoque(produto)}`}>
-                {estoqueDisponivel}
+                {estoqueFormatado}
               </span>
               {reservado > 0 && (
                 <span
