@@ -158,37 +158,37 @@ def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgo
 
 
 def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[str, str, str]:
-    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+        saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
         subject = "Recuperacao de senha do app - Pet Shop Pro"
-    html_body = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
-        <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+        html_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+                <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
                     <h1 style="margin: 0; font-size: 22px;">Recuperar senha no app</h1>
-        </div>
-        <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
-          <p>Ola{saudacao}.</p>
+                </div>
+                <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+                    <p>Ola{saudacao}.</p>
                     <p>Recebemos um pedido para redefinir a sua senha no aplicativo.</p>
                     <p>Abra o app, entre na tela <strong>Recuperar senha</strong> e use o token abaixo:</p>
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
-            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
-            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
-          </div>
-          <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
+                        <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+                    </div>
+                    <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
                     <p>Este e-mail e valido apenas para a recuperacao dentro do app.</p>
-          <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
-        </div>
-      </body>
-    </html>
-    """
-    text_body = (
+                    <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
+                </div>
+            </body>
+        </html>
+        """
+        text_body = (
                 "Recuperacao de senha do app - Pet Shop Pro\n\n"
                 "Abra o app e use este token na tela Recuperar senha:\n"
-        f"{reset_token}\n\n"
-        f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
-        "Se voce nao pediu essa alteracao, ignore este e-mail."
-    )
-    return subject, html_body, text_body
+                f"{reset_token}\n\n"
+                f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+                "Se voce nao pediu essa alteracao, ignore este e-mail."
+        )
+        return subject, html_body, text_body
 
 
 def _build_reset_password_email_for_site(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
