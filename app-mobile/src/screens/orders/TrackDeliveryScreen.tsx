@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRoute } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -11,19 +11,28 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 import api from "../../services/api";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 
-const STATUS_ROTA: Record<
-  string,
-  { emoji: string; label: string; cor: string }
-> = {
-  pendente: { emoji: "📦", label: "Preparando", cor: "#F59E0B" },
-  em_andamento: { emoji: "🛵", label: "Em rota", cor: "#3B82F6" },
-  em_rota: { emoji: "🛵", label: "A caminho", cor: "#3B82F6" },
-  concluida: { emoji: "✅", label: "Entregue", cor: "#10B981" },
-  entregue: { emoji: "✅", label: "Entregue", cor: "#10B981" },
+type Coordenada = {
+  latitude: number;
+  longitude: number;
+};
+
+type GpsPosicao = {
+  lat: number;
+  lon: number;
+  atualizada_em?: string | null;
+  fonte?: string | null;
+};
+
+const STATUS_ROTA: Record<string, { label: string; cor: string }> = {
+  pendente: { label: "Preparando", cor: "#F59E0B" },
+  em_andamento: { label: "Em rota", cor: "#3B82F6" },
+  em_rota: { label: "A caminho", cor: "#3B82F6" },
+  concluida: { label: "Entregue", cor: "#10B981" },
+  entregue: { label: "Entregue", cor: "#10B981" },
 };
 
 const STATUS_PARADA: Record<
@@ -44,7 +53,7 @@ const STATUS_PARADA: Record<
   },
   em_rota: {
     emoji: "🛵",
-    label: "A caminho!",
+    label: "A caminho",
     cor: "#1E40AF",
     corFundo: "#DBEAFE",
   },
@@ -68,8 +77,45 @@ interface RastreioData {
     status_parada: string;
     endereco_entrega?: string;
     data_entrega?: string;
-    ultima_posicao_gps?: { lat: number; lon: number };
+    ultima_posicao_gps?: GpsPosicao;
   };
+}
+
+function easeInOut(progress: number) {
+  if (progress < 0.5) {
+    return 2 * progress * progress;
+  }
+  return 1 - Math.pow(-2 * progress + 2, 2) / 2;
+}
+
+function samePoint(a: Coordenada | null, b: Coordenada) {
+  if (!a) return false;
+  return (
+    Math.abs(a.latitude - b.latitude) < 0.000001 &&
+    Math.abs(a.longitude - b.longitude) < 0.000001
+  );
+}
+
+function computeBearing(from: Coordenada, to: Coordenada) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const toDeg = (value: number) => (value * 180) / Math.PI;
+  const lat1 = toRad(from.latitude);
+  const lat2 = toRad(to.latitude);
+  const diffLong = toRad(to.longitude - from.longitude);
+  const y = Math.sin(diffLong) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(diffLong);
+
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function appendTrailPoint(points: Coordenada[], next: Coordenada) {
+  const last = points[points.length - 1];
+  if (last && samePoint(last, next)) {
+    return points;
+  }
+  return [...points, next].slice(-40);
 }
 
 export default function TrackDeliveryScreen() {
@@ -80,7 +126,13 @@ export default function TrackDeliveryScreen() {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
-  const [intervaloMs, setIntervaloMs] = useState(10_000);
+  const [intervaloMs, setIntervaloMs] = useState(6_000);
+  const [vehiclePosition, setVehiclePosition] = useState<Coordenada | null>(null);
+  const [routeTrail, setRouteTrail] = useState<Coordenada[]>([]);
+  const [markerHeading, setMarkerHeading] = useState(0);
+  const mapRef = useRef<MapView | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const livePointRef = useRef<Coordenada | null>(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -88,7 +140,7 @@ export default function TrackDeliveryScreen() {
       setDados(resp.data);
       setUltimaAtualizacao(new Date());
     } catch {
-      // silencioso — mostra o que tem
+      // Mantem o ultimo estado exibido se a rede oscilar.
     } finally {
       setCarregando(false);
       setRefreshing(false);
@@ -97,19 +149,92 @@ export default function TrackDeliveryScreen() {
 
   useEffect(() => {
     const paradasAntes = dados?.rota?.paradas_antes ?? 99;
-    setIntervaloMs(paradasAntes <= 1 ? 5_000 : 10_000);
+    setIntervaloMs(paradasAntes <= 1 ? 3_000 : 6_000);
   }, [dados?.rota?.paradas_antes]);
 
   useEffect(() => {
     carregar();
-    // Polling adaptativo: 10s quando longe, 5s quando perto.
     const interval = setInterval(() => {
       if (dados?.rota?.status_parada !== "entregue") {
-        carregar();
+        void carregar();
       }
     }, intervaloMs);
     return () => clearInterval(interval);
   }, [carregar, dados?.rota?.status_parada, intervaloMs]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const gps = dados?.rota?.ultima_posicao_gps;
+    if (!gps) {
+      livePointRef.current = null;
+      setVehiclePosition(null);
+      setRouteTrail([]);
+      return;
+    }
+
+    const nextPoint = {
+      latitude: gps.lat,
+      longitude: gps.lon,
+    };
+
+    if (!livePointRef.current) {
+      livePointRef.current = nextPoint;
+      setVehiclePosition(nextPoint);
+      setRouteTrail([nextPoint]);
+      return;
+    }
+
+    if (samePoint(livePointRef.current, nextPoint)) {
+      return;
+    }
+
+    const startPoint = livePointRef.current;
+    setMarkerHeading(computeBearing(startPoint, nextPoint));
+    setRouteTrail((prev) => appendTrailPoint(prev, nextPoint));
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    const startedAt = Date.now();
+    const duration = 1600;
+
+    mapRef.current?.animateCamera({ center: nextPoint }, { duration });
+
+    const animate = () => {
+      const progress = Math.min((Date.now() - startedAt) / duration, 1);
+      const eased = easeInOut(progress);
+      const currentPoint = {
+        latitude:
+          startPoint.latitude + (nextPoint.latitude - startPoint.latitude) * eased,
+        longitude:
+          startPoint.longitude + (nextPoint.longitude - startPoint.longitude) * eased,
+      };
+
+      livePointRef.current = currentPoint;
+      setVehiclePosition(currentPoint);
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        livePointRef.current = nextPoint;
+        setVehiclePosition(nextPoint);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [
+    dados?.rota?.ultima_posicao_gps?.lat,
+    dados?.rota?.ultima_posicao_gps?.lon,
+    dados?.rota?.ultima_posicao_gps?.atualizada_em,
+  ]);
 
   function abrirGoogleMaps() {
     const gps = dados?.rota?.ultima_posicao_gps;
@@ -138,14 +263,11 @@ export default function TrackDeliveryScreen() {
     return (
       <View style={styles.loading}>
         <Text style={{ fontSize: 40 }}>😕</Text>
-        <Text style={styles.erroText}>
-          Não foi possível carregar o rastreio
-        </Text>
+        <Text style={styles.erroText}>Nao foi possivel carregar o rastreio.</Text>
       </View>
     );
   }
 
-  // Pedido sem entrega (retirada na loja)
   if (!dados.tem_entrega) {
     return (
       <ScrollView
@@ -155,7 +277,7 @@ export default function TrackDeliveryScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              carregar();
+              void carregar();
             }}
             tintColor={CORES.primario}
           />
@@ -171,9 +293,7 @@ export default function TrackDeliveryScreen() {
           <View style={styles.palavraChaveCard}>
             <Ionicons name="key" size={28} color={CORES.primario} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.palavraChaveLabel}>
-                Fale essa palavra no caixa:
-              </Text>
+              <Text style={styles.palavraChaveLabel}>Fale essa palavra no caixa:</Text>
               <Text style={styles.palavraChaveValor}>
                 {dados.palavra_chave_retirada.toUpperCase()}
               </Text>
@@ -188,8 +308,8 @@ export default function TrackDeliveryScreen() {
             color={CORES.textoSecundario}
           />
           <Text style={styles.infoTexto}>
-            Apresente essa tela ou fale a palavra-chave ao atendente para
-            retirar seu pedido.
+            Apresente essa tela ou fale a palavra-chave ao atendente para retirar seu
+            pedido.
           </Text>
         </View>
       </ScrollView>
@@ -198,7 +318,6 @@ export default function TrackDeliveryScreen() {
 
   const rota = dados.rota;
 
-  // Pedido pago mas sem rota ainda
   if (!rota) {
     return (
       <ScrollView
@@ -208,7 +327,7 @@ export default function TrackDeliveryScreen() {
             refreshing={refreshing}
             onRefresh={() => {
               setRefreshing(true);
-              carregar();
+              void carregar();
             }}
             tintColor={CORES.primario}
           />
@@ -227,14 +346,13 @@ export default function TrackDeliveryScreen() {
             color={CORES.textoSecundario}
           />
           <Text style={styles.infoTexto}>
-            Assim que o entregador sair com seu pedido, você poderá acompanhar
-            aqui.
+            Assim que o entregador sair com seu pedido, o acompanhamento aparece aqui.
           </Text>
         </View>
 
         {ultimaAtualizacao && (
           <Text style={styles.atualizadoEm}>
-            🔄 Atualizado às{" "}
+            Atualizado as{" "}
             {ultimaAtualizacao.toLocaleTimeString("pt-BR", {
               hour: "2-digit",
               minute: "2-digit",
@@ -252,6 +370,15 @@ export default function TrackDeliveryScreen() {
     rota.total_paradas > 0 ? rota.entregues / rota.total_paradas : 0;
   const podeAbrirMapa =
     rota.ultima_posicao_gps !== undefined || Boolean(rota.endereco_entrega);
+  const gpsTempoReal = rota.ultima_posicao_gps?.fonte === "rota_atual";
+  const gpsAtualizadoEm = rota.ultima_posicao_gps?.atualizada_em
+    ? new Date(rota.ultima_posicao_gps.atualizada_em).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   return (
     <ScrollView
@@ -261,13 +388,12 @@ export default function TrackDeliveryScreen() {
           refreshing={refreshing}
           onRefresh={() => {
             setRefreshing(true);
-            carregar();
+            void carregar();
           }}
           tintColor={CORES.primario}
         />
       }
     >
-      {/* Hero status */}
       <View
         style={[
           styles.heroCard,
@@ -279,28 +405,21 @@ export default function TrackDeliveryScreen() {
         <Text style={styles.heroSubtitulo}>{dados.mensagem}</Text>
       </View>
 
-      {/* Entregador */}
       <View style={styles.entregadorCard}>
         <View style={styles.entregadorIcone}>
           <Ionicons name="bicycle" size={24} color={CORES.primario} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.entregadorNome}>{rota.entregador_nome}</Text>
-          <Text style={styles.entregadorLabel}>Entregador responsável</Text>
+          <Text style={styles.entregadorLabel}>Entregador responsavel</Text>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: statusRotaCfg.cor + "22" },
-          ]}
-        >
+        <View style={[styles.statusBadge, { backgroundColor: `${statusRotaCfg.cor}22` }]}>
           <Text style={[styles.statusBadgeTexto, { color: statusRotaCfg.cor }]}>
-            {statusRotaCfg.emoji} {statusRotaCfg.label}
+            {statusRotaCfg.label}
           </Text>
         </View>
       </View>
 
-      {/* Progresso da rota */}
       {rota.total_paradas > 1 && rota.status_parada !== "entregue" && (
         <View style={styles.progressoCard}>
           <Text style={styles.progressoTitulo}>Progresso da rota</Text>
@@ -313,23 +432,22 @@ export default function TrackDeliveryScreen() {
             />
           </View>
           <Text style={styles.progressoTexto}>
-            {rota.entregues} de {rota.total_paradas} entregas concluídas
+            {rota.entregues} de {rota.total_paradas} entregas concluidas
           </Text>
           {rota.paradas_antes > 0 && (
             <Text style={styles.progressoAntes}>
-              📍 {rota.paradas_antes}{" "}
-              {rota.paradas_antes === 1 ? "parada" : "paradas"} antes da sua
+              {rota.paradas_antes} {rota.paradas_antes === 1 ? "parada" : "paradas"} antes
+              da sua
             </Text>
           )}
           {rota.paradas_antes === 0 && rota.status_parada === "pendente" && (
             <Text style={[styles.progressoAntes, { color: "#2563EB" }]}>
-              🎯 Você é o próximo!
+              Voce e o proximo da rota.
             </Text>
           )}
         </View>
       )}
 
-      {/* Endereço de entrega */}
       {rota.endereco_entrega && (
         <View style={styles.enderecoCard}>
           <Ionicons name="location" size={20} color={CORES.primario} />
@@ -346,36 +464,46 @@ export default function TrackDeliveryScreen() {
         </View>
       )}
 
-      {!!rota.ultima_posicao_gps && (
+      {vehiclePosition && (
         <View style={styles.mapaCard}>
-          <Text style={styles.mapaTitulo}>Posição atual do entregador</Text>
+          <Text style={styles.mapaTitulo}>Rota ao vivo do entregador</Text>
+          <Text style={styles.mapaSubtitulo}>
+            {gpsTempoReal
+              ? "Atualizando com o GPS corrente do celular do entregador."
+              : "Exibindo o ultimo ponto confirmado da rota."}
+          </Text>
+          {gpsAtualizadoEm && (
+            <Text style={styles.mapaLegenda}>Ultima leitura: {gpsAtualizadoEm}</Text>
+          )}
+
           <MapView
+            ref={mapRef}
             style={styles.mapa}
             initialRegion={{
-              latitude: rota.ultima_posicao_gps.lat,
-              longitude: rota.ultima_posicao_gps.lon,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            region={{
-              latitude: rota.ultima_posicao_gps.lat,
-              longitude: rota.ultima_posicao_gps.lon,
+              latitude: vehiclePosition.latitude,
+              longitude: vehiclePosition.longitude,
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             }}
           >
-            <Marker
-              coordinate={{
-                latitude: rota.ultima_posicao_gps.lat,
-                longitude: rota.ultima_posicao_gps.lon,
-              }}
-              title="Entregador"
-              description="Posição atual"
-            >
+            {routeTrail.length > 1 && (
+              <Polyline
+                coordinates={routeTrail}
+                strokeColor="#2563EB"
+                strokeWidth={4}
+                lineDashPattern={[1]}
+              />
+            )}
+            <Marker coordinate={vehiclePosition} anchor={{ x: 0.5, y: 0.5 }} flat>
               <View style={styles.markerWrap}>
                 <View style={styles.markerPulse} />
                 <View style={styles.markerIconCircle}>
-                  <Text style={styles.markerEmoji}>🏍️</Text>
+                  <Ionicons
+                    name="car-sport"
+                    size={14}
+                    color="#fff"
+                    style={{ transform: [{ rotate: `${markerHeading}deg` }] }}
+                  />
                 </View>
               </View>
             </Marker>
@@ -383,7 +511,6 @@ export default function TrackDeliveryScreen() {
         </View>
       )}
 
-      {/* Data de entrega */}
       {rota.data_entrega && (
         <View style={styles.entregueCard}>
           <Ionicons name="checkmark-circle" size={24} color="#10B981" />
@@ -404,7 +531,7 @@ export default function TrackDeliveryScreen() {
 
       {ultimaAtualizacao && (
         <Text style={styles.atualizadoEm}>
-          🔄 Atualizado às{" "}
+          Atualizado as{" "}
           {ultimaAtualizacao.toLocaleTimeString("pt-BR", {
             hour: "2-digit",
             minute: "2-digit",
@@ -414,7 +541,7 @@ export default function TrackDeliveryScreen() {
 
       {rota.status_parada !== "entregue" && (
         <Text style={styles.autoAtualizaAviso}>
-          Atualizado automaticamente a cada {intervaloMs / 1000} segundos
+          Atualizacao automatica a cada {intervaloMs / 1000} segundos
         </Text>
       )}
     </ScrollView>
@@ -430,7 +557,6 @@ const styles = StyleSheet.create({
     color: CORES.textoSecundario,
     textAlign: "center",
   },
-
   heroCard: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.md,
@@ -446,7 +572,6 @@ const styles = StyleSheet.create({
     color: CORES.textoSecundario,
     textAlign: "center",
   },
-
   entregadorCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -476,7 +601,6 @@ const styles = StyleSheet.create({
     borderRadius: RAIO.circulo,
   },
   statusBadgeTexto: { fontSize: FONTE.pequena, fontWeight: "600" },
-
   progressoCard: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.md,
@@ -506,7 +630,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#92400E",
   },
-
   enderecoCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -535,7 +658,6 @@ const styles = StyleSheet.create({
     color: CORES.primario,
     fontWeight: "600",
   },
-
   mapaCard: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.md,
@@ -545,8 +667,17 @@ const styles = StyleSheet.create({
   },
   mapaTitulo: {
     fontSize: FONTE.normal,
-    fontWeight: "600",
+    fontWeight: "700",
     color: CORES.texto,
+  },
+  mapaSubtitulo: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+  },
+  mapaLegenda: {
+    fontSize: FONTE.pequena,
+    color: CORES.primario,
+    fontWeight: "600",
   },
   mapa: {
     width: "100%",
@@ -559,25 +690,21 @@ const styles = StyleSheet.create({
   },
   markerPulse: {
     position: "absolute",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(37,99,235,0.25)",
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(37,99,235,0.18)",
   },
   markerIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "#2563EB",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },
-  markerEmoji: {
-    fontSize: 12,
-  },
-
   palavraChaveCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -594,7 +721,6 @@ const styles = StyleSheet.create({
     color: CORES.primario,
     letterSpacing: 2,
   },
-
   infoCard: {
     flexDirection: "row",
     gap: ESPACO.sm,
@@ -605,7 +731,6 @@ const styles = StyleSheet.create({
     ...SOMBRA,
   },
   infoTexto: { fontSize: FONTE.normal, color: CORES.textoSecundario, flex: 1 },
-
   entregueCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -616,7 +741,6 @@ const styles = StyleSheet.create({
   },
   entregueLabel: { fontSize: FONTE.pequena, color: "#065F46" },
   entregueData: { fontSize: FONTE.normal, fontWeight: "700", color: "#065F46" },
-
   atualizadoEm: {
     textAlign: "center",
     fontSize: FONTE.pequena,

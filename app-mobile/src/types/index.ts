@@ -128,6 +128,8 @@ export interface PetFormData {
   observacoes?: string;
 }
 
+export type VetFocusSection = "vacinas" | "exames" | "consultas";
+
 // =====================
 // PRODUTOS
 // =====================
@@ -234,8 +236,8 @@ export type LojaStackParamList = {
 };
 
 export type PetsStackParamList = {
-  ListaPets: undefined;
+  ListaPets: { focusSection?: VetFocusSection } | undefined;
   FormPet: { pet?: Pet };
   CalculadoraRacao: { pet?: Pet };
-  DetalhePet: { pet: Pet };
+  DetalhePet: { pet: Pet; focusSection?: VetFocusSection };
 };

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,22 +12,23 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../../store/auth.store';
 import { updateProfile } from '../../services/auth.service';
-import { obterStatusPush } from '../../services/pets.service';
+import { listarPets, obterStatusPush } from '../../services/pets.service';
+import { Pet, PushStatus, VetFocusSection } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { PONTOS } from '../../config';
 import { formatarMoeda } from '../../utils/format';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const { user, logout, updateUser } = useAuthStore();
   const [editando, setEditando] = useState(false);
   const [editandoEndereco, setEditandoEndereco] = useState(false);
   const [nome, setNome] = useState(user?.nome ?? '');
   const [telefone, setTelefone] = useState(user?.telefone ?? '');
   const [cpf, setCpf] = useState(user?.cpf ?? '');
-
-  // Endereço
   const [cep, setCep] = useState(user?.cep ?? '');
   const [rua, setRua] = useState(user?.endereco ?? '');
   const [numero, setNumero] = useState(user?.numero ?? '');
@@ -35,37 +36,69 @@ export default function ProfileScreen() {
   const [cidade, setCidade] = useState(user?.cidade ?? '');
   const [estado, setEstado] = useState(user?.estado ?? '');
   const [buscandoCep, setBuscandoCep] = useState(false);
-
   const [salvando, setSalvando] = useState(false);
-  const [pushStatus, setPushStatus] = useState<any>(null);
+  const [carregandoSaude, setCarregandoSaude] = useState(false);
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pets, setPets] = useState<Pet[]>([]);
 
   useEffect(() => {
-    obterStatusPush().then(setPushStatus).catch(() => setPushStatus(null));
+    setNome(user?.nome ?? '');
+    setTelefone(user?.telefone ?? '');
+    setCpf(user?.cpf ?? '');
+    setCep(user?.cep ?? '');
+    setRua(user?.endereco ?? '');
+    setNumero(user?.numero ?? '');
+    setBairro(user?.bairro ?? '');
+    setCidade(user?.cidade ?? '');
+    setEstado(user?.estado ?? '');
+  }, [user]);
+
+  const carregarSaude = useCallback(async () => {
+    setCarregandoSaude(true);
+    try {
+      const [pushRes, petsRes] = await Promise.allSettled([obterStatusPush(), listarPets()]);
+
+      setPushStatus(
+        pushRes.status === 'fulfilled' ? (pushRes.value as PushStatus) : null
+      );
+      setPets(petsRes.status === 'fulfilled' ? (petsRes.value as Pet[]) : []);
+    } finally {
+      setCarregandoSaude(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarSaude();
+    }, [carregarSaude])
+  );
 
   const pontos = user?.pontos ?? 0;
   const valorPontos = (pontos / 100) * PONTOS.REAIS_POR_100_PONTOS;
+  const enderecoCompleto = user?.cidade
+    ? `${user?.endereco ?? ''}, ${user?.numero ?? 's/n'} - ${user?.bairro ?? ''} - ${user?.cidade}/${user?.estado ?? ''}`
+    : null;
 
   async function buscarCep(value: string) {
     const numeros = value.replace(/\D/g, '');
-    if (numeros.length <= 5) {
-      setCep(numeros);
-    } else {
-      setCep(numeros.slice(0, 5) + '-' + numeros.slice(5, 8));
-    }
-    if (numeros.length === 8) {
-      setBuscandoCep(true);
-      try {
-        const resp = await fetch(`https://viacep.com.br/ws/${numeros}/json/`);
-        const data = await resp.json();
-        if (!data.erro) {
-          setRua(data.logradouro ?? rua);
-          setBairro(data.bairro ?? bairro);
-          setCidade(data.localidade ?? cidade);
-          setEstado(data.uf ?? estado);
-        }
-      } catch {}
-      finally { setBuscandoCep(false); }
+    setCep(numeros.length <= 5 ? numeros : `${numeros.slice(0, 5)}-${numeros.slice(5, 8)}`);
+
+    if (numeros.length !== 8) return;
+
+    setBuscandoCep(true);
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${numeros}/json/`);
+      const data = await resp.json();
+      if (!data.erro) {
+        setRua(data.logradouro ?? rua);
+        setBairro(data.bairro ?? bairro);
+        setCidade(data.localidade ?? cidade);
+        setEstado(data.uf ?? estado);
+      }
+    } catch {
+      // Mantem os dados atuais quando o CEP falhar.
+    } finally {
+      setBuscandoCep(false);
     }
   }
 
@@ -79,9 +112,9 @@ export default function ProfileScreen() {
       });
       updateUser(updated);
       setEditando(false);
-      Alert.alert('Salvo!', 'Seus dados foram atualizados.');
+      Alert.alert('Salvo', 'Seus dados foram atualizados.');
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar.');
+      Alert.alert('Erro', 'Nao foi possivel salvar seus dados.');
     } finally {
       setSalvando(false);
     }
@@ -100,54 +133,76 @@ export default function ProfileScreen() {
       });
       updateUser(updated);
       setEditandoEndereco(false);
-      Alert.alert('Salvo!', 'Endereço atualizado. Será sugerido no checkout.');
+      Alert.alert('Salvo', 'Endereco atualizado com sucesso.');
     } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o endereço.');
+      Alert.alert('Erro', 'Nao foi possivel salvar o endereco.');
     } finally {
       setSalvando(false);
     }
   }
 
-  function handleLogout() {
-    Alert.alert(
-      'Sair',
-      'Deseja sair da sua conta?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: logout },
-      ]
-    );
+  function abrirAreaVet(section: VetFocusSection) {
+    if (!pets.length) {
+      navigation.navigate('Pets', { screen: 'FormPet' });
+      return;
+    }
+
+    if (pets.length === 1) {
+      navigation.navigate('Pets', {
+        screen: 'DetalhePet',
+        params: { pet: pets[0], focusSection: section },
+      });
+      return;
+    }
+
+    navigation.navigate('Pets', {
+      screen: 'ListaPets',
+      params: { focusSection: section },
+    });
   }
 
-  const enderecoCompleto = user?.cidade
-    ? `${user?.endereco ?? ''}, ${user?.numero ?? 's/n'} - ${user?.bairro ?? ''} - ${user?.cidade}/${user?.estado ?? ''}`
-    : null;
+  function nomePetAgendamento(petId: number) {
+    return pets.find((pet) => pet.id === petId)?.nome || `Pet #${petId}`;
+  }
+
+  function abrirCadastroPet() {
+    navigation.navigate('Pets', { screen: 'FormPet' });
+  }
+
+  function handleLogout() {
+    Alert.alert('Sair', 'Deseja sair da sua conta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: logout },
+    ]);
+  }
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Avatar e nome */}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.avatarSection}>
           <View style={styles.avatar}>
             <Text style={styles.avatarEmoji}>
-              {user?.nome ? user.nome[0].toUpperCase() : '👤'}
+              {user?.nome ? user.nome[0].toUpperCase() : 'U'}
             </Text>
           </View>
           <Text style={styles.nomeUsuario}>{user?.nome || 'Meu perfil'}</Text>
           <Text style={styles.emailUsuario}>{user?.email}</Text>
         </View>
 
-        {/* Card de pontos */}
         <View style={styles.pontosCard}>
           <View style={styles.pontosLeft}>
             <Ionicons name="trophy" size={28} color={CORES.pontos} />
             <View>
               <Text style={styles.pontosValor}>{pontos} pontos</Text>
               <Text style={styles.pontosLabel}>
-                ≈ {formatarMoeda(valorPontos)} em desconto
+                ~ {formatarMoeda(valorPontos)} em desconto
               </Text>
             </View>
           </View>
@@ -158,7 +213,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Dados pessoais */}
         <View style={styles.secao}>
           <View style={styles.secaoHeader}>
             <Text style={styles.secaoTitulo}>Dados pessoais</Text>
@@ -212,27 +266,28 @@ export default function ProfileScreen() {
                 {salvando ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.botaoSalvarTexto}>Salvar alterações</Text>
+                  <Text style={styles.botaoSalvarTexto}>Salvar alteracoes</Text>
                 )}
               </TouchableOpacity>
             </>
           ) : (
             <>
               <InfoRow label="E-mail" valor={user?.email} />
-              <InfoRow label="Nome" valor={user?.nome || '—'} />
-              <InfoRow label="Telefone" valor={user?.telefone || '—'} />
-              <InfoRow label="CPF" valor={user?.cpf || '—'} />
+              <InfoRow label="Nome" valor={user?.nome || '-'} />
+              <InfoRow label="Telefone" valor={user?.telefone || '-'} />
+              <InfoRow label="CPF" valor={user?.cpf || '-'} />
             </>
           )}
         </View>
 
-        {/* Endereço de entrega */}
         <View style={styles.secao}>
           <View style={styles.secaoHeader}>
-            <Text style={styles.secaoTitulo}>📍 Endereço padrão</Text>
+            <Text style={styles.secaoTitulo}>Endereco padrao</Text>
             {!editandoEndereco ? (
               <TouchableOpacity onPress={() => setEditandoEndereco(true)}>
-                <Text style={styles.editarTexto}>{enderecoCompleto ? 'Editar' : 'Cadastrar'}</Text>
+                <Text style={styles.editarTexto}>
+                  {enderecoCompleto ? 'Editar' : 'Cadastrar'}
+                </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => setEditandoEndereco(false)}>
@@ -255,29 +310,62 @@ export default function ProfileScreen() {
                 />
               </Campo>
               <Campo label="Rua / Avenida">
-                <TextInput style={styles.input} value={rua} onChangeText={setRua} placeholder="Rua..." placeholderTextColor={CORES.textoClaro} />
+                <TextInput
+                  style={styles.input}
+                  value={rua}
+                  onChangeText={setRua}
+                  placeholder="Rua..."
+                  placeholderTextColor={CORES.textoClaro}
+                />
               </Campo>
-              <View style={{ flexDirection: 'row', gap: ESPACO.sm }}>
+              <View style={styles.linha}>
                 <View style={{ flex: 1 }}>
-                  <Campo label="Número">
-                    <TextInput style={styles.input} value={numero} onChangeText={setNumero} placeholder="123" placeholderTextColor={CORES.textoClaro} keyboardType="numeric" />
+                  <Campo label="Numero">
+                    <TextInput
+                      style={styles.input}
+                      value={numero}
+                      onChangeText={setNumero}
+                      placeholder="123"
+                      placeholderTextColor={CORES.textoClaro}
+                      keyboardType="numeric"
+                    />
                   </Campo>
                 </View>
                 <View style={{ flex: 2 }}>
                   <Campo label="Bairro">
-                    <TextInput style={styles.input} value={bairro} onChangeText={setBairro} placeholder="Bairro" placeholderTextColor={CORES.textoClaro} />
+                    <TextInput
+                      style={styles.input}
+                      value={bairro}
+                      onChangeText={setBairro}
+                      placeholder="Bairro"
+                      placeholderTextColor={CORES.textoClaro}
+                    />
                   </Campo>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', gap: ESPACO.sm }}>
+              <View style={styles.linha}>
                 <View style={{ flex: 2 }}>
                   <Campo label="Cidade">
-                    <TextInput style={styles.input} value={cidade} onChangeText={setCidade} placeholder="Cidade" placeholderTextColor={CORES.textoClaro} />
+                    <TextInput
+                      style={styles.input}
+                      value={cidade}
+                      onChangeText={setCidade}
+                      placeholder="Cidade"
+                      placeholderTextColor={CORES.textoClaro}
+                    />
                   </Campo>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Campo label="UF">
-                    <TextInput style={styles.input} value={estado} onChangeText={setEstado} placeholder="SP" placeholderTextColor={CORES.textoClaro} autoCapitalize="characters" maxLength={2} />
+                    <TextInput
+                      style={styles.input}
+                      value={estado}
+                      onChangeText={setEstado}
+                      placeholder="SP"
+                      placeholderTextColor={CORES.textoClaro}
+                      autoCapitalize="characters"
+                      maxLength={2}
+                    />
                   </Campo>
                 </View>
               </View>
@@ -286,7 +374,11 @@ export default function ProfileScreen() {
                 onPress={salvarEndereco}
                 disabled={salvando}
               >
-                {salvando ? <ActivityIndicator color="#fff" /> : <Text style={styles.botaoSalvarTexto}>Salvar endereço</Text>}
+                {salvando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.botaoSalvarTexto}>Salvar endereco</Text>
+                )}
               </TouchableOpacity>
             </>
           ) : enderecoCompleto ? (
@@ -298,30 +390,130 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
-            <Text style={styles.enderecoVazio}>
-              Cadastre seu endereço para agilizar o checkout de entregas.
+            <Text style={styles.textoSuporte}>
+              Cadastre seu endereco para agilizar o checkout de entregas.
             </Text>
           )}
         </View>
 
-        {/* Menu de opções futuras */}
+        <View style={styles.secao}>
+          <View style={styles.secaoHeader}>
+            <Text style={styles.secaoTitulo}>Saude veterinaria</Text>
+            <View style={styles.badgeSaude}>
+              <Text style={styles.badgeSaudeTexto}>{pets.length} pet(s)</Text>
+            </View>
+          </View>
+
+          <Text style={styles.textoSuporte}>
+            Vacinas, consultas e exames agora ficam ligados ao cadastro do pet no app.
+          </Text>
+
+          {carregandoSaude ? (
+            <View style={styles.loadingInline}>
+              <ActivityIndicator color={CORES.primario} />
+            </View>
+          ) : (
+            <>
+              <MenuItem
+                emoji="💉"
+                titulo="Carteirinha de vacinas"
+                subtitulo={
+                  pets.length
+                    ? 'Veja vacinas aplicadas, pendentes e atrasadas.'
+                    : 'Cadastre um pet para liberar a carteirinha.'
+                }
+                acaoTexto={pets.length ? 'Abrir' : 'Cadastrar'}
+                onPress={() => (pets.length ? abrirAreaVet('vacinas') : abrirCadastroPet())}
+              />
+              <MenuItem
+                emoji="📋"
+                titulo="Exames e resultados"
+                subtitulo={
+                  pets.length
+                    ? 'Acompanhe resultados e abra arquivos de exames.'
+                    : 'Cadastre um pet para enxergar exames no app.'
+                }
+                acaoTexto={pets.length ? 'Abrir' : 'Cadastrar'}
+                onPress={() => (pets.length ? abrirAreaVet('exames') : abrirCadastroPet())}
+              />
+              <MenuItem
+                emoji="🩺"
+                titulo="Consultas veterinarias"
+                subtitulo={
+                  pets.length
+                    ? 'Consulte historico clinico e atendimentos recentes.'
+                    : 'Cadastre um pet para acompanhar consultas.'
+                }
+                acaoTexto={pets.length ? 'Abrir' : 'Cadastrar'}
+                onPress={() => (pets.length ? abrirAreaVet('consultas') : abrirCadastroPet())}
+                semBorda
+              />
+            </>
+          )}
+
+          <View style={styles.subsecao}>
+            <Text style={styles.subsecaoTitulo}>Proximos atendimentos</Text>
+            {pushStatus?.proximos_agendamentos?.length ? (
+              pushStatus.proximos_agendamentos.map((agendamento) => (
+                <View key={agendamento.id} style={styles.agendamentoItem}>
+                  <View style={styles.agendamentoIcone}>
+                    <Ionicons name="calendar-outline" size={16} color={CORES.primario} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.agendamentoTitulo}>
+                      {agendamento.tipo || 'Atendimento'} · {nomePetAgendamento(agendamento.pet_id)}
+                    </Text>
+                    <Text style={styles.agendamentoSubtitulo}>
+                      {agendamento.data_hora
+                        ? new Date(agendamento.data_hora).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : 'Horario a confirmar'}
+                    </Text>
+                  </View>
+                  <Text style={styles.agendamentoStatus}>{agendamento.status || 'agendado'}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.textoSuporte}>
+                Nenhuma consulta futura confirmada no momento.
+              </Text>
+            )}
+          </View>
+        </View>
+
         <View style={styles.secao}>
           <Text style={styles.secaoTitulo}>Em breve</Text>
-          <MenuItem emoji="📅" titulo="Agendamento de banho & tosa" em_breve />
-          <MenuItem emoji="🩺" titulo="Consultas veterinárias" em_breve />
-          <MenuItem emoji="📋" titulo="Resultado de exames" em_breve />
-          <MenuItem emoji="💉" titulo="Carteirinha de vacinas" em_breve />
+          <MenuItem
+            emoji="🛁"
+            titulo="Agendamento de banho & tosa"
+            subtitulo="Estamos preparando esse fluxo para os proximos updates."
+            acaoTexto="Em breve"
+            disabled
+            semBorda
+          />
         </View>
 
         <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>🔔 Status do push</Text>
-          <InfoRow label="Token registrado" valor={pushStatus?.token_registrado ? 'Sim' : 'Não'} />
-          <InfoRow label="Lembretes pendentes" valor={String(pushStatus?.pendencias?.length ?? 0)} />
-          <InfoRow label="Próximos agendamentos" valor={String(pushStatus?.proximos_agendamentos?.length ?? 0)} />
-          <Text style={styles.enderecoVazio}>{pushStatus?.observacao || 'Sem diagnóstico disponível no momento.'}</Text>
+          <Text style={styles.secaoTitulo}>Status do push</Text>
+          <InfoRow label="Token registrado" valor={pushStatus?.token_registrado ? 'Sim' : 'Nao'} />
+          <InfoRow
+            label="Lembretes pendentes"
+            valor={String(pushStatus?.pendencias?.length ?? 0)}
+          />
+          <InfoRow
+            label="Proximos agendamentos"
+            valor={String(pushStatus?.proximos_agendamentos?.length ?? 0)}
+          />
+          <Text style={styles.textoSuporte}>
+            {pushStatus?.observacao || 'Sem diagnostico disponivel no momento.'}
+          </Text>
         </View>
 
-        {/* Sair */}
         <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={CORES.erro} />
           <Text style={styles.botaoSairTexto}>Sair da conta</Text>
@@ -347,22 +539,47 @@ function InfoRow({ label, valor }: { label: string; valor?: string | null }) {
   return (
     <View style={styles.infoRow}>
       <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValor}>{valor || '—'}</Text>
+      <Text style={styles.infoValor}>{valor || '-'}</Text>
     </View>
   );
 }
 
-function MenuItem({ emoji, titulo, em_breve }: { emoji: string; titulo: string; em_breve?: boolean }) {
+function MenuItem({
+  emoji,
+  titulo,
+  subtitulo,
+  acaoTexto,
+  onPress,
+  disabled,
+  semBorda,
+}: {
+  emoji: string;
+  titulo: string;
+  subtitulo?: string;
+  acaoTexto?: string;
+  onPress?: () => void;
+  disabled?: boolean;
+  semBorda?: boolean;
+}) {
   return (
-    <View style={styles.menuItem}>
+    <TouchableOpacity
+      style={[styles.menuItem, semBorda && { borderBottomWidth: 0 }, disabled && { opacity: 0.7 }]}
+      onPress={onPress}
+      disabled={!onPress || disabled}
+    >
       <Text style={styles.menuEmoji}>{emoji}</Text>
-      <Text style={styles.menuTitulo}>{titulo}</Text>
-      {em_breve && (
-        <View style={styles.emBreve}>
-          <Text style={styles.emBreveTexto}>Em breve</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.menuTitulo}>{titulo}</Text>
+        {!!subtitulo && <Text style={styles.menuSubtitulo}>{subtitulo}</Text>}
+      </View>
+      {!!acaoTexto && (
+        <View style={[styles.menuAcao, disabled && styles.menuAcaoDisabled]}>
+          <Text style={[styles.menuAcaoTexto, disabled && styles.menuAcaoTextoDisabled]}>
+            {acaoTexto}
+          </Text>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -379,7 +596,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: ESPACO.sm,
   },
-  avatarEmoji: { fontSize: 36, color: '#fff' },
+  avatarEmoji: { fontSize: 36, color: '#fff', fontWeight: '700' },
   nomeUsuario: { fontSize: FONTE.titulo, fontWeight: 'bold', color: CORES.texto },
   emailUsuario: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
   pontosCard: {
@@ -407,14 +624,30 @@ const styles = StyleSheet.create({
     marginBottom: ESPACO.lg,
     ...SOMBRA,
   },
-  secaoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ESPACO.md },
+  secaoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: ESPACO.md,
+  },
   secaoTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto },
   editarTexto: { color: CORES.primario, fontWeight: '500' },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: ESPACO.sm },
   infoLabel: { fontSize: FONTE.normal, color: CORES.textoSecundario },
-  infoValor: { fontSize: FONTE.normal, color: CORES.texto, fontWeight: '500', flex: 1, textAlign: 'right' },
+  infoValor: {
+    fontSize: FONTE.normal,
+    color: CORES.texto,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+  },
   campo: { marginBottom: ESPACO.sm },
-  campoLabel: { fontSize: FONTE.pequena, fontWeight: '600', color: CORES.textoSecundario, marginBottom: 4 },
+  campoLabel: {
+    fontSize: FONTE.pequena,
+    fontWeight: '600',
+    color: CORES.textoSecundario,
+    marginBottom: 4,
+  },
   input: {
     borderWidth: 1,
     borderColor: CORES.borda,
@@ -433,23 +666,121 @@ const styles = StyleSheet.create({
     marginTop: ESPACO.sm,
   },
   botaoSalvarTexto: { color: '#fff', fontWeight: 'bold', fontSize: FONTE.normal },
+  linha: { flexDirection: 'row', gap: ESPACO.sm },
+  enderecoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACO.sm,
+    backgroundColor: '#EFF6FF',
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  enderecoTexto: { fontSize: FONTE.normal, color: CORES.texto, flex: 1 },
+  enderecoSub: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
+  textoSuporte: {
+    fontSize: FONTE.normal,
+    color: CORES.textoSecundario,
+    lineHeight: 20,
+  },
+  badgeSaude: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RAIO.circulo,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  badgeSaudeTexto: {
+    fontSize: FONTE.pequena,
+    color: CORES.primario,
+    fontWeight: '700',
+  },
+  loadingInline: {
+    paddingVertical: ESPACO.md,
+    alignItems: 'center',
+  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ESPACO.sm,
+    paddingVertical: ESPACO.md,
     borderBottomWidth: 1,
     borderBottomColor: CORES.borda,
     gap: ESPACO.sm,
   },
   menuEmoji: { fontSize: 20, width: 28 },
-  menuTitulo: { flex: 1, fontSize: FONTE.normal, color: CORES.texto },
-  emBreve: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: RAIO.circulo,
+  menuTitulo: { fontSize: FONTE.normal, color: CORES.texto, fontWeight: '700' },
+  menuSubtitulo: {
+    marginTop: 2,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    lineHeight: 18,
   },
-  emBreveTexto: { fontSize: FONTE.pequena, color: '#4338CA', fontWeight: '500' },
+  menuAcao: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RAIO.circulo,
+    backgroundColor: '#EFF6FF',
+  },
+  menuAcaoDisabled: {
+    backgroundColor: '#F3F4F6',
+  },
+  menuAcaoTexto: {
+    fontSize: FONTE.pequena,
+    color: CORES.primario,
+    fontWeight: '700',
+  },
+  menuAcaoTextoDisabled: {
+    color: CORES.textoSecundario,
+  },
+  subsecao: {
+    marginTop: ESPACO.md,
+    paddingTop: ESPACO.md,
+    borderTopWidth: 1,
+    borderTopColor: CORES.borda,
+  },
+  subsecaoTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: '700',
+    color: CORES.texto,
+    marginBottom: ESPACO.sm,
+  },
+  agendamentoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+    padding: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: RAIO.md,
+    backgroundColor: '#FAFAFA',
+  },
+  agendamentoIcone: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+  },
+  agendamentoTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: '700',
+    color: CORES.texto,
+  },
+  agendamentoSubtitulo: {
+    marginTop: 2,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+  },
+  agendamentoStatus: {
+    fontSize: FONTE.pequena,
+    fontWeight: '700',
+    color: '#2563EB',
+    textTransform: 'capitalize',
+  },
   botaoSair: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -464,23 +795,4 @@ const styles = StyleSheet.create({
   },
   botaoSairTexto: { color: CORES.erro, fontWeight: 'bold', fontSize: FONTE.normal },
   versao: { textAlign: 'center', fontSize: FONTE.pequena, color: CORES.textoClaro },
-  enderecoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: ESPACO.sm,
-    backgroundColor: '#EFF6FF',
-    borderRadius: RAIO.md,
-    padding: ESPACO.md,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  enderecoTexto: { fontSize: FONTE.normal, color: CORES.texto, flex: 1 },
-  enderecoSub: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
-  enderecoVazio: {
-    fontSize: FONTE.normal,
-    color: CORES.textoSecundario,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingVertical: ESPACO.sm,
-  },
 });

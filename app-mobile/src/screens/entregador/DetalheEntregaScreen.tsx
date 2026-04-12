@@ -1,6 +1,6 @@
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -158,10 +158,13 @@ export default function DetalheEntregaScreen() {
   const [paradaOrdemEmEdicao, setParadaOrdemEmEdicao] = useState<Parada | null>(null);
   const [novaOrdemTexto, setNovaOrdemTexto] = useState("");
   const [salvandoOrdemManual, setSalvandoOrdemManual] = useState(false);
+  const localizacaoSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const enviandoLocalizacaoRef = useRef(false);
 
   const paradasPendentes =
     rota?.paradas?.filter((p) => p.status === "pendente").length ?? 0;
-  const intervaloLocalizacaoMs = paradasPendentes <= 2 ? 5000 : 10000;
+  const intervaloLocalizacaoMs = paradasPendentes <= 2 ? 4000 : 7000;
+  const distanciaLocalizacaoM = paradasPendentes <= 2 ? 8 : 15;
 
   const carregar = useCallback(async () => {
     try {
@@ -185,36 +188,34 @@ export default function DetalheEntregaScreen() {
 
   useEffect(() => {
     if (!rota || !["em_rota", "em_andamento"].includes(rota.status)) {
+      localizacaoSubscriptionRef.current?.remove();
+      localizacaoSubscriptionRef.current = null;
       return;
     }
 
     let ativo = true;
-    let timer: ReturnType<typeof setInterval> | null = null;
 
-    const enviarLocalizacaoAtual = async () => {
+    const enviarLocalizacaoAtual = async (
+      coords: Pick<Location.LocationObjectCoords, "latitude" | "longitude">,
+    ) => {
       try {
-        const permissao = await Location.getForegroundPermissionsAsync();
-        if (!permissao.granted) return;
-
-        const posicao = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-
-        if (!ativo) return;
+        if (!ativo || enviandoLocalizacaoRef.current) return;
+        enviandoLocalizacaoRef.current = true;
 
         await api.post(
           `/rotas-entrega/${rotaId}/atualizar-localizacao`,
           {},
           {
             params: {
-              lat: posicao.coords.latitude,
-              lon: posicao.coords.longitude,
+              lat: coords.latitude,
+              lon: coords.longitude,
             },
           },
         );
       } catch {
         // Não interrompe a tela se GPS/rede falhar momentaneamente.
       }
+      enviandoLocalizacaoRef.current = false;
     };
 
     const iniciar = async () => {
@@ -227,17 +228,49 @@ export default function DetalheEntregaScreen() {
         // Permissão opcional para operação da tela.
       }
 
-      await enviarLocalizacaoAtual();
-      timer = setInterval(enviarLocalizacaoAtual, intervaloLocalizacaoMs);
+      try {
+        const posicaoInicial = await Location.getCurrentPositionAsync({
+          accuracy:
+            paradasPendentes <= 2
+              ? Location.Accuracy.High
+              : Location.Accuracy.Balanced,
+        });
+
+        if (ativo) {
+          await enviarLocalizacaoAtual(posicaoInicial.coords);
+        }
+      } catch {
+        // Segue com o watch mesmo sem ponto inicial.
+      }
+
+      try {
+        localizacaoSubscriptionRef.current = await Location.watchPositionAsync(
+          {
+            accuracy:
+              paradasPendentes <= 2
+                ? Location.Accuracy.High
+                : Location.Accuracy.Balanced,
+            timeInterval: intervaloLocalizacaoMs,
+            distanceInterval: distanciaLocalizacaoM,
+            mayShowUserSettingsDialog: true,
+          },
+          (posicao) => {
+            void enviarLocalizacaoAtual(posicao.coords);
+          },
+        );
+      } catch {
+        // Se o GPS estiver bloqueado, a tela continua funcional.
+      }
     };
 
-    iniciar();
+    void iniciar();
 
     return () => {
       ativo = false;
-      if (timer) clearInterval(timer);
+      localizacaoSubscriptionRef.current?.remove();
+      localizacaoSubscriptionRef.current = null;
     };
-  }, [rota, rotaId, intervaloLocalizacaoMs]);
+  }, [rota, rotaId, intervaloLocalizacaoMs, distanciaLocalizacaoM, paradasPendentes]);
 
   // ── Ações nas paradas ─────────────────────────────────────────────────────
 

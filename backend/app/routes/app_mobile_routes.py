@@ -607,12 +607,23 @@ def rastreio_entrega(
     ultima_posicao = None
     try:
         rota_posicao = db.execute(
-            text("SELECT lat_atual, lon_atual FROM rotas_entrega WHERE id = :rid"),
+            text(
+                """
+                SELECT lat_atual, lon_atual, localizacao_atualizada_em
+                FROM rotas_entrega
+                WHERE id = :rid
+                """
+            ),
             {"rid": rota.id},
         ).fetchone()
 
         if rota_posicao and rota_posicao[0] is not None and rota_posicao[1] is not None:
-            ultima_posicao = {"lat": float(rota_posicao[0]), "lon": float(rota_posicao[1])}
+            ultima_posicao = {
+                "lat": float(rota_posicao[0]),
+                "lon": float(rota_posicao[1]),
+                "atualizada_em": rota_posicao[2].isoformat() if rota_posicao[2] else None,
+                "fonte": "rota_atual",
+            }
         else:
             for p in reversed(todas_paradas):
                 result = db.execute(
@@ -620,7 +631,12 @@ def rastreio_entrega(
                     {"pid": p.id}
                 ).fetchone()
                 if result and result[0] is not None and result[1] is not None:
-                    ultima_posicao = {"lat": float(result[0]), "lon": float(result[1])}
+                    ultima_posicao = {
+                        "lat": float(result[0]),
+                        "lon": float(result[1]),
+                        "atualizada_em": p.data_entrega.isoformat() if p.data_entrega else None,
+                        "fonte": "ultima_parada",
+                    }
                     break
     except Exception:
         pass

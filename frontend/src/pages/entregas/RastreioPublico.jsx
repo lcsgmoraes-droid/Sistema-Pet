@@ -1,11 +1,52 @@
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
-// Instância sem autenticação — endpoint público
 const apiPublica = axios.create({ baseURL: "/api" });
+const TRAIL_LIMIT = 50;
+
+function easeInOut(progress) {
+  if (progress < 0.5) {
+    return 2 * progress * progress;
+  }
+  return 1 - Math.pow(-2 * progress + 2, 2) / 2;
+}
+
+function samePoint(a, b) {
+  if (!a || !b) return false;
+  return Math.abs(a.lat - b.lat) < 0.000001 && Math.abs(a.lon - b.lon) < 0.000001;
+}
+
+function computeBearing(from, to) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const toDeg = (value) => (value * 180) / Math.PI;
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const diffLong = toRad(to.lon - from.lon);
+  const y = Math.sin(diffLong) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(diffLong);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function createVehicleIcon() {
+  return L.divIcon({
+    html: `
+      <div style="display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;width:34px;height:34px;border-radius:999px;background:rgba(37,99,235,0.18);"></div>
+        <div style="width:28px;height:28px;border-radius:999px;background:#2563eb;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(37,99,235,0.28);">
+          <div class="tracker-vehicle-icon" style="font-size:14px;line-height:1;transform:rotate(0deg);transition:transform 0.45s ease;">🚚</div>
+        </div>
+      </div>
+    `,
+    className: "",
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
 
 export default function RastreioPublico() {
   const { token } = useParams();
@@ -15,75 +56,150 @@ export default function RastreioPublico() {
   const mapaRef = useRef(null);
   const leafletMapRef = useRef(null);
   const leafletMarkerRef = useRef(null);
+  const leafletTrailRef = useRef(null);
+  const latestPointRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
-  useEffect(() => {
-    if (!token) return;
-    carregarRastreio();
-    // Atualizar a cada 10 segundos
-    const interval = setInterval(carregarRastreio, 10000);
-    return () => clearInterval(interval);
-  }, [token]);
-
-  // Inicializa ou atualiza o mapa Leaflet a cada atualização de GPS
-  useEffect(() => {
-    if (!dados?.ultima_posicao_gps || !mapaRef.current) return;
-    const { lat, lon } = dados.ultima_posicao_gps;
-    if (!leafletMapRef.current) {
-      const map = L.map(mapaRef.current, {
-        dragging: false,
-        scrollWheelZoom: false,
-        zoomControl: true,
-        attributionControl: false,
-      }).setView([lat, lon], 15);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-      const motoIcon = L.divIcon({
-        html: '<div style="font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4))">🛵</div>',
-        className: "",
-        iconSize: [32, 32],
-        iconAnchor: [16, 28],
-      });
-      leafletMarkerRef.current = L.marker([lat, lon], { icon: motoIcon }).addTo(map);
-      leafletMapRef.current = map;
-    } else {
-      leafletMarkerRef.current.setLatLng([lat, lon]);
-      leafletMapRef.current.setView([lat, lon], leafletMapRef.current.getZoom());
-    }
-  }, [dados]);
-
-  // Limpa o mapa ao sair da página
-  useEffect(() => {
-    return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove();
-        leafletMapRef.current = null;
-        leafletMarkerRef.current = null;
-      }
-    };
-  }, []);
-
-  async function carregarRastreio() {
+  const carregarRastreio = useCallback(async () => {
     try {
       const res = await apiPublica.get(`/rotas-entrega/rastreio/${token}`);
       setDados(res.data);
       setErro(null);
     } catch (err) {
       if (err.response?.status === 404) {
-        setErro("Link de rastreio inválido ou expirado.");
+        setErro("Link de rastreio invalido ou expirado.");
       } else {
-        setErro("Não foi possível carregar o rastreio. Tente novamente.");
+        setErro("Nao foi possivel carregar o rastreio. Tente novamente.");
       }
     } finally {
       setCarregando(false);
     }
-  }
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    void carregarRastreio();
+    const pollingMs =
+      dados?.status === "em_rota" || dados?.status === "em_andamento" ? 4000 : 10000;
+    const interval = setInterval(() => {
+      void carregarRastreio();
+    }, pollingMs);
+
+    return () => clearInterval(interval);
+  }, [token, dados?.status, carregarRastreio]);
+
+  useEffect(() => {
+    const gps = dados?.ultima_posicao_gps;
+    if (!gps || !mapaRef.current) return;
+
+    const nextPoint = { lat: Number(gps.lat), lon: Number(gps.lon) };
+
+    if (!leafletMapRef.current) {
+      const map = L.map(mapaRef.current, {
+        dragging: false,
+        scrollWheelZoom: false,
+        zoomControl: true,
+        attributionControl: false,
+      }).setView([nextPoint.lat, nextPoint.lon], 15);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+      leafletMarkerRef.current = L.marker([nextPoint.lat, nextPoint.lon], {
+        icon: createVehicleIcon(),
+      }).addTo(map);
+
+      leafletTrailRef.current = L.polyline([[nextPoint.lat, nextPoint.lon]], {
+        color: "#2563eb",
+        weight: 4,
+        opacity: 0.8,
+      }).addTo(map);
+
+      leafletMapRef.current = map;
+      latestPointRef.current = nextPoint;
+      return;
+    }
+
+    if (!latestPointRef.current) {
+      latestPointRef.current = nextPoint;
+      leafletMarkerRef.current?.setLatLng([nextPoint.lat, nextPoint.lon]);
+      leafletTrailRef.current?.setLatLngs([[nextPoint.lat, nextPoint.lon]]);
+      return;
+    }
+
+    if (samePoint(latestPointRef.current, nextPoint)) {
+      return;
+    }
+
+    const startPoint = latestPointRef.current;
+    const bearing = computeBearing(startPoint, nextPoint);
+    const markerElement = leafletMarkerRef.current?.getElement();
+    const vehicleElement = markerElement?.querySelector(".tracker-vehicle-icon");
+    if (vehicleElement) {
+      vehicleElement.style.transform = `rotate(${bearing}deg)`;
+    }
+
+    const currentTrail = leafletTrailRef.current?.getLatLngs?.() || [];
+    const trailPoints = [...currentTrail, L.latLng(nextPoint.lat, nextPoint.lon)].slice(
+      -TRAIL_LIMIT,
+    );
+    leafletTrailRef.current?.setLatLngs(trailPoints);
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    leafletMapRef.current?.panTo([nextPoint.lat, nextPoint.lon], {
+      animate: true,
+      duration: 1.6,
+    });
+
+    const startedAt = performance.now();
+    const duration = 1800;
+
+    const animate = (now) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const eased = easeInOut(progress);
+      const currentPoint = {
+        lat: startPoint.lat + (nextPoint.lat - startPoint.lat) * eased,
+        lon: startPoint.lon + (nextPoint.lon - startPoint.lon) * eased,
+      };
+
+      latestPointRef.current = currentPoint;
+      leafletMarkerRef.current?.setLatLng([currentPoint.lat, currentPoint.lon]);
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        latestPointRef.current = nextPoint;
+        leafletMarkerRef.current?.setLatLng([nextPoint.lat, nextPoint.lon]);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [dados?.ultima_posicao_gps?.lat, dados?.ultima_posicao_gps?.lon, dados?.ultima_posicao_gps?.atualizada_em]);
+
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        leafletMarkerRef.current = null;
+        leafletTrailRef.current = null;
+      }
+    };
+  }, []);
 
   const getStatusLabel = (status) => {
     const labels = {
-      pendente: "🟠 Aguardando saída",
-      em_rota: "🔵 Em rota",
-      em_andamento: "🔵 Em rota",
-      concluida: "✅ Entregue",
-      cancelada: "❌ Cancelada",
+      pendente: "Aguardando saida",
+      em_rota: "Em rota",
+      em_andamento: "Em rota",
+      concluida: "Entregue",
+      cancelada: "Cancelada",
     };
     return labels[status] || status;
   };
@@ -98,7 +214,7 @@ export default function RastreioPublico() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <div style={styles.logo}>🐾 Sistema Pet</div>
+          <div style={styles.logo}>Sistema Pet</div>
           <p style={{ textAlign: "center", color: "#666" }}>Carregando rastreio...</p>
         </div>
       </div>
@@ -109,8 +225,8 @@ export default function RastreioPublico() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <div style={styles.logo}>🐾 Sistema Pet</div>
-          <div style={styles.erroBanner}>❌ {erro}</div>
+          <div style={styles.logo}>Sistema Pet</div>
+          <div style={styles.erroBanner}>Erro: {erro}</div>
         </div>
       </div>
     );
@@ -118,9 +234,10 @@ export default function RastreioPublico() {
 
   if (!dados) return null;
 
-  const progresso = dados.total_paradas > 0
-    ? Math.round((dados.entregues / dados.total_paradas) * 100)
-    : 0;
+  const progresso =
+    dados.total_paradas > 0
+      ? Math.round((dados.entregues / dados.total_paradas) * 100)
+      : 0;
 
   const linkMaps = dados.ultima_posicao_gps
     ? `https://www.google.com/maps?q=${dados.ultima_posicao_gps.lat},${dados.ultima_posicao_gps.lon}`
@@ -138,26 +255,20 @@ export default function RastreioPublico() {
   const gpsEhTempoReal = gpsFonte === "rota_atual";
   const distanciaTotalReal = Number(dados.distancia_total_km_real || 0);
   const distanciaRetornoReal = Number(dados.distancia_retorno_km_real || 0);
-  const distanciaAteUltima = Number(
-    dados.distancia_ate_ultima_entrega_km_real || 0,
-  );
+  const distanciaAteUltima = Number(dados.distancia_ate_ultima_entrega_km_real || 0);
 
   return (
     <div style={styles.page}>
       <div style={styles.card}>
-        {/* Header */}
         <div style={styles.header}>
-          <div style={styles.logo}>🐾 Sistema Pet</div>
-          <div style={styles.statusBadge(dados.status)}>
-            {getStatusLabel(dados.status)}
-          </div>
+          <div style={styles.logo}>Sistema Pet</div>
+          <div style={styles.statusBadge(dados.status)}>{getStatusLabel(dados.status)}</div>
         </div>
 
-        {/* Info do entregador */}
         <div style={styles.infoBox}>
           <div style={styles.infoRow}>
             <span style={styles.label}>Entregador:</span>
-            <span style={styles.value}>🏍️ {dados.entregador_nome}</span>
+            <span style={styles.value}>{dados.entregador_nome}</span>
           </div>
           <div style={styles.infoRow}>
             <span style={styles.label}>Rota:</span>
@@ -165,10 +276,9 @@ export default function RastreioPublico() {
           </div>
         </div>
 
-        {/* Progresso */}
         <div style={styles.progressoBox}>
           <div style={styles.progressoTexto}>
-            <span>📦 {dados.entregues} de {dados.total_paradas} entregas</span>
+            <span>{dados.entregues} de {dados.total_paradas} entregas</span>
             <span style={{ fontWeight: "bold" }}>{progresso}%</span>
           </div>
           <div style={styles.progressoBar}>
@@ -176,35 +286,28 @@ export default function RastreioPublico() {
           </div>
           {dados.pendentes > 0 && (
             <p style={styles.pendentesTexto}>
-              ⏳ {dados.pendentes} entrega{dados.pendentes !== 1 ? "s" : ""} ainda a caminho
+              {dados.pendentes} entrega{dados.pendentes !== 1 ? "s" : ""} ainda em rota
             </p>
           )}
         </div>
 
-        {/* Última posição GPS */}
         {linkMaps && (
           <div style={styles.gpsBox}>
             <p style={styles.gpsTexto}>
-              {gpsEhTempoReal
-                ? "🏍️ 📍 GPS ao vivo do entregador"
-                : "📍 Última posição registrada na rota"}
+              {gpsEhTempoReal ? "GPS ao vivo do entregador" : "Ultimo ponto confirmado"}
             </p>
-            {gpsAtualizadoEm && (
-              <p style={styles.gpsSubtexto}>
-                Atualizado em {gpsAtualizadoEm}
-              </p>
-            )}
+            {gpsAtualizadoEm && <p style={styles.gpsSubtexto}>Atualizado em {gpsAtualizadoEm}</p>}
             <a
               href={linkMaps}
               target="_blank"
               rel="noopener noreferrer"
               style={styles.btnMaps}
             >
-              🗺️ Abrir no Google Maps
+              Abrir no Google Maps
             </a>
             <div style={styles.mapaEmbedWrap}>
               <div style={styles.mapaBadgeMoto}>
-                {gpsEhTempoReal ? "🏍️ Entregador ao vivo" : "📌 Último ponto confirmado"}
+                {gpsEhTempoReal ? "Rota em movimento" : "Ultimo ponto salvo"}
               </div>
               <div ref={mapaRef} style={styles.mapaLeaflet} />
             </div>
@@ -213,13 +316,13 @@ export default function RastreioPublico() {
 
         {(distanciaTotalReal > 0 || distanciaRetornoReal > 0 || distanciaAteUltima > 0) && (
           <div style={styles.distBox}>
-            <div style={styles.distTitulo}>📏 Distância percorrida na rota</div>
+            <div style={styles.distTitulo}>Distancia percorrida na rota</div>
             <div style={styles.distLinha}>
               <span>Total rodado</span>
               <strong>{distanciaTotalReal.toFixed(2)} km</strong>
             </div>
             <div style={styles.distLinha}>
-              <span>Até última entrega</span>
+              <span>Ate ultima entrega</span>
               <strong>{distanciaAteUltima.toFixed(2)} km</strong>
             </div>
             <div style={styles.distLinha}>
@@ -229,9 +332,8 @@ export default function RastreioPublico() {
           </div>
         )}
 
-        {/* Lista de paradas */}
         <div style={styles.paradasBox}>
-          <h3 style={styles.paradasTitulo}>Sequência de entregas</h3>
+          <h3 style={styles.paradasTitulo}>Sequencia de entregas</h3>
           {dados.paradas.map((parada) => (
             <div key={parada.ordem} style={styles.paradaItem(parada.status)}>
               <div style={styles.paradaOrdem}>{parada.ordem}</div>
@@ -248,8 +350,11 @@ export default function RastreioPublico() {
                 <div style={styles.paradaStatusRow}>
                   <span style={styles.paradaStatus(parada.status)}>
                     {getParadaStatusIcon(parada.status)}{" "}
-                    {parada.status === "entregue" ? "Entregue" :
-                     parada.status === "tentativa" ? "Tentativa" : "A caminho"}
+                    {parada.status === "entregue"
+                      ? "Entregue"
+                      : parada.status === "tentativa"
+                        ? "Tentativa"
+                        : "A caminho"}
                   </span>
                   {parada.data_entrega && (
                     <span style={styles.paradaHora}>
@@ -262,32 +367,35 @@ export default function RastreioPublico() {
                 </div>
               </div>
             </div>
-          ))}          {/* Retorno vazio ao estabelecimento */}
+          ))}
+
           {distanciaRetornoReal > 0 && (
-            <div style={{...styles.paradaItem("entregue"), opacity: 0.8}}>
-              <div style={{...styles.paradaOrdem, backgroundColor: "#6b7280"}}>↩</div>
+            <div style={{ ...styles.paradaItem("entregue"), opacity: 0.82 }}>
+              <div style={{ ...styles.paradaOrdem, backgroundColor: "#6b7280" }}>↩</div>
               <div style={styles.paradaInfo}>
                 <div style={styles.paradaEndereco}>Retorno ao estabelecimento</div>
                 <div style={styles.paradaDistanciaReal}>
                   {`Trecho: ${distanciaRetornoReal.toFixed(2)} km`}
                 </div>
                 <div style={styles.paradaStatusRow}>
-                  <span style={{fontSize: 12, fontWeight: "600", color: "#6b7280"}}>🏠 Retorno vazio</span>
+                  <span style={{ fontSize: 12, fontWeight: "600", color: "#6b7280" }}>
+                    Retorno vazio
+                  </span>
                 </div>
               </div>
             </div>
-          )}        </div>
+          )}
+        </div>
 
-        {/* Rodapé */}
         <p style={styles.atualizacao}>
-          🔄 Atualiza automaticamente a cada 10 segundos
+          Atualiza automaticamente a cada{" "}
+          {dados.status === "em_rota" || dados.status === "em_andamento" ? 4 : 10} segundos
         </p>
       </div>
     </div>
   );
 }
 
-// ── Estilos inline ────────────────────────────────────────────────────────────
 const styles = {
   page: {
     minHeight: "100vh",
@@ -323,13 +431,21 @@ const styles = {
     fontSize: 13,
     fontWeight: "600",
     backgroundColor:
-      status === "concluida" ? "#d4edda" :
-      status === "em_rota" || status === "em_andamento" ? "#cce5ff" :
-      status === "cancelada" ? "#f8d7da" : "#fff3cd",
+      status === "concluida"
+        ? "#d4edda"
+        : status === "em_rota" || status === "em_andamento"
+          ? "#cce5ff"
+          : status === "cancelada"
+            ? "#f8d7da"
+            : "#fff3cd",
     color:
-      status === "concluida" ? "#155724" :
-      status === "em_rota" || status === "em_andamento" ? "#004085" :
-      status === "cancelada" ? "#721c24" : "#856404",
+      status === "concluida"
+        ? "#155724"
+        : status === "em_rota" || status === "em_andamento"
+          ? "#004085"
+          : status === "cancelada"
+            ? "#721c24"
+            : "#856404",
   }),
   erroBanner: {
     padding: 16,
@@ -391,6 +507,7 @@ const styles = {
     fontSize: 13,
     color: "#333",
     marginBottom: 4,
+    fontWeight: "700",
   },
   gpsSubtexto: {
     fontSize: 12,
@@ -418,7 +535,7 @@ const styles = {
   },
   mapaLeaflet: {
     width: "100%",
-    height: 240,
+    height: 260,
   },
   mapaBadgeMoto: {
     position: "absolute",
@@ -468,12 +585,18 @@ const styles = {
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor:
-      status === "entregue" ? "#f0fff4" :
-      status === "tentativa" ? "#fff5f5" : "#fafafa",
+      status === "entregue"
+        ? "#f0fff4"
+        : status === "tentativa"
+          ? "#fff5f5"
+          : "#fafafa",
     border: "1px solid",
     borderColor:
-      status === "entregue" ? "#c3e6cb" :
-      status === "tentativa" ? "#f5c6cb" : "#e9ecef",
+      status === "entregue"
+        ? "#c3e6cb"
+        : status === "tentativa"
+          ? "#f5c6cb"
+          : "#e9ecef",
   }),
   paradaOrdem: {
     width: 28,
@@ -513,8 +636,11 @@ const styles = {
     fontSize: 12,
     fontWeight: "600",
     color:
-      status === "entregue" ? "#28a745" :
-      status === "tentativa" ? "#dc3545" : "#666",
+      status === "entregue"
+        ? "#28a745"
+        : status === "tentativa"
+          ? "#dc3545"
+          : "#666",
   }),
   paradaHora: {
     fontSize: 12,
