@@ -169,12 +169,20 @@ def listar_produtos_publicos(
     apenas_com_estoque: bool = Query(default=False),
     apenas_com_imagem: bool = Query(default=False),
     ordenacao: str = Query(default="prontos"),
-    canal: str = Query(default="ecommerce"),
+    canal: str | None = Query(default=None),
+    x_canal_venda: str | None = Header(default=None, alias="X-Canal-Venda"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     db: Session = Depends(get_session),
 ):
     tenant = _get_active_tenant(db, tenant_ref)
     ordenacao_normalizada = str(ordenacao or "prontos").strip().lower()
-    canal_normalizado = _normalize_sales_channel(canal)
+    canal_resolvido = canal
+    if not canal_resolvido:
+        canal_resolvido = x_canal_venda
+    if not canal_resolvido and authorization:
+        # Compatibilidade com versões antigas do app que não enviam query/header de canal.
+        canal_resolvido = "app"
+    canal_normalizado = _normalize_sales_channel(canal_resolvido)
 
     if ordenacao_normalizada not in _CATALOG_ORDER_OPTIONS:
         raise HTTPException(
