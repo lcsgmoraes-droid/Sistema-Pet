@@ -65,6 +65,7 @@ export default function CatalogScreen() {
           somenteComEstoque,
           somenteComImagem,
           ordenacao,
+          cacheBust: pg === 1 ? Date.now() : undefined,
         });
 
         if (pg === 1) {

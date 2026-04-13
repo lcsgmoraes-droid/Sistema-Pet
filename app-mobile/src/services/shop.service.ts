@@ -63,6 +63,7 @@ export async function listarProdutos(params?: {
   somenteComEstoque?: boolean;
   somenteComImagem?: boolean;
   ordenacao?: CatalogOrder;
+  cacheBust?: number;
 }): Promise<{ produtos: Produto[]; total: number }> {
   const paginaAtual = Math.max(1, Number(params?.pagina || 1));
   const limit = 40;
@@ -74,6 +75,7 @@ export async function listarProdutos(params?: {
       limit,
       offset,
       canal: 'app',
+      cache_bust: params?.cacheBust ?? Date.now(),
       apenas_com_estoque: params?.somenteComEstoque || undefined,
       apenas_com_imagem: params?.somenteComImagem || undefined,
       ordenacao: params?.ordenacao || 'prontos',
