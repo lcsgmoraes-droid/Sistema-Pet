@@ -192,7 +192,7 @@ export default function useCampanhasGestor() {
     gestorBuscando,
     gestorCliente,
     gestorSaldo,
-    gestorCarIMbos,
+    gestorCarimbos,
     gestorCupons,
     gestorCarregando,
     gestorSecao,
