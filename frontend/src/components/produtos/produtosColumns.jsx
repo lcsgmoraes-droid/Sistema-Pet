@@ -490,6 +490,51 @@ export function createProdutosColunas() {
     },
   },
   {
+    key: "canais",
+    label: "Canais",
+    visible: true,
+    renderHeader: () => (
+      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Canais
+      </th>
+    ),
+    renderCell: (produto) => {
+      const ativoLojaFisica = produto.ativo !== false && produto.situacao !== false;
+      const statusEcommerce = ativoLojaFisica && produto.anunciar_ecommerce === true;
+      const statusApp = ativoLojaFisica && produto.anunciar_app === true;
+
+      const badgeClass = (status) =>
+        status
+          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+          : "bg-gray-50 text-gray-500 border-gray-200";
+
+      return (
+        <td className="px-4 py-3 text-center">
+          <div className="flex flex-col items-center gap-1.5">
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${badgeClass(statusEcommerce)}`}
+              title={statusEcommerce ? "Ativo no Ecommerce" : "Inativo no Ecommerce"}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${statusEcommerce ? "bg-emerald-500" : "bg-gray-400"}`}
+              />
+              E-commerce
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${badgeClass(statusApp)}`}
+              title={statusApp ? "Ativo no App" : "Inativo no App"}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${statusApp ? "bg-emerald-500" : "bg-gray-400"}`}
+              />
+              App
+            </span>
+          </div>
+        </td>
+      );
+    },
+  },
+  {
     key: "acoes",
     label: "Ações",
     visible: true,

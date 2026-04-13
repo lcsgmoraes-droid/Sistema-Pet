@@ -38,6 +38,8 @@ export default function ProdutosTabelaSection({
   totalItens,
   totalPaginas,
 }) {
+  const totalColunas = colunasVisiveis.length;
+
   return (
     <>
       {!loading && totalItens > 0 && (
@@ -76,13 +78,13 @@ export default function ProdutosTabelaSection({
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={totalColunas} className="px-4 py-8 text-center text-gray-500">
                     Carregando produtos...
                   </td>
                 </tr>
               ) : produtos.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={totalColunas} className="px-4 py-8 text-center text-gray-500">
                     Nenhum produto encontrado
                   </td>
                 </tr>
@@ -147,7 +149,7 @@ export default function ProdutosTabelaSection({
                             key={`kit-${produto.id}`}
                             className="bg-amber-50/50 border-l-4 border-amber-400"
                           >
-                            <td colSpan="10" className="px-4 py-3">
+                            <td colSpan={totalColunas} className="px-4 py-3">
                               <div className="ml-12">
                                 <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
                                   <svg
