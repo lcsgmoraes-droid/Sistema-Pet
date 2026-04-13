@@ -14,6 +14,8 @@ export default function useProdutosEdicao({
     marca_id: "",
     categoria_id: "",
     departamento_id: "",
+    anunciar_ecommerce: "",
+    anunciar_app: "",
   });
 
   const handleEditarPreco = (produtoId, precoAtual) => {
@@ -47,6 +49,8 @@ export default function useProdutosEdicao({
       marca_id: "",
       categoria_id: "",
       departamento_id: "",
+      anunciar_ecommerce: "",
+      anunciar_app: "",
     });
     setModalEdicaoLote(true);
   };
@@ -70,6 +74,12 @@ export default function useProdutosEdicao({
       }
       if (dadosEdicaoLote.departamento_id) {
         dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id, 10);
+      }
+      if (dadosEdicaoLote.anunciar_ecommerce !== "") {
+        dadosEnvio.anunciar_ecommerce = dadosEdicaoLote.anunciar_ecommerce === "true";
+      }
+      if (dadosEdicaoLote.anunciar_app !== "") {
+        dadosEnvio.anunciar_app = dadosEdicaoLote.anunciar_app === "true";
       }
 
       await api.patch("/produtos/atualizar-lote", {

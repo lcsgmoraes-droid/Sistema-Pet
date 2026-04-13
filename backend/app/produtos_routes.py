@@ -736,7 +736,7 @@ def criar_categoria(
 ):
     """Cria uma nova categoria"""
 
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Verificar se categoria pai existe (se fornecida)
     if categoria.categoria_pai_id:
@@ -2413,6 +2413,8 @@ class AtualizacaoLoteRequest(BaseModel):
     marca_id: Optional[int] = None
     categoria_id: Optional[int] = None
     departamento_id: Optional[int] = None
+    anunciar_ecommerce: Optional[bool] = None
+    anunciar_app: Optional[bool] = None
 
 
 @router.patch("/atualizar-lote")
@@ -2422,7 +2424,7 @@ def atualizar_produtos_lote(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Atualiza marca, categoria e/ou departamento de mÃºltiplos produtos"""
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     logger.info(f"ðŸ“¦ Atualizando {len(dados.produto_ids)} produtos em lote")
 
@@ -2455,6 +2457,24 @@ def atualizar_produtos_lote(
             produto.departamento_id = dados.departamento_id
             atualizado += 1
 
+        produto_ativo_loja = bool(getattr(produto, "ativo", True)) and bool(getattr(produto, "situacao", True))
+        if not produto_ativo_loja:
+            if bool(getattr(produto, "anunciar_ecommerce", False)):
+                atualizado += 1
+            if bool(getattr(produto, "anunciar_app", False)):
+                atualizado += 1
+            produto.anunciar_ecommerce = False
+            produto.anunciar_app = False
+        else:
+            if dados.anunciar_ecommerce is not None:
+                if produto.anunciar_ecommerce != dados.anunciar_ecommerce:
+                    atualizado += 1
+                produto.anunciar_ecommerce = dados.anunciar_ecommerce
+            if dados.anunciar_app is not None:
+                if produto.anunciar_app != dados.anunciar_app:
+                    atualizado += 1
+                produto.anunciar_app = dados.anunciar_app
+
         produto.updated_at = datetime.utcnow()
 
     db.commit()
@@ -2466,7 +2486,9 @@ def atualizar_produtos_lote(
         "campos_atualizados": atualizado,
         "marca_id": dados.marca_id,
         "categoria_id": dados.categoria_id,
-        "departamento_id": dados.departamento_id
+        "departamento_id": dados.departamento_id,
+        "anunciar_ecommerce": dados.anunciar_ecommerce,
+        "anunciar_app": dados.anunciar_app
     }
 
 

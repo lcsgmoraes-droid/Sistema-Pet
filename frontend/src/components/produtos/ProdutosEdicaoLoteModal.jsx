@@ -100,6 +100,52 @@ export default function ProdutosEdicaoLoteModal({
               ))}
             </select>
           </div>
+
+          <div className="pt-1 border-t border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-2">Canais de venda</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Ecommerce</label>
+                <select
+                  value={dadosEdicaoLote.anunciar_ecommerce}
+                  onChange={(event) =>
+                    setDadosEdicaoLote({
+                      ...dadosEdicaoLote,
+                      anunciar_ecommerce: event.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Nao alterar</option>
+                  <option value="true">Ativar</option>
+                  <option value="false">Desativar</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">App movel</label>
+                <select
+                  value={dadosEdicaoLote.anunciar_app}
+                  onChange={(event) =>
+                    setDadosEdicaoLote({
+                      ...dadosEdicaoLote,
+                      anunciar_app: event.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Nao alterar</option>
+                  <option value="true">Ativar</option>
+                  <option value="false">Desativar</option>
+                </select>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-2">
+              Se o produto estiver inativo na loja fisica, os dois canais ficam desativados automaticamente.
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6">
