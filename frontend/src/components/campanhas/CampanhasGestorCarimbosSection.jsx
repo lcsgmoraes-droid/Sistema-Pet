@@ -6,6 +6,8 @@ export default function CampanhasGestorCarimbosSection({
   setGestorSecao,
   gestorCarimboNota,
   setGestorCarimboNota,
+  gestorCarimboQuantidade,
+  setGestorCarimboQuantidade,
   gestorLancandoCarimbo,
   lancarCarimboGestor,
   gestorCarimbos,
@@ -67,12 +69,36 @@ export default function CampanhasGestorCarimbosSection({
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               />
             </div>
+            <div className="flex flex-col">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Quantidade
+              </label>
+              <div className="flex items-center gap-2 border rounded-lg bg-white">
+                <button
+                  onClick={() => setGestorCarimboQuantidade(Math.max(1, gestorCarimboQuantidade - 1))}
+                  disabled={gestorLancandoCarimbo || gestorCarimboQuantidade <= 1}
+                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  −
+                </button>
+                <span className="px-3 py-2 font-semibold text-gray-900 min-w-[3rem] text-center">
+                  {gestorCarimboQuantidade}
+                </span>
+                <button
+                  onClick={() => setGestorCarimboQuantidade(gestorCarimboQuantidade + 1)}
+                  disabled={gestorLancandoCarimbo || gestorCarimboQuantidade >= 100}
+                  className="px-3 py-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  +
+                </button>
+              </div>
+            </div>
             <button
               onClick={lancarCarimboGestor}
               disabled={gestorLancandoCarimbo}
               className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
             >
-              {gestorLancandoCarimbo ? "Lancando..." : "Lancar Carimbo"}
+              {gestorLancandoCarimbo ? `Lancando (${gestorCarimboQuantidade})...` : `Lancar ${gestorCarimboQuantidade > 1 ? gestorCarimboQuantidade + " Carimbos" : "Carimbo"}`}
             </button>
           </div>
         </div>

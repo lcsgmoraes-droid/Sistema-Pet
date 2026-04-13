@@ -13,6 +13,7 @@ export default function useCampanhasGestor() {
   const [gestorSecao, setGestorSecao] = useState(null);
   const [gestorIncluirEstornados, setGestorIncluirEstornados] = useState(false);
   const [gestorCarimboNota, setGestorCarimboNota] = useState("");
+  const [gestorCarimboQuantidade, setGestorCarimboQuantidade] = useState(1);
   const [gestorLancandoCarimbo, setGestorLancandoCarimbo] = useState(false);
   const [gestorRemovendo, setGestorRemovendo] = useState(null);
   const [gestorCashbackTipo, setGestorCashbackTipo] = useState("credito");
@@ -101,13 +102,19 @@ export default function useCampanhasGestor() {
   const lancarCarimboGestor = async () => {
     if (!gestorCliente) return;
 
+    const quantidade = Math.max(1, gestorCarimboQuantidade);
     setGestorLancandoCarimbo(true);
     try {
-      await api.post("/campanhas/carimbos/manual", {
-        customer_id: gestorCliente.id,
-        nota: gestorCarimboNota || "Carimbo lancado manualmente pelo operador",
-      });
+      const nota = gestorCarimboNota || "Carimbo lancado manualmente pelo operador";
+      // Realizar múltiplas chamadas para cada carimbo
+      for (let i = 0; i < quantidade; i++) {
+        await api.post("/campanhas/carimbos/manual", {
+          customer_id: gestorCliente.id,
+          nota: quantidade > 1 ? `${nota} (${i + 1}/${quantidade})` : nota,
+        });
+      }
       setGestorCarimboNota("");
+      setGestorCarimboQuantidade(1);
       await recarregarGestor();
     } catch (e) {
       alert("Erro: " + (e?.response?.data?.detail || e.message));
@@ -185,7 +192,7 @@ export default function useCampanhasGestor() {
     gestorBuscando,
     gestorCliente,
     gestorSaldo,
-    gestorCarimbos,
+    gestorCarIMbos,
     gestorCupons,
     gestorCarregando,
     gestorSecao,
@@ -194,6 +201,8 @@ export default function useCampanhasGestor() {
     setGestorIncluirEstornados,
     gestorCarimboNota,
     setGestorCarimboNota,
+    gestorCarimboQuantidade,
+    setGestorCarimboQuantidade,
     gestorLancandoCarimbo,
     gestorRemovendo,
     gestorCashbackTipo,

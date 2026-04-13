@@ -32,6 +32,8 @@ export default function CampanhasGestorTab({
   setGestorIncluirEstornados,
   gestorCarimboNota,
   setGestorCarimboNota,
+  gestorCarimboQuantidade,
+  setGestorCarimboQuantidade,
   gestorLancandoCarimbo,
   lancarCarimboGestor,
   gestorRemovendo,
@@ -100,6 +102,8 @@ export default function CampanhasGestorTab({
               setGestorSecao={setGestorSecao}
               gestorCarimboNota={gestorCarimboNota}
               setGestorCarimboNota={setGestorCarimboNota}
+              gestorCarimboQuantidade={gestorCarimboQuantidade}
+              setGestorCarimboQuantidade={setGestorCarimboQuantidade}
               gestorLancandoCarimbo={gestorLancandoCarimbo}
               lancarCarimboGestor={lancarCarimboGestor}
               gestorCarimbos={gestorCarimbos}
