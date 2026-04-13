@@ -228,6 +228,9 @@ def _aplicar_status_ativo_produto(produto: Produto, ativo: bool):
     """MantÃ©m ativo e situaÃ§Ã£o sincronizados."""
     produto.ativo = ativo
     produto.situacao = ativo
+    if not ativo:
+        produto.anunciar_ecommerce = False
+        produto.anunciar_app = False
     produto.updated_at = datetime.now()
 
 
@@ -397,6 +400,8 @@ class ProdutoBase(BaseModel):
     preco_app_promo: Optional[float] = None
     preco_app_promo_inicio: Optional[datetime] = None
     preco_app_promo_fim: Optional[datetime] = None
+    anunciar_ecommerce: Optional[bool] = True
+    anunciar_app: Optional[bool] = True
     controle_lote: Optional[bool] = False
     estoque_minimo: Optional[float] = 0
     estoque_maximo: Optional[float] = None
@@ -479,6 +484,8 @@ class ProdutoUpdate(BaseModel):
     preco_app_promo: Optional[float] = None
     preco_app_promo_inicio: Optional[datetime] = None
     preco_app_promo_fim: Optional[datetime] = None
+    anunciar_ecommerce: Optional[bool] = None
+    anunciar_app: Optional[bool] = None
     controle_lote: Optional[bool] = None
     estoque_minimo: Optional[float] = None
     estoque_maximo: Optional[float] = None
@@ -2352,6 +2359,10 @@ def atualizar_produto(
 
     for key, value in dados_recebidos.items():
         setattr(produto, key, value)
+
+    if not bool(produto.ativo) or produto.situacao is False:
+        produto.anunciar_ecommerce = False
+        produto.anunciar_app = False
 
     produto.updated_at = datetime.utcnow()
 

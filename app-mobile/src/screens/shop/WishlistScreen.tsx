@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -66,7 +66,7 @@ export default function WishlistScreen() {
   }
 
   function renderItem({ item }: { item: Produto }) {
-    const disponivel = (item.estoque_ecommerce ?? item.estoque ?? 0) > 0;
+    const disponivel = Number(item.estoque ?? 0) > 0;
     return (
       <View style={styles.card}>
         {/* Foto */}

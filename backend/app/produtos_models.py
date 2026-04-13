@@ -150,6 +150,8 @@ class Produto(BaseTenantModel):
     preco_app_promo = Column(Float, nullable=True)
     preco_app_promo_inicio = Column(DateTime(timezone=True), nullable=True)
     preco_app_promo_fim = Column(DateTime(timezone=True), nullable=True)
+    anunciar_ecommerce = Column(Boolean, nullable=False, default=True)
+    anunciar_app = Column(Boolean, nullable=False, default=True)
     
     # Estoque
     estoque_atual = Column(Float, default=0)

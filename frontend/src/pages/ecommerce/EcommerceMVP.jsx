@@ -58,19 +58,15 @@ function resolveProductPrice(product) {
 }
 
 function resolveProductStock(product) {
-  const ecommerceStock = Number(product?.estoque_ecommerce);
   const currentStock = Number(product?.estoque_atual);
-
-  if (Number.isFinite(ecommerceStock) && ecommerceStock > 0) {
-    return ecommerceStock;
-  }
 
   if (Number.isFinite(currentStock)) {
     return currentStock;
   }
 
-  if (Number.isFinite(ecommerceStock)) {
-    return ecommerceStock;
+  const fallbackStock = Number(product?.estoque ?? 0);
+  if (Number.isFinite(fallbackStock)) {
+    return fallbackStock;
   }
 
   return Number.POSITIVE_INFINITY;

@@ -68,7 +68,9 @@ export default function ProdutosForm() {
     preco_app: null,
     preco_app_promo: null,
     preco_app_promo_inicio: null,
-    preco_app_promo_fim: null
+    preco_app_promo_fim: null,
+    anunciar_ecommerce: true,
+    anunciar_app: true,
   });
   
   // Imagens
@@ -227,7 +229,9 @@ export default function ProdutosForm() {
         preco_app: prod.preco_app ?? null,
         preco_app_promo: prod.preco_app_promo ?? null,
         preco_app_promo_inicio: prod.preco_app_promo_inicio ?? null,
-        preco_app_promo_fim: prod.preco_app_promo_fim ?? null
+        preco_app_promo_fim: prod.preco_app_promo_fim ?? null,
+        anunciar_ecommerce: prod.anunciar_ecommerce ?? true,
+        anunciar_app: prod.anunciar_app ?? true,
       });
       
       // Carregar imagens
@@ -349,6 +353,7 @@ export default function ProdutosForm() {
       setSalvando(true);
       
       const { _mostrarCanais, ...restoProduto } = produto;
+      const lojaFisicaAtiva = produto.status !== 'inativo';
       const dados = {
         ...restoProduto,
         preco_custo: parseFloat(produto.preco_custo) || 0,
@@ -358,6 +363,8 @@ export default function ProdutosForm() {
         estoque_maximo: parseFloat(produto.estoque_maximo) || 0,
         categoria_id: produto.categoria_id || null,
         marca_id: produto.marca_id || null,
+        anunciar_ecommerce: lojaFisicaAtiva ? Boolean(produto.anunciar_ecommerce) : false,
+        anunciar_app: lojaFisicaAtiva ? Boolean(produto.anunciar_app) : false,
       };
       
       if (isEdit) {
@@ -787,7 +794,18 @@ export default function ProdutosForm() {
 
                 {/* Ecommerce */}
                 <div>
-                  <div className="text-xs font-bold text-purple-700 uppercase mb-2">🛒 Ecommerce</div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-xs font-bold text-purple-700 uppercase">🛒 Ecommerce</div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={produto.status !== 'inativo' && produto.anunciar_ecommerce !== false}
+                        onChange={e => setProduto(prev => ({ ...prev, anunciar_ecommerce: e.target.checked }))}
+                        disabled={produto.status === 'inativo'}
+                      />
+                      Exibir no canal
+                    </label>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
@@ -826,7 +844,18 @@ export default function ProdutosForm() {
 
                 {/* App Móvel (Aplicativo) */}
                 <div>
-                  <div className="text-xs font-bold text-green-700 uppercase mb-2">📱 App Móvel (Aplicativo)</div>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="text-xs font-bold text-green-700 uppercase">📱 App Móvel (Aplicativo)</div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={produto.status !== 'inativo' && produto.anunciar_app !== false}
+                        onChange={e => setProduto(prev => ({ ...prev, anunciar_app: e.target.checked }))}
+                        disabled={produto.status === 'inativo'}
+                      />
+                      Exibir no canal
+                    </label>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
@@ -862,6 +891,12 @@ export default function ProdutosForm() {
                     </div>
                   </div>
                 </div>
+
+                {produto.status === 'inativo' && (
+                  <p className="text-xs text-amber-700">
+                    Produto inativo na loja fisica: anuncio em Ecommerce e App Movel fica desativado automaticamente.
+                  </p>
+                )}
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>

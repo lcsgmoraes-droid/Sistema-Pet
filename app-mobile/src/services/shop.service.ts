@@ -3,6 +3,17 @@ import { Produto, Pedido } from '../types';
 import { API_BASE_URL } from '../config';
 import * as SecureStore from 'expo-secure-store';
 
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(',', '.').trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /** Retorna o tenant_id salvo, ou string vazia se não vinculado */
 async function getTenantId(): Promise<string> {
   try {
@@ -62,6 +73,7 @@ export async function listarProdutos(params?: {
       busca: params?.busca,
       limit,
       offset,
+      canal: 'app',
       apenas_com_estoque: params?.somenteComEstoque || undefined,
       apenas_com_imagem: params?.somenteComImagem || undefined,
       ordenacao: params?.ordenacao || 'prontos',
@@ -69,22 +81,28 @@ export async function listarProdutos(params?: {
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
   const items = data.items ?? data.produtos ?? [];
-  const produtos: Produto[] = items.map((p: any) => ({
-    id: p.id,
-    nome: p.nome,
-    preco: p.preco_venda ?? p.preco ?? 0,
-    preco_promocional: p.preco_promocional ?? null,
-    promocao_ativa: p.promocao_ativa ?? false,
-    foto_url: resolveMediaUrl(p.imagem_principal ?? p.foto_url),
-    estoque: p.estoque_ecommerce ?? p.estoque_atual ?? p.estoque ?? 0,
-    estoque_ecommerce: p.estoque_ecommerce ?? null,
-    categoria_nome: p.categoria_nome ?? null,
-    marca_nome: p.marca_nome ?? null,
-    codigo: p.codigo ?? p.codigo_barras ?? null,
-    codigo_barras: p.codigo_barras ?? null,
-    descricao: p.descricao ?? null,
-    peso_embalagem_kg: p.peso_embalagem ?? null,
-  }));
+  const produtos: Produto[] = items.map((p: any) => {
+    const estoqueAtual = toNumberOrNull(p.estoque_atual);
+    const estoquePadrao = toNumberOrNull(p.estoque);
+    const estoqueCatalogo = estoqueAtual ?? estoquePadrao ?? 0;
+
+    return {
+      id: p.id,
+      nome: p.nome,
+      preco: p.preco_venda ?? p.preco ?? 0,
+      preco_promocional: p.preco_promocional ?? null,
+      promocao_ativa: p.promocao_ativa ?? false,
+      foto_url: resolveMediaUrl(p.imagem_principal ?? p.foto_url),
+      estoque: estoqueCatalogo,
+      estoque_ecommerce: estoqueAtual,
+      categoria_nome: p.categoria_nome ?? null,
+      marca_nome: p.marca_nome ?? null,
+      codigo: p.codigo ?? p.codigo_barras ?? null,
+      codigo_barras: p.codigo_barras ?? null,
+      descricao: p.descricao ?? null,
+      peso_embalagem_kg: p.peso_embalagem ?? null,
+    };
+  });
   return { produtos, total: Number(data?.total ?? produtos.length) };
 }
 
@@ -112,16 +130,22 @@ export async function obterCarrinho(): Promise<{
   itens: any[];
   subtotal: number;
 }> {
-  const { data } = await api.get('/carrinho');
+  const { data } = await api.get('/carrinho', {
+    headers: { 'X-Canal-Venda': 'app' },
+  });
   return data;
 }
 
 export async function adicionarAoCarrinho(produto_id: number, quantidade = 1): Promise<void> {
-  await api.post('/carrinho/adicionar', { produto_id, quantidade });
+  await api.post('/carrinho/adicionar', { produto_id, quantidade }, {
+    headers: { 'X-Canal-Venda': 'app' },
+  });
 }
 
 export async function atualizarCarrinho(produto_id: number, quantidade: number): Promise<void> {
-  await api.put('/carrinho/atualizar', { produto_id, quantidade });
+  await api.put('/carrinho/atualizar', { produto_id, quantidade }, {
+    headers: { 'X-Canal-Venda': 'app' },
+  });
 }
 
 export async function removerDoCarrinho(produto_id: number): Promise<void> {

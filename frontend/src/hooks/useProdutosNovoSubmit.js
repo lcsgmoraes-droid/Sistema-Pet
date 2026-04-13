@@ -37,6 +37,7 @@ export default function useProdutosNovoSubmit({
         ordem: Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : 0,
         opcional: Boolean(item.opcional),
       }));
+      const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
 
       const dados = {
         codigo: skuNormalizado,
@@ -59,6 +60,8 @@ export default function useProdutosNovoSubmit({
         preco_app_promo: formData.preco_app_promo ? parseFloat(formData.preco_app_promo) : null,
         preco_app_promo_inicio: formData.preco_app_promo_inicio || null,
         preco_app_promo_fim: formData.preco_app_promo_fim || null,
+        anunciar_ecommerce: lojaFisicaAtiva ? Boolean(formData.anunciar_ecommerce) : false,
+        anunciar_app: lojaFisicaAtiva ? Boolean(formData.anunciar_app) : false,
         controle_lote: formData.controle_lote || false,
         estoque_minimo: formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
         estoque_maximo: formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,

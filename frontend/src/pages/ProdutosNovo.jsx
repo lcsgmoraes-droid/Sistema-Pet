@@ -71,6 +71,10 @@ export default function ProdutosNovo() {
     preco_app_promo: '',
     preco_app_promo_inicio: '',
     preco_app_promo_fim: '',
+    anunciar_ecommerce: true,
+    anunciar_app: true,
+    ativo: true,
+    situacao: true,
     markup: '',
     
     // Sprint 2: Produtos com variação

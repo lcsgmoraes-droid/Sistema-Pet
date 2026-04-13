@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -40,6 +40,21 @@ class CarrinhoCupomRequest(BaseModel):
 class EcommerceIdentity(BaseModel):
     user_id: int
     tenant_id: str
+
+
+def _normalize_sales_channel(raw_channel: str | None) -> str:
+    value = str(raw_channel or "ecommerce").strip().lower()
+    if value in {"app", "app_movel", "mobile", "aplicativo"}:
+        return "app"
+    return "ecommerce"
+
+
+def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
+    if not bool(produto.ativo) or produto.situacao is False:
+        return False
+    if canal == "app":
+        return bool(getattr(produto, "anunciar_app", True))
+    return bool(getattr(produto, "anunciar_ecommerce", True))
 
 
 def _current_identity(credentials: HTTPAuthorizationCredentials = Depends(security)) -> EcommerceIdentity:
@@ -191,6 +206,7 @@ def _resolver_preco_unitario(produto: Produto) -> float:
 @router.post("/adicionar")
 def adicionar_item_carrinho(
     payload: CarrinhoAdicionarRequest,
+    request: Request,
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
@@ -212,8 +228,12 @@ def adicionar_item_carrinho(
     if getattr(produto, "is_sellable", True) is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto não vendável")
 
-    estoque_ecommerce = float(produto.estoque_ecommerce or 0.0)
-    if estoque_ecommerce > 0 and payload.quantidade > estoque_ecommerce:
+    canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
+    if not _produto_disponivel_no_canal(produto, canal_venda):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto indisponível neste canal")
+
+    estoque_disponivel = float(produto.estoque_atual or 0.0)
+    if payload.quantidade > estoque_disponivel:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantidade indisponível em estoque")
 
     carrinho = _find_or_create_carrinho(db, identity)
@@ -240,9 +260,9 @@ def adicionar_item_carrinho(
         produto_id=produto.id,
         excluir_pedido_id=carrinho.pedido_id,
     )
-    disponivel_para_carrinho = max(estoque_ecommerce - reservado_outros, 0.0)
+    disponivel_para_carrinho = max(estoque_disponivel - reservado_outros, 0.0)
 
-    if estoque_ecommerce > 0 and float(nova_quantidade) > disponivel_para_carrinho:
+    if float(nova_quantidade) > disponivel_para_carrinho:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Quantidade indisponível em estoque (reserva ativa)",
@@ -272,6 +292,7 @@ def adicionar_item_carrinho(
 @router.put("/atualizar")
 def atualizar_item_carrinho(
     payload: CarrinhoAtualizarRequest,
+    request: Request,
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
@@ -304,16 +325,20 @@ def atualizar_item_carrinho(
     if not produto:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
 
-    estoque_ecommerce = float(produto.estoque_ecommerce or 0.0)
+    canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
+    if not _produto_disponivel_no_canal(produto, canal_venda):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto indisponível neste canal")
+
+    estoque_disponivel = float(produto.estoque_atual or 0.0)
     reservado_outros = _quantidade_reservada_produto(
         db,
         tenant_id=identity.tenant_id,
         produto_id=item.produto_id,
         excluir_pedido_id=carrinho.pedido_id,
     )
-    disponivel_para_carrinho = max(estoque_ecommerce - reservado_outros, 0.0)
+    disponivel_para_carrinho = max(estoque_disponivel - reservado_outros, 0.0)
 
-    if estoque_ecommerce > 0 and float(payload.quantidade) > disponivel_para_carrinho:
+    if float(payload.quantidade) > disponivel_para_carrinho:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Quantidade indisponível em estoque (reserva ativa)",

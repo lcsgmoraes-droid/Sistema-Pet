@@ -15,6 +15,13 @@ _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CATALOG_ORDER_OPTIONS = {"prontos", "nome", "menor_preco", "maior_preco"}
 
 
+def _normalize_sales_channel(raw_channel: str | None) -> str:
+    value = str(raw_channel or "ecommerce").strip().lower()
+    if value in {"app", "app_movel", "mobile", "aplicativo"}:
+        return "app"
+    return "ecommerce"
+
+
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> str | None:
     if not raw_tenant_id:
         return None
@@ -162,10 +169,12 @@ def listar_produtos_publicos(
     apenas_com_estoque: bool = Query(default=False),
     apenas_com_imagem: bool = Query(default=False),
     ordenacao: str = Query(default="prontos"),
+    canal: str = Query(default="ecommerce"),
     db: Session = Depends(get_session),
 ):
     tenant = _get_active_tenant(db, tenant_ref)
     ordenacao_normalizada = str(ordenacao or "prontos").strip().lower()
+    canal_normalizado = _normalize_sales_channel(canal)
 
     if ordenacao_normalizada not in _CATALOG_ORDER_OPTIONS:
         raise HTTPException(
@@ -173,13 +182,8 @@ def listar_produtos_publicos(
             detail="Ordenação inválida. Use: prontos, nome, menor_preco ou maior_preco.",
         )
 
-    estoque_catalogo = case(
-        (
-            func.coalesce(Produto.estoque_ecommerce, 0) > 0,
-            func.coalesce(Produto.estoque_ecommerce, 0),
-        ),
-        else_=func.coalesce(Produto.estoque_atual, Produto.estoque_ecommerce, 0),
-    )
+    # Fonte única de estoque: saldo oficial do Sistema Pet.
+    estoque_catalogo = func.coalesce(Produto.estoque_atual, 0)
     tem_imagem_expr = or_(
         and_(
             Produto.imagem_principal.is_not(None),
@@ -201,9 +205,15 @@ def listar_produtos_publicos(
         .filter(
             Produto.tenant_id == tenant.id,
             Produto.ativo == True,
+            Produto.situacao.is_not(False),
             Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
         )
     )
+
+    if canal_normalizado == "app":
+        query = query.filter(Produto.anunciar_app.is_(True))
+    else:
+        query = query.filter(Produto.anunciar_ecommerce.is_(True))
 
     if busca:
         termo = busca.strip()
@@ -257,7 +267,8 @@ def listar_produtos_publicos(
                 "categoria_id": produto.categoria_id,
                 "categoria_nome": getattr(produto.categoria, "nome", None),
                 "marca_nome": getattr(produto.marca, "nome", None) if hasattr(produto, "marca") else None,
-                "estoque_ecommerce": produto.estoque_ecommerce,
+                # Mantemos o campo por compatibilidade, mas com o mesmo saldo oficial.
+                "estoque_ecommerce": produto.estoque_atual,
                 "estoque_atual": produto.estoque_atual,
                 "imagem_principal": produto.imagem_principal,
                 "imagens": [

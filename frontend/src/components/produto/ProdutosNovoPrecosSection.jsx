@@ -17,6 +17,8 @@ export default function ProdutosNovoPrecosSection({
     return null;
   }
 
+  const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -144,7 +146,18 @@ export default function ProdutosNovoPrecosSection({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3">
-            <div className="text-xs font-bold text-purple-700 uppercase">Ecommerce</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-bold text-purple-700 uppercase">Ecommerce</div>
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={lojaFisicaAtiva && formData.anunciar_ecommerce !== false}
+                  onChange={(e) => handleChange('anunciar_ecommerce', e.target.checked)}
+                  disabled={!lojaFisicaAtiva}
+                />
+                Exibir no canal
+              </label>
+            </div>
             <input
               type="number"
               step="0.01"
@@ -180,7 +193,18 @@ export default function ProdutosNovoPrecosSection({
           </div>
 
           <div className="space-y-3">
-            <div className="text-xs font-bold text-green-700 uppercase">App Movel</div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-bold text-green-700 uppercase">App Movel</div>
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={lojaFisicaAtiva && formData.anunciar_app !== false}
+                  onChange={(e) => handleChange('anunciar_app', e.target.checked)}
+                  disabled={!lojaFisicaAtiva}
+                />
+                Exibir no canal
+              </label>
+            </div>
             <input
               type="number"
               step="0.01"
@@ -215,6 +239,12 @@ export default function ProdutosNovoPrecosSection({
             </div>
           </div>
         </div>
+
+        {!lojaFisicaAtiva && (
+          <p className="text-xs text-amber-700">
+            Produto inativo na loja fisica: anuncio em Ecommerce e App Movel fica desativado automaticamente.
+          </p>
+        )}
       </div>
     </>
   );
