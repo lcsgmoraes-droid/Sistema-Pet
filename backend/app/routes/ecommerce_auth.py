@@ -370,11 +370,47 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
 
 def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     tenant_id = str(user.tenant_id)
-    cliente = (
+    clientes_vinculados = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
-        .first()
+        .order_by(Cliente.id.asc())
+        .all()
     )
+
+    cliente: Cliente | None = None
+    if clientes_vinculados:
+        cpf_usuario = _digits_only(user.cpf_cnpj)
+        email_usuario = (user.email or "").strip().lower()
+
+        if cpf_usuario:
+            cliente = next(
+                (
+                    c
+                    for c in clientes_vinculados
+                    if _digits_only(c.cpf) == cpf_usuario
+                ),
+                None,
+            )
+
+        if not cliente and email_usuario:
+            cliente = next(
+                (
+                    c
+                    for c in clientes_vinculados
+                    if (c.email or "").strip().lower() == email_usuario
+                ),
+                None,
+            )
+
+        if not cliente:
+            cliente = clientes_vinculados[0]
+
+    if not cliente:
+        cliente = (
+            db.query(Cliente)
+            .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
+        .first()
+        )
 
     if not cliente:
         cliente = _find_cliente_match(
