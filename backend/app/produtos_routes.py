@@ -136,15 +136,18 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
     return [
         case(
             (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
-            (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 2),
-            (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 3),
-            (Produto.codigo.ilike(f"{termo}%"), 4),
-            (Produto.codigo_barras.ilike(f"{termo}%"), 5),
-            (Produto.nome.ilike(f"{termo}%"), 6),
-            (Produto.codigo.ilike(f"%{termo}%"), 7),
-            (Produto.codigo_barras.ilike(f"%{termo}%"), 8),
-            (Produto.nome.ilike(f"%{termo}%"), 9),
-            else_=10,
+            (func.lower(func.coalesce(Produto.sku, "")) == termo_lower, 2),
+            (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 3),
+            (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 4),
+            (Produto.codigo.ilike(f"{termo}%"), 5),
+            (Produto.sku.ilike(f"{termo}%"), 6),
+            (Produto.codigo_barras.ilike(f"{termo}%"), 7),
+            (Produto.nome.ilike(f"{termo}%"), 8),
+            (Produto.codigo.ilike(f"%{termo}%"), 9),
+            (Produto.sku.ilike(f"%{termo}%"), 10),
+            (Produto.codigo_barras.ilike(f"%{termo}%"), 11),
+            (Produto.nome.ilike(f"%{termo}%"), 12),
+            else_=13,
         ),
         Produto.nome.asc(),
         Produto.created_at.desc(),
@@ -1829,6 +1832,7 @@ def listar_produtos(
             query = query.filter(
                 (Produto.nome.ilike(busca_pattern)) |
                 (Produto.codigo.ilike(busca_pattern)) |
+                (Produto.sku.ilike(busca_pattern)) |
                 (Produto.codigo_barras.ilike(busca_pattern))
             )
 

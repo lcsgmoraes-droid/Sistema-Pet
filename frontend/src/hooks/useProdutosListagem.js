@@ -142,7 +142,10 @@ export default function useProdutosListagem({
         return produtoCorrespondeBusca(p);
       }
 
-      return paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id));
+      return (
+        produtoCorrespondeBusca(p) ||
+        paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id))
+      );
     });
 
     return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);
