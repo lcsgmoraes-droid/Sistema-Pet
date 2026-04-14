@@ -269,6 +269,9 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
         const tiposAtivos = Array.isArray(res.data)
           ? res.data.filter((item) => item?.ativo !== false)
           : [];
+        tiposAtivos.sort((a, b) =>
+          String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' })
+        );
         setTiposDespesa(tiposAtivos);
       } catch {
         if (!mounted) return;
