@@ -42,6 +42,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/produtos", tags=["produtos"])
 
+PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
+
+
+def _produto_sku_value(produto: Produto) -> Optional[str]:
+    return getattr(produto, "sku", None)
+
 
 # ==========================================
 # FUNÃ‡Ã•ES AUXILIARES - CONSOLIDAÃ‡ÃƒO DE LÃ“GICA REPETIDA
@@ -94,8 +100,11 @@ def _obter_marca_ou_404(db: Session, marca_id: int, tenant_id: int):
 
 def _validar_sku_unico(db: Session, sku: str, tenant_id: int, produto_id: Optional[int] = None):
     """Valida se SKU Ã© Ãºnico no tenant (exceto para o prÃ³prio produto em ediÃ§Ã£o)"""
+    if PRODUTO_SKU_COLUMN is None:
+        return
+
     query = db.query(Produto).filter(
-        Produto.sku == sku,
+        PRODUTO_SKU_COLUMN == sku,
         Produto.tenant_id == tenant_id
     )
 
@@ -133,18 +142,36 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         return [Produto.created_at.desc()]
 
     termo_lower = termo.lower()
+    if PRODUTO_SKU_COLUMN is None:
+        return [
+            case(
+                (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
+                (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 2),
+                (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 3),
+                (Produto.codigo.ilike(f"{termo}%"), 4),
+                (Produto.codigo_barras.ilike(f"{termo}%"), 5),
+                (Produto.nome.ilike(f"{termo}%"), 6),
+                (Produto.codigo.ilike(f"%{termo}%"), 7),
+                (Produto.codigo_barras.ilike(f"%{termo}%"), 8),
+                (Produto.nome.ilike(f"%{termo}%"), 9),
+                else_=10,
+            ),
+            Produto.nome.asc(),
+            Produto.created_at.desc(),
+        ]
+
     return [
         case(
             (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
-            (func.lower(func.coalesce(Produto.sku, "")) == termo_lower, 2),
+            (func.lower(func.coalesce(PRODUTO_SKU_COLUMN, "")) == termo_lower, 2),
             (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 3),
             (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 4),
             (Produto.codigo.ilike(f"{termo}%"), 5),
-            (Produto.sku.ilike(f"{termo}%"), 6),
+            (PRODUTO_SKU_COLUMN.ilike(f"{termo}%"), 6),
             (Produto.codigo_barras.ilike(f"{termo}%"), 7),
             (Produto.nome.ilike(f"{termo}%"), 8),
             (Produto.codigo.ilike(f"%{termo}%"), 9),
-            (Produto.sku.ilike(f"%{termo}%"), 10),
+            (PRODUTO_SKU_COLUMN.ilike(f"%{termo}%"), 10),
             (Produto.codigo_barras.ilike(f"%{termo}%"), 11),
             (Produto.nome.ilike(f"%{termo}%"), 12),
             else_=13,
@@ -1829,12 +1856,19 @@ def listar_produtos(
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
             busca_pattern = f"%{palavra}%"
-            query = query.filter(
-                (Produto.nome.ilike(busca_pattern)) |
-                (Produto.codigo.ilike(busca_pattern)) |
-                (Produto.sku.ilike(busca_pattern)) |
-                (Produto.codigo_barras.ilike(busca_pattern))
-            )
+            if PRODUTO_SKU_COLUMN is None:
+                query = query.filter(
+                    (Produto.nome.ilike(busca_pattern)) |
+                    (Produto.codigo.ilike(busca_pattern)) |
+                    (Produto.codigo_barras.ilike(busca_pattern))
+                )
+            else:
+                query = query.filter(
+                    (Produto.nome.ilike(busca_pattern)) |
+                    (Produto.codigo.ilike(busca_pattern)) |
+                    (PRODUTO_SKU_COLUMN.ilike(busca_pattern)) |
+                    (Produto.codigo_barras.ilike(busca_pattern))
+                )
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -3272,14 +3306,23 @@ def relatorio_valorizacao_estoque(
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
             busca_pattern = f"%{palavra}%"
-            query = query.filter(
-                or_(
-                    Produto.nome.ilike(busca_pattern),
-                    Produto.codigo.ilike(busca_pattern),
-                    Produto.sku.ilike(busca_pattern),
-                    Produto.codigo_barras.ilike(busca_pattern),
+            if PRODUTO_SKU_COLUMN is None:
+                query = query.filter(
+                    or_(
+                        Produto.nome.ilike(busca_pattern),
+                        Produto.codigo.ilike(busca_pattern),
+                        Produto.codigo_barras.ilike(busca_pattern),
+                    )
                 )
-            )
+            else:
+                query = query.filter(
+                    or_(
+                        Produto.nome.ilike(busca_pattern),
+                        Produto.codigo.ilike(busca_pattern),
+                        PRODUTO_SKU_COLUMN.ilike(busca_pattern),
+                        Produto.codigo_barras.ilike(busca_pattern),
+                    )
+                )
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -3369,7 +3412,7 @@ def relatorio_valorizacao_estoque(
             RelatorioValorizacaoEstoqueItem(
                 id=produto.id,
                 codigo=produto.codigo,
-                sku=produto.sku,
+                sku=_produto_sku_value(produto),
                 nome=produto.nome,
                 categoria_nome=produto.categoria.nome if produto.categoria else None,
                 marca_nome=produto.marca.nome if produto.marca else None,
