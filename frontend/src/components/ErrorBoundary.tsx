@@ -2,6 +2,8 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 const CHUNK_RELOAD_RETRY_KEY = 'lazy-chunk-reload-at';
 const CHUNK_RELOAD_WINDOW_MS = 5 * 60 * 1000;
+const DOM_DETACH_RELOAD_RETRY_KEY = 'dom-detach-reload-at';
+const DOM_DETACH_RELOAD_WINDOW_MS = 2 * 60 * 1000;
 
 function isDynamicImportError(error: unknown): boolean {
   const message = String(
@@ -13,6 +15,17 @@ function isDynamicImportError(error: unknown): boolean {
     message.includes('importing a module script failed') ||
     message.includes('chunkloaderror') ||
     message.includes('loading chunk')
+  );
+}
+
+function isDomDetachError(error: unknown): boolean {
+  const message = String(
+    error instanceof Error ? error.message : error || '',
+  ).toLowerCase();
+
+  return (
+    message.includes("failed to execute 'removechild' on 'node'") ||
+    message.includes('the node to be removed is not a child of this node')
   );
 }
 
@@ -31,6 +44,28 @@ function markChunkReloadAttempt(): void {
   try {
     window.sessionStorage.setItem(
       CHUNK_RELOAD_RETRY_KEY,
+      String(Date.now()),
+    );
+  } catch {
+    // Ignore storage issues and fallback to the regular error screen.
+  }
+}
+
+function shouldRetryDomDetachReload(): boolean {
+  try {
+    const lastAttempt = Number(
+      window.sessionStorage.getItem(DOM_DETACH_RELOAD_RETRY_KEY) || 0,
+    );
+    return !lastAttempt || Date.now() - lastAttempt > DOM_DETACH_RELOAD_WINDOW_MS;
+  } catch {
+    return true;
+  }
+}
+
+function markDomDetachReloadAttempt(): void {
+  try {
+    window.sessionStorage.setItem(
+      DOM_DETACH_RELOAD_RETRY_KEY,
       String(Date.now()),
     );
   } catch {
@@ -64,6 +99,12 @@ export class ErrorBoundary extends Component<Props, State> {
     if (isDynamicImportError(error) && shouldRetryChunkReload()) {
       markChunkReloadAttempt();
       window.location.reload();
+      return;
+    }
+
+    if (isDomDetachError(error) && shouldRetryDomDetachReload()) {
+      markDomDetachReloadAttempt();
+      window.location.reload();
     }
   }
 
@@ -74,6 +115,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       const isChunkError = isDynamicImportError(this.state.error);
+      const isDomDetach = isDomDetachError(this.state.error);
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -101,7 +143,9 @@ export class ErrorBoundary extends Component<Props, State> {
             <p className="text-sm text-gray-600 text-center mb-6">
               {isChunkError
                 ? 'A tela foi atualizada no servidor e esta aba ficou com um arquivo antigo. Vamos tentar carregar novamente.'
-                : 'Ocorreu um erro inesperado. Por favor, recarregue a pagina.'}
+                : isDomDetach
+                  ? 'A tela teve uma falha pontual de renderizacao. Recarregue a pagina para continuar.'
+                  : 'Ocorreu um erro inesperado. Por favor, recarregue a pagina.'}
             </p>
 
             {this.state.error && (

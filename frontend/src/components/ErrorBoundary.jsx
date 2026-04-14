@@ -3,6 +3,8 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 const CHUNK_RELOAD_RETRY_KEY = 'lazy-chunk-reload-at';
 const CHUNK_RELOAD_WINDOW_MS = 5 * 60 * 1000;
+const DOM_DETACH_RELOAD_RETRY_KEY = 'dom-detach-reload-at';
+const DOM_DETACH_RELOAD_WINDOW_MS = 2 * 60 * 1000;
 
 function isDynamicImportError(error) {
   const message = String(error?.message || error || '').toLowerCase();
@@ -12,6 +14,14 @@ function isDynamicImportError(error) {
     message.includes('importing a module script failed') ||
     message.includes('chunkloaderror') ||
     message.includes('loading chunk')
+  );
+}
+
+function isDomDetachError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return (
+    message.includes("failed to execute 'removechild' on 'node'") ||
+    message.includes('the node to be removed is not a child of this node')
   );
 }
 
@@ -37,6 +47,28 @@ function markChunkReloadAttempt() {
   }
 }
 
+function shouldRetryDomDetachReload() {
+  try {
+    const lastAttempt = Number(
+      window.sessionStorage.getItem(DOM_DETACH_RELOAD_RETRY_KEY) || 0,
+    );
+    return !lastAttempt || Date.now() - lastAttempt > DOM_DETACH_RELOAD_WINDOW_MS;
+  } catch {
+    return true;
+  }
+}
+
+function markDomDetachReloadAttempt() {
+  try {
+    window.sessionStorage.setItem(
+      DOM_DETACH_RELOAD_RETRY_KEY,
+      String(Date.now()),
+    );
+  } catch {
+    // Ignore storage issues and fallback to the regular error screen.
+  }
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -54,6 +86,12 @@ class ErrorBoundary extends React.Component {
     if (isDynamicImportError(error) && shouldRetryChunkReload()) {
       markChunkReloadAttempt();
       window.location.reload();
+      return;
+    }
+
+    if (isDomDetachError(error) && shouldRetryDomDetachReload()) {
+      markDomDetachReloadAttempt();
+      window.location.reload();
     }
   }
 
@@ -69,6 +107,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       const isChunkError = isDynamicImportError(this.state.error);
+      const isDomDetach = isDomDetachError(this.state.error);
 
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -85,7 +124,9 @@ class ErrorBoundary extends React.Component {
             <p className="text-gray-600 mb-6">
               {isChunkError
                 ? 'A tela foi atualizada no servidor e esta aba ficou com um arquivo antigo. Vamos tentar carregar novamente.'
-                : 'Ocorreu um erro inesperado na tela. Seus dados estao seguros. Recarregue a pagina para continuar.'}
+                : isDomDetach
+                  ? 'A tela teve uma falha pontual de renderizacao. Recarregue a pagina para continuar.'
+                  : 'Ocorreu um erro inesperado na tela. Seus dados estao seguros. Recarregue a pagina para continuar.'}
             </p>
 
             {this.state.error && (
