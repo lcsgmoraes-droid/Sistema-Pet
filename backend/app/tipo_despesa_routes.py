@@ -20,6 +20,7 @@ from typing import Optional, List
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .financeiro_models import TipoDespesa
+from .dre_plano_contas_models import DRESubcategoria
 
 router = APIRouter(prefix="/cadastros/tipo-despesa", tags=["Cadastros - Tipo de Despesa"])
 
@@ -28,16 +29,19 @@ router = APIRouter(prefix="/cadastros/tipo-despesa", tags=["Cadastros - Tipo de 
 class TipoDespesaCreate(BaseModel):
     nome: str
     e_custo_fixo: bool  # True = Fixo, False = Variável
+    dre_subcategoria_id: int
 
 class TipoDespesaUpdate(BaseModel):
     nome: Optional[str] = None
     e_custo_fixo: Optional[bool] = None
+    dre_subcategoria_id: Optional[int] = None
     ativo: Optional[bool] = None
 
 class TipoDespesaResponse(BaseModel):
     id: int
     nome: str
     e_custo_fixo: bool
+    dre_subcategoria_id: int
     ativo: bool
     model_config = {"from_attributes": True}
 
@@ -45,24 +49,24 @@ class TipoDespesaResponse(BaseModel):
 
 TIPOS_PADRAO = [
     # Fixos
-    {"nome": "Aluguel",                           "e_custo_fixo": True},
-    {"nome": "Salários e Encargos",               "e_custo_fixo": True},
-    {"nome": "Impostos / DAS Simples Nacional",   "e_custo_fixo": True},
-    {"nome": "Energia Elétrica",                  "e_custo_fixo": True},
-    {"nome": "Internet / Telefone",               "e_custo_fixo": True},
-    {"nome": "Água",                              "e_custo_fixo": True},
-    {"nome": "Contador / Assessoria Contábil",    "e_custo_fixo": True},
-    {"nome": "Sistema / Software",                "e_custo_fixo": True},
-    {"nome": "Seguro",                            "e_custo_fixo": True},
-    {"nome": "Marketing / Publicidade Fixo",      "e_custo_fixo": True},
+    {"nome": "Aluguel",                           "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Salários e Encargos",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Impostos / DAS Simples Nacional",   "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Energia Elétrica",                  "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Internet / Telefone",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Água",                              "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Contador / Assessoria Contábil",    "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Sistema / Software",                "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Seguro",                            "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Marketing / Publicidade Fixo",      "e_custo_fixo": True, "dre_subcategoria_id": 2},
     # Variáveis
-    {"nome": "Fornecedor de Produto para Revenda","e_custo_fixo": False},
-    {"nome": "Frete de Compra",                   "e_custo_fixo": False},
-    {"nome": "Comissões de Vendas",               "e_custo_fixo": False},
-    {"nome": "Embalagens",                        "e_custo_fixo": False},
-    {"nome": "Marketing / Anúncios por Resultado","e_custo_fixo": False},
-    {"nome": "Outros Custos Variáveis",           "e_custo_fixo": False},
-    {"nome": "Outros Custos Fixos",               "e_custo_fixo": True},
+    {"nome": "Fornecedor de Produto para Revenda","e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Frete de Compra",                   "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Comissões de Vendas",               "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Embalagens",                        "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Marketing / Anúncios por Resultado","e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Outros Custos Variáveis",           "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Outros Custos Fixos",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
 ]
 
 # ===================== ENDPOINTS =====================
@@ -102,7 +106,20 @@ def criar_tipo_despesa(
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    novo = TipoDespesa(tenant_id=tenant_id, nome=data.nome, e_custo_fixo=data.e_custo_fixo)
+    subcategoria = db.query(DRESubcategoria).filter(
+        DRESubcategoria.id == data.dre_subcategoria_id,
+        DRESubcategoria.tenant_id == tenant_id,
+        DRESubcategoria.ativo.is_(True),
+    ).first()
+    if not subcategoria:
+        raise HTTPException(status_code=400, detail="Subcategoria DRE inválida")
+
+    novo = TipoDespesa(
+        tenant_id=tenant_id,
+        nome=data.nome,
+        e_custo_fixo=data.e_custo_fixo,
+        dre_subcategoria_id=data.dre_subcategoria_id,
+    )
     db.add(novo)
     db.commit()
     db.refresh(novo)
@@ -127,6 +144,15 @@ def atualizar_tipo_despesa(
         tipo.nome = data.nome
     if data.e_custo_fixo is not None:
         tipo.e_custo_fixo = data.e_custo_fixo
+    if data.dre_subcategoria_id is not None:
+        subcategoria = db.query(DRESubcategoria).filter(
+            DRESubcategoria.id == data.dre_subcategoria_id,
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.ativo.is_(True),
+        ).first()
+        if not subcategoria:
+            raise HTTPException(status_code=400, detail="Subcategoria DRE inválida")
+        tipo.dre_subcategoria_id = data.dre_subcategoria_id
     if data.ativo is not None:
         tipo.ativo = data.ativo
     db.commit()

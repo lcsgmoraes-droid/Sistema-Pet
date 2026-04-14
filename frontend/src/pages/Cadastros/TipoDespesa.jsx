@@ -5,10 +5,11 @@ import { toast } from 'react-hot-toast';
 
 const TipoDespesa = () => {
   const [tipos, setTipos] = useState([]);
+  const [subcategoriasDre, setSubcategoriasDre] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
-  const [form, setForm] = useState({ nome: '', e_custo_fixo: true });
+  const [form, setForm] = useState({ nome: '', e_custo_fixo: true, dre_subcategoria_id: '' });
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -18,8 +19,16 @@ const TipoDespesa = () => {
   const carregar = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/cadastros/tipo-despesa/');
-      setTipos(res.data);
+      const [tiposRes, subcategoriasRes] = await Promise.all([
+        api.get('/cadastros/tipo-despesa/'),
+        api.get('/dre/subcategorias'),
+      ]);
+      setTipos(Array.isArray(tiposRes.data) ? tiposRes.data : []);
+      setSubcategoriasDre(
+        Array.isArray(subcategoriasRes.data)
+          ? subcategoriasRes.data.filter((item) => item?.ativo !== false)
+          : [],
+      );
     } catch {
       toast.error('Erro ao carregar tipos de despesa');
     } finally {
@@ -29,13 +38,17 @@ const TipoDespesa = () => {
 
   const abrirNovo = () => {
     setEditando(null);
-    setForm({ nome: '', e_custo_fixo: true });
+    setForm({ nome: '', e_custo_fixo: true, dre_subcategoria_id: '' });
     setShowModal(true);
   };
 
   const abrirEdicao = (tipo) => {
     setEditando(tipo.id);
-    setForm({ nome: tipo.nome, e_custo_fixo: tipo.e_custo_fixo });
+    setForm({
+      nome: tipo.nome,
+      e_custo_fixo: tipo.e_custo_fixo,
+      dre_subcategoria_id: tipo.dre_subcategoria_id ? String(tipo.dre_subcategoria_id) : '',
+    });
     setShowModal(true);
   };
 
@@ -44,13 +57,24 @@ const TipoDespesa = () => {
       toast.error('Informe o nome do tipo de despesa');
       return;
     }
+
+    if (!form.dre_subcategoria_id) {
+      toast.error('Selecione a subcategoria DRE');
+      return;
+    }
+
     try {
       setSalvando(true);
+      const payload = {
+        nome: form.nome,
+        e_custo_fixo: form.e_custo_fixo,
+        dre_subcategoria_id: Number(form.dre_subcategoria_id),
+      };
       if (editando) {
-        await api.put(`/cadastros/tipo-despesa/${editando}`, form);
+        await api.put(`/cadastros/tipo-despesa/${editando}`, payload);
         toast.success('Tipo atualizado!');
       } else {
-        await api.post('/cadastros/tipo-despesa/', form);
+        await api.post('/cadastros/tipo-despesa/', payload);
         toast.success('Tipo criado!');
       }
       setShowModal(false);
@@ -75,6 +99,8 @@ const TipoDespesa = () => {
 
   const fixos = tipos.filter((t) => t.e_custo_fixo && t.ativo);
   const variaveis = tipos.filter((t) => !t.e_custo_fixo && t.ativo);
+  const nomeSubcategoria = (id) =>
+    subcategoriasDre.find((item) => Number(item.id) === Number(id))?.nome || 'Subcategoria não encontrada';
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -123,7 +149,10 @@ const TipoDespesa = () => {
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-orange-500 font-bold text-lg">F</span>
-                    <span className="text-gray-800 font-medium">{tipo.nome}</span>
+                    <div>
+                      <span className="text-gray-800 font-medium">{tipo.nome}</span>
+                      <p className="text-xs text-gray-500">DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -163,7 +192,10 @@ const TipoDespesa = () => {
                 >
                   <div className="flex items-center gap-3">
                     <span className="text-blue-500 font-bold text-lg">V</span>
-                    <span className="text-gray-800 font-medium">{tipo.nome}</span>
+                    <div>
+                      <span className="text-gray-800 font-medium">{tipo.nome}</span>
+                      <p className="text-xs text-gray-500">DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -246,6 +278,22 @@ const TipoDespesa = () => {
                     ? '🔒 Fixo: valor não muda com o volume de vendas (ex: aluguel, salário, impostos)'
                     : '📈 Variável: valor cresce com as vendas (ex: mercadorias, frete, comissões)'}
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategoria DRE</label>
+                <select
+                  value={form.dre_subcategoria_id}
+                  onChange={(e) => setForm({ ...form, dre_subcategoria_id: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione...</option>
+                  {subcategoriasDre.map((sub) => (
+                    <option key={sub.id} value={String(sub.id)}>
+                      {sub.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

@@ -14,6 +14,8 @@ from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
+from app.financeiro_models import ContaPagar, TipoDespesa
+from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.models import User
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
 from app.utils.security_helpers import safe_get_caixa
@@ -47,6 +49,7 @@ class MovimentacaoSchema(BaseModel):
     fornecedor_id: Optional[int] = None
     fornecedor_nome: Optional[str] = None
     documento: Optional[str] = None
+    tipo_despesa_id: Optional[int] = None
 
 
 # Rotas
@@ -231,10 +234,63 @@ async def criar_movimentacao(
     )
     
     db.add(movimentacao)
+
+    conta_pagar_gerada = None
+    if dados.tipo == 'despesa':
+        hoje = date.today()
+        descricao_cp = dados.descricao or dados.categoria or 'Despesa lançada no caixa'
+        dre_subcategoria_id = 2
+
+        if dados.tipo_despesa_id is not None:
+            tipo_despesa = db.query(TipoDespesa).filter(
+                TipoDespesa.id == dados.tipo_despesa_id,
+                TipoDespesa.tenant_id == tenant_id,
+                TipoDespesa.ativo.is_(True),
+            ).first()
+            if not tipo_despesa:
+                raise HTTPException(status_code=400, detail="Tipo de despesa inválido")
+            dre_subcategoria_id = tipo_despesa.dre_subcategoria_id or 2
+
+        conta_pagar_gerada = ContaPagar(
+            descricao=descricao_cp,
+            fornecedor_id=dados.fornecedor_id,
+            tipo_despesa_id=dados.tipo_despesa_id,
+            valor_original=dados.valor,
+            valor_pago=dados.valor,
+            valor_final=dados.valor,
+            data_emissao=hoje,
+            data_vencimento=hoje,
+            data_pagamento=hoje,
+            status='pago',
+            dre_subcategoria_id=dre_subcategoria_id,
+            canal='loja_fisica',
+            documento=dados.documento,
+            observacoes=f"Gerada automaticamente pelo PDV (Caixa #{caixa.numero_caixa})",
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+        db.add(conta_pagar_gerada)
+
     db.commit()
     db.refresh(movimentacao)
-    
-    return movimentacao.to_dict()
+
+    retorno = movimentacao.to_dict()
+    if conta_pagar_gerada is not None:
+        db.refresh(conta_pagar_gerada)
+        atualizar_dre_por_lancamento(
+            db=db,
+            tenant_id=tenant_id,
+            dre_subcategoria_id=conta_pagar_gerada.dre_subcategoria_id,
+            canal=conta_pagar_gerada.canal,
+            valor=conta_pagar_gerada.valor_original,
+            data_lancamento=conta_pagar_gerada.data_pagamento,
+            tipo_movimentacao='DESPESA',
+        )
+        db.commit()
+        retorno['conta_pagar_id'] = conta_pagar_gerada.id
+        retorno['conta_pagar_status'] = conta_pagar_gerada.status
+
+    return retorno
 
 
 @router.post("/{caixa_id}/fechar")

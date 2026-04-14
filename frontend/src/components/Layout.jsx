@@ -707,6 +707,11 @@ const Layout = () => {
           permission: "cadastros.categorias_financeiras",
         },
         {
+          path: "/cadastros/despesas-rapidas",
+          label: "Despesas Rápidas (PDV)",
+          permission: "cadastros.categorias_financeiras",
+        },
+        {
           path: "/cadastros/especies-racas",
           label: "Espécies e Raças",
           permission: "cadastros.especies_racas",

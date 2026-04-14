@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, TrendingUp, TrendingDown, Receipt, ArrowRightLeft, RotateCcw, AlertCircle } from 'lucide-react';
 import { adicionarMovimentacao, obterCaixaAberto } from '../api/caixa';
+import api from '../api';
 
 const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
@@ -246,24 +247,42 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
  * Modal de Despesa - Registro de despesas
  */
 export function ModalDespesa({ caixaId, onClose, onSucesso }) {
-  const [categoria, setCategoria] = useState('');
+  const [tipoDespesaId, setTipoDespesaId] = useState('');
+  const [tiposDespesa, setTiposDespesa] = useState([]);
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [formaPagamento, setFormaPagamento] = useState('Dinheiro');
   const [fornecedor, setFornecedor] = useState('');
   const [documento, setDocumento] = useState('');
+  const [carregandoTipos, setCarregandoTipos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
 
-  const CATEGORIAS = [
-    'Água e Luz',
-    'Aluguel',
-    'Telefone/Internet',
-    'Material de Limpeza',
-    'Material de Escritório',
-    'Manutenção',
-    'Outros'
-  ];
+  useEffect(() => {
+    let mounted = true;
+
+    const carregarTiposDespesa = async () => {
+      try {
+        setCarregandoTipos(true);
+        const res = await api.get('/cadastros/tipo-despesa/');
+        if (!mounted) return;
+        const tiposAtivos = Array.isArray(res.data)
+          ? res.data.filter((item) => item?.ativo !== false)
+          : [];
+        setTiposDespesa(tiposAtivos);
+      } catch {
+        if (!mounted) return;
+        setTiposDespesa([]);
+      } finally {
+        if (mounted) setCarregandoTipos(false);
+      }
+    };
+
+    void carregarTiposDespesa();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
@@ -272,8 +291,19 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
       return;
     }
 
-    if (!categoria) {
-      setErro('Selecione uma categoria');
+    if (!tipoDespesaId) {
+      setErro('Selecione um tipo de despesa');
+      return;
+    }
+
+    const tipoSelecionado = tiposDespesa.find((item) => String(item.id) === String(tipoDespesaId));
+    if (!tipoSelecionado) {
+      setErro('Tipo de despesa inválido');
+      return;
+    }
+
+    if (!tipoSelecionado.dre_subcategoria_id) {
+      setErro('Esse tipo de despesa não está vinculado à DRE. Ajuste em Cadastros > Despesas Rápidas (PDV).');
       return;
     }
 
@@ -283,7 +313,9 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
       await adicionarMovimentacao(caixaId, {
         tipo: 'despesa',
         valor: valorNum,
-        categoria: categoria,
+        categoria: tipoSelecionado.nome,
+        tipo_despesa_id: Number(tipoDespesaId),
+        dre_subcategoria_id: Number(tipoSelecionado.dre_subcategoria_id),
         descricao: descricao,
         forma_pagamento: formaPagamento,
         fornecedor_nome: fornecedor,
@@ -308,18 +340,26 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Categoria*
+            Tipo de despesa*
           </label>
           <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value)}
+            value={tipoDespesaId}
+            onChange={(e) => {
+              setTipoDespesaId(e.target.value);
+            }}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            disabled={carregandoTipos}
           >
-            <option value="">Selecione...</option>
-            {CATEGORIAS.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+            <option value="">{carregandoTipos ? 'Carregando...' : 'Selecione...'}</option>
+            {tiposDespesa.map((cat) => (
+              <option key={cat.id} value={String(cat.id)}>{cat.nome}</option>
             ))}
           </select>
+          {!carregandoTipos && tiposDespesa.length === 0 && (
+            <p className="text-xs text-amber-700 mt-2">
+              Nenhum tipo ativo encontrado. Cadastre em Cadastros &gt; Despesas Rapidas (PDV).
+            </p>
+          )}
         </div>
 
         <div>

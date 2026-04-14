@@ -113,6 +113,7 @@ class TipoDespesa(BaseTenantModel):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False)
     e_custo_fixo = Column(Boolean, nullable=False, default=True)  # True = Fixo, False = Variável
+    dre_subcategoria_id = Column(Integer, ForeignKey('dre_subcategorias.id'), nullable=False)
     ativo = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
