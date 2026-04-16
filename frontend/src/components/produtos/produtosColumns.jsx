@@ -442,65 +442,6 @@ export function createProdutosColunas() {
     ),
   },
   {
-    key: "validade",
-    label: "Validade",
-    visible: true,
-    renderHeader: () => (
-      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-        Validade
-      </th>
-    ),
-    renderCell: (produto, props) => (
-      <td className="px-4 py-3 text-center text-sm">
-        {props.getValidadeMaisProxima(produto)}
-      </td>
-    ),
-  },
-  {
-    key: "estoque",
-    label: "Estoque",
-    visible: true,
-    renderHeader: () => (
-      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-        Estoque
-      </th>
-    ),
-    renderCell: (produto, props) => {
-      const isKitVirtual = isKitVirtualProduto(produto);
-      const estoqueAtual = obterEstoqueVisualProduto(produto);
-      const reservado = produto.estoque_reservado || 0;
-      const estoqueDisponivel = estoqueAtual - reservado;
-      const estoqueFormatado = parseFloat(estoqueDisponivel.toFixed(2));
-
-      return (
-        <td className="px-4 py-3 text-center">
-          {produto.controlar_estoque ? (
-            <div className="flex flex-col items-center">
-              <span className={`text-sm ${props.getCorEstoque(produto)}`}>
-                {estoqueFormatado}
-              </span>
-              {reservado > 0 && (
-                <span
-                  className="text-xs text-yellow-600 mt-0.5"
-                  title={`${reservado} unidade(s) reservada(s) em pedidos Bling`}
-                >
-                  {reservado} reservado{reservado > 1 ? "s" : ""}
-                </span>
-              )}
-              {isKitVirtual && (
-                <span className="text-xs text-gray-400 mt-0.5">
-                  estoque virtual
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-sm text-gray-400">-</span>
-          )}
-        </td>
-      );
-    },
-  },
-  {
     key: "margem",
     label: "Margem",
     visible: true,
@@ -597,6 +538,65 @@ export function createProdutosColunas() {
               </svg>
             </button>
           </div>
+        </td>
+      );
+    },
+  },
+  {
+    key: "validade",
+    label: "Validade",
+    visible: true,
+    renderHeader: () => (
+      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Validade
+      </th>
+    ),
+    renderCell: (produto, props) => (
+      <td className="px-4 py-3 text-center text-sm">
+        {props.getValidadeMaisProxima(produto)}
+      </td>
+    ),
+  },
+  {
+    key: "estoque",
+    label: "Estoque",
+    visible: true,
+    renderHeader: () => (
+      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Estoque
+      </th>
+    ),
+    renderCell: (produto, props) => {
+      const isKitVirtual = isKitVirtualProduto(produto);
+      const estoqueAtual = obterEstoqueVisualProduto(produto);
+      const reservado = produto.estoque_reservado || 0;
+      const estoqueDisponivel = estoqueAtual - reservado;
+      const estoqueFormatado = parseFloat(estoqueDisponivel.toFixed(2));
+
+      return (
+        <td className="px-4 py-3 text-center">
+          {produto.controlar_estoque ? (
+            <div className="flex flex-col items-center">
+              <span className={`text-sm ${props.getCorEstoque(produto)}`}>
+                {estoqueFormatado}
+              </span>
+              {reservado > 0 && (
+                <span
+                  className="text-xs text-yellow-600 mt-0.5"
+                  title={`${reservado} unidade(s) reservada(s) em pedidos Bling`}
+                >
+                  {reservado} reservado{reservado > 1 ? "s" : ""}
+                </span>
+              )}
+              {isKitVirtual && (
+                <span className="text-xs text-gray-400 mt-0.5">
+                  estoque virtual
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm text-gray-400">-</span>
+          )}
         </td>
       );
     },

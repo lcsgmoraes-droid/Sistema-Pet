@@ -689,6 +689,12 @@ class PedidoCompra(BaseTenantModel):
     sugestao_ia = Column(Boolean, default=False)  # Se foi sugerido por IA
     confianca_ia = Column(Float)  # 0-1: Confian�a da sugest�o
     dados_ia = Column(Text)  # JSON com an�lise da IA
+
+    # Confronto com NF-e
+    nota_entrada_id = Column(Integer, ForeignKey('notas_entrada.id'), nullable=True, index=True)
+    data_confronto = Column(DateTime, nullable=True)
+    status_confronto = Column(String(30), nullable=True)  # sem_divergencia, divergencia_quantidade, divergencia_preco, divergencia_mista
+    resumo_confronto = Column(Text, nullable=True)  # JSON com detalhes do confronto
     
     # Auditoria
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)

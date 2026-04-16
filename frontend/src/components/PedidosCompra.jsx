@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
+import ModalConfronto from './compras/ModalConfronto';
 
 const PedidosCompra = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -12,6 +13,8 @@ const PedidosCompra = () => {
   const [pedidoEditando, setPedidoEditando] = useState(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState(null);
   const [mostrarRecebimento, setMostrarRecebimento] = useState(false);
+  const [mostrarConfronto, setMostrarConfronto] = useState(false);
+  const [pedidoConfronto, setPedidoConfronto] = useState(null);
   
   // Modal de envio
   const [mostrarModalEnvio, setMostrarModalEnvio] = useState(false);
@@ -840,6 +843,16 @@ const PedidosCompra = () => {
     }
   };
 
+  const abrirConfronto = async (pedido) => {
+    try {
+      const response = await api.get(`/pedidos-compra/${pedido.id}`);
+      setPedidoConfronto(response.data);
+      setMostrarConfronto(true);
+    } catch (error) {
+      toast.error('Erro ao carregar detalhes do pedido');
+    }
+  };
+
   const receberPedido = async (itensRecebimento) => {
     try {
       await api.post(
@@ -1236,9 +1249,18 @@ const PedidosCompra = () => {
                     )}
                     {(pedido.status === 'confirmado' || pedido.status === 'recebido_parcial') && (
                       <button
-                        onClick={() => abrirRecebimento(pedido)}
+                        onClick={() => abrirConfronto(pedido)}
                         className="inline-flex items-center gap-1 px-3 py-1 border border-violet-200 bg-violet-50 text-violet-700 rounded-md hover:bg-violet-100 text-xs font-semibold"
-                        title="Registrar entrada de produtos no estoque"
+                        title="Confrontar pedido com NF fiscal"
+                      >
+                        🔍 Conferir NF
+                      </button>
+                    )}
+                    {(pedido.status === 'confirmado' || pedido.status === 'recebido_parcial') && (
+                      <button
+                        onClick={() => abrirRecebimento(pedido)}
+                        className="inline-flex items-center gap-1 px-3 py-1 border border-gray-200 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 text-xs font-semibold"
+                        title="Registrar entrada de produtos no estoque (legado)"
                       >
                         📦 Receber
                       </button>
@@ -1281,6 +1303,15 @@ const PedidosCompra = () => {
             setPedidoSelecionado(null);
           }}
           onReceber={receberPedido}
+        />
+      )}
+
+      {/* Modal de Confronto Pedido x NF */}
+      {mostrarConfronto && pedidoConfronto && (
+        <ModalConfronto
+          pedido={pedidoConfronto}
+          onClose={() => { setMostrarConfronto(false); setPedidoConfronto(null); }}
+          onPedidoComplementarCriado={() => { carregarDados(); }}
         />
       )}
       

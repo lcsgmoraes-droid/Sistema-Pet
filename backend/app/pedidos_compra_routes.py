@@ -1657,3 +1657,616 @@ def _gerar_observacao(prioridade: str, dias_estoque: float, tendencia: str, cons
     
     return " | ".join(observacoes) if observacoes else "✅ Estoque adequado"
 
+
+# ============================================================================
+# CONFRONTO PEDIDO x NF-e
+# ============================================================================
+
+def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
+    """Gera o confronto completo entre pedido e NF-e."""
+    from .produtos_models import NotaEntrada, NotaEntradaItem
+
+    itens_confronto = []
+    total_pedido = 0.0
+    total_nf = 0.0
+    tem_divergencia_qtd = False
+    tem_divergencia_preco = False
+
+    for item_pedido in pedido.itens:
+        produto = db.query(Produto).filter(
+            Produto.id == item_pedido.produto_id,
+            Produto.tenant_id == tenant_id
+        ).first()
+
+        nome_produto = produto.nome if produto else f"Produto {item_pedido.produto_id}"
+        codigo_produto = produto.codigo if produto else None
+        ean_produto = produto.codigo_barras if produto else None
+
+        # Tentar matchear item da NF pelo produto_id vinculado, EAN ou código
+        item_nf = None
+        for it in nota.itens:
+            if it.produto_id == item_pedido.produto_id:
+                item_nf = it
+                break
+        if not item_nf and ean_produto:
+            for it in nota.itens:
+                if it.ean and it.ean == ean_produto:
+                    item_nf = it
+                    break
+        if not item_nf and codigo_produto:
+            for it in nota.itens:
+                if it.codigo_produto and it.codigo_produto.strip() == str(codigo_produto).strip():
+                    item_nf = it
+                    break
+
+        qtd_pedida = item_pedido.quantidade_pedida
+        preco_pedido = item_pedido.preco_unitario - item_pedido.desconto_item
+        valor_pedido = qtd_pedida * preco_pedido
+        total_pedido += valor_pedido
+
+        if item_nf:
+            qtd_nf = item_nf.quantidade
+            preco_nf = item_nf.valor_unitario
+            valor_nf = item_nf.valor_total
+            total_nf += valor_nf
+
+            dif_qtd = qtd_nf - qtd_pedida
+            dif_preco_pct = ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+            dif_valor = valor_nf - valor_pedido
+
+            if abs(dif_qtd) > 0.001:
+                tem_divergencia_qtd = True
+            if abs(dif_preco_pct) > 0.5:
+                tem_divergencia_preco = True
+
+            status_item = "ok"
+            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
+                status_item = "divergencia_mista"
+            elif abs(dif_qtd) > 0.001:
+                status_item = "divergencia_quantidade"
+            elif abs(dif_preco_pct) > 0.5:
+                status_item = "divergencia_preco"
+
+            itens_confronto.append({
+                "produto_id": item_pedido.produto_id,
+                "produto_nome": nome_produto,
+                "produto_codigo": codigo_produto,
+                "item_pedido_id": item_pedido.id,
+                "item_nf_id": item_nf.id,
+                "qtd_pedida": qtd_pedida,
+                "qtd_nf": qtd_nf,
+                "dif_qtd": round(dif_qtd, 3),
+                "preco_pedido": round(preco_pedido, 4),
+                "preco_nf": round(preco_nf, 4),
+                "dif_preco_pct": round(dif_preco_pct, 2),
+                "valor_pedido": round(valor_pedido, 2),
+                "valor_nf": round(valor_nf, 2),
+                "dif_valor": round(dif_valor, 2),
+                "status": status_item,
+                "encontrado_na_nf": True,
+            })
+        else:
+            # Item do pedido não encontrado na NF
+            tem_divergencia_qtd = True
+            itens_confronto.append({
+                "produto_id": item_pedido.produto_id,
+                "produto_nome": nome_produto,
+                "produto_codigo": codigo_produto,
+                "item_pedido_id": item_pedido.id,
+                "item_nf_id": None,
+                "qtd_pedida": qtd_pedida,
+                "qtd_nf": 0,
+                "dif_qtd": -qtd_pedida,
+                "preco_pedido": round(preco_pedido, 4),
+                "preco_nf": 0,
+                "dif_preco_pct": 0,
+                "valor_pedido": round(valor_pedido, 2),
+                "valor_nf": 0,
+                "dif_valor": -round(valor_pedido, 2),
+                "status": "nao_encontrado",
+                "encontrado_na_nf": False,
+            })
+
+    # Itens na NF que não estavam no pedido
+    ids_pedido_produto = {i.produto_id for i in pedido.itens}
+    for it in nota.itens:
+        if it.produto_id and it.produto_id not in ids_pedido_produto:
+            total_nf += it.valor_total
+            itens_confronto.append({
+                "produto_id": it.produto_id,
+                "produto_nome": it.descricao,
+                "produto_codigo": it.codigo_produto,
+                "item_pedido_id": None,
+                "item_nf_id": it.id,
+                "qtd_pedida": 0,
+                "qtd_nf": it.quantidade,
+                "dif_qtd": it.quantidade,
+                "preco_pedido": 0,
+                "preco_nf": round(it.valor_unitario, 4),
+                "dif_preco_pct": 0,
+                "valor_pedido": 0,
+                "valor_nf": round(it.valor_total, 2),
+                "dif_valor": round(it.valor_total, 2),
+                "status": "nao_pedido",
+                "encontrado_na_nf": True,
+            })
+
+    # Status geral do confronto
+    if tem_divergencia_qtd and tem_divergencia_preco:
+        status_confronto = "divergencia_mista"
+    elif tem_divergencia_qtd:
+        status_confronto = "divergencia_quantidade"
+    elif tem_divergencia_preco:
+        status_confronto = "divergencia_preco"
+    else:
+        status_confronto = "sem_divergencia"
+
+    return {
+        "status_confronto": status_confronto,
+        "itens": itens_confronto,
+        "resumo": {
+            "total_pedido": round(total_pedido, 2),
+            "total_nf": round(total_nf, 2),
+            "dif_total": round(total_nf - total_pedido, 2),
+            "frete_pedido": pedido.valor_frete,
+            "frete_nf": nota.valor_frete,
+            "desconto_pedido": pedido.valor_desconto,
+            "desconto_nf": nota.valor_desconto,
+            "itens_pedido": len(pedido.itens),
+            "itens_nf": len(nota.itens),
+        }
+    }
+
+
+@router.get("/{pedido_id}/notas-candidatas")
+def listar_notas_candidatas(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Lista NF-e importadas do mesmo fornecedor do pedido, ordenadas pela mais recente."""
+    from .produtos_models import NotaEntrada
+
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    # Buscar CNPJ do fornecedor
+    fornecedor = db.query(Cliente).filter(
+        Cliente.id == pedido.fornecedor_id,
+        Cliente.tenant_id == tenant_id
+    ).first()
+
+    query = db.query(NotaEntrada).filter(NotaEntrada.tenant_id == tenant_id)
+
+    if fornecedor and fornecedor.cnpj:
+        cnpj_limpo = fornecedor.cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+        query = query.filter(
+            or_(
+                NotaEntrada.fornecedor_id == pedido.fornecedor_id,
+                func.replace(func.replace(func.replace(NotaEntrada.fornecedor_cnpj, ".", ""), "/", ""), "-", "") == cnpj_limpo,
+            )
+        )
+    elif fornecedor:
+        query = query.filter(NotaEntrada.fornecedor_id == pedido.fornecedor_id)
+
+    notas = query.order_by(desc(NotaEntrada.data_emissao)).limit(20).all()
+
+    result = []
+    for n in notas:
+        result.append({
+            "id": n.id,
+            "numero_nota": n.numero_nota,
+            "serie": n.serie,
+            "chave_acesso": n.chave_acesso,
+            "fornecedor_nome": n.fornecedor_nome,
+            "data_emissao": n.data_emissao,
+            "valor_total": n.valor_total,
+            "status": n.status,
+            "ja_vinculada": n.id == pedido.nota_entrada_id,
+        })
+
+    return {
+        "notas": result,
+        "nota_vinculada_id": pedido.nota_entrada_id,
+    }
+
+
+@router.post("/{pedido_id}/vincular-nota/{nota_id}")
+def vincular_nota_e_confrontar(
+    pedido_id: int,
+    nota_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Vincula NF-e ao pedido e realiza o confronto completo."""
+    from .produtos_models import NotaEntrada
+
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).options(
+        joinedload(PedidoCompra.itens)
+    ).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+
+    nota = db.query(NotaEntrada).options(
+        joinedload(NotaEntrada.itens)
+    ).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
+    if not nota:
+        raise HTTPException(status_code=404, detail="Nota fiscal não encontrada")
+
+    confronto = _realizar_confronto(pedido, nota, db, tenant_id)
+
+    # Salvar vínculo e resumo
+    pedido.nota_entrada_id = nota_id
+    pedido.data_confronto = datetime.utcnow()
+    pedido.status_confronto = confronto["status_confronto"]
+    pedido.resumo_confronto = json.dumps(confronto, ensure_ascii=False, default=str)
+    pedido.updated_at = datetime.utcnow()
+    db.commit()
+
+    return {
+        "message": "Confronto realizado com sucesso",
+        "pedido_id": pedido_id,
+        "nota_id": nota_id,
+        "confronto": confronto,
+    }
+
+
+@router.get("/{pedido_id}/confronto")
+def obter_confronto_salvo(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Retorna o confronto salvo do pedido."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if not pedido.nota_entrada_id:
+        raise HTTPException(status_code=404, detail="Pedido não possui NF vinculada")
+
+    return {
+        "pedido_id": pedido_id,
+        "nota_entrada_id": pedido.nota_entrada_id,
+        "data_confronto": pedido.data_confronto,
+        "status_confronto": pedido.status_confronto,
+        "confronto": json.loads(pedido.resumo_confronto) if pedido.resumo_confronto else None,
+    }
+
+
+@router.get("/{pedido_id}/confronto/csv")
+def exportar_confronto_csv(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Exporta o confronto do pedido em CSV."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido or not pedido.resumo_confronto:
+        raise HTTPException(status_code=404, detail="Confronto não encontrado")
+
+    confronto = json.loads(pedido.resumo_confronto)
+    itens = confronto.get("itens", [])
+    resumo = confronto.get("resumo", {})
+
+    def fmt(v):
+        return str(v).replace(".", ",")
+
+    linhas = [
+        "Produto;Código;Qtd Pedida;Qtd NF;Dif. Qtd;Preço Pedido (R$);Preço NF (R$);Dif. Preço (%);Valor Pedido (R$);Valor NF (R$);Dif. Valor (R$);Status"
+    ]
+    for it in itens:
+        linhas.append(
+            f"{it.get('produto_nome','')};{it.get('produto_codigo','')};{fmt(it.get('qtd_pedida',0))};{fmt(it.get('qtd_nf',0))};{fmt(it.get('dif_qtd',0))};{fmt(it.get('preco_pedido',0))};{fmt(it.get('preco_nf',0))};{fmt(it.get('dif_preco_pct',0))};{fmt(it.get('valor_pedido',0))};{fmt(it.get('valor_nf',0))};{fmt(it.get('dif_valor',0))};{it.get('status','')}"
+        )
+    linhas.append("")
+    linhas.append(f";;Total Pedido (R$);;{fmt(resumo.get('total_pedido',0))}")
+    linhas.append(f";;Total NF (R$);;{fmt(resumo.get('total_nf',0))}")
+    linhas.append(f";;Diferença Total (R$);;{fmt(resumo.get('dif_total',0))}")
+
+    csv_content = "\n".join(linhas)
+    return StreamingResponse(
+        io.StringIO(csv_content),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.csv"}
+    )
+
+
+@router.get("/{pedido_id}/confronto/pdf")
+def exportar_confronto_pdf(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Exporta o confronto do pedido em PDF."""
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+    except ImportError:
+        raise HTTPException(status_code=500, detail="reportlab não instalado")
+
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido or not pedido.resumo_confronto:
+        raise HTTPException(status_code=404, detail="Confronto não encontrado")
+
+    confronto = json.loads(pedido.resumo_confronto)
+    itens = confronto.get("itens", [])
+    resumo = confronto.get("resumo", {})
+
+    fornecedor = db.query(Cliente).filter(
+        Cliente.id == pedido.fornecedor_id,
+        Cliente.tenant_id == tenant_id
+    ).first()
+    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=12*mm, bottomMargin=12*mm, leftMargin=10*mm, rightMargin=10*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16,
+                                 textColor=colors.HexColor("#1a56db"), alignment=TA_CENTER, spaceAfter=8)
+    sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9, spaceAfter=4)
+    small_style = ParagraphStyle("Sm", parent=styles["Normal"], fontSize=7, leading=9)
+
+    elements.append(Paragraph("CONFRONTO PEDIDO x NOTA FISCAL", title_style))
+    elements.append(Paragraph(f"Pedido: <b>{pedido.numero_pedido}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_nome}</b> &nbsp;|&nbsp; Data confronto: <b>{pedido.data_confronto.strftime('%d/%m/%Y %H:%M') if pedido.data_confronto else '-'}</b>", sub_style))
+    elements.append(Spacer(1, 4*mm))
+
+    STATUS_LABELS = {
+        "ok": "OK",
+        "divergencia_quantidade": "Dif. Qtd",
+        "divergencia_preco": "Dif. Preço",
+        "divergencia_mista": "Dif. Mista",
+        "nao_encontrado": "Não Recebido",
+        "nao_pedido": "Não Pedido",
+    }
+    STATUS_COLORS = {
+        "ok": colors.HexColor("#d1fae5"),
+        "divergencia_quantidade": colors.HexColor("#fef3c7"),
+        "divergencia_preco": colors.HexColor("#fef3c7"),
+        "divergencia_mista": colors.HexColor("#fee2e2"),
+        "nao_encontrado": colors.HexColor("#fee2e2"),
+        "nao_pedido": colors.HexColor("#ede9fe"),
+    }
+
+    table_data = [["Produto", "Cód.", "Qtd Ped.", "Qtd NF", "Dif.Qtd", "R$ Ped.", "R$ NF", "Dif.%", "Vl.Ped.", "Vl.NF", "Dif.R$", "Status"]]
+    row_colors = []
+
+    for idx, it in enumerate(itens):
+        st = it.get("status", "ok")
+        row_colors.append((idx + 1, STATUS_COLORS.get(st, colors.white)))
+        table_data.append([
+            Paragraph(it.get("produto_nome", "")[:40], small_style),
+            it.get("produto_codigo") or "",
+            f"{it.get('qtd_pedida', 0):.2f}".rstrip("0").rstrip("."),
+            f"{it.get('qtd_nf', 0):.2f}".rstrip("0").rstrip("."),
+            f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip("."),
+            f"R$ {it.get('preco_pedido', 0):.2f}",
+            f"R$ {it.get('preco_nf', 0):.2f}",
+            f"{it.get('dif_preco_pct', 0):+.1f}%",
+            f"R$ {it.get('valor_pedido', 0):.2f}",
+            f"R$ {it.get('valor_nf', 0):.2f}",
+            f"R$ {it.get('dif_valor', 0):+.2f}",
+            STATUS_LABELS.get(st, st),
+        ])
+
+    col_widths = [55*mm, 18*mm, 18*mm, 18*mm, 16*mm, 20*mm, 20*mm, 16*mm, 22*mm, 22*mm, 22*mm, 22*mm]
+    t = Table(table_data, colWidths=col_widths, repeatRows=1)
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a56db")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("ALIGN", (2, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]
+    for row_idx, color in row_colors:
+        style_cmds.append(("BACKGROUND", (0, row_idx), (-1, row_idx), color))
+    t.setStyle(TableStyle(style_cmds))
+    elements.append(t)
+    elements.append(Spacer(1, 5*mm))
+
+    # Resumo financeiro
+    resumo_data = [
+        ["", "Total Produtos", "Frete", "Desconto"],
+        ["Pedido", f"R$ {resumo.get('total_pedido', 0):.2f}", f"R$ {resumo.get('frete_pedido', 0):.2f}", f"R$ {resumo.get('desconto_pedido', 0):.2f}"],
+        ["NF",    f"R$ {resumo.get('total_nf', 0):.2f}",    f"R$ {resumo.get('frete_nf', 0):.2f}",    f"R$ {resumo.get('desconto_nf', 0):.2f}"],
+        ["Diferença", f"R$ {resumo.get('dif_total', 0):+.2f}", f"R$ {(resumo.get('frete_nf',0)-resumo.get('frete_pedido',0)):+.2f}", "-"],
+    ]
+    rt = Table(resumo_data, colWidths=[30*mm, 45*mm, 35*mm, 35*mm])
+    rt.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(rt)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.pdf"}
+    )
+
+
+@router.get("/{pedido_id}/confronto/email-texto")
+def gerar_email_confronto(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Gera texto de e-mail para enviar ao fornecedor com as divergências."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido or not pedido.resumo_confronto:
+        raise HTTPException(status_code=404, detail="Confronto não encontrado")
+
+    confronto = json.loads(pedido.resumo_confronto)
+    itens = confronto.get("itens", [])
+    resumo = confronto.get("resumo", {})
+
+    fornecedor = db.query(Cliente).filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id).first()
+    fornecedor_nome = fornecedor.nome if fornecedor else "Fornecedor"
+
+    divergencias = [i for i in itens if i.get("status") != "ok"]
+
+    linhas_divergencia = []
+    for d in divergencias:
+        partes = []
+        st = d.get("status")
+        if st in ("divergencia_quantidade", "divergencia_mista", "nao_encontrado"):
+            partes.append(f"qtd. pedida: {d['qtd_pedida']}, qtd. recebida: {d['qtd_nf']}")
+        if st in ("divergencia_preco", "divergencia_mista"):
+            partes.append(f"preço pedido: R$ {d['preco_pedido']:.2f}, preço NF: R$ {d['preco_nf']:.2f} ({d['dif_preco_pct']:+.1f}%)")
+        if st == "nao_pedido":
+            partes.append("produto não constava no pedido")
+        linhas_divergencia.append(f"- {d['produto_nome']}: {'; '.join(partes)}")
+
+    dif_total = resumo.get("dif_total", 0)
+    sinal = "a maior" if dif_total > 0 else "a menor"
+
+    corpo = f"""Assunto: Divergências na NF {pedido.nota_entrada_id} referente ao pedido {pedido.numero_pedido}
+
+Prezados {fornecedor_nome},
+
+Ao realizar a conferência do pedido {pedido.numero_pedido} com a nota fiscal recebida, identificamos as seguintes divergências:
+
+{chr(10).join(linhas_divergencia)}
+
+Resumo financeiro:
+- Total do pedido: R$ {resumo.get('total_pedido', 0):.2f}
+- Total da NF:     R$ {resumo.get('total_nf', 0):.2f}
+- Diferença:       R$ {abs(dif_total):.2f} {sinal}
+
+Solicitamos gentilmente que nos informem o motivo das divergências e, se aplicável, o prazo para envio dos itens faltantes ou emissão de nota de crédito pela diferença de valores.
+
+Ficamos à disposição para esclarecimentos.
+
+Atenciosamente,
+[Seu nome]
+"""
+
+    return {"texto": corpo, "divergencias_count": len(divergencias)}
+
+
+@router.post("/{pedido_id}/sugerir-pedido-complementar")
+def sugerir_pedido_complementar(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Cria pedido rascunho com os itens faltantes após o confronto."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido or not pedido.resumo_confronto:
+        raise HTTPException(status_code=404, detail="Confronto não encontrado")
+
+    confronto = json.loads(pedido.resumo_confronto)
+    itens_faltantes = [
+        i for i in confronto.get("itens", [])
+        if i.get("status") in ("nao_encontrado", "divergencia_quantidade")
+        and i.get("dif_qtd", 0) < 0
+    ]
+
+    if not itens_faltantes:
+        raise HTTPException(status_code=400, detail="Não há itens faltantes para criar pedido complementar")
+
+    # Gerar número do pedido
+    ultimo = db.query(PedidoCompra).order_by(desc(PedidoCompra.id)).first()
+    numero = (ultimo.id + 1) if ultimo else 1
+    numero_pedido = f"PC{datetime.now().year}{numero:05d}-C"
+
+    valor_total = 0.0
+    itens_novos = []
+    for it in itens_faltantes:
+        qtd_faltante = abs(it.get("dif_qtd", 0))
+        preco = it.get("preco_pedido", 0)
+        valor_item = qtd_faltante * preco
+        valor_total += valor_item
+        itens_novos.append({
+            "produto_id": it["produto_id"],
+            "qtd": qtd_faltante,
+            "preco": preco,
+            "valor": valor_item,
+        })
+
+    # Criar pedido complementar
+    novo_pedido = PedidoCompra(
+        numero_pedido=numero_pedido,
+        fornecedor_id=pedido.fornecedor_id,
+        status="rascunho",
+        valor_total=valor_total,
+        valor_frete=0,
+        valor_desconto=0,
+        valor_final=valor_total,
+        data_pedido=datetime.utcnow(),
+        observacoes=f"Pedido complementar gerado automaticamente após confronto com NF. Pedido original: {pedido.numero_pedido}",
+        user_id=current_user.id,
+        tenant_id=tenant_id
+    )
+    db.add(novo_pedido)
+    db.flush()
+
+    for it in itens_novos:
+        item = PedidoCompraItem(
+            pedido_compra_id=novo_pedido.id,
+            produto_id=it["produto_id"],
+            quantidade_pedida=it["qtd"],
+            quantidade_recebida=0,
+            preco_unitario=it["preco"],
+            desconto_item=0,
+            valor_total=it["valor"],
+            status="pendente",
+            tenant_id=tenant_id
+        )
+        db.add(item)
+
+    db.commit()
+
+    return {
+        "message": "Pedido complementar criado em rascunho",
+        "pedido_complementar_id": novo_pedido.id,
+        "numero_pedido": numero_pedido,
+        "itens_faltantes": len(itens_novos),
+        "valor_total": valor_total,
+    }
+
