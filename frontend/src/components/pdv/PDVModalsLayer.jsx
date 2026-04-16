@@ -45,6 +45,7 @@ export default function PDVModalsLayer({
   onChangeEnderecoAtual,
   onChangeItemEditando,
   onClienteCriado,
+  buscarCliente,
   onCloseAnalise,
   onCloseCalculadoraRacao,
   onCloseHistoricoCliente,
@@ -166,6 +167,7 @@ export default function PDVModalsLayer({
 
       {mostrarModalCliente && (
         <ModalCadastroCliente
+          valorBuscaInicial={buscarCliente}
           onClose={onCloseModalCliente}
           onClienteCriado={onClienteCriado}
         />

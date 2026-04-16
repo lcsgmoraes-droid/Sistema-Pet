@@ -36,6 +36,7 @@ import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
+import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 
 const BANDEIRAS = [
   'Visa',
@@ -94,6 +95,9 @@ export default function ModalPagamento({
 
   // 💰 Cashback de campanhas
   const [saldoCashback, setSaldoCashback] = useState(0);
+  const [campanhasCompra, setCampanhasCompra] = useState([]);
+  const [rankCliente, setRankCliente] = useState('bronze');
+  const [loadingBeneficiosCampanha, setLoadingBeneficiosCampanha] = useState(false);
 
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
@@ -118,6 +122,41 @@ export default function ModalPagamento({
     api.get(`/campanhas/clientes/${clienteId}/saldo`)
       .then(res => setSaldoCashback(parseFloat(res.data.saldo_cashback || 0)))
       .catch(() => {}); // campanhas são opcionais
+  }, [venda.cliente?.id]);
+
+  useEffect(() => {
+    if (!venda.cliente?.id) {
+      setCampanhasCompra([]);
+      setRankCliente('bronze');
+      return;
+    }
+
+    const carregarBeneficiosCampanha = async () => {
+      try {
+        setLoadingBeneficiosCampanha(true);
+        const [campanhasResp, saldoResp] = await Promise.allSettled([
+          api.get('/campanhas'),
+          api.get(`/campanhas/clientes/${venda.cliente.id}/saldo`),
+        ]);
+
+        const campanhasAtivas = campanhasResp.status === 'fulfilled'
+          ? (campanhasResp.value.data || []).filter((campanha) => campanha.status === 'active')
+          : [];
+
+        const rankAtual = saldoResp.status === 'fulfilled'
+          ? String(saldoResp.value?.data?.rank_level || 'bronze').toLowerCase()
+          : 'bronze';
+
+        setCampanhasCompra(campanhasAtivas);
+        setRankCliente(rankAtual);
+      } catch (error) {
+        console.error('Erro ao carregar prévia de benefícios no pagamento:', error);
+      } finally {
+        setLoadingBeneficiosCampanha(false);
+      }
+    };
+
+    carregarBeneficiosCampanha();
   }, [venda.cliente?.id]);
 
   // 🆕 Carregar operadoras de cartão
@@ -179,6 +218,64 @@ export default function ModalPagamento({
   const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
   const valorRestante = valorTotal - valorPago;
   const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
+
+  const valorBaseBeneficios = Number(venda.total || 0);
+  const campanhasCashback = campanhasCompra.filter((campanha) => campanha.campaign_type === 'cashback');
+  const campanhasCarimbo = campanhasCompra.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
+  const campanhasRecompra = campanhasCompra.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
+
+  const cashbackPrevisto = campanhasCashback
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const chaveRank = `${rankCliente}_percent`;
+      const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
+      const bonusPdv = Number(params.pdv_bonus_percent ?? 0);
+      const percentualTotal = percentualBase + bonusPdv;
+      const valor = (valorBaseBeneficios * percentualTotal) / 100;
+
+      if (valor <= 0) return null;
+
+      return {
+        campanha: campanha.name,
+        percentual: percentualTotal,
+        valor,
+      };
+    })
+    .filter(Boolean);
+
+  const carimbosPrevistos = campanhasCarimbo
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const valorPorCarimbo = Number(params.min_purchase_value || 0);
+
+      if (valorPorCarimbo <= 0) return null;
+
+      const quantidade = Math.floor(valorBaseBeneficios / valorPorCarimbo);
+      if (quantidade <= 0) return null;
+
+      return {
+        campanha: campanha.name,
+        quantidade,
+      };
+    })
+    .filter(Boolean);
+
+  const recompraPrevista = campanhasRecompra
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const minPurchase = Number(params.min_purchase_value || 0);
+      const couponType = String(params.coupon_type || 'percent');
+      const couponValue = Number(params.coupon_value || 0);
+
+      if (couponValue <= 0 || valorBaseBeneficios < minPurchase) return null;
+
+      return {
+        campanha: campanha.name,
+        tipo: couponType,
+        valor: couponValue,
+      };
+    })
+    .filter(Boolean);
 
   // 🆕 Função para calcular status de margem operacional (INICIAL - À VISTA)
   const calcularStatusMargemInicial = async () => {
@@ -1380,6 +1477,44 @@ export default function ModalPagamento({
                     <span>R$ {valorRestante.toFixed(2)}</span>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <h3 className="font-semibold text-indigo-900 mb-2">Benefícios que esta venda pode gerar</h3>
+                <p className="text-xs text-indigo-700 mb-3">
+                  Prévia para o cliente com base nas campanhas ativas no momento.
+                </p>
+
+                {!venda.cliente?.id ? (
+                  <p className="text-sm text-indigo-800">Associe um cliente para visualizar os benefícios de campanhas.</p>
+                ) : loadingBeneficiosCampanha ? (
+                  <p className="text-sm text-indigo-800">Carregando campanhas ativas...</p>
+                ) : (
+                  <div className="space-y-1.5 text-sm text-indigo-900">
+                    {carimbosPrevistos.length > 0 && carimbosPrevistos.map((item) => (
+                      <div key={`carimbo-modal-${item.campanha}`}>
+                        {item.campanha}: esta venda está gerando <strong>{item.quantidade}</strong> carimbo(s).
+                      </div>
+                    ))}
+
+                    {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
+                      <div key={`cashback-modal-${item.campanha}`}>
+                        {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
+                      </div>
+                    ))}
+
+                    {recompraPrevista.length > 0 && recompraPrevista.map((item) => (
+                      <div key={`recompra-modal-${item.campanha}`}>
+                        {item.campanha}: pode gerar 1 cupom de recompra de
+                        <strong> {item.tipo === 'fixed' ? formatMoneyBRL(item.valor) : `${formatBRL(item.valor)}%`}</strong>.
+                      </div>
+                    ))}
+
+                    {carimbosPrevistos.length === 0 && cashbackPrevisto.length === 0 && recompraPrevista.length === 0 && (
+                      <div>Nenhum benefício de campanha previsto para esta venda.</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Pagamentos adicionados */}

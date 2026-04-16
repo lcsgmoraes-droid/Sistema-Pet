@@ -2,13 +2,66 @@ import { CheckCircle, X } from "lucide-react";
 import { useState } from "react";
 import api from "../../api";
 
-export default function ModalCadastroCliente({ onClose, onClienteCriado }) {
-  const [formData, setFormData] = useState({
+function validarCpf(cpf) {
+  const digits = String(cpf || "").replace(/\D/g, "");
+  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
+
+  const calcularDigito = (base, factor) => {
+    let total = 0;
+    for (const char of base) {
+      total += Number(char) * factor;
+      factor -= 1;
+    }
+    const rest = (total * 10) % 11;
+    return rest === 10 ? 0 : rest;
+  };
+
+  const dig1 = calcularDigito(digits.slice(0, 9), 10);
+  const dig2 = calcularDigito(digits.slice(0, 10), 11);
+  return dig1 === Number(digits[9]) && dig2 === Number(digits[10]);
+}
+
+function inferirDadosIniciais(valorBuscaInicial) {
+  const base = {
     nome: "",
     data_nascimento: "",
     telefone: "",
     cpf: "",
     email: "",
+  };
+
+  const texto = String(valorBuscaInicial || "").trim();
+  if (!texto) return base;
+
+  const digitos = texto.replace(/\D/g, "");
+  const temLetras = /[a-zA-ZÀ-ÿ]/.test(texto);
+
+  if (texto.includes("@")) {
+    return { ...base, email: texto };
+  }
+
+  if (temLetras) {
+    return { ...base, nome: texto };
+  }
+
+  if (digitos.length === 11 && validarCpf(digitos)) {
+    return { ...base, cpf: texto };
+  }
+
+  if (digitos.length >= 10) {
+    return { ...base, telefone: texto };
+  }
+
+  if (digitos.length > 0) {
+    return { ...base, nome: texto };
+  }
+
+  return base;
+}
+
+export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBuscaInicial }) {
+  const [formData, setFormData] = useState({
+    ...inferirDadosIniciais(valorBuscaInicial),
   });
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");

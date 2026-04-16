@@ -69,6 +69,7 @@ export default function PDVOverlays(props) {
     onChangeEnderecoAtual,
     onChangeItemEditando,
     onClienteCriado,
+    buscarCliente,
     onCloseAnalise,
     onCloseCalculadoraRacao,
     onCloseHistoricoCliente,
@@ -171,6 +172,7 @@ export default function PDVOverlays(props) {
         onChangeEnderecoAtual={onChangeEnderecoAtual}
         onChangeItemEditando={onChangeItemEditando}
         onClienteCriado={onClienteCriado}
+        buscarCliente={buscarCliente}
         onCloseAnalise={onCloseAnalise}
         onCloseCalculadoraRacao={onCloseCalculadoraRacao}
         onCloseHistoricoCliente={onCloseHistoricoCliente}

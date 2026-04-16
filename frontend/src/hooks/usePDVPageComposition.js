@@ -366,6 +366,7 @@ export function usePDVPageComposition({
     onChangeEnderecoAtual: setEnderecoAtual,
     onChangeItemEditando: setItemEditando,
     onClienteCriado: handleClienteCriado,
+    buscarCliente,
     onCloseAnalise: () => setMostrarAnaliseVenda(false),
     onCloseCalculadoraRacao: fecharCalculadoraRacao,
     onCloseHistoricoCliente: () => setMostrarHistoricoCliente(false),
