@@ -9,6 +9,7 @@ export default function useProdutosEdicao({
 }) {
   const [editandoPreco, setEditandoPreco] = useState(null);
   const [novoPreco, setNovoPreco] = useState("");
+  const [editandoMargem, setEditandoMargem] = useState(null);
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
     marca_id: "",
@@ -32,6 +33,31 @@ export default function useProdutosEdicao({
     } catch (error) {
       console.error("Erro ao atualizar preÃ§o:", error);
       toast.error("Erro ao atualizar preÃ§o");
+    }
+  };
+
+  const handleSalvarMargem = async (produtoId, custo) => {
+    try {
+      if (!editandoMargem) return;
+      let novoPrecoCalculado;
+      if (editandoMargem.modo === 'margem') {
+        const margem = Number(editandoMargem.valor);
+        if (margem >= 100 || margem < 0) {
+          toast.error('Margem inválida. Use um valor entre 0 e 99.');
+          return;
+        }
+        novoPrecoCalculado = custo / (1 - margem / 100);
+      } else {
+        novoPrecoCalculado = Number(editandoMargem.valor);
+      }
+      novoPrecoCalculado = Math.round(novoPrecoCalculado * 100) / 100;
+      await api.patch(`/produtos/${produtoId}?preco_venda=${novoPrecoCalculado}`, {});
+      toast.success('Preço atualizado!');
+      setEditandoMargem(null);
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao atualizar preço pela margem:', error);
+      toast.error('Erro ao atualizar preço');
     }
   };
 
@@ -101,15 +127,18 @@ export default function useProdutosEdicao({
 
   return {
     dadosEdicaoLote,
+    editandoMargem,
     editandoPreco,
     handleAbrirEdicaoLote,
     handleCancelarEdicaoPreco,
     handleEditarPreco,
     handleSalvarEdicaoLote,
+    handleSalvarMargem,
     handleSalvarPreco,
     modalEdicaoLote,
     novoPreco,
     setDadosEdicaoLote,
+    setEditandoMargem,
     setModalEdicaoLote,
     setNovoPreco,
   };

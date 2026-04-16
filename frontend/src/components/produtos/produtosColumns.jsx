@@ -1,5 +1,16 @@
-﻿import React from "react";
+﻿import React, { useState } from "react";
 import { formatarMoeda } from "../../api/produtos";
+import { formatPercent } from "../../utils/formatters";
+
+function calcularMargem(preco, custo) {
+  if (!preco || preco <= 0) return 0;
+  return ((preco - custo) / preco) * 100;
+}
+
+function calcularPrecoParaMargem(custo, margem) {
+  if (margem >= 100 || margem < 0) return custo;
+  return custo / (1 - margem / 100);
+}
 import {
   isKitFisicoProduto,
   isKitVirtualProduto,
@@ -485,6 +496,107 @@ export function createProdutosColunas() {
           ) : (
             <span className="text-sm text-gray-400">-</span>
           )}
+        </td>
+      );
+    },
+  },
+  {
+    key: "margem",
+    label: "Margem",
+    visible: true,
+    renderHeader: () => (
+      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Margem
+      </th>
+    ),
+    renderCell: (produto, props) => {
+      const custo = Number(produto.preco_custo || 0);
+      const preco = Number(produto.preco_venda || 0);
+      const margem = calcularMargem(preco, custo);
+      const editandoMargem = props.editandoMargem;
+      const setEditandoMargem = props.setEditandoMargem;
+      const editandoPreco = props.editandoPreco;
+
+      // Não exibir se não tem custo ou está editando PV nessa linha
+      if (!custo || editandoPreco === produto.id) {
+        return (
+          <td className="px-4 py-3 text-right">
+            <span className="text-sm text-gray-400">-</span>
+          </td>
+        );
+      }
+
+      const corMargem =
+        margem >= 30 ? 'text-emerald-600' :
+        margem >= 15 ? 'text-yellow-600' :
+        'text-red-600';
+
+      if (editandoMargem?.produtoId === produto.id) {
+        const modo = editandoMargem.modo; // 'margem' ou 'preco'
+        return (
+          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col gap-1 items-end">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step={modo === 'margem' ? '0.1' : '0.01'}
+                  value={editandoMargem.valor}
+                  onChange={(e) => setEditandoMargem({ ...editandoMargem, valor: e.target.value })}
+                  className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 text-right"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') props.handleSalvarMargem(produto.id, custo);
+                    if (e.key === 'Escape') setEditandoMargem(null);
+                  }}
+                />
+                <span className="text-xs text-gray-500">{modo === 'margem' ? '%' : 'R$'}</span>
+                <button onClick={() => props.handleSalvarMargem(produto.id, custo)} className="text-green-600 hover:text-green-800">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                </button>
+                <button onClick={() => setEditandoMargem(null)} className="text-red-600 hover:text-red-800">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setEditandoMargem({ produtoId: produto.id, modo: 'margem', valor: margem.toFixed(1) })}
+                  className={`text-xs px-1 py-0.5 rounded ${modo === 'margem' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}
+                >% margem</button>
+                <button
+                  onClick={() => setEditandoMargem({ produtoId: produto.id, modo: 'preco', valor: preco.toFixed(2) })}
+                  className={`text-xs px-1 py-0.5 rounded ${modo === 'preco' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}
+                >R$ preço</button>
+              </div>
+              <span className="text-xs text-gray-400">
+                {modo === 'margem'
+                  ? `→ PV: ${formatarMoeda(calcularPrecoParaMargem(custo, Number(editandoMargem.valor || 0)))}`
+                  : `→ Margem: ${calcularMargem(Number(editandoMargem.valor || 0), custo).toFixed(1)}%`
+                }
+              </span>
+            </div>
+          </td>
+        );
+      }
+
+      return (
+        <td className="px-4 py-3 text-right">
+          <div className="flex items-center gap-1 justify-end">
+            <span className={`text-sm font-semibold ${corMargem}`}>
+              {formatPercent(margem)}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditandoMargem({ produtoId: produto.id, modo: 'margem', valor: margem.toFixed(1) });
+              }}
+              className="text-blue-600 hover:text-blue-800"
+              title="Ajustar margem ou preço"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          </div>
         </td>
       );
     },

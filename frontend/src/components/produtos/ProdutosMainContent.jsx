@@ -7,6 +7,7 @@ export default function ProdutosMainContent({
   abrirModalColunas,
   categorias,
   copiarTexto,
+  editandoMargem,
   editandoPreco,
   filtrarColunas,
   filtros,
@@ -17,6 +18,7 @@ export default function ProdutosMainContent({
   handleEditarPreco,
   handleExcluir,
   handleFiltroChange,
+  handleSalvarMargem,
   handleSalvarPreco,
   handleSelecionar,
   handleSelecionarTodos,
@@ -52,6 +54,7 @@ export default function ProdutosMainContent({
   produtosColunas,
   selecionados,
   selecionadosCount,
+  setEditandoMargem,
   setNovoPreco,
   setPersistirBusca,
   toggleKitExpandido,
@@ -90,12 +93,14 @@ export default function ProdutosMainContent({
       <ProdutosTabelaSection
         colunasVisiveis={colunasVisiveis}
         copiarTexto={copiarTexto}
+        editandoMargem={editandoMargem}
         editandoPreco={editandoPreco}
         getCorEstoque={getCorEstoque}
         getValidadeMaisProxima={getValidadeMaisProxima}
         handleCancelarEdicaoPreco={handleCancelarEdicaoPreco}
         handleEditarPreco={handleEditarPreco}
         handleExcluir={handleExcluir}
+        handleSalvarMargem={handleSalvarMargem}
         handleSalvarPreco={handleSalvarPreco}
         handleSelecionar={handleSelecionar}
         handleSelecionarTodos={handleSelecionarTodos}
@@ -118,6 +123,7 @@ export default function ProdutosMainContent({
         produtos={produtos}
         selecionados={selecionados}
         selecionadosCount={selecionadosCount}
+        setEditandoMargem={setEditandoMargem}
         setNovoPreco={setNovoPreco}
         toggleKitExpandido={toggleKitExpandido}
         togglePaiExpandido={togglePaiExpandido}

@@ -1,0 +1,1 @@
+function i(t){return(parseFloat(t)||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}function o(t){return`R$ ${i(t)}`}function a(t){return(parseFloat(t)||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+"%"}export{a,o as b,i as f};
