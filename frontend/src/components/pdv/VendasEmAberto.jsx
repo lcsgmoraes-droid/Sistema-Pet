@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, DollarSign, Calendar, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { X, DollarSign, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import { formatBRL, formatMoneyBRL } from '../../utils/formatters';
 
 export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSucesso }) {
   const [vendas, setVendas] = useState([]);
@@ -14,10 +15,52 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
   const [observacoes, setObservacoes] = useState('');
   const [resumo, setResumo] = useState({ total_vendas: 0, total_em_aberto: 0 });
   const [ordenacao, setOrdenacao] = useState('antiga'); // 'antiga' ou 'recente'
+  const [campanhasCompra, setCampanhasCompra] = useState([]);
+  const [rankCliente, setRankCliente] = useState('bronze');
+  const [loadingCampanhasCompra, setLoadingCampanhasCompra] = useState(false);
+  const [campanhasCarregadas, setCampanhasCarregadas] = useState(false);
 
   useEffect(() => {
     carregarVendasEmAberto();
   }, [clienteId]);
+
+  useEffect(() => {
+    setCampanhasCompra([]);
+    setRankCliente('bronze');
+    setCampanhasCarregadas(false);
+  }, [clienteId]);
+
+  useEffect(() => {
+    if (!clienteId || campanhasCarregadas || vendasSelecionadas.length === 0) return;
+
+    const carregarCampanhasCompra = async () => {
+      try {
+        setLoadingCampanhasCompra(true);
+        const [campanhasResp, saldoResp] = await Promise.allSettled([
+          api.get('/campanhas'),
+          api.get(`/campanhas/clientes/${clienteId}/saldo`),
+        ]);
+
+        const campanhasAtivas = campanhasResp.status === 'fulfilled'
+          ? (campanhasResp.value.data || []).filter((campanha) => campanha.status === 'active')
+          : [];
+
+        const rankAtual = saldoResp.status === 'fulfilled'
+          ? String(saldoResp.value?.data?.rank_level || 'bronze').toLowerCase()
+          : 'bronze';
+
+        setCampanhasCompra(campanhasAtivas);
+        setRankCliente(rankAtual);
+      } catch (error) {
+        console.error('Erro ao carregar campanhas para previsao no PDV:', error);
+      } finally {
+        setCampanhasCarregadas(true);
+        setLoadingCampanhasCompra(false);
+      }
+    };
+
+    carregarCampanhasCompra();
+  }, [clienteId, campanhasCarregadas, vendasSelecionadas.length]);
 
   const carregarVendasEmAberto = async () => {
     try {
@@ -72,6 +115,100 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
     .filter(v => vendasSelecionadas.includes(v.id))
     .reduce((sum, v) => sum + parseFloat(v.saldo_devedor), 0);
 
+  const vendasSelecionadasOrdenadas = vendas
+    .filter((venda) => vendasSelecionadas.includes(venda.id))
+    .sort((a, b) => new Date(a.data_venda) - new Date(b.data_venda));
+
+  const valorPagamentoNumerico = parseFloat(valorPagamento || 0);
+  const valorBasePrevisao = valorPagamentoNumerico > 0 ? valorPagamentoNumerico : totalSelecionado;
+
+  let valorRestantePrevisao = valorBasePrevisao;
+  const vendasPrevistasQuitadas = [];
+
+  for (const venda of vendasSelecionadasOrdenadas) {
+    if (valorRestantePrevisao <= 0) break;
+
+    const saldoVenda = parseFloat(venda.saldo_devedor || 0);
+    const valorAplicado = Math.min(valorRestantePrevisao, saldoVenda);
+    const saldoAposPagamento = saldoVenda - valorAplicado;
+
+    if (saldoAposPagamento <= 0.01) {
+      vendasPrevistasQuitadas.push(venda);
+    }
+
+    valorRestantePrevisao -= valorAplicado;
+  }
+
+  const totalVendasQuitadasPrevistas = vendasPrevistasQuitadas.length;
+  const totalQuitadoPrevisto = vendasPrevistasQuitadas
+    .reduce((acc, venda) => acc + parseFloat(venda.total || 0), 0);
+
+  const campanhasCashback = campanhasCompra.filter((campanha) => campanha.campaign_type === 'cashback');
+  const campanhasCarimbo = campanhasCompra.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
+  const campanhasRecompra = campanhasCompra.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
+
+  const cashbackPrevisto = campanhasCashback
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const chaveRank = `${rankCliente}_percent`;
+      const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
+      const bonusPdv = Number(params.pdv_bonus_percent ?? 0);
+      const percentualTotal = percentualBase + bonusPdv;
+      const valorCashback = (totalQuitadoPrevisto * percentualTotal) / 100;
+
+      if (valorCashback <= 0) return null;
+
+      return {
+        campanha: campanha.name,
+        percentual: percentualTotal,
+        valor: valorCashback,
+      };
+    })
+    .filter(Boolean);
+
+  const carimbosPrevistos = campanhasCarimbo
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const valorPorCarimbo = Number(params.min_purchase_value || 0);
+
+      if (valorPorCarimbo <= 0) return null;
+
+      const totalCarimbosCampanha = vendasPrevistasQuitadas.reduce((acc, venda) => {
+        const totalVenda = parseFloat(venda.total || 0);
+        return acc + Math.floor(totalVenda / valorPorCarimbo);
+      }, 0);
+
+      if (totalCarimbosCampanha <= 0) return null;
+
+      return {
+        campanha: campanha.name,
+        quantidade: totalCarimbosCampanha,
+      };
+    })
+    .filter(Boolean);
+
+  const recompraPrevista = campanhasRecompra
+    .map((campanha) => {
+      const params = campanha.params || {};
+      const minPurchase = Number(params.min_purchase_value || 0);
+      const couponType = String(params.coupon_type || 'percent');
+      const couponValue = Number(params.coupon_value || 0);
+
+      const temVendaElegivel = vendasPrevistasQuitadas.some((venda) => {
+        const totalVenda = parseFloat(venda.total || 0);
+        return minPurchase <= 0 || totalVenda >= minPurchase;
+      });
+
+      if (!temVendaElegivel) return null;
+
+      return {
+        campanha: campanha.name,
+        tipo: couponType,
+        valor: couponValue,
+      };
+    })
+    .filter(Boolean);
+
   const handleBaixarVendas = async () => {
     if (vendasSelecionadas.length === 0) {
       toast.error('Selecione ao menos uma venda');
@@ -113,7 +250,7 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
         throw new Error('Resposta vazia do servidor');
       }
 
-      const { vendas_quitadas, vendas_parciais, total_vendas_afetadas, valor_total_baixado } = response.data;
+      const { vendas_quitadas, vendas_parciais, valor_total_baixado } = response.data;
 
       // Mensagem de sucesso detalhada
       let mensagem = `💰 Total baixado: R$ ${valor_total_baixado.toFixed(2)}\n`;
@@ -388,6 +525,48 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
                       <strong>Atenção:</strong> O valor será aplicado automaticamente da venda mais antiga para a mais recente. 
                       Se o valor for insuficiente para quitar todas as vendas selecionadas, a última venda ficará parcialmente paga.
                     </div>
+                  </div>
+
+                  <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                    <div className="text-sm font-semibold text-indigo-900 mb-1">Benefícios que esta baixa pode gerar</div>
+                    <div className="text-xs text-indigo-700 mb-3">
+                      Prévia baseada no valor informado e nas vendas que devem ficar quitadas agora.
+                    </div>
+
+                    {loadingCampanhasCompra ? (
+                      <div className="text-sm text-indigo-700">Carregando campanhas ativas...</div>
+                    ) : (
+                      <div className="space-y-2 text-sm text-indigo-900">
+                        <div>
+                          Vendas que devem ser quitadas agora: <strong>{totalVendasQuitadasPrevistas}</strong>
+                        </div>
+
+                        {carimbosPrevistos.length > 0 && carimbosPrevistos.map((item) => (
+                          <div key={`carimbo-${item.campanha}`}>
+                            {item.campanha}: esta baixa está gerando <strong>{item.quantidade}</strong> carimbo(s).
+                          </div>
+                        ))}
+
+                        {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
+                          <div key={`cashback-${item.campanha}`}>
+                            {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
+                          </div>
+                        ))}
+
+                        {recompraPrevista.length > 0 && recompraPrevista.map((item) => (
+                          <div key={`recompra-${item.campanha}`}>
+                            {item.campanha}: pode gerar 1 cupom de recompra de
+                            <strong> {item.tipo === 'fixed' ? formatMoneyBRL(item.valor) : `${formatBRL(item.valor)}%`}</strong>.
+                          </div>
+                        ))}
+
+                        {carimbosPrevistos.length === 0 && cashbackPrevisto.length === 0 && recompraPrevista.length === 0 && (
+                          <div>
+                            Com o valor atual, não há benefício de campanha previsto para esta baixa.
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <button
