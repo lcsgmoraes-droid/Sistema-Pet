@@ -16,7 +16,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
   const [expandidos, setExpandidos] = useState({});
   const [detalhesVenda, setDetalhesVenda] = useState({});
   const [loadingDetalhes, setLoadingDetalhes] = useState({});
-  const [copiadoSku, setCopiadoSku] = useState('');
+  const [copiadoCampo, setCopiadoCampo] = useState('');
 
   useEffect(() => {
     carregarHistorico();
@@ -109,18 +109,18 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
     }));
   };
 
-  const copiarSkuItem = async (sku, chave) => {
-    if (!sku) return;
+  const copiarCampoItem = async (valor, chave, mensagemErro) => {
+    if (!valor) return;
 
     try {
-      await navigator.clipboard.writeText(String(sku));
-      setCopiadoSku(chave);
+      await navigator.clipboard.writeText(String(valor));
+      setCopiadoCampo(chave);
       window.setTimeout(() => {
-        setCopiadoSku((atual) => (atual === chave ? '' : atual));
+        setCopiadoCampo((atual) => (atual === chave ? '' : atual));
       }, 1800);
     } catch (error) {
-      console.error('Erro ao copiar SKU:', error);
-      toast.error('Nao foi possivel copiar o codigo do item');
+      console.error('Erro ao copiar campo do item:', error);
+      toast.error(mensagemErro);
     }
   };
 
@@ -407,22 +407,40 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                                 {itensDaVenda.map((item, index) => {
                                   const itemSku = String(item.sku || '').trim();
                                   const chaveSku = `${venda.id}-${itemSku || item.nome}-${index}`;
+                                  const nomeItem = String(item.nome || '').trim();
+                                  const chaveNome = `nome-${venda.id}-${nomeItem || itemSku || index}`;
 
                                   return (
                                   <tr key={`${item.nome}-${item.quantidade}-${item.preco_unitario}-${item.subtotal}-${index}`} className="border-t border-gray-100">
                                     <td className="px-3 py-2 text-gray-900">
                                       <div className="space-y-1">
-                                        <div>{item.nome}</div>
+                                        <div className="inline-flex items-center gap-1.5">
+                                          <span>{item.nome}</span>
+                                          {nomeItem && (
+                                            <button
+                                              type="button"
+                                              onClick={() => copiarCampoItem(nomeItem, chaveNome, 'Nao foi possivel copiar o nome do item')}
+                                              className="text-gray-400 hover:text-gray-700 transition-colors"
+                                              title="Copiar nome do produto"
+                                            >
+                                              {copiadoCampo === chaveNome ? (
+                                                <Check className="w-3.5 h-3.5 text-green-600" />
+                                              ) : (
+                                                <Copy className="w-3.5 h-3.5" />
+                                              )}
+                                            </button>
+                                          )}
+                                        </div>
                                         {itemSku && (
                                           <div className="inline-flex items-center gap-1.5 text-xs text-gray-500">
                                             <span className="font-mono">SKU: {itemSku}</span>
                                             <button
                                               type="button"
-                                              onClick={() => copiarSkuItem(itemSku, chaveSku)}
+                                              onClick={() => copiarCampoItem(itemSku, chaveSku, 'Nao foi possivel copiar o codigo do item')}
                                               className="text-gray-400 hover:text-gray-700 transition-colors"
                                               title="Copiar SKU"
                                             >
-                                              {copiadoSku === chaveSku ? (
+                                              {copiadoCampo === chaveSku ? (
                                                 <Check className="w-3.5 h-3.5 text-green-600" />
                                               ) : (
                                                 <Copy className="w-3.5 h-3.5" />
