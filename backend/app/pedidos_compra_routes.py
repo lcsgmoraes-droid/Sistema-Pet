@@ -1711,6 +1711,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
             total_nf += valor_nf
 
             dif_qtd = qtd_nf - qtd_pedida
+            dif_preco_unit = preco_nf - preco_pedido
             dif_preco_pct = ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
             dif_valor = valor_nf - valor_pedido
 
@@ -1738,6 +1739,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
                 "dif_qtd": round(dif_qtd, 3),
                 "preco_pedido": round(preco_pedido, 4),
                 "preco_nf": round(preco_nf, 4),
+                "dif_preco_unit": round(dif_preco_unit, 4),
                 "dif_preco_pct": round(dif_preco_pct, 2),
                 "valor_pedido": round(valor_pedido, 2),
                 "valor_nf": round(valor_nf, 2),
@@ -1759,6 +1761,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
                 "dif_qtd": -qtd_pedida,
                 "preco_pedido": round(preco_pedido, 4),
                 "preco_nf": 0,
+                "dif_preco_unit": None,
                 "dif_preco_pct": 0,
                 "valor_pedido": round(valor_pedido, 2),
                 "valor_nf": 0,
@@ -1783,6 +1786,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
                 "dif_qtd": it.quantidade,
                 "preco_pedido": 0,
                 "preco_nf": round(it.valor_unitario, 4),
+                "dif_preco_unit": None,
                 "dif_preco_pct": 0,
                 "valor_pedido": 0,
                 "valor_nf": round(it.valor_total, 2),
@@ -1815,6 +1819,31 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
             "itens_pedido": len(pedido.itens),
             "itens_nf": len(nota.itens),
         }
+    }
+
+
+def _aplicar_filtros_confronto(itens: List[dict], filtros: Optional[str]) -> List[dict]:
+    if not filtros:
+        return itens
+    status_list = [s.strip() for s in filtros.split(",") if s.strip()]
+    if not status_list:
+        return itens
+    return [i for i in itens if i.get("status") in status_list]
+
+
+def _resumo_por_itens(itens: List[dict], resumo_base: dict) -> dict:
+    total_pedido = round(sum(float(i.get("valor_pedido", 0) or 0) for i in itens), 2)
+    total_nf = round(sum(float(i.get("valor_nf", 0) or 0) for i in itens), 2)
+    return {
+        "total_pedido": total_pedido,
+        "total_nf": total_nf,
+        "dif_total": round(total_nf - total_pedido, 2),
+        "frete_pedido": resumo_base.get("frete_pedido", 0),
+        "frete_nf": resumo_base.get("frete_nf", 0),
+        "desconto_pedido": resumo_base.get("desconto_pedido", 0),
+        "desconto_nf": resumo_base.get("desconto_nf", 0),
+        "itens_pedido": resumo_base.get("itens_pedido", 0),
+        "itens_nf": resumo_base.get("itens_nf", 0),
     }
 
 
@@ -1953,9 +1982,16 @@ def obter_confronto_salvo(
     if not pedido.nota_entrada_id:
         raise HTTPException(status_code=404, detail="Pedido não possui NF vinculada")
 
+    from .produtos_models import NotaEntrada as _NotaEntrada
+    nota = db.query(_NotaEntrada).filter(
+        _NotaEntrada.id == pedido.nota_entrada_id,
+        _NotaEntrada.tenant_id == tenant_id,
+    ).first() if pedido.nota_entrada_id else None
+
     return {
         "pedido_id": pedido_id,
         "nota_entrada_id": pedido.nota_entrada_id,
+        "numero_nota": nota.numero_nota if nota and nota.numero_nota else None,
         "data_confronto": pedido.data_confronto,
         "status_confronto": pedido.status_confronto,
         "confronto_finalizado": pedido.confronto_finalizado or False,
@@ -1979,23 +2015,33 @@ def exportar_confronto_csv(
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
+    from .produtos_models import NotaEntrada as _NotaEntrada
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
+    itens = _aplicar_filtros_confronto(itens, filtros)
+    resumo = _resumo_por_itens(itens, resumo)
 
-    if filtros:
-        status_list = [s.strip() for s in filtros.split(",")]
-        itens = [i for i in itens if i.get("status") in status_list]
+    nota = db.query(_NotaEntrada).filter(
+        _NotaEntrada.id == pedido.nota_entrada_id,
+        _NotaEntrada.tenant_id == tenant_id,
+    ).first() if pedido.nota_entrada_id else None
+    numero_nota = nota.numero_nota if nota and nota.numero_nota else "-"
 
     def fmt(v):
+        if v is None or v == "":
+            return ""
         return str(v).replace(".", ",")
 
     linhas = [
-        "Produto;Código;Qtd Pedida;Qtd NF;Dif. Qtd;Preço Pedido (R$);Preço NF (R$);Dif. Preço (%);Valor Pedido (R$);Valor NF (R$);Dif. Valor (R$);Status"
+        f"Pedido;{pedido.numero_pedido}",
+        f"NF;{numero_nota}",
+        "",
+        "Produto;Código;Qtd Pedida;Qtd NF;Dif. Qtd;Preço Pedido (R$);Preço NF (R$);Dif. Unit. (R$);Dif. Preço (%);Valor Pedido (R$);Valor NF (R$);Dif. Valor (R$);Status"
     ]
     for it in itens:
         linhas.append(
-            f"{it.get('produto_nome','')};{it.get('produto_codigo','')};{fmt(it.get('qtd_pedida',0))};{fmt(it.get('qtd_nf',0))};{fmt(it.get('dif_qtd',0))};{fmt(it.get('preco_pedido',0))};{fmt(it.get('preco_nf',0))};{fmt(it.get('dif_preco_pct',0))};{fmt(it.get('valor_pedido',0))};{fmt(it.get('valor_nf',0))};{fmt(it.get('dif_valor',0))};{it.get('status','')}"
+            f"{it.get('produto_nome','')};{it.get('produto_codigo','')};{fmt(it.get('qtd_pedida',0))};{fmt(it.get('qtd_nf',0))};{fmt(it.get('dif_qtd',0))};{fmt(it.get('preco_pedido',0))};{fmt(it.get('preco_nf',0))};{fmt(it.get('dif_preco_unit',''))};{fmt(it.get('dif_preco_pct',0))};{fmt(it.get('valor_pedido',0))};{fmt(it.get('valor_nf',0))};{fmt(it.get('dif_valor',0))};{it.get('status','')}"
         )
     linhas.append("")
     linhas.append(f";;Total Pedido (R$);;{fmt(resumo.get('total_pedido',0))}")
@@ -2036,13 +2082,18 @@ def exportar_confronto_pdf(
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
+    from .produtos_models import NotaEntrada as _NotaEntrada
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
+    itens = _aplicar_filtros_confronto(itens, filtros)
+    resumo = _resumo_por_itens(itens, resumo)
 
-    if filtros:
-        status_list = [s.strip() for s in filtros.split(",")]
-        itens = [i for i in itens if i.get("status") in status_list]
+    nota = db.query(_NotaEntrada).filter(
+        _NotaEntrada.id == pedido.nota_entrada_id,
+        _NotaEntrada.tenant_id == tenant_id,
+    ).first() if pedido.nota_entrada_id else None
+    numero_nota = nota.numero_nota if nota and nota.numero_nota else "-"
 
     fornecedor = db.query(Cliente).filter(
         Cliente.id == pedido.fornecedor_id,
@@ -2061,7 +2112,7 @@ def exportar_confronto_pdf(
     small_style = ParagraphStyle("Sm", parent=styles["Normal"], fontSize=7, leading=9)
 
     elements.append(Paragraph("CONFRONTO PEDIDO x NOTA FISCAL", title_style))
-    elements.append(Paragraph(f"Pedido: <b>{pedido.numero_pedido}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_nome}</b> &nbsp;|&nbsp; Data confronto: <b>{pedido.data_confronto.strftime('%d/%m/%Y %H:%M') if pedido.data_confronto else '-'}</b>", sub_style))
+    elements.append(Paragraph(f"Pedido: <b>{pedido.numero_pedido}</b> &nbsp;|&nbsp; NF: <b>{numero_nota}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_nome}</b> &nbsp;|&nbsp; Data confronto: <b>{pedido.data_confronto.strftime('%d/%m/%Y %H:%M') if pedido.data_confronto else '-'}</b>", sub_style))
     elements.append(Spacer(1, 4*mm))
 
     STATUS_LABELS = {
@@ -2081,7 +2132,7 @@ def exportar_confronto_pdf(
         "nao_pedido": colors.HexColor("#ede9fe"),
     }
 
-    table_data = [["Produto", "Cód.", "Qtd Ped.", "Qtd NF", "Dif.Qtd", "R$ Ped.", "R$ NF", "Dif.%", "Vl.Ped.", "Vl.NF", "Dif.R$", "Status"]]
+    table_data = [["Produto", "Cód.", "Qtd Ped.", "Qtd NF", "Dif.Qtd", "R$ Ped.", "R$ NF", "Dif.Unit", "Dif.%", "Vl.Ped.", "Vl.NF", "Dif.R$", "Status"]]
     row_colors = []
 
     for idx, it in enumerate(itens):
@@ -2095,6 +2146,7 @@ def exportar_confronto_pdf(
             f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip("."),
             f"R$ {it.get('preco_pedido', 0):.2f}",
             f"R$ {it.get('preco_nf', 0):.2f}",
+            f"R$ {it.get('dif_preco_unit', 0):+.2f}" if it.get('dif_preco_unit') is not None else "-",
             f"{it.get('dif_preco_pct', 0):+.1f}%",
             f"R$ {it.get('valor_pedido', 0):.2f}",
             f"R$ {it.get('valor_nf', 0):.2f}",
@@ -2102,7 +2154,7 @@ def exportar_confronto_pdf(
             STATUS_LABELS.get(st, st),
         ])
 
-    col_widths = [55*mm, 18*mm, 18*mm, 18*mm, 16*mm, 20*mm, 20*mm, 16*mm, 22*mm, 22*mm, 22*mm, 22*mm]
+    col_widths = [48*mm, 14*mm, 14*mm, 14*mm, 14*mm, 16*mm, 16*mm, 16*mm, 12*mm, 18*mm, 18*mm, 16*mm, 16*mm]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a56db")),
@@ -2166,10 +2218,8 @@ def gerar_email_confronto(
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
-
-    if filtros:
-        status_list = [s.strip() for s in filtros.split(",")]
-        itens = [i for i in itens if i.get("status") in status_list]
+    itens = _aplicar_filtros_confronto(itens, filtros)
+    resumo = _resumo_por_itens(itens, resumo)
 
     fornecedor = db.query(Cliente).filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id).first()
     fornecedor_nome = fornecedor.nome if fornecedor else "Fornecedor"

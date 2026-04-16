@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-hot-toast';
-import { formatMoneyBRL } from '../../utils/formatters';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -49,6 +48,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   const [pedidoComplementarInfo, setPedidoComplementarInfo] = useState(null);
   const [confrontoFinalizado, setConfrontoFinalizado] = useState(false);
   const [loadingFinalizar, setLoadingFinalizar] = useState(false);
+  const [numeroNotaVinculada, setNumeroNotaVinculada] = useState(null);
 
   const ALL_STATUS = ['ok', 'divergencia_quantidade', 'divergencia_preco', 'divergencia_mista', 'nao_encontrado', 'nao_pedido'];
   const [filtrosSelecionados, setFiltrosSelecionados] = useState(new Set(ALL_STATUS));
@@ -81,6 +81,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       const res = await api.get(`/pedidos-compra/${pedido.id}/confronto`);
       setConfronto(res.data.confronto);
       setNotaVinculadaId(res.data.nota_entrada_id);
+      setNumeroNotaVinculada(res.data.numero_nota || null);
       if (res.data.confronto_finalizado) setConfrontoFinalizado(true);
     } catch {
       // sem confronto salvo ainda
@@ -94,6 +95,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       const res = await api.post(`/pedidos-compra/${pedido.id}/vincular-nota/${nota.id}`);
       setConfronto(res.data.confronto);
       setNotaVinculadaId(nota.id);
+      setNumeroNotaVinculada(nota.numero_nota || null);
       setEtapa('confronto');
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao realizar confronto');
@@ -249,6 +251,13 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   const statusInfo = CONFRONTO_LABELS[confronto?.status_confronto] || CONFRONTO_LABELS.sem_divergencia;
   const resumo = confronto?.resumo || {};
   const itens = confronto?.itens || [];
+  const itensFiltrados = itens.filter(it => filtrosSelecionados.has(it.status));
+  const resumoFiltrado = {
+    total_pedido: itensFiltrados.reduce((acc, it) => acc + Number(it.valor_pedido || 0), 0),
+    total_nf: itensFiltrados.reduce((acc, it) => acc + Number(it.valor_nf || 0), 0),
+    frete_nf: Number(resumo.frete_nf || 0),
+  };
+  resumoFiltrado.dif_total = resumoFiltrado.total_nf - resumoFiltrado.total_pedido;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -266,7 +275,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               )}
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
-              Pedido <b>{pedido.numero_pedido}</b> · Nota Fiscal vinculada
+              Pedido <b>{pedido.numero_pedido}</b> · NF <b>{numeroNotaVinculada || '—'}</b>
               {!confrontoFinalizado && (
                 <button
                   onClick={() => setEtapa('selecionar')}
@@ -334,21 +343,21 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
         <div className="px-5 py-3 bg-gray-50 border-b grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total Pedido</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumo.total_pedido)}</div>
+            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.total_pedido)}</div>
           </div>
           <div>
             <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total NF</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumo.total_nf)}</div>
+            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.total_nf)}</div>
           </div>
           <div>
             <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Diferença</div>
-            <div className={`font-bold mt-0.5 ${(resumo.dif_total || 0) > 0 ? 'text-red-600' : (resumo.dif_total || 0) < 0 ? 'text-yellow-600' : 'text-green-600'}`}>
-              {fmtSinal(resumo.dif_total)} R$
+            <div className={`font-bold mt-0.5 ${(resumoFiltrado.dif_total || 0) > 0 ? 'text-red-600' : (resumoFiltrado.dif_total || 0) < 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+              {fmtSinal(resumoFiltrado.dif_total)} R$
             </div>
           </div>
           <div>
             <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Frete NF</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumo.frete_nf)}</div>
+            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.frete_nf)}</div>
           </div>
         </div>
 
@@ -376,7 +385,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
             </button>
           ))}
           <span className="text-xs text-gray-400 ml-1">
-            ({itens.filter(i => filtrosSelecionados.has(i.status)).length} de {itens.length} itens)
+            ({itensFiltrados.length} de {itens.length} itens)
           </span>
         </div>
 
@@ -391,6 +400,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                 <th className="px-3 py-2 text-center">Dif. Qtd</th>
                 <th className="px-3 py-2 text-right">R$ Pedido</th>
                 <th className="px-3 py-2 text-right">R$ NF</th>
+                <th className="px-3 py-2 text-right">Dif. Unit.</th>
                 <th className="px-3 py-2 text-center">Dif. %</th>
                 <th className="px-3 py-2 text-right">Vl. Pedido</th>
                 <th className="px-3 py-2 text-right">Vl. NF</th>
@@ -399,11 +409,14 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {itens.filter(it => filtrosSelecionados.has(it.status)).map((it, idx) => {
+              {itensFiltrados.map((it, idx) => {
                 const st = STATUS_LABELS[it.status] || { label: it.status, cls: 'bg-gray-100 text-gray-700' };
                 const rowBg = it.status === 'ok' ? '' :
                   ['nao_encontrado', 'divergencia_mista'].includes(it.status) ? 'bg-red-50' :
                   it.status === 'nao_pedido' ? 'bg-purple-50' : 'bg-yellow-50';
+                const difUnit = (it.dif_preco_unit !== undefined && it.dif_preco_unit !== null)
+                  ? Number(it.dif_preco_unit)
+                  : Number(it.preco_nf || 0) - Number(it.preco_pedido || 0);
                 return (
                   <tr key={idx} className={`${rowBg} hover:brightness-95`}>
                     <td className="px-3 py-2">
@@ -417,6 +430,9 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                     </td>
                     <td className="px-3 py-2 text-right">{fmtMoeda(it.preco_pedido)}</td>
                     <td className="px-3 py-2 text-right">{it.encontrado_na_nf ? fmtMoeda(it.preco_nf) : <span className="text-gray-400">—</span>}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${difUnit > 0 ? 'text-red-600' : difUnit < 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
+                      {it.encontrado_na_nf ? (Math.abs(difUnit) < 0.0001 ? '—' : `${difUnit > 0 ? '+' : ''}${fmtMoeda(difUnit)}`) : <span className="text-gray-400">—</span>}
+                    </td>
                     <td className={`px-3 py-2 text-center font-semibold ${it.dif_preco_pct > 0.5 ? 'text-red-600' : it.dif_preco_pct < -0.5 ? 'text-green-600' : 'text-gray-400'}`}>
                       {Math.abs(it.dif_preco_pct) < 0.5 ? '—' : `${it.dif_preco_pct > 0 ? '+' : ''}${fmt(it.dif_preco_pct, 1)}%`}
                     </td>
