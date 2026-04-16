@@ -19,12 +19,22 @@ logger = logging.getLogger(__name__)
 def adicionar_campos_confronto():
     try:
         with engine.connect() as conn:
-            result = conn.execute(text("PRAGMA table_info(pedidos_compra)"))
-            colunas_existentes = [row[1] for row in result]
+            # Detectar dialeto (SQLite vs PostgreSQL)
+            dialect = engine.dialect.name
+
+            if dialect == 'sqlite':
+                result = conn.execute(text("PRAGMA table_info(pedidos_compra)"))
+                colunas_existentes = [row[1] for row in result]
+            else:
+                result = conn.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'pedidos_compra'"
+                ))
+                colunas_existentes = [row[0] for row in result]
 
             campos_novos = [
                 ("nota_entrada_id", "ALTER TABLE pedidos_compra ADD COLUMN nota_entrada_id INTEGER REFERENCES notas_entrada(id)"),
-                ("data_confronto", "ALTER TABLE pedidos_compra ADD COLUMN data_confronto DATETIME"),
+                ("data_confronto", "ALTER TABLE pedidos_compra ADD COLUMN data_confronto TIMESTAMP"),
                 ("status_confronto", "ALTER TABLE pedidos_compra ADD COLUMN status_confronto VARCHAR(30)"),
                 ("resumo_confronto", "ALTER TABLE pedidos_compra ADD COLUMN resumo_confronto TEXT"),
             ]
