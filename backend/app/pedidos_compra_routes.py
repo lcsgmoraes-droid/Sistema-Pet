@@ -1905,6 +1905,19 @@ def vincular_nota_e_confrontar(
     if not nota:
         raise HTTPException(status_code=404, detail="Nota fiscal não encontrada")
 
+    # Bloquear se NF já foi finalizada em outro pedido (vínculo permanente)
+    outro_finalizado = db.query(PedidoCompra).filter(
+        PedidoCompra.nota_entrada_id == nota_id,
+        PedidoCompra.confronto_finalizado == True,
+        PedidoCompra.id != pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if outro_finalizado:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta NF já está vinculada em definitivo ao pedido {outro_finalizado.numero_pedido}. Não é possível revinculá-la."
+        )
+
     confronto = _realizar_confronto(pedido, nota, db, tenant_id)
 
     # Salvar vínculo e resumo
@@ -1945,6 +1958,7 @@ def obter_confronto_salvo(
         "nota_entrada_id": pedido.nota_entrada_id,
         "data_confronto": pedido.data_confronto,
         "status_confronto": pedido.status_confronto,
+        "confronto_finalizado": pedido.confronto_finalizado or False,
         "confronto": json.loads(pedido.resumo_confronto) if pedido.resumo_confronto else None,
     }
 
@@ -1952,6 +1966,7 @@ def obter_confronto_salvo(
 @router.get("/{pedido_id}/confronto/csv")
 def exportar_confronto_csv(
     pedido_id: int,
+    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula: ok,divergencia_quantidade,divergencia_preco,divergencia_mista,nao_encontrado,nao_pedido"),
     db: Session = Depends(get_session),
     current_user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1967,6 +1982,10 @@ def exportar_confronto_csv(
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
+
+    if filtros:
+        status_list = [s.strip() for s in filtros.split(",")]
+        itens = [i for i in itens if i.get("status") in status_list]
 
     def fmt(v):
         return str(v).replace(".", ",")
@@ -1994,6 +2013,7 @@ def exportar_confronto_csv(
 @router.get("/{pedido_id}/confronto/pdf")
 def exportar_confronto_pdf(
     pedido_id: int,
+    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula"),
     db: Session = Depends(get_session),
     current_user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -2019,6 +2039,10 @@ def exportar_confronto_pdf(
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
+
+    if filtros:
+        status_list = [s.strip() for s in filtros.split(",")]
+        itens = [i for i in itens if i.get("status") in status_list]
 
     fornecedor = db.query(Cliente).filter(
         Cliente.id == pedido.fornecedor_id,
@@ -2125,6 +2149,7 @@ def exportar_confronto_pdf(
 @router.get("/{pedido_id}/confronto/email-texto")
 def gerar_email_confronto(
     pedido_id: int,
+    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula"),
     db: Session = Depends(get_session),
     current_user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -2137,12 +2162,23 @@ def gerar_email_confronto(
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
+    from .produtos_models import NotaEntrada as _NotaEntrada
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
 
+    if filtros:
+        status_list = [s.strip() for s in filtros.split(",")]
+        itens = [i for i in itens if i.get("status") in status_list]
+
     fornecedor = db.query(Cliente).filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id).first()
     fornecedor_nome = fornecedor.nome if fornecedor else "Fornecedor"
+
+    nota = db.query(_NotaEntrada).filter(
+        _NotaEntrada.id == pedido.nota_entrada_id,
+        _NotaEntrada.tenant_id == tenant_id
+    ).first() if pedido.nota_entrada_id else None
+    numero_nota = nota.numero_nota if nota and nota.numero_nota else str(pedido.nota_entrada_id or "")
 
     divergencias = [i for i in itens if i.get("status") != "ok"]
 
@@ -2161,7 +2197,7 @@ def gerar_email_confronto(
     dif_total = resumo.get("dif_total", 0)
     sinal = "a maior" if dif_total > 0 else "a menor"
 
-    corpo = f"""Assunto: Divergências na NF {pedido.nota_entrada_id} referente ao pedido {pedido.numero_pedido}
+    corpo = f"""Assunto: Divergências na NF {numero_nota} referente ao pedido {pedido.numero_pedido}
 
 Prezados {fornecedor_nome},
 
@@ -2183,6 +2219,47 @@ Atenciosamente,
 """
 
     return {"texto": corpo, "divergencias_count": len(divergencias)}
+
+
+@router.post("/{pedido_id}/finalizar-confronto")
+def finalizar_confronto(
+    pedido_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Finaliza o confronto, criando vínculo permanente entre pedido e NF (1-para-1)."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    if not pedido.nota_entrada_id or not pedido.resumo_confronto:
+        raise HTTPException(status_code=400, detail="Pedido não possui confronto realizado")
+    if pedido.confronto_finalizado:
+        raise HTTPException(status_code=400, detail="Confronto já foi finalizado")
+    # Verificar se esta NF já está finalizada em outro pedido
+    outro = db.query(PedidoCompra).filter(
+        PedidoCompra.nota_entrada_id == pedido.nota_entrada_id,
+        PedidoCompra.confronto_finalizado == True,
+        PedidoCompra.id != pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if outro:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta NF já está vinculada ao pedido {outro.numero_pedido}. Uma NF só pode ser confrontada com um pedido."
+        )
+    pedido.confronto_finalizado = True
+    pedido.updated_at = datetime.utcnow()
+    db.commit()
+    return {
+        "message": "Confronto finalizado com sucesso",
+        "pedido_id": pedido_id,
+        "numero_pedido": pedido.numero_pedido,
+        "nota_entrada_id": pedido.nota_entrada_id,
+    }
 
 
 @router.post("/{pedido_id}/sugerir-pedido-complementar")

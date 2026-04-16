@@ -695,6 +695,7 @@ class PedidoCompra(BaseTenantModel):
     data_confronto = Column(DateTime, nullable=True)
     status_confronto = Column(String(30), nullable=True)  # sem_divergencia, divergencia_quantidade, divergencia_preco, divergencia_mista
     resumo_confronto = Column(Text, nullable=True)  # JSON com detalhes do confronto
+    confronto_finalizado = Column(Boolean, default=False)  # True = confronto encerrado, link permanente
     
     # Auditoria
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)

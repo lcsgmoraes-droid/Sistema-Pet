@@ -47,6 +47,11 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   const [emailTexto, setEmailTexto] = useState(null);
   const [mostrarEmail, setMostrarEmail] = useState(false);
   const [pedidoComplementarInfo, setPedidoComplementarInfo] = useState(null);
+  const [confrontoFinalizado, setConfrontoFinalizado] = useState(false);
+  const [loadingFinalizar, setLoadingFinalizar] = useState(false);
+
+  const ALL_STATUS = ['ok', 'divergencia_quantidade', 'divergencia_preco', 'divergencia_mista', 'nao_encontrado', 'nao_pedido'];
+  const [filtrosSelecionados, setFiltrosSelecionados] = useState(new Set(ALL_STATUS));
 
   useEffect(() => {
     carregarNotas();
@@ -76,6 +81,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       const res = await api.get(`/pedidos-compra/${pedido.id}/confronto`);
       setConfronto(res.data.confronto);
       setNotaVinculadaId(res.data.nota_entrada_id);
+      if (res.data.confronto_finalizado) setConfrontoFinalizado(true);
     } catch {
       // sem confronto salvo ainda
     }
@@ -96,9 +102,33 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
     }
   };
 
+  const filtrosParam = [...filtrosSelecionados].join(',');
+
+  const toggleFiltro = (status) => {
+    setFiltrosSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(status)) { next.delete(status); } else { next.add(status); }
+      return next;
+    });
+  };
+
+  const finalizarConfronto = async () => {
+    if (!window.confirm('Finalizar a conferência? Isso cria um vínculo permanente entre este pedido e a NF. Não será possível revincular depois.')) return;
+    setLoadingFinalizar(true);
+    try {
+      await api.post(`/pedidos-compra/${pedido.id}/finalizar-confronto`);
+      setConfrontoFinalizado(true);
+      toast.success('Conferência finalizada! Vínculo permanente criado.');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Erro ao finalizar confronto');
+    } finally {
+      setLoadingFinalizar(false);
+    }
+  };
+
   const baixarCSV = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/csv`, { responseType: 'blob' });
+      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/csv?filtros=${filtrosParam}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -112,7 +142,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
 
   const baixarPDF = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/pdf`, { responseType: 'blob' });
+      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/pdf?filtros=${filtrosParam}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
@@ -126,7 +156,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
 
   const gerarEmail = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/email-texto`);
+      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/email-texto?filtros=${filtrosParam}`);
       setEmailTexto(res.data.texto);
       setMostrarEmail(true);
     } catch {
@@ -227,13 +257,22 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
         {/* Header */}
         <div className="p-5 border-b flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">📊 Confronto Pedido x NF</h2>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-gray-900">📊 Confronto Pedido x NF</h2>
+              {confrontoFinalizado && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-full border border-green-300">
+                  🔒 Conferência Finalizada
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500 mt-0.5">
               Pedido <b>{pedido.numero_pedido}</b> · Nota Fiscal vinculada
-              <button
-                onClick={() => setEtapa('selecionar')}
-                className="ml-2 text-blue-600 hover:underline text-xs"
-              >trocar NF</button>
+              {!confrontoFinalizado && (
+                <button
+                  onClick={() => setEtapa('selecionar')}
+                  className="ml-2 text-blue-600 hover:underline text-xs"
+                >trocar NF</button>
+              )}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
@@ -245,6 +284,15 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
             {statusInfo.label}
           </span>
           <div className="flex items-center gap-2 flex-wrap">
+            {!confrontoFinalizado && (
+              <button
+                onClick={finalizarConfronto}
+                disabled={loadingFinalizar}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 text-white text-sm rounded-lg hover:bg-emerald-800 disabled:opacity-50 font-semibold"
+              >
+                🔒 Finalizar Conferência
+              </button>
+            )}
             <button
               onClick={baixarCSV}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
@@ -304,6 +352,34 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
           </div>
         </div>
 
+        {/* Filtros de status */}
+        <div className="px-5 py-2 border-b bg-gray-50 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtrar:</span>
+          {[
+            { key: 'ok', label: '✅ OK', cls: 'bg-green-100 text-green-800 border-green-300' },
+            { key: 'divergencia_quantidade', label: '⚠️ Dif. Qtd', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+            { key: 'divergencia_preco', label: '⚠️ Dif. Preço', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
+            { key: 'divergencia_mista', label: '🔴 Dif. Mista', cls: 'bg-red-100 text-red-800 border-red-300' },
+            { key: 'nao_encontrado', label: '🔴 Não Recebido', cls: 'bg-red-100 text-red-800 border-red-300' },
+            { key: 'nao_pedido', label: '🟣 Não Pedido', cls: 'bg-purple-100 text-purple-800 border-purple-300' },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => toggleFiltro(f.key)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                filtrosSelecionados.has(f.key)
+                  ? f.cls
+                  : 'bg-gray-100 text-gray-400 border-gray-200 line-through opacity-60'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+          <span className="text-xs text-gray-400 ml-1">
+            ({itens.filter(i => filtrosSelecionados.has(i.status)).length} de {itens.length} itens)
+          </span>
+        </div>
+
         {/* Tabela de itens */}
         <div className="flex-1 overflow-auto p-5">
           <table className="w-full text-sm border-collapse">
@@ -323,7 +399,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {itens.map((it, idx) => {
+              {itens.filter(it => filtrosSelecionados.has(it.status)).map((it, idx) => {
                 const st = STATUS_LABELS[it.status] || { label: it.status, cls: 'bg-gray-100 text-gray-700' };
                 const rowBg = it.status === 'ok' ? '' :
                   ['nao_encontrado', 'divergencia_mista'].includes(it.status) ? 'bg-red-50' :
