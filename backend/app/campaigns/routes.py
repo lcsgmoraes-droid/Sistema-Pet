@@ -77,6 +77,7 @@ from app.campaigns.coupon_service import preview_coupon_redemption
 from app.campaigns.loyalty_service import (
     build_consumed_loyalty_stamp_ids,
     get_loyalty_balance_for_campaign,
+    revoke_loyalty_reward_by_coupon,
     summarize_loyalty_balances_for_customer,
 )
 from app.db import SessionLocal
@@ -1403,8 +1404,10 @@ def anular_cupom(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Marca o cupão como void (cancelado).
-    Só é possível anular cupões com status `active`.
+    Marca o cupao como void (cancelado).
+    Se o cupao for de fidelidade (gerado por consumo de carimbos),
+    devolve automaticamente os carimbos comprometidos para saldo disponivel.
+    So e possivel anular cupoes com status `active`.
     """
     _, tenant_id = user_and_tenant
     cupom = (
@@ -1416,9 +1419,25 @@ def anular_cupom(
         raise HTTPException(404, detail="Cupão não encontrado.")
     if cupom.status != CouponStatusEnum.active:
         raise HTTPException(400, detail=f"Não é possível anular um cupão com status '{cupom.status.value}'.")
+
+    loyalty_reversal = revoke_loyalty_reward_by_coupon(
+        db,
+        tenant_id=tenant_id,
+        coupon_id=cupom.id,
+        reason="cupom_anulado_manualmente",
+    )
+
     cupom.status = CouponStatusEnum.voided
     db.commit()
-    return {"ok": True, "code": code, "status": "voided"}
+    return {
+        "ok": True,
+        "code": code,
+        "status": "voided",
+        "fidelidade": {
+            "cupom_vinculado": bool(loyalty_reversal.get("matched")),
+            "carimbos_restaurados": bool(loyalty_reversal.get("revoked")),
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
