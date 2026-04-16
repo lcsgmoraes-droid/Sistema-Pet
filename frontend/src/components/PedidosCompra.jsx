@@ -38,6 +38,8 @@ const PedidosCompra = () => {
   const [quantidadesEditadas, setQuantidadesEditadas] = useState({});
   const [filtroSugestao, setFiltroSugestao] = useState('');
   const [mostrarSoPreenchidos, setMostrarSoPreenchidos] = useState(false);
+  const [marcasSelecionadas, setMarcasSelecionadas] = useState([]);
+  const [produtoEditandoQuantidade, setProdutoEditandoQuantidade] = useState(null);
 
   const [formData, setFormData] = useState({
     fornecedor_id: '',
@@ -95,6 +97,7 @@ const PedidosCompra = () => {
     setProdutosSelecionados([]);
     setQuantidadesEditadas({});
     setFiltroSugestao('');
+    setMarcasSelecionadas([]);
     carregarProdutosFornecedor(fornecedor.id);
   };
 
@@ -320,7 +323,8 @@ const PedidosCompra = () => {
             periodo_dias: periodoSugestao,
             dias_cobertura: diasCobertura,
             apenas_criticos: apenasCriticos,
-            incluir_alerta: incluirAlerta
+            incluir_alerta: incluirAlerta,
+            marca_ids: marcasSelecionadas
           },
           timeout: 60000
         }
@@ -387,9 +391,46 @@ const PedidosCompra = () => {
         return true;
       }
 
+      if (produtoEditandoQuantidade === s.produto_id) {
+        return true;
+      }
+
       return obterQuantidadeInteira(s) > 0;
     });
-  }, [sugestoes, filtroSugestao, mostrarSoPreenchidos, quantidadesEditadas]);
+  }, [
+    sugestoes,
+    filtroSugestao,
+    mostrarSoPreenchidos,
+    quantidadesEditadas,
+    produtoEditandoQuantidade,
+  ]);
+
+  const marcasFornecedor = useMemo(() => {
+    const mapa = new Map();
+    produtos.forEach((produto) => {
+      const marcaId = Number(produto?.marca_id);
+      if (!Number.isFinite(marcaId) || marcaId <= 0) {
+        return;
+      }
+
+      const nomeMarca = String(
+        produto?.marca_nome
+          || produto?.marca?.nome
+          || produto?.marca
+          || ''
+      ).trim();
+
+      if (!nomeMarca) {
+        return;
+      }
+
+      if (!mapa.has(marcaId)) {
+        mapa.set(marcaId, { id: marcaId, nome: nomeMarca });
+      }
+    });
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [produtos]);
 
   const selecionadosComQuantidade = useMemo(
     () => sugestoes
@@ -404,6 +445,8 @@ const PedidosCompra = () => {
     setQuantidadesEditadas({});
     setFiltroSugestao('');
     setMostrarSoPreenchidos(false);
+    setMarcasSelecionadas([]);
+    setProdutoEditandoQuantidade(null);
   };
 
   // Fechar modal com ESC
@@ -1274,7 +1317,7 @@ const PedidosCompra = () => {
               </div>
 
               {/* Filtros */}
-              <div className="mt-4 grid grid-cols-6 gap-4">
+              <div className="mt-4 grid grid-cols-7 gap-4">
                 <div className="col-span-2">
                   <label className="block text-sm text-purple-100 mb-1">Buscar por nome ou SKU</label>
                   <input
@@ -1284,6 +1327,24 @@ const PedidosCompra = () => {
                     onChange={(e) => setFiltroSugestao(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm text-purple-100 mb-1">Marcas</label>
+                  <select
+                    multiple
+                    value={marcasSelecionadas.map(String)}
+                    onChange={(e) => {
+                      const selecionadas = Array.from(e.target.selectedOptions).map((option) => Number(option.value));
+                      setMarcasSelecionadas(selecionadas);
+                    }}
+                    className="w-full h-24 px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
+                  >
+                    {marcasFornecedor.map((marca) => (
+                      <option key={marca.id} value={marca.id}>
+                        {marca.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm text-purple-100 mb-1">Período</label>
@@ -1486,6 +1547,7 @@ const PedidosCompra = () => {
                                 <div className="text-xs text-gray-500">
                                   SKU: {sugestao.produto_sku || 'N/A'} | 
                                   Barras: {sugestao.produto_codigo_barras || 'N/A'}
+                                  {sugestao.marca_nome ? ` | Marca: ${sugestao.marca_nome}` : ''}
                                 </div>
                                 {sugestao.observacao && (
                                   <div className="text-xs text-gray-600 mt-1 italic">{sugestao.observacao}</div>
@@ -1515,6 +1577,12 @@ const PedidosCompra = () => {
                                 pattern="[0-9]*"
                                 value={obterQuantidadeInteira(sugestao)}
                                 onChange={(e) => atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)}
+                                onFocus={() => setProdutoEditandoQuantidade(sugestao.produto_id)}
+                                onBlur={() => {
+                                  setProdutoEditandoQuantidade((atual) => (atual === sugestao.produto_id ? null : atual));
+                                  const valorAtual = obterQuantidadeInteira(sugestao);
+                                  atualizarQuantidadeSugerida(sugestao.produto_id, valorAtual);
+                                }}
                                 onWheel={(e) => e.currentTarget.blur()}
                                 className="w-20 px-2 py-1 text-right font-bold text-purple-600 border rounded focus:ring-2 focus:ring-purple-300"
                               />

@@ -41,7 +41,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Cliente
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
-    PedidoCompra, PedidoCompraItem, ProdutoFornecedor
+    PedidoCompra, PedidoCompraItem, ProdutoFornecedor, Marca
 )
 from .vendas_models import VendaItem, Venda
 from .services.email_service import is_email_configured, send_email
@@ -1400,6 +1400,8 @@ def sugerir_pedido_inteligente(
     dias_cobertura: int = Query(default=30, ge=7, le=180, description="Dias de estoque que o pedido deve cobrir (7-180)"),
     apenas_criticos: bool = Query(default=False, description="Apenas produtos críticos (estoque < 7 dias)"),
     incluir_alerta: bool = Query(default=True, description="Incluir produtos em alerta"),
+    marca_ids: Optional[List[int]] = Query(default=None, description="Filtrar por marcas específicas"),
+    marca_ids_brackets: Optional[List[int]] = Query(default=None, alias="marca_ids[]"),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1439,19 +1441,32 @@ def sugerir_pedido_inteligente(
     # Data inicial para análise
     data_inicio = datetime.now() - timedelta(days=periodo_dias)
     
-    # Buscar produtos do fornecedor com relacionamento
-    produtos_fornecedor = db.query(
+    marcas_filtro = marca_ids or marca_ids_brackets or []
+
+    # Buscar produtos do fornecedor com relacionamento e marca
+    produtos_fornecedor_query = db.query(
         Produto,
-        ProdutoFornecedor
+        ProdutoFornecedor,
+        Marca
     ).join(
         ProdutoFornecedor,
         Produto.id == ProdutoFornecedor.produto_id
+    ).outerjoin(
+        Marca,
+        Produto.marca_id == Marca.id
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
         ProdutoFornecedor.fornecedor_id == fornecedor_id,
         ProdutoFornecedor.ativo == True
-    ).all()
+    )
+
+    if marcas_filtro:
+        produtos_fornecedor_query = produtos_fornecedor_query.filter(
+            Produto.marca_id.in_(marcas_filtro)
+        )
+
+    produtos_fornecedor = produtos_fornecedor_query.all()
     
     if not produtos_fornecedor:
         return {
@@ -1476,7 +1491,7 @@ def sugerir_pedido_inteligente(
     valor_total = 0
 
     # Bulk queries de vendas — 2 queries no total em vez de N queries individuais
-    ids_produtos = [p.id for p, _pf in produtos_fornecedor]
+    ids_produtos = [p.id for p, _pf, _marca in produtos_fornecedor]
 
     vendas_bulk = dict(
         db.query(VendaItem.produto_id, func.sum(VendaItem.quantidade))
@@ -1505,7 +1520,7 @@ def sugerir_pedido_inteligente(
             .all()
         )
 
-    for produto, produto_fornecedor in produtos_fornecedor:
+    for produto, produto_fornecedor, marca in produtos_fornecedor:
         # Consumo no período — lookup em vez de query individual
         vendas_periodo = float(vendas_bulk.get(produto.id) or 0)
 
@@ -1574,6 +1589,8 @@ def sugerir_pedido_inteligente(
                 "produto_nome": produto.nome,
                 "produto_sku": produto.codigo,
                 "produto_codigo_barras": produto.codigo_barras,
+                "marca_id": produto.marca_id,
+                "marca_nome": marca.nome if marca else None,
                 "estoque_atual": float(estoque_atual),
                 "estoque_minimo": float(estoque_minimo),
                 "consumo_diario": round(consumo_diario, 2),
