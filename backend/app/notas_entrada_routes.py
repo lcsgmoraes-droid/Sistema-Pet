@@ -729,10 +729,51 @@ def calcular_similaridade(texto1: str, texto2: str) -> float:
     return SequenceMatcher(None, texto1.lower(), texto2.lower()).ratio()
 
 
-def encontrar_produto_similar(descricao: str, codigo: str, db: Session, fornecedor_id: int = None) -> tuple:
+def normalizar_codigo_barras(valor: Optional[str]) -> str:
+    if not valor:
+        return ""
+    return re.sub(r"\D", "", str(valor))
+
+
+def obter_detalhe_vinculo_item(item: NotaEntradaItem) -> Dict[str, Optional[str]]:
+    """Identifica por qual referencia o item da NF-e coincide com o produto vinculado."""
+    if not item or not item.produto_id or not item.produto:
+        return {"origem": None, "referencia": None}
+
+    referencia_nf_codigo = (item.codigo_produto or "").strip()
+    referencia_nf_ean = normalizar_codigo_barras(item.ean)
+    produto_codigo = (item.produto.codigo or "").strip()
+
+    produto_codigos_barras = {
+        normalizar_codigo_barras(item.produto.codigo_barras),
+        normalizar_codigo_barras(getattr(item.produto, "gtin_ean", None)),
+        normalizar_codigo_barras(getattr(item.produto, "gtin_ean_tributario", None)),
+    }
+    produto_codigos_barras.discard("")
+
+    if referencia_nf_ean and referencia_nf_ean in produto_codigos_barras:
+        return {"origem": "codigo_barras", "referencia": referencia_nf_ean}
+
+    if referencia_nf_codigo and referencia_nf_codigo == produto_codigo:
+        return {"origem": "sku", "referencia": referencia_nf_codigo}
+
+    codigo_nf_normalizado = normalizar_codigo_barras(referencia_nf_codigo)
+    if codigo_nf_normalizado and codigo_nf_normalizado in produto_codigos_barras:
+        return {"origem": "codigo_barras", "referencia": codigo_nf_normalizado}
+
+    return {"origem": None, "referencia": None}
+
+
+def encontrar_produto_similar(
+    descricao: str,
+    codigo: str,
+    db: Session,
+    fornecedor_id: int = None,
+    ean: Optional[str] = None,
+) -> tuple:
     """
     Encontra produto similar no banco (ativo OU inativo)
-    Retorna (produto, confianca, foi_encontrado_inativo)
+    Retorna (produto, confianca, foi_encontrado_inativo, origem_match, referencia_match)
     
     REGRAS DE MATCHING (RIGOROSAS):
     1. SKU exato (codigo) + fornecedor igual = match automático
@@ -760,30 +801,43 @@ def encontrar_produto_similar(descricao: str, codigo: str, db: Session, forneced
             if produto_com_fornecedor:
                 foi_inativo = not produto_com_fornecedor.ativo
                 logger.info(f"✅ Match por SKU + Fornecedor: {produto_com_fornecedor.nome}")
-                return (produto_com_fornecedor, 1.0, foi_inativo)
+                return (produto_com_fornecedor, 1.0, foi_inativo, "sku", codigo)
         
         # Se não encontrou com fornecedor, buscar só por SKU
         produto = query.first()
         if produto:
             foi_inativo = not produto.ativo
             logger.info(f"✅ Match por SKU: {produto.nome}")
-            return (produto, 1.0, foi_inativo)
+            return (produto, 1.0, foi_inativo, "sku", codigo)
     
     # 2. Tentar por EAN/Código de Barras exato
-    if codigo:
+    referencias_codigo_barras = []
+    ean_normalizado = normalizar_codigo_barras(ean)
+    codigo_normalizado = normalizar_codigo_barras(codigo)
+
+    if ean_normalizado:
+        referencias_codigo_barras.append(ean_normalizado)
+    if codigo_normalizado and codigo_normalizado not in referencias_codigo_barras:
+        referencias_codigo_barras.append(codigo_normalizado)
+
+    for referencia in referencias_codigo_barras:
         produto = db.query(Produto).filter(
-            Produto.codigo_barras == codigo
+            or_(
+                Produto.codigo_barras == referencia,
+                Produto.gtin_ean == referencia,
+                Produto.gtin_ean_tributario == referencia,
+            )
         ).first()
         
         if produto:
             foi_inativo = not produto.ativo
             logger.info(f"✅ Match por EAN: {produto.nome}")
-            return (produto, 1.0, foi_inativo)
+            return (produto, 1.0, foi_inativo, "codigo_barras", referencia)
     
     # 3. NÃO fazer matching automático por nome/similaridade
     # Usuário deve vincular manualmente para evitar erros
     logger.info(f"⚠️ Nenhum match encontrado para: {descricao[:50]} (SKU: {codigo})")
-    return (None, 0, False)
+    return (None, 0, False, None, None)
 
 
 def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, user_id: int, tenant_id: str) -> List[int]:
@@ -972,11 +1026,12 @@ async def upload_xml(
         
         for item_data in dados_nfe['itens']:
             # Tentar encontrar produto similar (com fornecedor para matching mais preciso)
-            produto, confianca, foi_inativo = encontrar_produto_similar(
+            produto, confianca, foi_inativo, origem_vinculo, referencia_vinculo = encontrar_produto_similar(
                 item_data['descricao'],
                 item_data['codigo_produto'],
                 db,
-                fornecedor.id if fornecedor else None
+                fornecedor.id if fornecedor else None,
+                item_data.get('ean')
             )
             
             if produto:
@@ -995,9 +1050,12 @@ async def upload_xml(
                 
                 # Log de status do produto
                 status_msg = " (INATIVO - serÃ¡ reativado no processamento)" if foi_inativo else ""
+                detalhe_match = ""
+                if origem_vinculo and referencia_vinculo:
+                    detalhe_match = f" [match por {origem_vinculo}: {referencia_vinculo}]"
                 logger.info(
                     f"  âœ… {item_data['descricao'][:50]} â†’ "
-                    f"{produto.nome} (confianÃ§a: {confianca:.0%}){status_msg}"
+                    f"{produto.nome} (confianÃ§a: {confianca:.0%}){detalhe_match}{status_msg}"
                 )
             else:
                 nao_vinculados += 1
@@ -1173,10 +1231,12 @@ async def upload_lote_xml(
             produtos_reativados = 0
             
             for item_data in dados_nfe['itens']:
-                produto, confianca, foi_reativado = encontrar_produto_similar(
+                produto, confianca, foi_reativado, _, _ = encontrar_produto_similar(
                     item_data['descricao'],
                     item_data['codigo_produto'],
-                    db
+                    db,
+                    None,
+                    item_data.get('ean')
                 )
                 
                 if produto:
@@ -1342,6 +1402,7 @@ def buscar_nota(
     itens_formatados = []
     for item in nota.itens:
         composicao_custo = composicoes_custo.get(item.id, {})
+        detalhe_vinculo = obter_detalhe_vinculo_item(item)
         dados_pack = calcular_quantidade_custo_efetivos(
             item.descricao,
             item.quantidade,
@@ -1372,6 +1433,8 @@ def buscar_nota(
             ) if item.produto else None,
             "vinculado": item.vinculado,
             "confianca_vinculo": item.confianca_vinculo,
+            "origem_vinculo_automatico": detalhe_vinculo["origem"],
+            "referencia_vinculo": detalhe_vinculo["referencia"],
             "status": item.status,
             "pack_detectado_automatico": dados_pack["pack_detectado"],
             "pack_multiplicador_detectado": dados_pack["multiplicador_pack"],
@@ -1921,6 +1984,10 @@ def preview_processamento(
             "vinculado": item.vinculado,
             "confianca_vinculo": item.confianca_vinculo
         }
+
+        detalhe_vinculo = obter_detalhe_vinculo_item(item)
+        item_nf["origem_vinculo_automatico"] = detalhe_vinculo["origem"]
+        item_nf["referencia_vinculo"] = detalhe_vinculo["referencia"]
         
         # Dados do produto vinculado (se houver)
         produto_vinculado = None
@@ -1930,12 +1997,18 @@ def preview_processamento(
             custo_novo = composicao_custo.get("custo_aquisicao_unitario", dados_pack["custo_unitario_efetivo"])
             variacao_custo = ((custo_novo - custo_atual) / custo_atual * 100) if custo_atual > 0 else 0
             
-            # Calcular margem atual
+            # Calcular margem de referencia (com custo atual do cadastro)
             preco_venda_atual = produto.preco_venda or 0
-            if preco_venda_atual > 0 and custo_novo > 0:
-                margem_atual = ((preco_venda_atual - custo_novo) / preco_venda_atual) * 100
+            if preco_venda_atual > 0 and custo_atual > 0:
+                margem_atual = ((preco_venda_atual - custo_atual) / preco_venda_atual) * 100
             else:
                 margem_atual = 0
+
+            # Calcular margem projetada mantendo o preço de venda atual e aplicando o novo custo
+            if preco_venda_atual > 0 and custo_novo > 0:
+                margem_projetada = ((preco_venda_atual - custo_novo) / preco_venda_atual) * 100
+            else:
+                margem_projetada = 0
             
             produto_vinculado = {
                 "produto_id": produto.id,
@@ -1947,6 +2020,7 @@ def preview_processamento(
                 "variacao_custo_percentual": round(variacao_custo, 2),
                 "preco_venda_atual": preco_venda_atual,
                 "margem_atual": round(margem_atual, 2),
+                "margem_projetada_custo_novo": round(margem_projetada, 2),
                 "estoque_atual": produto.estoque_atual or 0
             }
         
@@ -3130,11 +3204,12 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
             vinculados = 0
             nao_vinculados = 0
             for item_data in dados_nfe["itens"]:
-                produto, confianca, _ = encontrar_produto_similar(
+                produto, confianca, _, _, _ = encontrar_produto_similar(
                     item_data["descricao"],
                     item_data["codigo_produto"],
                     db,
                     fornecedor.id if fornecedor else None,
+                    item_data.get("ean"),
                 )
                 item = NotaEntradaItem(
                     nota_entrada_id=nota.id,

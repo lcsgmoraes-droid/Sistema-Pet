@@ -1448,43 +1448,45 @@ const PedidosCompra = () => {
               ) : (
                 <>
                   {/* Ações Rápidas */}
-                  <div className="mb-4 flex gap-3 items-center">
-                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={mostrarSoPreenchidos}
-                        onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
-                        className="w-4 h-4 rounded"
-                      />
-                      Mostrar só preenchidos (qtd {`>`} 0)
-                    </label>
-                    <button
-                      onClick={selecionarTodosCriticos}
-                      className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
-                    >
-                      🔴 Selecionar Todos Críticos
-                    </button>
-                    <button
-                      onClick={selecionarPreenchidosVisiveis}
-                      className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-200"
-                    >
-                      ✅ Selecionar Preenchidos
-                    </button>
-                    <button
-                      onClick={desmarcarVisiveis}
-                      className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200"
-                    >
-                      ⛔ Desmarcar Visíveis
-                    </button>
-                    <div className="flex-1"></div>
-                    <span className="text-gray-500 text-sm">
-                      {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) · ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
-                    </span>
+                  <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-sm">
+                    <div className="flex gap-3 items-center">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mostrarSoPreenchidos}
+                          onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
+                          className="w-4 h-4 rounded"
+                        />
+                        Mostrar só preenchidos (qtd {`>`} 0)
+                      </label>
+                      <button
+                        onClick={selecionarTodosCriticos}
+                        className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
+                      >
+                        🔴 Selecionar Todos Críticos
+                      </button>
+                      <button
+                        onClick={selecionarPreenchidosVisiveis}
+                        className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-200"
+                      >
+                        ✅ Selecionar Preenchidos
+                      </button>
+                      <button
+                        onClick={desmarcarVisiveis}
+                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200"
+                      >
+                        ⛔ Desmarcar Visíveis
+                      </button>
+                      <div className="flex-1"></div>
+                      <span className="text-gray-500 text-sm">
+                        {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) · ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
-                      <thead className="bg-gray-50 sticky top-0 z-10">
+                      <thead className="bg-gray-50 sticky top-[76px] z-10">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                             <input

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
-import { formatMoneyBRL } from '../utils/formatters';
+import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
 import { jsPDF } from 'jspdf';
 import CardFiscal from './CardFiscal';
 import TooltipComposicao from './TooltipComposicao';
@@ -162,7 +162,10 @@ function aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride = {}) {
       ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100
       : 0;
     const precoVendaAtual = Number(item.produto_vinculado.preco_venda_atual || 0);
-    const margemAtual = precoVendaAtual > 0
+    const margemReferencia = precoVendaAtual > 0 && custoAnterior > 0
+      ? ((precoVendaAtual - custoAnterior) / precoVendaAtual) * 100
+      : 0;
+    const margemProjetada = precoVendaAtual > 0
       ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100
       : 0;
 
@@ -170,7 +173,8 @@ function aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride = {}) {
       ...item.produto_vinculado,
       custo_novo: custoUnitarioEfetivo,
       variacao_custo_percentual: Number(variacaoCusto.toFixed(2)),
-      margem_atual: Number(margemAtual.toFixed(2)),
+      margem_atual: Number(margemReferencia.toFixed(2)),
+      margem_projetada_custo_novo: Number(margemProjetada.toFixed(2)),
     };
   }
 
@@ -232,6 +236,7 @@ const EntradaXML = () => {
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
   const [precosAjustados, setPrecosAjustados] = useState({});
+  const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
   const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
   
@@ -709,15 +714,25 @@ const EntradaXML = () => {
       
       // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
       const precosIniciais = {};
+      const inputsIniciais = {};
       previewComOverrides.itens.forEach(item => {
         if (item.produto_vinculado) {
+          const margemProjetada = Number(
+            item.produto_vinculado.margem_projetada_custo_novo ??
+            calcularMargem(item.produto_vinculado.preco_venda_atual, item.produto_vinculado.custo_novo)
+          );
           precosIniciais[item.produto_vinculado.produto_id] = {
             preco_venda: item.produto_vinculado.preco_venda_atual,
-            margem: item.produto_vinculado.margem_atual
+            margem: margemProjetada
+          };
+          inputsIniciais[item.produto_vinculado.produto_id] = {
+            preco_venda: formatBRL(item.produto_vinculado.preco_venda_atual),
+            margem: formatBRL(margemProjetada),
           };
         }
       });
       setPrecosAjustados(precosIniciais);
+      setInputsRevisaoPrecos(inputsIniciais);
       
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao carregar preview');
@@ -778,6 +793,7 @@ const EntradaXML = () => {
       setNotaSelecionada(null);
       setMostrarRevisaoPrecos(false);
       setPreviewProcessamento(null);
+      setInputsRevisaoPrecos({});
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao processar nota');
@@ -793,13 +809,39 @@ const EntradaXML = () => {
     return custoNovo / (1 - margemDesejada / 100);
   };
 
+  const parseNumeroFlexivel = (valor) => {
+    if (typeof valor === 'number') {
+      return Number.isFinite(valor) ? valor : 0;
+    }
+
+    let texto = String(valor || '').trim();
+    if (!texto) return 0;
+
+    texto = texto.replaceAll(/\s+/g, '');
+    texto = texto.replaceAll(/[^\d,.-]/g, '');
+
+    if (texto.includes(',') && texto.includes('.')) {
+      if (texto.lastIndexOf(',') > texto.lastIndexOf('.')) {
+        texto = texto.replaceAll('.', '').replace(',', '.');
+      } else {
+        texto = texto.replaceAll(',', '');
+      }
+    } else if (texto.includes(',')) {
+      texto = texto.replaceAll('.', '').replace(',', '.');
+    }
+
+    const numero = Number.parseFloat(texto);
+    return Number.isFinite(numero) ? numero : 0;
+  };
+
   const calcularMargem = (precoVenda, custoNovo) => {
     // Margem = (Preço Venda - Custo) / Preço Venda * 100
     if (precoVenda <= 0) return 0;
     return ((precoVenda - custoNovo) / precoVenda) * 100;
   };
 
-  const atualizarPrecoVenda = (produtoId, novoPreco, custoNovo) => {
+  const atualizarPrecoVenda = (produtoId, novoPrecoEntrada, custoNovo) => {
+    const novoPreco = parseNumeroFlexivel(novoPrecoEntrada);
     const novaMargem = calcularMargem(novoPreco, custoNovo);
     setPrecosAjustados(prev => ({
       ...prev,
@@ -808,15 +850,43 @@ const EntradaXML = () => {
         margem: novaMargem
       }
     }));
+    setInputsRevisaoPrecos(prev => ({
+      ...prev,
+      [produtoId]: {
+        preco_venda: String(novoPrecoEntrada ?? ''),
+        margem: formatBRL(novaMargem),
+      }
+    }));
   };
 
-  const atualizarMargem = (produtoId, novaMargem, custoNovo) => {
+  const atualizarMargem = (produtoId, novaMargemEntrada, custoNovo) => {
+    const novaMargem = parseNumeroFlexivel(novaMargemEntrada);
     const novoPreco = calcularPrecoVenda(custoNovo, novaMargem);
     setPrecosAjustados(prev => ({
       ...prev,
       [produtoId]: {
         preco_venda: novoPreco,
         margem: novaMargem
+      }
+    }));
+    setInputsRevisaoPrecos(prev => ({
+      ...prev,
+      [produtoId]: {
+        preco_venda: formatBRL(novoPreco),
+        margem: String(novaMargemEntrada ?? ''),
+      }
+    }));
+  };
+
+  const normalizarCamposRevisaoPrecos = (produtoId) => {
+    const dados = precosAjustados[produtoId];
+    if (!dados) return;
+
+    setInputsRevisaoPrecos(prev => ({
+      ...prev,
+      [produtoId]: {
+        preco_venda: formatBRL(dados.preco_venda),
+        margem: formatBRL(dados.margem),
       }
     }));
   };
@@ -2328,6 +2398,11 @@ const EntradaXML = () => {
                                         {item.produto_ean || 'Nao informado'}
                                       </span>
                                     </div>
+                                    {item.origem_vinculo_automatico && item.referencia_vinculo && (
+                                      <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-emerald-800">
+                                        Match automatico por <strong>{item.origem_vinculo_automatico === 'codigo_barras' ? 'codigo de barras' : 'SKU'}</strong>: <strong>{item.referencia_vinculo}</strong>
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="text-xs text-green-700 mb-3 italic">
@@ -3188,6 +3263,7 @@ const EntradaXML = () => {
                     onClick={() => {
                       setMostrarRevisaoPrecos(false);
                       setPreviewProcessamento(null);
+                      setInputsRevisaoPrecos({});
                       if (notaSelecionada) {
                         setMostrarVisualizacao(true);
                       }
@@ -3343,11 +3419,30 @@ const EntradaXML = () => {
                   
                   const custoVariacao = produtoVinc.variacao_custo_percentual || 0;
                   const custoAumentou = custoVariacao > 0;
+                  const margemReferencia = Number(
+                    produtoVinc.margem_atual ??
+                    calcularMargem(produtoVinc.preco_venda_atual || 0, produtoVinc.custo_anterior || 0)
+                  );
+                  const margemProjetadaComCustoNovo = calcularMargem(
+                    produtoVinc.preco_venda_atual || 0,
+                    produtoVinc.custo_novo || 0
+                  );
                   
                   const precosAtuais = precosAjustados[produtoVinc.produto_id] || {
                     preco_venda: produtoVinc.preco_venda_atual || 0,
-                    margem: produtoVinc.margem_atual || 0
+                    margem: produtoVinc.margem_projetada_custo_novo ?? margemProjetadaComCustoNovo
                   };
+
+                  const camposTexto = inputsRevisaoPrecos[produtoVinc.produto_id] || {
+                    preco_venda: formatBRL(precosAtuais.preco_venda),
+                    margem: formatBRL(precosAtuais.margem),
+                  };
+
+                  const tooltipMargem =
+                    `Margem = ((Preço de Venda - Custo) / Preço de Venda) × 100\n` +
+                    `Com os valores atuais:\n` +
+                    `(${formatBRL(precosAtuais.preco_venda)} - ${formatBRL(produtoVinc.custo_novo || 0)}) / ${formatBRL(precosAtuais.preco_venda)} × 100\n` +
+                    `Resultado: ${formatPercent(precosAtuais.margem)}`;
 
                   return (
                     <div key={item.item_id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
@@ -3380,7 +3475,7 @@ const EntradaXML = () => {
                           <div>
                             <div className="text-xs text-gray-500 mb-1">Custo Anterior</div>
                             <div className="text-2xl font-bold text-gray-700">
-                              R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}
+                              {formatMoneyBRL(produtoVinc.custo_anterior || 0)}
                             </div>
                           </div>
                           <div>
@@ -3393,13 +3488,13 @@ const EntradaXML = () => {
                               />
                             </div>
                             <div className="text-2xl font-bold text-gray-900">
-                              R$ {(produtoVinc.custo_novo || 0).toFixed(2)}
+                              {formatMoneyBRL(produtoVinc.custo_novo || 0)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 mb-1">Variacao</div>
                             <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-emerald-700' : 'text-gray-600'}`}>
-                              {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {Math.abs(custoVariacao).toFixed(1)}%
+                              {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {formatPercent(Math.abs(custoVariacao))}
                             </div>
                           </div>
                         </div>
@@ -3413,36 +3508,39 @@ const EntradaXML = () => {
                             <div className="relative">
                               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                               <input
-                                type="number"
-                                step="0.01"
-                                value={precosAtuais.preco_venda}
+                                type="text"
+                                inputMode="decimal"
+                                value={camposTexto.preco_venda}
                                 onChange={(e) => atualizarPrecoVenda(
                                   produtoVinc.produto_id,
-                                  Number.parseFloat(e.target.value) || 0,
+                                  e.target.value,
                                   produtoVinc.custo_novo
                                 )}
+                                onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                             </div>
                             <div className="mt-1 text-xs text-gray-500">
-                              Anterior: R$ {produtoVinc.preco_venda_atual.toFixed(2)}
+                              Anterior: {formatMoneyBRL(produtoVinc.preco_venda_atual || 0)}
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                               Margem de Lucro
+                              <span className="text-gray-400 cursor-help" title={tooltipMargem}>ⓘ</span>
                             </label>
                             <div className="relative">
                               <input
-                                type="number"
-                                step="0.1"
-                                value={precosAtuais.margem}
+                                type="text"
+                                inputMode="decimal"
+                                value={camposTexto.margem}
                                 onChange={(e) => atualizarMargem(
                                   produtoVinc.produto_id,
-                                  Number.parseFloat(e.target.value) || 0,
+                                  e.target.value,
                                   produtoVinc.custo_novo
                                 )}
+                                onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pr-10 pl-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                               />
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
@@ -3459,15 +3557,15 @@ const EntradaXML = () => {
                           <div className="grid grid-cols-3 gap-4 text-center">
                             <div>
                               <div className="text-xs text-gray-600 mb-1">Custo Anterior</div>
-                              <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.custo_anterior || 0).toFixed(2)}</div>
+                              <div className="text-lg font-bold text-gray-700">{formatMoneyBRL(produtoVinc.custo_anterior || 0)}</div>
                             </div>
                             <div>
                               <div className="text-xs text-gray-600 mb-1">Preco Anterior</div>
-                              <div className="text-lg font-bold text-gray-700">R$ {(produtoVinc.preco_venda_atual || 0).toFixed(2)}</div>
+                              <div className="text-lg font-bold text-gray-700">{formatMoneyBRL(produtoVinc.preco_venda_atual || 0)}</div>
                             </div>
                             <div>
                               <div className="text-xs text-gray-600 mb-1">Margem Anterior</div>
-                              <div className="text-lg font-bold text-gray-700">{(produtoVinc.margem_atual || 0).toFixed(1)}%</div>
+                              <div className="text-lg font-bold text-gray-700">{formatPercent(margemReferencia)}</div>
                             </div>
                           </div>
                         </div>
@@ -3484,6 +3582,7 @@ const EntradaXML = () => {
                 onClick={() => {
                   setMostrarRevisaoPrecos(false);
                   setPreviewProcessamento(null);
+                  setInputsRevisaoPrecos({});
                   if (notaSelecionada) {
                     setMostrarVisualizacao(true);
                   }
