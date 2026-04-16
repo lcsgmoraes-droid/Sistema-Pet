@@ -989,7 +989,8 @@ const EntradaXML = () => {
         nf_anterior_data: nfAnterior?.nota_data_emissao || nfAnterior?.data || null,
         nf_anterior_custo: custoAnteriorNf,
         variacao_percentual: Number(produto.variacao_custo_percentual || 0),
-        variacao_absoluta: custoAtualNf - custoAnteriorNf
+        variacao_absoluta: custoAtualNf - custoAnteriorNf,
+        composicao_custo: item.composicao_custo || {}
       };
     }));
 
@@ -1007,7 +1008,17 @@ const EntradaXML = () => {
         'Fornecedor',
         'NF Atual',
         'Data NF Atual',
-        'Custo NF Atual',
+        'Custo Bruto Unit.',
+        'Frete Unit.',
+        'Seguro Unit.',
+        'Outras Despesas Unit.',
+        'Desconto Unit.',
+        'ICMS ST Unit.',
+        'IPI Unit.',
+        'ICMS Unit.',
+        'PIS Unit.',
+        'COFINS Unit.',
+        'Custo Aquisicao Unit.',
         'Qtd NF Atual',
         'NF Anterior',
         'Data NF Anterior',
@@ -1017,21 +1028,36 @@ const EntradaXML = () => {
       ];
 
       const escapeCsv = (valor) => `"${String(valor ?? '').replaceAll('"', '""')}"`;
-      const corpo = linhas.map((linha) => [
-        linha.produto_nome,
-        linha.sku || 'Nao informado',
-        linha.ean || 'Nao informado',
-        linha.fornecedor,
-        linha.nf_atual_numero,
-        formatarDataRelatorio(linha.nf_atual_data),
-        formatarMoedaRelatorio(linha.nf_atual_custo),
-        linha.nf_atual_quantidade,
-        linha.nf_anterior_numero || 'Nao encontrado',
-        formatarDataRelatorio(linha.nf_anterior_data),
-        formatarMoedaRelatorio(linha.nf_anterior_custo),
-        `${linha.variacao_percentual.toFixed(2).replace('.', ',')}%`,
-        formatarMoedaRelatorio(linha.variacao_absoluta)
-      ].map(escapeCsv).join(';'));
+      const corpo = linhas.map((linha) => {
+        const comp = linha.composicao_custo?.componentes_unitario || {};
+        const compTotal = linha.composicao_custo?.componentes_total || {};
+        
+        return [
+          linha.produto_nome,
+          linha.sku || 'Nao informado',
+          linha.ean || 'Nao informado',
+          linha.fornecedor,
+          linha.nf_atual_numero,
+          formatarDataRelatorio(linha.nf_atual_data),
+          formatarMoedaRelatorio(linha.composicao_custo?.custo_bruto_unitario || 0),
+          formatarMoedaRelatorio(comp.valor_frete || 0),
+          formatarMoedaRelatorio(comp.valor_seguro || 0),
+          formatarMoedaRelatorio(comp.valor_outras_despesas || 0),
+          formatarMoedaRelatorio(-(comp.valor_desconto || 0)),
+          formatarMoedaRelatorio(comp.valor_icms_st || 0),
+          formatarMoedaRelatorio(comp.valor_ipi || 0),
+          formatarMoedaRelatorio(comp.valor_icms || 0),
+          formatarMoedaRelatorio(comp.valor_pis || 0),
+          formatarMoedaRelatorio(comp.valor_cofins || 0),
+          formatarMoedaRelatorio(linha.nf_atual_custo),
+          linha.nf_atual_quantidade,
+          linha.nf_anterior_numero || 'Nao encontrado',
+          formatarDataRelatorio(linha.nf_anterior_data),
+          formatarMoedaRelatorio(linha.nf_anterior_custo),
+          `${linha.variacao_percentual.toFixed(2).replace('.', ',')}%`,
+          formatarMoedaRelatorio(linha.variacao_absoluta)
+        ].map(escapeCsv).join(';');
+      });
 
       const csv = `\uFEFF${headers.join(';')}\n${corpo.join('\n')}`;
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1063,18 +1089,22 @@ const EntradaXML = () => {
       const rowHeight = 6;
 
       const colunas = [
-        { key: 'produto_nome', label: 'Produto', width: 46 },
-        { key: 'sku', label: 'SKU', width: 20 },
-        { key: 'ean', label: 'EAN', width: 28 },
-        { key: 'nf_anterior_numero', label: 'NF', width: 14 },
-        { key: 'nf_anterior_data', label: 'Data', width: 18 },
-        { key: 'nf_anterior_custo', label: 'Custo', width: 18 },
-        { key: 'nf_atual_numero', label: 'NF', width: 14 },
-        { key: 'nf_atual_data', label: 'Data', width: 18 },
-        { key: 'nf_atual_custo', label: 'Custo', width: 18 },
-        { key: 'nf_atual_quantidade', label: 'Qtd', width: 12 },
-        { key: 'variacao_percentual', label: 'Var %', width: 12 },
-        { key: 'variacao_absoluta', label: 'Delta R$', width: 15 }
+        { key: 'produto_nome', label: 'Produto', width: 30 },
+        { key: 'sku', label: 'SKU', width: 10 },
+        { key: 'nf_atual_numero', label: 'NF', width: 10 },
+        { key: 'custo_bruto_unitario', label: 'Bruto', width: 10 },
+        { key: 'frete_unitario', label: 'Frete', width: 10 },
+        { key: 'seguro_unitario', label: 'Seguro', width: 10 },
+        { key: 'outras_despesas_unitario', label: 'Desp.', width: 10 },
+        { key: 'desconto_unitario', label: 'Desc.', width: 10 },
+        { key: 'icms_st_unitario', label: 'ICMS ST', width: 10 },
+        { key: 'ipi_unitario', label: 'IPI', width: 10 },
+        { key: 'icms_unitario', label: 'ICMS', width: 10 },
+        { key: 'custo_aquisicao', label: 'Custo Total', width: 12 },
+        { key: 'nf_anterior_numero', label: 'NF Ant.', width: 10 },
+        { key: 'nf_anterior_custo', label: 'Custo Ant.', width: 12 },
+        { key: 'variacao_percentual', label: 'Var %', width: 10 },
+        { key: 'variacao_absoluta', label: 'Delta R$', width: 12 }
       ];
 
       const larguraColunas = colunas.reduce((acc, col) => acc + col.width, 0);
@@ -1101,26 +1131,13 @@ const EntradaXML = () => {
         doc.text(`Fornecedor: ${previewProcessamento?.fornecedor_nome || 'Nao informado'}`, marginX, 16);
         doc.text(`Data de emissao NF atual: ${formatarDataRelatorio(previewProcessamento?.data_emissao)}`, marginX, 21);
 
-        const xProduto = marginX;
-        const xDadosAnteriores = marginX + colunas.slice(0, 3).reduce((acc, col) => acc + col.width, 0);
-        const xDadosNovos = xDadosAnteriores + colunas.slice(3, 6).reduce((acc, col) => acc + col.width, 0);
-        const xVariacao = xDadosNovos + colunas.slice(6, 10).reduce((acc, col) => acc + col.width, 0);
-
-        doc.setFillColor(241, 245, 249);
-        doc.rect(marginX, tableStartY - 5, usableWidth, 5, 'F');
-        doc.setFontSize(8);
-        doc.text('Produto', xProduto + 1, tableStartY - 1.5);
-        doc.text('Dados Anteriores', xDadosAnteriores + 1, tableStartY - 1.5);
-        doc.text('Dados Novos', xDadosNovos + 1, tableStartY - 1.5);
-        doc.text('Variacao', xVariacao + 1, tableStartY - 1.5);
-
-        let xAtual = marginX;
         doc.setFillColor(226, 232, 240);
         doc.rect(marginX, tableStartY, usableWidth, rowHeight, 'F');
         doc.setDrawColor(203, 213, 225);
         doc.setTextColor(15, 23, 42);
-        doc.setFontSize(7.8);
+        doc.setFontSize(7);
 
+        let xAtual = marginX;
         colunas.forEach((coluna) => {
           doc.rect(xAtual, tableStartY, coluna.width, rowHeight);
           doc.text(coluna.label, xAtual + 1, tableStartY + 4);
@@ -1141,18 +1158,31 @@ const EntradaXML = () => {
         let xAtual = marginX;
         doc.setDrawColor(226, 232, 240);
         doc.setTextColor(15, 23, 42);
-        doc.setFontSize(7.5);
+        doc.setFontSize(6.5);
+
+        const comp = linha.composicao_custo?.componentes_unitario || {};
+        const rowData = {
+          produto_nome: truncarTexto(linha.produto_nome, 28),
+          sku: linha.sku || '-',
+          nf_atual_numero: linha.nf_atual_numero,
+          custo_bruto_unitario: formatarMoedaRelatorio(linha.composicao_custo?.custo_bruto_unitario || 0),
+          frete_unitario: formatarMoedaRelatorio(comp.valor_frete || 0),
+          seguro_unitario: formatarMoedaRelatorio(comp.valor_seguro || 0),
+          outras_despesas_unitario: formatarMoedaRelatorio(comp.valor_outras_despesas || 0),
+          desconto_unitario: formatarMoedaRelatorio(-(comp.valor_desconto || 0)),
+          icms_st_unitario: formatarMoedaRelatorio(comp.valor_icms_st || 0),
+          ipi_unitario: formatarMoedaRelatorio(comp.valor_ipi || 0),
+          icms_unitario: formatarMoedaRelatorio(comp.valor_icms || 0),
+          custo_aquisicao: formatarMoedaRelatorio(linha.nf_atual_custo),
+          nf_anterior_numero: linha.nf_anterior_numero || '-',
+          nf_anterior_custo: formatarMoedaRelatorio(linha.nf_anterior_custo),
+          variacao_percentual: `${Number(linha.variacao_percentual || 0).toFixed(2).replace('.', ',')}%`,
+          variacao_absoluta: formatarMoedaRelatorio(linha.variacao_absoluta)
+        };
 
         colunas.forEach((coluna) => {
           doc.rect(xAtual, y, coluna.width, rowHeight);
-          let valor = linha[coluna.key];
-
-          if (coluna.key.includes('_data')) valor = formatarDataRelatorio(valor);
-          if (coluna.key.includes('_custo') || coluna.key === 'variacao_absoluta') valor = formatarMoedaRelatorio(valor);
-          if (coluna.key === 'variacao_percentual') valor = `${Number(valor || 0).toFixed(2).replace('.', ',')}%`;
-          if (coluna.key === 'sku' || coluna.key === 'ean') valor = valor || 'Nao informado';
-          if (coluna.key === 'nf_anterior_numero') valor = valor || 'Nao encontrado';
-
+          const valor = rowData[coluna.key] || '';
           const texto = truncarTexto(valor, coluna.width - 2);
           doc.text(texto, xAtual + 1, y + 4);
           xAtual += coluna.width;
@@ -3473,7 +3503,9 @@ const EntradaXML = () => {
                         {/* Comparação de Custos */}
                         <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <div>
-                            <div className="text-xs text-gray-500 mb-1">Custo Anterior</div>
+                            <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
+                              <span>Custo Anterior</span>
+                            </div>
                             <div className="text-2xl font-bold text-gray-700">
                               {formatMoneyBRL(produtoVinc.custo_anterior || 0)}
                             </div>
