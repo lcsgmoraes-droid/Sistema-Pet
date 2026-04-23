@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Syringe, Plus, AlertCircle, CheckCircle, ChevronDown, CalendarDays, RefreshCw } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
+import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 
 function adicionarDias(dataIso, dias) {
   if (!dataIso || !dias) return "";
@@ -64,6 +66,8 @@ function classeFaseCalendario(fase) {
 }
 
 export default function VetVacinas() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [aba, setAba] = useState("registros"); // "registros" | "vencendo" | "calendario"
   const [pessoaFiltro, setPessoaFiltro] = useState("");
@@ -95,7 +99,12 @@ export default function VetVacinas() {
   const [salvando, setSalvando] = useState(false);
 
   const petIdQuery = searchParams.get("pet_id") || "";
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
   const acaoQuery = searchParams.get("acao") || "";
+  const agendamentoIdQuery = searchParams.get("agendamento_id") || "";
+  const consultaIdQuery = searchParams.get("consulta_id") || "";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
 
   useEffect(() => {
     api.get("/pets", { params: { limit: 500 } })
@@ -145,9 +154,10 @@ export default function VetVacinas() {
   useEffect(() => { carregarVacinasPet(); }, [carregarVacinasPet]);
 
   useEffect(() => {
-    if (!petIdQuery || !pets.length) return;
+    const petIdAlvo = novoPetIdQuery || petIdQuery;
+    if (!petIdAlvo || !pets.length) return;
 
-    const petEncontrado = pets.find((p) => String(p.id) === String(petIdQuery));
+    const petEncontrado = pets.find((p) => String(p.id) === String(petIdAlvo));
     if (!petEncontrado) return;
 
     const pessoaId = petEncontrado?.cliente_id ? String(petEncontrado.cliente_id) : "";
@@ -161,10 +171,19 @@ export default function VetVacinas() {
     setPetSelecionado(String(petEncontrado.id));
     setForm((prev) => ({ ...prev, pet_id: String(petEncontrado.id) }));
 
-    if (acaoQuery === "novo") {
+    if (acaoQuery === "novo" || novoPetIdQuery) {
       setNovaAberta(true);
     }
-  }, [petIdQuery, acaoQuery, pets]);
+  }, [petIdQuery, novoPetIdQuery, acaoQuery, pets]);
+
+  useEffect(() => {
+    if (!tutorIdQuery || tutorFormSelecionado?.id) return;
+    setTutorFormSelecionado({
+      id: String(tutorIdQuery),
+      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+    });
+    setForm((prev) => ({ ...prev, pessoa_id: String(tutorIdQuery) }));
+  }, [tutorIdQuery, tutorNomeQuery, tutorFormSelecionado]);
 
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
@@ -194,6 +213,20 @@ export default function VetVacinas() {
 
   function set(campo, valor) { setForm((p) => ({ ...p, [campo]: valor })); }
 
+  function fecharModalVacina() {
+    setNovaAberta(false);
+    setTutorFormSelecionado(null);
+    setForm({ pessoa_id: "", pet_id: "", nome_vacina: "", fabricante: "", lote: "", data_aplicacao: "", proxima_dose: "", veterinario_responsavel: "", observacoes: "" });
+    if (acaoQuery === "novo" || petIdQuery || novoPetIdQuery || agendamentoIdQuery || consultaIdQuery) {
+      navigate("/veterinario/vacinas", { replace: true });
+    }
+  }
+
+  const retornoNovoPet = useMemo(
+    () => buildReturnTo(location.pathname, location.search, { acao: "novo" }),
+    [location.pathname, location.search]
+  );
+
   async function salvarVacina() {
     if (!form.pet_id || !form.nome_vacina || !form.data_aplicacao) return;
     setSalvando(true);
@@ -201,6 +234,8 @@ export default function VetVacinas() {
     try {
       await vetApi.registrarVacina({
         pet_id: form.pet_id,
+        consulta_id: consultaIdQuery ? Number(consultaIdQuery) : undefined,
+        agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
         nome_vacina: form.nome_vacina,
         fabricante: form.fabricante || undefined,
         lote: form.lote || undefined,
@@ -209,9 +244,7 @@ export default function VetVacinas() {
         veterinario_responsavel: form.veterinario_responsavel || undefined,
         observacoes: form.observacoes || undefined,
       });
-      setNovaAberta(false);
-      setTutorFormSelecionado(null);
-      setForm({ pessoa_id: "", pet_id: "", nome_vacina: "", fabricante: "", lote: "", data_aplicacao: "", proxima_dose: "", veterinario_responsavel: "", observacoes: "" });
+      fecharModalVacina();
       // Recarrega a lista se for o mesmo pet
       if (form.pet_id === petSelecionado) await carregarVacinasPet();
       await carregarVencendo();
@@ -525,6 +558,11 @@ export default function VetVacinas() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="font-bold text-gray-800">Registrar vacina</h2>
+            {consultaIdQuery && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                Esta vacina sera vinculada a consulta <strong>#{consultaIdQuery}</strong>.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {/* Pet */}
               <div className="col-span-2">
@@ -540,7 +578,15 @@ export default function VetVacinas() {
                 />
               </div>
               <div className="col-span-2">
-                <label htmlFor="vacinas-pet-form" className="block text-xs font-medium text-gray-600 mb-1">Pet da pessoa *</label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label htmlFor="vacinas-pet-form" className="block text-xs font-medium text-gray-600">Pet da pessoa *</label>
+                  <NovoPetButton
+                    tutorId={tutorFormSelecionado?.id || form.pessoa_id}
+                    tutorNome={tutorFormSelecionado?.nome}
+                    returnTo={retornoNovoPet}
+                    onBeforeNavigate={() => setNovaAberta(false)}
+                  />
+                </div>
                 <select
                   id="vacinas-pet-form"
                   value={form.pet_id}
@@ -551,6 +597,9 @@ export default function VetVacinas() {
                   <option value="">Selecione…</option>
                   {petsDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
                 </select>
+                {form.pessoa_id && petsDaPessoa.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para esta pessoa.</p>
+                )}
               </div>
 
               {sugestaoDose?.protocolo && (
@@ -625,7 +674,7 @@ export default function VetVacinas() {
             </div>
             {erro && <p className="text-xs text-red-600">{erro}</p>}
             <div className="flex gap-3 pt-1">
-              <button onClick={() => setNovaAberta(false)}
+              <button onClick={fecharModalVacina}
                 className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
               <button
                 onClick={salvarVacina}

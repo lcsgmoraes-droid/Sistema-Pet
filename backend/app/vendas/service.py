@@ -214,12 +214,17 @@ class VendaService:
             # ============================================================
             
             subtotal_itens = sum(item['subtotal'] for item in itens)
-            taxa_entrega = payload.get('taxa_entrega', 0) or 0
+            tem_entrega = bool(payload.get('tem_entrega', False))
+            taxa_entrega = (payload.get('taxa_entrega', 0) or 0) if tem_entrega else 0
             total = subtotal_itens + taxa_entrega
             
             # 🚚 Calcular distribuição da taxa de entrega
-            percentual_taxa_entregador = payload.get('percentual_taxa_entregador', 0) or 0
-            percentual_taxa_loja = payload.get('percentual_taxa_loja', 100)
+            percentual_taxa_entregador = (
+                payload.get('percentual_taxa_entregador', 0) or 0
+            ) if tem_entrega else 0
+            percentual_taxa_loja = (
+                payload.get('percentual_taxa_loja', 100 if taxa_entrega > 0 else 0) or 0
+            ) if tem_entrega else 0
             
             logger.info(f"📥 PAYLOAD RECEBIDO - percentual_taxa_entregador: {percentual_taxa_entregador}, percentual_taxa_loja: {percentual_taxa_loja}")
             
@@ -255,19 +260,19 @@ class VendaService:
                 desconto_percentual=payload.get('desconto_percentual', 0) or 0,
                 total=float(total),
                 observacoes=payload.get('observacoes'),
-                tem_entrega=payload.get('tem_entrega', False),
+                tem_entrega=tem_entrega,
                 taxa_entrega=float(taxa_entrega),
                 percentual_taxa_entregador=float(percentual_taxa_entregador),
                 percentual_taxa_loja=float(percentual_taxa_loja),
                 valor_taxa_entregador=float(valor_taxa_entregador),
                 valor_taxa_loja=float(valor_taxa_loja),
-                entregador_id=payload.get('entregador_id'),
-                loja_origem=payload.get('loja_origem'),
-                endereco_entrega=payload.get('endereco_entrega'),
-                distancia_km=payload.get('distancia_km'),
-                valor_por_km=payload.get('valor_por_km'),
-                observacoes_entrega=payload.get('observacoes_entrega'),
-                status_entrega='pendente' if payload.get('tem_entrega') else None,
+                entregador_id=payload.get('entregador_id') if tem_entrega else None,
+                loja_origem=payload.get('loja_origem') if tem_entrega else None,
+                endereco_entrega=payload.get('endereco_entrega') if tem_entrega else None,
+                distancia_km=payload.get('distancia_km') if tem_entrega else None,
+                valor_por_km=payload.get('valor_por_km') if tem_entrega else None,
+                observacoes_entrega=payload.get('observacoes_entrega') if tem_entrega else None,
+                status_entrega='pendente' if tem_entrega else None,
                 canal=payload.get('canal', 'loja_fisica'),  # Canal de venda para DRE
                 status='aberta',
                 data_venda=now_brasilia(),

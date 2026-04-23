@@ -307,6 +307,32 @@ class Produto(BaseTenantModel):
     # ========== SPRINT 2: VARIA��ES ==========
     # Relacionamento pai/filhos para produtos com varia��o
     produto_pai = relationship("Produto", remote_side=[id], foreign_keys=[produto_pai_id], backref="variacoes")
+
+    @property
+    def eh_racao(self) -> bool:
+        tipo = (self.tipo or "").strip().lower()
+        classificacao = (self.classificacao_racao or "").strip().lower()
+
+        if tipo in {"ração", "racao"}:
+            return True
+
+        if getattr(self, "linha_racao_id", None):
+            return True
+
+        if classificacao in {
+            "sim",
+            "standard",
+            "premium",
+            "super_premium",
+            "especial",
+            "terapeutica",
+        }:
+            return True
+
+        if self.peso_embalagem and float(self.peso_embalagem or 0) > 0:
+            return True
+
+        return False
     # Acesso via: produto_pai.variacoes (lista de varia��es)
     
     # ? DESABILITADO: ProductVariation n�o existe mais
@@ -491,6 +517,38 @@ class ProdutoLote(BaseTenantModel):
         """Verifica se está vencido"""
         dias = self.dias_para_vencer
         return dias is not None and dias <= 0
+
+
+class CampanhaValidadeAutomatica(BaseTenantModel):
+    """Configuracao da campanha automatica por validade."""
+    __tablename__ = "campanha_validade_automatica"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True)
+    ativo = Column(Boolean, nullable=False, default=False)
+    aplicar_app = Column(Boolean, nullable=False, default=True)
+    aplicar_ecommerce = Column(Boolean, nullable=False, default=True)
+    desconto_60_dias = Column(Float, nullable=False, default=10)
+    desconto_30_dias = Column(Float, nullable=False, default=20)
+    desconto_7_dias = Column(Float, nullable=False, default=35)
+    rotulo_publico = Column(String(80), nullable=True)
+    mensagem_publica = Column(Text, nullable=True)
+
+
+class CampanhaValidadeExclusao(BaseTenantModel):
+    """Opt-out manual da campanha automatica por produto ou lote."""
+    __tablename__ = "campanha_validade_exclusoes"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False, index=True)
+    lote_id = Column(Integer, ForeignKey("produto_lotes.id", ondelete="CASCADE"), nullable=True, index=True)
+    ativo = Column(Boolean, nullable=False, default=True)
+    motivo = Column(String(120), nullable=True)
+    observacao = Column(Text, nullable=True)
+
+    produto = relationship("Produto")
+    lote = relationship("ProdutoLote")
 
 
 class ProdutoFornecedor(BaseTenantModel):
@@ -776,6 +834,12 @@ class NotaEntrada(BaseTenantModel):
     # Status: pendente, processada, erro
     status = Column(String(20), default="pendente", index=True)
     erro_mensagem = Column(Text)
+
+    # Conferência física da NF
+    conferencia_status = Column(String(30), default="nao_iniciada", index=True)
+    conferencia_observacoes = Column(Text)
+    conferencia_realizada_em = Column(DateTime)
+    conferencia_user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
     
     # Processamento
     processada_em = Column(DateTime)
@@ -798,6 +862,7 @@ class NotaEntrada(BaseTenantModel):
     # Relationships
     itens = relationship("NotaEntradaItem", back_populates="nota", cascade="all, delete-orphan")
     user = relationship("User", foreign_keys=[user_id])
+    conferencia_user = relationship("User", foreign_keys=[conferencia_user_id])
 
 
 class NotaEntradaItem(BaseTenantModel):
@@ -834,6 +899,12 @@ class NotaEntradaItem(BaseTenantModel):
     
     # Status: pendente, vinculado, nao_vinculado, processado
     status = Column(String(20), default="pendente")
+
+    # Conferência física
+    quantidade_conferida = Column(Float, nullable=True)
+    quantidade_avariada = Column(Float, default=0)
+    observacao_conferencia = Column(Text)
+    acao_sugerida = Column(String(40), default="sem_acao")
     
     # Rateio (apenas para análise/relatórios - estoque é UNIFICADO)
     quantidade_online = Column(Float, default=0)  # Quantidade deste item que é do online

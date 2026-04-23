@@ -210,6 +210,148 @@ function aplicarOverridesPackNoPreview(preview, multiplicadoresOverride = {}) {
   };
 }
 
+const CONFERENCIA_STATUS_META = {
+  nao_iniciada: {
+    label: 'Nao conferida',
+    cls: 'bg-gray-100 text-gray-700 border-gray-200',
+  },
+  sem_divergencia: {
+    label: 'Conferida sem divergencias',
+    cls: 'bg-green-100 text-green-800 border-green-200',
+  },
+  com_divergencia: {
+    label: 'Conferida com divergencias',
+    cls: 'bg-orange-100 text-orange-800 border-orange-200',
+  },
+};
+
+const ACAO_CONFERENCIA_OPCOES = [
+  { value: 'sem_acao', label: 'Sem acao' },
+  { value: 'contatar_fornecedor', label: 'Contatar fornecedor' },
+  { value: 'reposicao_fornecedor', label: 'Pedir reposicao' },
+  { value: 'nf_devolucao', label: 'NF de devolucao' },
+  { value: 'ajuste_interno', label: 'Ajuste interno' },
+];
+
+function normalizarNumeroConferencia(valor, fallback = 0) {
+  const numero = Number.parseFloat(String(valor ?? '').replace(',', '.'));
+  if (!Number.isFinite(numero)) return fallback;
+  return Math.max(0, numero);
+}
+
+function obterDraftConferenciaItem(item) {
+  const quantidadeNF = Number(item?.quantidade ?? item?.quantidade_nf ?? 0);
+  const quantidadeConferida = Math.max(
+    0,
+    Math.min(
+      Number(item?.quantidade_conferida ?? quantidadeNF),
+      quantidadeNF,
+    ),
+  );
+  const quantidadeAvariada = Math.max(
+    0,
+    Math.min(
+      Number(item?.quantidade_avariada ?? 0),
+      Math.max(0, quantidadeNF - quantidadeConferida),
+    ),
+  );
+
+  return {
+    quantidade_conferida: quantidadeConferida,
+    quantidade_avariada: quantidadeAvariada,
+    observacao_conferencia: item?.observacao_conferencia || '',
+    acao_sugerida: item?.acao_sugerida || 'sem_acao',
+  };
+}
+
+function calcularConferenciaItem(item, draft) {
+  const quantidadeNF = Number(item?.quantidade ?? item?.quantidade_nf ?? 0);
+  const base = draft || obterDraftConferenciaItem(item);
+  const quantidadeConferida = Math.max(
+    0,
+    Math.min(Number(base?.quantidade_conferida ?? quantidadeNF), quantidadeNF),
+  );
+  const quantidadeAvariada = Math.max(
+    0,
+    Math.min(Number(base?.quantidade_avariada ?? 0), Math.max(0, quantidadeNF - quantidadeConferida)),
+  );
+  const quantidadeFaltante = Math.max(0, quantidadeNF - quantidadeConferida - quantidadeAvariada);
+  const temAvaria = quantidadeAvariada > 0;
+  const temFalta = quantidadeFaltante > 0;
+
+  let statusConferencia = 'ok';
+  if (temAvaria && temFalta) statusConferencia = 'falta_avaria';
+  else if (temAvaria) statusConferencia = 'avaria';
+  else if (temFalta) statusConferencia = 'falta';
+
+  const temDivergencia = statusConferencia !== 'ok';
+  const acaoSugerida = temDivergencia
+    ? (base?.acao_sugerida || (temAvaria ? 'nf_devolucao' : 'contatar_fornecedor'))
+    : 'sem_acao';
+
+  return {
+    quantidadeNF,
+    quantidadeConferida,
+    quantidadeAvariada,
+    quantidadeFaltante,
+    statusConferencia,
+    temDivergencia,
+    acaoSugerida,
+    observacaoConferencia: base?.observacao_conferencia || '',
+  };
+}
+
+function montarConferenciaState(nota) {
+  const state = {};
+  (nota?.itens || []).forEach((item) => {
+    state[item.id] = obterDraftConferenciaItem(item);
+  });
+  return state;
+}
+
+function calcularResumoConferencia(nota, conferenciaItens) {
+  const itens = nota?.itens || [];
+  const resumo = {
+    itens_total: itens.length,
+    itens_ok: 0,
+    itens_com_divergencia: 0,
+    itens_com_avaria: 0,
+    quantidade_total_nf: 0,
+    quantidade_total_conferida: 0,
+    quantidade_total_avariada: 0,
+    quantidade_total_faltante: 0,
+  };
+
+  itens.forEach((item) => {
+    const conferenciaItem = calcularConferenciaItem(item, conferenciaItens?.[item.id]);
+    resumo.quantidade_total_nf += conferenciaItem.quantidadeNF;
+    resumo.quantidade_total_conferida += conferenciaItem.quantidadeConferida;
+    resumo.quantidade_total_avariada += conferenciaItem.quantidadeAvariada;
+    resumo.quantidade_total_faltante += conferenciaItem.quantidadeFaltante;
+
+    if (conferenciaItem.temDivergencia) {
+      resumo.itens_com_divergencia += 1;
+    } else {
+      resumo.itens_ok += 1;
+    }
+
+    if (conferenciaItem.quantidadeAvariada > 0) {
+      resumo.itens_com_avaria += 1;
+    }
+  });
+
+  const statusBase = nota?.conferencia?.status || nota?.conferencia_status || 'nao_iniciada';
+  const status = statusBase === 'nao_iniciada'
+    ? 'nao_iniciada'
+    : (resumo.itens_com_divergencia > 0 ? 'com_divergencia' : 'sem_divergencia');
+
+  return {
+    ...resumo,
+    status,
+    tem_nf_devolucao_sugerida: resumo.itens_com_avaria > 0,
+  };
+}
+
 const EntradaXML = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -220,6 +362,14 @@ const EntradaXML = () => {
   const [notaSelecionada, setNotaSelecionada] = useState(null);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
+  const [mostrarCamposConferencia, setMostrarCamposConferencia] = useState(false);
+  const [conferenciaItens, setConferenciaItens] = useState({});
+  const [conferenciaObservacaoGeral, setConferenciaObservacaoGeral] = useState('');
+  const [salvandoConferencia, setSalvandoConferencia] = useState(false);
+  const [desfazendoConferencia, setDesfazendoConferencia] = useState(false);
+  const [gerandoRascunhoDevolucao, setGerandoRascunhoDevolucao] = useState(false);
+  const [rascunhoDevolucao, setRascunhoDevolucao] = useState(null);
+  const [mostrarRascunhoDevolucao, setMostrarRascunhoDevolucao] = useState(false);
   
   // Estados para upload em lote
   const [uploadingLote, setUploadingLote] = useState(false);
@@ -235,6 +385,8 @@ const EntradaXML = () => {
   // Estados para revisao de precos
   const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
   const [previewProcessamento, setPreviewProcessamento] = useState(null);
+  const [custosAjustados, setCustosAjustados] = useState({});
+  const [inputsRevisaoCustos, setInputsRevisaoCustos] = useState({});
   const [precosAjustados, setPrecosAjustados] = useState({});
   const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
@@ -269,6 +421,189 @@ const EntradaXML = () => {
 
   // Filtro de status da tabela
   const [filtroStatus, setFiltroStatus] = useState('todos');
+
+  const aplicarNotaSelecionada = (dadosNota) => {
+    const notaNormalizada = {
+      ...dadosNota,
+      itens: [...(dadosNota?.itens || [])].sort((a, b) => a.id - b.id),
+    };
+
+    setNotaSelecionada(notaNormalizada);
+    setConferenciaItens(montarConferenciaState(notaNormalizada));
+    setConferenciaObservacaoGeral(notaNormalizada?.conferencia?.observacao_geral || '');
+    setTipoRateio(notaNormalizada.tipo_rateio || 'loja');
+
+    return notaNormalizada;
+  };
+
+  const sincronizarNotaNaLista = (dadosNota) => {
+    if (!dadosNota?.id) return;
+
+    const conferenciaStatus = dadosNota?.conferencia?.status || dadosNota?.conferencia_status || 'nao_iniciada';
+    const divergenciasCount = Number(
+      dadosNota?.conferencia?.itens_com_divergencia ??
+      dadosNota?.divergencias_count ??
+      0,
+    );
+
+    setNotasEntrada((prev) => prev.map((nota) => {
+      if (nota.id !== dadosNota.id) {
+        return nota;
+      }
+
+      return {
+        ...nota,
+        status: dadosNota.status ?? nota.status,
+        fornecedor_nome: dadosNota.fornecedor_nome ?? nota.fornecedor_nome,
+        fornecedor_cnpj: dadosNota.fornecedor_cnpj ?? nota.fornecedor_cnpj,
+        data_emissao: dadosNota.data_emissao ?? nota.data_emissao,
+        valor_total: dadosNota.valor_total ?? nota.valor_total,
+        produtos_vinculados: dadosNota.produtos_vinculados ?? nota.produtos_vinculados,
+        produtos_nao_vinculados: dadosNota.produtos_nao_vinculados ?? nota.produtos_nao_vinculados,
+        entrada_estoque_realizada: dadosNota.entrada_estoque_realizada ?? nota.entrada_estoque_realizada,
+        conferencia_status: conferenciaStatus,
+        divergencias_count: divergenciasCount,
+      };
+    }));
+  };
+
+  const atualizarCampoConferenciaItem = (item, campo, valor) => {
+    setConferenciaItens((prev) => {
+      const atual = prev[item.id] || obterDraftConferenciaItem(item);
+      const quantidadeNF = Number(item.quantidade ?? item.quantidade_nf ?? 0);
+      const proximo = { ...atual };
+
+      if (campo === 'quantidade_conferida') {
+        proximo.quantidade_conferida = Math.max(
+          0,
+          Math.min(normalizarNumeroConferencia(valor, atual.quantidade_conferida), quantidadeNF),
+        );
+        proximo.quantidade_avariada = Math.min(
+          Number(proximo.quantidade_avariada || 0),
+          Math.max(0, quantidadeNF - proximo.quantidade_conferida),
+        );
+      } else if (campo === 'quantidade_avariada') {
+        proximo.quantidade_avariada = Math.max(
+          0,
+          Math.min(
+            normalizarNumeroConferencia(valor, atual.quantidade_avariada),
+            Math.max(0, quantidadeNF - Number(proximo.quantidade_conferida ?? atual.quantidade_conferida ?? quantidadeNF)),
+          ),
+        );
+      } else if (campo === 'observacao_conferencia') {
+        proximo.observacao_conferencia = String(valor ?? '');
+      } else if (campo === 'acao_sugerida') {
+        proximo.acao_sugerida = valor || 'sem_acao';
+      }
+
+      const conferenciaItem = calcularConferenciaItem(item, proximo);
+      if (!conferenciaItem.temDivergencia) {
+        proximo.acao_sugerida = 'sem_acao';
+      } else if (!proximo.acao_sugerida || proximo.acao_sugerida === 'sem_acao') {
+        proximo.acao_sugerida = conferenciaItem.quantidadeAvariada > 0
+          ? 'nf_devolucao'
+          : 'contatar_fornecedor';
+      }
+
+      return {
+        ...prev,
+        [item.id]: proximo,
+      };
+    });
+  };
+
+  const construirPayloadConferencia = () => {
+    if (!notaSelecionada) return null;
+
+    return {
+      observacao_geral: conferenciaObservacaoGeral || null,
+      itens: notaSelecionada.itens.map((item) => {
+        const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
+        return {
+          item_id: item.id,
+          quantidade_conferida: conferenciaItem.quantidadeConferida,
+          quantidade_avariada: conferenciaItem.quantidadeAvariada,
+          observacao_conferencia: conferenciaItem.observacaoConferencia || null,
+          acao_sugerida: conferenciaItem.acaoSugerida,
+        };
+      }),
+    };
+  };
+
+  const salvarConferenciaAtual = async ({ silencioso = false } = {}) => {
+    if (!notaSelecionada) return false;
+
+    setSalvandoConferencia(true);
+    try {
+      const payload = construirPayloadConferencia();
+      await api.post(`/notas-entrada/${notaSelecionada.id}/conferencia`, payload);
+      const notaResponse = await api.get(`/notas-entrada/${notaSelecionada.id}`);
+      const notaAtualizada = aplicarNotaSelecionada(notaResponse.data);
+      sincronizarNotaNaLista(notaAtualizada);
+      await carregarDados();
+
+      if (!silencioso) {
+        toast.success('Conferencia salva com sucesso');
+      }
+
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao salvar conferencia');
+      return false;
+    } finally {
+      setSalvandoConferencia(false);
+    }
+  };
+
+  const desfazerConferenciaAtual = async () => {
+    if (!notaSelecionada) return false;
+
+    const confirmou = window.confirm('Deseja desfazer a conferencia desta NF e voltar para o estado nao conferido?');
+    if (!confirmou) {
+      return false;
+    }
+
+    setDesfazendoConferencia(true);
+    try {
+      await api.post(`/notas-entrada/${notaSelecionada.id}/conferencia/desfazer`);
+      const notaResponse = await api.get(`/notas-entrada/${notaSelecionada.id}`);
+      const notaAtualizada = aplicarNotaSelecionada(notaResponse.data);
+      sincronizarNotaNaLista(notaAtualizada);
+      setMostrarCamposConferencia(false);
+      await carregarDados();
+      toast.success('Conferencia desfeita com sucesso');
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao desfazer conferencia');
+      return false;
+    } finally {
+      setDesfazendoConferencia(false);
+    }
+  };
+
+  const gerarRascunhoDevolucao = async () => {
+    if (!notaSelecionada) return;
+
+    const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
+    if (!conferenciaSalva) return;
+
+    setGerandoRascunhoDevolucao(true);
+    try {
+      const { data } = await api.get(`/notas-entrada/${notaSelecionada.id}/devolucao-draft`);
+      setRascunhoDevolucao(data);
+      setMostrarRascunhoDevolucao(true);
+
+      if (data.disponivel) {
+        toast.success('Rascunho de NF de devolucao gerado');
+      } else {
+        toast('Nao ha itens avariados para NF de devolucao');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao gerar rascunho da NF de devolucao');
+    } finally {
+      setGerandoRascunhoDevolucao(false);
+    }
+  };
 
   // Painel de busca SEFAZ embutido
   const [mostrarPainelSefaz, setMostrarPainelSefaz] = useState(false);
@@ -584,19 +919,13 @@ const EntradaXML = () => {
     }
   };
 
-  const abrirDetalhes = async (notaId) => {
+  const abrirDetalhes = async (notaId, { abrirConferencia = false } = {}) => {
     try {
-            const response = await api.get(`/notas-entrada/${notaId}`);
-      // Ordenar itens por ID para manter ordem consistente
-      if (response.data.itens) {
-        response.data.itens.sort((a, b) => a.id - b.id);
-      }
-      setNotaSelecionada(response.data);
+      const response = await api.get(`/notas-entrada/${notaId}`);
+      const nota = aplicarNotaSelecionada(response.data);
       setMostrarDetalhes(true);
+      setMostrarCamposConferencia(abrirConferencia || (nota?.conferencia?.itens_com_divergencia || 0) > 0);
       setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
-      
-      // Sincronizar estado de rateio
-      setTipoRateio(response.data.tipo_rateio || 'loja');
     } catch (error) {
       toast.error('Erro ao carregar detalhes da nota');
     }
@@ -604,8 +933,9 @@ const EntradaXML = () => {
 
   const abrirVisualizacao = async (notaId) => {
     try {
-            const response = await api.get(`/notas-entrada/${notaId}`);
-      setNotaSelecionada(response.data);
+      const response = await api.get(`/notas-entrada/${notaId}`);
+      aplicarNotaSelecionada(response.data);
+      setMostrarCamposConferencia(false);
       setMostrarVisualizacao(true);
     } catch (error) {
       toast.error('Erro ao carregar nota');
@@ -622,11 +952,7 @@ const EntradaXML = () => {
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
-      // Ordenar itens por ID para manter ordem consistente
-      if (response.data.itens) {
-        response.data.itens.sort((a, b) => a.id - b.id);
-      }
-      setNotaSelecionada(response.data);
+      aplicarNotaSelecionada(response.data);
     } catch (error) {
       console.error('❌ Erro ao vincular produto:', error);
       toast.error(error.response?.data?.detail || 'Erro ao vincular produto');
@@ -647,10 +973,7 @@ const EntradaXML = () => {
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
-      setNotaSelecionada(response.data);
-      
-      // Atualizar estado local para selecao visual
-      setTipoRateio(tipo);
+      aplicarNotaSelecionada(response.data);
     } catch (error) {
       console.error('❌ Erro ao salvar tipo de rateio:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
@@ -698,8 +1021,14 @@ const EntradaXML = () => {
   };
 
   const processarNota = async (notaId) => {
-    // Primeiro, buscar preview
     try {
+      if (notaSelecionada?.id === notaId) {
+        const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
+        if (!conferenciaSalva) {
+          return;
+        }
+      }
+
       const response = await api.get(
         `/notas-entrada/${notaId}/preview-processamento`
       );
@@ -713,13 +1042,25 @@ const EntradaXML = () => {
       setMostrarDetalhes(false);
       
       // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
+      const custosIniciais = {};
+      const inputsCustosIniciais = {};
       const precosIniciais = {};
       const inputsIniciais = {};
       previewComOverrides.itens.forEach(item => {
+        const itemId = item.item_id ?? item.id;
+        const custoBase = obterCustoBasePreviewItem(item);
+        const custoExistente = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
+        const custoInicial = Number.isFinite(custoExistente) && custoExistente > 0
+          ? custoExistente
+          : custoBase;
+
+        custosIniciais[itemId] = custoInicial;
+        inputsCustosIniciais[itemId] = formatBRL(custoInicial);
+
         if (item.produto_vinculado) {
           const margemProjetada = Number(
             item.produto_vinculado.margem_projetada_custo_novo ??
-            calcularMargem(item.produto_vinculado.preco_venda_atual, item.produto_vinculado.custo_novo)
+            calcularMargem(item.produto_vinculado.preco_venda_atual, custoInicial)
           );
           precosIniciais[item.produto_vinculado.produto_id] = {
             preco_venda: item.produto_vinculado.preco_venda_atual,
@@ -731,6 +1072,8 @@ const EntradaXML = () => {
           };
         }
       });
+      setCustosAjustados(custosIniciais);
+      setInputsRevisaoCustos(inputsCustosIniciais);
       setPrecosAjustados(precosIniciais);
       setInputsRevisaoPrecos(inputsIniciais);
       
@@ -779,9 +1122,29 @@ const EntradaXML = () => {
           return [[itemId, multiplicador]];
         })
       );
+      const custosOverride = Object.fromEntries(
+        (previewProcessamento.itens || []).flatMap((item) => {
+          const itemId = item.item_id ?? item.id;
+          const custoBase = obterCustoBasePreviewItem(item);
+          const custoSistema = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
+
+          if (!Number.isFinite(custoSistema) || custoSistema <= 0) {
+            return [];
+          }
+
+          if (Math.abs(custoSistema - custoBase) < 0.0001) {
+            return [];
+          }
+
+          return [[itemId, Number(custoSistema.toFixed(4))]];
+        })
+      );
       const response = await api.post(
         `/notas-entrada/${previewProcessamento.nota_id}/processar`,
-        Object.keys(overridesNaoDefault).length > 0 ? { multiplicadores_override: overridesNaoDefault } : {}
+        {
+          ...(Object.keys(overridesNaoDefault).length > 0 ? { multiplicadores_override: overridesNaoDefault } : {}),
+          ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
+        }
       );
 
       toast.success(
@@ -793,6 +1156,8 @@ const EntradaXML = () => {
       setNotaSelecionada(null);
       setMostrarRevisaoPrecos(false);
       setPreviewProcessamento(null);
+      setCustosAjustados({});
+      setInputsRevisaoCustos({});
       setInputsRevisaoPrecos({});
       carregarDados();
     } catch (error) {
@@ -891,6 +1256,91 @@ const EntradaXML = () => {
     }));
   };
 
+  const atualizarCustoSistema = (item, novoCustoEntrada) => {
+    const itemId = item?.item_id ?? item?.id;
+    const custoBase = obterCustoBasePreviewItem(item);
+    const custoDigitado = parseNumeroFlexivel(novoCustoEntrada);
+    const custoAplicado = custoDigitado > 0 ? custoDigitado : 0;
+
+    setCustosAjustados((prev) => ({
+      ...prev,
+      [itemId]: custoAplicado,
+    }));
+    setInputsRevisaoCustos((prev) => ({
+      ...prev,
+      [itemId]: String(novoCustoEntrada ?? ''),
+    }));
+
+    const produto = normalizarProdutoPreview(item);
+    if (!produto?.produto_id) {
+      return;
+    }
+
+    const precoAtual = Number(
+      precosAjustados[produto.produto_id]?.preco_venda ??
+      produto.preco_venda_atual ??
+      0
+    );
+    const margemAtualizada = calcularMargem(precoAtual, custoAplicado || custoBase);
+
+    setPrecosAjustados((prev) => ({
+      ...prev,
+      [produto.produto_id]: {
+        preco_venda: precoAtual,
+        margem: margemAtualizada,
+      }
+    }));
+    setInputsRevisaoPrecos((prev) => ({
+      ...prev,
+      [produto.produto_id]: {
+        preco_venda: prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual),
+        margem: formatBRL(margemAtualizada),
+      }
+    }));
+  };
+
+  const normalizarCamposRevisaoCustos = (item) => {
+    const itemId = item?.item_id ?? item?.id;
+    const custoBase = obterCustoBasePreviewItem(item);
+    const custoAtual = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
+    const custoNormalizado = Number.isFinite(custoAtual) && custoAtual > 0 ? custoAtual : custoBase;
+
+    setCustosAjustados((prev) => ({
+      ...prev,
+      [itemId]: custoNormalizado,
+    }));
+    setInputsRevisaoCustos((prev) => ({
+      ...prev,
+      [itemId]: formatBRL(custoNormalizado),
+    }));
+
+    const produto = normalizarProdutoPreview(item);
+    if (!produto?.produto_id) {
+      return;
+    }
+
+    const precoAtual = Number(
+      precosAjustados[produto.produto_id]?.preco_venda ??
+      produto.preco_venda_atual ??
+      0
+    );
+    const margemAtualizada = calcularMargem(precoAtual, custoNormalizado);
+    setPrecosAjustados((prev) => ({
+      ...prev,
+      [produto.produto_id]: {
+        preco_venda: precoAtual,
+        margem: margemAtualizada,
+      }
+    }));
+    setInputsRevisaoPrecos((prev) => ({
+      ...prev,
+      [produto.produto_id]: {
+        preco_venda: prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual),
+        margem: formatBRL(margemAtualizada),
+      }
+    }));
+  };
+
   const formatarDataRelatorio = (valor) => {
     if (!valor) return 'Nao informado';
     const dt = new Date(valor);
@@ -911,7 +1361,58 @@ const EntradaXML = () => {
     produto_ean: item.produto_ean,
     custo_anterior: item.custo_anterior,
     custo_novo: item.custo_novo,
-    variacao_custo_percentual: item.variacao_custo_percentual
+    variacao_custo_percentual: item.variacao_custo_percentual,
+    preco_venda_atual: item.preco_venda_atual,
+    margem_atual: item.margem_atual,
+    margem_projetada_custo_novo: item.margem_projetada_custo_novo,
+    estoque_atual: item.estoque_atual,
+  };
+
+  const obterCustoBasePreviewItem = (item) => Number(
+    item?.produto_vinculado?.custo_novo ??
+    item?.custo_novo ??
+    item?.custo_aquisicao_unitario_nf ??
+    item?.custo_unitario_efetivo_nf ??
+    item?.valor_unitario_nf ??
+    0
+  );
+
+  const obterCustoSistemaItem = (item) => {
+    const itemId = item?.item_id ?? item?.id;
+    const overrideRaw = custosAjustados[itemId] ?? custosAjustados[String(itemId)];
+    const override = Number(overrideRaw);
+    if (Number.isFinite(override) && override > 0) {
+      return override;
+    }
+    return obterCustoBasePreviewItem(item);
+  };
+
+  const obterResumoCustoItem = (item) => {
+    const produto = normalizarProdutoPreview(item);
+    const custoAnterior = Number(produto.custo_anterior || 0);
+    const custoNF = obterCustoBasePreviewItem(item);
+    const custoSistema = obterCustoSistemaItem(item);
+    const precoVendaAtual = Number(produto.preco_venda_atual || 0);
+    const variacaoCustoPercentual = custoAnterior > 0
+      ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
+      : 0;
+    const margemReferencia = Number(
+      produto.margem_atual ??
+      calcularMargem(precoVendaAtual, custoAnterior)
+    );
+    const margemProjetada = calcularMargem(precoVendaAtual, custoSistema);
+
+    return {
+      produto,
+      custoAnterior,
+      custoNF,
+      custoSistema,
+      custoManual: Math.abs(custoSistema - custoNF) > 0.0001,
+      variacaoCustoPercentual,
+      precoVendaAtual,
+      margemReferencia,
+      margemProjetada,
+    };
   };
 
   const obterHistoricoNfAnterior = (historicos, numeroNotaAtual) => {
@@ -940,7 +1441,7 @@ const EntradaXML = () => {
     const itensAumentaram = (previewProcessamento?.itens || [])
       .filter((item) => {
         const produto = normalizarProdutoPreview(item);
-        const variacao = Number(produto.variacao_custo_percentual || 0);
+        const variacao = Number(obterResumoCustoItem(item).variacaoCustoPercentual || 0);
         return produto.produto_id && variacao > 0;
       });
 
@@ -950,6 +1451,7 @@ const EntradaXML = () => {
 
     const linhas = await Promise.all(itensAumentaram.map(async (item) => {
       const produto = normalizarProdutoPreview(item);
+      const resumoCusto = obterResumoCustoItem(item);
       let historicos = [];
 
       try {
@@ -969,6 +1471,7 @@ const EntradaXML = () => {
         0
       );
       const custoAtualNf = Number(
+        resumoCusto.custoSistema ??
         produto.custo_novo ??
         item.custo_aquisicao_unitario_nf ??
         item.custo_unitario_efetivo_nf ??
@@ -988,7 +1491,7 @@ const EntradaXML = () => {
         nf_anterior_numero: nfAnterior?.nota_numero || '',
         nf_anterior_data: nfAnterior?.nota_data_emissao || nfAnterior?.data || null,
         nf_anterior_custo: custoAnteriorNf,
-        variacao_percentual: Number(produto.variacao_custo_percentual || 0),
+        variacao_percentual: Number(resumoCusto.variacaoCustoPercentual || 0),
         variacao_absoluta: custoAtualNf - custoAnteriorNf,
         composicao_custo: item.composicao_custo || {}
       };
@@ -1281,11 +1784,7 @@ const EntradaXML = () => {
       
       // Recarregar detalhes da nota
       const response = await api.get(`/notas-entrada/${notaId}`);
-      // Ordenar itens por ID para manter ordem consistente
-      if (response.data.itens) {
-        response.data.itens.sort((a, b) => a.id - b.id);
-      }
-      setNotaSelecionada(response.data);
+      aplicarNotaSelecionada(response.data);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao desvincular produto');
     }
@@ -1490,7 +1989,9 @@ const EntradaXML = () => {
         dadosProduto
       );
       
-      toast.success(`✅ Produto ${response.data.produto.codigo} criado e vinculado!`);
+      toast.success(
+        response.data.message || `✅ Produto ${response.data.produto.codigo} criado e vinculado!`
+      );
       
       // Fechar modal
       setMostrarModalCriarProduto(false);
@@ -1504,7 +2005,7 @@ const EntradaXML = () => {
       const notaResponse = await api.get(
         `/notas-entrada/${notaSelecionada.id}`
       );
-      setNotaSelecionada(notaResponse.data);
+      aplicarNotaSelecionada(notaResponse.data);
       
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao criar produto');
@@ -1595,7 +2096,7 @@ const EntradaXML = () => {
       
       // Recarregar detalhes da nota
       const notaResponse = await api.get(`/notas-entrada/${notaSelecionada.id}`);
-      setNotaSelecionada(notaResponse.data);
+      aplicarNotaSelecionada(notaResponse.data);
       
     } catch (error) {
       toast.error('Erro ao criar produtos em lote');
@@ -1819,6 +2320,11 @@ const EntradaXML = () => {
       </span>
     );
   };
+
+  const resumoConferenciaAtual = notaSelecionada
+    ? calcularResumoConferencia(notaSelecionada, conferenciaItens)
+    : null;
+  const metaConferenciaAtual = CONFERENCIA_STATUS_META[resumoConferenciaAtual?.status || 'nao_iniciada'];
 
   return (
     <div className="p-6">
@@ -2075,59 +2581,79 @@ const EntradaXML = () => {
                     </tr>
                   );
                 }
-                return notas.map(nota => (
-                  <tr
-                    key={nota.id}
-                    onClick={() => abrirVisualizacao(nota.id)}
-                    className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-mono text-xs">{nota.chave_acesso.substring(0, 20)}...</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold">{nota.fornecedor_nome}</div>
-                      <div className="text-xs text-gray-500">{nota.fornecedor_cnpj}</div>
-                    </td>
-                    <td className="px-4 py-3">{new Date(nota.data_emissao).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 text-right font-semibold">{formatMoneyBRL(nota.valor_total || 0)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                        {nota.produtos_vinculados + nota.produtos_nao_vinculados} itens
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">{getStatusBadge(nota.status)}</td>
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-2 justify-center">
-                        {nota.status === 'pendente' && (
-                          <button
-                            onClick={() => abrirDetalhes(nota.id)}
-                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
-                            title="Vincular produtos"
-                          >
-                            Vincular
-                          </button>
-                        )}
-                        {nota.entrada_estoque_realizada ? (
-                          <button
-                            onClick={() => reverterNota(nota.id, nota.numero_nota)}
-                            className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
-                            title="Reverter entrada no estoque"
-                          >
-                            Reverter
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => excluirNota(nota.id, nota.numero_nota)}
-                            className="text-red-600 hover:text-red-800 font-semibold text-sm"
-                            title="Excluir nota"
-                          >
-                            Excluir
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ));
+                return notas.map((nota) => {
+                  const conferenciaMeta = CONFERENCIA_STATUS_META[nota.conferencia_status || 'nao_iniciada'];
+                  return (
+                    <tr
+                      key={nota.id}
+                      onClick={() => abrirVisualizacao(nota.id)}
+                      className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-mono text-xs">{nota.chave_acesso.substring(0, 20)}...</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold">{nota.fornecedor_nome}</div>
+                        <div className="text-xs text-gray-500">{nota.fornecedor_cnpj}</div>
+                      </td>
+                      <td className="px-4 py-3">{new Date(nota.data_emissao).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatMoneyBRL(nota.valor_total || 0)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
+                          {nota.produtos_vinculados + nota.produtos_nao_vinculados} itens
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="space-y-2">
+                          <div>{getStatusBadge(nota.status)}</div>
+                          <div className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                            {conferenciaMeta?.label || 'Nao conferida'}
+                            {nota.divergencias_count > 0 ? ` • ${nota.divergencias_count} divergencia(s)` : ''}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-2 justify-center">
+                          {nota.status === 'pendente' && (
+                            <button
+                              onClick={() => abrirDetalhes(nota.id)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
+                              title="Vincular produtos"
+                            >
+                              Vincular
+                            </button>
+                          )}
+                          {nota.status === 'pendente' && (
+                            <button
+                              onClick={() => abrirDetalhes(nota.id, { abrirConferencia: true })}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold text-sm"
+                              title="Conferir entrada da nota"
+                            >
+                              Conferir
+                            </button>
+                          )}
+                          {nota.entrada_estoque_realizada ? (
+                            <button
+                              onClick={() => reverterNota(nota.id, nota.numero_nota)}
+                              className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
+                              title="Reverter entrada no estoque"
+                            >
+                              Reverter
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => excluirNota(nota.id, nota.numero_nota)}
+                              className="text-red-600 hover:text-red-800 font-semibold text-sm"
+                              title="Excluir nota"
+                            >
+                              Excluir
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
               })()}
             </tbody>
           </table>
@@ -2194,6 +2720,88 @@ const EntradaXML = () => {
               </div>
             )}
 
+            {notaSelecionada.status === 'pendente' && resumoConferenciaAtual && (
+              <div className="px-6 py-4 border-b bg-emerald-50/40">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="space-y-3">
+                    <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                      {metaConferenciaAtual?.label || 'Nao conferida'}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
+                        <div className="text-gray-500 text-xs uppercase tracking-wide">Itens OK</div>
+                        <div className="font-bold text-lg text-emerald-700">{resumoConferenciaAtual.itens_ok}</div>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
+                        <div className="text-gray-500 text-xs uppercase tracking-wide">Divergencias</div>
+                        <div className="font-bold text-lg text-orange-700">{resumoConferenciaAtual.itens_com_divergencia}</div>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
+                        <div className="text-gray-500 text-xs uppercase tracking-wide">Qtd recebida / estoque</div>
+                        <div className="font-bold text-lg text-slate-800">{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</div>
+                      </div>
+                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
+                        <div className="text-gray-500 text-xs uppercase tracking-wide">Falta + Avaria</div>
+                        <div className="font-bold text-lg text-rose-700">
+                          {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_faltante + resumoConferenciaAtual.quantidade_total_avariada, 2)}
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 max-w-3xl">
+                      A conferência nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em <strong>Conferido</strong>. Só mexa nos itens com falta ou avaria.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setMostrarCamposConferencia((prev) => !prev)}
+                      className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
+                    >
+                      {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
+                    </button>
+                    <button
+                      onClick={() => salvarConferenciaAtual()}
+                      disabled={salvandoConferencia || desfazendoConferencia}
+                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {salvandoConferencia
+                        ? 'Salvando...'
+                        : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
+                    </button>
+                    {resumoConferenciaAtual.status !== 'nao_iniciada' && (
+                      <button
+                        onClick={desfazerConferenciaAtual}
+                        disabled={desfazendoConferencia || salvandoConferencia || Boolean(notaSelecionada?.entrada_estoque_realizada)}
+                        className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 rounded-lg font-semibold hover:bg-amber-100 disabled:opacity-60"
+                      >
+                        {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
+                      </button>
+                    )}
+                    <button
+                      onClick={gerarRascunhoDevolucao}
+                      disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
+                    >
+                      {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
+                    </button>
+                  </div>
+                </div>
+
+                {mostrarCamposConferencia && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Observacao geral da conferencia</label>
+                    <textarea
+                      value={conferenciaObservacaoGeral}
+                      onChange={(e) => setConferenciaObservacaoGeral(e.target.value)}
+                      rows="2"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Ex.: faltou 1 unidade do item X e 2 vieram avariadas."
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Itens da Nota */}
             <div className="px-6 py-4">
               <div className="flex items-center justify-between mb-4">
@@ -2223,6 +2831,7 @@ const EntradaXML = () => {
                   const temDivergencia = divergencias.length > 0;
                   const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
                   const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
+                  const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
                   
                   return (
                     <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
@@ -2645,6 +3254,98 @@ const EntradaXML = () => {
                           )}
                         </div>
                       )}
+
+                      {notaSelecionada.status === 'pendente' && mostrarCamposConferencia && (
+                        <div className="border-t border-emerald-200 bg-emerald-50/60 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <div>
+                              <h4 className="font-semibold text-emerald-900">Conferencia fisica</h4>
+                              <p className="text-xs text-emerald-800">
+                                Ajuste apenas o que realmente entrou, o que faltou e o que veio avariado.
+                              </p>
+                            </div>
+                            <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${
+                              conferenciaItem.temDivergencia
+                                ? 'bg-orange-100 text-orange-800 border-orange-200'
+                                : 'bg-green-100 text-green-800 border-green-200'
+                            }`}>
+                              {conferenciaItem.temDivergencia ? `Divergencia: ${conferenciaItem.statusConferencia}` : 'OK'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Qtd NF</label>
+                              <input
+                                type="number"
+                                value={conferenciaItem.quantidadeNF}
+                                disabled
+                                className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd recebida (entra no estoque)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={conferenciaItem.quantidadeNF}
+                                step="0.01"
+                                value={conferenciaItens[item.id]?.quantidade_conferida ?? conferenciaItem.quantidadeConferida}
+                                onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_conferida', e.target.value)}
+                                className="w-full rounded border border-emerald-300 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd avariada</label>
+                              <input
+                                type="number"
+                                min="0"
+                                max={Math.max(0, conferenciaItem.quantidadeNF - conferenciaItem.quantidadeConferida)}
+                                step="0.01"
+                                value={conferenciaItens[item.id]?.quantidade_avariada ?? conferenciaItem.quantidadeAvariada}
+                                onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_avariada', e.target.value)}
+                                className="w-full rounded border border-orange-300 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-orange-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Qtd faltante</label>
+                              <input
+                                type="number"
+                                value={conferenciaItem.quantidadeFaltante.toFixed(2)}
+                                disabled
+                                className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-3 mt-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Tratativa sugerida</label>
+                              <select
+                                value={conferenciaItens[item.id]?.acao_sugerida ?? conferenciaItem.acaoSugerida}
+                                onChange={(e) => atualizarCampoConferenciaItem(item, 'acao_sugerida', e.target.value)}
+                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                              >
+                                {ACAO_CONFERENCIA_OPCOES.map((opcao) => (
+                                  <option key={opcao.value} value={opcao.value}>
+                                    {opcao.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Observacao</label>
+                              <input
+                                type="text"
+                                value={conferenciaItens[item.id]?.observacao_conferencia ?? conferenciaItem.observacaoConferencia}
+                                onChange={(e) => atualizarCampoConferenciaItem(item, 'observacao_conferencia', e.target.value)}
+                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
+                                placeholder="Ex.: faltou 1 unidade, embalagem avariada, solicitar reposicao..."
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {notaSelecionada.status === 'processada' && item.produto_id && (
@@ -2755,7 +3456,7 @@ const EntradaXML = () => {
                               disabled={loading}
                               className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
                             >
-                              Revisar Precos
+                              Ajuste de custo
                             </button>
                             <button
                               onClick={() => processarNota(notaSelecionada.id)}
@@ -3151,6 +3852,35 @@ const EntradaXML = () => {
                 </div>
               </div>
 
+              {resumoConferenciaAtual && (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                        {metaConferenciaAtual?.label || 'Nao conferida'}
+                      </div>
+                      <p className="text-sm text-gray-700 mt-2">
+                        Entrada prevista em estoque: <strong>{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</strong>
+                        {resumoConferenciaAtual.itens_com_divergencia > 0 && (
+                          <>
+                            {' '}| Divergencias: <strong>{resumoConferenciaAtual.itens_com_divergencia}</strong>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setMostrarVisualizacao(false);
+                        abrirDetalhes(notaSelecionada.id, { abrirConferencia: true });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
+                    >
+                      Conferencia
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Itens da Nota */}
               <div>
                 <h3 className="font-semibold text-gray-700 mb-2">Itens da Nota</h3>
@@ -3226,6 +3956,18 @@ const EntradaXML = () => {
                           <span className="text-sm font-semibold text-blue-600">{item.produto_nome}</span>
                         </div>
                       )}
+
+                      {item.tem_divergencia && (
+                        <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+                          <div className="font-semibold mb-1">Divergencia registrada</div>
+                          <div>
+                            Estoque: {formatarValorFiscal(item.quantidade_conferida, 2)} | Avaria: {formatarValorFiscal(item.quantidade_avariada, 2)} | Faltante: {formatarValorFiscal(item.quantidade_faltante, 2)}
+                          </div>
+                          {item.observacao_conferencia && (
+                            <div className="mt-1">Obs.: {item.observacao_conferencia}</div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -3247,11 +3989,20 @@ const EntradaXML = () => {
                     <button
                       onClick={() => {
                         setMostrarVisualizacao(false);
+                        abrirDetalhes(notaSelecionada.id, { abrirConferencia: true });
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
+                    >
+                      Conferencia
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMostrarVisualizacao(false);
                         processarNota(notaSelecionada.id);
                       }}
                       className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                     >
-                      💰 Revisar Precos e Processar
+                      💰 Ajustar custos e processar
                     </button>
                   </>
                 )}
@@ -3281,6 +4032,95 @@ const EntradaXML = () => {
         </div>
       )}
 
+      {mostrarRascunhoDevolucao && rascunhoDevolucao && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Rascunho de NF de Devolucao</h2>
+                <p className="text-sm text-gray-500">
+                  NF origem {rascunhoDevolucao.numero_nota_origem} • {rascunhoDevolucao.fornecedor_nome}
+                </p>
+              </div>
+              <button
+                onClick={() => setMostrarRascunhoDevolucao(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                  <div className="text-xs uppercase tracking-wide text-orange-700">Itens devolucao</div>
+                  <div className="text-2xl font-bold text-orange-900">{rascunhoDevolucao.quantidade_itens || 0}</div>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="text-xs uppercase tracking-wide text-emerald-700">Valor estimado</div>
+                  <div className="text-2xl font-bold text-emerald-900">{formatMoneyBRL(rascunhoDevolucao.valor_total_estimado || 0)}</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs uppercase tracking-wide text-slate-600">Status</div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {rascunhoDevolucao.disponivel ? 'Rascunho pronto para gerar NF' : 'Sem itens avariados para devolucao'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <div className="text-sm font-semibold text-gray-700 mb-1">Observacao sugerida</div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{rascunhoDevolucao.observacao_sugerida}</p>
+              </div>
+
+              {rascunhoDevolucao.itens?.length > 0 ? (
+                <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left">Item</th>
+                        <th className="px-4 py-3 text-right">Qtd devolucao</th>
+                        <th className="px-4 py-3 text-right">Valor unit.</th>
+                        <th className="px-4 py-3 text-right">Valor total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rascunhoDevolucao.itens.map((item) => (
+                        <tr key={item.item_id} className="border-t">
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-gray-900">{item.descricao}</div>
+                            <div className="text-xs text-gray-500">{item.codigo_produto || 'Sem codigo'} • Item NF {item.numero_item_nf}</div>
+                            {item.observacao_conferencia && (
+                              <div className="text-xs text-orange-700 mt-1">{item.observacao_conferencia}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold">{formatarValorFiscal(item.quantidade_devolucao, 2)}</td>
+                          <td className="px-4 py-3 text-right">{formatMoneyBRL(item.valor_unitario || 0)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-emerald-700">{formatMoneyBRL(item.valor_total || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-gray-500">
+                  Nenhum item avariado foi marcado nesta conferência.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t px-6 py-4 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setMostrarRascunhoDevolucao(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-100"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Revisão de Preços */}
       {mostrarRevisaoPrecos && previewProcessamento && (
         <div className="fixed inset-0 z-50 bg-black/50">
@@ -3303,9 +4143,13 @@ const EntradaXML = () => {
                     ← Voltar
                   </button>
                   <div>
-                    <h2 className="text-xl md:text-2xl font-bold">Revisao de Precos e Custos</h2>
+                    <h2 className="text-xl md:text-2xl font-bold">Ajuste de Custos, Precos e Margens</h2>
                     <p className="text-slate-300 mt-1 text-sm">
                       NF-e {previewProcessamento.numero_nota} - {previewProcessamento.fornecedor_nome}
+                    </p>
+                    <p className="text-slate-400 mt-2 text-xs md:text-sm max-w-3xl">
+                      O valor fiscal da NF permanece intacto. O ajuste abaixo altera apenas o custo que o sistema vai
+                      receber ao processar a entrada no estoque.
                     </p>
                   </div>
                 </div>
@@ -3322,15 +4166,15 @@ const EntradaXML = () => {
                     i.produto_vinculado !== null || i.produto_id !== null
                   );
                   const aumentos = itensVinculados.filter(i => {
-                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    const variacao = obterResumoCustoItem(i).variacaoCustoPercentual;
                     return variacao > 0;
                   }).length;
                   const reducoes = itensVinculados.filter(i => {
-                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    const variacao = obterResumoCustoItem(i).variacaoCustoPercentual;
                     return variacao < 0;
                   }).length;
                   const iguais = itensVinculados.filter(i => {
-                    const variacao = i.produto_vinculado?.variacao_custo_percentual || i.variacao_custo_percentual || 0;
+                    const variacao = obterResumoCustoItem(i).variacaoCustoPercentual;
                     return variacao === 0;
                   }).length;
                   const total = itensVinculados.length;
@@ -3419,8 +4263,7 @@ const EntradaXML = () => {
                     
                     if (!vinculado) return false;
                     
-                    // Pegar variação de custo (pode estar em produto_vinculado ou diretamente no item)
-                    const custoVariacao = item.produto_vinculado?.variacao_custo_percentual || item.variacao_custo_percentual || 0;
+                    const custoVariacao = obterResumoCustoItem(item).variacaoCustoPercentual;
                     
                     if (filtroCusto === 'todos') return true;
                     if (filtroCusto === 'aumentou') return custoVariacao > 0;
@@ -3429,49 +4272,31 @@ const EntradaXML = () => {
                     return true;
                   })
                   .map((item) => {
-                  // Adaptar para estrutura flat ou aninhada
-                  const produtoVinc = item.produto_vinculado || {
-                    produto_id: item.produto_id,
-                    produto_nome: item.produto_nome,
-                    produto_codigo: item.produto_codigo,
-                    produto_ean: item.produto_ean,
-                    custo_anterior: item.custo_anterior,
-                    custo_novo: item.custo_novo,
-                    variacao_custo_percentual: item.variacao_custo_percentual,
-                    preco_venda_atual: item.preco_venda_atual,
-                    margem_atual: item.margem_atual,
-                    estoque_atual: item.estoque_atual
-                  };
+                  const resumoCusto = obterResumoCustoItem(item);
+                  const produtoVinc = resumoCusto.produto;
                   
                   if (!produtoVinc.produto_id) return null;
-                  
-                  if (!produtoVinc.produto_id) return null;
-                  
-                  const custoVariacao = produtoVinc.variacao_custo_percentual || 0;
+                  const custoItemId = item.item_id ?? item.id;
+                  const custoVariacao = resumoCusto.variacaoCustoPercentual;
                   const custoAumentou = custoVariacao > 0;
-                  const margemReferencia = Number(
-                    produtoVinc.margem_atual ??
-                    calcularMargem(produtoVinc.preco_venda_atual || 0, produtoVinc.custo_anterior || 0)
-                  );
-                  const margemProjetadaComCustoNovo = calcularMargem(
-                    produtoVinc.preco_venda_atual || 0,
-                    produtoVinc.custo_novo || 0
-                  );
+                  const margemReferencia = resumoCusto.margemReferencia;
+                  const margemProjetadaComCustoNovo = resumoCusto.margemProjetada;
                   
                   const precosAtuais = precosAjustados[produtoVinc.produto_id] || {
                     preco_venda: produtoVinc.preco_venda_atual || 0,
-                    margem: produtoVinc.margem_projetada_custo_novo ?? margemProjetadaComCustoNovo
+                    margem: margemProjetadaComCustoNovo
                   };
 
                   const camposTexto = inputsRevisaoPrecos[produtoVinc.produto_id] || {
                     preco_venda: formatBRL(precosAtuais.preco_venda),
                     margem: formatBRL(precosAtuais.margem),
                   };
+                  const custoTexto = inputsRevisaoCustos[custoItemId] || formatBRL(resumoCusto.custoSistema);
 
                   const tooltipMargem =
                     `Margem = ((Preço de Venda - Custo) / Preço de Venda) × 100\n` +
                     `Com os valores atuais:\n` +
-                    `(${formatBRL(precosAtuais.preco_venda)} - ${formatBRL(produtoVinc.custo_novo || 0)}) / ${formatBRL(precosAtuais.preco_venda)} × 100\n` +
+                    `(${formatBRL(precosAtuais.preco_venda)} - ${formatBRL(resumoCusto.custoSistema || 0)}) / ${formatBRL(precosAtuais.preco_venda)} × 100\n` +
                     `Resultado: ${formatPercent(precosAtuais.margem)}`;
 
                   return (
@@ -3501,32 +4326,59 @@ const EntradaXML = () => {
 
                       <div className="p-5 bg-white space-y-4">
                         {/* Comparação de Custos */}
-                        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                           <div>
                             <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
                               <span>Custo Anterior</span>
                             </div>
                             <div className="text-2xl font-bold text-gray-700">
-                              {formatMoneyBRL(produtoVinc.custo_anterior || 0)}
+                              {formatMoneyBRL(resumoCusto.custoAnterior || 0)}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 mb-1 flex items-center justify-between">
-                              <span>Custo Novo</span>
+                              <span>Custo da NF</span>
                               <TooltipComposicao 
-                                custo={produtoVinc.custo_novo} 
+                                custo={resumoCusto.custoNF} 
                                 composicao={item.composicao_custo}
                                 texto="detalhar"
                               />
                             </div>
                             <div className="text-2xl font-bold text-gray-900">
-                              {formatMoneyBRL(produtoVinc.custo_novo || 0)}
+                              {formatMoneyBRL(resumoCusto.custoNF || 0)}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              Valor fiscal da nota
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1 font-semibold">
+                              Custo no sistema
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={custoTexto}
+                                onChange={(e) => atualizarCustoSistema(item, e.target.value)}
+                                onBlur={() => normalizarCamposRevisaoCustos(item)}
+                                className="w-full pl-10 pr-3 py-3 border-2 border-amber-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                              />
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              {resumoCusto.custoManual
+                                ? 'Custo manual aplicado so no processamento; a NF fiscal nao sera alterada'
+                                : 'Igual ao custo fiscal da NF'}
                             </div>
                           </div>
                           <div>
                             <div className="text-xs text-gray-500 mb-1">Variacao</div>
                             <div className={`text-2xl font-bold ${custoAumentou ? 'text-red-600' : custoVariacao < 0 ? 'text-emerald-700' : 'text-gray-600'}`}>
                               {custoVariacao > 0 ? '↗' : custoVariacao < 0 ? '↘' : '➡'} {formatPercent(Math.abs(custoVariacao))}
+                            </div>
+                            <div className="mt-1 text-xs text-gray-500">
+                              Comparado ao custo atual do cadastro
                             </div>
                           </div>
                         </div>
@@ -3546,7 +4398,7 @@ const EntradaXML = () => {
                                 onChange={(e) => atualizarPrecoVenda(
                                   produtoVinc.produto_id,
                                   e.target.value,
-                                  produtoVinc.custo_novo
+                                  resumoCusto.custoSistema
                                 )}
                                 onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -3570,7 +4422,7 @@ const EntradaXML = () => {
                                 onChange={(e) => atualizarMargem(
                                   produtoVinc.produto_id,
                                   e.target.value,
-                                  produtoVinc.custo_novo
+                                  resumoCusto.custoSistema
                                 )}
                                 onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pr-10 pl-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"

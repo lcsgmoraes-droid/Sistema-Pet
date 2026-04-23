@@ -20,6 +20,10 @@ from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.services.validade_campanha_service import (
+    mapear_ofertas_validade_por_produto,
+    resolver_preco_publico_produto,
+)
 from app.veterinario_models import AgendamentoVet, ConsultaVet, ExameVet
 
 router = APIRouter(prefix="/app", tags=["App Mobile"])
@@ -67,6 +71,9 @@ class ProdutoBarcodeResponse(BaseModel):
     codigo_barras: Optional[str]
     unidade: str
     estoque: float
+    promocao_ativa: Optional[bool] = False
+    promocao_origem: Optional[str] = None
+    promocao_validade: Optional[dict] = None
 
 
 # ─────────────────────────────────────────
@@ -459,8 +466,14 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
-    preco = float(produto.preco_venda or 0)
-    preco_original = float(produto.preco_promocional or produto.preco_venda or 0) if produto.preco_promocional else preco
+    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(produto.id)
+    pricing = resolver_preco_publico_produto(
+        produto,
+        "app",
+        validity_offer=oferta_validade,
+    )
+    preco = float(pricing.promotional_price if pricing.promotional_price is not None else pricing.regular_price or 0)
+    preco_original = float(pricing.regular_price or 0)
 
     return {
         "id": produto.id,
@@ -471,6 +484,18 @@ def buscar_produto_barcode(
         "codigo_barras": produto.codigo_barras,
         "unidade": produto.unidade or "UN",
         "estoque": float(produto.estoque_atual or 0),
+        "promocao_ativa": pricing.promotion_active,
+        "promocao_origem": pricing.promotion_origin,
+        "promocao_validade": {
+            "ativa": bool(oferta_validade and oferta_validade.active),
+            "lote_id": oferta_validade.lote_id if oferta_validade else None,
+            "nome_lote": oferta_validade.lote_nome if oferta_validade else None,
+            "dias_para_vencer": oferta_validade.dias_para_vencer if oferta_validade else None,
+            "quantidade_promocional": oferta_validade.quantity_available if oferta_validade else None,
+            "percentual_desconto": oferta_validade.percentual_desconto if oferta_validade else None,
+            "preco_promocional": oferta_validade.promotional_price if oferta_validade else None,
+            "mensagem": oferta_validade.message if oferta_validade else None,
+        } if oferta_validade else None,
     }
 
 

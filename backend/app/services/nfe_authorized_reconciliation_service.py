@@ -302,7 +302,11 @@ def reconciliar_nf_autorizada_cache(
     try:
         _registrar_nf_no_pedido(
             pedido=pedido,
-            data=refs.get("dados_nf") or {},
+            data={
+                **_dict(refs.get("dados_nf")),
+                "numero": refs.get("nf_numero"),
+                "id": refs.get("nf_bling_id"),
+            },
             nf_id=refs.get("nf_bling_id") or "",
             situacao_num=_coerce_int(refs.get("situacao_num"), 5),
         )

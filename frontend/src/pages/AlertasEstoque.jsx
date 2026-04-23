@@ -3,7 +3,7 @@
  * Sistema de monitoramento e gerenciamento de estoque crítico
  */
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, XCircle, TrendingDown, Package, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -13,19 +13,38 @@ import {
   resolverAlerta
 } from '../api/alertasEstoque';
 import { getProdutos } from '../api/produtos';
+import ProdutosValidadeProxima from './ProdutosValidadeProxima';
+
+const ABAS_VALIDAS = ['pendentes', 'dashboard', 'historico', 'validade'];
+
+const obterAbaDaQuery = (search) => {
+  const aba = new URLSearchParams(search).get('aba');
+  return ABAS_VALIDAS.includes(aba) ? aba : 'pendentes';
+};
 
 export default function AlertasEstoque() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [alertasPendentes, setAlertasPendentes] = useState([]);
   const [todosAlertas, setTodosAlertas] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState('pendentes'); // 'pendentes' | 'historico' | 'dashboard'
+  const [reloadValidade, setReloadValidade] = useState(0);
+  const [abaAtiva, setAbaAtiva] = useState(() => obterAbaDaQuery(location.search)); // 'pendentes' | 'historico' | 'dashboard' | 'validade'
   const [produtosBrutos, setProdutosBrutos] = useState([]);
 
   useEffect(() => {
-    carregarDados();
+    if (abaAtiva !== 'validade') {
+      carregarDados();
+    }
   }, [abaAtiva]);
+
+  useEffect(() => {
+    const abaDaUrl = obterAbaDaQuery(location.search);
+    if (abaDaUrl !== abaAtiva) {
+      setAbaAtiva(abaDaUrl);
+    }
+  }, [location.search, abaAtiva]);
 
   useEffect(() => {
     getProdutos({ limit: 5000, ativo: true })
@@ -72,6 +91,11 @@ export default function AlertasEstoque() {
   }, [produtosBrutos]);
 
   const carregarDados = async () => {
+    if (abaAtiva === 'validade') {
+      setReloadValidade((prev) => prev + 1);
+      return;
+    }
+
     setLoading(true);
     try {
       if (abaAtiva === 'pendentes') {
@@ -90,6 +114,19 @@ export default function AlertasEstoque() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleMudarAba = (aba) => {
+    setAbaAtiva(aba);
+    const params = new URLSearchParams(location.search);
+    params.set('aba', aba);
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString(),
+      },
+      { replace: true },
+    );
   };
 
   const handleResolverAlerta = async (alertaId, acao, produtoId = null) => {
@@ -138,10 +175,10 @@ export default function AlertasEstoque() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
           <AlertTriangle className="text-red-500" />
-          Alertas de Estoque Negativo
+          Alertas de Estoque
         </h1>
         <p className="text-gray-600 mt-2">
-          Monitoramento em tempo real de produtos com estoque crítico
+          Monitoramento operacional de rupturas, excesso e produtos com validade proxima
         </p>
       </div>
 
@@ -221,7 +258,7 @@ export default function AlertasEstoque() {
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
             <button
-              onClick={() => setAbaAtiva('pendentes')}
+              onClick={() => handleMudarAba('pendentes')}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                 abaAtiva === 'pendentes'
                   ? 'border-blue-500 text-blue-600'
@@ -239,7 +276,7 @@ export default function AlertasEstoque() {
               </div>
             </button>
             <button
-              onClick={() => setAbaAtiva('dashboard')}
+              onClick={() => handleMudarAba('dashboard')}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                 abaAtiva === 'dashboard'
                   ? 'border-blue-500 text-blue-600'
@@ -252,7 +289,7 @@ export default function AlertasEstoque() {
               </div>
             </button>
             <button
-              onClick={() => setAbaAtiva('historico')}
+              onClick={() => handleMudarAba('historico')}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
                 abaAtiva === 'historico'
                   ? 'border-blue-500 text-blue-600'
@@ -262,6 +299,19 @@ export default function AlertasEstoque() {
               <div className="flex items-center gap-2">
                 <Package size={18} />
                 Histórico
+              </div>
+            </button>
+            <button
+              onClick={() => handleMudarAba('validade')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                abaAtiva === 'validade'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Package size={18} />
+                Validade Próxima
               </div>
             </button>
           </nav>
@@ -281,7 +331,7 @@ export default function AlertasEstoque() {
       </div>
 
       {/* Conteúdo das Abas */}
-      {loading ? (
+      {loading && abaAtiva !== 'validade' ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <RefreshCw className="animate-spin mx-auto text-gray-400" size={48} />
           <p className="text-gray-600 mt-4">Carregando...</p>
@@ -566,6 +616,10 @@ export default function AlertasEstoque() {
                 </table>
               </div>
             </div>
+          )}
+
+          {abaAtiva === 'validade' && (
+            <ProdutosValidadeProxima embedded reloadSignal={reloadValidade} />
           )}
         </>
       )}

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import xml.etree.ElementTree as ET
 import re
 from difflib import SequenceMatcher
@@ -57,6 +57,8 @@ class NotaEntradaResponse(BaseModel):
     produtos_vinculados: Optional[int] = 0
     produtos_nao_vinculados: Optional[int] = 0
     entrada_estoque_realizada: Optional[bool] = False
+    conferencia_status: Optional[str] = "nao_iniciada"
+    divergencias_count: Optional[int] = 0
     
     model_config = {"from_attributes": True}
 
@@ -72,6 +74,29 @@ COST_COMPONENT_KEYS = (
     "valor_icms_st",
     "valor_ipi",
 )
+CONFERENCIA_STATUS_NAO_INICIADA = "nao_iniciada"
+CONFERENCIA_STATUS_SEM_DIVERGENCIA = "sem_divergencia"
+CONFERENCIA_STATUS_COM_DIVERGENCIA = "com_divergencia"
+ACOES_CONFERENCIA_VALIDAS = {
+    "sem_acao",
+    "contatar_fornecedor",
+    "reposicao_fornecedor",
+    "nf_devolucao",
+    "ajuste_interno",
+}
+
+
+class ConferenciaItemPayload(BaseModel):
+    item_id: int
+    quantidade_conferida: float
+    quantidade_avariada: float = 0
+    observacao_conferencia: Optional[str] = None
+    acao_sugerida: Optional[str] = "sem_acao"
+
+
+class ConferenciaNotaPayload(BaseModel):
+    itens: List[ConferenciaItemPayload]
+    observacao_geral: Optional[str] = None
 
 
 # ============================================================================
@@ -345,6 +370,168 @@ def calcular_composicao_custos_nota(nota: NotaEntrada) -> Dict[int, Dict[str, An
         }
 
     return composicoes
+
+
+def _round_quantity(value: Any) -> float:
+    try:
+        return round(float(value or 0), 4)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalizar_texto_curto(value: Optional[str]) -> Optional[str]:
+    texto = (value or "").strip()
+    return texto or None
+
+
+def _obter_override_mapa(mapa: Dict[Any, Any], chave: Any) -> Any:
+    if not isinstance(mapa, dict):
+        return None
+    if chave in mapa:
+        return mapa[chave]
+    chave_str = str(chave)
+    if chave_str in mapa:
+        return mapa[chave_str]
+    return None
+
+
+def _normalizar_custo_unitario_override(valor: Any, item_id: int) -> Optional[float]:
+    if valor is None or str(valor).strip() == "":
+        return None
+
+    try:
+        custo = float(valor)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Custo manual inválido para o item {item_id}.",
+        )
+
+    custo = round(custo, 4)
+    if custo <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"O custo manual do item {item_id} deve ser maior que zero.",
+        )
+    return custo
+
+
+def _obter_acao_conferencia(acao: Optional[str], tem_divergencia: bool) -> str:
+    acao_normalizada = (acao or "").strip() or ("contatar_fornecedor" if tem_divergencia else "sem_acao")
+    if acao_normalizada not in ACOES_CONFERENCIA_VALIDAS:
+        return "contatar_fornecedor" if tem_divergencia else "sem_acao"
+    if not tem_divergencia:
+        return "sem_acao"
+    return acao_normalizada
+
+
+def _quantidades_conferencia_item(item: NotaEntradaItem) -> Dict[str, float]:
+    quantidade_nf = _round_quantity(item.quantidade)
+    quantidade_conferida = item.quantidade_conferida
+    if quantidade_conferida is None:
+        quantidade_conferida = quantidade_nf
+    quantidade_conferida = max(0.0, min(_round_quantity(quantidade_conferida), quantidade_nf))
+
+    quantidade_avariada = max(0.0, _round_quantity(item.quantidade_avariada))
+    max_avariada = max(quantidade_nf - quantidade_conferida, 0.0)
+    quantidade_avariada = min(quantidade_avariada, max_avariada)
+    quantidade_faltante = max(quantidade_nf - quantidade_conferida - quantidade_avariada, 0.0)
+
+    return {
+        "quantidade_nf": quantidade_nf,
+        "quantidade_conferida": quantidade_conferida,
+        "quantidade_avariada": quantidade_avariada,
+        "quantidade_faltante": _round_quantity(quantidade_faltante),
+    }
+
+
+def _status_conferencia_item(item: NotaEntradaItem) -> str:
+    quantidades = _quantidades_conferencia_item(item)
+    tem_avaria = quantidades["quantidade_avariada"] > 0
+    tem_falta = quantidades["quantidade_faltante"] > 0
+
+    if tem_avaria and tem_falta:
+        return "falta_avaria"
+    if tem_avaria:
+        return "avaria"
+    if tem_falta:
+        return "falta"
+    return "ok"
+
+
+def _serializar_conferencia_item(item: NotaEntradaItem) -> Dict[str, Any]:
+    quantidades = _quantidades_conferencia_item(item)
+    status_conferencia = _status_conferencia_item(item)
+    tem_divergencia = status_conferencia != "ok"
+    acao_sugerida = _obter_acao_conferencia(item.acao_sugerida, tem_divergencia)
+
+    return {
+        **quantidades,
+        "status_conferencia": status_conferencia,
+        "tem_divergencia": tem_divergencia,
+        "observacao_conferencia": _normalizar_texto_curto(item.observacao_conferencia),
+        "acao_sugerida": acao_sugerida,
+        "pode_gerar_nf_devolucao": quantidades["quantidade_avariada"] > 0,
+        "quantidade_para_devolucao": quantidades["quantidade_avariada"],
+    }
+
+
+def _resumir_conferencia_nota(nota: NotaEntrada) -> Dict[str, Any]:
+    itens = list(getattr(nota, "itens", []) or [])
+    itens_serializados = [_serializar_conferencia_item(item) for item in itens]
+    itens_divergencia = [item for item in itens_serializados if item["tem_divergencia"]]
+    itens_com_avaria = [item for item in itens_serializados if item["quantidade_avariada"] > 0]
+
+    if nota.conferencia_realizada_em:
+        status_conferencia = nota.conferencia_status or (
+            CONFERENCIA_STATUS_COM_DIVERGENCIA if itens_divergencia else CONFERENCIA_STATUS_SEM_DIVERGENCIA
+        )
+    else:
+        status_conferencia = CONFERENCIA_STATUS_NAO_INICIADA
+
+    return {
+        "status": status_conferencia,
+        "observacao_geral": _normalizar_texto_curto(nota.conferencia_observacoes),
+        "conferida_em": nota.conferencia_realizada_em.isoformat() if nota.conferencia_realizada_em else None,
+        "itens_total": len(itens),
+        "itens_ok": len(itens_serializados) - len(itens_divergencia),
+        "itens_com_divergencia": len(itens_divergencia),
+        "itens_com_avaria": len(itens_com_avaria),
+        "quantidade_total_nf": _round_quantity(sum(item["quantidade_nf"] for item in itens_serializados)),
+        "quantidade_total_conferida": _round_quantity(sum(item["quantidade_conferida"] for item in itens_serializados)),
+        "quantidade_total_avariada": _round_quantity(sum(item["quantidade_avariada"] for item in itens_serializados)),
+        "quantidade_total_faltante": _round_quantity(sum(item["quantidade_faltante"] for item in itens_serializados)),
+        "tem_nf_devolucao_sugerida": len(itens_com_avaria) > 0,
+    }
+
+
+def _montar_payload_nota(nota: NotaEntrada, itens_formatados: List[Dict[str, Any]], fornecedor_criado_automaticamente: bool = False) -> Dict[str, Any]:
+    conferencia = _resumir_conferencia_nota(nota)
+    return {
+        "id": nota.id,
+        "numero_nota": nota.numero_nota,
+        "serie": nota.serie,
+        "chave_acesso": nota.chave_acesso,
+        "fornecedor_nome": nota.fornecedor_nome,
+        "fornecedor_cnpj": nota.fornecedor_cnpj,
+        "fornecedor_id": nota.fornecedor_id,
+        "fornecedor_criado_automaticamente": fornecedor_criado_automaticamente,
+        "data_emissao": nota.data_emissao,
+        "valor_total": nota.valor_total,
+        "status": nota.status,
+        "produtos_vinculados": nota.produtos_vinculados,
+        "produtos_nao_vinculados": nota.produtos_nao_vinculados,
+        "entrada_estoque_realizada": nota.entrada_estoque_realizada,
+        "tipo_rateio": nota.tipo_rateio,
+        "percentual_online": nota.percentual_online,
+        "percentual_loja": nota.percentual_loja,
+        "valor_online": nota.valor_online,
+        "valor_loja": nota.valor_loja,
+        "conferencia": conferencia,
+        "conferencia_status": conferencia["status"],
+        "divergencias_count": conferencia["itens_com_divergencia"],
+        "itens": itens_formatados,
+    }
 
 def parse_nfe_xml(xml_content: str) -> dict:
     """
@@ -768,6 +955,7 @@ def encontrar_produto_similar(
     descricao: str,
     codigo: str,
     db: Session,
+    tenant_id = None,
     fornecedor_id: int = None,
     ean: Optional[str] = None,
 ) -> tuple:
@@ -786,17 +974,30 @@ def encontrar_produto_similar(
     if codigo:
         # Buscar por SKU exato
         query = db.query(Produto).filter(Produto.codigo == codigo)
+        if tenant_id is not None:
+            query = query.filter(Produto.tenant_id == tenant_id)
         
         # Se tem fornecedor, verificar se produto pertence a ele
         if fornecedor_id:
             # Buscar produto que pertence ao fornecedor
-            produto_com_fornecedor = query.join(
+            query_fornecedor = query.join(
                 ProdutoFornecedor,
                 ProdutoFornecedor.produto_id == Produto.id
             ).filter(
                 ProdutoFornecedor.fornecedor_id == fornecedor_id,
-                ProdutoFornecedor.ativo == True
-            ).first()
+                ProdutoFornecedor.ativo == True,
+            )
+            if tenant_id is not None:
+                query_fornecedor = query.join(
+                    ProdutoFornecedor,
+                    ProdutoFornecedor.produto_id == Produto.id
+                ).filter(
+                    ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                    ProdutoFornecedor.ativo == True,
+                    ProdutoFornecedor.tenant_id == tenant_id,
+                )
+
+            produto_com_fornecedor = query_fornecedor.first()
             
             if produto_com_fornecedor:
                 foi_inativo = not produto_com_fornecedor.ativo
@@ -821,13 +1022,17 @@ def encontrar_produto_similar(
         referencias_codigo_barras.append(codigo_normalizado)
 
     for referencia in referencias_codigo_barras:
-        produto = db.query(Produto).filter(
+        query = db.query(Produto).filter(
             or_(
                 Produto.codigo_barras == referencia,
                 Produto.gtin_ean == referencia,
                 Produto.gtin_ean_tributario == referencia,
             )
-        ).first()
+        )
+        if tenant_id is not None:
+            query = query.filter(Produto.tenant_id == tenant_id)
+
+        produto = query.first()
         
         if produto:
             foi_inativo = not produto.ativo
@@ -1030,8 +1235,9 @@ async def upload_xml(
                 item_data['descricao'],
                 item_data['codigo_produto'],
                 db,
-                fornecedor.id if fornecedor else None,
-                item_data.get('ean')
+                tenant_id=tenant_id,
+                fornecedor_id=fornecedor.id if fornecedor else None,
+                ean=item_data.get('ean')
             )
             
             if produto:
@@ -1235,8 +1441,9 @@ async def upload_lote_xml(
                     item_data['descricao'],
                     item_data['codigo_produto'],
                     db,
-                    None,
-                    item_data.get('ean')
+                    tenant_id=tenant_id,
+                    fornecedor_id=None,
+                    ean=item_data.get('ean')
                 )
                 
                 if produto:
@@ -1344,7 +1551,7 @@ def listar_notas(
     """Lista notas de entrada"""
     user, tenant_id = user_and_tenant
     
-    query = db.query(NotaEntrada).filter(NotaEntrada.tenant_id == tenant_id)
+    query = db.query(NotaEntrada).options(joinedload(NotaEntrada.itens)).filter(NotaEntrada.tenant_id == tenant_id)
     
     if status:
         query = query.filter(NotaEntrada.status == status)
@@ -1358,8 +1565,32 @@ def listar_notas(
     
     logger.info(f"ðŸ“‹ {len(notas)} notas encontradas (total: {total})")
     
-    # Converter explicitamente para o schema Pydantic (Pydantic v2)
-    return [NotaEntradaResponse.model_validate(nota) for nota in notas]
+    respostas = []
+    for nota in notas:
+        conferencia = _resumir_conferencia_nota(nota)
+        respostas.append(
+            NotaEntradaResponse.model_validate(
+                {
+                    "id": nota.id,
+                    "numero_nota": nota.numero_nota,
+                    "serie": nota.serie,
+                    "chave_acesso": nota.chave_acesso,
+                    "fornecedor_nome": nota.fornecedor_nome,
+                    "fornecedor_cnpj": nota.fornecedor_cnpj,
+                    "fornecedor_id": nota.fornecedor_id,
+                    "data_emissao": nota.data_emissao,
+                    "valor_total": nota.valor_total,
+                    "status": nota.status,
+                    "produtos_vinculados": nota.produtos_vinculados,
+                    "produtos_nao_vinculados": nota.produtos_nao_vinculados,
+                    "entrada_estoque_realizada": nota.entrada_estoque_realizada,
+                    "conferencia_status": conferencia["status"],
+                    "divergencias_count": conferencia["itens_com_divergencia"],
+                }
+            )
+        )
+
+    return respostas
 
 
 # ============================================================================
@@ -1409,6 +1640,7 @@ def buscar_nota(
             item.valor_unitario,
             item.valor_total
         )
+        conferencia_item = _serializar_conferencia_item(item)
         itens_formatados.append({
             "id": item.id,
             "numero_item": item.numero_item,
@@ -1443,127 +1675,390 @@ def buscar_nota(
             "custo_aquisicao_unitario": composicao_custo.get("custo_aquisicao_unitario", dados_pack["custo_unitario_efetivo"]),
             "custo_aquisicao_total": composicao_custo.get("custo_aquisicao_total", item.valor_total),
             "composicao_custo": composicao_custo,
+            **conferencia_item,
         })
 
-    # Formatar resposta
-    return {
-        "id": nota.id,
-        "numero_nota": nota.numero_nota,
-        "serie": nota.serie,
-        "chave_acesso": nota.chave_acesso,
-        "fornecedor_nome": nota.fornecedor_nome,
-        "fornecedor_cnpj": nota.fornecedor_cnpj,
-        "fornecedor_id": nota.fornecedor_id,
-        "fornecedor_criado_automaticamente": fornecedor_criado_automaticamente,
-        "data_emissao": nota.data_emissao,
-        "valor_total": nota.valor_total,
-        "status": nota.status,
-        "produtos_vinculados": nota.produtos_vinculados,
-        "produtos_nao_vinculados": nota.produtos_nao_vinculados,
-        "entrada_estoque_realizada": nota.entrada_estoque_realizada,
-        "itens": itens_formatados
-    }
+    return _montar_payload_nota(
+        nota,
+        itens_formatados,
+        fornecedor_criado_automaticamente=fornecedor_criado_automaticamente,
+    )
 
 
-# ============================================================================
-# SUGERIR SKU PARA NOVO PRODUTO
-# ============================================================================
-
-@router.get("/{nota_id}/itens/{item_id}/sugerir-sku")
-def sugerir_sku_produto(
+@router.post("/{nota_id}/conferencia")
+def salvar_conferencia_nota(
     nota_id: int,
-    item_id: int,
+    payload: ConferenciaNotaPayload,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Sugere SKU para criar novo produto baseado no fornecedor"""
-    # Buscar nota e item
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
+    """Salva a conferência física da NF, assumindo tudo OK por padrão e ajustando apenas exceções."""
+    current_user, tenant_id = user_and_tenant
+
+    nota = db.query(NotaEntrada).options(
+        joinedload(NotaEntrada.itens)
+    ).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
+
+    if not nota:
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
+
+    itens_por_id = {item.id: item for item in nota.itens}
+    payload_por_id = {item.item_id: item for item in payload.itens}
+
+    itens_invalidos = [item_id for item_id in payload_por_id if item_id not in itens_por_id]
+    if itens_invalidos:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Itens de conferência inválidos: {', '.join(str(item_id) for item_id in itens_invalidos)}",
+        )
+
+    for item in nota.itens:
+        quantidade_nf = _round_quantity(item.quantidade)
+        payload_item = payload_por_id.get(item.id)
+
+        quantidade_conferida = item.quantidade_conferida if item.quantidade_conferida is not None else quantidade_nf
+        quantidade_avariada = item.quantidade_avariada or 0
+        observacao_conferencia = item.observacao_conferencia
+        acao_sugerida = item.acao_sugerida
+
+        if payload_item:
+            quantidade_conferida = _round_quantity(payload_item.quantidade_conferida)
+            quantidade_avariada = _round_quantity(payload_item.quantidade_avariada)
+            observacao_conferencia = payload_item.observacao_conferencia
+            acao_sugerida = payload_item.acao_sugerida
+
+        if quantidade_conferida < 0 or quantidade_avariada < 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Quantidades inválidas para o item {item.numero_item}.",
+            )
+
+        if quantidade_conferida > quantidade_nf:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A quantidade conferida do item {item.numero_item} não pode ser maior que a quantidade da NF.",
+            )
+
+        if quantidade_conferida + quantidade_avariada > quantidade_nf:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A soma de conferida + avariada do item {item.numero_item} não pode ultrapassar a quantidade da NF.",
+            )
+
+        tem_divergencia = (quantidade_conferida + quantidade_avariada) < quantidade_nf or quantidade_avariada > 0
+
+        item.quantidade_conferida = quantidade_conferida
+        item.quantidade_avariada = quantidade_avariada
+        item.observacao_conferencia = _normalizar_texto_curto(observacao_conferencia)
+        item.acao_sugerida = _obter_acao_conferencia(acao_sugerida, tem_divergencia)
+
+    nota.conferencia_observacoes = _normalizar_texto_curto(payload.observacao_geral)
+    nota.conferencia_realizada_em = datetime.utcnow()
+
+    resumo = _resumir_conferencia_nota(nota)
+    nota.conferencia_status = (
+        CONFERENCIA_STATUS_COM_DIVERGENCIA
+        if resumo["itens_com_divergencia"] > 0
+        else CONFERENCIA_STATUS_SEM_DIVERGENCIA
+    )
+    nota.conferencia_user_id = current_user.id
+
+    db.commit()
+
+    return {
+        "message": "Conferência salva com sucesso",
+        "nota_id": nota.id,
+        "conferencia": _resumir_conferencia_nota(nota),
+    }
+
+
+@router.post("/{nota_id}/conferencia/desfazer")
+def desfazer_conferencia_nota(
+    nota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Limpa a conferencia registrada da NF antes do processamento do estoque."""
+    current_user, tenant_id = user_and_tenant
+
+    nota = db.query(NotaEntrada).options(
+        joinedload(NotaEntrada.itens)
+    ).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
+
+    if not nota:
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
+
+    if nota.entrada_estoque_realizada:
+        raise HTTPException(
+            status_code=400,
+            detail="Nao e possivel desfazer a conferencia apos processar a entrada no estoque.",
+        )
+
+    for item in nota.itens:
+        item.quantidade_conferida = None
+        item.quantidade_avariada = 0
+        item.observacao_conferencia = None
+        item.acao_sugerida = "sem_acao"
+
+    nota.conferencia_observacoes = None
+    nota.conferencia_realizada_em = None
+    nota.conferencia_status = CONFERENCIA_STATUS_NAO_INICIADA
+    nota.conferencia_user_id = None
+
+    db.commit()
+
+    return {
+        "message": "Conferencia desfeita com sucesso",
+        "nota_id": nota.id,
+        "conferencia": _resumir_conferencia_nota(nota),
+    }
+
+
+@router.get("/{nota_id}/devolucao-draft")
+def gerar_rascunho_nf_devolucao(
+    nota_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Gera um rascunho de NF de devolução com base nos itens avariados da conferência."""
+    _, tenant_id = user_and_tenant
+
+    nota = db.query(NotaEntrada).options(
+        joinedload(NotaEntrada.itens)
+    ).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
+
+    if not nota:
+        raise HTTPException(status_code=404, detail="Nota não encontrada")
+
+    itens_devolucao = []
+    valor_total_estimado = 0.0
+
+    for item in nota.itens:
+        conferencia_item = _serializar_conferencia_item(item)
+        quantidade_devolucao = conferencia_item["quantidade_para_devolucao"]
+        if quantidade_devolucao <= 0:
+            continue
+
+        valor_total_item = round(quantidade_devolucao * float(item.valor_unitario or 0), 2)
+        valor_total_estimado += valor_total_item
+        itens_devolucao.append(
+            {
+                "item_id": item.id,
+                "numero_item_nf": item.numero_item,
+                "codigo_produto": item.codigo_produto,
+                "descricao": item.descricao,
+                "unidade": item.unidade,
+                "quantidade_devolucao": quantidade_devolucao,
+                "valor_unitario": float(item.valor_unitario or 0),
+                "valor_total": valor_total_item,
+                "observacao_conferencia": conferencia_item["observacao_conferencia"],
+            }
+        )
+
+    observacao_padrao = (
+        f"Rascunho de NF de devolução referente à NF de entrada {nota.numero_nota}. "
+        "Gerado a partir das divergências por avaria registradas na conferência física."
+    )
+
+    return {
+        "disponivel": len(itens_devolucao) > 0,
+        "nota_entrada_id": nota.id,
+        "numero_nota_origem": nota.numero_nota,
+        "fornecedor_nome": nota.fornecedor_nome,
+        "fornecedor_cnpj": nota.fornecedor_cnpj,
+        "data_emissao_origem": nota.data_emissao.isoformat() if nota.data_emissao else None,
+        "itens": itens_devolucao,
+        "quantidade_itens": len(itens_devolucao),
+        "valor_total_estimado": round(valor_total_estimado, 2),
+        "observacao_sugerida": observacao_padrao,
+        "message": (
+            "Rascunho gerado com sucesso"
+            if itens_devolucao
+            else "Nenhuma divergência com avaria foi encontrada para gerar NF de devolução"
+        ),
+    }
+
+
+def _buscar_nota_item_por_tenant(
+    nota_id: int,
+    item_id: int,
+    tenant_id,
+    db: Session,
+) -> tuple[NotaEntrada, NotaEntradaItem]:
+    nota = db.query(NotaEntrada).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id,
+    ).first()
     if not nota:
         raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
-    
+
     item = db.query(NotaEntradaItem).filter(
         NotaEntradaItem.id == item_id,
-        NotaEntradaItem.nota_entrada_id == nota_id
+        NotaEntradaItem.nota_entrada_id == nota_id,
+        NotaEntradaItem.tenant_id == tenant_id,
     ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item nÃ£o encontrado")
-    
-    # Gerar prefixo do fornecedor
-    prefixo = gerar_prefixo_fornecedor(nota.fornecedor_nome)
-    
-    # Tentar usar cÃ³digo do produto como base
-    sku_base = item.codigo_produto if item.codigo_produto else ""
-    
-    # SugestÃµes de SKU
-    sugestoes = []
-    
-    # 1. CÃ³digo original (verificar se estÃ¡ livre)
-    if sku_base:
-        if not db.query(Produto).filter(Produto.codigo == sku_base).first():
-            sugestoes.append({
-                "sku": sku_base,
-                "descricao": "CÃ³digo original do fornecedor",
-                "disponivel": True
-            })
-        else:
-            sugestoes.append({
-                "sku": sku_base,
-                "descricao": "CÃ³digo original do fornecedor",
-                "disponivel": False
-            })
-    
-    # 2. Prefixo + CÃ³digo
-    if sku_base:
-        sku_com_prefixo = f"{prefixo}-{sku_base}"
-        disponivel = not db.query(Produto).filter(Produto.codigo == sku_com_prefixo).first()
+
+    return nota, item
+
+
+def _buscar_produto_por_codigo_global(
+    db: Session,
+    codigo: Optional[str],
+):
+    codigo_limpo = (codigo or "").strip()
+    if not codigo_limpo:
+        return None
+
+    return db.query(Produto).filter(
+        Produto.codigo == codigo_limpo,
+    ).first()
+
+
+def _produto_pertence_ao_tenant(produto: Optional[Produto], tenant_id) -> bool:
+    if not produto:
+        return False
+    return getattr(produto, "tenant_id", None) == tenant_id
+
+
+def _gerar_candidatos_sku_disponiveis(
+    sku_base: str,
+    prefixo: str,
+    db: Session,
+    tenant_id,
+    user_id: int,
+) -> List[Dict[str, Any]]:
+    sugestoes: List[Dict[str, Any]] = []
+    vistos = set()
+
+    def adicionar_candidato(sku: Optional[str], descricao: str) -> None:
+        sku_limpo = (sku or "").strip()
+        if not sku_limpo or sku_limpo in vistos:
+            return
+        vistos.add(sku_limpo)
+
+        existe = _buscar_produto_por_codigo_global(db, sku_limpo)
+        if existe:
+            return
+
         sugestoes.append({
-            "sku": sku_com_prefixo,
-            "descricao": f"Prefixo {prefixo} + cÃ³digo do fornecedor",
-            "disponivel": disponivel
+            "sku": sku_limpo,
+            "descricao": descricao,
+            "disponivel": True,
+            "padrao": False,
         })
-    
-    # 3. CÃ³digo + Sufixo
-    if sku_base:
-        sku_com_sufixo = f"{sku_base}-{prefixo}"
-        disponivel = not db.query(Produto).filter(Produto.codigo == sku_com_sufixo).first()
-        sugestoes.append({
-            "sku": sku_com_sufixo,
-            "descricao": f"CÃ³digo do fornecedor + sufixo {prefixo}",
-            "disponivel": disponivel
-        })
-    
-    # 4. CÃ³digo sequencial com prefixo
-    contador = 1
-    while contador <= 3:
-        sku_sequencial = f"{prefixo}{contador:04d}"
-        if not db.query(Produto).filter(Produto.codigo == sku_sequencial).first():
-            sugestoes.append({
-                "sku": sku_sequencial,
-                "descricao": f"CÃ³digo sequencial com prefixo {prefixo}",
-                "disponivel": True
-            })
-            break
-        contador += 1
-    
+
+    sku_base_limpo = (sku_base or "").strip()
+    prefixo_limpo = (prefixo or "PROD").strip() or "PROD"
+
+    if sku_base_limpo:
+        adicionar_candidato(
+            f"{prefixo_limpo}-{sku_base_limpo}",
+            f"Prefixo {prefixo_limpo} + cÃ³digo do fornecedor",
+        )
+        adicionar_candidato(
+            f"{sku_base_limpo}-{prefixo_limpo}",
+            f"CÃ³digo do fornecedor + sufixo {prefixo_limpo}",
+        )
+        for indice in range(1, 6):
+            adicionar_candidato(
+                f"{prefixo_limpo}-{sku_base_limpo}-V{indice}",
+                f"VariaÃ§Ã£o {indice} com prefixo {prefixo_limpo}",
+            )
+
+    adicionar_candidato(
+        gerar_sku_automatico(prefixo_limpo, db, user_id),
+        f"Sequencial automÃ¡tico com prefixo {prefixo_limpo}",
+    )
+    for indice in range(1, 6):
+        adicionar_candidato(
+            f"{prefixo_limpo}-{indice:05d}",
+            f"Sequencial manual {indice} com prefixo {prefixo_limpo}",
+        )
+
+    if sugestoes:
+        sugestoes[0]["padrao"] = True
+
+    return sugestoes
+
+
+def _montar_sugestao_sku_produto(
+    nota: NotaEntrada,
+    item: NotaEntradaItem,
+    db: Session,
+    tenant_id,
+    user_id: int,
+    sku_base_customizado: Optional[str] = None,
+) -> Dict[str, Any]:
+    fornecedor_nome = (nota.fornecedor_nome or "").strip()
+    prefixo = gerar_prefixo_fornecedor(fornecedor_nome) if fornecedor_nome else "PROD"
+
+    sku_base = (sku_base_customizado or item.codigo_produto or "").strip()
+    if not sku_base:
+        descricao_base = re.sub(r"[^A-Z0-9]", "", (item.descricao or "").upper())
+        sku_base = (descricao_base[:10] or gerar_sku_automatico(prefixo, db, user_id)).strip()
+
+    produto_existente = _buscar_produto_por_codigo_global(db, sku_base)
     composicoes_custo = calcular_composicao_custos_nota(nota)
     composicao_item = composicoes_custo.get(item.id, {})
 
-    return {
+    if produto_existente:
+        sugestoes = _gerar_candidatos_sku_disponiveis(
+            sku_base=sku_base,
+            prefixo=prefixo,
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+        )
+    else:
+        sugestoes = [{
+            "sku": sku_base,
+            "descricao": "CÃ³digo original do fornecedor",
+            "disponivel": True,
+            "padrao": True,
+        }]
+
+    payload: Dict[str, Any] = {
         "item_id": item.id,
         "descricao_item": item.descricao,
         "codigo_fornecedor": item.codigo_produto,
         "fornecedor": nota.fornecedor_nome,
         "prefixo_sugerido": prefixo,
+        "sku_proposto": sku_base,
+        "ja_existe": produto_existente is not None,
         "sugestoes": sugestoes,
         "dados_produto": {
             "nome": item.descricao,
             "unidade": item.unidade,
             "preco_custo": composicao_item.get("custo_aquisicao_unitario", item.valor_unitario),
-            "ncm": item.ncm if hasattr(item, 'ncm') else None,
-            "ean": item.ean if hasattr(item, 'ean') else None
-        }
+            "ncm": item.ncm if hasattr(item, "ncm") else None,
+            "ean": item.ean if hasattr(item, "ean") else None,
+        },
     }
+
+    if produto_existente:
+        nome_produto_existente = (
+            produto_existente.nome
+            if _produto_pertence_ao_tenant(produto_existente, tenant_id)
+            else "SKU já utilizado em outro cadastro"
+        )
+        payload["produto_existente"] = {
+            "id": produto_existente.id if _produto_pertence_ao_tenant(produto_existente, tenant_id) else None,
+            "codigo": produto_existente.codigo,
+            "nome": nome_produto_existente,
+        }
+
+    return payload
 
 
 # ============================================================================
@@ -1958,6 +2453,7 @@ def preview_processamento(
     
     for item in nota.itens:
         composicao_custo = composicoes_custo.get(item.id, {})
+        conferencia_item = _serializar_conferencia_item(item)
         # Dados do item da NF (sempre presente)
         dados_pack = calcular_quantidade_custo_efetivos(
             item.descricao,
@@ -1982,7 +2478,8 @@ def preview_processamento(
             "ean_nf": item.ean,
             "ncm_nf": item.ncm,
             "vinculado": item.vinculado,
-            "confianca_vinculo": item.confianca_vinculo
+            "confianca_vinculo": item.confianca_vinculo,
+            **conferencia_item,
         }
 
         detalhe_vinculo = obter_detalhe_vinculo_item(item)
@@ -2036,6 +2533,7 @@ def preview_processamento(
         "fornecedor_nome": nota.fornecedor_nome,
         "fornecedor_cnpj": nota.fornecedor_cnpj,
         "valor_total": nota.valor_total,
+        "conferencia": _resumir_conferencia_nota(nota),
         "itens": preview_itens
     }
 
@@ -2059,12 +2557,20 @@ def atualizar_precos_produtos(
     Atualiza preÃ§os de venda dos produtos antes de processar a nota
     Registra histÃ³rico de alteraÃ§Ãµes
     """
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
+    current_user, tenant_id = user_and_tenant
+
+    nota = db.query(NotaEntrada).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
     if not nota:
         raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
     
     for preco_data in precos:
-        produto = db.query(Produto).filter(Produto.id == preco_data.produto_id).first()
+        produto = db.query(Produto).filter(
+            Produto.id == preco_data.produto_id,
+            Produto.tenant_id == tenant_id
+        ).first()
         if produto:
             # Capturar valores anteriores
             preco_venda_anterior = produto.preco_venda
@@ -2095,7 +2601,8 @@ def atualizar_precos_produtos(
                     nota_entrada_id=nota.id,
                     referencia=f"NF-e {nota.numero_nota} - RevisÃ£o de PreÃ§os",
                     observacoes=f"PreÃ§o ajustado de R$ {preco_venda_anterior:.2f} para R$ {produto.preco_venda:.2f} (margem: {margem_anterior:.1f}% â†’ {margem_nova:.1f}%)",
-                    user_id=current_user.id
+                    user_id=current_user.id,
+                    tenant_id=tenant_id
                 )
                 db.add(historico)
                 
@@ -2116,7 +2623,9 @@ def atualizar_precos_produtos(
 
 class ProcessarConfig(BaseModel):
     # chave = str(item_id), valor = multiplicador (ex: {"42": 10})
-    multiplicadores_override: dict = {}
+    multiplicadores_override: dict = Field(default_factory=dict)
+    # chave = str(item_id), valor = custo unitário manual a aplicar no sistema
+    custos_override: dict = Field(default_factory=dict)
 
 
 @router.post("/{nota_id}/processar")
@@ -2128,14 +2637,19 @@ def processar_entrada_estoque(
 ):
     """
     Processa entrada no estoque de todos os itens vinculados.
-    Aceita multiplicadores_override: {"item_id": multiplicador} para packs manuais.
+    Aceita:
+    - multiplicadores_override: {"item_id": multiplicador} para packs manuais
+    - custos_override: {"item_id": custo_unitario} para custo manual de sistema
     """
     current_user, tenant_id = user_and_tenant
     logger.info(f"ðŸ“¦ Processando entrada no estoque - Nota {nota_id}")
     
     nota = db.query(NotaEntrada).options(
         joinedload(NotaEntrada.itens).joinedload(NotaEntradaItem.produto)
-    ).filter(NotaEntrada.id == nota_id).first()
+    ).filter(
+        NotaEntrada.id == nota_id,
+        NotaEntrada.tenant_id == tenant_id
+    ).first()
     
     if not nota:
         raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
@@ -2162,21 +2676,29 @@ def processar_entrada_estoque(
             continue
 
         composicao_custo = composicoes_custo.get(item.id, {})
+        conferencia_item = _serializar_conferencia_item(item)
+        quantidade_base_conferida = conferencia_item["quantidade_conferida"]
 
         # Verificar override manual antes de usar auto-deteccao
-        override_raw = config.multiplicadores_override.get(str(item.id))
-        if override_raw is None:
-            override_raw = config.multiplicadores_override.get(item.id)
+        override_raw = _obter_override_mapa(config.multiplicadores_override, item.id)
         try:
             override_mult = int(override_raw) if override_raw is not None else None
         except (ValueError, TypeError):
             override_mult = None
+        custo_unitario_manual = _normalizar_custo_unitario_override(
+            _obter_override_mapa(config.custos_override, item.id),
+            item.id,
+        )
 
         if override_mult is not None and 1 <= override_mult <= 200:
             multiplicador_pack = override_mult
-            quantidade_entrada = item.quantidade * override_mult
+            quantidade_total_efetiva_nf = (item.quantidade or 0) * override_mult
+            quantidade_entrada = quantidade_base_conferida * override_mult
             custo_total_aquisicao = composicao_custo.get("custo_aquisicao_total", item.valor_total)
-            custo_unitario_entrada = (custo_total_aquisicao / quantidade_entrada) if quantidade_entrada > 0 else item.valor_unitario
+            custo_unitario_entrada = (
+                (custo_total_aquisicao / quantidade_total_efetiva_nf)
+                if quantidade_total_efetiva_nf > 0 else item.valor_unitario
+            )
             logger.info(f"📦 Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} → qtd entrada {quantidade_entrada})")
         else:
             dados_pack = calcular_quantidade_custo_efetivos(
@@ -2185,9 +2707,34 @@ def processar_entrada_estoque(
                 item.valor_unitario,
                 item.valor_total
             )
-            quantidade_entrada = dados_pack["quantidade_efetiva"]
+            quantidade_entrada = quantidade_base_conferida * dados_pack["multiplicador_pack"]
             custo_unitario_entrada = composicao_custo.get("custo_aquisicao_unitario", dados_pack["custo_unitario_efetivo"])
             multiplicador_pack = dados_pack["multiplicador_pack"]
+
+        if custo_unitario_manual is not None:
+            custo_unitario_entrada = custo_unitario_manual
+            logger.info(
+                f"💰 Custo manual aplicado no item {item.id}: "
+                f"R$ {custo_unitario_entrada:.4f} por unidade"
+            )
+
+        if quantidade_entrada <= 0:
+            item.status = 'processado'
+            itens_processados.append({
+                "produto_id": item.produto.id,
+                "produto_nome": item.produto.nome,
+                "quantidade": 0,
+                "lote": None,
+                "estoque_atual": item.produto.estoque_atual or 0,
+                "pack_multiplicador": multiplicador_pack,
+                "status_conferencia": conferencia_item["status_conferencia"],
+            })
+            logger.info(
+                f"  ⚠️ {item.produto.nome}: sem entrada em estoque "
+                f"(conferida: {quantidade_base_conferida}, avariada: {conferencia_item['quantidade_avariada']}, "
+                f"faltante: {conferencia_item['quantidade_faltante']})"
+            )
+            continue
         
         produto = item.produto
         
@@ -2297,7 +2844,11 @@ def processar_entrada_estoque(
                 motivo="nfe_entrada",
                 nota_entrada_id=nota.id,
                 referencia=f"NF-e {nota.numero_nota}",
-                observacoes=f"Entrada via NF-e: custo alterado de R$ {preco_custo_anterior:.2f} para R$ {produto.preco_custo:.2f}",
+                observacoes=(
+                    f"Entrada via NF-e: custo alterado de R$ {preco_custo_anterior:.2f} "
+                    f"para R$ {produto.preco_custo:.2f}"
+                    f"{' (ajuste manual aplicado no processamento)' if custo_unitario_manual is not None else ''}"
+                ),
                 user_id=current_user.id,
                 tenant_id=tenant_id
             )
@@ -2319,11 +2870,23 @@ def processar_entrada_estoque(
             quantidade_anterior=estoque_anterior,
             quantidade_nova=produto.estoque_atual,
             custo_unitario=float(custo_unitario_entrada),
-            valor_total=float(item.valor_total) if item.valor_total is not None else 0.0,
+            valor_total=float(quantidade_entrada * custo_unitario_entrada),
             documento=nota.chave_acesso,
             referencia_tipo="nota_entrada",
             referencia_id=nota.id,
-            observacao=f"Entrada NF-e {nota.numero_nota} - {item.descricao}",
+            observacao=(
+                f"Entrada NF-e {nota.numero_nota} - {item.descricao}"
+                if conferencia_item["status_conferencia"] == "ok"
+                else (
+                    f"Entrada NF-e {nota.numero_nota} - {item.descricao} | "
+                    f"Conferida: {conferencia_item['quantidade_conferida']} | "
+                    f"Avariada: {conferencia_item['quantidade_avariada']} | "
+                    f"Faltante: {conferencia_item['quantidade_faltante']}"
+                )
+            ) + (
+                f" | Custo sistema manual: R$ {custo_unitario_entrada:.4f}"
+                if custo_unitario_manual is not None else ""
+            ),
             user_id=current_user.id,
             tenant_id=tenant_id
         )
@@ -2338,7 +2901,10 @@ def processar_entrada_estoque(
             "quantidade": quantidade_entrada,
             "lote": nome_lote,
             "estoque_atual": produto.estoque_atual,
-            "pack_multiplicador": multiplicador_pack
+            "pack_multiplicador": multiplicador_pack,
+            "status_conferencia": conferencia_item["status_conferencia"],
+            "custo_unitario_aplicado": float(custo_unitario_entrada),
+            "custo_manual_aplicado": custo_unitario_manual is not None,
         })
         
         logger.info(
@@ -2352,6 +2918,17 @@ def processar_entrada_estoque(
                 f"x{multiplicador_pack} (qtd NF {item.quantidade} â†’ qtd entrada {quantidade_entrada})"
             )
     
+    resumo_conferencia = _resumir_conferencia_nota(nota)
+    if not nota.conferencia_realizada_em:
+        nota.conferencia_realizada_em = datetime.utcnow()
+        nota.conferencia_user_id = current_user.id
+    nota.conferencia_status = (
+        CONFERENCIA_STATUS_COM_DIVERGENCIA
+        if resumo_conferencia["itens_com_divergencia"] > 0
+        else CONFERENCIA_STATUS_SEM_DIVERGENCIA
+    )
+    resumo_conferencia = _resumir_conferencia_nota(nota)
+
     # Atualizar nota
     nota.status = 'processada'
     nota.entrada_estoque_realizada = True
@@ -2406,6 +2983,7 @@ def processar_entrada_estoque(
         "numero_nota": nota.numero_nota,
         "itens_processados": len(itens_processados),
         "contas_pagar_criadas": len(contas_ids),
+        "conferencia": resumo_conferencia,
         "detalhes": itens_processados
     }
 
@@ -2484,6 +3062,8 @@ def reverter_entrada_estoque(
                 ).first()
                 
                 if lote:
+                    quantidade_lancada = float(lote.quantidade_inicial or 0)
+
                     # REVERTER PREÇO DE CUSTO se foi alterado
                     try:
                         historico_preco = db.query(ProdutoHistoricoPreco).filter(
@@ -2513,7 +3093,7 @@ def reverter_entrada_estoque(
                     
                     # Remover quantidade do estoque
                     estoque_anterior = produto.estoque_atual or 0
-                    produto.estoque_atual = max(0, estoque_anterior - item.quantidade)
+                    produto.estoque_atual = max(0, estoque_anterior - quantidade_lancada)
                     
                     # Registrar movimentação de estorno (sem referência ao lote que será deletado)
                     try:
@@ -2522,11 +3102,11 @@ def reverter_entrada_estoque(
                             lote_id=None,  # Não referenciar o lote que será deletado
                             tipo="saida",
                             motivo="ajuste",
-                            quantidade=float(item.quantidade or 0),
+                            quantidade=quantidade_lancada,
                             quantidade_anterior=float(estoque_anterior),
                             quantidade_nova=float(produto.estoque_atual or 0),
-                            custo_unitario=float(item.valor_unitario or 0),
-                            valor_total=float(item.valor_total or 0),
+                            custo_unitario=float(lote.custo_unitario or item.valor_unitario or 0),
+                            valor_total=float(quantidade_lancada * float(lote.custo_unitario or item.valor_unitario or 0)),
                             documento=nota.chave_acesso or "",
                             referencia_tipo="estorno_nota_entrada",
                             referencia_id=nota.id,
@@ -2557,12 +3137,12 @@ def reverter_entrada_estoque(
                     itens_revertidos.append({
                         "produto_id": produto.id,
                         "produto_nome": produto.nome,
-                        "quantidade_removida": float(item.quantidade or 0),
+                        "quantidade_removida": quantidade_lancada,
                         "estoque_atual": float(produto.estoque_atual or 0)
                     })
                     
                     logger.info(
-                        f"  ↩️  {produto.nome}: -{item.quantidade} unidades "
+                        f"  ↩️  {produto.nome}: -{quantidade_lancada} unidades "
                         f"(estoque: {estoque_anterior} → {produto.estoque_atual})"
                     )
                 
@@ -2616,85 +3196,17 @@ def sugerir_sku(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Sugere SKU para produto baseado no cÃ³digo do fornecedor
-    PadrÃ£o: PREFIXO_FORNECEDOR-CODIGO_FORNECEDOR
+    Sugere SKU para produto novo usando o SKU do fornecedor como primeira opÃ§Ã£o.
     """
-    # Buscar nota e item
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
-    if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
-    
-    item = db.query(NotaEntradaItem).filter(
-        NotaEntradaItem.id == item_id,
-        NotaEntradaItem.nota_entrada_id == nota_id
-    ).first()
-    
-    if not item:
-        raise HTTPException(status_code=404, detail="Item nÃ£o encontrado")
-    
-    # Buscar fornecedor
-    fornecedor = db.query(Cliente).filter(Cliente.id == nota.fornecedor_id).first() if nota.fornecedor_id else None
-    
-    # Gerar prefixo do fornecedor
-    if fornecedor:
-        prefixo = gerar_prefixo_fornecedor(fornecedor.nome)
-    else:
-        prefixo = "PROD"
-    
-    # CÃ³digo base do produto
-    codigo_base = item.codigo_produto or item.descricao[:10].upper().replace(" ", "")
-    
-    # SKU proposto
-    sku_proposto = f"{prefixo}-{codigo_base}"
-    
-    logger.info(f"ðŸ·ï¸ SugestÃ£o de SKU:")
-    logger.info(f"   - Prefixo: {prefixo}")
-    logger.info(f"   - CÃ³digo base: {codigo_base}")
-    logger.info(f"   - SKU proposto: {sku_proposto}")
-    
-    # Verificar se jÃ¡ existe
-    produto_existente = db.query(Produto).filter(Produto.codigo == sku_proposto).first()
-    
-    sugestoes = []
-    
-    if produto_existente:
-        # Gerar sugestÃµes alternativas
-        for i in range(1, 6):
-            sku_alternativo = f"{prefixo}-{codigo_base}-V{i}"
-            existe = db.query(Produto).filter(Produto.codigo == sku_alternativo).first()
-            if not existe:
-                sugestoes.append({
-                    "sku": sku_alternativo,
-                    "disponivel": True,
-                    "padrao": i == 1
-                })
-        
-        return {
-            "sku_proposto": sku_proposto,
-            "ja_existe": True,
-            "produto_existente": {
-                "id": produto_existente.id,
-                "codigo": produto_existente.codigo,
-                "nome": produto_existente.nome
-            },
-            "sugestoes": sugestoes,
-            "codigo_fornecedor": item.codigo_produto,
-            "prefixo_fornecedor": prefixo
-        }
-    else:
-        return {
-            "sku_proposto": sku_proposto,
-            "ja_existe": False,
-            "sugestoes": [
-                {
-                    "sku": sku_proposto,
-                    "disponivel": True,
-                    "padrao": True
-                }
-            ],
-            "codigo_fornecedor": item.codigo_produto,
-            "prefixo_fornecedor": prefixo
-        }
+    current_user, tenant_id = user_and_tenant
+    nota, item = _buscar_nota_item_por_tenant(nota_id, item_id, tenant_id, db)
+    return _montar_sugestao_sku_produto(
+        nota=nota,
+        item=item,
+        db=db,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+    )
 
 
 # ============================================================================
@@ -2730,165 +3242,51 @@ def criar_produto_from_item(
     
     logger.info(f"ðŸ”¨ Criando produto: {dados.sku} - {dados.nome}")
     
-    # Buscar nota e item
-    nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
-    if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
-    
-    item = db.query(NotaEntradaItem).filter(
-        NotaEntradaItem.id == item_id,
-        NotaEntradaItem.nota_entrada_id == nota_id
-    ).first()
-    
-    if not item:
-        raise HTTPException(status_code=404, detail="Item nÃ£o encontrado")
-    
-    # Verificar se SKU jÃ¡ existe
-    produto_existente = db.query(Produto).filter(Produto.codigo == dados.sku).first()
-    
-    # Se existir produto ativo, vincular ao item automaticamente
-    if produto_existente and produto_existente.ativo:
-        logger.info(f"âœ… Produto jÃ¡ existe e estÃ¡ ativo: {produto_existente.codigo} - {produto_existente.nome}")
-        
-        # Vincular ao item da nota
-        item.produto_id = produto_existente.id
-        item.vinculado = True
-        item.confianca_vinculo = 1.0
-        item.status = 'vinculado'
-        
-        # IMPORTANTE: Flush antes de contar para garantir que o produto_id esteja no banco
-        db.flush()
-        
-        # Atualizar contadores da nota
-        nota.produtos_vinculados = db.query(NotaEntradaItem).filter(
-            NotaEntradaItem.nota_entrada_id == nota_id,
-            NotaEntradaItem.produto_id.isnot(None)
-        ).count()
-        
-        nota.produtos_nao_vinculados = db.query(NotaEntradaItem).filter(
-            NotaEntradaItem.nota_entrada_id == nota_id,
-            NotaEntradaItem.produto_id.is_(None)
-        ).count()
-        
-        db.commit()
-        db.refresh(item)
-        db.refresh(nota)
-        db.refresh(produto_existente)
-        
-        return {
-            "message": "Produto jÃ¡ existia e foi vinculado com sucesso",
-            "produto": {
-                "id": produto_existente.id,
-                "codigo": produto_existente.codigo,
-                "nome": produto_existente.nome,
-                "descricao_curta": produto_existente.descricao_curta,
-                "descricao_completa": produto_existente.descricao_completa,
-                "preco_custo": produto_existente.preco_custo,
-                "preco_venda": produto_existente.preco_venda
-            },
-            "item_vinculado": True,
-            "produto_ja_existia": True
-        }
-    
-    # Se existir produto inativo, reativar e atualizar
-    if produto_existente and not produto_existente.ativo:
-        try:
-            # Preparar descriÃ§Ãµes
-            descricao_texto = dados.descricao or item.descricao or ''
-            descricao_curta = descricao_texto[:100] if descricao_texto else ''
-            descricao_completa = descricao_texto
-            
-            # Atualizar produto existente com TODOS os dados do XML
-            produto_existente.nome = dados.nome
-            produto_existente.descricao_curta = descricao_curta
-            produto_existente.descricao_completa = descricao_completa
-            produto_existente.preco_custo = dados.preco_custo
-            produto_existente.preco_venda = dados.preco_venda
-            produto_existente.categoria_id = dados.categoria_id
-            produto_existente.marca_id = dados.marca_id
-            
-            # DADOS FISCAIS DO XML
-            produto_existente.ncm = item.ncm
-            produto_existente.cfop = item.cfop
-            produto_existente.cest = item.cest if hasattr(item, 'cest') else None
-            produto_existente.origem = item.origem if hasattr(item, 'origem') else '0'
-            produto_existente.aliquota_icms = item.aliquota_icms if hasattr(item, 'aliquota_icms') else 0
-            produto_existente.aliquota_pis = item.aliquota_pis if hasattr(item, 'aliquota_pis') else 0
-            produto_existente.aliquota_cofins = item.aliquota_cofins if hasattr(item, 'aliquota_cofins') else 0
-            produto_existente.codigo_barras = item.ean if item.ean and item.ean != 'SEM GTIN' else None
-            
-            # ESTOQUE
-            produto_existente.estoque_minimo = dados.estoque_minimo
-            produto_existente.estoque_maximo = dados.estoque_maximo
-            produto_existente.unidade = item.unidade
-            produto_existente.controle_lote = True  # Sempre ativar controle de lote
-            produto_existente.ativo = True
-            produto_existente.user_id = current_user.id
-            
-            db.flush()
-            
-            # Vincular ao item da nota
-            item.produto_id = produto_existente.id
-            item.vinculado = True
-            item.confianca_vinculo = 1.0
-            item.status = 'vinculado'
-            
-            # Vincular produto ao fornecedor da nota automaticamente
-            if nota.fornecedor_id:
-                vinculo_existente = db.query(ProdutoFornecedor).filter(
-                    ProdutoFornecedor.produto_id == produto_existente.id,
-                    ProdutoFornecedor.fornecedor_id == nota.fornecedor_id
-                ).first()
-                
-                if not vinculo_existente:
-                    novo_vinculo = ProdutoFornecedor(
-                        produto_id=produto_existente.id,
-                        fornecedor_id=nota.fornecedor_id,
-                        preco_custo=dados.preco_custo,
-                        e_principal=True,
-                        ativo=True,
-                        tenant_id=tenant_id
-                    )
-                    db.add(novo_vinculo)
-                    logger.info(f"âœ… Produto reativado {produto_existente.id} vinculado ao fornecedor {nota.fornecedor_id}")
-                else:
-                    vinculo_existente.preco_custo = dados.preco_custo
-                    vinculo_existente.ativo = True
-            
-            # Atualizar contadores da nota
-            nota.produtos_vinculados = db.query(NotaEntradaItem).filter(
-                NotaEntradaItem.nota_entrada_id == nota_id,
-                NotaEntradaItem.produto_id.isnot(None)
-            ).count()
-            
-            nota.produtos_nao_vinculados = db.query(NotaEntradaItem).filter(
-                NotaEntradaItem.nota_entrada_id == nota_id,
-                NotaEntradaItem.produto_id.is_(None)
-            ).count()
-            
-            db.commit()
-            db.refresh(produto_existente)
-            
-            logger.info(f"âœ… Produto reativado e atualizado: {produto_existente.codigo} - {produto_existente.nome}")
-            
-            return {
-                "message": "Produto reativado e vinculado com sucesso",
-                "produto": {
-                    "id": produto_existente.id,
-                    "codigo": produto_existente.codigo,
-                    "nome": produto_existente.nome,
-                    "descricao_curta": produto_existente.descricao_curta,
-                    "descricao_completa": produto_existente.descricao_completa,
-                    "preco_custo": produto_existente.preco_custo,
-                    "preco_venda": produto_existente.preco_venda
-                },
-                "item_vinculado": True
-            }
-            
-        except Exception as e:
-            db.rollback()
-            logger.error(f"âŒ Erro ao reativar produto: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Erro ao reativar produto: {str(e)}")
+    nota, item = _buscar_nota_item_por_tenant(nota_id, item_id, tenant_id, db)
+
+    sku_solicitado = (dados.sku or "").strip()
+    sku_final = sku_solicitado
+    sku_ajustado_automaticamente = False
+
+    if not sku_final:
+        sugestao = _montar_sugestao_sku_produto(
+            nota=nota,
+            item=item,
+            db=db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+        )
+        sugestao_recomendada = next(
+            (sug for sug in sugestao["sugestoes"] if sug.get("padrao")),
+            sugestao["sugestoes"][0] if sugestao["sugestoes"] else None,
+        )
+        if not sugestao_recomendada:
+            raise HTTPException(status_code=409, detail="NÃ£o foi possÃ­vel gerar um SKU para o novo produto")
+        sku_final = sugestao_recomendada["sku"]
+        sku_ajustado_automaticamente = True
+
+    produto_existente = _buscar_produto_por_codigo_global(db, sku_final)
+    if produto_existente:
+        sugestao = _montar_sugestao_sku_produto(
+            nota=nota,
+            item=item,
+            db=db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            sku_base_customizado=sku_final,
+        )
+        sugestao_recomendada = next(
+            (sug for sug in sugestao["sugestoes"] if sug.get("padrao")),
+            sugestao["sugestoes"][0] if sugestao["sugestoes"] else None,
+        )
+        if not sugestao_recomendada:
+            raise HTTPException(status_code=409, detail="O SKU informado jÃ¡ existe e nÃ£o foi possÃ­vel gerar alternativa")
+        sku_final = sugestao_recomendada["sku"]
+        sku_ajustado_automaticamente = True
+        logger.info(
+            f"ðŸ”„ SKU ajustado automaticamente para criar novo produto: "
+            f"{sku_solicitado or '<vazio>'} -> {sku_final}"
+        )
     
     # Criar produto novo e vincular
     try:
@@ -2925,7 +3323,7 @@ def criar_produto_from_item(
             logger.info(f"🎯 {dados_fiscais['padrao_fiscal_motivo']} (confiança: {dados_fiscais.get('padrao_fiscal_confianca', 0):.0%})")
         
         novo_produto = Produto(
-            codigo=dados.sku,
+            codigo=sku_final,
             nome=dados.nome,
             descricao_curta=descricao_curta,
             descricao_completa=descricao_completa,
@@ -3004,7 +3402,11 @@ def criar_produto_from_item(
     logger.info(f"âœ… Produto criado a partir da nota: {novo_produto.codigo} - {novo_produto.nome}")
     
     return {
-        "message": "Produto criado e vinculado com sucesso",
+        "message": (
+            f"Produto criado e vinculado com sucesso com SKU ajustado para {novo_produto.codigo}"
+            if sku_ajustado_automaticamente
+            else "Produto criado e vinculado com sucesso"
+        ),
         "produto": {
             "id": novo_produto.id,
             "codigo": novo_produto.codigo,
@@ -3014,7 +3416,8 @@ def criar_produto_from_item(
             "preco_custo": novo_produto.preco_custo,
             "preco_venda": novo_produto.preco_venda
         },
-        "item_vinculado": True
+        "item_vinculado": True,
+        "sku_ajustado_automaticamente": sku_ajustado_automaticamente
     }
 
 
@@ -3208,8 +3611,9 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
                     item_data["descricao"],
                     item_data["codigo_produto"],
                     db,
-                    fornecedor.id if fornecedor else None,
-                    item_data.get("ean"),
+                    tenant_id=tenant_id_str,
+                    fornecedor_id=fornecedor.id if fornecedor else None,
+                    ean=item_data.get("ean"),
                 )
                 item = NotaEntradaItem(
                     nota_entrada_id=nota.id,

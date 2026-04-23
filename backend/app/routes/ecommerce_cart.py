@@ -13,6 +13,10 @@ from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
+from app.services.validade_campanha_service import (
+    mapear_ofertas_validade_por_produto,
+    resolver_preco_publico_produto,
+)
 
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
@@ -197,10 +201,35 @@ def _serialize_carrinho(db: Session, carrinho: Pedido) -> dict:
     }
 
 
-def _resolver_preco_unitario(produto: Produto) -> float:
-    if produto.promocao_ativa and produto.preco_promocional is not None:
-        return float(produto.preco_promocional)
-    return float(produto.preco_venda or 0.0)
+def _formatar_quantidade_promocional(valor: float) -> str:
+    numero = float(valor or 0)
+    if numero.is_integer():
+        return str(int(numero))
+    return f"{numero:.2f}".replace(".", ",")
+
+
+def _resolver_precificacao_produto(db: Session, produto: Produto, canal: str):
+    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], canal).get(produto.id)
+    return resolver_preco_publico_produto(
+        produto,
+        canal,
+        validity_offer=oferta_validade,
+    )
+
+
+def _validar_limite_promocao_validade(pricing, quantidade: float):
+    oferta_validade = pricing.validity_offer
+    if not pricing.promotion_active or pricing.promotion_origin != "validade" or not oferta_validade:
+        return
+    limite = float(oferta_validade.quantity_available or 0)
+    if float(quantidade) > limite:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Oferta de validade disponivel para ate "
+                f"{_formatar_quantidade_promocional(limite)} unidade(s) nesse preco."
+            ),
+        )
 
 
 @router.post("/adicionar")
@@ -248,7 +277,13 @@ def adicionar_item_carrinho(
         .first()
     )
 
-    preco_unitario = _resolver_preco_unitario(produto)
+    pricing = _resolver_precificacao_produto(db, produto, canal_venda)
+    preco_unitario = float(
+        pricing.promotional_price
+        if pricing.promotional_price is not None
+        else pricing.regular_price
+        or 0.0
+    )
 
     nova_quantidade = payload.quantidade
     if item:
@@ -268,9 +303,12 @@ def adicionar_item_carrinho(
             detail="Quantidade indisponível em estoque (reserva ativa)",
         )
 
+    _validar_limite_promocao_validade(pricing, nova_quantidade)
+
     if item:
+        item.preco_unitario = preco_unitario
         item.quantidade = nova_quantidade
-        item.subtotal = round(item.quantidade * item.preco_unitario, 2)
+        item.subtotal = round(item.quantidade * preco_unitario, 2)
     else:
         item = PedidoItem(
             pedido_id=carrinho.pedido_id,
@@ -344,8 +382,18 @@ def atualizar_item_carrinho(
             detail="Quantidade indisponível em estoque (reserva ativa)",
         )
 
+    pricing = _resolver_precificacao_produto(db, produto, canal_venda)
+    preco_unitario = float(
+        pricing.promotional_price
+        if pricing.promotional_price is not None
+        else pricing.regular_price
+        or 0.0
+    )
+    _validar_limite_promocao_validade(pricing, payload.quantidade)
+
+    item.preco_unitario = preco_unitario
     item.quantidade = payload.quantidade
-    item.subtotal = round(item.quantidade * item.preco_unitario, 2)
+    item.subtotal = round(item.quantidade * preco_unitario, 2)
 
     _recalcular_total(db, carrinho)
     db.commit()

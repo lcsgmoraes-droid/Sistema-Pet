@@ -19,6 +19,15 @@
 export function ehRacao(produto) {
   if (!produto) return false;
 
+  if (typeof produto.eh_racao === 'boolean') {
+    return produto.eh_racao;
+  }
+
+  const tipo = (produto.tipo || '').toString().toLowerCase();
+  if (tipo === 'ração' || tipo === 'racao') {
+    return true;
+  }
+
   // 🎯 REGRA PRINCIPAL: Produto com peso_embalagem > 0 é ração
   // (mesmo critério usado pela Calculadora de Ração antiga que funciona)
   if (produto.peso_embalagem && produto.peso_embalagem > 0) {
@@ -31,7 +40,10 @@ export function ehRacao(produto) {
   const nomeCategoria = produto.categoria_nome?.toLowerCase() || '';
 
   return (
-    (classificacao && classificacao !== 'não é ração') ||
+    (classificacao &&
+      classificacao !== 'não é ração' &&
+      classificacao !== 'nao' &&
+      classificacao !== 'não') ||
     nomeCategoria.includes('ração') ||
     nomeCategoria.includes('racao') ||
     categoriaId === 5 // ID da categoria de ração (ajustar conforme BD)

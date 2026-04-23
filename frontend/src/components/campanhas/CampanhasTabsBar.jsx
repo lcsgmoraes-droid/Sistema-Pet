@@ -1,6 +1,7 @@
 const CAMPANHAS_TABS = [
   { id: "dashboard", label: "\u{1F4CA} Dashboard" },
   { id: "campanhas", label: "\u{1F4CB} Campanhas" },
+  { id: "validade", label: "\u23F3 Validade" },
   { id: "retencao", label: "\u{1F504} Retencao" },
   { id: "destaque", label: "\u{1F31F} Destaque Mensal" },
   { id: "sorteios", label: "\u{1F3B2} Sorteios" },

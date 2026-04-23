@@ -1,5 +1,6 @@
 import { PawPrint } from "lucide-react";
 import { FiPlus } from "react-icons/fi";
+import { buildNovoPetPath } from "../../utils/petReturnFlow";
 
 const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
   return (
@@ -98,9 +99,12 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
           type="button"
           onClick={() => {
             if (editingCliente?.id) {
-              navigate("/pets/novo", {
-                state: { clienteId: editingCliente.id },
-              });
+              navigate(
+                buildNovoPetPath({
+                  tutorId: editingCliente.id,
+                  tutorNome: editingCliente.nome,
+                })
+              );
             } else {
               alert("Salve o cliente primeiro para adicionar pets");
             }

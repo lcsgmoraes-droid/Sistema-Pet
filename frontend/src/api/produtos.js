@@ -393,6 +393,10 @@ export const getRelatorioMovimentacoes = (params = {}) => {
   return api.get('/produtos/relatorio/movimentacoes', { params });
 };
 
+export const getRelatorioProdutoVendas = (params = {}) => {
+  return api.get('/produtos/relatorio/produto-vendas', { params });
+};
+
 export const getRelatorioValorizacaoEstoque = (params = {}) => {
   return api.get('/produtos/relatorio/valorizacao-estoque', { params });
 };
@@ -416,8 +420,13 @@ export const getRelatorioMaisVendidos = (params = {}) => {
  * Relatório de validades próximas
  * @param {number} dias - Dias para considerar validade próxima
  */
-export const getRelatorioValidadeProxima = (dias = 30) => {
-  return api.get('/produtos/relatorio/validade-proxima', { params: { dias } });
+export const getRelatorioValidadeProxima = (paramsOrDias = 30) => {
+  const params =
+    typeof paramsOrDias === 'number'
+      ? { dias: paramsOrDias }
+      : paramsOrDias || {};
+
+  return api.get('/produtos/relatorio/validade-proxima', { params });
 };
 
 // ========================================
@@ -520,6 +529,7 @@ export default {
   addProdutoListaPreco,
   // Relatórios
   getRelatorioMovimentacoes,
+  getRelatorioProdutoVendas,
   getRelatorioValorizacaoEstoque,
   getRelatorioEstoqueBaixo,
   getRelatorioMaisVendidos,

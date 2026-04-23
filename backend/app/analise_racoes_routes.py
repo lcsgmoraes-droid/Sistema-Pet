@@ -21,6 +21,17 @@ from .vendas_models import VendaItem, Venda
 
 router = APIRouter(prefix="/racoes/analises", tags=["Análises Rações"])
 
+def _produto_eh_racao_expr():
+    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
+    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    return or_(
+        tipo_normalizado.in_(["raÃ§Ã£o", "racao"]),
+        and_(
+            classificacao_normalizada != "",
+            classificacao_normalizada.notin_(["nao", "nÃ£o"]),
+        ),
+    )
+
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
@@ -32,9 +43,24 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
     return current_user, tenant_id
 
 
+def _produto_eh_racao_expr():
+    return or_(Produto.tipo == "ração", Produto.classificacao_racao == "sim")
+
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
+
+def _produto_eh_racao_expr():
+    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
+    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    return or_(
+        tipo_normalizado.like("ra%"),
+        and_(
+            classificacao_normalizada != "",
+            classificacao_normalizada != "nao",
+        ),
+    )
 
 from pydantic import BaseModel
 
@@ -211,14 +237,14 @@ async def obter_resumo_dashboard(
     total_racoes = db.query(func.count(Produto.id)).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim'
+        _produto_eh_racao_expr()
     ).scalar() or 0
     
     # Total classificadas (com pelo menos um campo preenchido)
     total_classificadas = db.query(func.count(Produto.id)).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         or_(
             Produto.porte_animal.isnot(None),
             Produto.fase_publico.isnot(None),
@@ -235,7 +261,7 @@ async def obter_resumo_dashboard(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim'
+        _produto_eh_racao_expr()
     ).scalar() or 0
     
     # Margem média geral
@@ -246,7 +272,7 @@ async def obter_resumo_dashboard(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         Produto.preco_venda > 0
     )
     margem_media = query_margem.scalar() or 0.0
@@ -268,7 +294,7 @@ async def obter_resumo_dashboard(
             Produto, VendaItem.produto_id == Produto.id
         ).filter(
             Venda.tenant_id == tenant_id,
-            Produto.classificacao_racao == 'sim',
+            _produto_eh_racao_expr(),
             Venda.data_venda >= dt_inicio,
             Venda.data_venda <= dt_fim,
             Venda.status != 'cancelada'
@@ -285,7 +311,7 @@ async def obter_resumo_dashboard(
             Venda, VendaItem.venda_id == Venda.id
         ).filter(
             Venda.tenant_id == tenant_id,
-            Produto.classificacao_racao == 'sim',
+            _produto_eh_racao_expr(),
             Venda.data_venda >= dt_inicio,
             Venda.data_venda <= dt_fim,
             Venda.status != 'cancelada'
@@ -307,7 +333,7 @@ async def obter_resumo_dashboard(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         Produto.porte_animal.isnot(None),
         Produto.preco_venda > 0
     ).group_by(Produto.porte_animal).order_by(desc('margem_media')).first()
@@ -369,7 +395,7 @@ async def analisar_margem_por_segmento(
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         campo.isnot(None)
     )
     
@@ -480,7 +506,7 @@ async def comparar_marcas(
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         Produto.marca_id.isnot(None)
     )
     
@@ -596,7 +622,7 @@ async def obter_ranking_vendas(
         Categoria, Produto.categoria_id == Categoria.id
     ).filter(
         Venda.tenant_id == tenant_id,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         Venda.data_venda >= dt_inicio,
         Venda.data_venda <= dt_fim,
         Venda.status != 'cancelada'
@@ -649,7 +675,7 @@ async def obter_opcoes_filtros(
                 Produto, Produto.marca_id == Marca.id
             ).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.classificacao_racao == 'sim'
+                _produto_eh_racao_expr()
             ).distinct().all()
             logger.info(f"[opcoes-filtros] Marcas encontradas: {len(marcas)}")
         except Exception as e:
@@ -662,7 +688,7 @@ async def obter_opcoes_filtros(
                 Produto, Produto.categoria_id == Categoria.id
             ).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.classificacao_racao == 'sim'
+                _produto_eh_racao_expr()
             ).distinct().all()
             logger.info(f"[opcoes-filtros] Categorias encontradas: {len(categorias)}")
         except Exception as e:
@@ -673,7 +699,7 @@ async def obter_opcoes_filtros(
         try:
             sabores = db.query(distinct(Produto.sabor_proteina)).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.classificacao_racao == 'sim',
+                _produto_eh_racao_expr(),
                 Produto.sabor_proteina.isnot(None)
             ).all()
             logger.info(f"[opcoes-filtros] Sabores encontrados: {len(sabores)}")
@@ -685,7 +711,7 @@ async def obter_opcoes_filtros(
         try:
             especies_result = db.query(distinct(Produto.especies_indicadas)).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.classificacao_racao == 'sim',
+                _produto_eh_racao_expr(),
                 Produto.especies_indicadas.isnot(None)
             ).all()
             especies = [row[0] for row in especies_result if row[0]]
@@ -703,7 +729,7 @@ async def obter_opcoes_filtros(
                     Produto, Produto.linha_racao_id == LinhaRacao.id
                 ).filter(
                     Produto.tenant_id == tenant_id,
-                    Produto.classificacao_racao == 'sim',
+                    _produto_eh_racao_expr(),
                     LinhaRacao.ativo == True
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Linhas encontradas: {len(linhas)}")
@@ -721,7 +747,7 @@ async def obter_opcoes_filtros(
                     Produto, Produto.porte_animal_id == PorteAnimal.id
                 ).filter(
                     Produto.tenant_id == tenant_id,
-                    Produto.classificacao_racao == 'sim',
+                    _produto_eh_racao_expr(),
                     PorteAnimal.ativo == True
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Portes encontrados: {len(portes)}")
@@ -739,7 +765,7 @@ async def obter_opcoes_filtros(
                     Produto, Produto.fase_publico_id == FasePublico.id
                 ).filter(
                     Produto.tenant_id == tenant_id,
-                    Produto.classificacao_racao == 'sim',
+                    _produto_eh_racao_expr(),
                     FasePublico.ativo == True
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Fases encontradas: {len(fases)}")
@@ -757,7 +783,7 @@ async def obter_opcoes_filtros(
                     Produto, Produto.tipo_tratamento_id == TipoTratamento.id
                 ).filter(
                     Produto.tenant_id == tenant_id,
-                    Produto.classificacao_racao == 'sim',
+                    _produto_eh_racao_expr(),
                     TipoTratamento.ativo == True
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Tratamentos encontrados: {len(tratamentos)}")
@@ -771,7 +797,7 @@ async def obter_opcoes_filtros(
         try:
             pesos_result = db.query(distinct(Produto.peso_embalagem)).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.classificacao_racao == 'sim',
+                _produto_eh_racao_expr(),
                 Produto.peso_embalagem.isnot(None)
             ).order_by(Produto.peso_embalagem).all()
             pesos = [float(row[0]) for row in pesos_result if row[0]]
@@ -835,7 +861,7 @@ async def obter_produtos_para_comparacao(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        Produto.classificacao_racao == 'sim'
+        _produto_eh_racao_expr()
     )
     
     # Aplicar filtros

@@ -199,7 +199,17 @@ export default function useProdutosNovoCarregamento({
         numero_doses: produto.numero_doses || '',
         especie_compativel: produto.especie_compativel || 'both',
         observacoes_recorrencia: produto.observacoes_recorrencia || '',
-        classificacao_racao: produto.classificacao_racao || '',
+        eh_racao:
+          typeof produto.eh_racao === 'boolean'
+            ? produto.eh_racao
+            : produto.tipo === 'ração' ||
+              produto.tipo === 'racao' ||
+              Boolean(produto.linha_racao_id) ||
+              Boolean(produto.classificacao_racao && produto.classificacao_racao !== 'nao'),
+        classificacao_racao:
+          produto.classificacao_racao && produto.classificacao_racao !== 'sim'
+            ? produto.classificacao_racao
+            : '',
         peso_embalagem: produto.peso_embalagem || '',
         tabela_nutricional: produto.tabela_nutricional || '',
         tabela_consumo: produto.tabela_consumo || '',

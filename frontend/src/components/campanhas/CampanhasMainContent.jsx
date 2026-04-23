@@ -10,6 +10,7 @@ import CampanhasRelatoriosTab from "./CampanhasRelatoriosTab";
 import CampanhasUnificacaoTab from "./CampanhasUnificacaoTab";
 import CampanhasGestorTab from "./CampanhasGestorTab";
 import CampanhasConfigTab from "./CampanhasConfigTab";
+import CampanhasValidadeTab from "./CampanhasValidadeTab";
 import {
   TIPO_LABELS,
   USER_CREATABLE_TYPES,
@@ -126,6 +127,8 @@ export default function CampanhasMainContent({
           onSalvarParametros={gestao.salvarParametros}
         />
       )}
+
+      {aba === "validade" && <CampanhasValidadeTab />}
 
       {aba === "retencao" && (
         <CampanhasRetencaoTab

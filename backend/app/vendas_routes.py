@@ -479,9 +479,31 @@ def atualizar_venda(
         )
 
     # Validar entregador obrigatório quando tem entrega
-    entregador_id_resolvido = dados.entregador_id or venda.entregador_id
+    tem_entrega = bool(dados.tem_entrega)
+    taxa_entrega = float(dados.taxa_entrega or 0) if tem_entrega else 0.0
+    percentual_taxa_entregador = (
+        float(dados.percentual_taxa_entregador or 0) if tem_entrega else 0.0
+    )
+    percentual_taxa_loja = (
+        float(
+            dados.percentual_taxa_loja
+            if dados.percentual_taxa_loja is not None
+            else (100 if taxa_entrega > 0 else 0)
+        )
+        if tem_entrega
+        else 0.0
+    )
+    if tem_entrega and taxa_entrega > 0 and percentual_taxa_entregador == 0 and percentual_taxa_loja == 0:
+        percentual_taxa_loja = 100.0
+    valor_taxa_entregador = (
+        taxa_entrega * percentual_taxa_entregador / 100 if taxa_entrega > 0 else 0.0
+    )
+    valor_taxa_loja = (
+        taxa_entrega * percentual_taxa_loja / 100 if taxa_entrega > 0 else 0.0
+    )
+    entregador_id_resolvido = (dados.entregador_id or venda.entregador_id) if tem_entrega else None
 
-    if dados.tem_entrega and not entregador_id_resolvido:
+    if tem_entrega and not entregador_id_resolvido:
         raise HTTPException(
             status_code=400,
             detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
@@ -492,7 +514,7 @@ def atualizar_venda(
         dados.itens,
         dados.desconto_valor or 0,
         dados.desconto_percentual or 0,
-        dados.taxa_entrega or 0
+        taxa_entrega
     )
 
     logger.info(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
@@ -511,15 +533,19 @@ def atualizar_venda(
     venda.desconto_percentual = dados.desconto_percentual or 0
     venda.total = totais['total']
     venda.observacoes = dados.observacoes
-    venda.tem_entrega = dados.tem_entrega
-    venda.taxa_entrega = dados.taxa_entrega or 0
+    venda.tem_entrega = tem_entrega
+    venda.taxa_entrega = taxa_entrega
+    venda.percentual_taxa_entregador = percentual_taxa_entregador
+    venda.percentual_taxa_loja = percentual_taxa_loja
+    venda.valor_taxa_entregador = valor_taxa_entregador
+    venda.valor_taxa_loja = valor_taxa_loja
     venda.entregador_id = entregador_id_resolvido
-    venda.loja_origem = dados.loja_origem
-    venda.endereco_entrega = dados.endereco_entrega
-    venda.distancia_km = dados.distancia_km
-    venda.valor_por_km = dados.valor_por_km
-    venda.observacoes_entrega = dados.observacoes_entrega
-    venda.status_entrega = 'pendente' if dados.tem_entrega else None
+    venda.loja_origem = dados.loja_origem if tem_entrega else None
+    venda.endereco_entrega = dados.endereco_entrega if tem_entrega else None
+    venda.distancia_km = dados.distancia_km if tem_entrega else None
+    venda.valor_por_km = dados.valor_por_km if tem_entrega else None
+    venda.observacoes_entrega = dados.observacoes_entrega if tem_entrega else None
+    venda.status_entrega = 'pendente' if tem_entrega else None
     venda.updated_at = datetime.now()
 
     # 🔄 DEVOLVER ESTOQUE dos produtos REMOVIDOS

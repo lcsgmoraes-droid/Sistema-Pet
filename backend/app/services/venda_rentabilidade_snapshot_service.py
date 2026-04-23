@@ -14,7 +14,7 @@ from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_VERSION = 1
+SNAPSHOT_VERSION = 2
 FROZEN_STATUSES = {"finalizada", "baixa_parcial"}
 
 
@@ -154,10 +154,13 @@ def _resolve_taxa_operacional_entrega(
     venda: Any,
     taxa_operacional_entrega: Optional[float],
 ) -> float:
+    if not getattr(venda, "tem_entrega", False):
+        return 0.0
+
     if taxa_operacional_entrega is not None:
         return _round_money(taxa_operacional_entrega)
 
-    if not getattr(venda, "tem_entrega", False) or not getattr(venda, "entregador_id", None):
+    if not getattr(venda, "entregador_id", None):
         return 0.0
 
     try:

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { FiArrowLeft, FiSave, FiAlertCircle, FiCheckCircle, FiPlus } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import CampoIdadeInteligente from '../components/CampoIdadeInteligente';
 import QuickAddModal from '../components/QuickAddModal';
+import { buildReturnWithNovoPet } from '../utils/petReturnFlow';
 import './EspeciesRacas.css'; // Para estilos do botão de adicionar rápido
 
 const listToTextarea = (items = [], fallback = '') => {
@@ -23,10 +24,15 @@ const PetForm = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const isEditing = !!petId;
 
   // Pegar cliente_id do state de navegação (vindo de ClientesNovo.jsx)
   const clienteIdFromState = location.state?.clienteId;
+  const clienteIdFromQuery = searchParams.get('cliente_id');
+  const tutorNomeFromQuery = searchParams.get('tutor_nome') || '';
+  const returnTo = searchParams.get('return_to') || '';
+  const clienteIdPreSelecionado = clienteIdFromQuery || clienteIdFromState || '';
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,7 +47,7 @@ const PetForm = () => {
   const [quickAddTipo, setQuickAddTipo] = useState(null); // 'especie' ou 'raca'
 
   const [formData, setFormData] = useState({
-    cliente_id: clienteIdFromState || '',  // Preenche automaticamente se vier do state
+    cliente_id: clienteIdPreSelecionado || '',  // Preenche automaticamente se vier do state/query
     nome: '',
     especie: '',
     raca: '',
@@ -90,7 +96,26 @@ const PetForm = () => {
     try {
       const response = await api.get('/clientes/');
       const lista = response.data?.items || response.data?.clientes || response.data || [];
-      setClientes(Array.isArray(lista) ? lista : []);
+      let clientesCarregados = Array.isArray(lista) ? lista : [];
+
+      if (
+        clienteIdPreSelecionado &&
+        !clientesCarregados.some((cliente) => String(cliente.id) === String(clienteIdPreSelecionado))
+      ) {
+        try {
+          const responseTutor = await api.get(`/clientes/${clienteIdPreSelecionado}`);
+          if (responseTutor?.data?.id) {
+            clientesCarregados = [responseTutor.data, ...clientesCarregados];
+          }
+        } catch (erroTutor) {
+          console.warn('Não foi possível carregar o tutor pré-selecionado:', erroTutor);
+        }
+      }
+
+      const clientesUnicos = Array.from(
+        new Map(clientesCarregados.map((cliente) => [String(cliente.id), cliente])).values()
+      );
+      setClientes(clientesUnicos);
     } catch (err) {
       console.error('Erro ao carregar clientes:', err);
       setClientes([]);
@@ -251,8 +276,26 @@ const PetForm = () => {
         setTimeout(() => navigate(`/pets/${petId}`), 1500);
       } else {
         const response = await api.post('/pets', dataToSend);
-        setSuccess('Pet cadastrado com sucesso!');
-        setTimeout(() => navigate(`/pets/${response.data.id}`), 1500);
+        const tutorSelecionado = clientes.find(
+          (cliente) => String(cliente.id) === String(dataToSend.cliente_id)
+        );
+        const petCriado = {
+          id: response.data?.id,
+          nome: dataToSend.nome,
+          cliente_id: dataToSend.cliente_id,
+          cliente_nome: tutorSelecionado?.nome || tutorNomeFromQuery || '',
+        };
+
+        if (returnTo) {
+          setSuccess('Pet cadastrado com sucesso! Voltando ao atendimento...');
+          setTimeout(
+            () => navigate(buildReturnWithNovoPet(returnTo, petCriado), { replace: true }),
+            600
+          );
+        } else {
+          setSuccess('Pet cadastrado com sucesso!');
+          setTimeout(() => navigate(`/pets/${response.data.id}`), 1500);
+        }
       }
     } catch (err) {
       console.error('Erro ao salvar pet:', err);
@@ -278,7 +321,13 @@ const PetForm = () => {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => navigate(isEditing ? `/pets/${petId}` : '/pets')}
+          onClick={() => {
+            if (!isEditing && returnTo) {
+              navigate(returnTo);
+              return;
+            }
+            navigate(isEditing ? `/pets/${petId}` : '/pets');
+          }}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
         >
           <FiArrowLeft />
@@ -314,7 +363,7 @@ const PetForm = () => {
       )}
 
       {/* Aviso de tutor pré-selecionado */}
-      {clienteIdFromState && (
+      {clienteIdPreSelecionado && (
         <div className="mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center gap-2">
           <FiCheckCircle />
           <span>
@@ -340,7 +389,7 @@ const PetForm = () => {
                 onChange={handleChange}
                 required
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none ${
-                  clienteIdFromState ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
+                  clienteIdPreSelecionado ? 'border-blue-400 bg-blue-50' : 'border-gray-300'
                 }`}
               >
                 <option value="">Selecione o tutor...</option>
@@ -350,7 +399,7 @@ const PetForm = () => {
                   </option>
                 ))}
               </select>
-              {clienteIdFromState && (
+              {clienteIdPreSelecionado && (
                 <p className="text-xs text-blue-600 mt-1">
                   🎯 Tutor selecionado automaticamente
                 </p>

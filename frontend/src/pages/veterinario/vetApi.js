@@ -16,10 +16,17 @@ export const vetApi = {
   listarAgendamentos: (params) => api.get(`${BASE}/agendamentos`, { params }),
   criarAgendamento: (data) => api.post(`${BASE}/agendamentos`, data),
   atualizarAgendamento: (id, data) => api.patch(`${BASE}/agendamentos/${id}`, data),
+  removerAgendamento: (id) => api.delete(`${BASE}/agendamentos/${id}`),
+  desfazerInicioAgendamento: (id) => api.post(`${BASE}/agendamentos/${id}/desfazer-inicio`),
+  obterCalendarioAgendaMeta: () => api.get(`${BASE}/agenda/calendario`),
+  regenerarCalendarioAgendaToken: () => api.post(`${BASE}/agenda/calendario/token`),
+  baixarCalendarioAgendaIcs: () =>
+    api.get(`${BASE}/agenda/calendario.ics`, { responseType: "blob" }),
 
   // Consultas
   listarConsultas: (params) => api.get(`${BASE}/consultas`, { params }),
   obterConsulta: (id) => api.get(`${BASE}/consultas/${id}`),
+  obterTimelineConsulta: (id) => api.get(`${BASE}/consultas/${id}/timeline`),
   criarConsulta: (data) => api.post(`${BASE}/consultas`, data),
   atualizarConsulta: (id, data) => api.patch(`${BASE}/consultas/${id}`, data),
   finalizarConsulta: (id) => api.post(`${BASE}/consultas/${id}/finalizar`),
@@ -35,6 +42,10 @@ export const vetApi = {
 
   // Veterinários
   listarVeterinarios: () => api.get(`${BASE}/veterinarios`),
+  listarConsultorios: (params) => api.get(`${BASE}/consultorios`, { params }),
+  criarConsultorio: (data) => api.post(`${BASE}/consultorios`, data),
+  atualizarConsultorio: (id, data) => api.patch(`${BASE}/consultorios/${id}`, data),
+  removerConsultorio: (id) => api.delete(`${BASE}/consultorios/${id}`),
 
   // Vacinas
   listarVacinasPet: (petId) => api.get(`${BASE}/pets/${petId}/vacinas`),
@@ -49,6 +60,7 @@ export const vetApi = {
   criarExame: (data) => api.post(`${BASE}/exames`, data),
   atualizarExame: (id, data) => api.patch(`${BASE}/exames/${id}`, data),
   interpretarExameIA: (id) => api.post(`${BASE}/exames/${id}/interpretar-ia`),
+  processarArquivoExameIA: (id) => api.post(`${BASE}/exames/${id}/processar-arquivo-ia`),
   uploadArquivoExame: (id, file) => {
     const formData = new FormData();
     formData.append("arquivo", file);
@@ -135,11 +147,17 @@ export const vetApi = {
   // Catálogos
   listarCatalogoProcedimentos: () => api.get(`${BASE}/catalogo/procedimentos`),
   criarCatalogoProcedimento: (data) => api.post(`${BASE}/catalogo/procedimentos`, data),
+  atualizarCatalogoProcedimento: (id, data) => api.patch(`${BASE}/catalogo/procedimentos/${id}`, data),
+  removerCatalogoProcedimento: (id) => api.delete(`${BASE}/catalogo/procedimentos/${id}`),
   listarProdutosEstoque: (busca) => api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
   listarMedicamentos: (busca) => api.get(`${BASE}/catalogo/medicamentos`, { params: { busca } }),
   criarMedicamento: (data) => api.post(`${BASE}/catalogo/medicamentos`, data),
+  atualizarMedicamento: (id, data) => api.patch(`${BASE}/catalogo/medicamentos/${id}`, data),
+  removerMedicamento: (id) => api.delete(`${BASE}/catalogo/medicamentos/${id}`),
   listarProtocolosVacinas: () => api.get(`${BASE}/catalogo/protocolos-vacinas`),
   criarProtocoloVacina: (params) => api.post(`${BASE}/catalogo/protocolos-vacinas`, null, { params }),
+  atualizarProtocoloVacina: (id, data) => api.patch(`${BASE}/catalogo/protocolos-vacinas/${id}`, data),
+  removerProtocoloVacina: (id) => api.delete(`${BASE}/catalogo/protocolos-vacinas/${id}`),
 
   // Perfil comportamental
   obterPerfilComportamental: (petId) => api.get(`${BASE}/pets/${petId}/perfil-comportamental`),

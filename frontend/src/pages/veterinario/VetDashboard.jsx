@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Stethoscope, Calendar, Syringe, BedDouble, TrendingUp, Plus, AlertCircle } from "lucide-react";
+import { Stethoscope, Calendar, Syringe, BedDouble, TrendingUp, Plus, AlertCircle, Download, Link2 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 
@@ -26,6 +26,8 @@ export default function VetDashboard() {
   const [carregando, setCarregando] = useState(true);
   const [exportando, setExportando] = useState(false);
   const [erro, setErro] = useState(null);
+  const [calendarioMeta, setCalendarioMeta] = useState(null);
+  const [mensagemCalendario, setMensagemCalendario] = useState("");
 
   useEffect(() => {
     async function carregar() {
@@ -52,6 +54,11 @@ export default function VetDashboard() {
           console.warn("Relatório clínico indisponível no momento", relRes.reason);
           setRelatorio(null);
         }
+
+        vetApi
+          .obterCalendarioAgendaMeta()
+          .then((res) => setCalendarioMeta(res.data || null))
+          .catch(() => setCalendarioMeta(null));
       } catch (e) {
         console.error("Erro ao carregar painel veterinário", e);
         setErro("Não foi possível carregar o painel veterinário.");
@@ -150,6 +157,36 @@ export default function VetDashboard() {
       setErro("Não foi possível exportar o relatório clínico.");
     } finally {
       setExportando(false);
+    }
+  }
+
+  async function baixarCalendarioAgenda() {
+    try {
+      setMensagemCalendario("");
+      const resposta = await vetApi.baixarCalendarioAgendaIcs();
+      const blob = new Blob([resposta.data], { type: "text/calendar;charset=utf-8" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "agenda-veterinaria.ics";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Erro ao baixar calendario veterinario", e);
+      setMensagemCalendario("Nao foi possivel baixar o calendario agora.");
+    }
+  }
+
+  async function copiarLinkCalendario() {
+    if (!calendarioMeta?.feed_url) return;
+    try {
+      await navigator.clipboard.writeText(calendarioMeta.feed_url);
+      setMensagemCalendario("Link privado copiado para assinar a agenda no celular.");
+    } catch (e) {
+      console.error("Erro ao copiar link do calendario", e);
+      setMensagemCalendario("Nao foi possivel copiar o link automaticamente.");
     }
   }
 
@@ -260,6 +297,42 @@ export default function VetDashboard() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-cyan-900">Agenda no celular</h2>
+            <p className="mt-1 text-sm text-cyan-800">
+              Use um link privado para assinar sua agenda veterinaria no Google Calendar, Apple Calendar ou Outlook.
+            </p>
+            {calendarioMeta?.mensagem_escopo && (
+              <p className="mt-2 text-xs text-cyan-700">{calendarioMeta.mensagem_escopo}</p>
+            )}
+            {mensagemCalendario && (
+              <p className="mt-2 text-xs font-medium text-cyan-700">{mensagemCalendario}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={baixarCalendarioAgenda}
+              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100"
+            >
+              <Download size={14} />
+              Baixar .ics
+            </button>
+            <button
+              type="button"
+              onClick={copiarLinkCalendario}
+              disabled={!calendarioMeta?.feed_url}
+              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Link2 size={14} />
+              Copiar link privado
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

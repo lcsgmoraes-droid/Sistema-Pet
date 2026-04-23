@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Calculator, Pill, Scale } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
+import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 
 function numero(valor) {
   const parsed = Number.parseFloat(String(valor).replace(",", "."));
@@ -11,14 +13,18 @@ function numero(valor) {
 }
 
 export default function VetCalculadoraDoses() {
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const petIdQuery = searchParams.get("pet_id") || "";
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
   const [pets, setPets] = useState([]);
   const [medicamentos, setMedicamentos] = useState([]);
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [form, setForm] = useState({
     pessoa_id: "",
-    pet_id: petIdQuery,
+    pet_id: novoPetIdQuery || petIdQuery,
     peso_kg: "",
     medicamento_id: "",
     dose_mg_kg: "",
@@ -37,8 +43,9 @@ export default function VetCalculadoraDoses() {
   }, []);
 
   useEffect(() => {
-    if (!petIdQuery || !pets.length) return;
-    const pet = pets.find((item) => String(item.id) === String(petIdQuery));
+    const petIdAlvo = novoPetIdQuery || petIdQuery;
+    if (!petIdAlvo || !pets.length) return;
+    const pet = pets.find((item) => String(item.id) === String(petIdAlvo));
     if (!pet) return;
     setForm((prev) => ({
       ...prev,
@@ -51,7 +58,19 @@ export default function VetCalculadoraDoses() {
         ? { id: String(pet.cliente_id), nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}` }
         : null
     );
-  }, [petIdQuery, pets]);
+  }, [petIdQuery, novoPetIdQuery, pets]);
+
+  useEffect(() => {
+    if (!tutorIdQuery || tutorSelecionado?.id) return;
+    setTutorSelecionado({
+      id: String(tutorIdQuery),
+      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+    });
+    setForm((prev) => ({
+      ...prev,
+      pessoa_id: String(tutorIdQuery),
+    }));
+  }, [tutorIdQuery, tutorNomeQuery, tutorSelecionado]);
 
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
@@ -102,6 +121,10 @@ export default function VetCalculadoraDoses() {
   }, [form]);
 
   const setCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));
+  const retornoNovoPet = useMemo(
+    () => buildReturnTo(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -136,7 +159,14 @@ export default function VetCalculadoraDoses() {
             </div>
 
             <div>
-              <label htmlFor="calc-dose-pet" className="block text-sm font-medium text-gray-700 mb-1">Pet</label>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label htmlFor="calc-dose-pet" className="block text-sm font-medium text-gray-700">Pet</label>
+                <NovoPetButton
+                  tutorId={tutorSelecionado?.id || form.pessoa_id}
+                  tutorNome={tutorSelecionado?.nome}
+                  returnTo={retornoNovoPet}
+                />
+              </div>
               <select
                 id="calc-dose-pet"
                 value={form.pet_id}
@@ -157,6 +187,9 @@ export default function VetCalculadoraDoses() {
                   <option key={pet.id} value={pet.id}>{pet.nome} {pet.especie ? `• ${pet.especie}` : ""}</option>
                 ))}
               </select>
+              {form.pessoa_id && petsDaPessoa.length === 0 && (
+                <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para esta pessoa.</p>
+              )}
             </div>
 
             <div>

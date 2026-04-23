@@ -4,17 +4,23 @@ export default function useProdutosNovoRacao({
   setFormData,
 }) {
   const handleClassificacaoRacaoChange = (valor) => {
+    const ehRacao = valor === 'sim';
+
     setFormData((prev) => ({
       ...prev,
-      classificacao_racao: valor,
-      linha_racao_id: valor === 'sim' ? prev.linha_racao_id : '',
-      porte_animal_id: valor === 'sim' ? prev.porte_animal_id : '',
-      fase_publico_id: valor === 'sim' ? prev.fase_publico_id : '',
-      tipo_tratamento_id: valor === 'sim' ? prev.tipo_tratamento_id : '',
-      sabor_proteina_id: valor === 'sim' ? prev.sabor_proteina_id : '',
-      apresentacao_peso_id: valor === 'sim' ? prev.apresentacao_peso_id : '',
-      peso_embalagem: valor === 'sim' ? prev.peso_embalagem : '',
-      categoria_racao: valor === 'sim' ? prev.categoria_racao : '',
+      eh_racao: ehRacao,
+      linha_racao_id: ehRacao ? prev.linha_racao_id : '',
+      porte_animal_id: ehRacao ? prev.porte_animal_id : '',
+      fase_publico_id: ehRacao ? prev.fase_publico_id : '',
+      tipo_tratamento_id: ehRacao ? prev.tipo_tratamento_id : '',
+      sabor_proteina_id: ehRacao ? prev.sabor_proteina_id : '',
+      apresentacao_peso_id: ehRacao ? prev.apresentacao_peso_id : '',
+      classificacao_racao: ehRacao ? prev.classificacao_racao : '',
+      peso_embalagem: ehRacao ? prev.peso_embalagem : '',
+      categoria_racao: ehRacao ? prev.categoria_racao : '',
+      especies_indicadas: ehRacao ? prev.especies_indicadas : 'both',
+      tabela_nutricional: ehRacao ? prev.tabela_nutricional : '',
+      tabela_consumo: ehRacao ? prev.tabela_consumo : '',
     }));
   };
 

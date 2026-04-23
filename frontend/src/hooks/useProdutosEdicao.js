@@ -12,9 +12,21 @@ export default function useProdutosEdicao({
   const [editandoMargem, setEditandoMargem] = useState(null);
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
+    eh_racao: "",
     marca_id: "",
     categoria_id: "",
     departamento_id: "",
+    linha_racao_id: "",
+    porte_animal_id: "",
+    fase_publico_id: "",
+    tipo_tratamento_id: "",
+    sabor_proteina_id: "",
+    apresentacao_peso_id: "",
+    categoria_racao: "",
+    especies_indicadas: "",
+    controle_lote: "",
+    estoque_minimo: "",
+    estoque_maximo: "",
     anunciar_ecommerce: "",
     anunciar_app: "",
   });
@@ -72,9 +84,21 @@ export default function useProdutosEdicao({
     }
 
     setDadosEdicaoLote({
+      eh_racao: "",
       marca_id: "",
       categoria_id: "",
       departamento_id: "",
+      linha_racao_id: "",
+      porte_animal_id: "",
+      fase_publico_id: "",
+      tipo_tratamento_id: "",
+      sabor_proteina_id: "",
+      apresentacao_peso_id: "",
+      categoria_racao: "",
+      especies_indicadas: "",
+      controle_lote: "",
+      estoque_minimo: "",
+      estoque_maximo: "",
       anunciar_ecommerce: "",
       anunciar_app: "",
     });
@@ -92,6 +116,9 @@ export default function useProdutosEdicao({
       }
 
       const dadosEnvio = {};
+      if (dadosEdicaoLote.eh_racao !== "") {
+        dadosEnvio.eh_racao = dadosEdicaoLote.eh_racao === "true";
+      }
       if (dadosEdicaoLote.marca_id) {
         dadosEnvio.marca_id = parseInt(dadosEdicaoLote.marca_id, 10);
       }
@@ -100,6 +127,39 @@ export default function useProdutosEdicao({
       }
       if (dadosEdicaoLote.departamento_id) {
         dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id, 10);
+      }
+      if (dadosEdicaoLote.linha_racao_id) {
+        dadosEnvio.linha_racao_id = parseInt(dadosEdicaoLote.linha_racao_id, 10);
+      }
+      if (dadosEdicaoLote.porte_animal_id) {
+        dadosEnvio.porte_animal_id = parseInt(dadosEdicaoLote.porte_animal_id, 10);
+      }
+      if (dadosEdicaoLote.fase_publico_id) {
+        dadosEnvio.fase_publico_id = parseInt(dadosEdicaoLote.fase_publico_id, 10);
+      }
+      if (dadosEdicaoLote.tipo_tratamento_id) {
+        dadosEnvio.tipo_tratamento_id = parseInt(dadosEdicaoLote.tipo_tratamento_id, 10);
+      }
+      if (dadosEdicaoLote.sabor_proteina_id) {
+        dadosEnvio.sabor_proteina_id = parseInt(dadosEdicaoLote.sabor_proteina_id, 10);
+      }
+      if (dadosEdicaoLote.apresentacao_peso_id) {
+        dadosEnvio.apresentacao_peso_id = parseInt(dadosEdicaoLote.apresentacao_peso_id, 10);
+      }
+      if (dadosEdicaoLote.categoria_racao) {
+        dadosEnvio.categoria_racao = dadosEdicaoLote.categoria_racao;
+      }
+      if (dadosEdicaoLote.especies_indicadas) {
+        dadosEnvio.especies_indicadas = dadosEdicaoLote.especies_indicadas;
+      }
+      if (dadosEdicaoLote.controle_lote !== "") {
+        dadosEnvio.controle_lote = dadosEdicaoLote.controle_lote === "true";
+      }
+      if (dadosEdicaoLote.estoque_minimo !== "") {
+        dadosEnvio.estoque_minimo = Number(dadosEdicaoLote.estoque_minimo);
+      }
+      if (dadosEdicaoLote.estoque_maximo !== "") {
+        dadosEnvio.estoque_maximo = Number(dadosEdicaoLote.estoque_maximo);
       }
       if (dadosEdicaoLote.anunciar_ecommerce !== "") {
         dadosEnvio.anunciar_ecommerce = dadosEdicaoLote.anunciar_ecommerce === "true";

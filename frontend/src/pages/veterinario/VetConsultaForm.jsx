@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Stethoscope,
   ChevronRight,
@@ -12,10 +12,16 @@ import {
   MessageSquare,
   Send,
   Bot,
+  FlaskConical,
+  Syringe,
+  BedDouble,
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
+import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 
 // ---------- helpers ----------
 function campo(label, obrigatorio = false) {
@@ -34,6 +40,21 @@ function campo(label, obrigatorio = false) {
 function toNumber(value) {
   if (value == null || value === "") return 0;
   return Number(String(value).replace(",", ".")) || 0;
+}
+
+function hojeIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatDateTimeBR(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function obterResumoProcedimentoSelecionado(item, catalogos) {
@@ -65,10 +86,16 @@ const ETAPAS = ["Triagem", "Exame Clínico", "Diagnóstico / Prescrição"];
 // ---------- componente principal ----------
 export default function VetConsultaForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { consultaId } = useParams();
   const [searchParams] = useSearchParams();
   const isEdicao = Boolean(consultaId);
   const petIdQuery = searchParams.get("pet_id") || "";
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
+  const agendamentoIdQuery = searchParams.get("agendamento_id") || "";
+  const tipoQuery = searchParams.get("tipo") || "consulta";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
 
   const [etapa, setEtapa] = useState(0);
   const [salvando, setSalvando] = useState(false);
@@ -79,6 +106,10 @@ export default function VetConsultaForm() {
   const [carregando, setCarregando] = useState(isEdicao);
   const [assinatura, setAssinatura] = useState(null);
   const [baixandoPdf, setBaixandoPdf] = useState(false);
+  const [modalCalculadoraAberto, setModalCalculadoraAberto] = useState(false);
+  const [modalNovoExameAberto, setModalNovoExameAberto] = useState(false);
+  const [salvandoNovoExame, setSalvandoNovoExame] = useState(false);
+  const [refreshExamesToken, setRefreshExamesToken] = useState(0);
   const modoSomenteLeitura = isEdicao && finalizado;
   const tituloConsulta = modoSomenteLeitura
     ? "Consulta finalizada (somente visualização)"
@@ -95,6 +126,31 @@ export default function VetConsultaForm() {
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
   const [listaPetsExpandida, setListaPetsExpandida] = useState(false);
+  const [novoExameForm, setNovoExameForm] = useState({
+    tipo: "laboratorial",
+    nome: "",
+    data_solicitacao: hojeIso(),
+    laboratorio: "",
+    observacoes: "",
+  });
+  const [novoExameArquivo, setNovoExameArquivo] = useState(null);
+  const [calculadoraForm, setCalculadoraForm] = useState({
+    medicamento_id: "",
+    peso_kg: "",
+    dose_mg_kg: "",
+    frequencia_horas: "12",
+    dias: "7",
+  });
+  const [timelineConsulta, setTimelineConsulta] = useState([]);
+  const [carregandoTimeline, setCarregandoTimeline] = useState(false);
+  const [modalInsumoAberto, setModalInsumoAberto] = useState(false);
+  const [salvandoInsumoRapido, setSalvandoInsumoRapido] = useState(false);
+  const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
+  const [insumoRapidoForm, setInsumoRapidoForm] = useState({
+    quantidade_utilizada: "1",
+    quantidade_desperdicio: "",
+    observacoes: "",
+  });
 
   // ---------- Form state ----------
   const [form, setForm] = useState({
@@ -124,10 +180,6 @@ export default function VetConsultaForm() {
     prescricao_itens: [], // [{nome, principio, dose_mg, frequencia, duracao}]
     procedimentos_realizados: [],
   });
-  const rotaCalculadora = form.pet_id
-    ? `/veterinario/calculadora-doses?pet_id=${form.pet_id}`
-    : "/veterinario/calculadora-doses";
-
   // Carrega dados ao editar
   useEffect(() => {
     if (!isEdicao) return;
@@ -194,9 +246,10 @@ export default function VetConsultaForm() {
 
   useEffect(() => {
     if (isEdicao) return;
-    if (!petIdQuery || !pets.length) return;
+    const petIdAlvo = novoPetIdQuery || petIdQuery;
+    if (!petIdAlvo || !pets.length) return;
 
-    const petEncontrado = pets.find((p) => String(p.id) === String(petIdQuery));
+    const petEncontrado = pets.find((p) => String(p.id) === String(petIdAlvo));
     if (!petEncontrado) return;
 
     set("pet_id", String(petEncontrado.id));
@@ -208,7 +261,21 @@ export default function VetConsultaForm() {
     });
     setBuscaTutor(petEncontrado.cliente_nome ?? "");
     setListaPetsExpandida(false);
-  }, [isEdicao, petIdQuery, pets]);
+  }, [isEdicao, petIdQuery, novoPetIdQuery, pets]);
+
+  useEffect(() => {
+    if (isEdicao || !tutorIdQuery) return;
+    setTutorSelecionado((prev) => {
+      if (prev?.id && String(prev.id) === String(tutorIdQuery)) return prev;
+      return {
+        id: String(tutorIdQuery),
+        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+        telefone: "",
+        celular: "",
+      };
+    });
+    setBuscaTutor((prev) => prev || tutorNomeQuery || "");
+  }, [isEdicao, tutorIdQuery, tutorNomeQuery]);
 
   function set(campo, valor) {
     setForm((prev) => ({ ...prev, [campo]: valor }));
@@ -258,6 +325,49 @@ export default function VetConsultaForm() {
     return especieValida ? `${petSelecionado.nome} (${especie})` : petSelecionado.nome;
   }, [petSelecionado]);
 
+  const retornoNovoPet = useMemo(
+    () => buildReturnTo(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
+  const medicamentoCalculadoraSelecionado = useMemo(
+    () =>
+      medicamentosCatalogo.find(
+        (item) => String(item.id) === String(calculadoraForm.medicamento_id)
+      ) ?? null,
+    [medicamentosCatalogo, calculadoraForm.medicamento_id]
+  );
+  const calculadoraResultado = useMemo(() => {
+    const peso = parseNumero(calculadoraForm.peso_kg);
+    const dose = parseNumero(calculadoraForm.dose_mg_kg);
+    const frequencia = parseNumero(calculadoraForm.frequencia_horas);
+    const dias = parseNumero(calculadoraForm.dias);
+    if (!Number.isFinite(peso) || peso <= 0 || !Number.isFinite(dose) || dose <= 0) {
+      return null;
+    }
+
+    const mgPorDose = peso * dose;
+    const dosesPorDia = Number.isFinite(frequencia) && frequencia > 0 ? 24 / frequencia : null;
+    const mgDia = dosesPorDia ? mgPorDose * dosesPorDia : null;
+    const mgTratamento = mgDia && Number.isFinite(dias) && dias > 0 ? mgDia * dias : null;
+
+    return {
+      mgPorDose,
+      dosesPorDia,
+      mgDia,
+      mgTratamento,
+    };
+  }, [calculadoraForm]);
+  const contextoConsultaParams = useMemo(() => {
+    if (!form.pet_id) return "";
+    const params = new URLSearchParams();
+    params.set("pet_id", String(form.pet_id));
+    if (consultaIdAtual) params.set("consulta_id", String(consultaIdAtual));
+    if (agendamentoIdQuery) params.set("agendamento_id", String(agendamentoIdQuery));
+    if (tutorSelecionado?.id) params.set("tutor_id", String(tutorSelecionado.id));
+    if (tutorSelecionado?.nome) params.set("tutor_nome", tutorSelecionado.nome);
+    return params.toString();
+  }, [form.pet_id, consultaIdAtual, agendamentoIdQuery, tutorSelecionado]);
+
   useEffect(() => {
     const termo = buscaTutor.trim();
     if (!termo) {
@@ -305,6 +415,61 @@ export default function VetConsultaForm() {
     setBuscaTutor((prev) => prev || petAtual.cliente_nome || "");
   }, [form.pet_id, pets]);
 
+  useEffect(() => {
+    setCalculadoraForm((prev) => ({
+      ...prev,
+      peso_kg: prev.peso_kg || form.peso_kg || String(petSelecionado?.peso || ""),
+    }));
+  }, [form.peso_kg, petSelecionado]);
+
+  useEffect(() => {
+    if (!medicamentoCalculadoraSelecionado) return;
+    const doseMin = parseNumero(medicamentoCalculadoraSelecionado.dose_minima_mg_kg);
+    const doseMax = parseNumero(medicamentoCalculadoraSelecionado.dose_maxima_mg_kg);
+    const doseMedia = Number.isFinite(doseMin) && Number.isFinite(doseMax)
+      ? ((doseMin + doseMax) / 2).toFixed(2)
+      : doseMin || doseMax || "";
+    setCalculadoraForm((prev) => ({
+      ...prev,
+      dose_mg_kg: prev.dose_mg_kg || String(doseMedia || ""),
+    }));
+  }, [medicamentoCalculadoraSelecionado]);
+
+  useEffect(() => {
+    if (!consultaIdAtual) {
+      setTimelineConsulta([]);
+      return;
+    }
+    carregarTimelineConsulta(consultaIdAtual);
+  }, [consultaIdAtual]);
+
+  async function carregarTimelineConsulta(id = consultaIdAtual) {
+    if (!id) return;
+    setCarregandoTimeline(true);
+    try {
+      const res = await vetApi.obterTimelineConsulta(id);
+      setTimelineConsulta(Array.isArray(res.data?.eventos) ? res.data.eventos : []);
+    } catch {
+      setTimelineConsulta([]);
+    } finally {
+      setCarregandoTimeline(false);
+    }
+  }
+
+  function abrirModalInsumoRapido() {
+    if (!consultaIdAtual) {
+      setErro("Salve a consulta primeiro para lançar insumos rápidos.");
+      return;
+    }
+    setInsumoRapidoSelecionado(null);
+    setInsumoRapidoForm({
+      quantidade_utilizada: "1",
+      quantidade_desperdicio: "",
+      observacoes: "",
+    });
+    setModalInsumoAberto(true);
+  }
+
   function selecionarTutor(tutor) {
     setTutorSelecionado(tutor);
     setBuscaTutor(tutor.nome);
@@ -339,6 +504,8 @@ export default function VetConsultaForm() {
         pet_id: form.pet_id || undefined,
         cliente_id: petSelecionadoAtual.cliente_id,
         veterinario_id: form.veterinario_id || undefined,
+        tipo: tipoQuery || "consulta",
+        agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
         queixa_principal: form.motivo_consulta || undefined,
         // Campos extras são ignorados pelo backend no create e usados no patch quando suportados.
         peso_kg: form.peso_kg ? Number.parseFloat(form.peso_kg) : undefined,
@@ -455,6 +622,7 @@ export default function VetConsultaForm() {
       // finaliza (gera hash)
       await vetApi.finalizarConsulta(consultaIdAtual);
       setFinalizado(true);
+      await carregarTimelineConsulta();
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao finalizar.");
     } finally {
@@ -675,6 +843,132 @@ export default function VetConsultaForm() {
     }
   }
 
+  function abrirFluxoConsulta(pathname, extras = {}) {
+    if (!contextoConsultaParams) {
+      setErro("Salve a consulta com um pet válido antes de abrir outro fluxo clínico.");
+      return;
+    }
+    const params = new URLSearchParams(contextoConsultaParams);
+    Object.entries(extras).forEach(([chave, valor]) => {
+      if (valor == null || valor === "") return;
+      params.set(chave, String(valor));
+    });
+    navigate(`${pathname}?${params.toString()}`);
+  }
+
+  async function salvarNovoExameRapido() {
+    if (!form.pet_id || !novoExameForm.nome.trim()) {
+      setErro("Selecione o pet e informe o nome do exame.");
+      return;
+    }
+
+    setSalvandoNovoExame(true);
+    setErro(null);
+    try {
+      const res = await vetApi.criarExame({
+        pet_id: Number(form.pet_id),
+        consulta_id: consultaIdAtual ? Number(consultaIdAtual) : undefined,
+        agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
+        tipo: novoExameForm.tipo,
+        nome: novoExameForm.nome.trim(),
+        data_solicitacao: novoExameForm.data_solicitacao || undefined,
+        laboratorio: novoExameForm.laboratorio?.trim() || undefined,
+        observacoes: novoExameForm.observacoes?.trim() || undefined,
+      });
+
+      if (novoExameArquivo) {
+        await vetApi.uploadArquivoExame(res.data.id, novoExameArquivo);
+        try {
+          await vetApi.processarArquivoExameIA(res.data.id);
+        } catch (erroProcessamento) {
+          console.warn("Nao foi possivel processar o arquivo do exame com IA automaticamente.", erroProcessamento);
+        }
+      }
+
+      setModalNovoExameAberto(false);
+      setNovoExameForm({
+        tipo: "laboratorial",
+        nome: "",
+        data_solicitacao: hojeIso(),
+        laboratorio: "",
+        observacoes: "",
+      });
+      setNovoExameArquivo(null);
+      setRefreshExamesToken((prev) => prev + 1);
+      setSucesso("Exame vinculado à consulta com sucesso.");
+      await carregarTimelineConsulta();
+      setEtapa(1);
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Não foi possível registrar o exame.");
+    } finally {
+      setSalvandoNovoExame(false);
+    }
+  }
+
+  async function salvarInsumoRapidoConsulta() {
+    if (!consultaIdAtual) {
+      setErro("Salve a consulta primeiro para lançar insumos.");
+      return;
+    }
+    if (!insumoRapidoSelecionado?.id) {
+      setErro("Selecione o insumo do estoque.");
+      return;
+    }
+
+    const quantidadeUtilizada = parseNumero(insumoRapidoForm.quantidade_utilizada);
+    const quantidadeDesperdicio = parseNumero(insumoRapidoForm.quantidade_desperdicio) || 0;
+    const quantidadeConsumida = quantidadeUtilizada + quantidadeDesperdicio;
+
+    if (!Number.isFinite(quantidadeUtilizada) || quantidadeUtilizada <= 0) {
+      setErro("Informe a quantidade efetivamente utilizada do insumo.");
+      return;
+    }
+    if (!Number.isFinite(quantidadeConsumida) || quantidadeConsumida <= 0) {
+      setErro("A baixa total do insumo precisa ser maior que zero.");
+      return;
+    }
+
+    setSalvandoInsumoRapido(true);
+    setErro(null);
+    try {
+      const unidade = insumoRapidoSelecionado.unidade || "un";
+      await vetApi.adicionarProcedimento({
+        consulta_id: Number(consultaIdAtual),
+        nome: `Insumo: ${insumoRapidoSelecionado.nome}`,
+        descricao: "Lançamento rápido de insumo durante a consulta",
+        valor: 0,
+        observacoes: insumoRapidoForm.observacoes?.trim()
+          ? `${insumoRapidoForm.observacoes.trim()} | Utilizado: ${quantidadeUtilizada} ${unidade}${quantidadeDesperdicio ? ` | Desperdício: ${quantidadeDesperdicio} ${unidade}` : ""}`
+          : `Utilizado: ${quantidadeUtilizada} ${unidade}${quantidadeDesperdicio ? ` | Desperdício: ${quantidadeDesperdicio} ${unidade}` : ""}`,
+        realizado: true,
+        baixar_estoque: true,
+        insumos: [
+          {
+            produto_id: insumoRapidoSelecionado.id,
+            nome: insumoRapidoSelecionado.nome,
+            unidade,
+            quantidade: quantidadeConsumida,
+            baixar_estoque: true,
+          },
+        ],
+      });
+
+      setModalInsumoAberto(false);
+      setInsumoRapidoSelecionado(null);
+      setInsumoRapidoForm({
+        quantidade_utilizada: "1",
+        quantidade_desperdicio: "",
+        observacoes: "",
+      });
+      setSucesso("Insumo lançado com sucesso na consulta.");
+      await carregarTimelineConsulta();
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Não foi possível lançar o insumo.");
+    } finally {
+      setSalvandoInsumoRapido(false);
+    }
+  }
+
   // ---------- Render ----------
   if (carregando) {
     return (
@@ -722,17 +1016,31 @@ export default function VetConsultaForm() {
             <h1 className="text-xl font-bold text-gray-800">
               {tituloConsulta}
             </h1>
-            <p className="text-xs text-gray-400">{consultaIdAtual ? `ID: ${String(consultaIdAtual).slice(0, 8)}…` : "Ainda não salva"}</p>
+            <p className="text-xs text-gray-400">
+              {consultaIdAtual ? `Código da consulta: #${consultaIdAtual}` : "Ainda não salva"}
+            </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate(rotaCalculadora)}
-          className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
-        >
-          <Calculator size={16} />
-          Calculadora livre
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {consultaIdAtual && (
+            <button
+              type="button"
+              onClick={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
+              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+            >
+              <MessageSquare size={16} />
+              IA da consulta
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setModalCalculadoraAberto(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
+          >
+            <Calculator size={16} />
+            Calculadora
+          </button>
+        </div>
       </div>
 
       {modoSomenteLeitura && (
@@ -883,19 +1191,24 @@ export default function VetConsultaForm() {
             <div className="col-span-2">
               {campo("Pet", true)(
               <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => tutorSelecionado && setListaPetsExpandida((prev) => !prev)}
-                  disabled={!tutorSelecionado || isEdicao}
-                  className="w-full flex items-center justify-between px-3 py-2 text-sm disabled:opacity-60"
-                >
-                  <span className="text-left">
-                    {petSelecionadoLabel}
-                  </span>
+                <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => tutorSelecionado && setListaPetsExpandida((prev) => !prev)}
+                    disabled={!tutorSelecionado || isEdicao}
+                    className="flex-1 text-left text-sm disabled:opacity-60"
+                  >
+                    <span>{petSelecionadoLabel}</span>
+                  </button>
+                  <NovoPetButton
+                    tutorId={tutorSelecionado?.id}
+                    tutorNome={tutorSelecionado?.nome}
+                    returnTo={retornoNovoPet}
+                  />
                   <span className="text-gray-500 text-xs">
                     {tutorSelecionado ? `${petsDoTutor.length} pet(s)` : "Sem tutor"}
                   </span>
-                </button>
+                </div>
 
                 {listaPetsExpandida && tutorSelecionado && !isEdicao && (
                   <div className="border-t border-gray-200 max-h-52 overflow-y-auto p-2 space-y-1">
@@ -1011,8 +1324,43 @@ export default function VetConsultaForm() {
             )}
           </fieldset>
 
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-blue-900">Exames ligados a esta consulta</h3>
+                <p className="text-xs text-blue-700">
+                  Cadastre o exame já com anexo e mantenha a IA olhando o mesmo caso clínico.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalNovoExameAberto(true)}
+                  disabled={modoSomenteLeitura || !form.pet_id || !consultaIdAtual}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+                >
+                  <FlaskConical size={15} />
+                  Novo exame / anexo
+                </button>
+                {consultaIdAtual && (
+                  <button
+                    type="button"
+                    onClick={() => abrirFluxoConsulta("/veterinario/exames", { acao: "novo" })}
+                    className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                  >
+                    Ver tela de exames
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Painel chat IA de exames */}
-          <ExameChatIA petId={form.pet_id} />
+          <ExameChatIAAvancada
+            petId={form.pet_id}
+            refreshToken={refreshExamesToken}
+            onNovoExame={() => setModalNovoExameAberto(true)}
+          />
         </>
       )}
 
@@ -1112,9 +1460,19 @@ export default function VetConsultaForm() {
           <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-700">Procedimentos realizados</h2>
-              <button onClick={adicionarProcedimento} className="text-xs text-blue-600 hover:text-blue-800 underline">
-                + Adicionar procedimento
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={adicionarProcedimento} className="text-xs text-blue-600 hover:text-blue-800 underline">
+                  + Adicionar procedimento
+                </button>
+                <button
+                  type="button"
+                  onClick={abrirModalInsumoRapido}
+                  disabled={!consultaIdAtual}
+                  className="text-xs text-emerald-600 hover:text-emerald-800 underline disabled:opacity-50"
+                >
+                  + Lançar insumo rápido
+                </button>
+              </div>
             </div>
             {form.procedimentos_realizados.length === 0 && (
               <p className="text-xs text-gray-400">Nenhum procedimento lançado ainda.</p>
@@ -1169,6 +1527,124 @@ export default function VetConsultaForm() {
               </div>
             ))}
           </fieldset>
+
+          <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-purple-900">Fluxos vinculados à consulta</h3>
+                <p className="text-xs text-purple-700">
+                  Use a consulta #{consultaIdAtual || "—"} como referência para exames, vacinas, IA e internação.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
+                  disabled={!consultaIdAtual}
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
+                >
+                  <MessageSquare size={15} />
+                  IA da consulta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => abrirFluxoConsulta("/veterinario/vacinas", { acao: "novo" })}
+                  disabled={!consultaIdAtual}
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
+                >
+                  <Syringe size={15} />
+                  Registrar vacina
+                </button>
+                <button
+                  type="button"
+                  onClick={() => abrirFluxoConsulta("/veterinario/internacoes", { abrir_nova: "1" })}
+                  disabled={!consultaIdAtual}
+                  className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
+                >
+                  <BedDouble size={15} />
+                  Encaminhar para internação
+                </button>
+              </div>
+            </div>
+            {!consultaIdAtual && (
+              <p className="mt-3 text-xs text-purple-700">
+                Salve o rascunho primeiro para liberar os outros fluxos já amarrados a esta consulta.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">Timeline clínica da consulta</h3>
+                <p className="text-xs text-slate-500">
+                  Consulta, exames, vacinas, procedimentos, insumos e internações vinculados ficam centralizados aqui.
+                </p>
+              </div>
+              {consultaIdAtual && (
+                <button
+                  type="button"
+                  onClick={() => carregarTimelineConsulta()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <RefreshCw size={14} />
+                  Atualizar timeline
+                </button>
+              )}
+            </div>
+
+            {!consultaIdAtual ? (
+              <p className="mt-4 text-xs text-slate-500">Salve a consulta para começar a montar a timeline clínica.</p>
+            ) : carregandoTimeline ? (
+              <div className="mt-4 flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-slate-500" />
+              </div>
+            ) : timelineConsulta.length === 0 ? (
+              <p className="mt-4 text-xs text-slate-500">Nenhum evento clínico vinculado ainda.</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {timelineConsulta.map((evento) => (
+                  <div key={`${evento.kind}_${evento.item_id}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            {evento.kind.replaceAll("_", " ")}
+                          </span>
+                          {evento.status ? (
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                              {evento.status}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm font-semibold text-slate-900">{evento.titulo}</p>
+                        <p className="text-xs text-slate-500">{formatDateTimeBR(evento.data_hora)}</p>
+                        {evento.descricao ? <p className="mt-2 text-sm text-slate-600">{evento.descricao}</p> : null}
+                        {Array.isArray(evento.meta?.insumos) && evento.meta.insumos.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {evento.meta.insumos.map((insumo, idx) => (
+                              <span key={`${evento.kind}_${evento.item_id}_insumo_${idx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                                {insumo.nome || `Produto #${insumo.produto_id}`} • {insumo.quantidade} {insumo.unidade || "un"}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      {evento.link ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(evento.link)}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                          Abrir
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1226,7 +1702,7 @@ export default function VetConsultaForm() {
                 title={!form.diagnostico ? "Preencha o diagnóstico para finalizar" : ""}
               >
                 <Lock size={14} />
-                {salvando ? "Finalizando…" : "Finalizar e assinar"}
+                {salvando ? "Finalizando…" : "Dar alta / finalizar"}
               </button>
             </div>
           )}
@@ -1234,12 +1710,347 @@ export default function VetConsultaForm() {
           )}
         </div>
       </div>
+
+      {modalInsumoAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Lançar insumo rápido</h2>
+                <p className="text-sm text-gray-500">
+                  Consulta #{consultaIdAtual || "—"} • {petSelecionadoLabel}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalInsumoAberto(false)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Fechar modal de insumo"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4">
+              <ProdutoEstoqueAutocomplete
+                selectedProduct={insumoRapidoSelecionado}
+                onSelect={setInsumoRapidoSelecionado}
+                helperText="Pesquise o material, medicamento ou item de consumo usado durante a consulta."
+              />
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Quantidade utilizada *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={insumoRapidoForm.quantidade_utilizada}
+                    onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))}
+                    className={css.input}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Desperdício / perda</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={insumoRapidoForm.quantidade_desperdicio}
+                    onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))}
+                    className={css.input}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
+                <textarea
+                  value={insumoRapidoForm.observacoes}
+                  onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, observacoes: e.target.value }))}
+                  rows={4}
+                  className={css.textarea}
+                  placeholder="Ex.: usado 1 tapete agora e outro precisou ser descartado, bolsa de soro conectada, desinfecção do campo..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setModalInsumoAberto(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarInsumoRapidoConsulta}
+                disabled={salvandoInsumoRapido}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {salvandoInsumoRapido ? "Salvando..." : "Registrar insumo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalCalculadoraAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Calculadora rápida de dose</h2>
+                <p className="text-sm text-gray-500">
+                  Modal livre para cálculo rápido durante a consulta.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalCalculadoraAberto(false)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Fechar calculadora"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Pet</label>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  {petSelecionadoLabel}
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Peso atual (kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={calculadoraForm.peso_kg}
+                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, peso_kg: e.target.value }))}
+                  className={css.input}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Medicamento</label>
+                <select
+                  value={calculadoraForm.medicamento_id}
+                  onChange={(e) => {
+                    setCalculadoraForm((prev) => ({
+                      ...prev,
+                      medicamento_id: e.target.value,
+                      dose_mg_kg: "",
+                    }));
+                  }}
+                  className={css.select}
+                >
+                  <option value="">Selecione…</option>
+                  {medicamentosCatalogo.map((med) => (
+                    <option key={med.id} value={med.id}>
+                      {med.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Dose (mg/kg)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={calculadoraForm.dose_mg_kg}
+                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, dose_mg_kg: e.target.value }))}
+                  className={css.input}
+                />
+                {(medicamentoCalculadoraSelecionado?.dose_minima_mg_kg || medicamentoCalculadoraSelecionado?.dose_maxima_mg_kg) && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Faixa do catálogo: {medicamentoCalculadoraSelecionado?.dose_minima_mg_kg || "—"}
+                    {medicamentoCalculadoraSelecionado?.dose_maxima_mg_kg
+                      ? ` a ${medicamentoCalculadoraSelecionado.dose_maxima_mg_kg}`
+                      : ""} mg/kg
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Frequência (horas)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={calculadoraForm.frequencia_horas}
+                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, frequencia_horas: e.target.value }))}
+                  className={css.input}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Dias de tratamento</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={calculadoraForm.dias}
+                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, dias: e.target.value }))}
+                  className={css.input}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-cyan-100 bg-cyan-50 p-4">
+              {!calculadoraResultado ? (
+                <p className="text-sm text-cyan-700">
+                  Informe peso e dose para calcular. Se quiser, você ainda pode abrir a calculadora completa depois.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg por dose</p>
+                    <p className="text-lg font-semibold text-cyan-900">{calculadoraResultado.mgPorDose.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">doses / dia</p>
+                    <p className="text-lg font-semibold text-cyan-900">
+                      {calculadoraResultado.dosesPorDia ? calculadoraResultado.dosesPorDia.toFixed(2) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg / dia</p>
+                    <p className="text-lg font-semibold text-cyan-900">
+                      {calculadoraResultado.mgDia ? calculadoraResultado.mgDia.toFixed(2) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg tratamento</p>
+                    <p className="text-lg font-semibold text-cyan-900">
+                      {calculadoraResultado.mgTratamento ? calculadoraResultado.mgTratamento.toFixed(2) : "—"}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setModalCalculadoraAberto(false)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalNovoExameAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Novo exame vinculado à consulta</h2>
+                <p className="text-sm text-gray-500">
+                  Consulta #{consultaIdAtual || "—"} • {petSelecionadoLabel}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalNovoExameAberto(false)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Fechar modal de exame"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Tipo</label>
+                <select
+                  value={novoExameForm.tipo}
+                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, tipo: e.target.value }))}
+                  className={css.select}
+                >
+                  <option value="laboratorial">Laboratorial</option>
+                  <option value="imagem">Imagem</option>
+                  <option value="clinico">Clínico</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Data da solicitação</label>
+                <input
+                  type="date"
+                  value={novoExameForm.data_solicitacao}
+                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, data_solicitacao: e.target.value }))}
+                  className={css.input}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Nome do exame</label>
+                <input
+                  type="text"
+                  value={novoExameForm.nome}
+                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, nome: e.target.value }))}
+                  placeholder="Ex: hemograma, ultrassom, perfil renal..."
+                  className={css.input}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Laboratório</label>
+                <input
+                  type="text"
+                  value={novoExameForm.laboratorio}
+                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, laboratorio: e.target.value }))}
+                  className={css.input}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
+                <textarea
+                  value={novoExameForm.observacoes}
+                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, observacoes: e.target.value }))}
+                  rows={4}
+                  className={css.textarea}
+                  placeholder="Contexto clínico, o que espera confirmar, prioridade..."
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Arquivo do exame</label>
+                <input
+                  type="file"
+                  onChange={(e) => setNovoExameArquivo(e.target.files?.[0] ?? null)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-blue-700"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Pode registrar sem arquivo agora e anexar depois, mas com anexo a IA já ganha contexto melhor.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setModalNovoExameAberto(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarNovoExameRapido}
+                disabled={salvandoNovoExame || !form.pet_id || !novoExameForm.nome.trim()}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {salvandoNovoExame ? "Salvando..." : "Salvar exame"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------- Componente ExameChatIA ----------
-function ExameChatIA({ petId }) {
+function ExameChatIA({ petId, refreshToken, onNovoExame }) {
   const [expandido, setExpandido] = useState(false);
   const [exames, setExames] = useState([]);
   const [exameId, setExameId] = useState("");
@@ -1254,7 +2065,7 @@ function ExameChatIA({ petId }) {
       .listarExamesPet(petId)
       .then((r) => setExames(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
       .catch(() => {});
-  }, [petId]);
+  }, [petId, refreshToken]);
 
   useEffect(() => {
     chatFimRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1293,7 +2104,7 @@ function ExameChatIA({ petId }) {
       >
         <div className="flex items-center gap-2">
           <Bot size={18} className="text-indigo-500" />
-          <span className="text-sm font-semibold text-indigo-800">Consultor IA de exames</span>
+          <span className="text-sm font-semibold text-indigo-800">Exames do paciente + IA</span>
           {exames.length > 0 && (
             <span className="text-xs bg-indigo-200 text-indigo-700 px-2 py-0.5 rounded-full">
               {exames.length} exame{exames.length !== 1 ? "s" : ""}
@@ -1305,10 +2116,24 @@ function ExameChatIA({ petId }) {
 
       {expandido && (
         <div className="px-4 pb-4 space-y-3">
+          <div className="flex flex-wrap gap-2 pt-1">
+            {typeof onNovoExame === "function" && (
+              <button
+                type="button"
+                onClick={onNovoExame}
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              >
+                <FlaskConical size={14} />
+                Novo exame / anexar
+              </button>
+            )}
+          </div>
           {!petId ? (
             <p className="text-xs text-indigo-500 italic">Selecione o pet para carregar os exames.</p>
           ) : exames.length === 0 ? (
-            <p className="text-xs text-indigo-500 italic">Nenhum exame encontrado para este pet ainda.</p>
+            <p className="text-xs text-indigo-500 italic">
+              Nenhum exame encontrado para este pet ainda. Você já pode cadastrar e anexar um arquivo acima.
+            </p>
           ) : (
             <>
               <div>
@@ -1321,8 +2146,8 @@ function ExameChatIA({ petId }) {
                   <option value="">Selecione um exame…</option>
                   {exames.map((ex) => (
                     <option key={ex.id} value={ex.id}>
-                      {ex.nome || ex.tipo || `Exame #${ex.id}`}
-                      {ex.data_solicitacao ? ` — ${ex.data_solicitacao}` : ""}
+                      #{ex.id} • {ex.nome || ex.tipo || `Exame`}
+                      {ex.data_solicitacao ? ` • ${ex.data_solicitacao}` : ""}
                     </option>
                   ))}
                 </select>
@@ -1330,6 +2155,23 @@ function ExameChatIA({ petId }) {
 
               {exameId && (
                 <>
+                  {(() => {
+                    const exameSelecionado = exames.find((item) => String(item.id) === String(exameId));
+                    if (!exameSelecionado) return null;
+                    return (
+                      <div className="rounded-lg border border-indigo-200 bg-white px-3 py-3 text-xs text-indigo-700">
+                        <div className="font-semibold text-indigo-800">
+                          Exame #{exameSelecionado.id} • {exameSelecionado.nome || exameSelecionado.tipo || "Exame"}
+                        </div>
+                        <div className="mt-1">
+                          {exameSelecionado.arquivo_nome
+                            ? `Arquivo anexado: ${exameSelecionado.arquivo_nome}`
+                            : "Sem arquivo anexado ainda"}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Histórico do chat */}
                   {historico.length > 0 && (
                     <div className="max-h-56 overflow-y-auto space-y-2 bg-white border border-indigo-100 rounded-lg p-3">
@@ -1387,6 +2229,439 @@ function ExameChatIA({ petId }) {
                       onClick={enviar}
                       disabled={!pergunta.trim() || carregando}
                       className="flex items-center gap-1 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Send size={14} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExameChatIAAvancada({ petId, refreshToken, onNovoExame }) {
+  const [expandido, setExpandido] = useState(true);
+  const [exames, setExames] = useState([]);
+  const [exameId, setExameId] = useState("");
+  const [pergunta, setPergunta] = useState("");
+  const [historico, setHistorico] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const [processando, setProcessando] = useState(false);
+  const [erroLocal, setErroLocal] = useState("");
+  const chatFimRef = useRef(null);
+  const exameSelecionado = useMemo(
+    () => exames.find((item) => String(item.id) === String(exameId)),
+    [exames, exameId]
+  );
+  const payloadIA = exameSelecionado?.interpretacao_ia_payload || {};
+  const alertasIA = Array.isArray(exameSelecionado?.interpretacao_ia_alertas)
+    ? exameSelecionado.interpretacao_ia_alertas
+    : [];
+  const resultadoEstruturado =
+    exameSelecionado?.resultado_json && typeof exameSelecionado.resultado_json === "object"
+      ? Object.entries(exameSelecionado.resultado_json)
+      : [];
+  const achadosImagem = Array.isArray(payloadIA.achados_imagem) ? payloadIA.achados_imagem : [];
+  const condutasSugeridas = Array.isArray(payloadIA.conduta_sugerida) ? payloadIA.conduta_sugerida : [];
+  const limitacoesIA = Array.isArray(payloadIA.limitacoes) ? payloadIA.limitacoes : [];
+  const temArquivo = Boolean(exameSelecionado?.arquivo_url);
+  const temAnaliseIA = Boolean(
+    exameSelecionado?.interpretacao_ia ||
+      exameSelecionado?.interpretacao_ia_resumo ||
+      alertasIA.length ||
+      achadosImagem.length ||
+      condutasSugeridas.length
+  );
+  const temResultadoBase = Boolean(
+    (exameSelecionado?.resultado_texto || "").trim() || resultadoEstruturado.length
+  );
+
+  async function carregarExames(preferidoId = null) {
+    if (!petId) return;
+    try {
+      const response = await vetApi.listarExamesPet(petId);
+      const lista = Array.isArray(response.data) ? response.data : response.data?.items ?? [];
+      setExames(lista);
+      setExameId((anterior) => {
+        const alvo = preferidoId != null ? String(preferidoId) : anterior;
+        if (alvo && lista.some((item) => String(item.id) === alvo)) return alvo;
+        return lista.length === 1 ? String(lista[0].id) : "";
+      });
+    } catch {
+      setExames([]);
+    }
+  }
+
+  useEffect(() => {
+    carregarExames();
+  }, [petId, refreshToken]);
+
+  useEffect(() => {
+    chatFimRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [historico]);
+
+  useEffect(() => {
+    setErroLocal("");
+  }, [exameId]);
+
+  async function processarExameSelecionado() {
+    if (!exameSelecionado || processando) return;
+    setProcessando(true);
+    setErroLocal("");
+    try {
+      const response = temArquivo
+        ? await vetApi.processarArquivoExameIA(Number(exameSelecionado.id))
+        : await vetApi.interpretarExameIA(Number(exameSelecionado.id));
+      const exameAtualizado = response.data;
+      setExames((lista) =>
+        lista.map((item) => (String(item.id) === String(exameAtualizado.id) ? exameAtualizado : item))
+      );
+      setHistorico((mensagens) => [
+        ...mensagens,
+        {
+          role: "ia",
+          text: temArquivo
+            ? "Arquivo processado com IA. Ja deixei o resumo clinico pronto para voce revisar e perguntar em seguida."
+            : "Resultado interpretado com IA. Ja deixei a triagem automatica atualizada.",
+        },
+      ]);
+    } catch (erro) {
+      setErroLocal(
+        erro?.response?.data?.detail ||
+          (temArquivo
+            ? "Nao foi possivel processar o arquivo com IA agora."
+            : "Nao foi possivel interpretar o resultado agora.")
+      );
+    } finally {
+      setProcessando(false);
+    }
+  }
+
+  async function enviar() {
+    if (!exameId || !pergunta.trim() || carregando) return;
+    const perg = pergunta.trim();
+    setHistorico((mensagens) => [...mensagens, { role: "user", text: perg }]);
+    setPergunta("");
+    setCarregando(true);
+    setErroLocal("");
+    try {
+      const response = await vetApi.chatExameIA(Number(exameId), perg);
+      setHistorico((mensagens) => [...mensagens, { role: "ia", text: response.data.resposta }]);
+      await carregarExames(exameId);
+    } catch {
+      setHistorico((mensagens) => [
+        ...mensagens,
+        { role: "ia", text: "Erro ao consultar a IA. Tente novamente." },
+      ]);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      enviar();
+    }
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-indigo-200 bg-indigo-50">
+      <button
+        type="button"
+        onClick={() => setExpandido((valorAtual) => !valorAtual)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-indigo-100"
+      >
+        <div className="flex items-center gap-2">
+          <Bot size={18} className="text-indigo-500" />
+          <span className="text-sm font-semibold text-indigo-800">Exames do paciente + IA</span>
+          {exames.length > 0 && (
+            <span className="rounded-full bg-indigo-200 px-2 py-0.5 text-xs text-indigo-700">
+              {exames.length} exame{exames.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+        <span className="text-xs text-indigo-500">{expandido ? "fechar" : "abrir"}</span>
+      </button>
+
+      {expandido && (
+        <div className="space-y-3 px-4 pb-4">
+          <div className="rounded-lg border border-indigo-100 bg-white px-3 py-3 text-xs text-indigo-700">
+            <p className="font-medium text-indigo-800">O que esta IA ja pode ajudar agora</p>
+            <p className="mt-1">
+              Processa hemograma, bioquimica, laudos em PDF e imagem anexada ao exame. Para imagem, ajuda a revisar
+              raio-x, ultrassom e outros arquivos visuais como apoio clinico, sem substituir o laudo do especialista.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-1">
+            {typeof onNovoExame === "function" && (
+              <button
+                type="button"
+                onClick={onNovoExame}
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
+              >
+                <FlaskConical size={14} />
+                Novo exame / anexar
+              </button>
+            )}
+            {exameSelecionado && (
+              <button
+                type="button"
+                onClick={processarExameSelecionado}
+                disabled={processando}
+                className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {processando
+                  ? "Processando..."
+                  : temArquivo
+                    ? temAnaliseIA
+                      ? "Reprocessar arquivo + IA"
+                      : "Processar arquivo + IA"
+                    : "Interpretar resultado"}
+              </button>
+            )}
+          </div>
+
+          {erroLocal && (
+            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-600">
+              <AlertCircle size={14} />
+              <span>{erroLocal}</span>
+            </div>
+          )}
+
+          {!petId ? (
+            <p className="text-xs italic text-indigo-500">Selecione o pet para carregar os exames.</p>
+          ) : exames.length === 0 ? (
+            <p className="text-xs italic text-indigo-500">
+              Nenhum exame encontrado para este pet ainda. Voce ja pode cadastrar e anexar um arquivo acima.
+            </p>
+          ) : (
+            <>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-indigo-700">Exame para consultar</label>
+                <select
+                  value={exameId}
+                  onChange={(event) => {
+                    setExameId(event.target.value);
+                    setHistorico([]);
+                  }}
+                  className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  <option value="">Selecione um exame...</option>
+                  {exames.map((exame) => (
+                    <option key={exame.id} value={exame.id}>
+                      #{exame.id} - {exame.nome || exame.tipo || "Exame"}
+                      {exame.data_solicitacao ? ` - ${exame.data_solicitacao}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {exameSelecionado && (
+                <>
+                  <div className="space-y-3 rounded-xl border border-indigo-200 bg-white px-3 py-3 text-xs text-indigo-700">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-indigo-900">
+                          Exame #{exameSelecionado.id} - {exameSelecionado.nome || exameSelecionado.tipo || "Exame"}
+                        </div>
+                        <p className="mt-1 text-indigo-600">
+                          Tipo: {exameSelecionado.tipo || "nao informado"}
+                          {exameSelecionado.data_solicitacao ? ` - solicitado em ${exameSelecionado.data_solicitacao}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className={`rounded-full px-2 py-1 font-medium ${temArquivo ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                          {temArquivo ? "Arquivo anexado" : "Sem arquivo"}
+                        </span>
+                        <span className={`rounded-full px-2 py-1 font-medium ${temAnaliseIA ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"}`}>
+                          {temAnaliseIA ? "IA pronta" : "IA pendente"}
+                        </span>
+                        <span className={`rounded-full px-2 py-1 font-medium ${temResultadoBase ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                          {temResultadoBase ? "Resultado carregado" : "Sem resultado base"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {exameSelecionado.arquivo_nome && (
+                      <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
+                        <p className="font-medium text-indigo-800">Arquivo</p>
+                        <div className="mt-1 flex flex-wrap items-center gap-3">
+                          <span>{exameSelecionado.arquivo_nome}</span>
+                          {exameSelecionado.arquivo_url && (
+                            <a
+                              href={exameSelecionado.arquivo_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-700 underline"
+                            >
+                              abrir arquivo
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {(exameSelecionado.interpretacao_ia_resumo || exameSelecionado.interpretacao_ia) && (
+                      <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-3">
+                        <p className="font-medium text-indigo-900">Resumo da triagem</p>
+                        <p className="mt-1 text-sm text-indigo-800">
+                          {exameSelecionado.interpretacao_ia_resumo || exameSelecionado.interpretacao_ia}
+                        </p>
+                        {exameSelecionado.interpretacao_ia && exameSelecionado.interpretacao_ia !== exameSelecionado.interpretacao_ia_resumo && (
+                          <p className="mt-2 text-xs text-indigo-700">
+                            <strong>Conclusao:</strong> {exameSelecionado.interpretacao_ia}
+                          </p>
+                        )}
+                        {exameSelecionado.interpretacao_ia_confianca != null && (
+                          <p className="mt-2 text-[11px] text-indigo-600">
+                            Confianca estimada: {Math.round(Number(exameSelecionado.interpretacao_ia_confianca || 0) * 100)}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {alertasIA.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-indigo-900">Alertas automaticos</p>
+                        <div className="flex flex-wrap gap-2">
+                          {alertasIA.map((alerta, index) => {
+                            const status = String(alerta.status || "atencao").toLowerCase();
+                            const classes =
+                              status === "alto" || status === "baixo"
+                                ? "border-red-200 bg-red-50 text-red-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700";
+                            return (
+                              <span key={`${alerta.campo || "alerta"}_${index}`} className={`rounded-full border px-2 py-1 text-[11px] ${classes}`}>
+                                {alerta.mensagem || alerta.campo}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {(achadosImagem.length > 0 || condutasSugeridas.length > 0 || limitacoesIA.length > 0) && (
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-lg border border-indigo-100 bg-gray-50 px-3 py-3">
+                          <p className="font-medium text-gray-800">Achados da imagem</p>
+                          {achadosImagem.length > 0 ? (
+                            <ul className="mt-2 space-y-1 text-gray-600">
+                              {achadosImagem.map((item, index) => (
+                                <li key={`achado_${index}`}>- {item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 text-gray-500">Sem achados visuais destacados.</p>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-indigo-100 bg-gray-50 px-3 py-3">
+                          <p className="font-medium text-gray-800">Condutas sugeridas</p>
+                          {condutasSugeridas.length > 0 ? (
+                            <ul className="mt-2 space-y-1 text-gray-600">
+                              {condutasSugeridas.map((item, index) => (
+                                <li key={`conduta_${index}`}>- {item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 text-gray-500">Sem conduta sugerida automaticamente.</p>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-indigo-100 bg-gray-50 px-3 py-3">
+                          <p className="font-medium text-gray-800">Limitacoes</p>
+                          {limitacoesIA.length > 0 ? (
+                            <ul className="mt-2 space-y-1 text-gray-600">
+                              {limitacoesIA.map((item, index) => (
+                                <li key={`limite_${index}`}>- {item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 text-gray-500">Sem limitacoes especiais registradas.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {resultadoEstruturado.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-medium text-indigo-900">Valores estruturados</p>
+                        <div className="flex flex-wrap gap-2">
+                          {resultadoEstruturado.slice(0, 12).map(([chave, valor]) => (
+                            <span key={chave} className="rounded-full border border-indigo-200 bg-white px-2 py-1 text-[11px] text-indigo-700">
+                              {chave}: {String(valor)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {!temArquivo && !temResultadoBase && (
+                      <p className="text-xs text-amber-700">
+                        Este exame ainda nao tem arquivo nem resultado em texto. Cadastre o anexo para a IA conseguir
+                        analisar hemograma, bioquimica, laudos em PDF e imagens.
+                      </p>
+                    )}
+                  </div>
+
+                  {historico.length > 0 && (
+                    <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-indigo-100 bg-white p-3">
+                      {historico.map((mensagem, index) => (
+                        <div
+                          key={index}
+                          className={`flex ${mensagem.role === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                              mensagem.role === "user"
+                                ? "rounded-br-none bg-indigo-600 text-white"
+                                : "rounded-bl-none bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {mensagem.role === "ia" && (
+                              <span className="mb-0.5 block text-xs font-semibold text-indigo-500">IA</span>
+                            )}
+                            {mensagem.text}
+                          </div>
+                        </div>
+                      ))}
+                      {carregando && (
+                        <div className="flex justify-start">
+                          <div className="animate-pulse rounded-xl rounded-bl-none bg-gray-100 px-3 py-2 text-sm text-gray-500">
+                            Analisando...
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatFimRef} />
+                    </div>
+                  )}
+
+                  {historico.length === 0 && (
+                    <p className="text-xs italic text-indigo-400">
+                      Pergunte sobre o exame selecionado. Ex.: "Ha anemia no hemograma?", "Tem alerta importante?",
+                      "O raio-x sugere alteracao pulmonar?" ou "Qual conduta devo revisar?".
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={pergunta}
+                      onChange={(event) => setPergunta(event.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Digite sua pergunta sobre o exame..."
+                      disabled={carregando}
+                      className="flex-1 rounded-lg border border-indigo-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={enviar}
+                      disabled={!pergunta.trim() || carregando}
+                      className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
                     >
                       <Send size={14} />
                     </button>

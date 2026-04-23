@@ -49,12 +49,43 @@ function formatDateTime(value) {
 }
 
 function resolveProductPrice(product) {
+  if (product?.promocao_ativa && product?.preco_promocional != null) {
+    return Number(product.preco_promocional ?? 0);
+  }
   return Number(
     product?.preco_venda ??
       product?.preco ??
-      product?.preco_promocional ??
       0
   );
+}
+
+function resolveOriginalProductPrice(product) {
+  return Number(product?.preco_venda ?? product?.preco ?? 0);
+}
+
+function hasPromotionalPrice(product) {
+  return (
+    Boolean(product?.promocao_ativa) &&
+    Number(product?.preco_promocional ?? 0) > 0 &&
+    Number(product?.preco_promocional ?? 0) < resolveOriginalProductPrice(product)
+  );
+}
+
+function resolveValidityPromotionText(product) {
+  const promocaoValidade = product?.promocao_validade;
+  if (!promocaoValidade?.ativa) return "";
+  const quantidade = Number(promocaoValidade?.quantidade_promocional ?? 0);
+  if (!Number.isFinite(quantidade) || quantidade <= 0) return "";
+  const quantidadeLabel = Number.isInteger(quantidade)
+    ? quantidade
+    : quantidade.toFixed(2).replace(".", ",");
+  return `Ate ${quantidadeLabel} unid. desse lote por esse preco`;
+}
+
+function resolveValidityPromotionLimit(product) {
+  const limite = Number(product?.promocao_validade?.quantidade_promocional ?? 0);
+  if (product?.promocao_origem !== 'validade') return null;
+  return Number.isFinite(limite) && limite > 0 ? limite : null;
 }
 
 function resolveProductStock(product) {
@@ -1150,6 +1181,14 @@ export default function EcommerceMVP() {
     }
 
     if (!customerToken) {
+      const limiteValidade = resolveValidityPromotionLimit(product);
+      const quantidadeAtual = Array.isArray(cart?.itens)
+        ? Number(cart.itens.find((item) => item.produto_id === product.id)?.quantidade || 0)
+        : 0;
+      if (limiteValidade && quantidadeAtual + 1 > limiteValidade) {
+        setError(`Oferta de validade disponivel para ate ${limiteValidade} unidade(s) nesse preco.`);
+        return;
+      }
       setError('');
       const price = resolveProductPrice(product);
       setCart((previousCart) => {
@@ -1197,6 +1236,15 @@ export default function EcommerceMVP() {
 
   async function updateCartItem(itemId, quantidade) {
     if (!customerToken) {
+      const itemAtual = Array.isArray(cart?.itens)
+        ? cart.itens.find((item) => item.item_id === itemId)
+        : null;
+      const produtoAtual = itemAtual ? productMap[itemAtual.produto_id] : null;
+      const limiteValidade = resolveValidityPromotionLimit(produtoAtual);
+      if (limiteValidade && quantidade > limiteValidade) {
+        setError(`Oferta de validade disponivel para ate ${limiteValidade} unidade(s) nesse preco.`);
+        return;
+      }
       setCart((previousCart) => {
         const currentItems = Array.isArray(previousCart?.itens) ? previousCart.itens : [];
 
@@ -1872,6 +1920,16 @@ export default function EcommerceMVP() {
                       <div style={S.cardCat}>{product?.categoria_nome || product?.categoria || 'Sem categoria'}</div>
                       <div style={S.cardSku}>SKU: {product?.codigo || '-'}</div>
                       <div style={S.cardPrice}>{formatCurrency(resolveProductPrice(product))}</div>
+                      {hasPromotionalPrice(product) && (
+                        <div style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'line-through', marginTop: 2 }}>
+                          {formatCurrency(resolveOriginalProductPrice(product))}
+                        </div>
+                      )}
+                      {resolveValidityPromotionText(product) && (
+                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: '#166534', lineHeight: 1.35 }}>
+                          {resolveValidityPromotionText(product)}
+                        </div>
+                      )}
 
                       <button
                         disabled={outOfStock}
@@ -1993,6 +2051,16 @@ export default function EcommerceMVP() {
               <div style={{ fontSize: 30, fontWeight: 800, color: '#1a1a2e', letterSpacing: -1 }}>
                 {formatCurrency(resolveProductPrice(selectedProduct))}
               </div>
+              {hasPromotionalPrice(selectedProduct) && (
+                <div style={{ marginTop: -6, fontSize: 14, color: '#94a3b8', textDecoration: 'line-through' }}>
+                  {formatCurrency(resolveOriginalProductPrice(selectedProduct))}
+                </div>
+              )}
+              {resolveValidityPromotionText(selectedProduct) && (
+                <div style={{ marginTop: -6, fontSize: 12, fontWeight: 700, color: '#166534' }}>
+                  {resolveValidityPromotionText(selectedProduct)}
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#faf7f4', borderRadius: 10, padding: '12px 14px' }}>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>Categoria: <strong style={{ color: '#1a1a2e' }}>{selectedProduct?.categoria_nome || selectedProduct?.categoria || 'Sem categoria'}</strong></div>

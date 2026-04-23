@@ -8,11 +8,33 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.db import get_session
 from app.models import Tenant
 from app.produtos_models import Produto
+from app.services.validade_campanha_service import (
+    mapear_ofertas_validade_por_produto,
+    resolver_preco_publico_produto,
+)
 
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CATALOG_ORDER_OPTIONS = {"prontos", "nome", "menor_preco", "maior_preco"}
+
+
+def _serializar_promocao_validade(oferta, origem_preco: str | None) -> dict | None:
+    if not oferta:
+        return None
+    return {
+        "ativa": bool(oferta.active),
+        "origem_preco_promocional": origem_preco,
+        "lote_id": oferta.lote_id,
+        "nome_lote": oferta.lote_nome,
+        "dias_para_vencer": oferta.dias_para_vencer,
+        "quantidade_promocional": oferta.quantity_available,
+        "percentual_desconto": oferta.percentual_desconto,
+        "preco_promocional": oferta.promotional_price,
+        "faixa": oferta.faixa,
+        "label": oferta.label,
+        "mensagem": oferta.message,
+    }
 
 
 def _normalize_sales_channel(raw_channel: str | None) -> str:
@@ -201,7 +223,10 @@ def listar_produtos_publicos(
     )
     prioridade_estoque = case((estoque_catalogo > 0, 0), else_=1)
     prioridade_imagem = case((tem_imagem_expr, 0), else_=1)
-    preco_catalogo = func.coalesce(Produto.preco_venda, 0)
+    if canal_normalizado == "app":
+        preco_catalogo = func.coalesce(Produto.preco_app, Produto.preco_venda, 0)
+    else:
+        preco_catalogo = func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0)
 
     query = (
         db.query(Produto)
@@ -258,20 +283,26 @@ def listar_produtos_publicos(
         )
 
     itens = query.offset(offset).limit(limit).all()
+    ofertas_validade = mapear_ofertas_validade_por_produto(db, itens, canal_normalizado)
 
     return {
         "total": total,
         "offset": offset,
         "limit": limit,
         "items": [
-            {
+            (lambda pricing, oferta: {
                 "id": produto.id,
                 "nome": produto.nome,
                 "codigo": produto.codigo,
                 "codigo_barras": produto.codigo_barras,
-                "preco_venda": produto.preco_venda,
-                "preco_promocional": produto.preco_promocional,
-                "promocao_ativa": produto.promocao_ativa,
+                "preco_venda": pricing.regular_price,
+                "preco_promocional": pricing.promotional_price,
+                "promocao_ativa": pricing.promotion_active,
+                "promocao_origem": pricing.promotion_origin,
+                "promocao_validade": _serializar_promocao_validade(
+                    oferta,
+                    pricing.promotion_origin,
+                ),
                 "categoria_id": produto.categoria_id,
                 "categoria_nome": getattr(produto.categoria, "nome", None),
                 "marca_nome": getattr(produto.marca, "nome", None) if hasattr(produto, "marca") else None,
@@ -292,7 +323,14 @@ def listar_produtos_publicos(
                 "peso_embalagem": produto.peso_embalagem,
                 "classificacao_racao": produto.classificacao_racao,
                 "categoria_racao": produto.categoria_racao,
-            }
+            })(
+                resolver_preco_publico_produto(
+                    produto,
+                    canal_normalizado,
+                    validity_offer=ofertas_validade.get(produto.id),
+                ),
+                ofertas_validade.get(produto.id),
+            )
             for produto in itens
         ],
     }

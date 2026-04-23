@@ -103,24 +103,40 @@ export default function useProdutosNovoSubmit({
         observacoes_recorrencia: formData.tem_recorrencia
           ? formData.observacoes_recorrencia
           : null,
-        classificacao_racao: formData.classificacao_racao || null,
-        peso_embalagem: formData.peso_embalagem ? parseFloat(formData.peso_embalagem) : null,
-        tabela_nutricional: formData.tabela_nutricional || null,
-        tabela_consumo: formData.tabela_consumo || null,
-        categoria_racao: formData.categoria_racao || null,
-        especies_indicadas: formData.especies_indicadas || null,
-        linha_racao_id: formData.linha_racao_id ? parseInt(formData.linha_racao_id) : null,
-        porte_animal_id: formData.porte_animal_id ? parseInt(formData.porte_animal_id) : null,
-        fase_publico_id: formData.fase_publico_id ? parseInt(formData.fase_publico_id) : null,
-        tipo_tratamento_id: formData.tipo_tratamento_id
-          ? parseInt(formData.tipo_tratamento_id)
-          : null,
-        sabor_proteina_id: formData.sabor_proteina_id
-          ? parseInt(formData.sabor_proteina_id)
-          : null,
-        apresentacao_peso_id: formData.apresentacao_peso_id
-          ? parseInt(formData.apresentacao_peso_id)
-          : null,
+        eh_racao: Boolean(formData.eh_racao),
+        classificacao_racao: formData.eh_racao ? formData.classificacao_racao || null : null,
+        peso_embalagem:
+          formData.eh_racao && formData.peso_embalagem
+            ? parseFloat(formData.peso_embalagem)
+            : null,
+        tabela_nutricional: formData.eh_racao ? formData.tabela_nutricional || null : null,
+        tabela_consumo: formData.eh_racao ? formData.tabela_consumo || null : null,
+        categoria_racao: formData.eh_racao ? formData.categoria_racao || null : null,
+        especies_indicadas: formData.eh_racao ? formData.especies_indicadas || null : null,
+        linha_racao_id:
+          formData.eh_racao && formData.linha_racao_id
+            ? parseInt(formData.linha_racao_id)
+            : null,
+        porte_animal_id:
+          formData.eh_racao && formData.porte_animal_id
+            ? parseInt(formData.porte_animal_id)
+            : null,
+        fase_publico_id:
+          formData.eh_racao && formData.fase_publico_id
+            ? parseInt(formData.fase_publico_id)
+            : null,
+        tipo_tratamento_id:
+          formData.eh_racao && formData.tipo_tratamento_id
+            ? parseInt(formData.tipo_tratamento_id)
+            : null,
+        sabor_proteina_id:
+          formData.eh_racao && formData.sabor_proteina_id
+            ? parseInt(formData.sabor_proteina_id)
+            : null,
+        apresentacao_peso_id:
+          formData.eh_racao && formData.apresentacao_peso_id
+            ? parseInt(formData.apresentacao_peso_id)
+            : null,
       };
 
       debugLog('Enviando dados para API:', dados);

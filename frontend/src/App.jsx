@@ -6,7 +6,9 @@ import Layout from "./components/Layout";
 import ModuloBloqueado from "./components/ModuloBloqueado";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
+import { useAuth } from "./contexts/AuthContext";
 import { ModulosProvider } from "./contexts/ModulosContext";
+import { isMobileViewport, isVeterinarioProfile } from "./utils/veterinarioPerfil";
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Register = lazy(() => import("./pages/Register"));
@@ -34,6 +36,9 @@ const ProdutosValorizacaoEstoque = lazy(
 const ProdutosBalanco = lazy(() => import("./pages/ProdutosBalanco"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
 const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
+const EstoqueTransferenciaParceiro = lazy(
+  () => import("./pages/EstoqueTransferenciaParceiro"),
+);
 const SEFAZImportacao = lazy(() => import("./pages/SEFAZImportacao"));
 const preloadLembretes = () => import("./pages/Lembretes");
 const Lembretes = lazy(preloadLembretes);
@@ -255,6 +260,12 @@ function AppRoutePreloader() {
   return null;
 }
 
+function DefaultProtectedHomeRedirect() {
+  const { user } = useAuth();
+  const destino = isMobileViewport() && isVeterinarioProfile(user) ? "/veterinario/agenda" : "/lembretes";
+  return <Navigate to={destino} replace />;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -289,7 +300,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route index element={<Navigate to="/lembretes" replace />} />
+                  <Route index element={<DefaultProtectedHomeRedirect />} />
                   <Route
                     path="dashboard"
                     element={
@@ -399,6 +410,10 @@ function App() {
                     element={<ProdutosRelatorio />}
                   />
                   <Route
+                    path="produtos/validade-proxima"
+                    element={<Navigate to="/estoque/alertas?aba=validade" replace />}
+                  />
+                  <Route
                     path="produtos/valorizacao-estoque"
                     element={
                       <ProtectedRoute permission="produtos.visualizar">
@@ -427,6 +442,14 @@ function App() {
                     element={
                       <ProtectedRoute permission="produtos.editar">
                         <EstoqueFullNF />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="estoque/transferencia-parceiro"
+                    element={
+                      <ProtectedRoute permission="produtos.editar">
+                        <EstoqueTransferenciaParceiro />
                       </ProtectedRoute>
                     }
                   />

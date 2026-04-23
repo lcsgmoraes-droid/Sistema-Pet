@@ -43,7 +43,40 @@ class KitEstoqueService:
     """
     
     @staticmethod
-    def calcular_estoque_virtual_kit(db: Session, kit_id: int) -> int:
+    def _obter_reservas_componentes(
+        db: Session,
+        tenant_id=None,
+        reservas_por_produto: Optional[Dict[int, float]] = None,
+    ) -> Dict[int, float]:
+        """Retorna reservas ativas por produto para o tenant informado."""
+        if reservas_por_produto is not None:
+            return reservas_por_produto
+
+        if tenant_id is None:
+            return {}
+
+        try:
+            from app.estoque_reserva_service import EstoqueReservaService
+
+            return EstoqueReservaService.mapa_reservas_ativas_por_produto(
+                db,
+                str(tenant_id),
+            )
+        except Exception as exc:
+            logger.warning(
+                "Nao foi possivel carregar reservas dos componentes do tenant %s: %s",
+                tenant_id,
+                exc,
+            )
+            return {}
+
+    @staticmethod
+    def calcular_estoque_virtual_kit(
+        db: Session,
+        kit_id: int,
+        tenant_id=None,
+        reservas_por_produto: Optional[Dict[int, float]] = None,
+    ) -> int:
         """
         Calcula quantos kits podem ser montados com base no estoque dos componentes.
         
@@ -71,6 +104,12 @@ class KitEstoqueService:
         if kit.tipo_kit == 'FISICO':
             return int(kit.estoque_atual or 0)
         
+        reservas_ativas = KitEstoqueService._obter_reservas_componentes(
+            db,
+            tenant_id=tenant_id or getattr(kit, "tenant_id", None),
+            reservas_por_produto=reservas_por_produto,
+        )
+
         # Buscar componentes do KIT
         componentes = db.query(ProdutoKitComponente).filter(
             ProdutoKitComponente.kit_id == kit_id
@@ -92,16 +131,22 @@ class KitEstoqueService:
                 logger.error(f"Componente #{comp.produto_componente_id} não encontrado")
                 return 0
             
-            estoque_componente = produto_componente.estoque_atual or 0
+            estoque_componente = float(produto_componente.estoque_atual or 0)
+            estoque_reservado = float(
+                reservas_ativas.get(produto_componente.id, 0.0) or 0.0
+            )
+            estoque_disponivel = max(estoque_componente - estoque_reservado, 0.0)
             quantidade_necessaria = comp.quantidade or 1
             
             # Quantos kits podemos montar com este componente?
-            kits_possiveis = int(estoque_componente // quantidade_necessaria)
+            kits_possiveis = int(estoque_disponivel // quantidade_necessaria)
             kits_possiveis_por_componente.append(kits_possiveis)
             
             logger.debug(
                 f"Componente '{produto_componente.nome}': "
                 f"estoque={estoque_componente}, "
+                f"reservado={estoque_reservado}, "
+                f"disponivel={estoque_disponivel}, "
                 f"necessário={quantidade_necessaria}, "
                 f"kits_possíveis={kits_possiveis}"
             )
@@ -215,7 +260,12 @@ class KitEstoqueService:
         return True, None
     
     @staticmethod
-    def obter_detalhes_composicao(db: Session, kit_id: int) -> List[Dict]:
+    def obter_detalhes_composicao(
+        db: Session,
+        kit_id: int,
+        tenant_id=None,
+        reservas_por_produto: Optional[Dict[int, float]] = None,
+    ) -> List[Dict]:
         """
         Retorna detalhes completos da composição de um KIT.
         
@@ -226,6 +276,13 @@ class KitEstoqueService:
         Returns:
             Lista de dicts com dados completos de cada componente
         """
+        kit = db.query(Produto).filter(Produto.id == kit_id).first()
+        reservas_ativas = KitEstoqueService._obter_reservas_componentes(
+            db,
+            tenant_id=tenant_id or getattr(kit, "tenant_id", None),
+            reservas_por_produto=reservas_por_produto,
+        )
+
         componentes = db.query(ProdutoKitComponente).filter(
             ProdutoKitComponente.kit_id == kit_id
         ).all()
@@ -237,8 +294,11 @@ class KitEstoqueService:
             ).first()
             
             if produto:
-                estoque_atual = produto.estoque_atual or 0
-                kits_possiveis = int(estoque_atual // comp.quantidade)
+                estoque_atual = float(produto.estoque_atual or 0)
+                estoque_reservado = float(reservas_ativas.get(produto.id, 0.0) or 0.0)
+                estoque_disponivel = max(estoque_atual - estoque_reservado, 0.0)
+                quantidade_necessaria = float(comp.quantidade or 1)
+                kits_possiveis = int(estoque_disponivel // quantidade_necessaria)
                 
                 resultado.append({
                     'id': comp.id,
@@ -248,6 +308,8 @@ class KitEstoqueService:
                     'produto_tipo': produto.tipo_produto,
                     'quantidade': comp.quantidade,
                     'estoque_componente': estoque_atual,
+                    'estoque_reservado': estoque_reservado,
+                    'estoque_disponivel': estoque_disponivel,
                     'kits_possiveis': kits_possiveis,
                     'ordem': comp.ordem,
                     'opcional': comp.opcional,

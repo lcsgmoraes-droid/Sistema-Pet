@@ -1,4 +1,4 @@
-import { PawPrint, Stethoscope } from "lucide-react";
+import { CalendarDays, FlaskConical, PawPrint, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -34,6 +34,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
+import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 import TooltipPremium from "./TooltipPremium";
@@ -130,20 +131,25 @@ const Layout = () => {
   const [lembretesCount, setLembretesCount] = useState(0);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
   const overlaySuspeitoDesdeRef = useRef(new Map());
+  const perfilVeterinario = isVeterinarioProfile(user);
+  const rotaVeterinaria = location.pathname.startsWith("/veterinario");
+  const exibirAtalhosVetMobile = isMobile && perfilVeterinario && rotaVeterinaria;
+  const atalhosVetMobile = [
+    { path: "/veterinario", label: "Painel", icon: Stethoscope },
+    { path: "/veterinario/agenda", label: "Agenda", icon: CalendarDays },
+    { path: "/veterinario/consultas", label: "Consultas", icon: FiFileText },
+    { path: "/veterinario/vacinas", label: "Vacinas", icon: Syringe },
+    { path: "/veterinario/exames", label: "Exames", icon: FlaskConical },
+  ];
 
   const neutralizarOverlay = (elementoOverlay) => {
     if (!elementoOverlay) return;
 
+    elementoOverlay.setAttribute("data-overlay-neutralizado", "true");
     elementoOverlay.style.pointerEvents = "none";
     elementoOverlay.style.backgroundColor = "transparent";
     elementoOverlay.style.opacity = "0";
     elementoOverlay.style.transition = "opacity 120ms ease";
-
-    window.setTimeout(() => {
-      if (elementoOverlay.parentNode) {
-        elementoOverlay.remove();
-      }
-    }, 140);
   };
 
   const ehOverlayTelaCheia = (elementoOverlay) => {
@@ -170,6 +176,10 @@ const Layout = () => {
     const overlays = Array.from(document.querySelectorAll("div.fixed.inset-0"));
 
     return overlays.filter((elementoOverlay) => {
+      if (elementoOverlay.getAttribute("data-overlay-neutralizado") === "true") {
+        return false;
+      }
+
       if (!ehOverlayTelaCheia(elementoOverlay)) {
         return false;
       }
@@ -193,8 +203,6 @@ const Layout = () => {
       const overlayCalculadora =
         elementoOverlay.getAttribute("data-overlay-type") ===
         "calculadora-universal";
-      const overlaySemConteudo =
-        (elementoOverlay.textContent || "").trim().length === 0;
 
       if (!visivel || !bloqueiaClique) {
         return false;
@@ -210,10 +218,7 @@ const Layout = () => {
         return true;
       }
 
-      return (
-        !possuiConteudoModal &&
-        (fundoAtivo || possuiSpinner || overlaySemConteudo)
-      );
+      return !possuiConteudoModal && (fundoAtivo || possuiSpinner);
     });
   };
 
@@ -473,6 +478,11 @@ const Layout = () => {
         {
           path: "/estoque/full-nf",
           label: "Movimentacao Full por NF",
+          permission: "produtos.editar",
+        },
+        {
+          path: "/estoque/transferencia-parceiro",
+          label: "Transferencia Parceiro",
           permission: "produtos.editar",
         },
         {
@@ -771,7 +781,7 @@ const Layout = () => {
         },
         {
           path: "/ia/alertas-racao",
-          label: "⚠ Alertas Rações",
+          label: "Comparador de Racoes",
           permission: "produtos.editar",
         },
       ],
@@ -1260,18 +1270,45 @@ const Layout = () => {
         </header>
 
         {/* Page Content */}
-        <main className={`flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : "p-3 md:p-6"}`}>
+        <main className={`flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}>
           <Outlet />
         </main>
       </div>
 
       {/* Botão flutuante da calculadora */}
+      {!exibirAtalhosVetMobile && (
       <FloatingCalculatorButton
         onClick={() => {
           console.log("🎯 Layout: Abrindo calculadora...");
           setCalculadoraAberta(true);
         }}
       />
+      )}
+
+      {exibirAtalhosVetMobile && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-cyan-100 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.35rem)] pt-2 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+          <div className="grid grid-cols-5 gap-1">
+            {atalhosVetMobile.map((item) => {
+              const Icon = item.icon;
+              const ativo = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors ${
+                    ativo
+                      ? "bg-cyan-50 text-cyan-700"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
       {/* Modal da Calculadora Universal */}
       {calculadoraAberta && (

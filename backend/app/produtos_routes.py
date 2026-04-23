@@ -12,8 +12,8 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, text, or_, case
-from typing import List, Optional
+from sqlalchemy import func, text, or_, and_, case
+from typing import Any, List, Optional
 from datetime import datetime, timedelta
 import random
 import logging
@@ -25,10 +25,12 @@ from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
 from .models import User, Cliente
 from app.partner_utils import get_all_accessible_tenant_ids, is_partner_owned
+from .vendas_models import Venda, VendaItem
 from .produtos_models import (
     Categoria, Marca, Departamento, Produto, ProdutoLote,
     ProdutoImagem, ProdutoFornecedor, ListaPreco, ProdutoListaPreco,
     EstoqueMovimentacao, ProdutoHistoricoPreco, NotaEntrada,
+    CampanhaValidadeAutomatica, CampanhaValidadeExclusao,
     ProdutoKitComponente  # Sprint 4: ComposiÃ§Ã£o de KIT
 )
 from pydantic import BaseModel, Field, ConfigDict, field_validator
@@ -36,6 +38,11 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 # Service Layer
 from .services.produto_service import ProdutoService
 from .services.kit_estoque_service import KitEstoqueService  # Sprint 4: ComposiÃ§Ã£o de KIT
+from .services.validade_campanha_service import (
+    construir_oferta_validade,
+    obter_configs_campanha_validade,
+    obter_mapas_exclusao_validade,
+)
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -47,6 +54,59 @@ PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
 
 def _produto_sku_value(produto: Produto) -> Optional[str]:
     return getattr(produto, "sku", None)
+
+
+def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:
+    """Consolida reservas ativas por produto para os tenants acessiveis."""
+    try:
+        from app.estoque_reserva_service import EstoqueReservaService
+
+        reservas_consolidadas: dict[int, float] = {}
+        for tenant_ref in {str(tenant) for tenant in tenant_ids if tenant is not None}:
+            reservas_tenant = EstoqueReservaService.mapa_reservas_ativas_por_produto(
+                db,
+                tenant_ref,
+            )
+            for produto_id, quantidade in (reservas_tenant or {}).items():
+                reservas_consolidadas[int(produto_id)] = (
+                    float(reservas_consolidadas.get(int(produto_id), 0.0) or 0.0)
+                    + float(quantidade or 0.0)
+                )
+        return reservas_consolidadas
+    except Exception as exc:
+        logger.warning("Nao foi possivel consolidar reservas ativas: %s", exc)
+        db.rollback()
+        return {}
+
+
+def _calcular_status_validade(dias_para_vencer: Optional[int]) -> str:
+    """Classifica o lote conforme a proximidade do vencimento."""
+    if dias_para_vencer is None:
+        return "sem_validade"
+    if dias_para_vencer < 0:
+        return "vencido"
+    if dias_para_vencer <= 7:
+        return "urgente"
+    if dias_para_vencer <= 30:
+        return "alerta_30"
+    if dias_para_vencer <= 60:
+        return "alerta_60"
+    return "monitorar"
+
+
+def _calcular_faixa_campanha_validade(dias_para_vencer: Optional[int]) -> Optional[str]:
+    """Sugere uma faixa comercial para campanhas por vencimento."""
+    if dias_para_vencer is None:
+        return None
+    if dias_para_vencer < 0:
+        return "vencido"
+    if dias_para_vencer <= 7:
+        return "7_dias"
+    if dias_para_vencer <= 30:
+        return "30_dias"
+    if dias_para_vencer <= 60:
+        return "60_dias"
+    return None
 
 
 # ==========================================
@@ -189,6 +249,11 @@ def _enriquecer_produto_listagem(
 ):
     """Padroniza dados de listagem para produtos simples, kits e variaÃ§Ãµes-kit."""
     reservas_por_produto = reservas_por_produto or {}
+    tenant_produto = getattr(produto, "tenant_id", tenant_id)
+    reservas_mesmo_tenant = str(tenant_produto) == str(tenant_id)
+    estoque_reservado = float(
+        reservas_por_produto.get(produto.id, 0.0) or 0.0
+    ) if reservas_mesmo_tenant else 0.0
 
     if produto.categoria:
         produto.categoria_nome = produto.categoria.nome
@@ -198,7 +263,12 @@ def _enriquecer_produto_listagem(
             from app.services.kit_estoque_service import KitEstoqueService
             from app.services.kit_custo_service import KitCustoService
 
-            composicao = KitEstoqueService.obter_detalhes_composicao(db, produto.id)
+            composicao = KitEstoqueService.obter_detalhes_composicao(
+                db,
+                produto.id,
+                tenant_id=tenant_produto,
+                reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+            )
             produto.composicao_kit = [
                 {
                     "id": comp["id"],
@@ -208,6 +278,8 @@ def _enriquecer_produto_listagem(
                     "produto_tipo": comp["produto_tipo"],
                     "quantidade": comp["quantidade"],
                     "estoque_componente": comp["estoque_componente"],
+                    "estoque_reservado": comp.get("estoque_reservado", 0),
+                    "estoque_disponivel": comp.get("estoque_disponivel", 0),
                     "kits_possiveis": comp["kits_possiveis"],
                     "ordem": comp["ordem"],
                     "opcional": comp["opcional"],
@@ -217,7 +289,14 @@ def _enriquecer_produto_listagem(
             produto.preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
 
             if produto.tipo_kit == "VIRTUAL":
-                produto.estoque_virtual = int(KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id))
+                produto.estoque_virtual = int(
+                    KitEstoqueService.calcular_estoque_virtual_kit(
+                        db,
+                        produto.id,
+                        tenant_id=tenant_produto,
+                        reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+                    )
+                )
             else:
                 produto.estoque_virtual = int(produto.estoque_atual or 0)
         except Exception as e:
@@ -228,9 +307,177 @@ def _enriquecer_produto_listagem(
         produto.composicao_kit = []
         produto.estoque_virtual = int(produto.estoque_atual or 0)
 
-    produto.estoque_reservado = float(reservas_por_produto.get(produto.id, 0.0) or 0.0)
+    produto.estoque_reservado = estoque_reservado
+    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
+        produto.estoque_disponivel = float(produto.estoque_virtual or 0)
+    else:
+        produto.estoque_disponivel = max(
+            float(produto.estoque_atual or 0) - produto.estoque_reservado,
+            0.0,
+        )
     produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
     return produto
+
+
+def _nome_area_produto(produto: Produto) -> str:
+    if getattr(produto, "departamento", None):
+        return produto.departamento.nome
+    if getattr(produto, "categoria", None) and getattr(produto.categoria, "departamento", None):
+        return produto.categoria.departamento.nome
+    return "Sem setor"
+
+
+def _departamento_id_produto(produto: Produto) -> Optional[int]:
+    if getattr(produto, "departamento_id", None):
+        return produto.departamento_id
+    if getattr(produto, "categoria", None):
+        return getattr(produto.categoria, "departamento_id", None)
+    return None
+
+
+def _produto_eh_racao_expr():
+    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
+    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    return or_(
+        tipo_normalizado.like("ra%"),
+        and_(
+            classificacao_normalizada != "",
+            classificacao_normalizada != "nao",
+        ),
+    )
+
+
+def _normalizar_classificacao_racao(valor: Any) -> Optional[str]:
+    if valor is None:
+        return None
+
+    texto = str(valor).strip().lower()
+    if not texto:
+        return None
+
+    aliases = {
+        "super premium": "super_premium",
+        "super-premium": "super_premium",
+        "premium": "premium",
+        "standard": "standard",
+        "standardo": "standard",
+        "especial": "especial",
+        "especial premium": "especial",
+        "terapeutica": "terapeutica",
+        "terapêutica": "terapeutica",
+    }
+    return aliases.get(texto, texto)
+
+
+def _normalizar_payload_racao(dados: dict[str, Any]) -> dict[str, Any]:
+    eh_racao = dados.pop("eh_racao", None)
+    classificacao_racao = dados.get("classificacao_racao", None)
+    classificacao_normalizada = _normalizar_classificacao_racao(classificacao_racao)
+
+    if eh_racao is None and classificacao_normalizada in {"sim", "nao", "não"}:
+        eh_racao = classificacao_normalizada == "sim"
+        classificacao_normalizada = None
+
+    if eh_racao is None and classificacao_normalizada:
+        eh_racao = True
+
+    if classificacao_racao is not None:
+        dados["classificacao_racao"] = classificacao_normalizada
+
+    if eh_racao is not None:
+        eh_racao = bool(eh_racao)
+        dados["tipo"] = "ração" if eh_racao else "produto"
+
+        if not eh_racao:
+            for campo in (
+                "classificacao_racao",
+                "peso_embalagem",
+                "tabela_nutricional",
+                "categoria_racao",
+                "especies_indicadas",
+                "tabela_consumo",
+                "linha_racao_id",
+                "porte_animal_id",
+                "fase_publico_id",
+                "tipo_tratamento_id",
+                "sabor_proteina_id",
+                "apresentacao_peso_id",
+            ):
+                dados[campo] = None
+
+    return dados
+
+
+def _fornecedor_nome_produto(produto: Produto) -> Optional[str]:
+    fornecedor = produto.fornecedor
+    if not fornecedor and getattr(produto, "fornecedores_alternativos", None):
+        vinculo_principal = next(
+            (
+                vinculo
+                for vinculo in produto.fornecedores_alternativos
+                if vinculo.ativo and vinculo.e_principal and vinculo.fornecedor
+            ),
+            None,
+        )
+        vinculo_secundario = next(
+            (
+                vinculo
+                for vinculo in produto.fornecedores_alternativos
+                if vinculo.ativo and vinculo.fornecedor
+            ),
+            None,
+        )
+        fornecedor = (
+            vinculo_principal.fornecedor
+            if vinculo_principal
+            else vinculo_secundario.fornecedor if vinculo_secundario else None
+        )
+    return fornecedor.nome if fornecedor else None
+
+
+def _resolver_metricas_valorizacao_produto(
+    db: Session,
+    produto: Produto,
+    reservas_por_produto: dict[int, float] | None = None,
+) -> dict:
+    reservas_por_produto = reservas_por_produto or {}
+    estoque_reservado = float(reservas_por_produto.get(produto.id, 0.0) or 0.0)
+    estoque_atual = float(produto.estoque_atual or 0)
+    preco_custo = float(produto.preco_custo or 0)
+
+    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
+        try:
+            from .services.kit_custo_service import KitCustoService
+
+            estoque_atual = float(
+                KitEstoqueService.calcular_estoque_virtual_kit(
+                    db,
+                    produto.id,
+                    tenant_id=getattr(produto, "tenant_id", None),
+                    reservas_por_produto=reservas_por_produto,
+                )
+            )
+            preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
+            estoque_reservado = 0.0
+        except Exception as exc:
+            logger.warning(
+                "Erro ao calcular valorizacao do kit virtual %s: %s",
+                produto.id,
+                exc,
+            )
+
+    estoque_disponivel = max(estoque_atual - estoque_reservado, 0.0)
+    preco_venda = float(produto.preco_venda or 0)
+
+    return {
+        "estoque_atual": estoque_atual,
+        "estoque_reservado": estoque_reservado,
+        "estoque_disponivel": estoque_disponivel,
+        "preco_custo": preco_custo,
+        "preco_venda": preco_venda,
+        "valor_custo_total": estoque_atual * preco_custo,
+        "valor_venda_total": estoque_atual * preco_venda,
+    }
 
 
 def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
@@ -395,6 +642,8 @@ class KitComponenteResponse(BaseModel):
     produto_tipo: str
     quantidade: float
     estoque_componente: float
+    estoque_reservado: float = 0
+    estoque_disponivel: float = 0
     kits_possiveis: int
     ordem: int
     opcional: bool
@@ -450,6 +699,7 @@ class ProdutoBase(BaseModel):
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
     # RaÃ§Ã£o - Calculadora (Fase 2)
+    eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
     tabela_nutricional: Optional[str] = None  # JSON string
@@ -534,6 +784,7 @@ class ProdutoUpdate(BaseModel):
     especie_compativel: Optional[str] = None
     observacoes_recorrencia: Optional[str] = None
     # RaÃ§Ã£o - Calculadora (Fase 2)
+    eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
     peso_embalagem: Optional[float] = None
     tabela_nutricional: Optional[str] = None
@@ -621,6 +872,7 @@ class ProdutoResponse(ProdutoBase):
     composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
     estoque_reservado: Optional[float] = 0  # Unidades reservadas por pedidos Bling em aberto
+    estoque_disponivel: Optional[float] = 0  # Estoque livre apos reservas
     # Sistema Predecessor/Sucessor
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
     predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
@@ -686,9 +938,22 @@ class RelatorioValorizacaoEstoqueItem(BaseModel):
     marca_nome: Optional[str] = None
     departamento_nome: Optional[str] = None
     fornecedor_nome: Optional[str] = None
+    tipo_produto: Optional[str] = None
+    tipo_kit: Optional[str] = None
     estoque_atual: float = 0
+    estoque_reservado: float = 0
+    estoque_disponivel: float = 0
     preco_custo: float = 0
     preco_venda: float = 0
+    valor_custo_total: float = 0
+    valor_venda_total: float = 0
+
+
+class RelatorioValorizacaoEstoqueAreaResumo(BaseModel):
+    area_nome: str
+    total_produtos: int = 0
+    total_itens_estoque: float = 0
+    total_itens_disponiveis: float = 0
     valor_custo_total: float = 0
     valor_venda_total: float = 0
 
@@ -696,14 +961,74 @@ class RelatorioValorizacaoEstoqueItem(BaseModel):
 class RelatorioValorizacaoEstoqueTotais(BaseModel):
     total_produtos: int = 0
     total_itens_estoque: float = 0
+    total_itens_reservados: float = 0
+    total_itens_disponiveis: float = 0
     valor_custo_total: float = 0
     valor_venda_total: float = 0
     margem_potencial_total: float = 0
+    total_areas: int = 0
 
 
 class RelatorioValorizacaoEstoqueResponse(BaseModel):
     items: List[RelatorioValorizacaoEstoqueItem]
+    areas: List[RelatorioValorizacaoEstoqueAreaResumo] = Field(default_factory=list)
     totais: RelatorioValorizacaoEstoqueTotais
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
+class RelatorioValidadeProximaItem(BaseModel):
+    lote_id: int
+    produto_id: int
+    codigo: Optional[str] = None
+    sku: Optional[str] = None
+    nome: str
+    categoria_nome: Optional[str] = None
+    marca_nome: Optional[str] = None
+    departamento_nome: Optional[str] = None
+    fornecedor_nome: Optional[str] = None
+    nome_lote: str
+    data_validade: datetime
+    dias_para_vencer: int
+    quantidade_disponivel: float = 0
+    custo_unitario: float = 0
+    preco_venda: float = 0
+    valor_custo_lote: float = 0
+    valor_venda_lote: float = 0
+    status_validade: str = "monitorar"
+    faixa_campanha: Optional[str] = None
+    promocao_ativa: bool = False
+    campanha_validade_ativa: bool = False
+    campanha_validade_excluida: bool = False
+    campanha_validade_exclusao_id: Optional[int] = None
+    campanha_validade_canais: List[str] = Field(default_factory=list)
+    percentual_desconto_validade: Optional[float] = None
+    quantidade_promocional: float = 0
+    preco_promocional_validade: Optional[float] = None
+    preco_promocional_validade_app: Optional[float] = None
+    preco_promocional_validade_ecommerce: Optional[float] = None
+    mensagem_promocional: Optional[str] = None
+
+
+class RelatorioValidadeProximaTotais(BaseModel):
+    total_lotes: int = 0
+    total_produtos: int = 0
+    total_quantidade: float = 0
+    lotes_vencidos: int = 0
+    lotes_ate_7_dias: int = 0
+    lotes_ate_30_dias: int = 0
+    lotes_ate_60_dias: int = 0
+    valor_custo_em_risco: float = 0
+    valor_venda_em_risco: float = 0
+    lotes_em_campanha: int = 0
+    lotes_excluidos_campanha: int = 0
+
+
+class RelatorioValidadeProximaResponse(BaseModel):
+    items: List[RelatorioValidadeProximaItem]
+    totais: RelatorioValidadeProximaTotais
     total: int
     page: int
     page_size: int
@@ -1632,7 +1957,7 @@ def criar_produto(
 
     try:
         # Preparar dados do produto
-        produto_data = produto.model_dump()
+        produto_data = _normalizar_payload_racao(produto.model_dump())
 
         # Adicionar user_id aos dados (necessÃ¡rio para o modelo)
         produto_data['user_id'] = current_user.id
@@ -1927,14 +2252,7 @@ def listar_produtos(
     # Filtro de seguranÃ§a: remover None
     produtos = [p for p in produtos if p is not None]
 
-    # Reservas ativas por SKU (pedidos Bling em aberto)
-    try:
-        from app.estoque_reserva_service import EstoqueReservaService
-
-        reservas_por_produto = EstoqueReservaService.mapa_reservas_ativas_por_produto(db, tenant_id)
-    except Exception:
-        db.rollback()
-        reservas_por_produto = {}
+    reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
 
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
@@ -2177,7 +2495,8 @@ def obter_produto(
         'imagens': produto.imagens,
         'lotes': produto.lotes,
         'composicao_kit': [],
-        'estoque_virtual': None
+        'estoque_virtual': None,
+        'estoque_disponivel': None,
     }
 
     # ========================================
@@ -2188,13 +2507,21 @@ def obter_produto(
         from .services.kit_custo_service import KitCustoService
 
         # Buscar composiÃ§Ã£o do KIT
-        composicao = KitEstoqueService.obter_detalhes_composicao(db, produto_id)
+        composicao = KitEstoqueService.obter_detalhes_composicao(
+            db,
+            produto_id,
+            tenant_id=getattr(produto, "tenant_id", tenant_id),
+        )
         response_data['composicao_kit'] = composicao
         response_data['preco_custo'] = float(KitCustoService.calcular_custo_kit(produto_id, db))
 
         # Calcular estoque virtual (se for KIT VIRTUAL)
         if produto.tipo_kit == 'VIRTUAL':
-            estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(db, produto_id)
+            estoque_virtual = KitEstoqueService.calcular_estoque_virtual_kit(
+                db,
+                produto_id,
+                tenant_id=getattr(produto, "tenant_id", tenant_id),
+            )
             response_data['estoque_virtual'] = estoque_virtual
             logger.info(f"ðŸ§© Kit #{produto_id}: estoque_virtual={estoque_virtual}")
         else:
@@ -2213,6 +2540,14 @@ def obter_produto(
         )
     except Exception:
         response_data['estoque_reservado'] = 0.0
+
+    if produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit == 'VIRTUAL':
+        response_data['estoque_disponivel'] = float(response_data.get('estoque_virtual') or 0)
+    else:
+        response_data['estoque_disponivel'] = max(
+            float(produto.estoque_atual or 0) - float(response_data.get('estoque_reservado') or 0),
+            0.0,
+        )
 
     return response_data
 
@@ -2274,17 +2609,7 @@ def atualizar_produto(
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
     composicao_kit = dados_recebidos.pop('composicao_kit', None)
 
-    # ========================================
-    # ï¿½ AUTO-CONVERSÃƒO: classificacao_racao='sim' â†’ tipo='raÃ§Ã£o'
-    # ========================================
-    if 'classificacao_racao' in dados_recebidos:
-        if dados_recebidos['classificacao_racao'] == 'sim':
-            dados_recebidos['tipo'] = 'raÃ§Ã£o'
-            logger.info(f"âœ… Produto {produto_id} marcado como raÃ§Ã£o (classificacao_racao='sim')")
-        elif dados_recebidos['classificacao_racao'] in ['nao', 'nÃ£o', None]:
-            # Se nÃ£o Ã© raÃ§Ã£o, garantir que tipo seja 'produto'
-            dados_recebidos['tipo'] = 'produto'
-            logger.info(f"âœ… Produto {produto_id} desmarcado como raÃ§Ã£o")
+    dados_recebidos = _normalizar_payload_racao(dados_recebidos)
 
     # ========================================
     # ï¿½ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O (ATUALIZAÃ‡ÃƒO)
@@ -2418,7 +2743,13 @@ def atualizar_produto(
         if produto.tipo_produto in ('KIT', 'VARIACAO') and produto.tipo_kit == 'VIRTUAL':
             from .services.kit_estoque_service import KitEstoqueService
 
-            produto.estoque_atual = float(KitEstoqueService.calcular_estoque_virtual_kit(db, produto.id))
+            produto.estoque_atual = float(
+                KitEstoqueService.calcular_estoque_virtual_kit(
+                    db,
+                    produto.id,
+                    tenant_id=getattr(produto, "tenant_id", tenant_id),
+                )
+            )
             db.add(produto)
 
         db.commit()
@@ -2448,9 +2779,22 @@ def atualizar_produto(
 
 class AtualizacaoLoteRequest(BaseModel):
     produto_ids: List[int]
+    eh_racao: Optional[bool] = None
+    classificacao_racao: Optional[str] = None
     marca_id: Optional[int] = None
     categoria_id: Optional[int] = None
     departamento_id: Optional[int] = None
+    linha_racao_id: Optional[int] = None
+    porte_animal_id: Optional[int] = None
+    fase_publico_id: Optional[int] = None
+    tipo_tratamento_id: Optional[int] = None
+    sabor_proteina_id: Optional[int] = None
+    apresentacao_peso_id: Optional[int] = None
+    categoria_racao: Optional[str] = None
+    especies_indicadas: Optional[str] = None
+    controle_lote: Optional[bool] = None
+    estoque_minimo: Optional[float] = None
+    estoque_maximo: Optional[float] = None
     anunciar_ecommerce: Optional[bool] = None
     anunciar_app: Optional[bool] = None
 
@@ -2461,7 +2805,7 @@ def atualizar_produtos_lote(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Atualiza marca, categoria e/ou departamento de mÃºltiplos produtos"""
+    """Atualiza dados comerciais e operacionais de mÃºltiplos produtos."""
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     logger.info(f"ðŸ“¦ Atualizando {len(dados.produto_ids)} produtos em lote")
@@ -2482,17 +2826,85 @@ def atualizar_produtos_lote(
             detail="Alguns produtos nÃ£o foram encontrados ou nÃ£o pertencem ao usuÃ¡rio"
         )
 
+    linha_racao_selecionada = None
+    if dados.linha_racao_id is not None:
+        from .opcoes_racao_models import LinhaRacao
+
+        linha_racao_selecionada = db.query(LinhaRacao).filter(
+            LinhaRacao.id == dados.linha_racao_id,
+            LinhaRacao.tenant_id == tenant_id,
+        ).first()
+
     # Atualizar campos fornecidos
     atualizado = 0
     for produto in produtos:
         if dados.marca_id is not None:
             produto.marca_id = dados.marca_id
             atualizado += 1
+        if dados.eh_racao is not None:
+            produto.tipo = "ração" if dados.eh_racao else "produto"
+            atualizado += 1
+            if not dados.eh_racao:
+                produto.classificacao_racao = None
+                produto.peso_embalagem = None
+                produto.categoria_racao = None
+                produto.especies_indicadas = None
+                produto.linha_racao_id = None
+                produto.porte_animal_id = None
+                produto.fase_publico_id = None
+                produto.tipo_tratamento_id = None
+                produto.sabor_proteina_id = None
+                produto.apresentacao_peso_id = None
+        if dados.classificacao_racao is not None and dados.eh_racao is not False:
+            produto.classificacao_racao = _normalizar_classificacao_racao(
+                dados.classificacao_racao
+            )
+            if produto.classificacao_racao:
+                produto.tipo = "ração"
+            atualizado += 1
         if dados.categoria_id is not None:
             produto.categoria_id = dados.categoria_id
             atualizado += 1
         if dados.departamento_id is not None:
             produto.departamento_id = dados.departamento_id
+            atualizado += 1
+        if dados.linha_racao_id is not None:
+            produto.linha_racao_id = dados.linha_racao_id
+            if dados.eh_racao is not False and linha_racao_selecionada:
+                produto.classificacao_racao = _normalizar_classificacao_racao(
+                    linha_racao_selecionada.nome
+                )
+                produto.tipo = "ração"
+            atualizado += 1
+        if dados.porte_animal_id is not None:
+            produto.porte_animal_id = dados.porte_animal_id
+            atualizado += 1
+        if dados.fase_publico_id is not None:
+            produto.fase_publico_id = dados.fase_publico_id
+            atualizado += 1
+        if dados.tipo_tratamento_id is not None:
+            produto.tipo_tratamento_id = dados.tipo_tratamento_id
+            atualizado += 1
+        if dados.sabor_proteina_id is not None:
+            produto.sabor_proteina_id = dados.sabor_proteina_id
+            atualizado += 1
+        if dados.apresentacao_peso_id is not None:
+            produto.apresentacao_peso_id = dados.apresentacao_peso_id
+            atualizado += 1
+        if dados.categoria_racao is not None:
+            produto.categoria_racao = dados.categoria_racao
+            atualizado += 1
+        if dados.especies_indicadas is not None:
+            produto.especies_indicadas = dados.especies_indicadas
+            atualizado += 1
+        if dados.controle_lote is not None:
+            produto.controle_lote = dados.controle_lote
+            atualizado += 1
+        if dados.estoque_minimo is not None:
+            produto.estoque_minimo = dados.estoque_minimo
+            atualizado += 1
+        if dados.estoque_maximo is not None:
+            produto.estoque_maximo = dados.estoque_maximo
             atualizado += 1
 
         produto_ativo_loja = bool(getattr(produto, "ativo", True)) and bool(getattr(produto, "situacao", True))
@@ -2522,9 +2934,22 @@ def atualizar_produtos_lote(
     return {
         "produtos_atualizados": len(produtos),
         "campos_atualizados": atualizado,
+        "eh_racao": dados.eh_racao,
+        "classificacao_racao": dados.classificacao_racao,
         "marca_id": dados.marca_id,
         "categoria_id": dados.categoria_id,
         "departamento_id": dados.departamento_id,
+        "linha_racao_id": dados.linha_racao_id,
+        "porte_animal_id": dados.porte_animal_id,
+        "fase_publico_id": dados.fase_publico_id,
+        "tipo_tratamento_id": dados.tipo_tratamento_id,
+        "sabor_proteina_id": dados.sabor_proteina_id,
+        "apresentacao_peso_id": dados.apresentacao_peso_id,
+        "categoria_racao": dados.categoria_racao,
+        "especies_indicadas": dados.especies_indicadas,
+        "controle_lote": dados.controle_lote,
+        "estoque_minimo": dados.estoque_minimo,
+        "estoque_maximo": dados.estoque_maximo,
         "anunciar_ecommerce": dados.anunciar_ecommerce,
         "anunciar_app": dados.anunciar_app
     }
@@ -3105,152 +3530,745 @@ def saida_estoque_fifo(
 # ENDPOINTS - RELATÃ“RIOS
 # ==========================================
 
+def _parse_relatorio_datetime(valor: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+    texto = (valor or "").strip()
+    if not texto:
+        return None
+
+    try:
+        data = datetime.fromisoformat(texto)
+    except ValueError:
+        return None
+
+    if end_of_day:
+        return data.replace(hour=23, minute=59, second=59, microsecond=999999)
+    return data.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _serializar_movimentacao_relatorio(mov: EstoqueMovimentacao) -> dict:
+    produto = mov.produto
+    motivo = (mov.motivo or "").strip()
+
+    return {
+        "id": mov.id,
+        "data": mov.created_at.strftime("%d/%m/%Y") if mov.created_at else None,
+        "data_completa": mov.created_at.isoformat() if mov.created_at else None,
+        "codigo": produto.codigo if produto else "N/A",
+        "sku": _produto_sku_value(produto) if produto else None,
+        "codigo_barras": produto.codigo_barras if produto else None,
+        "produto_nome": produto.nome if produto else "Produto removido",
+        "produto_id": mov.produto_id,
+        "entrada": float(mov.quantidade or 0) if mov.tipo == "entrada" else None,
+        "saida": float(mov.quantidade or 0) if mov.tipo != "entrada" else None,
+        "estoque": float(mov.quantidade_nova or 0),
+        "tipo": (mov.tipo or "").title(),
+        "motivo": motivo,
+        "motivo_label": motivo.replace("_", " ").title() if motivo else None,
+        "valor_unitario": float(mov.custo_unitario or 0),
+        "valor_total": float(mov.valor_total or 0),
+        "usuario": mov.user.nome if mov.user else "Sistema",
+        "numero_pedido": mov.documento,
+        "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S") if mov.created_at else None,
+        "observacoes": mov.observacao,
+        "lotes_consumidos": mov.lotes_consumidos,
+    }
+
+
 @router.get("/relatorio/movimentacoes")
+@require_permission("produtos.visualizar")
 def relatorio_movimentacoes(
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
-    produto_id: Optional[str] = None,  # String para aceitar "" vazio
+    produto_id: Optional[str] = None,
     tipo_movimentacao: Optional[str] = None,
     agrupar_por_mes: bool = False,
+    page: int = 1,
+    page_size: int = 20,
+    export_all: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    RelatÃ³rio de movimentaÃ§Ãµes de estoque
-    Retorna histÃ³rico com filtros de perÃ­odo, produto e tipo
-    Inclui nÃºmero de pedido clicÃ¡vel para navegaÃ§Ã£o ao PDV
+    Relatorio operacional de movimentacoes de estoque.
+
+    A resposta agora e paginada para manter a tela leve e os totais sao
+    calculados sobre todo o filtro aplicado, nao apenas sobre a pagina atual.
     """
 
-    from datetime import datetime as dt, timedelta
-    from sqlalchemy import func, extract
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 200)
 
-    # Extrair tenant_id
-    user, tenant_id = user_and_tenant
-
-    # Query base
     query = db.query(EstoqueMovimentacao).join(Produto).filter(
-        Produto.tenant_id == tenant_id
+        EstoqueMovimentacao.tenant_id == tenant_id,
+        Produto.tenant_id.in_(access_ids),
     )
 
-    # Filtro de data
-    if data_inicio:
-        try:
-            data_inicio_dt = dt.fromisoformat(data_inicio)
-            query = query.filter(EstoqueMovimentacao.created_at >= data_inicio_dt)
-        except:
-            pass
+    data_inicio_dt = _parse_relatorio_datetime(data_inicio)
+    data_fim_dt = _parse_relatorio_datetime(data_fim, end_of_day=True)
 
-    if data_fim:
-        try:
-            data_fim_dt = dt.fromisoformat(data_fim)
-            # Adicionar 1 dia para incluir todo o dia final
-            data_fim_dt = data_fim_dt + timedelta(days=1)
-            query = query.filter(EstoqueMovimentacao.created_at < data_fim_dt)
-        except:
-            pass
-
-    # Se nÃ£o informou datas, usar Ãºltimos 6 meses
-    if not data_inicio and not data_fim:
-        data_inicio_dt = dt.now() - timedelta(days=180)
+    if data_inicio_dt:
         query = query.filter(EstoqueMovimentacao.created_at >= data_inicio_dt)
 
-    # Filtro de produto (converter string para int se nÃ£o vazio)
+    if data_fim_dt:
+        query = query.filter(EstoqueMovimentacao.created_at <= data_fim_dt)
+
+    if not data_inicio_dt and not data_fim_dt:
+        query = query.filter(EstoqueMovimentacao.created_at >= (datetime.now() - timedelta(days=90)))
+
     if produto_id and produto_id.strip():
         try:
-            produto_id_int = int(produto_id)
-            query = query.filter(EstoqueMovimentacao.produto_id == produto_id_int)
+            query = query.filter(EstoqueMovimentacao.produto_id == int(produto_id))
         except ValueError:
-            pass  # Ignora se nÃ£o for nÃºmero vÃ¡lido
+            pass
 
-    # Filtro de tipo (campo 'tipo' e nÃ£o 'tipo_movimentacao')
     if tipo_movimentacao and tipo_movimentacao != "todos":
         query = query.filter(EstoqueMovimentacao.tipo == tipo_movimentacao)
 
-    # Ordenar por data (mais recente primeiro)
-    query = query.order_by(EstoqueMovimentacao.created_at.desc())
+    total_registros = query.count()
+    pages = (total_registros + page_size - 1) // page_size if total_registros else 0
 
-    movimentacoes = query.all()
+    totais_row = query.with_entities(
+        func.coalesce(
+            func.sum(case((EstoqueMovimentacao.tipo == "entrada", EstoqueMovimentacao.quantidade), else_=0)),
+            0,
+        ),
+        func.coalesce(
+            func.sum(case((EstoqueMovimentacao.tipo != "entrada", EstoqueMovimentacao.quantidade), else_=0)),
+            0,
+        ),
+        func.coalesce(func.sum(EstoqueMovimentacao.valor_total), 0),
+    ).first()
 
-    # Montar resultado
-    resultado = []
+    query = query.options(
+        joinedload(EstoqueMovimentacao.produto),
+        joinedload(EstoqueMovimentacao.user),
+    ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc())
 
-    for mov in movimentacoes:
-        # Buscar produto
-        produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
+    if not export_all:
+        query = query.offset((page - 1) * page_size).limit(page_size)
 
-        # Determinar entrada/saÃ­da (campo 'tipo' e nÃ£o 'tipo_movimentacao')
-        entrada = mov.quantidade if mov.tipo == "entrada" else None
-        saida = mov.quantidade if mov.tipo != "entrada" else None
+    resultado = [_serializar_movimentacao_relatorio(mov) for mov in query.all()]
 
-        item = {
-            "id": mov.id,
-            "data": mov.created_at.strftime("%d/%m/%Y"),
-            "data_completa": mov.created_at.isoformat(),
-            "mes": mov.created_at.strftime("%B, %Y"),
-            "mes_numero": mov.created_at.month,
-            "ano": mov.created_at.year,
-            "codigo": produto.codigo if produto else "N/A",
-            "produto_nome": produto.nome if produto else "Produto deletado",
-            "produto_id": mov.produto_id,
-            "entrada": entrada,
-            "saida": saida,
-            "estoque": mov.quantidade_nova,
-            "tipo": mov.tipo.title(),
-            "valor_unitario": mov.custo_unitario,
-            "valor_total": mov.valor_total,
-            "usuario": mov.user.nome if mov.user else "Sistema",
-            "numero_pedido": mov.documento,
-            "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S"),
-            "observacoes": mov.observacao,
-            "lotes_consumidos": mov.lotes_consumidos
-        }
-
-        resultado.append(item)
-
-    # Se solicitado, agrupar por mÃªs
     if agrupar_por_mes:
-        # Agrupar movimentaÃ§Ãµes por mÃªs
         agrupado = {}
 
         for item in resultado:
-            chave_mes = f"{item['ano']}-{item['mes_numero']:02d}"
+            data_item = _parse_relatorio_datetime((item.get("data_completa") or "")[:10])
+            if not data_item:
+                continue
+
+            chave_mes = f"{data_item.year}-{data_item.month:02d}"
 
             if chave_mes not in agrupado:
                 agrupado[chave_mes] = {
-                    "mes": item["mes"],
-                    "ano": item["ano"],
+                    "mes": data_item.strftime("%B, %Y"),
+                    "ano": data_item.year,
                     "total_vendas": 0,
                     "total_outras_saidas": 0,
                     "total_entradas": 0,
-                    "movimentacoes": []
+                    "movimentacoes": [],
                 }
 
-            # Contabilizar totais
             if item["entrada"]:
                 agrupado[chave_mes]["total_entradas"] += item["entrada"]
-            elif item["tipo"].lower() == "venda":
+            elif (item.get("motivo") or "").lower() == "venda":
                 agrupado[chave_mes]["total_vendas"] += item["saida"] or 0
             else:
                 agrupado[chave_mes]["total_outras_saidas"] += item["saida"] or 0
 
             agrupado[chave_mes]["movimentacoes"].append(item)
 
-        # Converter para lista ordenada
-        resultado_agrupado = []
-        for chave in sorted(agrupado.keys(), reverse=True):
-            resultado_agrupado.append(agrupado[chave])
-
         return {
-            "total_registros": len(resultado),
+            "total_registros": total_registros,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+            "totais": {
+                "total_entradas": float(totais_row[0] or 0),
+                "total_saidas": float(totais_row[1] or 0),
+                "valor_total": float(totais_row[2] or 0),
+            },
             "agrupado_por_mes": True,
-            "meses": resultado_agrupado
+            "meses": [agrupado[chave] for chave in sorted(agrupado.keys(), reverse=True)],
         }
 
     return {
-        "total_registros": len(resultado),
+        "total_registros": total_registros,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+        "totais": {
+            "total_entradas": float(totais_row[0] or 0),
+            "total_saidas": float(totais_row[1] or 0),
+            "valor_total": float(totais_row[2] or 0),
+        },
         "agrupado_por_mes": False,
-        "movimentacoes": resultado
+        "movimentacoes": resultado,
     }
+
+
+@router.get("/relatorio/produto-vendas")
+@require_permission("produtos.visualizar")
+def relatorio_vendas_produto(
+    produto_id: int,
+    data_inicio: Optional[str] = None,
+    data_fim: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Resumo de giro comercial de um produto para apoiar a compra.
+    """
+
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 50)
+
+    produto = db.query(Produto).options(
+        joinedload(Produto.categoria),
+        joinedload(Produto.marca),
+    ).filter(
+        Produto.id == produto_id,
+        Produto.tenant_id.in_(access_ids),
+    ).first()
+
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto nao encontrado")
+
+    data_fim_dt = _parse_relatorio_datetime(data_fim, end_of_day=True) or datetime.now()
+    data_inicio_dt = _parse_relatorio_datetime(data_inicio) or (
+        data_fim_dt - timedelta(days=89)
+    ).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    janela_90_inicio = (data_fim_dt - timedelta(days=89)).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    janela_30_inicio = (data_fim_dt - timedelta(days=29)).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+    base_historico = db.query(VendaItem).join(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        VendaItem.produto_id == produto.id,
+        VendaItem.tipo == "produto",
+        Venda.status.notin_(["cancelada", "devolvida"]),
+        Venda.data_venda >= data_inicio_dt,
+        Venda.data_venda <= data_fim_dt,
+    )
+
+    historico_total = base_historico.count()
+    historico_pages = (historico_total + page_size - 1) // page_size if historico_total else 0
+
+    historico_rows = base_historico.options(
+        joinedload(VendaItem.venda).joinedload(Venda.cliente),
+    ).order_by(
+        Venda.data_venda.desc(),
+        Venda.numero_venda.desc(),
+        VendaItem.id.desc(),
+    ).offset((page - 1) * page_size).limit(page_size).all()
+
+    historico = []
+    for item in historico_rows:
+        venda = item.venda
+        historico.append({
+            "id": item.id,
+            "venda_id": venda.id if venda else None,
+            "numero_venda": venda.numero_venda if venda else None,
+            "data_venda": venda.data_venda.isoformat() if venda and venda.data_venda else None,
+            "cliente_nome": venda.cliente.nome if venda and venda.cliente else "Sem cliente",
+            "status": venda.status if venda else None,
+            "canal": venda.canal if venda else None,
+            "quantidade": float(item.quantidade or 0),
+            "preco_unitario": float(item.preco_unitario or 0),
+            "subtotal": float(item.subtotal or 0),
+        })
+
+    analise_rows = db.query(
+        Venda.id.label("venda_id"),
+        Venda.data_venda,
+        VendaItem.quantidade,
+        VendaItem.subtotal,
+    ).join(VendaItem, VendaItem.venda_id == Venda.id).filter(
+        Venda.tenant_id == tenant_id,
+        VendaItem.produto_id == produto.id,
+        VendaItem.tipo == "produto",
+        Venda.status.notin_(["cancelada", "devolvida"]),
+        Venda.data_venda >= janela_90_inicio,
+        Venda.data_venda <= data_fim_dt,
+    ).all()
+
+    janelas = {}
+    vendas_por_janela = {}
+    for dias in (7, 15, 30, 60, 90):
+        chave = str(dias)
+        janelas[chave] = {
+            "dias": dias,
+            "quantidade_vendida": 0.0,
+            "valor_vendido": 0.0,
+            "numero_vendas": 0,
+            "media_diaria": 0.0,
+        }
+        vendas_por_janela[chave] = set()
+
+    curva_30_map = {}
+    for deslocamento in range(30):
+        data_ref = (janela_30_inicio + timedelta(days=deslocamento)).date().isoformat()
+        curva_30_map[data_ref] = 0.0
+
+    for row in analise_rows:
+        quantidade = float(row.quantidade or 0)
+        subtotal = float(row.subtotal or 0)
+        diferenca_dias = max(0, (data_fim_dt.date() - row.data_venda.date()).days)
+        data_ref = row.data_venda.date().isoformat()
+
+        if data_ref in curva_30_map:
+            curva_30_map[data_ref] += quantidade
+
+        for dias in (7, 15, 30, 60, 90):
+            if diferenca_dias < dias:
+                chave = str(dias)
+                janelas[chave]["quantidade_vendida"] += quantidade
+                janelas[chave]["valor_vendido"] += subtotal
+                vendas_por_janela[chave].add(row.venda_id)
+
+    for dias in (7, 15, 30, 60, 90):
+        chave = str(dias)
+        janelas[chave]["numero_vendas"] = len(vendas_por_janela[chave])
+        janelas[chave]["quantidade_vendida"] = round(janelas[chave]["quantidade_vendida"], 3)
+        janelas[chave]["valor_vendido"] = round(janelas[chave]["valor_vendido"], 2)
+        janelas[chave]["media_diaria"] = round(
+            janelas[chave]["quantidade_vendida"] / dias if dias else 0,
+            2,
+        )
+
+    ultima_venda_row = db.query(
+        Venda.id.label("venda_id"),
+        Venda.numero_venda,
+        Venda.data_venda,
+        Cliente.nome.label("cliente_nome"),
+        VendaItem.quantidade,
+        VendaItem.preco_unitario,
+    ).join(VendaItem, VendaItem.venda_id == Venda.id).outerjoin(
+        Cliente,
+        Cliente.id == Venda.cliente_id,
+    ).filter(
+        Venda.tenant_id == tenant_id,
+        VendaItem.produto_id == produto.id,
+        VendaItem.tipo == "produto",
+        Venda.status.notin_(["cancelada", "devolvida"]),
+    ).order_by(
+        Venda.data_venda.desc(),
+        VendaItem.id.desc(),
+    ).first()
+
+    ultima_venda = None
+    dias_sem_vender = None
+    if ultima_venda_row:
+        dias_sem_vender = max(0, (data_fim_dt.date() - ultima_venda_row.data_venda.date()).days)
+        ultima_venda = {
+            "venda_id": ultima_venda_row.venda_id,
+            "numero_venda": ultima_venda_row.numero_venda,
+            "data_venda": ultima_venda_row.data_venda.isoformat() if ultima_venda_row.data_venda else None,
+            "cliente_nome": ultima_venda_row.cliente_nome or "Sem cliente",
+            "quantidade": float(ultima_venda_row.quantidade or 0),
+            "preco_unitario": float(ultima_venda_row.preco_unitario or 0),
+        }
+
+    media_diaria_30 = float(janelas["30"]["media_diaria"] or 0)
+    estoque_atual = float(produto.estoque_atual or 0)
+    cobertura_estimada_dias = round(estoque_atual / media_diaria_30, 1) if media_diaria_30 > 0 else None
+
+    return {
+        "produto": {
+            "id": produto.id,
+            "nome": produto.nome,
+            "codigo": produto.codigo,
+            "sku": _produto_sku_value(produto),
+            "codigo_barras": produto.codigo_barras,
+            "estoque_atual": estoque_atual,
+            "estoque_minimo": float(produto.estoque_minimo or 0),
+            "preco_custo": float(produto.preco_custo or 0),
+            "preco_venda": float(produto.preco_venda or 0),
+            "categoria_nome": produto.categoria.nome if produto.categoria else None,
+            "marca_nome": produto.marca.nome if produto.marca else None,
+        },
+        "resumo": {
+            "data_referencia": data_fim_dt.isoformat(),
+            "cobertura_estimada_dias": cobertura_estimada_dias,
+            "media_diaria_30": round(media_diaria_30, 2),
+            "quantidade_vendida_30": float(janelas["30"]["quantidade_vendida"] or 0),
+            "quantidade_vendida_90": float(janelas["90"]["quantidade_vendida"] or 0),
+            "dias_sem_vender": dias_sem_vender,
+            "ultima_venda": ultima_venda,
+        },
+        "janelas": [janelas[str(dias)] for dias in (7, 15, 30, 60, 90)],
+        "curva_30_dias": [
+            {
+                "data": data_ref,
+                "quantidade": round(float(quantidade or 0), 3),
+            }
+            for data_ref, quantidade in sorted(curva_30_map.items())
+        ],
+        "historico_vendas": historico,
+        "historico_total": historico_total,
+        "historico_page": page,
+        "historico_page_size": page_size,
+        "historico_pages": historico_pages,
+    }
+
+
+@router.get(
+    "/relatorio/validade-proxima",
+    response_model=RelatorioValidadeProximaResponse,
+)
+@require_permission("produtos.visualizar")
+def relatorio_validade_proxima(
+    page: int = 1,
+    page_size: int = 20,
+    dias: int = 60,
+    status_validade: str = "proximos",
+    busca: Optional[str] = None,
+    categoria_id: Optional[int] = None,
+    marca_id: Optional[int] = None,
+    departamento_id: Optional[int] = None,
+    fornecedor_id: Optional[int] = None,
+    apenas_com_estoque: bool = True,
+    ordenacao: str = "validade_asc",
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """
+    Relatorio operacional de lotes com validade proxima.
+
+    A resposta e paginada por lote para facilitar a conferencia comercial:
+    - ordenacao padrao pela validade mais proxima
+    - resumo consolidado dos lotes em risco
+    - sugestao de faixa comercial (60/30/7 dias)
+    """
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    termo_busca = (busca or "").strip()
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 200)
+    dias = max(dias, 0)
+    agora = datetime.utcnow()
+    data_limite = agora + timedelta(days=dias)
+    status_validade = (status_validade or "proximos").strip().lower()
+    ordenacao = (ordenacao or "validade_asc").strip().lower()
+
+    query_base = (
+        db.query(ProdutoLote, Produto)
+        .join(Produto, Produto.id == ProdutoLote.produto_id)
+        .filter(
+            Produto.tenant_id.in_(access_ids),
+            ProdutoLote.data_validade.isnot(None),
+            or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
+        )
+    )
+
+    if apenas_com_estoque:
+        query_base = query_base.filter(func.coalesce(ProdutoLote.quantidade_disponivel, 0) > 0)
+
+    if termo_busca:
+        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
+        for palavra in palavras:
+            busca_pattern = f"%{palavra}%"
+            if PRODUTO_SKU_COLUMN is None:
+                query_base = query_base.filter(
+                    or_(
+                        Produto.nome.ilike(busca_pattern),
+                        Produto.codigo.ilike(busca_pattern),
+                        Produto.codigo_barras.ilike(busca_pattern),
+                        ProdutoLote.nome_lote.ilike(busca_pattern),
+                    )
+                )
+            else:
+                query_base = query_base.filter(
+                    or_(
+                        Produto.nome.ilike(busca_pattern),
+                        Produto.codigo.ilike(busca_pattern),
+                        PRODUTO_SKU_COLUMN.ilike(busca_pattern),
+                        Produto.codigo_barras.ilike(busca_pattern),
+                        ProdutoLote.nome_lote.ilike(busca_pattern),
+                    )
+                )
+
+    if categoria_id:
+        query_base = query_base.filter(Produto.categoria_id == categoria_id)
+
+    if marca_id:
+        query_base = query_base.filter(Produto.marca_id == marca_id)
+
+    if departamento_id:
+        query_base = query_base.filter(Produto.departamento_id == departamento_id)
+
+    if fornecedor_id:
+        query_base = query_base.filter(Produto.fornecedor_id == fornecedor_id)
+
+    if status_validade == "vencidos":
+        query_base = query_base.filter(ProdutoLote.data_validade < agora)
+    elif status_validade == "todos":
+        query_base = query_base.filter(ProdutoLote.data_validade <= data_limite)
+    else:
+        query_base = query_base.filter(
+            ProdutoLote.data_validade >= agora,
+            ProdutoLote.data_validade <= data_limite,
+        )
+
+    total = query_base.count()
+
+    query = query_base.options(
+        joinedload(Produto.categoria),
+        joinedload(Produto.marca),
+        joinedload(Produto.departamento),
+        joinedload(Produto.fornecedor),
+        joinedload(Produto.fornecedores_alternativos).joinedload(ProdutoFornecedor.fornecedor),
+    )
+
+    if ordenacao == "validade_desc":
+        query = query.order_by(ProdutoLote.data_validade.desc(), Produto.nome.asc())
+    elif ordenacao == "quantidade_desc":
+        query = query.order_by(
+            func.coalesce(ProdutoLote.quantidade_disponivel, 0).desc(),
+            ProdutoLote.data_validade.asc(),
+        )
+    elif ordenacao == "valor_desc":
+        query = query.order_by(
+            (
+                func.coalesce(ProdutoLote.quantidade_disponivel, 0)
+                * func.coalesce(ProdutoLote.custo_unitario, Produto.preco_custo, 0)
+            ).desc(),
+            ProdutoLote.data_validade.asc(),
+        )
+    else:
+        query = query.order_by(ProdutoLote.data_validade.asc(), Produto.nome.asc())
+
+    resultados = (
+        query.offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    resumo_rows = (
+        query_base.with_entities(
+            ProdutoLote.id,
+            Produto.id,
+            Produto.tenant_id,
+            ProdutoLote.data_validade,
+            func.coalesce(ProdutoLote.quantidade_disponivel, 0),
+            func.coalesce(ProdutoLote.custo_unitario, Produto.preco_custo, 0),
+            func.coalesce(Produto.preco_venda, 0),
+        )
+        .order_by(None)
+        .all()
+    )
+
+    tenant_ids_resumo = {row[2] for row in resumo_rows if row[2]}
+    tenant_ids_resultados = {produto.tenant_id for _, produto in resultados if produto.tenant_id}
+    campaign_configs = obter_configs_campanha_validade(
+        db,
+        tenant_ids_resumo.union(tenant_ids_resultados),
+    )
+    exclusoes_produto, exclusoes_lote = obter_mapas_exclusao_validade(
+        db,
+        tenant_ids_resumo.union(tenant_ids_resultados),
+        produto_ids={row[1] for row in resumo_rows},
+    )
+
+    items = []
+    for lote, produto in resultados:
+        dias_para_vencer = lote.dias_para_vencer
+        custo_unitario = float(
+            lote.custo_unitario
+            if lote.custo_unitario is not None
+            else produto.preco_custo or 0
+        )
+        preco_venda = float(produto.preco_venda or 0)
+        quantidade_disponivel = float(lote.quantidade_disponivel or 0)
+        departamento_nome = None
+        if produto.departamento:
+            departamento_nome = produto.departamento.nome
+        elif produto.categoria and produto.categoria.departamento:
+            departamento_nome = produto.categoria.departamento.nome
+
+        fornecedor = produto.fornecedor
+        if not fornecedor:
+            vinculo_principal = next(
+                (
+                    vinculo
+                    for vinculo in produto.fornecedores_alternativos
+                    if vinculo.ativo and vinculo.e_principal and vinculo.fornecedor
+                ),
+                None,
+            )
+            vinculo_secundario = next(
+                (
+                    vinculo
+                    for vinculo in produto.fornecedores_alternativos
+                    if vinculo.ativo and vinculo.fornecedor
+                ),
+                None,
+            )
+            fornecedor = (
+                vinculo_principal.fornecedor
+                if vinculo_principal
+                else vinculo_secundario.fornecedor if vinculo_secundario else None
+            )
+
+        tenant_key = str(produto.tenant_id)
+        exclusao_produto = exclusoes_produto.get((tenant_key, int(produto.id)))
+        exclusao_lote = exclusoes_lote.get((tenant_key, int(lote.id)))
+        campanha_config = campaign_configs.get(tenant_key)
+        oferta_app = construir_oferta_validade(
+            produto,
+            lote,
+            "app",
+            config=campanha_config,
+            exclusao_produto=exclusao_produto,
+            exclusao_lote=exclusao_lote,
+        )
+        oferta_ecommerce = construir_oferta_validade(
+            produto,
+            lote,
+            "ecommerce",
+            config=campanha_config,
+            exclusao_produto=exclusao_produto,
+            exclusao_lote=exclusao_lote,
+        )
+        campanha_canais = []
+        if oferta_app.active:
+            campanha_canais.append("app")
+        if oferta_ecommerce.active:
+            campanha_canais.append("ecommerce")
+        preco_promocional_validade = (
+            oferta_ecommerce.promotional_price
+            if oferta_ecommerce.promotional_price is not None
+            else oferta_app.promotional_price
+        )
+        percentual_desconto_validade = (
+            oferta_ecommerce.percentual_desconto
+            if oferta_ecommerce.percentual_desconto is not None
+            else oferta_app.percentual_desconto
+        )
+        mensagem_promocional = oferta_ecommerce.message or oferta_app.message
+        campanha_validade_ativa = bool(campanha_canais)
+        campanha_validade_excluida = bool(exclusao_produto or exclusao_lote)
+
+        items.append(
+            RelatorioValidadeProximaItem(
+                lote_id=lote.id,
+                produto_id=produto.id,
+                codigo=produto.codigo,
+                sku=_produto_sku_value(produto),
+                nome=produto.nome,
+                categoria_nome=produto.categoria.nome if produto.categoria else None,
+                marca_nome=produto.marca.nome if produto.marca else None,
+                departamento_nome=departamento_nome,
+                fornecedor_nome=fornecedor.nome if fornecedor else None,
+                nome_lote=lote.nome_lote,
+                data_validade=lote.data_validade,
+                dias_para_vencer=int(dias_para_vencer or 0),
+                quantidade_disponivel=quantidade_disponivel,
+                custo_unitario=custo_unitario,
+                preco_venda=preco_venda,
+                valor_custo_lote=quantidade_disponivel * custo_unitario,
+                valor_venda_lote=quantidade_disponivel * preco_venda,
+                status_validade=_calcular_status_validade(dias_para_vencer),
+                faixa_campanha=_calcular_faixa_campanha_validade(dias_para_vencer),
+                promocao_ativa=bool(produto.promocao_ativa or campanha_validade_ativa),
+                campanha_validade_ativa=campanha_validade_ativa,
+                campanha_validade_excluida=campanha_validade_excluida,
+                campanha_validade_exclusao_id=(
+                    exclusao_lote.id if exclusao_lote else exclusao_produto.id if exclusao_produto else None
+                ),
+                campanha_validade_canais=campanha_canais,
+                percentual_desconto_validade=percentual_desconto_validade,
+                quantidade_promocional=quantidade_disponivel if campanha_validade_ativa else 0,
+                preco_promocional_validade=preco_promocional_validade,
+                preco_promocional_validade_app=oferta_app.promotional_price,
+                preco_promocional_validade_ecommerce=oferta_ecommerce.promotional_price,
+                mensagem_promocional=mensagem_promocional,
+            )
+        )
+
+    totais = {
+        "total_lotes": len(resumo_rows),
+        "total_produtos": len({row[1] for row in resumo_rows}),
+        "total_quantidade": 0.0,
+        "lotes_vencidos": 0,
+        "lotes_ate_7_dias": 0,
+        "lotes_ate_30_dias": 0,
+        "lotes_ate_60_dias": 0,
+        "valor_custo_em_risco": 0.0,
+        "valor_venda_em_risco": 0.0,
+        "lotes_em_campanha": 0,
+        "lotes_excluidos_campanha": 0,
+    }
+
+    for lote_id, produto_id, tenant_row_id, data_validade_item, quantidade_item, custo_item, venda_item in resumo_rows:
+        quantidade = float(quantidade_item or 0)
+        custo = float(custo_item or 0)
+        venda = float(venda_item or 0)
+        dias_item = (data_validade_item - agora).days if data_validade_item else None
+        tenant_key = str(tenant_row_id)
+        config = campaign_configs.get(tenant_key)
+        exclusao_produto = exclusoes_produto.get((tenant_key, int(produto_id)))
+        exclusao_lote = exclusoes_lote.get((tenant_key, int(lote_id)))
+
+        totais["total_quantidade"] += quantidade
+        totais["valor_custo_em_risco"] += quantidade * custo
+        totais["valor_venda_em_risco"] += quantidade * venda
+
+        if exclusao_produto or exclusao_lote:
+            totais["lotes_excluidos_campanha"] += 1
+        elif (
+            quantidade > 0
+            and config
+            and bool(config.ativo)
+            and (bool(config.aplicar_app) or bool(config.aplicar_ecommerce))
+            and dias_item is not None
+            and dias_item >= 0
+            and (
+                (dias_item <= 7 and float(config.desconto_7_dias or 0) > 0)
+                or (dias_item <= 30 and float(config.desconto_30_dias or 0) > 0)
+                or (dias_item <= 60 and float(config.desconto_60_dias or 0) > 0)
+            )
+        ):
+            totais["lotes_em_campanha"] += 1
+
+        if dias_item is None:
+            continue
+        if dias_item < 0:
+            totais["lotes_vencidos"] += 1
+            continue
+        if dias_item <= 7:
+            totais["lotes_ate_7_dias"] += 1
+        if dias_item <= 30:
+            totais["lotes_ate_30_dias"] += 1
+        if dias_item <= 60:
+            totais["lotes_ate_60_dias"] += 1
+
+    pages = (total + page_size - 1) // page_size if total else 0
+
+    return RelatorioValidadeProximaResponse(
+        items=items,
+        totais=RelatorioValidadeProximaTotais(**totais),
+        total=total,
+        page=page,
+        page_size=page_size,
+        pages=pages,
+    )
 
 
 @router.get(
@@ -3266,6 +4284,7 @@ def relatorio_valorizacao_estoque(
     marca_id: Optional[int] = None,
     departamento_id: Optional[int] = None,
     fornecedor_id: Optional[int] = None,
+    incluir_kits_virtuais: bool = False,
     ativo: Optional[bool] = True,
     apenas_com_estoque: bool = True,
     db: Session = Depends(get_session),
@@ -3285,16 +4304,26 @@ def relatorio_valorizacao_estoque(
     page_size = min(max(page_size, 1), 200)
 
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    estoque_expr = func.coalesce(Produto.estoque_atual, 0.0)
-    preco_custo_expr = func.coalesce(Produto.preco_custo, 0.0)
-    preco_venda_expr = func.coalesce(Produto.preco_venda, 0.0)
-    valor_custo_expr = estoque_expr * preco_custo_expr
-    valor_venda_expr = estoque_expr * preco_venda_expr
 
     query = db.query(Produto).filter(
         Produto.tenant_id.in_(access_ids),
-        or_(Produto.tipo_produto.is_(None), Produto.tipo_produto.in_(["SIMPLES", "KIT", "VARIACAO"])),
+        or_(
+            Produto.tipo_produto.is_(None),
+            Produto.tipo_produto.in_(["SIMPLES", "KIT", "VARIACAO"]),
+        ),
     )
+
+    if not incluir_kits_virtuais:
+        query = query.filter(
+            or_(
+                Produto.tipo_produto.is_(None),
+                Produto.tipo_produto == "SIMPLES",
+                and_(
+                    Produto.tipo_produto.in_(["KIT", "VARIACAO"]),
+                    or_(Produto.tipo_kit.is_(None), Produto.tipo_kit != "VIRTUAL"),
+                ),
+            )
+        )
 
     if ativo is not None:
         if ativo:
@@ -3339,107 +4368,127 @@ def relatorio_valorizacao_estoque(
         )
 
     if fornecedor_id:
-        query = query.join(
-            ProdutoFornecedor,
-            Produto.id == ProdutoFornecedor.produto_id,
-        ).filter(
-            ProdutoFornecedor.fornecedor_id == fornecedor_id,
-            ProdutoFornecedor.ativo == True,
+        query = query.filter(
+            or_(
+                Produto.fornecedor_id == fornecedor_id,
+                Produto.fornecedores_alternativos.any(
+                    and_(
+                        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                        ProdutoFornecedor.ativo == True,
+                    )
+                ),
+            )
         )
 
-    if apenas_com_estoque:
-        query = query.filter(estoque_expr > 0)
-
-    total = query.count()
-    totais_db = query.with_entities(
-        func.count(Produto.id),
-        func.coalesce(func.sum(estoque_expr), 0.0),
-        func.coalesce(func.sum(valor_custo_expr), 0.0),
-        func.coalesce(func.sum(valor_venda_expr), 0.0),
-    ).first()
-
-    offset = (page - 1) * page_size
-    produtos = (
-        query.options(
-            joinedload(Produto.categoria).joinedload(Categoria.departamento),
-            joinedload(Produto.marca),
-            joinedload(Produto.departamento),
-            joinedload(Produto.fornecedor),
-            joinedload(Produto.fornecedores_alternativos).joinedload(ProdutoFornecedor.fornecedor),
-        )
-        .order_by(valor_custo_expr.desc(), Produto.nome.asc())
-        .offset(offset)
-        .limit(page_size)
-        .all()
+    query = query.options(
+        joinedload(Produto.categoria).joinedload(Categoria.departamento),
+        joinedload(Produto.marca),
+        joinedload(Produto.departamento),
+        joinedload(Produto.fornecedor),
+        joinedload(Produto.fornecedores_alternativos).joinedload(ProdutoFornecedor.fornecedor),
     )
 
-    items = []
-    for produto in produtos:
-        fornecedor = produto.fornecedor
-        if not fornecedor and produto.fornecedores_alternativos:
-            vinculo_principal = next(
-                (
-                    vinculo
-                    for vinculo in produto.fornecedores_alternativos
-                    if vinculo.ativo and vinculo.e_principal and vinculo.fornecedor
-                ),
-                None,
-            )
-            vinculo_secundario = next(
-                (
-                    vinculo
-                    for vinculo in produto.fornecedores_alternativos
-                    if vinculo.ativo and vinculo.fornecedor
-                ),
-                None,
-            )
-            fornecedor = (
-                vinculo_principal.fornecedor
-                if vinculo_principal
-                else vinculo_secundario.fornecedor if vinculo_secundario else None
-            )
+    reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
+    produtos_filtrados = query.order_by(Produto.nome.asc()).all()
 
-        estoque_atual = float(produto.estoque_atual or 0)
-        preco_custo = float(produto.preco_custo or 0)
-        preco_venda = float(produto.preco_venda or 0)
-        departamento_nome = None
-        if produto.departamento:
-            departamento_nome = produto.departamento.nome
-        elif produto.categoria and produto.categoria.departamento:
-            departamento_nome = produto.categoria.departamento.nome
+    resumo_areas: dict[str, dict] = {}
+    itens_processados: list[dict] = []
+    totais = {
+        "total_produtos": 0,
+        "total_itens_estoque": 0.0,
+        "total_itens_reservados": 0.0,
+        "total_itens_disponiveis": 0.0,
+        "valor_custo_total": 0.0,
+        "valor_venda_total": 0.0,
+    }
 
-        items.append(
-            RelatorioValorizacaoEstoqueItem(
-                id=produto.id,
-                codigo=produto.codigo,
-                sku=_produto_sku_value(produto),
-                nome=produto.nome,
-                categoria_nome=produto.categoria.nome if produto.categoria else None,
-                marca_nome=produto.marca.nome if produto.marca else None,
-                departamento_nome=departamento_nome,
-                fornecedor_nome=fornecedor.nome if fornecedor else None,
-                estoque_atual=estoque_atual,
-                preco_custo=preco_custo,
-                preco_venda=preco_venda,
-                valor_custo_total=estoque_atual * preco_custo,
-                valor_venda_total=estoque_atual * preco_venda,
-            )
+    for produto in produtos_filtrados:
+        if departamento_id and _departamento_id_produto(produto) != departamento_id:
+            continue
+
+        metricas = _resolver_metricas_valorizacao_produto(
+            db,
+            produto,
+            reservas_por_produto=reservas_por_produto,
         )
 
-    total_produtos = int((totais_db[0] or 0) if totais_db else 0)
-    total_itens_estoque = float((totais_db[1] or 0) if totais_db else 0)
-    valor_custo_total = float((totais_db[2] or 0) if totais_db else 0)
-    valor_venda_total = float((totais_db[3] or 0) if totais_db else 0)
+        if apenas_com_estoque and metricas["estoque_atual"] <= 0:
+            continue
+
+        area_nome = _nome_area_produto(produto)
+        fornecedor_nome = _fornecedor_nome_produto(produto)
+
+        totais["total_produtos"] += 1
+        totais["total_itens_estoque"] += metricas["estoque_atual"]
+        totais["total_itens_reservados"] += metricas["estoque_reservado"]
+        totais["total_itens_disponiveis"] += metricas["estoque_disponivel"]
+        totais["valor_custo_total"] += metricas["valor_custo_total"]
+        totais["valor_venda_total"] += metricas["valor_venda_total"]
+
+        resumo_area = resumo_areas.setdefault(
+            area_nome,
+            {
+                "area_nome": area_nome,
+                "total_produtos": 0,
+                "total_itens_estoque": 0.0,
+                "total_itens_disponiveis": 0.0,
+                "valor_custo_total": 0.0,
+                "valor_venda_total": 0.0,
+            },
+        )
+        resumo_area["total_produtos"] += 1
+        resumo_area["total_itens_estoque"] += metricas["estoque_atual"]
+        resumo_area["total_itens_disponiveis"] += metricas["estoque_disponivel"]
+        resumo_area["valor_custo_total"] += metricas["valor_custo_total"]
+        resumo_area["valor_venda_total"] += metricas["valor_venda_total"]
+
+        itens_processados.append(
+            {
+                "id": produto.id,
+                "codigo": produto.codigo,
+                "sku": _produto_sku_value(produto),
+                "nome": produto.nome,
+                "categoria_nome": produto.categoria.nome if produto.categoria else None,
+                "marca_nome": produto.marca.nome if produto.marca else None,
+                "departamento_nome": area_nome if area_nome != "Sem setor" else None,
+                "fornecedor_nome": fornecedor_nome,
+                "tipo_produto": produto.tipo_produto,
+                "tipo_kit": produto.tipo_kit,
+                **metricas,
+            }
+        )
+
+    itens_processados.sort(
+        key=lambda item: (
+            -float(item["valor_custo_total"] or 0.0),
+            str(item["nome"] or "").lower(),
+        )
+    )
+
+    total = len(itens_processados)
     pages = (total + page_size - 1) // page_size if total else 0
+    offset = (page - 1) * page_size
+    pagina_items = itens_processados[offset : offset + page_size]
+
+    areas = sorted(
+        resumo_areas.values(),
+        key=lambda area: (-float(area["valor_custo_total"] or 0.0), area["area_nome"]),
+    )
 
     return RelatorioValorizacaoEstoqueResponse(
-        items=items,
+        items=[RelatorioValorizacaoEstoqueItem(**item) for item in pagina_items],
+        areas=[RelatorioValorizacaoEstoqueAreaResumo(**area) for area in areas],
         totais=RelatorioValorizacaoEstoqueTotais(
-            total_produtos=total_produtos,
-            total_itens_estoque=total_itens_estoque,
-            valor_custo_total=valor_custo_total,
-            valor_venda_total=valor_venda_total,
-            margem_potencial_total=valor_venda_total - valor_custo_total,
+            total_produtos=int(totais["total_produtos"]),
+            total_itens_estoque=float(totais["total_itens_estoque"]),
+            total_itens_reservados=float(totais["total_itens_reservados"]),
+            total_itens_disponiveis=float(totais["total_itens_disponiveis"]),
+            valor_custo_total=float(totais["valor_custo_total"]),
+            valor_venda_total=float(totais["valor_venda_total"]),
+            margem_potencial_total=float(
+                totais["valor_venda_total"] - totais["valor_custo_total"]
+            ),
+            total_areas=len(areas),
         ),
         total=total,
         page=page,
@@ -4444,9 +5493,7 @@ async def listar_racoes_sem_classificacao(
         )
 
         # Filtro: Ã© raÃ§Ã£o E estÃ¡ incompleta
-        query = query.filter(
-            Produto.classificacao_racao == 'sim'
-        )
+        query = query.filter(_produto_eh_racao_expr())
 
         # Montar filtros dinamicamente baseado em campos que existem
         filtros_incompletos = []

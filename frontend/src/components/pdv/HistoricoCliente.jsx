@@ -413,8 +413,8 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                                   return (
                                   <tr key={`${item.nome}-${item.quantidade}-${item.preco_unitario}-${item.subtotal}-${index}`} className="border-t border-gray-100">
                                     <td className="px-3 py-2 text-gray-900">
-                                      <div className="space-y-1">
-                                        <div className="inline-flex items-center gap-1.5">
+                                      <div className="flex flex-col items-start gap-1.5">
+                                        <div className="flex flex-wrap items-center gap-1.5">
                                           <span>{item.nome}</span>
                                           {nomeItem && (
                                             <button
@@ -432,7 +432,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                                           )}
                                         </div>
                                         {itemSku && (
-                                          <div className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                                          <div className="flex items-center gap-1.5 pl-0.5 text-xs text-gray-500">
                                             <span className="font-mono">SKU: {itemSku}</span>
                                             <button
                                               type="button"

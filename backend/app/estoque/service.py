@@ -204,7 +204,9 @@ class EstoqueService:
         db: Session,
         tenant_id: str,
         documento: Optional[str] = None,
-        observacao: Optional[str] = None
+        observacao: Optional[str] = None,
+        custo_unitario_override: Optional[float] = None,
+        valor_total_override: Optional[float] = None,
     ) -> Dict:
         """
         Baixa estoque de um produto com FIFO de lotes
@@ -281,8 +283,21 @@ class EstoqueService:
             quantidade=quantidade,
             quantidade_anterior=estoque_anterior,
             quantidade_nova=estoque_novo,
-            custo_unitario=produto.preco_custo,
-            valor_total=quantidade * (produto.preco_custo or 0),
+            custo_unitario=(
+                float(custo_unitario_override)
+                if custo_unitario_override is not None
+                else float(produto.preco_custo or 0)
+            ),
+            valor_total=(
+                float(valor_total_override)
+                if valor_total_override is not None
+                else quantidade
+                * (
+                    float(custo_unitario_override)
+                    if custo_unitario_override is not None
+                    else float(produto.preco_custo or 0)
+                )
+            ),
             lotes_consumidos=json.dumps(lotes_consumidos) if lotes_consumidos else None,
             documento=documento,
             referencia_id=referencia_id,
@@ -322,7 +337,9 @@ class EstoqueService:
         db: Session,
         tenant_id: str,
         documento: Optional[str] = None,
-        observacao: Optional[str] = None
+        observacao: Optional[str] = None,
+        custo_unitario_override: Optional[float] = None,
+        valor_total_override: Optional[float] = None,
     ) -> Dict:
         """
         Devolve estoque ao produto (usado em devolução/cancelamento)
@@ -375,8 +392,21 @@ class EstoqueService:
             quantidade=quantidade,
             quantidade_anterior=estoque_anterior,
             quantidade_nova=estoque_novo,
-            custo_unitario=produto.preco_custo,
-            valor_total=quantidade * (produto.preco_custo or 0),
+            custo_unitario=(
+                float(custo_unitario_override)
+                if custo_unitario_override is not None
+                else float(produto.preco_custo or 0)
+            ),
+            valor_total=(
+                float(valor_total_override)
+                if valor_total_override is not None
+                else quantidade
+                * (
+                    float(custo_unitario_override)
+                    if custo_unitario_override is not None
+                    else float(produto.preco_custo or 0)
+                )
+            ),
             lotes_consumidos=None,  # Estorno não usa lotes
             documento=documento,
             referencia_id=referencia_id,

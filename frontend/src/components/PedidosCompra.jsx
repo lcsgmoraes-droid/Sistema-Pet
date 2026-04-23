@@ -1,7 +1,208 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalConfronto from './compras/ModalConfronto';
+
+const FORM_DATA_INICIAL = {
+  fornecedor_id: '',
+  data_prevista_entrega: '',
+  valor_frete: '0',
+  valor_desconto: '0',
+  observacoes: '',
+  itens: []
+};
+
+const ITEM_FORM_INICIAL = {
+  produto_id: '',
+  quantidade_pedida: '',
+  preco_unitario: ''
+};
+
+const COLUNAS_DOCUMENTO_PEDIDO = [
+  { chave: 'codigo', label: 'Codigo / SKU' },
+  { chave: 'produto', label: 'Descricao' },
+  { chave: 'quantidade', label: 'Quantidade' },
+  { chave: 'preco_unitario', label: 'Custo unitario' },
+  { chave: 'desconto', label: 'Desconto' },
+  { chave: 'total', label: 'Total' },
+];
+
+const COLUNAS_DOCUMENTO_COMPLETO = COLUNAS_DOCUMENTO_PEDIDO.map((coluna) => coluna.chave);
+const COLUNAS_DOCUMENTO_FORNECEDOR = ['codigo', 'produto', 'quantidade'];
+const COLUNAS_DOCUMENTO_FINANCEIRAS = ['preco_unitario', 'desconto', 'total'];
+
+const normalizarColunasDocumentoPedido = (colunas = []) => {
+  const candidatas = Array.isArray(colunas)
+    ? colunas
+    : String(colunas || '').split(',');
+
+  const selecionadas = new Set(
+    candidatas
+      .map((coluna) => String(coluna || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  return COLUNAS_DOCUMENTO_COMPLETO.filter((coluna) => selecionadas.has(coluna));
+};
+
+const documentoTemColunasFinanceiras = (colunas = []) => (
+  normalizarColunasDocumentoPedido(colunas).some((coluna) => COLUNAS_DOCUMENTO_FINANCEIRAS.includes(coluna))
+);
+
+const numeroSeguro = (valor) => {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : 0;
+};
+
+const textoNumeroSeguro = (valor, fallback = '0') => {
+  if (valor === null || valor === undefined || valor === '') {
+    return fallback;
+  }
+
+  return String(valor);
+};
+
+const normalizarItemPedido = (item = {}) => {
+  const quantidade = numeroSeguro(item.quantidade_pedida);
+  const preco = numeroSeguro(item.preco_unitario);
+  const desconto = numeroSeguro(item.desconto_item);
+  const totalInformado = Number(item.total ?? item.valor_total);
+  const total = Number.isFinite(totalInformado)
+    ? totalInformado
+    : (preco - desconto) * quantidade;
+
+  return {
+    produto_id: Number(item.produto_id),
+    produto_nome: item.produto_nome || item.nome || `Produto ${item.produto_id}`,
+    produto_codigo: item.produto_codigo || item.codigo || item.sku || '',
+    quantidade_pedida: quantidade,
+    preco_unitario: preco,
+    desconto_item: desconto,
+    total
+  };
+};
+
+const clonarItensPedido = (itens = []) => itens.map((item) => normalizarItemPedido(item));
+
+const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estrategia = 'somar') => {
+  const mapa = new Map();
+
+  const adicionarOuSomarItem = (item) => {
+    const normalizado = normalizarItemPedido(item);
+    const chave = Number(normalizado.produto_id);
+
+    if (!Number.isFinite(chave) || chave <= 0) {
+      return;
+    }
+
+    const existente = mapa.get(chave);
+    if (!existente) {
+      mapa.set(chave, normalizado);
+      return;
+    }
+
+    if (estrategia === 'maior_quantidade') {
+      const quantidadeExistente = numeroSeguro(existente.quantidade_pedida);
+      const quantidadeNova = numeroSeguro(normalizado.quantidade_pedida);
+      const itemEscolhido = quantidadeNova >= quantidadeExistente
+        ? normalizado
+        : existente;
+      const preco = numeroSeguro(itemEscolhido.preco_unitario);
+      const desconto = numeroSeguro(itemEscolhido.desconto_item);
+      const quantidade = Math.max(quantidadeExistente, quantidadeNova);
+
+      mapa.set(chave, {
+        ...existente,
+        ...normalizado,
+        ...itemEscolhido,
+        quantidade_pedida: quantidade,
+        preco_unitario: preco,
+        desconto_item: desconto,
+        total: (preco - desconto) * quantidade
+      });
+      return;
+    }
+
+    const preco = numeroSeguro(normalizado.preco_unitario) || numeroSeguro(existente.preco_unitario);
+    const desconto = numeroSeguro(normalizado.desconto_item) || numeroSeguro(existente.desconto_item);
+    const quantidade = numeroSeguro(existente.quantidade_pedida) + numeroSeguro(normalizado.quantidade_pedida);
+
+    mapa.set(chave, {
+      ...existente,
+      ...normalizado,
+      preco_unitario: preco,
+      desconto_item: desconto,
+      quantidade_pedida: quantidade,
+      total: (preco - desconto) * quantidade
+    });
+  };
+
+  clonarItensPedido(itensBase).forEach(adicionarOuSomarItem);
+  clonarItensPedido(itensAdicionais).forEach(adicionarOuSomarItem);
+
+  return Array.from(mapa.values());
+};
+
+const converterPedidoParaFormData = (pedido) => ({
+  fornecedor_id: pedido?.fornecedor_id?.toString() || '',
+  data_prevista_entrega: pedido?.data_prevista_entrega
+    ? new Date(pedido.data_prevista_entrega).toISOString().split('T')[0]
+    : '',
+  valor_frete: textoNumeroSeguro(pedido?.valor_frete, '0'),
+  valor_desconto: textoNumeroSeguro(pedido?.valor_desconto, '0'),
+  observacoes: pedido?.observacoes || '',
+  itens: clonarItensPedido(
+    (pedido?.itens || []).map((item) => ({
+      produto_id: item.produto_id,
+      produto_nome: item.produto_nome || `Produto ${item.produto_id}`,
+      produto_codigo: item.produto_codigo || item.codigo || item.sku || '',
+      quantidade_pedida: item.quantidade_pedida,
+      preco_unitario: item.preco_unitario,
+      desconto_item: item.desconto_item || 0,
+      total: item.total ?? item.valor_total
+    }))
+  )
+});
+
+const extrairNomeArquivoCabecalho = (contentDisposition, fallback) => {
+  if (!contentDisposition) {
+    return fallback;
+  }
+
+  const matchUtf8 = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (matchUtf8?.[1]) {
+    try {
+      return decodeURIComponent(matchUtf8[1].trim());
+    } catch (_error) {
+      // ignora e tenta os outros formatos
+    }
+  }
+
+  const matchQuoted = contentDisposition.match(/filename\s*=\s*"([^"]+)"/i);
+  if (matchQuoted?.[1]) {
+    return matchQuoted[1].trim();
+  }
+
+  const matchSimple = contentDisposition.match(/filename\s*=\s*([^;]+)/i);
+  if (matchSimple?.[1]) {
+    return matchSimple[1].trim().replace(/^"|"$/g, '');
+  }
+
+  return fallback;
+};
+
+const baixarArquivoResposta = (response, fallback) => {
+  const contentDisposition = response?.headers?.['content-disposition'] || response?.headers?.['Content-Disposition'];
+  const nomeArquivo = extrairNomeArquivoCabecalho(contentDisposition, fallback);
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', nomeArquivo);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
 
 const PedidosCompra = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -20,6 +221,10 @@ const PedidosCompra = () => {
   const [mostrarModalEnvio, setMostrarModalEnvio] = useState(false);
   const [pedidoParaEnviar, setPedidoParaEnviar] = useState(null);
   const [emailEnvioDisponivel, setEmailEnvioDisponivel] = useState(false);
+  const [mostrarModalExportacao, setMostrarModalExportacao] = useState(false);
+  const [pedidoParaExportar, setPedidoParaExportar] = useState(null);
+  const [exportandoArquivo, setExportandoArquivo] = useState(false);
+  const [colunasDocumentoPedido, setColunasDocumentoPedido] = useState(COLUNAS_DOCUMENTO_COMPLETO);
   const [dadosEnvio, setDadosEnvio] = useState({
     email: '',
     whatsapp: '',
@@ -33,6 +238,7 @@ const PedidosCompra = () => {
   const [mostrarSugestao, setMostrarSugestao] = useState(false);
   const [sugestoes, setSugestoes] = useState([]);
   const [loadingSugestao, setLoadingSugestao] = useState(false);
+  const [loadingPrepararSugestao, setLoadingPrepararSugestao] = useState(false);
   const [periodoSugestao, setPeriodoSugestao] = useState(90);
   const [diasCobertura, setDiasCobertura] = useState(30);
   const [apenasCriticos, setApenasCriticos] = useState(false);
@@ -42,22 +248,19 @@ const PedidosCompra = () => {
   const [filtroSugestao, setFiltroSugestao] = useState('');
   const [mostrarSoPreenchidos, setMostrarSoPreenchidos] = useState(false);
   const [marcasSelecionadas, setMarcasSelecionadas] = useState([]);
+  const [mostrarFiltroMarcas, setMostrarFiltroMarcas] = useState(false);
   const [produtoEditandoQuantidade, setProdutoEditandoQuantidade] = useState(null);
+  const [mostrarModalRascunhoSugestao, setMostrarModalRascunhoSugestao] = useState(false);
+  const [contextoRascunhoSugestao, setContextoRascunhoSugestao] = useState(null);
+  const [modoAplicacaoSugestao, setModoAplicacaoSugestao] = useState('merge');
+  const [estrategiaMesclaItens, setEstrategiaMesclaItens] = useState('somar');
+  const cabecalhoTabelaSugestaoRef = useRef(null);
+  const corpoTabelaSugestaoRef = useRef(null);
+  const filtroMarcasRef = useRef(null);
 
-  const [formData, setFormData] = useState({
-    fornecedor_id: '',
-    data_prevista_entrega: '',
-    valor_frete: '0',
-    valor_desconto: '0',
-    observacoes: '',
-    itens: []
-  });
+  const [formData, setFormData] = useState(FORM_DATA_INICIAL);
 
-  const [itemForm, setItemForm] = useState({
-    produto_id: '',
-    quantidade_pedida: '',
-    preco_unitario: ''
-  });
+  const [itemForm, setItemForm] = useState(ITEM_FORM_INICIAL);
 
   // Estados para inputs digitáveis
   const [fornecedorTexto, setFornecedorTexto] = useState('');
@@ -92,15 +295,11 @@ const PedidosCompra = () => {
   const selecionarFornecedor = (fornecedor) => {
     setFornecedorTexto(fornecedor.nome || '');
     setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
-    setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
+    setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
     setMostrarSugestoesFornecedor(false);
     // Limpar sugestões do fornecedor anterior
-    setSugestoes([]);
-    setProdutosSelecionados([]);
-    setQuantidadesEditadas({});
-    setFiltroSugestao('');
-    setMarcasSelecionadas([]);
+    limparEstadosSugestao();
     carregarProdutosFornecedor(fornecedor.id);
   };
 
@@ -128,6 +327,230 @@ const PedidosCompra = () => {
     );
 
     return (emailValido || '').trim();
+  };
+
+  const obterSnapshotFormularioAtual = () => ({
+    ...formData,
+    fornecedor_id: formData.fornecedor_id?.toString() || '',
+    data_prevista_entrega: formData.data_prevista_entrega || '',
+    valor_frete: textoNumeroSeguro(formData.valor_frete, '0'),
+    valor_desconto: textoNumeroSeguro(formData.valor_desconto, '0'),
+    observacoes: formData.observacoes || '',
+    itens: clonarItensPedido(formData.itens),
+  });
+
+  const limparEstadosSugestao = () => {
+    setSugestoes([]);
+    setProdutosSelecionados([]);
+    setQuantidadesEditadas({});
+    setFiltroSugestao('');
+    setMostrarSoPreenchidos(false);
+    setMarcasSelecionadas([]);
+    setMostrarFiltroMarcas(false);
+    setProdutoEditandoQuantidade(null);
+    setModoAplicacaoSugestao('merge');
+  };
+
+  const limparFormularioPedido = () => {
+    setFormData(FORM_DATA_INICIAL);
+    setItemForm(ITEM_FORM_INICIAL);
+    setEstrategiaMesclaItens('somar');
+    setFornecedorTexto('');
+    setProdutoTexto('');
+    setProdutos([]);
+    setMostrarSugestoesFornecedor(false);
+    setMostrarSugestoesProduto(false);
+    limparEstadosSugestao();
+  };
+
+  const fecharFormularioPedido = () => {
+    setMostrarForm(false);
+    setModoEdicao(false);
+    setPedidoEditando(null);
+    limparFormularioPedido();
+  };
+
+  const abrirNovoFormulario = () => {
+    setModoEdicao(false);
+    setPedidoEditando(null);
+    limparFormularioPedido();
+    setMostrarForm(true);
+  };
+
+  const combinarCabecalhoPedido = (formBase, formAtual) => ({
+    fornecedor_id: formBase.fornecedor_id || formAtual.fornecedor_id || '',
+    data_prevista_entrega: formAtual.data_prevista_entrega || formBase.data_prevista_entrega || '',
+    valor_frete:
+      numeroSeguro(formAtual.valor_frete) > 0
+        ? textoNumeroSeguro(formAtual.valor_frete, '0')
+        : textoNumeroSeguro(formBase.valor_frete, '0'),
+    valor_desconto:
+      numeroSeguro(formAtual.valor_desconto) > 0
+        ? textoNumeroSeguro(formAtual.valor_desconto, '0')
+        : textoNumeroSeguro(formBase.valor_desconto, '0'),
+    observacoes: formAtual.observacoes?.trim() || formBase.observacoes || '',
+  });
+
+  const aplicarPedidoNoFormulario = async (
+    pedidoCompleto,
+    formDataOverride = null,
+    options = {},
+  ) => {
+    const { mensagemSucesso = '', mostrarToast = false } = options;
+    const fornecedorId = Number(pedidoCompleto?.fornecedor_id);
+    const fornecedorSelecionado = obterFornecedorPorId(fornecedorId);
+    const proximoFormData = formDataOverride || converterPedidoParaFormData(pedidoCompleto);
+
+    setModoEdicao(true);
+    setPedidoEditando(pedidoCompleto);
+    setFormData(proximoFormData);
+    setFornecedorTexto(fornecedorSelecionado?.nome || '');
+    setItemForm(ITEM_FORM_INICIAL);
+    setProdutoTexto('');
+    setMostrarSugestoesProduto(false);
+    setMostrarSugestoesFornecedor(false);
+    setMostrarForm(true);
+    limparEstadosSugestao();
+
+    if (fornecedorId) {
+      await carregarProdutosFornecedor(fornecedorId);
+    }
+
+    if (mostrarToast && mensagemSucesso) {
+      toast.success(mensagemSucesso);
+    }
+  };
+
+  const abrirModalSugestao = async (fornecedorId, modo = 'merge') => {
+    setModoAplicacaoSugestao(modo);
+    setMostrarSugestao(true);
+    await buscarSugestoes(fornecedorId);
+  };
+
+  const abrirFluxoSugestaoInteligente = async () => {
+    if (!formData.fornecedor_id) {
+      toast.error('Selecione um fornecedor primeiro');
+      return;
+    }
+
+    const fornecedorId = Number(formData.fornecedor_id);
+    const snapshotFormulario = obterSnapshotFormularioAtual();
+    const editandoMesmoRascunho =
+      modoEdicao
+      && pedidoEditando
+      && Number(pedidoEditando.id) > 0
+      && Number(pedidoEditando.fornecedor_id) === fornecedorId
+      && pedidoEditando.status === 'rascunho';
+
+    if (editandoMesmoRascunho) {
+      setContextoRascunhoSugestao({
+        tipo: 'atual',
+        pedidoRascunho: pedidoEditando,
+        pedidoNovo: snapshotFormulario,
+        totalRascunhos: 1,
+      });
+      setMostrarModalRascunhoSugestao(true);
+      return;
+    }
+
+    setLoadingPrepararSugestao(true);
+    try {
+      const response = await api.get(`/pedidos-compra/rascunho/fornecedor/${fornecedorId}`);
+      const pedidoRascunho = response?.data?.pedido || null;
+
+      if (pedidoRascunho) {
+        setContextoRascunhoSugestao({
+          tipo: 'externo',
+          pedidoRascunho,
+          pedidoNovo: snapshotFormulario,
+          totalRascunhos: Number(response?.data?.total_rascunhos || 1),
+        });
+        setMostrarModalRascunhoSugestao(true);
+        return;
+      }
+
+      await abrirModalSugestao(fornecedorId);
+    } catch (error) {
+      console.error('Erro ao verificar rascunho do fornecedor:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao verificar rascunho do fornecedor');
+    } finally {
+      setLoadingPrepararSugestao(false);
+    }
+  };
+
+  const fecharModalRascunho = () => {
+    setMostrarModalRascunhoSugestao(false);
+    setContextoRascunhoSugestao(null);
+  };
+
+  const decidirAcaoRascunhoSugestao = async (acao) => {
+    const contexto = contextoRascunhoSugestao;
+    if (!contexto) {
+      return;
+    }
+
+    const { pedidoRascunho, pedidoNovo, tipo } = contexto;
+    const fornecedorId = Number(pedidoRascunho?.fornecedor_id || pedidoNovo?.fornecedor_id);
+
+    fecharModalRascunho();
+    setLoadingPrepararSugestao(true);
+
+    try {
+      if (acao === 'manter') {
+      if (tipo === 'externo' && pedidoRascunho) {
+        await aplicarPedidoNoFormulario(
+          pedidoRascunho,
+          converterPedidoParaFormData(pedidoRascunho),
+          {
+            mostrarToast: true,
+            mensagemSucesso: 'Rascunho existente carregado e mantido como está.',
+          },
+        );
+      } else {
+        toast('O rascunho atual foi mantido sem aplicar nova sugestão.');
+      }
+      return;
+    }
+
+    if (tipo === 'externo' && pedidoRascunho) {
+      const formRascunho = converterPedidoParaFormData(pedidoRascunho);
+      const itensConsolidados = acao === 'mesclar'
+        ? consolidarItensPedido(formRascunho.itens, pedidoNovo.itens, estrategiaMesclaItens)
+        : clonarItensPedido(formRascunho.itens);
+      const cabecalhoConsolidado = combinarCabecalhoPedido(formRascunho, pedidoNovo);
+
+      await aplicarPedidoNoFormulario(
+        pedidoRascunho,
+        {
+          ...formRascunho,
+          ...cabecalhoConsolidado,
+          itens: itensConsolidados,
+        },
+        {
+          mostrarToast: true,
+          mensagemSucesso: acao === 'mesclar'
+            ? 'Rascunho existente carregado para mesclar com o pedido atual.'
+            : 'Rascunho existente mantido e pronto para receber só a nova sugestão.',
+        },
+      );
+
+      await abrirModalSugestao(
+        fornecedorId,
+        acao === 'substituir' ? 'replace' : 'merge',
+      );
+      return;
+    }
+
+    await abrirModalSugestao(
+      fornecedorId,
+      acao === 'substituir' ? 'replace' : 'merge',
+    );
+    } catch (error) {
+      console.error('Erro ao preparar consolidação do rascunho:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao preparar a sugestão inteligente');
+    } finally {
+      setLoadingPrepararSugestao(false);
+    }
   };
 
   useEffect(() => {
@@ -221,6 +644,7 @@ const PedidosCompra = () => {
     const quantidade = parseFloat(itemForm.quantidade_pedida);
     const preco = parseFloat(itemForm.preco_unitario);
     const produtoId = parseInt(itemForm.produto_id);
+    const produtoCodigo = produto?.codigo || produto?.sku || '';
 
     // Verificar se produto já existe no pedido
     const itemExistenteIndex = formData.itens.findIndex(item => item.produto_id === produtoId);
@@ -244,6 +668,7 @@ const PedidosCompra = () => {
         const novosItens = [...formData.itens];
         novosItens[itemExistenteIndex] = {
           ...itemExistente,
+          produto_codigo: itemExistente.produto_codigo || produtoCodigo,
           quantidade_pedida: itemExistente.quantidade_pedida + quantidade,
           preco_unitario: preco, // Atualiza com o novo preço
           total: (itemExistente.quantidade_pedida + quantidade) * preco
@@ -262,11 +687,7 @@ const PedidosCompra = () => {
       // Limpar form
       setProdutoTexto('');
       setMostrarSugestoesProduto(false);
-      setItemForm({
-        produto_id: '',
-        quantidade_pedida: '',
-        preco_unitario: ''
-      });
+      setItemForm(ITEM_FORM_INICIAL);
       return;
     }
 
@@ -278,6 +699,7 @@ const PedidosCompra = () => {
         {
           produto_id: produtoId,
           produto_nome: produto.nome,
+          produto_codigo: produtoCodigo,
           quantidade_pedida: quantidade,
           preco_unitario: preco,
           desconto_item: 0,
@@ -289,11 +711,7 @@ const PedidosCompra = () => {
     // Limpar apenas os campos do item, mantendo o texto do produto limpo
     setProdutoTexto('');
     setMostrarSugestoesProduto(false);
-    setItemForm({
-      produto_id: '',
-      quantidade_pedida: '',
-      preco_unitario: ''
-    });
+    setItemForm(ITEM_FORM_INICIAL);
   };
 
   const removerItem = (index) => {
@@ -301,6 +719,62 @@ const PedidosCompra = () => {
       ...formData,
       itens: formData.itens.filter((_, i) => i !== index)
     });
+  };
+
+  const atualizarItemPedido = (index, campo, valor) => {
+    setFormData((prev) => {
+      const itens = prev.itens.map((item, itemIndex) => {
+        if (itemIndex !== index) {
+          return item;
+        }
+
+        const proximoItem = {
+          ...item,
+          [campo]: numeroSeguro(valor)
+        };
+        const quantidade = numeroSeguro(proximoItem.quantidade_pedida);
+        const preco = numeroSeguro(proximoItem.preco_unitario);
+        const desconto = numeroSeguro(proximoItem.desconto_item);
+
+        return {
+          ...proximoItem,
+          quantidade_pedida: quantidade,
+          preco_unitario: preco,
+          desconto_item: desconto,
+          total: (preco - desconto) * quantidade
+        };
+      });
+
+      return {
+        ...prev,
+        itens
+      };
+    });
+  };
+
+  const obterSkuItemPedido = (item) => {
+    if (item?.produto_codigo) {
+      return item.produto_codigo;
+    }
+
+    const produto = produtos.find((produtoAtual) => produtoAtual.id === Number(item?.produto_id));
+    return produto?.codigo || produto?.sku || '';
+  };
+
+  const copiarSkuItemPedido = async (item) => {
+    const sku = obterSkuItemPedido(item);
+
+    if (!sku) {
+      toast.error('SKU não disponível para este item');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(sku);
+      toast.success(`SKU ${sku} copiado`);
+    } catch (_error) {
+      toast.error('Não foi possível copiar o SKU');
+    }
   };
 
   const calcularTotal = () => {
@@ -311,8 +785,10 @@ const PedidosCompra = () => {
   };
 
   // 💡 FUNÇÕES DE SUGESTÃO INTELIGENTE
-  const buscarSugestoes = async () => {
-    if (!formData.fornecedor_id) {
+  const buscarSugestoes = async (fornecedorIdOverride = null) => {
+    const fornecedorId = fornecedorIdOverride || formData.fornecedor_id;
+
+    if (!fornecedorId) {
       toast.error('Selecione um fornecedor primeiro');
       return;
     }
@@ -320,7 +796,7 @@ const PedidosCompra = () => {
     setLoadingSugestao(true);
     try {
       const response = await api.get(
-        `/pedidos-compra/sugestao/${formData.fornecedor_id}`,
+        `/pedidos-compra/sugestao/${fornecedorId}`,
         {
           params: {
             periodo_dias: periodoSugestao,
@@ -442,6 +918,18 @@ const PedidosCompra = () => {
     [sugestoes, produtosSelecionados, quantidadesEditadas],
   );
 
+  const resumoMarcasSelecionadas = useMemo(() => {
+    if (marcasSelecionadas.length === 0 || marcasSelecionadas.length === marcasFornecedor.length) {
+      return 'Todas';
+    }
+
+    if (marcasSelecionadas.length === 1) {
+      return marcasFornecedor.find((marca) => marca.id === marcasSelecionadas[0])?.nome || '1 marca';
+    }
+
+    return `${marcasSelecionadas.length} marcas`;
+  }, [marcasFornecedor, marcasSelecionadas]);
+
   const fecharModalSugestao = () => {
     setMostrarSugestao(false);
     setProdutosSelecionados([]);
@@ -449,16 +937,69 @@ const PedidosCompra = () => {
     setFiltroSugestao('');
     setMostrarSoPreenchidos(false);
     setMarcasSelecionadas([]);
+    setMostrarFiltroMarcas(false);
     setProdutoEditandoQuantidade(null);
+    setModoAplicacaoSugestao('merge');
   };
 
   // Fechar modal com ESC
   useEffect(() => {
     if (!mostrarSugestao) return;
-    const handleKeyDown = (e) => { if (e.key === 'Escape') fecharModalSugestao(); };
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+
+      if (mostrarFiltroMarcas) {
+        setMostrarFiltroMarcas(false);
+        return;
+      }
+
+      fecharModalSugestao();
+    };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mostrarSugestao]);
+  }, [mostrarSugestao, mostrarFiltroMarcas]);
+
+  useEffect(() => {
+    if (!mostrarSugestao || !mostrarFiltroMarcas) {
+      return undefined;
+    }
+
+    const handleClickFora = (event) => {
+      if (!filtroMarcasRef.current?.contains(event.target)) {
+        setMostrarFiltroMarcas(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleClickFora);
+    return () => window.removeEventListener('mousedown', handleClickFora);
+  }, [mostrarSugestao, mostrarFiltroMarcas]);
+
+  useEffect(() => {
+    if (!mostrarSugestao) {
+      return undefined;
+    }
+
+    const cabecalho = cabecalhoTabelaSugestaoRef.current;
+    const corpo = corpoTabelaSugestaoRef.current;
+    if (!cabecalho || !corpo) {
+      return undefined;
+    }
+
+    const sincronizarScrollHorizontal = () => {
+      if (cabecalho.scrollLeft !== corpo.scrollLeft) {
+        cabecalho.scrollLeft = corpo.scrollLeft;
+      }
+    };
+
+    sincronizarScrollHorizontal();
+    corpo.addEventListener('scroll', sincronizarScrollHorizontal, { passive: true });
+    window.addEventListener('resize', sincronizarScrollHorizontal);
+
+    return () => {
+      corpo.removeEventListener('scroll', sincronizarScrollHorizontal);
+      window.removeEventListener('resize', sincronizarScrollHorizontal);
+    };
+  }, [mostrarSugestao, sugestoesFiltradas.length]);
 
   const selecionarTodosCriticos = () => {
     const criticos = sugestoes
@@ -478,6 +1019,45 @@ const PedidosCompra = () => {
     const idsVisiveis = new Set(sugestoesFiltradas.map((s) => s.produto_id));
     setProdutosSelecionados((prev) => prev.filter((id) => !idsVisiveis.has(id)));
   };
+
+  const alternarMarcaSelecionada = (marcaId) => {
+    setMarcasSelecionadas((marcasAtuais) => {
+      if (marcasAtuais.length === 0) {
+        return [marcaId];
+      }
+
+      const jaSelecionada = marcasAtuais.includes(marcaId);
+      const proximasMarcas = jaSelecionada
+        ? marcasAtuais.filter((id) => id !== marcaId)
+        : [...marcasAtuais, marcaId].sort((a, b) => a - b);
+
+      if (
+        proximasMarcas.length === 0
+        || proximasMarcas.length === marcasFornecedor.length
+      ) {
+        return [];
+      }
+
+      return proximasMarcas;
+    });
+  };
+
+  const classeCabecalhoTabelaSugestao = 'border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.04em] text-slate-600 whitespace-nowrap shadow-[inset_0_-1px_0_rgba(203,213,225,0.9)]';
+  const classeTabelaSugestao = 'w-full min-w-[1180px] table-fixed border-separate border-spacing-0';
+  const renderColGroupSugestao = () => (
+    <colgroup>
+      <col style={{ width: '3%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '34%' }} />
+      <col style={{ width: '7%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '9%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '8%' }} />
+      <col style={{ width: '7%' }} />
+    </colgroup>
+  );
 
   const adicionarSugestoesAoPedido = () => {
     if (produtosSelecionados.length === 0) {
@@ -502,6 +1082,7 @@ const PedidosCompra = () => {
       return {
         produto_id: sugestao.produto_id,
         produto_nome: sugestao.produto_nome,
+        produto_codigo: sugestao.produto_sku || '',
         quantidade_pedida: quantidade,
         preco_unitario: sugestao.preco_unitario,
         desconto_item: 0,
@@ -509,12 +1090,20 @@ const PedidosCompra = () => {
       };
     });
 
+    const itensAtualizados = modoAplicacaoSugestao === 'replace'
+      ? clonarItensPedido(novosItens)
+      : consolidarItensPedido(formData.itens, novosItens, estrategiaMesclaItens);
+
     setFormData({
       ...formData,
-      itens: [...formData.itens, ...novosItens]
+      itens: itensAtualizados
     });
 
-    toast.success(`${novosItens.length} produtos adicionados ao pedido`);
+    toast.success(
+      modoAplicacaoSugestao === 'replace'
+        ? `${novosItens.length} produtos aplicados substituindo o rascunho atual`
+        : `${novosItens.length} produtos consolidados no pedido`
+    );
     fecharModalSugestao();
   };
 
@@ -530,23 +1119,21 @@ const PedidosCompra = () => {
     try {
       const dadosEnvio = {
         ...formData,
-        data_prevista_entrega: formData.data_prevista_entrega ? `${formData.data_prevista_entrega}T12:00:00` : null
+        fornecedor_id: parseInt(formData.fornecedor_id),
+        valor_frete: parseFloat(formData.valor_frete),
+        valor_desconto: parseFloat(formData.valor_desconto),
+        data_prevista_entrega: formData.data_prevista_entrega ? `${formData.data_prevista_entrega}T12:00:00` : null,
+        itens: formData.itens.map((item) => ({
+          produto_id: item.produto_id,
+          quantidade_pedida: parseFloat(item.quantidade_pedida),
+          preco_unitario: parseFloat(item.preco_unitario),
+          desconto_item: parseFloat(item.desconto_item || 0)
+        }))
       };
       await api.post('/pedidos-compra/', dadosEnvio);
 
       toast.success('✅ Pedido criado com sucesso!');
-      setMostrarForm(false);
-      setFormData({
-        fornecedor_id: '',
-        data_prevista_entrega: '',
-        valor_frete: '0',
-        valor_desconto: '0',
-        observacoes: '',
-        itens: []
-      });
-      setFornecedorTexto('');
-      setProdutoTexto('');
-      setMostrarSugestoesProduto(false);
+      fecharFormularioPedido();
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao criar pedido');
@@ -571,6 +1158,27 @@ const PedidosCompra = () => {
     });
     setMostrarModalEnvio(true);
   };
+
+  const atualizarColunasDocumento = (colunas) => {
+    setColunasDocumentoPedido(normalizarColunasDocumentoPedido(colunas));
+  };
+
+  const abrirModalExportacao = (pedido, formato) => {
+    setPedidoParaExportar({
+      id: pedido.id,
+      numero_pedido: pedido.numero_pedido,
+      formato,
+    });
+    setMostrarModalExportacao(true);
+  };
+
+  const fecharModalExportacao = () => {
+    if (exportandoArquivo) {
+      return;
+    }
+    setMostrarModalExportacao(false);
+    setPedidoParaExportar(null);
+  };
   
   const confirmarEnvioPedido = async () => {
     if (!dadosEnvio.email && !dadosEnvio.whatsapp) {
@@ -587,14 +1195,20 @@ const PedidosCompra = () => {
       toast.error('Selecione pelo menos um formato (PDF ou Excel)');
       return;
     }
-    
+
+    if (normalizarColunasDocumentoPedido(colunasDocumentoPedido).length === 0) {
+      toast.error('Selecione pelo menos uma coluna para o documento');
+      return;
+    }
+
     try {
             // Aqui você pode implementar o envio real por e-mail/WhatsApp no futuro
       // Por enquanto, apenas marca como enviado
       const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
         email: dadosEnvio.email,
         whatsapp: dadosEnvio.whatsapp,
-        formatos: dadosEnvio.formatos
+        formatos: dadosEnvio.formatos,
+        colunas_exportacao: normalizarColunasDocumentoPedido(colunasDocumentoPedido)
       });
 
       const tipoEnvio = response?.data?.tipo_envio;
@@ -638,44 +1252,60 @@ const PedidosCompra = () => {
   };
 
   const exportarPDF = async (id) => {
-    try {
-      const response = await api.get(
-        `/pedidos-compra/${id}/export/pdf`,
-        {
-          responseType: 'blob'
-        }
-      );
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `pedido_${id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success('📄 PDF exportado com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao exportar PDF');
+    const pedido = pedidos.find((item) => Number(item.id) === Number(id));
+    if (!pedido) {
+      toast.error('Pedido nao encontrado para exportacao');
+      return;
     }
+    abrirModalExportacao(pedido, 'pdf');
   };
 
   const exportarExcel = async (id) => {
+    const pedido = pedidos.find((item) => Number(item.id) === Number(id));
+    if (!pedido) {
+      toast.error('Pedido nao encontrado para exportacao');
+      return;
+    }
+    abrirModalExportacao(pedido, 'excel');
+  };
+
+  const confirmarExportacaoPedido = async () => {
+    if (!pedidoParaExportar) {
+      return;
+    }
+
+    const colunasNormalizadas = normalizarColunasDocumentoPedido(colunasDocumentoPedido);
+    if (colunasNormalizadas.length === 0) {
+      toast.error('Selecione pelo menos uma coluna para o documento');
+      return;
+    }
+
+    const { id, formato } = pedidoParaExportar;
+    const rota = formato === 'pdf'
+      ? `/pedidos-compra/${id}/export/pdf`
+      : `/pedidos-compra/${id}/export/excel`;
+    const fallback = formato === 'pdf'
+      ? `pedido_${id}.pdf`
+      : `pedido_${id}.xlsx`;
+
+    setExportandoArquivo(true);
     try {
       const response = await api.get(
-        `/pedidos-compra/${id}/export/excel`,
+        rota,
         {
+          params: {
+            colunas: colunasNormalizadas.join(','),
+          },
           responseType: 'blob'
         }
       );
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `pedido_${id}.xlsx`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success('📊 Excel exportado com sucesso!');
+      baixarArquivoResposta(response, fallback);
+      toast.success(`${formato.toUpperCase()} exportado com sucesso!`);
+      fecharModalExportacao();
     } catch (error) {
-      toast.error('Erro ao exportar Excel');
+      toast.error(`Erro ao exportar ${formato.toUpperCase()}`);
+    } finally {
+      setExportandoArquivo(false);
     }
   };
 
@@ -741,6 +1371,11 @@ const PedidosCompra = () => {
       const response = await api.get(`/pedidos-compra/${pedido.id}`);
       
       const pedidoCompleto = response.data;
+      await aplicarPedidoNoFormulario(pedidoCompleto, null, {
+        mostrarToast: true,
+        mensagemSucesso: 'Modo de edição ativado',
+      });
+      return;
       
       setModoEdicao(true);
       setPedidoEditando(pedidoCompleto);
@@ -811,20 +1446,7 @@ const PedidosCompra = () => {
       );
 
       toast.success('✏️ Pedido atualizado com sucesso!');
-      setMostrarForm(false);
-      setModoEdicao(false);
-      setPedidoEditando(null);
-      setFormData({
-        fornecedor_id: '',
-        data_prevista_entrega: '',
-        valor_frete: '0',
-        valor_desconto: '0',
-        observacoes: '',
-        itens: []
-      });
-      setFornecedorTexto('');
-      setProdutoTexto('');
-      setMostrarSugestoesProduto(false);
+      fecharFormularioPedido();
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao atualizar pedido');
@@ -892,7 +1514,14 @@ const PedidosCompra = () => {
           <p className="text-gray-600">Gerencie seus pedidos aos fornecedores</p>
         </div>
         <button
-          onClick={() => setMostrarForm(!mostrarForm)}
+          onClick={() => {
+            if (mostrarForm) {
+              fecharFormularioPedido();
+              return;
+            }
+
+            abrirNovoFormulario();
+          }}
           className="inline-flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-700 px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
         >
           {mostrarForm ? '❌ Cancelar' : '➕ Novo Pedido'}
@@ -908,11 +1537,7 @@ const PedidosCompra = () => {
             </h2>
             <button
               type="button"
-              onClick={() => {
-                setMostrarForm(false);
-                setModoEdicao(false);
-                setPedidoEditando(null);
-              }}
+              onClick={fecharFormularioPedido}
               className="text-gray-500 hover:text-gray-700"
             >
               ✖️
@@ -943,7 +1568,8 @@ const PedidosCompra = () => {
                       setProdutos([]);
                       setProdutoTexto('');
                       setMostrarSugestoesProduto(false);
-                      setItemForm({ produto_id: '', quantidade_pedida: '', preco_unitario: '' });
+                      setItemForm(ITEM_FORM_INICIAL);
+                      limparEstadosSugestao();
                     }
                   }}
                   onFocus={() => setMostrarSugestoesFornecedor(true)}
@@ -978,13 +1604,11 @@ const PedidosCompra = () => {
                 {formData.fornecedor_id && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMostrarSugestao(true);
-                      buscarSugestoes();
-                    }}
+                    onClick={abrirFluxoSugestaoInteligente}
+                    disabled={loadingPrepararSugestao}
                     className="mt-2 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
                   >
-                    💡 Sugestão Inteligente de Pedido
+                    {loadingPrepararSugestao ? 'Verificando rascunho...' : '💡 Sugestão Inteligente de Pedido'}
                   </button>
                 )}
               </div>
@@ -1097,10 +1721,36 @@ const PedidosCompra = () => {
                     <tbody>
                       {formData.itens.map((item, index) => (
                         <tr key={index} className="border-t">
-                          <td className="px-4 py-2">{item.produto_nome}</td>
-                          <td className="px-4 py-2 text-right">{item.quantidade_pedida}</td>
-                          <td className="px-4 py-2 text-right">R$ {item.preco_unitario.toFixed(2)}</td>
-                          <td className="px-4 py-2 text-right font-semibold">R$ {item.total.toFixed(2)}</td>
+                          <td className="px-4 py-2">
+                            <div className="font-medium text-gray-900">{item.produto_nome}</div>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                              <span>SKU: {obterSkuItemPedido(item) || 'N/A'}</span>
+                              <button
+                                type="button"
+                                onClick={() => copiarSkuItemPedido(item)}
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
+                                title="Copiar SKU"
+                                aria-label={`Copiar SKU de ${item.produto_nome}`}
+                              >
+                                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                  <rect x="9" y="9" width="11" height="11" rx="2" />
+                                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={item.quantidade_pedida}
+                              onChange={(e) => atualizarItemPedido(index, 'quantidade_pedida', e.target.value)}
+                              className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-right">R$ {numeroSeguro(item.preco_unitario).toFixed(2)}</td>
+                          <td className="px-4 py-2 text-right font-semibold">R$ {numeroSeguro(item.total).toFixed(2)}</td>
                           <td className="px-4 py-2 text-right">
                             <button
                               type="button"
@@ -1325,6 +1975,29 @@ const PedidosCompra = () => {
           emailEnvioDisponivel={emailEnvioDisponivel}
           dadosEnvio={dadosEnvio}
           setDadosEnvio={setDadosEnvio}
+          colunasSelecionadas={colunasDocumentoPedido}
+          onChangeColunas={atualizarColunasDocumento}
+        />
+      )}
+
+      {mostrarModalExportacao && pedidoParaExportar && (
+        <ModalExportacaoPedido
+          pedido={pedidoParaExportar}
+          onClose={fecharModalExportacao}
+          onConfirmar={confirmarExportacaoPedido}
+          loading={exportandoArquivo}
+          colunasSelecionadas={colunasDocumentoPedido}
+          onChangeColunas={atualizarColunasDocumento}
+        />
+      )}
+
+      {mostrarModalRascunhoSugestao && contextoRascunhoSugestao && (
+        <ModalDecisaoRascunho
+          contexto={contextoRascunhoSugestao}
+          estrategiaMesclaItens={estrategiaMesclaItens}
+          setEstrategiaMesclaItens={setEstrategiaMesclaItens}
+          onClose={fecharModalRascunho}
+          onSelecionar={decidirAcaoRascunhoSugestao}
         />
       )}
 
@@ -1333,137 +2006,190 @@ const PedidosCompra = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white w-full h-full flex flex-col">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">💡 Sugestão Inteligente de Pedido</h2>
-                  <p className="text-purple-100">Análise baseada em vendas e estoque atual</p>
-                </div>
-                <button
-                  onClick={fecharModalSugestao}
-                  className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2"
-                >
-                  ✖️
-                </button>
-              </div>
-
-              {/* Filtros */}
-              <div className="mt-4 grid grid-cols-7 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-sm text-purple-100 mb-1">Buscar por nome ou SKU</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Special Dog, SKU 211..."
-                    value={filtroSugestao}
-                    onChange={(e) => setFiltroSugestao(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-purple-100 mb-1">Marcas</label>
-                  <select
-                    multiple
-                    value={marcasSelecionadas.map(String)}
-                    onChange={(e) => {
-                      const selecionadas = Array.from(e.target.selectedOptions).map((option) => Number(option.value));
-                      setMarcasSelecionadas(selecionadas);
-                    }}
-                    className="w-full h-24 px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
-                  >
-                    {marcasFornecedor.map((marca) => (
-                      <option key={marca.id} value={marca.id}>
-                        {marca.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-purple-100 mb-1">Período</label>
-                  <select
-                    value={periodoSugestao}
-                    onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
-                  >
-                    <option value={30}>Últimos 30 dias</option>
-                    <option value={60}>Últimos 60 dias</option>
-                    <option value={90}>Últimos 90 dias</option>
-                    <option value={180}>Últimos 180 dias</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-purple-100 mb-1">Cobertura</label>
-                  <select
-                    value={diasCobertura}
-                    onChange={(e) => setDiasCobertura(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg text-gray-800 focus:ring-2 focus:ring-purple-300"
-                  >
-                    <option value={15}>15 dias</option>
-                    <option value={30}>30 dias</option>
-                    <option value={45}>45 dias</option>
-                    <option value={60}>60 dias</option>
-                    <option value={90}>90 dias</option>
-                  </select>
-                </div>
-
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={apenasCriticos}
-                      onChange={(e) => setApenasCriticos(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span>Apenas Críticos</span>
-                  </label>
-                </div>
-
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 text-white cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={incluirAlerta}
-                      onChange={(e) => setIncluirAlerta(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span>Incluir Alertas</span>
-                  </label>
-                </div>
-
-                <div className="flex items-end">
+            <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 px-4 py-3 text-white shadow-sm">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-purple-100/90">
+                      Sugestão Inteligente
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <h2 className="text-lg font-bold leading-tight">Pedido guiado por vendas e estoque</h2>
+                      <p className="text-xs text-purple-100/85">
+                        Ajuste rápido dos filtros sem perder área útil.
+                      </p>
+                      </div>
+                    </div>
                   <button
-                    onClick={buscarSugestoes}
-                    disabled={loadingSugestao}
-                    className="w-full bg-white text-purple-600 px-4 py-2 rounded-lg font-semibold hover:bg-purple-50 disabled:opacity-50"
+                    onClick={fecharModalSugestao}
+                    className="shrink-0 rounded-lg p-2 text-white transition hover:bg-white/15"
                   >
-                    {loadingSugestao ? '🔄 Analisando...' : '🔍 Atualizar'}
+                    ✕
                   </button>
                 </div>
-              </div>
 
-              {/* Totalizador dos selecionados */}
-              {sugestoes.length > 0 && (
-                <div className="mt-3 flex gap-6 text-sm text-purple-100">
-                  {(() => {
-                    const selecionados = sugestoes.filter(s => produtosSelecionados.includes(s.produto_id));
-                    const totalQtd = selecionados.reduce((sum, s) => sum + obterQuantidadeInteira(s), 0);
-                    const totalPeso = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * (s.peso_bruto || 0)), 0);
-                    const totalValor = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0);
-                    return (
-                      <>
-                        <span>📦 <strong className="text-white">{totalQtd}</strong> unidades</span>
-                        <span>⚖️ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong></span>
-                        <span>💰 <strong className="text-white">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        {selecionados.length === 0 && <span className="italic opacity-75">(selecione produtos para ver o total)</span>}
-                      </>
-                    );
-                  })()}
+                {/* Filtros */}
+                <div className="grid gap-2 xl:grid-cols-12">
+                  <div className="xl:col-span-4">
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">Buscar por nome ou SKU</label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Special Dog, SKU 211..."
+                      value={filtroSugestao}
+                      onChange={(e) => setFiltroSugestao(e.target.value)}
+                      className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                    />
+                  </div>
+                  <div ref={filtroMarcasRef} className="relative sm:col-span-2 xl:col-span-3">
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">Marcas</label>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarFiltroMarcas((aberto) => !aberto)}
+                      className="flex h-11 w-full items-center justify-between rounded-lg border border-white/20 bg-white px-3 text-left text-gray-800 shadow-sm transition hover:bg-purple-50"
+                    >
+                      <span className="truncate">
+                        {resumoMarcasSelecionadas}
+                      </span>
+                      <span className={`ml-3 text-sm transition-transform ${mostrarFiltroMarcas ? 'rotate-180' : ''}`}>
+                        ▾
+                      </span>
+                    </button>
+
+                    {mostrarFiltroMarcas && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-purple-200 bg-white text-gray-800 shadow-2xl">
+                        <button
+                          type="button"
+                          onClick={() => setMarcasSelecionadas([])}
+                          className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-sm font-medium transition hover:bg-purple-50"
+                        >
+                          <span className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={marcasSelecionadas.length === 0}
+                              readOnly
+                              className="h-4 w-4 rounded"
+                            />
+                            Todas
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {marcasSelecionadas.length === 0 ? 'sem filtro' : 'limpar'}
+                          </span>
+                        </button>
+
+                        <div className="max-h-56 overflow-y-auto py-1">
+                          {marcasFornecedor.map((marca) => (
+                            <label
+                              key={marca.id}
+                              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm transition hover:bg-purple-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={marcasSelecionadas.includes(marca.id)}
+                                onChange={() => alternarMarcaSelecionada(marca.id)}
+                                className="h-4 w-4 rounded"
+                              />
+                              <span className="truncate">{marca.nome}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="sm:col-span-1 xl:col-span-2">
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">Período</label>
+                    <select
+                      value={periodoSugestao}
+                      onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
+                      className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                    >
+                      <option value={30}>Últimos 30 dias</option>
+                      <option value={60}>Últimos 60 dias</option>
+                      <option value={90}>Últimos 90 dias</option>
+                      <option value={180}>Últimos 180 dias</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-1 xl:col-span-2">
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">Cobertura</label>
+                    <select
+                      value={diasCobertura}
+                      onChange={(e) => setDiasCobertura(parseInt(e.target.value))}
+                      className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                    >
+                      <option value={15}>15 dias</option>
+                      <option value={30}>30 dias</option>
+                      <option value={45}>45 dias</option>
+                      <option value={60}>60 dias</option>
+                      <option value={90}>90 dias</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2 xl:col-span-1 flex flex-col justify-end">
+                    <span className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-transparent select-none">
+                      Atualizar
+                    </span>
+                    <button
+                      onClick={() => buscarSugestoes()}
+                      disabled={loadingSugestao}
+                      className="flex h-11 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-purple-700 shadow-sm transition hover:bg-purple-50 disabled:opacity-50"
+                    >
+                      {loadingSugestao ? '🔄 Analisando...' : '🔍 Atualizar'}
+                    </button>
+                  </div>
+                  <div className="xl:col-span-12">
+                    <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-white">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={apenasCriticos}
+                            onChange={(e) => setApenasCriticos(e.target.checked)}
+                            className="h-4 w-4 rounded"
+                          />
+                          <span>Apenas Críticos</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={incluirAlerta}
+                            onChange={(e) => setIncluirAlerta(e.target.checked)}
+                            className="h-4 w-4 rounded"
+                          />
+                          <span>Incluir Alertas</span>
+                        </label>
+                      </div>
+
+                      {sugestoes.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-purple-100">
+                          {(() => {
+                            const selecionados = sugestoes.filter(s => produtosSelecionados.includes(s.produto_id));
+                            const totalQtd = selecionados.reduce((sum, s) => sum + obterQuantidadeInteira(s), 0);
+                            const totalPeso = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * (s.peso_bruto || 0)), 0);
+                            const totalValor = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0);
+                            return (
+                              <>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">📦 <strong className="text-white">{totalQtd}</strong> unidades</span>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">⚖️ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong></span>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">💰 <strong className="text-white">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                {selecionados.length === 0 && (
+                                  <span className="italic opacity-80">(selecione produtos para ver o total)</span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Tabela de Sugestões */}
-            <div className="flex-1 overflow-auto p-6">
+            <div className="flex-1 overflow-auto p-5">
+              {modoAplicacaoSugestao === 'replace' && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  A sugestão selecionada vai substituir os itens atuais do rascunho quando você confirmar.
+                </div>
+              )}
               {loadingSugestao ? (
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center">
@@ -1479,75 +2205,132 @@ const PedidosCompra = () => {
               ) : (
                 <>
                   {/* Ações Rápidas */}
-                  <div className="sticky top-0 z-20 -mx-6 mb-4 border-b border-gray-200 bg-white/95 px-6 py-3 backdrop-blur-sm">
-                    <div className="flex gap-3 items-center">
-                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={mostrarSoPreenchidos}
-                          onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
-                          className="w-4 h-4 rounded"
-                        />
-                        Mostrar só preenchidos (qtd {`>`} 0)
-                      </label>
-                      <button
-                        onClick={selecionarTodosCriticos}
-                        className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold hover:bg-red-200"
-                      >
-                        🔴 Selecionar Todos Críticos
-                      </button>
-                      <button
-                        onClick={selecionarPreenchidosVisiveis}
-                        className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold hover:bg-green-200"
-                      >
-                        ✅ Selecionar Preenchidos
-                      </button>
-                      <button
-                        onClick={desmarcarVisiveis}
-                        className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200"
-                      >
-                        ⛔ Desmarcar Visíveis
-                      </button>
-                      <div className="flex-1"></div>
-                      <span className="text-gray-500 text-sm">
+                  <div className="sticky top-0 z-30 -mx-5 mb-3 bg-white/95 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm">
+                    <div className="border-b border-gray-200 px-5 py-3">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={mostrarSoPreenchidos}
+                            onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
+                            className="w-4 h-4 rounded"
+                          />
+                          Mostrar só preenchidos (qtd {`>`} 0)
+                        </label>
+                        <button
+                          onClick={selecionarTodosCriticos}
+                          className="rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-200"
+                        >
+                          🔴 Selecionar Todos Críticos
+                        </button>
+                        <button
+                          onClick={selecionarPreenchidosVisiveis}
+                          className="rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-200"
+                        >
+                          ✅ Selecionar Preenchidos
+                        </button>
+                        <button
+                          onClick={desmarcarVisiveis}
+                          className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                        >
+                          ⛔ Desmarcar Visíveis
+                        </button>
+                      </div>
+                      <span className="text-sm text-gray-500 xl:ml-auto">
                         {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) · ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
                       </span>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-gray-50 sticky top-[76px] z-10">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                            <input
-                              type="checkbox"
-                              onChange={(e) => {
-                                const visiveis = sugestoesFiltradas;
-                                if (e.target.checked) {
-                                  setProdutosSelecionados((prev) => [
-                                    ...new Set([...prev, ...visiveis.map((s) => s.produto_id)]),
-                                  ]);
-                                } else {
-                                  const idsVisiveis = new Set(visiveis.map((s) => s.produto_id));
-                                  setProdutosSelecionados((prev) => prev.filter((id) => !idsVisiveis.has(id)));
-                                }
-                              }}
-                              checked={sugestoesFiltradas.length > 0 && sugestoesFiltradas.every((s) => produtosSelecionados.includes(s.produto_id))}
-                              className="w-4 h-4 rounded"
-                            />
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase" title="CRÍTICO = menos de 7 dias. ALERTA = menos de 14 dias. ATENÇÃO = menos de 30 dias.">Prioridade ℹ️</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Produto</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantity atual no estoque. Negativo indica divergência de ajuste.">Estoque ℹ️</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Média de unidades vendidas por dia no período selecionado.">Consumo/dia ℹ️</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantos dias o estoque atual dura ao ritmo de consumo atual. ∞ = sem venda recente.">Dias Restantes ℹ️</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Quantidade sugerida para cobrir o período de cobertura definido. Você pode editar.">Qtd Sugerida ℹ️</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Último preço de custo registrado para este produto.">Preço Unit. ℹ️</th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase" title="Qtd sugerida × preço unitário.">Total ℹ️</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase" title="Tendência de vendas: comparação entre a primeira e segunda metade do período.">Tendência ℹ️</th>
-                        </tr>
-                      </thead>
+                    <div className="border-b border-slate-200 bg-white/95 px-5">
+                    <div
+                      ref={cabecalhoTabelaSugestaoRef}
+                      className="overflow-hidden"
+                    >
+                      <table className={classeTabelaSugestao}>
+                        {renderColGroupSugestao()}
+                        <thead>
+                          <tr>
+                            <th className={`${classeCabecalhoTabelaSugestao} text-left`}>
+                              <input
+                                type="checkbox"
+                                onChange={(e) => {
+                                  const visiveis = sugestoesFiltradas;
+                                  if (e.target.checked) {
+                                    setProdutosSelecionados((prev) => [
+                                      ...new Set([...prev, ...visiveis.map((s) => s.produto_id)]),
+                                    ]);
+                                  } else {
+                                    const idsVisiveis = new Set(visiveis.map((s) => s.produto_id));
+                                    setProdutosSelecionados((prev) => prev.filter((id) => !idsVisiveis.has(id)));
+                                  }
+                                }}
+                                checked={sugestoesFiltradas.length > 0 && sugestoesFiltradas.every((s) => produtosSelecionados.includes(s.produto_id))}
+                                className="w-4 h-4 rounded"
+                              />
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-left`}
+                              title="CRÍTICO = menos de 7 dias. ALERTA = menos de 14 dias. ATENÇÃO = menos de 30 dias."
+                            >
+                              Prioridade ℹ️
+                            </th>
+                            <th className={`${classeCabecalhoTabelaSugestao} text-left`}>
+                              Produto
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Quantity atual no estoque. Negativo indica divergência de ajuste."
+                            >
+                              Estoque ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Média de unidades vendidas por dia no período selecionado."
+                            >
+                              Consumo/dia ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Quantos dias o estoque atual dura ao ritmo de consumo atual. ∞ = sem venda recente."
+                            >
+                              Dias Restantes ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Quantidade sugerida para cobrir o período de cobertura definido. Você pode editar."
+                            >
+                              Qtd Sugerida ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Último preço de custo registrado para este produto."
+                            >
+                              Preço Unit. ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-right`}
+                              title="Qtd sugerida × preço unitário."
+                            >
+                              Total ℹ️
+                            </th>
+                            <th
+                              className={`${classeCabecalhoTabelaSugestao} text-left`}
+                              title="Tendência de vendas: comparação entre a primeira e segunda metade do período."
+                            >
+                              Tendência ℹ️
+                            </th>
+                          </tr>
+                        </thead>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                  <div ref={corpoTabelaSugestaoRef} className="overflow-x-auto">
+                    <table className={classeTabelaSugestao}>
+                      {renderColGroupSugestao()}
                       <tbody className="divide-y divide-gray-200">
                         {sugestoesFiltradas.map((sugestao) => (
                           <tr
@@ -1680,7 +2463,9 @@ const PedidosCompra = () => {
                       disabled={selecionadosComQuantidade.length === 0}
                       className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      ✅ Adicionar {selecionadosComQuantidade.length} Produtos ao Pedido
+                      {modoAplicacaoSugestao === 'replace'
+                        ? `Substituir rascunho com ${selecionadosComQuantidade.length} produtos`
+                        : `Adicionar ${selecionadosComQuantidade.length} produtos ao pedido`}
                     </button>
                   </div>
                 </div>
@@ -1689,6 +2474,155 @@ const PedidosCompra = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ModalDecisaoRascunho = ({
+  contexto,
+  estrategiaMesclaItens,
+  setEstrategiaMesclaItens,
+  onClose,
+  onSelecionar,
+}) => {
+  const pedidoRascunho = contexto?.pedidoRascunho || {};
+  const pedidoNovo = contexto?.pedidoNovo || {};
+  const quantidadeItensRascunho = pedidoRascunho?.itens?.length || 0;
+  const quantidadeItensPedidoNovo = pedidoNovo?.itens?.length || 0;
+  const totalRascunhos = Number(contexto?.totalRascunhos || 1);
+  const usandoMesmoRascunho = contexto?.tipo === 'atual';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl">
+        <div className="border-b border-gray-200 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Consolidar rascunho do fornecedor</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                Já existe um pedido em rascunho para este fornecedor. Escolha como o sistema deve tratar a nova sugestão.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 px-6 py-5 md:grid-cols-3">
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Rascunho atual</div>
+            <div className="mt-2 text-lg font-bold text-indigo-900">
+              {pedidoRascunho?.numero_pedido || 'Rascunho em edição'}
+            </div>
+            <div className="mt-2 text-sm text-indigo-900">
+              {quantidadeItensRascunho} item(ns) já no rascunho.
+            </div>
+            {totalRascunhos > 1 && (
+              <div className="mt-3 text-xs text-indigo-700">
+                Há {totalRascunhos} rascunhos deste fornecedor. O sistema vai usar o mais recente.
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Pedido novo</div>
+            <div className="mt-2 text-lg font-bold text-emerald-900">
+              {quantidadeItensPedidoNovo} item(ns) montados agora
+            </div>
+            <div className="mt-2 text-sm text-emerald-900">
+              Esses itens podem entrar no mesmo rascunho antes de abrir a sugestão inteligente.
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Objetivo</div>
+            <div className="mt-2 text-sm text-amber-900">
+              Consolidar tudo em um único pedido para o envio ao fornecedor ficar centralizado.
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 px-6 py-5">
+          <div className="mb-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-sm font-semibold text-slate-900">Quando o mesmo produto já existir no rascunho</div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white p-3">
+                <input
+                  type="radio"
+                  name="estrategia-mescla-itens"
+                  checked={estrategiaMesclaItens === 'somar'}
+                  onChange={() => setEstrategiaMesclaItens('somar')}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Somar quantidades</span>
+                  <span className="mt-1 block text-sm text-slate-600">
+                    Junta o item novo com o item já existente no mesmo pedido.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 bg-white p-3">
+                <input
+                  type="radio"
+                  name="estrategia-mescla-itens"
+                  checked={estrategiaMesclaItens === 'maior_quantidade'}
+                  onChange={() => setEstrategiaMesclaItens('maior_quantidade')}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-slate-900">Manter a maior quantidade</span>
+                  <span className="mt-1 block text-sm text-slate-600">
+                    Evita duplicidade e preserva a maior quantidade entre o rascunho e a nova entrada.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => onSelecionar('mesclar')}
+              className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-left transition hover:bg-blue-100"
+            >
+              <div className="text-base font-semibold text-blue-900">Mesclar</div>
+              <div className="mt-2 text-sm text-blue-800">
+                Soma o pedido novo com o rascunho existente e depois aplica a sugestão no mesmo pedido.
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelecionar('substituir')}
+              className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-left transition hover:bg-amber-100"
+            >
+              <div className="text-base font-semibold text-amber-900">Substituir</div>
+              <div className="mt-2 text-sm text-amber-800">
+                {usandoMesmoRascunho
+                  ? 'Troca os itens atuais do rascunho pela nova sugestão selecionada.'
+                  : 'Troca o conteúdo do rascunho pelo pedido novo que você está montando agora.'}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelecionar('manter')}
+              className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:bg-gray-100"
+            >
+              <div className="text-base font-semibold text-gray-900">Manter rascunho</div>
+              <div className="mt-2 text-sm text-gray-700">
+                Abre ou mantém o rascunho atual sem aplicar uma nova sugestão agora.
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1786,6 +2720,131 @@ const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
   );
 };
 
+const SeletorColunasDocumentoPedido = ({ colunasSelecionadas, onChange, titulo, descricao }) => {
+  const colunasNormalizadas = normalizarColunasDocumentoPedido(colunasSelecionadas);
+  const semValores = !documentoTemColunasFinanceiras(colunasNormalizadas);
+
+  const alternarColuna = (chave) => {
+    if (colunasNormalizadas.includes(chave)) {
+      onChange(colunasNormalizadas.filter((coluna) => coluna !== chave));
+      return;
+    }
+
+    onChange([...colunasNormalizadas, chave]);
+  };
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">{titulo}</h3>
+          <p className="mt-1 text-xs text-slate-500">{descricao}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onChange(COLUNAS_DOCUMENTO_FORNECEDOR)}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Somente fornecedor
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(COLUNAS_DOCUMENTO_COMPLETO)}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Documento completo
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {COLUNAS_DOCUMENTO_PEDIDO.map((coluna) => (
+          <label
+            key={coluna.chave}
+            className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          >
+            <input
+              type="checkbox"
+              checked={colunasNormalizadas.includes(coluna.chave)}
+              onChange={() => alternarColuna(coluna.chave)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{coluna.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className={`mt-3 rounded-md px-3 py-2 text-xs ${semValores ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'}`}>
+        {semValores
+          ? 'Sem colunas financeiras: frete, desconto e total tambem ficam ocultos no documento e no e-mail.'
+          : 'Com colunas financeiras: o documento mostra custos, descontos e total do pedido.'}
+      </div>
+    </div>
+  );
+};
+
+const ModalExportacaoPedido = ({
+  pedido,
+  onClose,
+  onConfirmar,
+  loading,
+  colunasSelecionadas,
+  onChangeColunas
+}) => {
+  if (!pedido) return null;
+
+  const formatoLabel = pedido.formato === 'pdf' ? 'PDF' : 'Excel';
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
+        <div className="flex justify-between items-center gap-4 mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">Exportar {formatoLabel}</h2>
+            <p className="mt-1 text-sm text-gray-500">Pedido {pedido.numero_pedido}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+            disabled={loading}
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <SeletorColunasDocumentoPedido
+          colunasSelecionadas={colunasSelecionadas}
+          onChange={onChangeColunas}
+          titulo="Colunas do documento"
+          descricao="Escolha exatamente o que deve aparecer no arquivo antes de baixar ou encaminhar."
+        />
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={loading}
+            className="flex-1 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {loading ? `Gerando ${formatoLabel}...` : `Gerar ${formatoLabel}`}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-lg border border-slate-300 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Modal de Envio de Pedido
 const ModalEnvioPedido = ({
   pedidoId,
@@ -1794,11 +2853,13 @@ const ModalEnvioPedido = ({
   onEnvioManual,
   emailEnvioDisponivel,
   dadosEnvio,
-  setDadosEnvio
+  setDadosEnvio,
+  colunasSelecionadas,
+  onChangeColunas
 }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-800">📤 Enviar Pedido ao Fornecedor</h2>
           <button
@@ -1874,6 +2935,13 @@ const ModalEnvioPedido = ({
               </label>
             </div>
           </div>
+
+          <SeletorColunasDocumentoPedido
+            colunasSelecionadas={colunasSelecionadas}
+            onChange={onChangeColunas}
+            titulo="Conteudo do PDF / Excel"
+            descricao="Use este ajuste quando quiser ocultar custos do fornecedor e enviar apenas codigo, descricao e quantidade."
+          />
 
           {emailEnvioDisponivel === false && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

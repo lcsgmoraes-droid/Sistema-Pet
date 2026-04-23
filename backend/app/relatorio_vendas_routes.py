@@ -540,7 +540,11 @@ async def obter_relatorio_vendas(
             formas_pagamento_map=formas_pagamento_map,
             custo_campanha=cashback_por_venda.get(venda.id, 0.0),
             comissao_total=comissao_total_por_venda.get(venda.id, 0.0),
-            taxa_operacional_entrega=entregadores_map.get(venda.entregador_id, 0.0),
+            taxa_operacional_entrega=(
+                entregadores_map.get(venda.entregador_id, 0.0)
+                if venda.tem_entrega
+                else None
+            ),
             estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
         )
 

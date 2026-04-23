@@ -10,10 +10,14 @@ import {
   RefreshCw,
   ThumbsUp,
   ThumbsDown,
+  Link2,
 } from "lucide-react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
+import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 
 const css = {
   input:
@@ -32,6 +36,15 @@ function criarIdMensagemLocal() {
 }
 
 export default function VetAssistenteIA() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const petIdQuery = searchParams.get("pet_id") || "";
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
+  const consultaIdQuery = searchParams.get("consulta_id") || "";
+  const exameIdQuery = searchParams.get("exame_id") || "";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
   const [modo, setModo] = useState("atendimento"); // atendimento | livre
   const [conversaId, setConversaId] = useState("");
   const [filtrarConversasContexto, setFiltrarConversasContexto] = useState(false);
@@ -85,6 +98,30 @@ export default function VetAssistenteIA() {
   }, []);
 
   useEffect(() => {
+    const petIdAlvo = novoPetIdQuery || petIdQuery;
+    if (!petIdAlvo || !pets.length) return;
+    const pet = pets.find((item) => String(item.id) === String(petIdAlvo));
+    if (!pet) return;
+    setPetId(String(pet.id));
+    setTutorSelecionado(
+      pet?.cliente_id
+        ? {
+            id: String(pet.cliente_id),
+            nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}`,
+          }
+        : null
+    );
+  }, [pets, petIdQuery, novoPetIdQuery]);
+
+  useEffect(() => {
+    if (!tutorIdQuery || tutorSelecionado?.id) return;
+    setTutorSelecionado({
+      id: String(tutorIdQuery),
+      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+    });
+  }, [tutorIdQuery, tutorNomeQuery, tutorSelecionado]);
+
+  useEffect(() => {
     if (!filtrarConversasContexto) return;
     carregarConversas();
   }, [filtrarConversasContexto, petId, consultaId, exameId]);
@@ -122,6 +159,22 @@ export default function VetAssistenteIA() {
       })
       .catch(() => setExames([]));
   }, [petId]);
+
+  useEffect(() => {
+    if (!consultaIdQuery || consultaId) return;
+    const consulta = consultas.find((item) => String(item.id) === String(consultaIdQuery));
+    if (consulta) {
+      setConsultaId(String(consulta.id));
+    }
+  }, [consultaIdQuery, consultaId, consultas]);
+
+  useEffect(() => {
+    if (!exameIdQuery || exameId) return;
+    const exame = exames.find((item) => String(item.id) === String(exameIdQuery));
+    if (exame) {
+      setExameId(String(exame.id));
+    }
+  }, [exameIdQuery, exameId, exames]);
 
   useEffect(() => {
     if (petSelecionado?.peso && !pesoKg) {
@@ -245,6 +298,42 @@ export default function VetAssistenteIA() {
     setMensagem(texto);
   }
 
+  const retornoNovoPet = useMemo(
+    () => buildReturnTo(location.pathname, location.search),
+    [location.pathname, location.search]
+  );
+  const consultaSelecionada = useMemo(
+    () => consultas.find((item) => String(item.id) === String(consultaId)) ?? null,
+    [consultas, consultaId]
+  );
+  const exameSelecionado = useMemo(
+    () => exames.find((item) => String(item.id) === String(exameId)) ?? null,
+    [exames, exameId]
+  );
+
+  function formatarLabelConsulta(consulta) {
+    if (!consulta) return "Consulta";
+    const pedacos = [`#${consulta.id}`];
+    if (consulta.status) {
+      pedacos.push(String(consulta.status).replaceAll("_", " "));
+    }
+    const dataRef = consulta.created_at || consulta.data_hora;
+    if (dataRef) {
+      pedacos.push(
+        new Date(dataRef).toLocaleString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      );
+    }
+    if (consulta.motivo_consulta) {
+      pedacos.push(consulta.motivo_consulta);
+    }
+    return pedacos.filter(Boolean).join(" • ");
+  }
+
   let memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">Memória: verificando...</span>;
   if (memoriaAtiva === true) {
     memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Memória ativa</span>;
@@ -344,11 +433,22 @@ export default function VetAssistenteIA() {
           </div>
 
           <div>
-            <label htmlFor="vet-ia-pet" className="block text-xs font-medium text-gray-600 mb-1">Pet (opcional)</label>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label htmlFor="vet-ia-pet" className="block text-xs font-medium text-gray-600">Pet (opcional)</label>
+              <NovoPetButton
+                tutorId={tutorSelecionado?.id}
+                tutorNome={tutorSelecionado?.nome}
+                returnTo={retornoNovoPet}
+              />
+            </div>
             <select
               id="vet-ia-pet"
               value={petId}
-              onChange={(e) => setPetId(e.target.value)}
+              onChange={(e) => {
+                setPetId(e.target.value);
+                setConsultaId("");
+                setExameId("");
+              }}
               className={css.select}
               disabled={!tutorSelecionado?.id}
             >
@@ -357,6 +457,9 @@ export default function VetAssistenteIA() {
                 <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>
               ))}
             </select>
+            {tutorSelecionado?.id && petsDoTutor.length === 0 && (
+              <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para este tutor.</p>
+            )}
           </div>
 
           {modo === "atendimento" && (
@@ -366,7 +469,7 @@ export default function VetAssistenteIA() {
                 <select id="vet-ia-consulta" value={consultaId} onChange={(e) => setConsultaId(e.target.value)} className={css.select}>
                   <option value="">Sem consulta</option>
                   {consultas.map((c) => (
-                    <option key={c.id} value={c.id}>Consulta #{c.id} {c.data_consulta ? `- ${c.data_consulta}` : ""}</option>
+                    <option key={c.id} value={c.id}>{formatarLabelConsulta(c)}</option>
                   ))}
                 </select>
               </div>
@@ -382,6 +485,43 @@ export default function VetAssistenteIA() {
             </>
           )}
         </div>
+
+        {(consultaSelecionada || exameSelecionado) && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {consultaSelecionada && (
+              <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-600">Consulta vinculada</p>
+                    <p className="font-semibold">#{consultaSelecionada.id}</p>
+                    <p className="text-xs text-cyan-700">
+                      {consultaSelecionada.motivo_consulta || "Sem motivo informado"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/veterinario/consultas/${consultaSelecionada.id}`)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-medium text-cyan-700 hover:bg-cyan-100"
+                  >
+                    <Link2 size={13} />
+                    Abrir consulta
+                  </button>
+                </div>
+              </div>
+            )}
+            {exameSelecionado && (
+              <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                <p className="text-xs font-medium uppercase tracking-wide text-violet-600">Exame vinculado</p>
+                <p className="font-semibold">#{exameSelecionado.id} • {exameSelecionado.nome || exameSelecionado.tipo || "Exame"}</p>
+                <p className="text-xs text-violet-700">
+                  {exameSelecionado.arquivo_nome
+                    ? `Arquivo: ${exameSelecionado.arquivo_nome}`
+                    : "Sem arquivo anexado ainda"}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>

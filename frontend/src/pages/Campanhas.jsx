@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useCampanhasConsultas } from "../hooks/useCampanhasConsultas";
 import CampanhasTabsBar from "../components/campanhas/CampanhasTabsBar";
 import CampanhasMainContent from "../components/campanhas/CampanhasMainContent";
@@ -19,6 +21,7 @@ import { hoje, primeiroDiaMes, createDefaultPremio } from "../components/campanh
 import useCampanhasPageComposition from "../hooks/useCampanhasPageComposition";
 
 export default function Campanhas() {
+  const location = useLocation();
   const campanhasConsultas = useCampanhasConsultas({
     createDefaultPremio,
     hoje,
@@ -54,6 +57,13 @@ export default function Campanhas() {
     carregarSugestoes,
     carregarSchedulerConfig,
   } = campanhasConsultas;
+
+  useEffect(() => {
+    const abaDaUrl = new URLSearchParams(location.search).get("aba");
+    if (abaDaUrl) {
+      setAba(abaDaUrl);
+    }
+  }, [location.search, setAba]);
 
   const campanhasGestor = useCampanhasGestor();
   const campanhasGestao = useCampanhasGestao({

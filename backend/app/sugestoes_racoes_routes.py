@@ -35,9 +35,24 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
     return current_user, tenant_id
 
 
+def _produto_eh_racao_expr():
+    return or_(Produto.tipo == "ração", Produto.classificacao_racao == "sim")
+
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
+
+def _produto_eh_racao_expr():
+    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
+    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    return or_(
+        tipo_normalizado.like("ra%"),
+        and_(
+            classificacao_normalizada != "",
+            classificacao_normalizada != "nao",
+        ),
+    )
 
 class DuplicataDetectada(BaseModel):
     """Possível duplicata detectada"""
@@ -403,7 +418,7 @@ async def sugerir_padronizacao_nomes(
     # Buscar produtos de ração
     produtos = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.classificacao_racao == 'sim',
+        _produto_eh_racao_expr(),
         Produto.ativo == True
     ).limit(limite).all()
     

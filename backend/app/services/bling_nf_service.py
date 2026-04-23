@@ -140,6 +140,9 @@ def movimento_legado_pedido_para_nf(
     if pedido_bling_numero and documento == pedido_bling_numero:
         return True
 
+    if "baixa automatica via nf autorizada do bling" in observacao:
+        return True
+
     if "webhook bling" in observacao or "pedido criado ja atendido" in observacao:
         return True
 
@@ -907,6 +910,20 @@ def processar_nf_autorizada(
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido, nf_id)
+    if not nf_numero and _text(nf_id):
+        nf_numero = (
+            db.query(BlingNotaFiscalCache.numero)
+            .filter(
+                BlingNotaFiscalCache.tenant_id == pedido.tenant_id,
+                BlingNotaFiscalCache.bling_id == _text(nf_id),
+            )
+            .order_by(
+                BlingNotaFiscalCache.data_emissao.desc().nullslast(),
+                BlingNotaFiscalCache.last_synced_at.desc().nullslast(),
+                BlingNotaFiscalCache.id.desc(),
+            )
+            .scalar()
+        )
     pedido_ref_conflitante = _nf_cache_pertence_a_outro_pedido(
         db,
         tenant_id=pedido.tenant_id,
@@ -1090,7 +1107,13 @@ def processar_nf_autorizada(
                 referencia_tipo="pedido_integrado",
                 user_id=user_id_execucao,
                 documento=nf_numero,
-                observacao=f"Baixa automatica via NF {nf_numero}" if nf_numero else "Baixa automatica via NF autorizada do Bling",
+                observacao=(
+                    f"Baixa automatica via NF {nf_numero}"
+                    if nf_numero
+                    else f"Baixa automatica via NF Bling #{nf_id}"
+                    if _text(nf_id)
+                    else "Baixa automatica via NF autorizada do Bling"
+                ),
             )
             movimentos_gerados = resultado_baixa.get("movimentos") or []
             if movimentos_gerados:

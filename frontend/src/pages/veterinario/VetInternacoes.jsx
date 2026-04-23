@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { BedDouble, Plus, Activity, ArrowUpCircle, AlertCircle, Clock, Map as MapIcon, List, LayoutGrid, BellRing, Trash2, Check } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
+import TutorAutocomplete from "../../components/TutorAutocomplete";
+import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 
 const STORAGE_AGENDA = "vet_internacao_agenda_v1";
 const STORAGE_TOTAL_BAIAS = "vet_internacao_total_baias_v1";
@@ -16,6 +20,21 @@ function formatDateTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function parseQuantity(value) {
+  if (value == null || value === "") return null;
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatQuantity(value, unidade = "") {
+  if (value == null || value === "" || Number.isNaN(Number(value))) return "—";
+  const numero = Number(value);
+  const texto = Number.isInteger(numero)
+    ? numero.toLocaleString("pt-BR")
+    : numero.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return unidade ? `${texto} ${unidade}` : texto;
 }
 
 function montarSerieEvolucao(registros = []) {
@@ -40,6 +59,13 @@ const STATUS_CORES = {
 
 export default function VetInternacoes() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const abrirNovaQuery = searchParams.get("abrir_nova") === "1";
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
+  const consultaIdQuery = searchParams.get("consulta_id") || "";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
   const [aba, setAba] = useState("ativas"); // "ativas" | "historico"
   const [centroAba, setCentroAba] = useState("widget"); // "mapa" | "lista" | "widget" | "agenda"
   const [internacoes, setInternacoes] = useState([]);
@@ -57,6 +83,7 @@ export default function VetInternacoes() {
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
   const [formNova, setFormNova] = useState({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+  const [tutorNovaSelecionado, setTutorNovaSelecionado] = useState(null);
   const [formAlta, setFormAlta] = useState("");
   const [formEvolucao, setFormEvolucao] = useState({ temperatura: "", fc: "", fr: "", observacoes: "" });
   const [filtroDataAltaInicio, setFiltroDataAltaInicio] = useState("");
@@ -70,18 +97,65 @@ export default function VetInternacoes() {
     horario: "",
     medicamento: "",
     dose: "",
+    quantidade_prevista: "",
+    unidade_quantidade: "",
     via: "",
     lembrete_min: "30",
     observacoes: "",
   });
   const [modalFeito, setModalFeito] = useState(null); // item completo da agenda
-  const [formFeito, setFormFeito] = useState({ feito_por: "", horario_execucao: "", observacao_execucao: "" });
+  const [formFeito, setFormFeito] = useState({
+    feito_por: "",
+    horario_execucao: "",
+    observacao_execucao: "",
+    quantidade_prevista: "",
+    quantidade_executada: "",
+    quantidade_desperdicio: "",
+    unidade_quantidade: "",
+  });
+  const [modalInsumoRapido, setModalInsumoRapido] = useState(false);
+  const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
+  const [formInsumoRapido, setFormInsumoRapido] = useState({
+    internacao_id: "",
+    responsavel: "",
+    horario_execucao: "",
+    quantidade_utilizada: "1",
+    quantidade_desperdicio: "",
+    observacoes: "",
+  });
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     api.get("/pets", { params: { limit: 500 } }).then((r) => setPets(r.data?.items ?? r.data ?? [])).catch(() => {});
     vetApi.listarVeterinarios().then((r) => setVeterinarios(Array.isArray(r.data) ? r.data : [])).catch(() => setVeterinarios([]));
   }, []);
+
+  useEffect(() => {
+    if (abrirNovaQuery) {
+      setModalNova(true);
+    }
+  }, [abrirNovaQuery]);
+
+  useEffect(() => {
+    if (!tutorIdQuery) return;
+    setFormNova((prev) => ({
+      ...prev,
+      pessoa_id: prev.pessoa_id || String(tutorIdQuery),
+    }));
+    setTutorNovaSelecionado((prev) => prev || {
+      id: String(tutorIdQuery),
+      nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
+    });
+  }, [tutorIdQuery, tutorNomeQuery]);
+
+  useEffect(() => {
+    if (!novoPetIdQuery) return;
+    setModalNova(true);
+    setFormNova((prev) => ({
+      ...prev,
+      pet_id: String(novoPetIdQuery),
+    }));
+  }, [novoPetIdQuery]);
 
   useEffect(() => {
     try {
@@ -134,6 +208,17 @@ export default function VetInternacoes() {
       (p) => String(p.cliente_id) === String(formNova.pessoa_id) && p.ativo !== false
     );
   }, [pets, formNova.pessoa_id]);
+
+  const tutorAtualInternacao = useMemo(() => {
+    if (tutorNovaSelecionado?.id) return tutorNovaSelecionado;
+    if (!formNova.pessoa_id) return null;
+    return pessoas.find((item) => String(item.id) === String(formNova.pessoa_id)) || null;
+  }, [pessoas, formNova.pessoa_id, tutorNovaSelecionado]);
+
+  const retornoNovoPet = useMemo(
+    () => buildReturnTo(location.pathname, location.search, { abrir_nova: "1" }),
+    [location.pathname, location.search]
+  );
 
   const petsHistoricoDaPessoa = useMemo(() => {
     if (!filtroPessoaHistorico) return [];
@@ -235,6 +320,10 @@ export default function VetInternacoes() {
     setAgendaForm((prev) => (prev.horario ? prev : { ...prev, horario: sugestaoHorario }));
   }, [sugestaoHorario]);
 
+  useEffect(() => {
+    setFormInsumoRapido((prev) => (prev.horario_execucao ? prev : { ...prev, horario_execucao: sugestaoHorario }));
+  }, [sugestaoHorario]);
+
   const carregar = useCallback(async () => {
     try {
       setCarregando(true);
@@ -285,11 +374,13 @@ export default function VetInternacoes() {
     try {
       await vetApi.criarInternacao({
         pet_id: formNova.pet_id,
+        consulta_id: consultaIdQuery ? Number(consultaIdQuery) : undefined,
         motivo: formNova.motivo,
         box: formNova.box || undefined,
       });
       setModalNova(false);
       setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+      setTutorNovaSelecionado(null);
       await carregar();
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao criar internação.");
@@ -348,6 +439,8 @@ export default function VetInternacoes() {
         horario_agendado: agendaForm.horario,
         medicamento: agendaForm.medicamento,
         dose: agendaForm.dose || undefined,
+        quantidade_prevista: parseQuantity(agendaForm.quantidade_prevista) ?? undefined,
+        unidade_quantidade: agendaForm.unidade_quantidade?.trim() || undefined,
         via: agendaForm.via || undefined,
         observacoes_agenda: agendaForm.observacoes || undefined,
       });
@@ -362,6 +455,8 @@ export default function VetInternacoes() {
         horario: agendaForm.horario,
         medicamento: agendaForm.medicamento,
         dose: agendaForm.dose,
+        quantidade_prevista: agendaForm.quantidade_prevista,
+        unidade_quantidade: agendaForm.unidade_quantidade,
         via: agendaForm.via,
         lembrete_min: Number.parseInt(agendaForm.lembrete_min || "30", 10),
         observacoes: agendaForm.observacoes,
@@ -378,6 +473,8 @@ export default function VetInternacoes() {
         horario: sugestaoHorario,
         medicamento: "",
         dose: "",
+        quantidade_prevista: "",
+        unidade_quantidade: "",
         via: "",
         observacoes: "",
       }));
@@ -398,6 +495,10 @@ export default function VetInternacoes() {
       feito_por: item?.feito_por || "",
       horario_execucao: item?.horario_execucao || valorPadrao,
       observacao_execucao: item?.observacao_execucao || "",
+      quantidade_prevista: item?.quantidade_prevista ?? "",
+      quantidade_executada: item?.quantidade_executada ?? item?.quantidade_prevista ?? "",
+      quantidade_desperdicio: item?.quantidade_desperdicio ?? "",
+      unidade_quantidade: item?.unidade_quantidade ?? "",
     });
   }
 
@@ -420,6 +521,10 @@ export default function VetInternacoes() {
         medicamento: modalFeito.medicamento,
         dose: modalFeito.dose || undefined,
         via: modalFeito.via || undefined,
+        quantidade_prevista: parseQuantity(formFeito.quantidade_prevista) ?? undefined,
+        quantidade_executada: parseQuantity(formFeito.quantidade_executada) ?? undefined,
+        quantidade_desperdicio: parseQuantity(formFeito.quantidade_desperdicio) ?? undefined,
+        unidade_quantidade: formFeito.unidade_quantidade?.trim() || undefined,
         observacoes_agenda: modalFeito.observacoes || undefined,
         executado_por: formFeito.feito_por.trim(),
         horario_execucao: formFeito.horario_execucao,
@@ -436,12 +541,110 @@ export default function VetInternacoes() {
           feito_por: formFeito.feito_por.trim(),
           horario_execucao: formFeito.horario_execucao,
           observacao_execucao: formFeito.observacao_execucao?.trim() || "",
+          quantidade_prevista: formFeito.quantidade_prevista,
+          quantidade_executada: formFeito.quantidade_executada,
+          quantidade_desperdicio: formFeito.quantidade_desperdicio,
+          unidade_quantidade: formFeito.unidade_quantidade,
         };
       }));
       setModalFeito(null);
-      setFormFeito({ feito_por: "", horario_execucao: "", observacao_execucao: "" });
+      setFormFeito({
+        feito_por: "",
+        horario_execucao: "",
+        observacao_execucao: "",
+        quantidade_prevista: "",
+        quantidade_executada: "",
+        quantidade_desperdicio: "",
+        unidade_quantidade: "",
+      });
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao registrar procedimento concluído.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function abrirModalInsumoRapido(internacaoId = "") {
+    setModalInsumoRapido(true);
+    setInsumoRapidoSelecionado(null);
+    setFormInsumoRapido({
+      internacao_id: internacaoId ? String(internacaoId) : "",
+      responsavel: "",
+      horario_execucao: sugestaoHorario,
+      quantidade_utilizada: "1",
+      quantidade_desperdicio: "",
+      observacoes: "",
+    });
+  }
+
+  async function confirmarInsumoRapido() {
+    if (!formInsumoRapido.internacao_id) {
+      setErro("Selecione o internado para lançar o insumo.");
+      return;
+    }
+    if (!insumoRapidoSelecionado?.id) {
+      setErro("Selecione o insumo/produto utilizado.");
+      return;
+    }
+    if (!formInsumoRapido.responsavel.trim()) {
+      setErro("Informe quem realizou o uso do insumo.");
+      return;
+    }
+
+    const quantidadeUtilizada = parseQuantity(formInsumoRapido.quantidade_utilizada);
+    const quantidadeDesperdicio = parseQuantity(formInsumoRapido.quantidade_desperdicio) ?? 0;
+    const quantidadeConsumida = (quantidadeUtilizada ?? 0) + quantidadeDesperdicio;
+
+    if (!quantidadeUtilizada || quantidadeUtilizada <= 0) {
+      setErro("Informe a quantidade efetivamente utilizada do insumo.");
+      return;
+    }
+    if (quantidadeConsumida <= 0) {
+      setErro("A baixa total do insumo precisa ser maior que zero.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      const unidade = insumoRapidoSelecionado.unidade || "un";
+      const internacaoId = String(formInsumoRapido.internacao_id);
+
+      await vetApi.registrarProcedimentoInternacao(internacaoId, {
+        status: "concluido",
+        tipo_registro: "insumo",
+        medicamento: `Insumo: ${insumoRapidoSelecionado.nome}`,
+        dose: formatQuantity(quantidadeUtilizada, unidade),
+        quantidade_prevista: quantidadeUtilizada,
+        quantidade_executada: quantidadeUtilizada,
+        quantidade_desperdicio: quantidadeDesperdicio || undefined,
+        unidade_quantidade: unidade,
+        executado_por: formInsumoRapido.responsavel.trim(),
+        horario_execucao: formInsumoRapido.horario_execucao,
+        observacao_execucao: formInsumoRapido.observacoes?.trim() || undefined,
+        insumos: [
+          {
+            produto_id: insumoRapidoSelecionado.id,
+            nome: insumoRapidoSelecionado.nome,
+            unidade,
+            quantidade: quantidadeConsumida,
+            baixar_estoque: true,
+          },
+        ],
+      });
+
+      await carregarDetalheInternacao(Number(internacaoId), expandida === Number(internacaoId));
+      setModalInsumoRapido(false);
+      setInsumoRapidoSelecionado(null);
+      setFormInsumoRapido({
+        internacao_id: "",
+        responsavel: "",
+        horario_execucao: sugestaoHorario,
+        quantidade_utilizada: "1",
+        quantidade_desperdicio: "",
+        observacoes: "",
+      });
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Erro ao lançar insumo rápido.");
     } finally {
       setSalvando(false);
     }
@@ -492,6 +695,8 @@ export default function VetInternacoes() {
         <button
           onClick={() => {
             setAba("ativas");
+            setTutorNovaSelecionado(null);
+            setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
             setModalNova(true);
           }}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
@@ -715,6 +920,12 @@ export default function VetInternacoes() {
                       {(intern.status === "ativa" || intern.status === "internado") && (
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
+                            onClick={() => abrirModalInsumoRapido(intern.id)}
+                            className="flex items-center gap-1 text-xs px-2 py-1 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50"
+                          >
+                            + Insumo
+                          </button>
+                          <button
                             onClick={() => setModalEvolucao(intern.id)}
                             className="flex items-center gap-1 text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
                           >
@@ -817,7 +1028,21 @@ export default function VetInternacoes() {
                                   </div>
                                   <p className="text-sm font-semibold text-emerald-800">{proc.medicamento || "Procedimento"}</p>
                                   <p className="text-gray-600">Dose: {proc.dose || "—"} • Via: {proc.via || "—"}</p>
+                                  {(proc.quantidade_prevista != null || proc.quantidade_executada != null || proc.quantidade_desperdicio != null) && (
+                                    <p className="text-gray-600">
+                                      Previsto: {formatQuantity(proc.quantidade_prevista, proc.unidade_quantidade)} • Feito: {formatQuantity(proc.quantidade_executada, proc.unidade_quantidade)} • Desperdício: {formatQuantity(proc.quantidade_desperdicio, proc.unidade_quantidade)}
+                                    </p>
+                                  )}
                                   <p className="text-gray-500">Responsável: {proc.executado_por || "—"}</p>
+                                  {Array.isArray(proc.insumos) && proc.insumos.length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                      {proc.insumos.map((insumo, insumoIdx) => (
+                                        <span key={`${proc.id ?? idx}_insumo_${insumoIdx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                                          {insumo.nome || `Produto #${insumo.produto_id}`} • {formatQuantity(insumo.quantidade, insumo.unidade)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                   {proc.observacao_execucao && <p className="text-gray-500 mt-1">Obs.: {proc.observacao_execucao}</p>}
                                 </div>
                               ))}
@@ -894,7 +1119,23 @@ export default function VetInternacoes() {
           {aba === "ativas" && centroAba === "agenda" && (
             <div className="space-y-3">
               <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Novo procedimento / lembrete</p>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Novo procedimento / lembrete</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Preencha o que estava previsto para o paciente: horário, nome do medicamento/procedimento,
+                      dose clínica, quantidade prevista e via. Se quiser apenas baixar um material usado na rotina,
+                      use o botão de insumo rápido.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => abrirModalInsumoRapido(agendaForm.internacao_id)}
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                  >
+                    + Lançar insumo rápido
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <select
                     value={agendaForm.internacao_id}
@@ -924,6 +1165,22 @@ export default function VetInternacoes() {
                     placeholder="Dose"
                     value={agendaForm.dose}
                     onChange={(e) => setAgendaForm((p) => ({ ...p, dose: e.target.value }))}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Qtd. prevista"
+                    value={agendaForm.quantidade_prevista}
+                    onChange={(e) => setAgendaForm((p) => ({ ...p, quantidade_prevista: e.target.value }))}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Unidade (mL, mg, comp, un...)"
+                    value={agendaForm.unidade_quantidade}
+                    onChange={(e) => setAgendaForm((p) => ({ ...p, unidade_quantidade: e.target.value }))}
                     className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
                   />
                   <input
@@ -997,6 +1254,11 @@ export default function VetInternacoes() {
                               <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">
                                 Dose: {item.dose || "—"}
                               </span>
+                              {(item.quantidade_prevista || item.unidade_quantidade) && (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                                  Previsto: {formatQuantity(item.quantidade_prevista, item.unidade_quantidade)}
+                                </span>
+                              )}
                               <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                                 Via: {item.via || "—"}
                               </span>
@@ -1010,6 +1272,11 @@ export default function VetInternacoes() {
                                 <p className="text-[11px] text-emerald-700 font-semibold">
                                   Feito por: {item.feito_por || "—"} • {item.horario_execucao ? formatDateTime(item.horario_execucao) : "—"}
                                 </p>
+                                {(item.quantidade_executada || item.quantidade_desperdicio) && (
+                                  <p className="text-[11px] text-emerald-800">
+                                    Feito: {formatQuantity(item.quantidade_executada, item.unidade_quantidade)} • Desperdício: {formatQuantity(item.quantidade_desperdicio, item.unidade_quantidade)}
+                                  </p>
+                                )}
                                 {item.observacao_execucao && (
                                   <p className="text-[11px] text-emerald-800">Obs. execução: {item.observacao_execucao}</p>
                                 )}
@@ -1049,24 +1316,45 @@ export default function VetInternacoes() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
             <h2 className="font-bold text-gray-800">Nova internação</h2>
             <div className="space-y-3">
+              {consultaIdQuery && (
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+                  Esta internação ficará vinculada à consulta <strong>#{consultaIdQuery}</strong>.
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Pessoa (tutor) *</label>
-                <select
-                  value={formNova.pessoa_id}
-                  onChange={(e) => setFormNova((p) => ({ ...p, pessoa_id: e.target.value, pet_id: "" }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white">
-                  <option value="">Selecione…</option>
-                  {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
-                </select>
+                <TutorAutocomplete
+                  label="Pessoa (tutor) *"
+                  inputId="internacao-tutor"
+                  selectedTutor={tutorNovaSelecionado}
+                  onSelect={(cliente) => {
+                    setTutorNovaSelecionado(cliente);
+                    setFormNova((prev) => ({
+                      ...prev,
+                      pessoa_id: cliente?.id ? String(cliente.id) : "",
+                      pet_id: "",
+                    }));
+                  }}
+                />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Pet da pessoa *</label>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="block text-xs font-medium text-gray-600">Pet da pessoa *</label>
+                  <NovoPetButton
+                    tutorId={formNova.pessoa_id}
+                    tutorNome={tutorAtualInternacao?.nome}
+                    returnTo={retornoNovoPet}
+                    onBeforeNavigate={() => setModalNova(false)}
+                  />
+                </div>
                 <select value={formNova.pet_id} onChange={(e) => setFormNova((p) => ({ ...p, pet_id: e.target.value }))}
                   disabled={!formNova.pessoa_id}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white disabled:opacity-60">
                   <option value="">Selecione…</option>
                   {petsDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
                 </select>
+                {formNova.pessoa_id && petsDaPessoa.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para esta pessoa.</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Motivo da internação *</label>
@@ -1130,7 +1418,18 @@ export default function VetInternacoes() {
               </div>
             </div>
             <div className="flex gap-3 pt-1">
-              <button onClick={() => setModalNova(false)} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+              <button
+                onClick={() => {
+                  setModalNova(false);
+                  if (!consultaIdQuery) {
+                    setTutorNovaSelecionado(null);
+                    setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+                  }
+                }}
+                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
               <button onClick={criarInternacao} disabled={salvando || !formNova.pet_id || !formNova.motivo}
                 className="flex-1 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-60">
                 {salvando ? "Salvando…" : "Internar"}
@@ -1210,6 +1509,9 @@ export default function VetInternacoes() {
               <p className="text-sm font-bold text-purple-900">{modalFeito.medicamento}</p>
               <p className="text-xs text-purple-700">Dose: {modalFeito.dose || "—"} • Baia: {(internacaoPorId.get(String(modalFeito.internacao_id))?.box || modalFeito.baia || "Sem baia")}</p>
             </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Informe o que estava previsto, quanto realmente foi administrado e quanto virou desperdício/excesso. Assim o registro clínico fica fiel ao que aconteceu no atendimento.
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Responsável veterinário *</label>
               <select
@@ -1227,6 +1529,51 @@ export default function VetInternacoes() {
                   <option value={formFeito.feito_por}>{formFeito.feito_por}</option>
                 )}
               </select>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. prevista</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formFeito.quantidade_prevista}
+                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_prevista: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
+                <input
+                  type="text"
+                  value={formFeito.unidade_quantidade}
+                  onChange={(e) => setFormFeito((p) => ({ ...p, unidade_quantidade: e.target.value }))}
+                  placeholder="mL, mg, comp, un..."
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. efetivamente feita</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formFeito.quantidade_executada}
+                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_executada: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Desperdício / excesso</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formFeito.quantidade_desperdicio}
+                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_desperdicio: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Horário da execução *</label>
@@ -1296,10 +1643,160 @@ export default function VetInternacoes() {
                     <p className="text-xs text-gray-500 mt-1">Entrada: {formatDateTime(hist.data_entrada)}{hist.data_saida ? ` • Alta: ${formatDateTime(hist.data_saida)}` : ""}</p>
                     <p className="text-xs text-gray-600 mt-1">Motivo: {hist.motivo || "—"}</p>
                     <p className="text-xs text-gray-600 mt-1">Evoluções: {hist.evolucoes?.length ?? 0} • Procedimentos: {hist.procedimentos?.length ?? 0}</p>
+                    {Array.isArray(hist.procedimentos) && hist.procedimentos.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        {hist.procedimentos.map((proc, idx) => (
+                          <div key={`${hist.internacao_id}_proc_${proc.id ?? idx}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs">
+                            <p className="font-semibold text-gray-800">{proc.medicamento || "Procedimento"}</p>
+                            <p className="text-gray-500">
+                              {proc.horario_execucao ? formatDateTime(proc.horario_execucao) : formatDateTime(proc.data_hora)}
+                            </p>
+                            {(proc.quantidade_prevista != null || proc.quantidade_executada != null || proc.quantidade_desperdicio != null) && (
+                              <p className="mt-1 text-gray-600">
+                                Previsto: {formatQuantity(proc.quantidade_prevista, proc.unidade_quantidade)} • Feito: {formatQuantity(proc.quantidade_executada, proc.unidade_quantidade)} • Desperdício: {formatQuantity(proc.quantidade_desperdicio, proc.unidade_quantidade)}
+                              </p>
+                            )}
+                            {Array.isArray(proc.insumos) && proc.insumos.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {proc.insumos.map((insumo, insumoIdx) => (
+                                  <span key={`${hist.internacao_id}_proc_${idx}_insumo_${insumoIdx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
+                                    {insumo.nome || `Produto #${insumo.produto_id}`} • {formatQuantity(insumo.quantidade, insumo.unidade)}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {modalInsumoRapido && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Lançar insumo rápido</h2>
+                <p className="text-sm text-gray-500">
+                  Registre materiais ou medicamentos consumidos durante a internação com baixa automática do estoque.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalInsumoRapido(false)}
+                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Fechar modal de insumo"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Internado *</label>
+                <select
+                  value={formInsumoRapido.internacao_id}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, internacao_id: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">Selecione…</option>
+                  {internacoesOrdenadas.map((internacao) => (
+                    <option key={`insumo_internacao_${internacao.id}`} value={internacao.id}>
+                      {internacao.pet_nome ?? `Pet #${internacao.pet_id}`}{internacao.box ? ` • ${internacao.box}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Responsável *</label>
+                <select
+                  value={formInsumoRapido.responsavel}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, responsavel: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
+                >
+                  <option value="">Selecione…</option>
+                  {veterinarios.map((vet) => (
+                    <option key={`insumo_vet_${vet.id}`} value={vet.nome}>
+                      {vet.nome}{vet.crmv ? ` • CRMV ${vet.crmv}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <ProdutoEstoqueAutocomplete
+                  selectedProduct={insumoRapidoSelecionado}
+                  onSelect={setInsumoRapidoSelecionado}
+                  helperText="Pesquise pelo nome ou código do insumo que foi consumido na internação."
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Quantidade utilizada *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formInsumoRapido.quantidade_utilizada}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Desperdício / perda</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formInsumoRapido.quantidade_desperdicio}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Horário do uso *</label>
+                <input
+                  type="datetime-local"
+                  value={formInsumoRapido.horario_execucao}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, horario_execucao: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
+                <textarea
+                  value={formInsumoRapido.observacoes}
+                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, observacoes: e.target.value }))}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  placeholder="Ex.: trocado tapete, perdido 5 mL na manipulação, pet removeu curativo..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setModalInsumoRapido(false)}
+                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarInsumoRapido}
+                disabled={salvando}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {salvando ? "Salvando..." : "Registrar insumo"}
+              </button>
+            </div>
           </div>
         </div>
       )}

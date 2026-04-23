@@ -127,6 +127,7 @@ export default function ProdutosNovo() {
     especie_compativel: 'both',
     
     // Aba 7: Ração - Calculadora (Fase 2)
+    eh_racao: false,
     classificacao_racao: '',
     peso_embalagem: '',
     tabela_nutricional: '',
@@ -492,14 +493,14 @@ export default function ProdutosNovo() {
       const nomeMinusculo = formData.nome.toLowerCase();
       const isRacao = nomeMinusculo.includes('racao') || nomeMinusculo.includes('ração');
       
-      if (isRacao && formData.classificacao_racao !== 'sim') {
+      if (isRacao && !formData.eh_racao) {
         setFormData(prev => ({
           ...prev,
-          classificacao_racao: 'sim'
+          eh_racao: true
         }));
       }
     }
-  }, [formData.nome, isEdicao, formData.classificacao_racao]);
+  }, [formData.nome, isEdicao, formData.eh_racao]);
   
   // Detectar parâmetro de aba na URL (após carregar o produto)
   useEffect(() => {

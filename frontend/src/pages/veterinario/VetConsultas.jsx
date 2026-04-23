@@ -71,8 +71,10 @@ export default function VetConsultas() {
     if (!busca) return true;
     const texto = busca.toLowerCase();
     return (
+      String(c.id ?? "").includes(texto) ||
       (c.pet_nome ?? "").toLowerCase().includes(texto) ||
       (c.veterinario_nome ?? "").toLowerCase().includes(texto) ||
+      (c.motivo_consulta ?? "").toLowerCase().includes(texto) ||
       (c.diagnostico ?? "").toLowerCase().includes(texto)
     );
   });
@@ -107,7 +109,7 @@ export default function VetConsultas() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por pet, veterinário ou diagnóstico…"
+            placeholder="Buscar por código, pet, veterinário, motivo ou diagnóstico…"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -148,6 +150,7 @@ export default function VetConsultas() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Código</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Data</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Pet</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Veterinário</th>
@@ -164,9 +167,13 @@ export default function VetConsultas() {
                   className="hover:bg-blue-50 transition-colors cursor-pointer"
                   onClick={() => navigate(`/veterinario/consultas/${c.id}`)}
                 >
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="font-semibold text-gray-800">#{c.id}</div>
+                    <div className="text-[11px] text-gray-400">Consulta</div>
+                  </td>
                   <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                    {formatData(c.data_hora)}
-                    <span className="text-xs ml-1 text-gray-400">{formatHora(c.data_hora)}</span>
+                    {formatData(c.created_at)}
+                    <span className="text-xs ml-1 text-gray-400">{formatHora(c.created_at)}</span>
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-800">{c.pet_nome ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-600">{c.veterinario_nome ?? "—"}</td>

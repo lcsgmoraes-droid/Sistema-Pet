@@ -171,7 +171,7 @@ function AlertasRacao() {
         <div className="flex items-center gap-3 mb-4">
           <AlertTriangle className="w-8 h-8 text-amber-600" />
           <h1 className="text-2xl font-bold text-gray-800">
-            Sistema Inteligente de Rações
+            Comparador de Rações
           </h1>
         </div>
         
@@ -187,7 +187,7 @@ function AlertasRacao() {
           >
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
-              Dashboard de Análise
+              Painel comparativo
             </div>
           </button>
           
@@ -201,7 +201,7 @@ function AlertasRacao() {
           >
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
-              Alertas de Classificação
+              Pendencias de classificacao
               {stats.total > 0 && (
                 <span className="px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
                   {stats.total}
@@ -220,7 +220,7 @@ function AlertasRacao() {
           >
             <div className="flex items-center gap-2">
               <Lightbulb className="w-4 h-4" />
-              Sugestões Inteligentes
+              Sugestoes inteligentes
             </div>
           </button>
         </div>

@@ -1,20 +1,7 @@
 import api from "../api";
 import { criarVenda } from "../api/vendas";
+import { montarPayloadVenda } from "../utils/pdvVendaPayload";
 import { debugLog } from "../utils/debug";
-
-function montarItensPayload(vendaAtual) {
-  return vendaAtual.itens.map((item) => ({
-    tipo: item.tipo,
-    produto_id: item.produto_id,
-    servico_descricao: item.servico_descricao,
-    quantidade: item.quantidade,
-    preco_unitario: item.preco_unitario || item.preco_venda,
-    desconto_item: 0,
-    subtotal: item.subtotal,
-    lote_id: item.lote_id,
-    pet_id: item.pet_id || vendaAtual.pet?.id,
-  }));
-}
 
 function calcularStatusPorPagamento(totalPago, totalVenda) {
   if (totalPago >= totalVenda - 0.01) {
@@ -66,30 +53,16 @@ export function usePDVSalvarVenda({
 
     setLoading(true);
     try {
-      const entregadorIdResolvido =
-        vendaAtual.entregador_id || entregadorSelecionado?.id || null;
+      const payloadVenda = montarPayloadVenda(
+        vendaAtual,
+        entregadorSelecionado,
+      );
 
       if (vendaAtual.id) {
-        await api.put(`/vendas/${vendaAtual.id}`, {
-          cliente_id: vendaAtual.cliente?.id,
-          funcionario_id: vendaAtual.funcionario_id,
-          itens: montarItensPayload(vendaAtual),
-          desconto_valor: 0,
-          desconto_percentual: 0,
-          observacoes: vendaAtual.observacoes,
-          tem_entrega: vendaAtual.tem_entrega,
-          taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-          endereco_entrega: vendaAtual.entrega?.endereco_completo,
-          observacoes_entrega: vendaAtual.entrega?.observacoes_entrega,
-          distancia_km: vendaAtual.entrega?.distancia_km,
-          valor_por_km: vendaAtual.entrega?.valor_por_km,
-          loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: entregadorIdResolvido,
-        });
+        await api.put(`/vendas/${vendaAtual.id}`, payloadVenda);
 
         debugLog("🚨 DEBUG - Payload sendo enviado:", {
-          tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: entregadorIdResolvido,
+          payload: payloadVenda,
           vendaAtual_completo: vendaAtual,
         });
 
@@ -108,9 +81,9 @@ export function usePDVSalvarVenda({
         alert("Venda atualizada com sucesso!");
         limparVenda();
       } else {
-        debugLog("🚀 CRIANDO VENDA - Versão 2.0 - DESCONTOS ZERADOS");
-        debugLog("Desconto valor:", 0);
-        debugLog("Desconto percentual:", 0);
+        debugLog("🚀 CRIANDO VENDA - payload consolidado");
+        debugLog("Desconto valor:", payloadVenda.desconto_valor);
+        debugLog("Desconto percentual:", payloadVenda.desconto_percentual);
         debugLog("✅ Checkbox Venda Comissionada:", vendaComissionada);
         debugLog("💼 Funcionário Comissão:", funcionarioComissao);
         debugLog("📋 Funcionário ID enviado:", funcionarioComissao?.id || null);
@@ -121,50 +94,17 @@ export function usePDVSalvarVenda({
           );
         }
 
-        const taxaTotal = vendaAtual.entrega?.taxa_entrega_total || 0;
-        const taxaLoja = vendaAtual.entrega?.taxa_loja || 0;
-        const taxaEntregador = vendaAtual.entrega?.taxa_entregador || 0;
-        const percentualLoja =
-          taxaTotal > 0 ? (taxaLoja / taxaTotal) * 100 : 100;
-        const percentualEntregador =
-          taxaTotal > 0 ? (taxaEntregador / taxaTotal) * 100 : 0;
-
-        const payloadVenda = {
-          cliente_id: vendaAtual.cliente?.id,
-          funcionario_id: vendaAtual.funcionario_id,
-          itens: montarItensPayload(vendaAtual),
-          desconto_valor: 0,
-          desconto_percentual: 0,
-          observacoes: vendaAtual.observacoes,
-          tem_entrega: vendaAtual.tem_entrega,
-          taxa_entrega: vendaAtual.entrega?.taxa_entrega_total || 0,
-          percentual_taxa_loja: percentualLoja,
-          percentual_taxa_entregador: percentualEntregador,
-          endereco_entrega: vendaAtual.entrega?.endereco_completo,
-          observacoes_entrega: vendaAtual.entrega?.observacoes_entrega,
-          distancia_km: vendaAtual.entrega?.distancia_km,
-          valor_por_km: vendaAtual.entrega?.valor_por_km,
-          loja_origem: vendaAtual.entrega?.loja_origem,
-          entregador_id: entregadorIdResolvido,
-        };
-
         debugLog(
           "📦 PAYLOAD COMPLETO antes de enviar:",
           JSON.stringify(payloadVenda, null, 2),
         );
         debugLog("🚚 Dados de entrega:", {
-          tem_entrega: vendaAtual.tem_entrega,
-          entregador_id: entregadorIdResolvido,
+          tem_entrega: payloadVenda.tem_entrega,
+          entregador_id: payloadVenda.entregador_id,
           entregadorSelecionado: entregadorSelecionado?.id,
           vendaAtual_completo: vendaAtual,
         });
-        debugLog("💰 Percentuais calculados:", {
-          taxaTotal,
-          taxaLoja,
-          taxaEntregador,
-          percentualLoja: `${percentualLoja.toFixed(2)}%`,
-          percentualEntregador: `${percentualEntregador.toFixed(2)}%`,
-        });
+        debugLog("💰 Percentuais calculados:", payloadVenda);
 
         await criarVenda(payloadVenda);
 

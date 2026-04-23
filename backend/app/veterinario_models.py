@@ -66,6 +66,16 @@ class ProtocoloVacina(BaseTenantModel):
 # AGENDAMENTO VETERINÁRIO
 # ==============================================================
 
+class ConsultorioVet(BaseTenantModel):
+    """Consultórios/salas configurados para uso na agenda veterinária."""
+    __tablename__ = "vet_consultorios"
+
+    nome = Column(String(120), nullable=False, index=True)
+    descricao = Column(Text, nullable=True)
+    ordem = Column(Integer, nullable=False, default=1)
+    ativo = Column(Boolean, default=True, nullable=False)
+
+
 class AgendamentoVet(BaseTenantModel):
     """Agenda de consultas veterinárias."""
     __tablename__ = "vet_agendamentos"
@@ -73,6 +83,7 @@ class AgendamentoVet(BaseTenantModel):
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     veterinario_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)  # Cliente com tipo_cadastro=veterinario
+    consultorio_id = Column(Integer, ForeignKey("vet_consultorios.id"), nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     data_hora = Column(DateTime(timezone=True), nullable=False, index=True)
@@ -105,6 +116,7 @@ class AgendamentoVet(BaseTenantModel):
     pet = relationship("Pet", foreign_keys=[pet_id])
     cliente = relationship("Cliente", foreign_keys=[cliente_id])
     veterinario = relationship("Cliente", foreign_keys=[veterinario_id])
+    consultorio = relationship("ConsultorioVet", foreign_keys=[consultorio_id])
     consulta = relationship("ConsultaVet", foreign_keys=[consulta_id], back_populates="agendamento")
 
 

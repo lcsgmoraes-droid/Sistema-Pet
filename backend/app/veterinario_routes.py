@@ -9,12 +9,15 @@ import os
 import re
 import secrets
 import csv
+import base64
+import mimetypes
 from decimal import Decimal
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from typing import List, Optional
 
+import pdfplumber
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -29,10 +32,12 @@ from .ia.aba6_models import Conversa, MensagemChat
 from .models import Cliente, Pet, Tenant, User
 from .pdf_veterinario import gerar_pdf_prontuario, gerar_pdf_receita
 from .produtos_models import EstoqueMovimentacao, Produto
+from .utils.timezone import now_brasilia, to_brasilia
 from .veterinario_models import (
     AgendamentoVet,
     CatalogoProcedimento,
     ConsultaVet,
+    ConsultorioVet,
     ExameVet,
     FotoClinica,
     InternacaoVet,
@@ -47,9 +52,29 @@ from .veterinario_models import (
     VacinaRegistro,
     VetPartnerLink,
 )
+from .whatsapp.models import TenantWhatsAppConfig
 
 router = APIRouter(prefix="/vet", tags=["Veterinário"])
-UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads" / "veterinario" / "exames"
+# Em produção o backend roda em /app/app/*.py, então `parents[1]` aponta para
+# /app, que é onde o volume de uploads está montado. `parents[2]` subiria até /
+# e faria o upload tentar gravar em /uploads, gerando erro 500.
+UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads" / "veterinario" / "exames"
+CALENDARIO_VET_DIAS_PASSADOS = 30
+CALENDARIO_VET_DIAS_FUTUROS = 180
+TIPO_AGENDAMENTO_LABEL = {
+    "consulta": "Consulta",
+    "retorno": "Retorno",
+    "vacina": "Vacina",
+    "exame": "Exame",
+}
+STATUS_AGENDAMENTO_LABEL = {
+    "agendado": "Agendado",
+    "confirmado": "Confirmado",
+    "aguardando": "Aguardando",
+    "em_atendimento": "Em atendimento",
+    "finalizado": "Finalizado",
+    "cancelado": "Cancelado",
+}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -60,6 +85,254 @@ def _get_tenant(current: tuple) -> tuple:
     """Extrai user e tenant_id do tuple retornado pelo Depends."""
     user, tenant_id = current
     return user, tenant_id
+
+
+def _vet_now() -> datetime:
+    return now_brasilia()
+
+
+def _normalizar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None):
+        try:
+            return to_brasilia(value).replace(tzinfo=None)
+        except Exception:
+            return value.replace(tzinfo=None)
+    return value
+
+
+def _serializar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    try:
+        if getattr(value, "tzinfo", None):
+            return to_brasilia(value).replace(tzinfo=None)
+    except Exception:
+        if getattr(value, "tzinfo", None):
+            return value.replace(tzinfo=None)
+    return value
+
+
+def _date_para_datetime_vet(value: Optional[date]) -> Optional[datetime]:
+    if value is None:
+        return None
+    return datetime.combine(value, time(hour=12, minute=0))
+
+
+def _resolver_data_entrada_exibicao_internacao(
+    internacao: InternacaoVet,
+    registros: Optional[list[EvolucaoInternacao]] = None,
+) -> Optional[datetime]:
+    data_entrada = _serializar_datetime_vet(internacao.data_entrada)
+    if not registros:
+        return data_entrada
+
+    candidatos = []
+    for registro in registros:
+        data_registro = _serializar_datetime_vet(registro.data_hora)
+        if data_registro:
+            candidatos.append(data_registro)
+
+    if not candidatos:
+        return data_entrada
+
+    primeira_movimentacao = min(candidatos)
+    if not data_entrada:
+        return primeira_movimentacao
+
+    try:
+        diff_horas = abs((primeira_movimentacao - data_entrada).total_seconds()) / 3600
+        if data_entrada.date() == primeira_movimentacao.date() and 2.5 <= diff_horas <= 3.5:
+            return primeira_movimentacao
+    except Exception:
+        return data_entrada
+
+    return data_entrada
+
+
+def _gerar_token_calendario_vet(db: Session) -> str:
+    while True:
+        token = secrets.token_urlsafe(32)
+        existe = db.query(User.id).filter(User.vet_calendar_token == token).first()
+        if not existe:
+            return token
+
+
+def _garantir_token_calendario_vet(db: Session, user: User) -> str:
+    if getattr(user, "vet_calendar_token", None):
+        return user.vet_calendar_token
+    user.vet_calendar_token = _gerar_token_calendario_vet(db)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user.vet_calendar_token
+
+
+def _resolver_veterinario_por_usuario(db: Session, tenant_id, user: Optional[User]) -> Optional[Cliente]:
+    email = (getattr(user, "email", None) or "").strip().lower()
+    if not email:
+        return None
+
+    return (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "veterinario",
+            Cliente.ativo == True,
+            func.lower(Cliente.email) == email,
+        )
+        .order_by(Cliente.id.asc())
+        .first()
+    )
+
+
+def _montar_urls_calendario_vet(request: Request, token: str) -> tuple[str, str]:
+    base_url = str(request.base_url).rstrip("/")
+    feed_url = f"{base_url}/api/vet/agenda/feed/{token}.ics"
+    if feed_url.startswith("https://"):
+        webcal_url = f"webcal://{feed_url[len('https://'):]}"
+    elif feed_url.startswith("http://"):
+        webcal_url = f"webcal://{feed_url[len('http://'):]}"
+    else:
+        webcal_url = feed_url
+    return feed_url, webcal_url
+
+
+def _buscar_agendamentos_para_calendario(
+    db: Session,
+    *,
+    tenant_id,
+    veterinario_id: Optional[int] = None,
+) -> list[AgendamentoVet]:
+    data_inicio = datetime.now() - timedelta(days=CALENDARIO_VET_DIAS_PASSADOS)
+    data_fim = datetime.now() + timedelta(days=CALENDARIO_VET_DIAS_FUTUROS)
+    consulta = (
+        db.query(AgendamentoVet)
+        .options(
+            joinedload(AgendamentoVet.pet),
+            joinedload(AgendamentoVet.cliente),
+            joinedload(AgendamentoVet.veterinario),
+            joinedload(AgendamentoVet.consultorio),
+        )
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            AgendamentoVet.data_hora >= data_inicio,
+            AgendamentoVet.data_hora <= data_fim,
+            AgendamentoVet.status != "cancelado",
+        )
+    )
+    if veterinario_id:
+        consulta = consulta.filter(AgendamentoVet.veterinario_id == veterinario_id)
+    return consulta.order_by(AgendamentoVet.data_hora.asc()).all()
+
+
+def _escape_ics(value: Optional[str]) -> str:
+    texto = str(value or "")
+    texto = texto.replace("\\", "\\\\")
+    texto = texto.replace(";", "\\;")
+    texto = texto.replace(",", "\\,")
+    texto = texto.replace("\r\n", "\\n").replace("\n", "\\n")
+    return texto
+
+
+def _formatar_datetime_ics(data_hora: datetime) -> str:
+    if data_hora.tzinfo:
+        return data_hora.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return data_hora.strftime("%Y%m%dT%H%M%S")
+
+
+def _gerar_calendario_ics(
+    agendamentos: list[AgendamentoVet],
+    *,
+    nome_calendario: str,
+) -> str:
+    linhas = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Sistema Pet//Agenda Veterinaria//PT-BR",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        "X-WR-CALNAME:" + _escape_ics(nome_calendario),
+        "X-WR-TIMEZONE:America/Sao_Paulo",
+    ]
+
+    for ag in agendamentos:
+        data_inicio = ag.data_hora
+        data_fim = data_inicio + timedelta(minutes=ag.duracao_minutos or 30)
+        pet_nome = ag.pet.nome if ag.pet else f"Pet #{ag.pet_id}"
+        tutor_nome = ag.cliente.nome if ag.cliente else None
+        vet_nome = ag.veterinario.nome if ag.veterinario else None
+        consultorio_nome = ag.consultorio.nome if ag.consultorio else None
+        tipo_label = TIPO_AGENDAMENTO_LABEL.get(ag.tipo, (ag.tipo or "Consulta").title())
+        status_label = STATUS_AGENDAMENTO_LABEL.get(ag.status, ag.status or "Agendado")
+
+        detalhes = [
+            f"Tipo: {tipo_label}",
+            f"Status: {status_label}",
+        ]
+        if tutor_nome:
+            detalhes.append(f"Tutor: {tutor_nome}")
+        if vet_nome:
+            detalhes.append(f"Veterinario: {vet_nome}")
+        if consultorio_nome:
+            detalhes.append(f"Consultorio: {consultorio_nome}")
+        if ag.motivo:
+            detalhes.append(f"Motivo: {ag.motivo}")
+        if ag.observacoes:
+            detalhes.append(f"Observacoes: {ag.observacoes}")
+
+        linhas.extend([
+            "BEGIN:VEVENT",
+            f"UID:vet-agendamento-{ag.id}@sistemapet",
+            f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTSTART:{_formatar_datetime_ics(data_inicio)}",
+            f"DTEND:{_formatar_datetime_ics(data_fim)}",
+            "SUMMARY:" + _escape_ics(f"{tipo_label} - {pet_nome}"),
+            "DESCRIPTION:" + _escape_ics("\n".join(detalhes)),
+            "STATUS:CONFIRMED",
+        ])
+        if consultorio_nome:
+            linhas.append("LOCATION:" + _escape_ics(consultorio_nome))
+        linhas.append("END:VEVENT")
+
+    linhas.append("END:VCALENDAR")
+    return "\r\n".join(linhas)
+
+
+def _montar_payload_calendario_vet(
+    db: Session,
+    request: Request,
+    *,
+    user: User,
+    tenant_id,
+) -> dict:
+    token = _garantir_token_calendario_vet(db, user)
+    feed_url, webcal_url = _montar_urls_calendario_vet(request, token)
+    veterinario = _resolver_veterinario_por_usuario(db, tenant_id, user)
+    mensagem_escopo = None
+    if veterinario:
+        escopo = "veterinario"
+        veterinario_id = veterinario.id
+        veterinario_nome = veterinario.nome
+        mensagem_escopo = "O calendario exibe apenas os agendamentos vinculados ao seu usuario veterinario."
+    else:
+        escopo = "tenant"
+        veterinario_id = None
+        veterinario_nome = None
+        mensagem_escopo = "Nao encontramos um cadastro de veterinario com o mesmo e-mail deste usuario. O calendario vai mostrar a agenda geral da empresa."
+
+    return {
+        "feed_token": token,
+        "feed_url": feed_url,
+        "webcal_url": webcal_url,
+        "escopo": escopo,
+        "veterinario_id": veterinario_id,
+        "veterinario_nome": veterinario_nome,
+        "mensagem_escopo": mensagem_escopo,
+        "janela_dias_passados": CALENDARIO_VET_DIAS_PASSADOS,
+        "janela_dias_futuros": CALENDARIO_VET_DIAS_FUTUROS,
+    }
 
 
 def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
@@ -83,6 +356,465 @@ def _as_float(value) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _parse_numeric_text(value) -> Optional[float]:
+    if value is None:
+        return None
+    texto = str(value).strip()
+    if not texto:
+        return None
+
+    texto = re.sub(r"[^0-9,.\-]", "", texto)
+    if not texto:
+        return None
+
+    if "," in texto and "." in texto:
+        if texto.rfind(",") > texto.rfind("."):
+            texto = texto.replace(".", "").replace(",", ".")
+        else:
+            texto = texto.replace(",", "")
+    elif texto.count(",") == 1 and texto.count(".") == 0:
+        texto = texto.replace(",", ".")
+    elif texto.count(".") > 1 and texto.count(",") == 0:
+        partes = texto.split(".")
+        texto = "".join(partes[:-1]) + "." + partes[-1]
+
+    try:
+        return float(texto)
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_vet_openai_config(db: Session, tenant_id) -> tuple[str, str]:
+    config = (
+        db.query(TenantWhatsAppConfig)
+        .filter(TenantWhatsAppConfig.tenant_id == str(tenant_id))
+        .first()
+    )
+    api_key = ""
+    model = "gpt-4o-mini"
+    if config and config.openai_api_key:
+        api_key = config.openai_api_key.strip()
+        model = (config.model_preference or model).strip() or model
+    else:
+        api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+        model = (os.getenv("OPENAI_MODEL") or model).strip() or model
+    return api_key, model
+
+
+def _resolve_exame_file_path(exame: ExameVet, tenant_id) -> Path:
+    if not exame.arquivo_url:
+        raise HTTPException(400, "O exame ainda não possui arquivo anexado.")
+
+    nome_arquivo = Path(exame.arquivo_url).name
+    caminho = UPLOADS_DIR / str(tenant_id) / nome_arquivo
+    if caminho.exists():
+        return caminho
+
+    partes = Path(str(exame.arquivo_url).lstrip("/")).parts
+    uploads_idx = None
+    for idx, parte in enumerate(partes):
+        if parte == "uploads":
+            uploads_idx = idx
+            break
+    if uploads_idx is not None:
+        caminho_alternativo = Path(__file__).resolve().parents[1].joinpath(*partes[uploads_idx:])
+        if caminho_alternativo.exists():
+            return caminho_alternativo
+
+    raise HTTPException(404, "Arquivo do exame não foi encontrado no servidor.")
+
+
+def _extract_text_from_pdf(pdf_path: Path, max_pages: int = 8, max_chars: int = 18000) -> str:
+    trechos: list[str] = []
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page in pdf.pages[:max_pages]:
+            texto = (page.extract_text() or "").strip()
+            if texto:
+                trechos.append(texto)
+            if sum(len(parte) for parte in trechos) >= max_chars:
+                break
+    return "\n\n".join(trechos)[:max_chars].strip()
+
+
+def _basic_lab_values_from_text(texto: str) -> dict:
+    if not texto:
+        return {}
+
+    padroes = {
+        "hematocrito": [
+            r"hemat[oó]crito[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"\bht\b[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "hemacias": [
+            r"hem[aá]cias[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"eritr[oó]citos?[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "hemoglobina": [
+            r"hemoglobina[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"\bhb\b[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "leucocitos": [
+            r"leuc[oó]citos?[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"leu[cç][^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "plaquetas": [
+            r"plaquetas?[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "ureia": [
+            r"ur[eé]ia[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "creatinina": [
+            r"creatinina[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "alt": [
+            r"\balt\b[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"alanina aminotransferase[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "ast": [
+            r"\bast\b[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+            r"aspartato aminotransferase[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+        "glicose": [
+            r"glicose[^\d]{0,20}([0-9]+(?:[.,][0-9]+)?)",
+        ],
+    }
+
+    resultado = {}
+    for chave, lista_padroes in padroes.items():
+        for padrao in lista_padroes:
+            match = re.search(padrao, texto, flags=re.IGNORECASE)
+            if not match:
+                continue
+            numero = _parse_numeric_text(match.group(1))
+            if numero is not None:
+                resultado[chave] = numero
+                break
+    return resultado
+
+
+def _strip_markdown_code_block(content: str) -> str:
+    texto = (content or "").strip()
+    if texto.startswith("```"):
+        texto = re.sub(r"^```(?:json)?\s*", "", texto, flags=re.IGNORECASE)
+        texto = re.sub(r"\s*```$", "", texto)
+    return texto.strip()
+
+
+def _parse_llm_json_payload(content: str) -> dict:
+    texto = _strip_markdown_code_block(content)
+    if not texto:
+        return {}
+
+    try:
+        parsed = json.loads(texto)
+        return parsed if isinstance(parsed, dict) else {}
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", texto)
+        if not match:
+            return {}
+        try:
+            parsed = json.loads(match.group(0))
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+
+def _normalize_ai_alerts(alertas) -> list[dict]:
+    normalizados: list[dict] = []
+    if not isinstance(alertas, list):
+        return normalizados
+
+    for alerta in alertas:
+        if isinstance(alerta, str):
+            mensagem = alerta.strip()
+            if mensagem:
+                normalizados.append({"campo": "atencao", "status": "atencao", "mensagem": mensagem})
+            continue
+        if not isinstance(alerta, dict):
+            continue
+        mensagem = str(alerta.get("mensagem") or "").strip()
+        if not mensagem:
+            continue
+        normalizados.append({
+            "campo": str(alerta.get("campo") or "atencao").strip() or "atencao",
+            "status": str(alerta.get("status") or "atencao").strip() or "atencao",
+            "mensagem": mensagem,
+        })
+    return normalizados
+
+
+def _normalize_ai_result_json(resultado_json) -> dict:
+    if not isinstance(resultado_json, dict):
+        return {}
+    normalizado = {}
+    for chave, valor in resultado_json.items():
+        if chave is None:
+            continue
+        chave_limpa = str(chave).strip()
+        if not chave_limpa:
+            continue
+        numero = _parse_numeric_text(valor)
+        normalizado[chave_limpa] = numero if numero is not None else valor
+    return normalizado
+
+
+def _merge_exam_result_json(exame: ExameVet, novo_json: dict) -> dict:
+    atual = exame.resultado_json if isinstance(exame.resultado_json, dict) else {}
+    merged = dict(atual)
+    for chave, valor in (novo_json or {}).items():
+        if valor in (None, "", []):
+            continue
+        merged[chave] = valor
+    return merged
+
+
+def _build_local_image_data_url(path_arquivo: Path) -> str:
+    mime = mimetypes.guess_type(str(path_arquivo))[0] or "image/png"
+    conteudo = path_arquivo.read_bytes()
+    encoded = base64.b64encode(conteudo).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _call_openai_exam_file_analysis(
+    *,
+    api_key: str,
+    model: str,
+    exame: ExameVet,
+    texto_extraido: str,
+    imagem_data_url: Optional[str] = None,
+) -> dict:
+    from openai import (
+        APIConnectionError,
+        APIStatusError,
+        APITimeoutError,
+        AuthenticationError,
+        BadRequestError,
+        OpenAI,
+        RateLimitError,
+    )
+
+    client = OpenAI(api_key=api_key, timeout=45.0)
+    system_prompt = (
+        "Você é um assistente veterinário de apoio à triagem de exames.\n"
+        "Sua tarefa é ler o conteúdo do exame e responder SOMENTE em JSON válido.\n"
+        "Nunca invente valores. Se não conseguir ler algo, assuma incerteza e registre em limitacoes.\n"
+        "Para exames de imagem, descreva achados prováveis, mas deixe claro que não substitui laudo do especialista.\n"
+        "Formato JSON obrigatório:\n"
+        "{\n"
+        '  "resultado_texto": "texto resumido e fiel ao exame",\n'
+        '  "resultado_json": {"campo": valor},\n'
+        '  "resumo": "resumo curto da triagem",\n'
+        '  "conclusao": "conclusão curta",\n'
+        '  "alertas": [{"campo":"...","status":"alto|baixo|atencao","mensagem":"..."}],\n'
+        '  "confianca": 0.0,\n'
+        '  "achados_imagem": ["..."],\n'
+        '  "conduta_sugerida": ["..."],\n'
+        '  "limitacoes": ["..."]\n'
+        "}"
+    )
+
+    prompt_texto = (
+        f"Tipo do exame: {exame.tipo}\n"
+        f"Nome do exame: {exame.nome}\n"
+        f"Laboratório: {exame.laboratorio or 'não informado'}\n"
+        f"Status atual: {exame.status}\n"
+    )
+    if texto_extraido:
+        prompt_texto += f"\nTexto já extraído do arquivo:\n{texto_extraido[:16000]}"
+    else:
+        prompt_texto += "\nNão há texto previamente extraído. Analise a imagem anexada."
+
+    try:
+        if imagem_data_url:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt_texto},
+                            {"type": "image_url", "image_url": {"url": imagem_data_url}},
+                        ],
+                    },
+                ],
+                temperature=0.1,
+                max_tokens=1400,
+            )
+        else:
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt_texto},
+                ],
+                temperature=0.1,
+                max_tokens=1400,
+            )
+    except AuthenticationError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail="A chave da OpenAI configurada para exames veterinarios esta invalida. Revise a chave em Configuracoes > Integracoes.",
+        ) from exc
+    except RateLimitError as exc:
+        mensagem = str(exc).lower()
+        if "insufficient_quota" in mensagem or "quota" in mensagem or "billing" in mensagem:
+            raise HTTPException(
+                status_code=429,
+                detail="A IA veterinaria da OpenAI esta sem creditos ou sem faturamento ativo. Adicione creditos em platform.openai.com/account/billing e tente novamente.",
+            ) from exc
+        raise HTTPException(
+            status_code=429,
+            detail="A OpenAI atingiu o limite temporario de uso para este exame. Aguarde um pouco e tente novamente.",
+        ) from exc
+    except (APITimeoutError, APIConnectionError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Nao foi possivel falar com a OpenAI agora. Verifique a conexao e tente novamente em instantes.",
+        ) from exc
+    except BadRequestError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="A OpenAI recusou este processamento do exame. Verifique o arquivo anexado e tente novamente.",
+        ) from exc
+    except APIStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="A OpenAI retornou um erro ao processar este exame. Tente novamente em instantes.",
+        ) from exc
+
+    content = response.choices[0].message.content or ""
+    return _parse_llm_json_payload(content)
+
+
+def _persist_exam_file_ai_analysis(
+    exame: ExameVet,
+    *,
+    texto_extraido: str,
+    resultado_json: dict,
+    resumo: Optional[str],
+    conclusao: Optional[str],
+    alertas: list[dict],
+    confianca: Optional[float],
+    payload_extra: Optional[dict] = None,
+) -> None:
+    if texto_extraido and not (exame.resultado_texto or "").strip():
+        exame.resultado_texto = texto_extraido
+    elif texto_extraido and (exame.resultado_texto or "").strip() and texto_extraido not in (exame.resultado_texto or ""):
+        exame.resultado_texto = f"{(exame.resultado_texto or '').strip()}\n\n--- Texto extraído do arquivo ---\n{texto_extraido}".strip()
+
+    exame.resultado_json = _merge_exam_result_json(exame, resultado_json)
+
+    analise_fallback = _gerar_interpretacao_exame(exame)
+    exame.interpretacao_ia = (conclusao or "").strip() or analise_fallback["conclusao"]
+    exame.interpretacao_ia_resumo = (resumo or "").strip() or analise_fallback["resumo"]
+    exame.interpretacao_ia_confianca = round(float(confianca), 2) if confianca is not None else analise_fallback["confianca"]
+    exame.interpretacao_ia_alertas = alertas or analise_fallback["alertas"]
+
+    payload_base = {
+        "resultado_json": exame.resultado_json if isinstance(exame.resultado_json, dict) else {},
+        "tem_resultado_texto": bool(exame.resultado_texto),
+        "analisado_em": datetime.utcnow().isoformat(),
+        "fonte_arquivo": True,
+    }
+    if isinstance(payload_extra, dict):
+        payload_base.update(payload_extra)
+    exame.interpretacao_ia_payload = payload_base
+    if not exame.data_resultado:
+        exame.data_resultado = date.today()
+    if exame.status in {"solicitado", "coletado", "aguardando", "disponivel"}:
+        exame.status = "interpretado"
+
+
+def _process_exam_file_with_ai(
+    db: Session,
+    *,
+    tenant_id,
+    exame: ExameVet,
+) -> ExameVet:
+    caminho_arquivo = _resolve_exame_file_path(exame, tenant_id)
+    extensao = caminho_arquivo.suffix.lower()
+    texto_extraido = ""
+    imagem_data_url = None
+    payload_extra = {
+        "arquivo_nome": exame.arquivo_nome,
+        "arquivo_url": exame.arquivo_url,
+        "tipo_arquivo": extensao,
+    }
+    falha_ia_detail = ""
+
+    if extensao == ".pdf":
+        texto_extraido = _extract_text_from_pdf(caminho_arquivo)
+        payload_extra["fonte_extracao"] = "pdf_texto"
+    elif extensao in {".png", ".jpg", ".jpeg", ".webp"}:
+        imagem_data_url = _build_local_image_data_url(caminho_arquivo)
+        payload_extra["fonte_extracao"] = "imagem"
+    else:
+        raise HTTPException(400, "Formato inválido para análise. Envie PDF ou imagem.")
+
+    api_key, model = _resolve_vet_openai_config(db, tenant_id)
+    resposta_ai = {}
+    if api_key and (imagem_data_url or texto_extraido):
+        try:
+            resposta_ai = _call_openai_exam_file_analysis(
+                api_key=api_key,
+                model=model,
+                exame=exame,
+                texto_extraido=texto_extraido,
+                imagem_data_url=imagem_data_url,
+            )
+            payload_extra["modelo_ia"] = model
+        except HTTPException as exc:
+            if not texto_extraido:
+                raise
+            falha_ia_detail = str(exc.detail or "").strip()
+            payload_extra["modelo_ia"] = model
+            payload_extra["ia_status_code"] = exc.status_code
+            payload_extra["ia_indisponivel"] = True
+            payload_extra["ia_erro"] = falha_ia_detail
+
+    if not texto_extraido:
+        texto_extraido = str(resposta_ai.get("resultado_texto") or "").strip()
+
+    resultado_json = _normalize_ai_result_json(resposta_ai.get("resultado_json"))
+    if not resultado_json and texto_extraido:
+        resultado_json = _basic_lab_values_from_text(texto_extraido)
+
+    alertas = _normalize_ai_alerts(resposta_ai.get("alertas"))
+    resumo = str(resposta_ai.get("resumo") or "").strip()
+    conclusao = str(resposta_ai.get("conclusao") or "").strip()
+    confianca = _as_float(resposta_ai.get("confianca"))
+    achados_imagem = resposta_ai.get("achados_imagem") if isinstance(resposta_ai.get("achados_imagem"), list) else []
+    conduta_sugerida = resposta_ai.get("conduta_sugerida") if isinstance(resposta_ai.get("conduta_sugerida"), list) else []
+    limitacoes = resposta_ai.get("limitacoes") if isinstance(resposta_ai.get("limitacoes"), list) else []
+    if falha_ia_detail:
+        limitacoes = [*limitacoes, falha_ia_detail]
+
+    if not texto_extraido and not resultado_json and not resposta_ai:
+        raise HTTPException(
+            400,
+            "Não foi possível extrair conteúdo útil do arquivo. Em PDFs escaneados, tente anexar como imagem ou informe o laudo em texto.",
+        )
+
+    payload_extra.update({
+        "achados_imagem": achados_imagem,
+        "conduta_sugerida": conduta_sugerida,
+        "limitacoes": limitacoes,
+    })
+
+    _persist_exam_file_ai_analysis(
+        exame,
+        texto_extraido=texto_extraido,
+        resultado_json=resultado_json,
+        resumo=resumo,
+        conclusao=conclusao,
+        alertas=alertas,
+        confianca=confianca,
+        payload_extra=payload_extra,
+    )
+    return exame
 
 
 def _normalizar_insumos(insumos: Optional[list]) -> list[dict]:
@@ -396,7 +1128,7 @@ def _serializar_procedimento(procedimento: ProcedimentoConsulta, db: Session, te
         "entrada_empresa_valor": resumo["entrada_empresa_valor"],
         "estoque_baixado": bool(procedimento.estoque_baixado),
         "estoque_movimentacao_ids": procedimento.estoque_movimentacao_ids or [],
-        "created_at": procedimento.created_at,
+        "created_at": _serializar_datetime_vet(procedimento.created_at),
     }
 
 
@@ -515,6 +1247,71 @@ def _gerar_interpretacao_exame(exame: ExameVet) -> dict:
             "analisado_em": datetime.utcnow().isoformat(),
         },
     }
+
+
+def _aplicar_baixa_estoque_itens(
+    db: Session,
+    *,
+    tenant_id,
+    user_id: int,
+    itens: Optional[list],
+    motivo: str,
+    referencia_id: int,
+    referencia_tipo: str,
+    documento: str,
+    observacao: str,
+) -> tuple[list[dict], list[int]]:
+    itens = _normalizar_insumos(itens)
+    produtos = _buscar_produtos_por_ids(db, tenant_id, [item["produto_id"] for item in itens])
+    movimentacoes_ids = []
+    for item in itens:
+        if not item["baixar_estoque"]:
+            continue
+
+        produto = produtos.get(item["produto_id"])
+        if not produto:
+            raise HTTPException(status_code=404, detail=f"Produto {item['produto_id']} nÃ£o encontrado para o procedimento")
+        if not produto.ativo:
+            raise HTTPException(status_code=404, detail=f"Produto {item['produto_id']} nÃ£o encontrado para o procedimento")
+
+        estoque_atual = float(produto.estoque_atual or 0)
+        if estoque_atual < item["quantidade"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estoque insuficiente para {produto.nome}. DisponÃ­vel: {estoque_atual}, necessÃ¡rio: {item['quantidade']}",
+            )
+
+        quantidade_anterior = estoque_atual
+        quantidade_nova = estoque_atual - item["quantidade"]
+        produto.estoque_atual = quantidade_nova
+        custo_unitario = _round_money(produto.preco_custo)
+        custo_total = _round_money(custo_unitario * item["quantidade"])
+
+        movimentacao = EstoqueMovimentacao(
+            tenant_id=str(tenant_id),
+            produto_id=produto.id,
+            tipo="saida",
+            motivo=motivo,
+            quantidade=item["quantidade"],
+            quantidade_anterior=quantidade_anterior,
+            quantidade_nova=quantidade_nova,
+            custo_unitario=custo_unitario,
+            valor_total=custo_total,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            documento=documento,
+            observacao=observacao,
+            user_id=user_id,
+        )
+        db.add(movimentacao)
+        db.flush()
+        movimentacoes_ids.append(movimentacao.id)
+        item["nome"] = item.get("nome") or produto.nome
+        item["unidade"] = item.get("unidade") or produto.unidade
+        item["custo_unitario"] = custo_unitario
+        item["custo_total"] = custo_total
+
+    return itens, movimentacoes_ids
 
 
 def _aplicar_baixa_estoque_procedimento(db: Session, procedimento: ProcedimentoConsulta, tenant_id, user_id: int) -> None:
@@ -848,12 +1645,20 @@ def _separar_evolucoes_e_procedimentos(registros: list[EvolucaoInternacao]) -> t
         if proc_payload:
             procedimentos_formatados.append({
                 "id": ev.id,
-                "data_hora": ev.data_hora,
+                "data_hora": _serializar_datetime_vet(ev.data_hora),
                 "status": proc_payload.get("status") or "concluido",
+                "tipo_registro": proc_payload.get("tipo_registro") or "procedimento",
                 "horario_agendado": proc_payload.get("horario_agendado"),
                 "medicamento": proc_payload.get("medicamento"),
                 "dose": proc_payload.get("dose"),
                 "via": proc_payload.get("via"),
+                "quantidade_prevista": proc_payload.get("quantidade_prevista"),
+                "quantidade_executada": proc_payload.get("quantidade_executada"),
+                "quantidade_desperdicio": proc_payload.get("quantidade_desperdicio"),
+                "unidade_quantidade": proc_payload.get("unidade_quantidade"),
+                "insumos": proc_payload.get("insumos") or [],
+                "estoque_baixado": bool(proc_payload.get("estoque_baixado")),
+                "estoque_movimentacao_ids": proc_payload.get("estoque_movimentacao_ids") or [],
                 "executado_por": proc_payload.get("executado_por"),
                 "horario_execucao": proc_payload.get("horario_execucao"),
                 "observacao_execucao": proc_payload.get("observacao_execucao"),
@@ -863,7 +1668,7 @@ def _separar_evolucoes_e_procedimentos(registros: list[EvolucaoInternacao]) -> t
 
         evolucoes_formatadas.append({
             "id": ev.id,
-            "data_hora": ev.data_hora,
+            "data_hora": _serializar_datetime_vet(ev.data_hora),
             "temperatura": ev.temperatura,
             "freq_cardiaca": ev.frequencia_cardiaca,
             "freq_respiratoria": ev.frequencia_respiratoria,
@@ -883,8 +1688,9 @@ def _separar_evolucoes_e_procedimentos(registros: list[EvolucaoInternacao]) -> t
 
 class AgendamentoCreate(BaseModel):
     pet_id: int
-    cliente_id: int
+    cliente_id: Optional[int] = None
     veterinario_id: Optional[int] = None
+    consultorio_id: Optional[int] = None
     data_hora: datetime
     duracao_minutos: int = 30
     tipo: str = "consulta"
@@ -895,12 +1701,16 @@ class AgendamentoCreate(BaseModel):
 
 
 class AgendamentoUpdate(BaseModel):
+    pet_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    veterinario_id: Optional[int] = None
+    consultorio_id: Optional[int] = None
     data_hora: Optional[datetime] = None
     duracao_minutos: Optional[int] = None
     tipo: Optional[str] = None
     motivo: Optional[str] = None
     status: Optional[str] = None
-    veterinario_id: Optional[int] = None
+    is_emergencia: Optional[bool] = None
     observacoes: Optional[str] = None
     pretriagem: Optional[dict] = None
 
@@ -910,6 +1720,7 @@ class AgendamentoResponse(BaseModel):
     pet_id: int
     cliente_id: int
     veterinario_id: Optional[int]
+    consultorio_id: Optional[int]
     data_hora: datetime
     duracao_minutos: int
     tipo: str
@@ -921,10 +1732,207 @@ class AgendamentoResponse(BaseModel):
     pet_nome: Optional[str] = None
     cliente_nome: Optional[str] = None
     veterinario_nome: Optional[str] = None
+    consultorio_nome: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+def _sincronizar_marcos_agendamento(ag: AgendamentoVet) -> None:
+    agora = _vet_now()
+    if ag.status in {"agendado", "confirmado", "aguardando"}:
+        ag.inicio_atendimento = None
+        ag.fim_atendimento = None
+        return
+    if ag.status == "em_atendimento" and not ag.inicio_atendimento:
+        ag.inicio_atendimento = agora
+    if ag.status == "finalizado":
+        if not ag.inicio_atendimento:
+            ag.inicio_atendimento = agora
+        if not ag.fim_atendimento:
+            ag.fim_atendimento = agora
+
+
+def _atualizar_status_agendamento(
+    db: Session,
+    *,
+    tenant_id,
+    agendamento_id: Optional[int],
+    status_agendamento: str,
+) -> Optional[AgendamentoVet]:
+    if not agendamento_id:
+        return None
+
+    ag = db.query(AgendamentoVet).filter(
+        AgendamentoVet.id == agendamento_id,
+        AgendamentoVet.tenant_id == tenant_id,
+    ).first()
+    if not ag:
+        return None
+
+    ag.status = status_agendamento
+    _sincronizar_marcos_agendamento(ag)
+    return ag
+
+
+def _validar_veterinario_agendamento(db: Session, tenant_id, veterinario_id: Optional[int]) -> Optional[Cliente]:
+    if not veterinario_id:
+        return None
+
+    veterinario = db.query(Cliente).filter(
+        Cliente.id == veterinario_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == "veterinario",
+        Cliente.ativo == True,
+    ).first()
+    if not veterinario:
+        raise HTTPException(status_code=422, detail="Veterinario selecionado nao foi encontrado ou esta inativo")
+    return veterinario
+
+
+def _validar_consultorio_agendamento(db: Session, tenant_id, consultorio_id: Optional[int]) -> Optional[ConsultorioVet]:
+    if not consultorio_id:
+        return None
+
+    consultorio = db.query(ConsultorioVet).filter(
+        ConsultorioVet.id == consultorio_id,
+        ConsultorioVet.tenant_id == tenant_id,
+        ConsultorioVet.ativo == True,
+    ).first()
+    if not consultorio:
+        raise HTTPException(status_code=422, detail="Consultorio selecionado nao foi encontrado ou esta inativo")
+    return consultorio
+
+
+def _agendamento_intervalo(data_hora: datetime, duracao_minutos: Optional[int]) -> tuple[datetime, datetime]:
+    inicio = data_hora
+    fim = data_hora + timedelta(minutes=max(int(duracao_minutos or 30), 1))
+    return inicio, fim
+
+
+def _garantir_sem_conflitos_agendamento(
+    db: Session,
+    *,
+    tenant_id,
+    data_hora: datetime,
+    duracao_minutos: Optional[int],
+    veterinario_id: Optional[int],
+    consultorio_id: Optional[int],
+    agendamento_id_ignorar: Optional[int] = None,
+) -> None:
+    if not veterinario_id and not consultorio_id:
+        return
+
+    consulta = db.query(AgendamentoVet).options(
+        joinedload(AgendamentoVet.veterinario),
+        joinedload(AgendamentoVet.consultorio),
+    ).filter(
+        AgendamentoVet.tenant_id == tenant_id,
+        func.date(AgendamentoVet.data_hora) == data_hora.date(),
+        AgendamentoVet.status != "cancelado",
+    )
+
+    if agendamento_id_ignorar:
+        consulta = consulta.filter(AgendamentoVet.id != agendamento_id_ignorar)
+
+    if veterinario_id and consultorio_id:
+        consulta = consulta.filter(
+            or_(
+                AgendamentoVet.veterinario_id == veterinario_id,
+                AgendamentoVet.consultorio_id == consultorio_id,
+            )
+        )
+    elif veterinario_id:
+        consulta = consulta.filter(AgendamentoVet.veterinario_id == veterinario_id)
+    else:
+        consulta = consulta.filter(AgendamentoVet.consultorio_id == consultorio_id)
+
+    novo_inicio, novo_fim = _agendamento_intervalo(data_hora, duracao_minutos)
+    conflito_veterinario = None
+    conflito_consultorio = None
+
+    for existente in consulta.all():
+        existente_inicio, existente_fim = _agendamento_intervalo(existente.data_hora, existente.duracao_minutos)
+        if novo_inicio >= existente_fim or novo_fim <= existente_inicio:
+            continue
+
+        if veterinario_id and existente.veterinario_id == veterinario_id and conflito_veterinario is None:
+            conflito_veterinario = existente
+        if consultorio_id and existente.consultorio_id == consultorio_id and conflito_consultorio is None:
+            conflito_consultorio = existente
+
+    mensagens = []
+    if conflito_veterinario:
+        nome_vet = conflito_veterinario.veterinario.nome if conflito_veterinario.veterinario else "O veterinario selecionado"
+        mensagens.append(
+            f"{nome_vet} ja possui outro agendamento em conflito nesse horario"
+        )
+    if conflito_consultorio:
+        nome_consultorio = conflito_consultorio.consultorio.nome if conflito_consultorio.consultorio else "O consultorio selecionado"
+        mensagens.append(
+            f"{nome_consultorio} ja esta reservado nesse horario"
+        )
+    if mensagens:
+        raise HTTPException(status_code=409, detail=". ".join(mensagens) + ".")
+
+
+def _consulta_tem_conteudo_clinico(consulta: ConsultaVet) -> bool:
+    campos_texto = [
+        "historia_clinica",
+        "exame_fisico",
+        "hipotese_diagnostica",
+        "diagnostico",
+        "diagnostico_simples",
+        "conduta",
+        "asa_justificativa",
+        "observacoes_internas",
+        "observacoes_tutor",
+    ]
+    for campo in campos_texto:
+        valor = getattr(consulta, campo, None)
+        if isinstance(valor, str) and valor.strip():
+            return True
+
+    campos_numericos = [
+        "peso_consulta",
+        "temperatura",
+        "frequencia_cardiaca",
+        "frequencia_respiratoria",
+        "nivel_dor",
+        "saturacao_o2",
+        "pressao_sistolica",
+        "pressao_diastolica",
+        "glicemia",
+        "retorno_em_dias",
+        "asa_score",
+    ]
+    for campo in campos_numericos:
+        if getattr(consulta, campo, None) is not None:
+            return True
+
+    if getattr(consulta, "data_retorno", None) is not None:
+        return True
+    if getattr(consulta, "tpc", None):
+        return True
+    if getattr(consulta, "mucosas", None):
+        return True
+    if getattr(consulta, "hidratacao", None):
+        return True
+    return False
+
+
+def _consulta_tem_dependencias(db: Session, tenant_id, consulta_id: int) -> bool:
+    checagens = (
+        db.query(PrescricaoVet.id).filter(PrescricaoVet.tenant_id == tenant_id, PrescricaoVet.consulta_id == consulta_id).first(),
+        db.query(ExameVet.id).filter(ExameVet.tenant_id == tenant_id, ExameVet.consulta_id == consulta_id).first(),
+        db.query(ProcedimentoConsulta.id).filter(ProcedimentoConsulta.tenant_id == tenant_id, ProcedimentoConsulta.consulta_id == consulta_id).first(),
+        db.query(FotoClinica.id).filter(FotoClinica.tenant_id == tenant_id, FotoClinica.consulta_id == consulta_id).first(),
+        db.query(VacinaRegistro.id).filter(VacinaRegistro.tenant_id == tenant_id, VacinaRegistro.consulta_id == consulta_id).first(),
+        db.query(InternacaoVet.id).filter(InternacaoVet.tenant_id == tenant_id, InternacaoVet.consulta_id == consulta_id).first(),
+        db.query(PesoRegistro.id).filter(PesoRegistro.tenant_id == tenant_id, PesoRegistro.consulta_id == consulta_id).first(),
+    )
+    return any(item is not None for item in checagens)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -937,6 +1945,30 @@ class VeterinarioSimples(BaseModel):
     crmv: Optional[str] = None
     email: Optional[str] = None
     telefone: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ConsultorioCreate(BaseModel):
+    nome: str = Field(..., min_length=1, max_length=120)
+    descricao: Optional[str] = None
+    ordem: Optional[int] = Field(default=None, ge=1, le=999)
+
+
+class ConsultorioUpdate(BaseModel):
+    nome: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    descricao: Optional[str] = None
+    ordem: Optional[int] = Field(default=None, ge=1, le=999)
+    ativo: Optional[bool] = None
+
+
+class ConsultorioResponse(BaseModel):
+    id: int
+    nome: str
+    descricao: Optional[str] = None
+    ordem: int
+    ativo: bool
 
     class Config:
         from_attributes = True
@@ -965,6 +1997,124 @@ def listar_veterinarios(
     ]
 
 
+@router.get("/consultorios", response_model=List[ConsultorioResponse])
+def listar_consultorios(
+    ativos_only: bool = Query(False),
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    q = db.query(ConsultorioVet).filter(ConsultorioVet.tenant_id == tenant_id)
+    if ativos_only:
+        q = q.filter(ConsultorioVet.ativo == True)
+    return q.order_by(ConsultorioVet.ordem.asc(), ConsultorioVet.nome.asc()).all()
+
+
+@router.post("/consultorios", response_model=ConsultorioResponse, status_code=201)
+def criar_consultorio(
+    body: ConsultorioCreate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    nome = (body.nome or "").strip()
+    if not nome:
+        raise HTTPException(status_code=422, detail="Informe o nome do consultorio")
+
+    existente = db.query(ConsultorioVet).filter(
+        ConsultorioVet.tenant_id == tenant_id,
+        func.lower(ConsultorioVet.nome) == nome.lower(),
+    ).first()
+    if existente:
+        raise HTTPException(status_code=409, detail="Ja existe um consultorio com esse nome")
+
+    ultima_ordem = db.query(func.max(ConsultorioVet.ordem)).filter(
+        ConsultorioVet.tenant_id == tenant_id
+    ).scalar() or 0
+
+    consultorio = ConsultorioVet(
+        tenant_id=tenant_id,
+        nome=nome,
+        descricao=(body.descricao or "").strip() or None,
+        ordem=body.ordem or (int(ultima_ordem) + 1),
+        ativo=True,
+    )
+    db.add(consultorio)
+    db.commit()
+    db.refresh(consultorio)
+    return consultorio
+
+
+@router.patch("/consultorios/{consultorio_id}", response_model=ConsultorioResponse)
+def atualizar_consultorio(
+    consultorio_id: int,
+    body: ConsultorioUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    consultorio = db.query(ConsultorioVet).filter(
+        ConsultorioVet.id == consultorio_id,
+        ConsultorioVet.tenant_id == tenant_id,
+    ).first()
+    if not consultorio:
+        raise HTTPException(status_code=404, detail="Consultorio nao encontrado")
+
+    payload = body.model_dump(exclude_unset=True)
+    if "nome" in payload:
+        nome = (payload.get("nome") or "").strip()
+        if not nome:
+            raise HTTPException(status_code=422, detail="Informe o nome do consultorio")
+        duplicado = db.query(ConsultorioVet).filter(
+            ConsultorioVet.tenant_id == tenant_id,
+            func.lower(ConsultorioVet.nome) == nome.lower(),
+            ConsultorioVet.id != consultorio_id,
+        ).first()
+        if duplicado:
+            raise HTTPException(status_code=409, detail="Ja existe um consultorio com esse nome")
+        consultorio.nome = nome
+
+    if "descricao" in payload:
+        consultorio.descricao = (payload.get("descricao") or "").strip() or None
+    if "ordem" in payload and payload.get("ordem") is not None:
+        consultorio.ordem = int(payload["ordem"])
+    if "ativo" in payload and payload.get("ativo") is not None:
+        consultorio.ativo = bool(payload["ativo"])
+
+    db.commit()
+    db.refresh(consultorio)
+    return consultorio
+
+
+@router.delete("/consultorios/{consultorio_id}", status_code=204)
+def remover_consultorio(
+    consultorio_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    consultorio = db.query(ConsultorioVet).filter(
+        ConsultorioVet.id == consultorio_id,
+        ConsultorioVet.tenant_id == tenant_id,
+    ).first()
+    if not consultorio:
+        raise HTTPException(status_code=404, detail="Consultorio nao encontrado")
+
+    agendamento_vinculado = db.query(AgendamentoVet.id).filter(
+        AgendamentoVet.tenant_id == tenant_id,
+        AgendamentoVet.consultorio_id == consultorio_id,
+    ).first()
+    if agendamento_vinculado:
+        raise HTTPException(
+            status_code=409,
+            detail="Esse consultorio ja possui agendamentos vinculados. Inative-o em vez de excluir.",
+        )
+
+    db.delete(consultorio)
+    db.commit()
+    return Response(status_code=204)
+
+
 # ═══════════════════════════════════════════════════════════════
 # PETS ACESSÍVEIS (próprio tenant + empresas parceiras)
 # ═══════════════════════════════════════════════════════════════
@@ -972,6 +2122,7 @@ def listar_veterinarios(
 @router.get("/pets")
 def listar_pets_vet(
     busca: Optional[str] = Query(None),
+    cliente_id: Optional[int] = Query(None),
     limit: int = Query(500, ge=1, le=1000),
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
@@ -990,6 +2141,9 @@ def listar_pets_vet(
         .options(joinedload(Pet.cliente))
         .filter(Cliente.tenant_id.in_(tenant_ids), Pet.ativo == True)
     )
+
+    if cliente_id:
+        q = q.filter(Pet.cliente_id == cliente_id)
 
     if busca:
         busca_term = f"%{busca}%"
@@ -1033,6 +2187,82 @@ def listar_pets_vet(
     ]
 
 
+@router.get("/agenda/calendario")
+def obter_calendario_agenda_vet(
+    request: Request,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    return _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+
+
+@router.post("/agenda/calendario/token")
+def regenerar_token_calendario_agenda_vet(
+    request: Request,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    user.vet_calendar_token = _gerar_token_calendario_vet(db)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+
+
+@router.get("/agenda/calendario.ics")
+def baixar_calendario_agenda_vet(
+    request: Request,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    payload = _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    agendamentos = _buscar_agendamentos_para_calendario(
+        db,
+        tenant_id=tenant_id,
+        veterinario_id=payload["veterinario_id"],
+    )
+    nome_calendario = (
+        f"Agenda Vet - {payload['veterinario_nome']}"
+        if payload["veterinario_nome"]
+        else "Agenda Veterinaria"
+    )
+    conteudo = _gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
+    headers = {
+        "Content-Disposition": 'attachment; filename="agenda-veterinaria.ics"',
+        "Cache-Control": "no-store",
+    }
+    return Response(content=conteudo, media_type="text/calendar; charset=utf-8", headers=headers)
+
+
+@router.get("/agenda/feed/{token}.ics")
+def feed_publico_calendario_agenda_vet(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    user = db.query(User).filter(User.vet_calendar_token == token).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Calendario nao encontrado")
+
+    tenant_id = user.tenant_id
+    payload = _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    agendamentos = _buscar_agendamentos_para_calendario(
+        db,
+        tenant_id=tenant_id,
+        veterinario_id=payload["veterinario_id"],
+    )
+    nome_calendario = (
+        f"Agenda Vet - {payload['veterinario_nome']}"
+        if payload["veterinario_nome"]
+        else "Agenda Veterinaria"
+    )
+    conteudo = _gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
+    return Response(content=conteudo, media_type="text/calendar; charset=utf-8")
+
+
 @router.get("/agendamentos", response_model=List[AgendamentoResponse])
 def listar_agendamentos(
     data_inicio: Optional[date] = None,
@@ -1040,11 +2270,21 @@ def listar_agendamentos(
     status: Optional[str] = None,
     pet_id: Optional[int] = None,
     veterinario_id: Optional[int] = None,
+    consultorio_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    q = db.query(AgendamentoVet).filter(AgendamentoVet.tenant_id == tenant_id)
+    q = (
+        db.query(AgendamentoVet)
+        .options(
+            joinedload(AgendamentoVet.pet),
+            joinedload(AgendamentoVet.cliente),
+            joinedload(AgendamentoVet.veterinario),
+            joinedload(AgendamentoVet.consultorio),
+        )
+        .filter(AgendamentoVet.tenant_id == tenant_id)
+    )
 
     if data_inicio:
         q = q.filter(func.date(AgendamentoVet.data_hora) >= data_inicio)
@@ -1056,6 +2296,8 @@ def listar_agendamentos(
         q = q.filter(AgendamentoVet.pet_id == pet_id)
     if veterinario_id:
         q = q.filter(AgendamentoVet.veterinario_id == veterinario_id)
+    if consultorio_id:
+        q = q.filter(AgendamentoVet.consultorio_id == consultorio_id)
 
     agendamentos = q.order_by(AgendamentoVet.data_hora).all()
 
@@ -1066,6 +2308,7 @@ def listar_agendamentos(
             "pet_id": ag.pet_id,
             "cliente_id": ag.cliente_id,
             "veterinario_id": ag.veterinario_id,
+            "consultorio_id": ag.consultorio_id,
             "data_hora": ag.data_hora,
             "duracao_minutos": ag.duracao_minutos,
             "tipo": ag.tipo,
@@ -1076,68 +2319,70 @@ def listar_agendamentos(
             "observacoes": ag.observacoes,
             "created_at": ag.created_at,
         }
-
-
-    @router.get("/agendamentos/{agendamento_id}/push-diagnostico")
-    def diagnostico_push_agendamento(
-        agendamento_id: int,
-        db: Session = Depends(get_session),
-        current=Depends(get_current_user_and_tenant),
-    ):
-        _, tenant_id = _get_tenant(current)
-        ag = db.query(AgendamentoVet).filter(
-            AgendamentoVet.id == agendamento_id,
-            AgendamentoVet.tenant_id == tenant_id,
-        ).first()
-        if not ag:
-            raise HTTPException(404, "Agendamento não encontrado")
-
-        from app.campaigns.models import NotificationQueue, NotificationStatusEnum
-
-        cliente = db.query(Cliente).filter(
-            Cliente.id == ag.cliente_id,
-            Cliente.tenant_id == str(tenant_id),
-        ).first()
-        user_tutor = None
-        if cliente and cliente.user_id:
-            user_tutor = db.query(User).filter(
-                User.id == cliente.user_id,
-                User.tenant_id == str(tenant_id),
-            ).first()
-
-        prefixo = f"vet-agendamento:{ag.id}:"
-        lembretes = db.query(NotificationQueue).filter(
-            NotificationQueue.tenant_id == str(tenant_id),
-            NotificationQueue.idempotency_key.like(f"{prefixo}%"),
-        ).order_by(NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()).all()
-
-        return {
-            "agendamento_id": ag.id,
-            "pet_id": ag.pet_id,
-            "cliente_id": ag.cliente_id,
-            "data_hora": ag.data_hora.isoformat() if ag.data_hora else None,
-            "status": ag.status,
-            "tutor_tem_push_token": bool(getattr(user_tutor, "push_token", None)),
-            "push_token_preview": f"{user_tutor.push_token[:18]}..." if getattr(user_tutor, "push_token", None) else None,
-            "lembretes": [
-                {
-                    "id": lembrete.id,
-                    "subject": lembrete.subject,
-                    "status": lembrete.status.value if hasattr(lembrete.status, "value") else str(lembrete.status),
-                    "scheduled_at": lembrete.scheduled_at.isoformat() if lembrete.scheduled_at else None,
-                }
-                for lembrete in lembretes
-            ],
-            "observacao": "Para validar push real no celular, o app precisa estar fora do Expo Go e com token registrado.",
-        }
         if ag.pet:
             d["pet_nome"] = ag.pet.nome
         if ag.cliente:
             d["cliente_nome"] = ag.cliente.nome
         if ag.veterinario:
             d["veterinario_nome"] = ag.veterinario.nome
+        if ag.consultorio:
+            d["consultorio_nome"] = ag.consultorio.nome
         result.append(d)
     return result
+
+
+@router.get("/agendamentos/{agendamento_id}/push-diagnostico")
+def diagnostico_push_agendamento(
+    agendamento_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    ag = db.query(AgendamentoVet).filter(
+        AgendamentoVet.id == agendamento_id,
+        AgendamentoVet.tenant_id == tenant_id,
+    ).first()
+    if not ag:
+        raise HTTPException(404, "Agendamento não encontrado")
+
+    from app.campaigns.models import NotificationQueue
+
+    cliente = db.query(Cliente).filter(
+        Cliente.id == ag.cliente_id,
+        Cliente.tenant_id == str(tenant_id),
+    ).first()
+    user_tutor = None
+    if cliente and cliente.user_id:
+        user_tutor = db.query(User).filter(
+            User.id == cliente.user_id,
+            User.tenant_id == str(tenant_id),
+        ).first()
+
+    prefixo = f"vet-agendamento:{ag.id}:"
+    lembretes = db.query(NotificationQueue).filter(
+        NotificationQueue.tenant_id == str(tenant_id),
+        NotificationQueue.idempotency_key.like(f"{prefixo}%"),
+    ).order_by(NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()).all()
+
+    return {
+        "agendamento_id": ag.id,
+        "pet_id": ag.pet_id,
+        "cliente_id": ag.cliente_id,
+        "data_hora": ag.data_hora.isoformat() if ag.data_hora else None,
+        "status": ag.status,
+        "tutor_tem_push_token": bool(getattr(user_tutor, "push_token", None)),
+        "push_token_preview": f"{user_tutor.push_token[:18]}..." if getattr(user_tutor, "push_token", None) else None,
+        "lembretes": [
+            {
+                "id": lembrete.id,
+                "subject": lembrete.subject,
+                "status": lembrete.status.value if hasattr(lembrete.status, "value") else str(lembrete.status),
+                "scheduled_at": lembrete.scheduled_at.isoformat() if lembrete.scheduled_at else None,
+            }
+            for lembrete in lembretes
+        ],
+        "observacao": "Para validar push real no celular, o app precisa estar fora do Expo Go e com token registrado.",
+    }
 
 
 @router.post("/agendamentos", response_model=AgendamentoResponse, status_code=201)
@@ -1147,10 +2392,44 @@ def criar_agendamento(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    ag = AgendamentoVet(
-        pet_id=body.pet_id,
-        cliente_id=body.cliente_id,
+    tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+    pet_ref = (
+        db.query(Pet)
+        .join(Cliente, Cliente.id == Pet.cliente_id)
+        .filter(
+            Pet.id == body.pet_id,
+            Cliente.tenant_id.in_(tenant_ids),
+        )
+        .first()
+    )
+    if not pet_ref:
+        raise HTTPException(status_code=404, detail="Pet nao encontrado para este agendamento")
+
+    cliente_id = body.cliente_id or pet_ref.cliente_id
+    if cliente_id != pet_ref.cliente_id:
+        raise HTTPException(status_code=422, detail="Tutor informado nao corresponde ao pet selecionado")
+
+    _validar_veterinario_agendamento(db, tenant_id, body.veterinario_id)
+    _validar_consultorio_agendamento(db, tenant_id, body.consultorio_id)
+    _garantir_sem_conflitos_agendamento(
+        db,
+        tenant_id=tenant_id,
+        data_hora=body.data_hora,
+        duracao_minutos=body.duracao_minutos,
         veterinario_id=body.veterinario_id,
+        consultorio_id=body.consultorio_id,
+    )
+
+    tenant_agendamento = tenant_id or getattr(pet_ref, "tenant_id", None)
+    if tenant_agendamento is None:
+        raise HTTPException(status_code=400, detail="Nao foi possivel identificar o tenant do agendamento")
+
+    ag = AgendamentoVet(
+        tenant_id=tenant_agendamento,
+        pet_id=body.pet_id,
+        cliente_id=cliente_id,
+        veterinario_id=body.veterinario_id,
+        consultorio_id=body.consultorio_id,
         user_id=user.id,
         data_hora=body.data_hora,
         duracao_minutos=body.duracao_minutos,
@@ -1184,9 +2463,146 @@ def atualizar_agendamento(
     if not ag:
         raise HTTPException(404, "Agendamento não encontrado")
 
-    for field, value in body.model_dump(exclude_unset=True).items():
+    payload = body.model_dump(exclude_unset=True)
+    pet_id_novo = payload.pop("pet_id", None)
+    cliente_id_novo = payload.pop("cliente_id", None)
+
+    if pet_id_novo is not None:
+        tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+        pet_ref = (
+            db.query(Pet)
+            .join(Cliente, Cliente.id == Pet.cliente_id)
+            .filter(
+                Pet.id == pet_id_novo,
+                Cliente.tenant_id.in_(tenant_ids),
+            )
+            .first()
+        )
+        if not pet_ref:
+            raise HTTPException(status_code=404, detail="Pet nao encontrado para este agendamento")
+
+        cliente_relacionado = cliente_id_novo or pet_ref.cliente_id
+        if cliente_relacionado != pet_ref.cliente_id:
+            raise HTTPException(status_code=422, detail="Tutor informado nao corresponde ao pet selecionado")
+
+        ag.pet_id = pet_ref.id
+        ag.cliente_id = cliente_relacionado
+    elif cliente_id_novo is not None and cliente_id_novo != ag.cliente_id:
+        raise HTTPException(status_code=422, detail="Para alterar o tutor, selecione tambem o pet correspondente")
+
+    veterinario_id_novo = payload.get("veterinario_id", ag.veterinario_id)
+    consultorio_id_novo = payload.get("consultorio_id", ag.consultorio_id)
+    data_hora_nova = payload.get("data_hora", ag.data_hora)
+    duracao_nova = payload.get("duracao_minutos", ag.duracao_minutos)
+
+    _validar_veterinario_agendamento(db, tenant_id, veterinario_id_novo)
+    _validar_consultorio_agendamento(db, tenant_id, consultorio_id_novo)
+    _garantir_sem_conflitos_agendamento(
+        db,
+        tenant_id=tenant_id,
+        data_hora=data_hora_nova,
+        duracao_minutos=duracao_nova,
+        veterinario_id=veterinario_id_novo,
+        consultorio_id=consultorio_id_novo,
+        agendamento_id_ignorar=agendamento_id,
+    )
+
+    for field, value in payload.items():
         setattr(ag, field, value)
 
+    _sincronizar_marcos_agendamento(ag)
+    _upsert_lembretes_push_agendamento(db, ag, tenant_id)
+    db.commit()
+    db.refresh(ag)
+    return _agendamento_to_dict(ag)
+
+
+@router.delete("/agendamentos/{agendamento_id}", status_code=204)
+def remover_agendamento(
+    agendamento_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    ag = db.query(AgendamentoVet).filter(
+        AgendamentoVet.id == agendamento_id,
+        AgendamentoVet.tenant_id == tenant_id,
+    ).first()
+    if not ag:
+        raise HTTPException(404, "Agendamento não encontrado")
+
+    if ag.consulta_id or ag.status == "finalizado":
+        raise HTTPException(
+            status_code=409,
+            detail="Esse agendamento ja gerou um atendimento. Use 'Desfazer inicio do atendimento' primeiro. Se o atendimento ja tiver dados clinicos, exclua ou cancele o atendimento antes.",
+        )
+
+    try:
+        from app.campaigns.models import NotificationQueue
+
+        prefixo = f"vet-agendamento:{ag.id}:"
+        db.query(NotificationQueue).filter(
+            NotificationQueue.tenant_id == str(tenant_id),
+            NotificationQueue.idempotency_key.like(f"{prefixo}%"),
+        ).delete(synchronize_session=False)
+    except Exception:
+        pass
+
+    db.delete(ag)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/agendamentos/{agendamento_id}/desfazer-inicio", response_model=AgendamentoResponse)
+def desfazer_inicio_agendamento(
+    agendamento_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    ag = db.query(AgendamentoVet).options(
+        joinedload(AgendamentoVet.consulta),
+        joinedload(AgendamentoVet.pet),
+        joinedload(AgendamentoVet.cliente),
+        joinedload(AgendamentoVet.veterinario),
+        joinedload(AgendamentoVet.consultorio),
+    ).filter(
+        AgendamentoVet.id == agendamento_id,
+        AgendamentoVet.tenant_id == tenant_id,
+    ).first()
+    if not ag:
+        raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
+
+    if ag.status == "finalizado":
+        raise HTTPException(
+            status_code=409,
+            detail="Esse agendamento ja foi finalizado e nao pode voltar para agendado.",
+        )
+
+    consulta = None
+    if ag.consulta_id:
+        consulta = db.query(ConsultaVet).filter(
+            ConsultaVet.id == ag.consulta_id,
+            ConsultaVet.tenant_id == tenant_id,
+        ).first()
+
+    if consulta:
+        if consulta.status == "finalizada":
+            raise HTTPException(
+                status_code=409,
+                detail="Esse atendimento ja foi finalizado. Para excluir o agendamento, primeiro cancele ou trate o atendimento vinculado.",
+            )
+        if _consulta_tem_conteudo_clinico(consulta) or _consulta_tem_dependencias(db, tenant_id, consulta.id):
+            raise HTTPException(
+                status_code=409,
+                detail="Esse atendimento ja tem dados clinicos ou registros vinculados. Exclua/cancele o atendimento antes de voltar o agendamento.",
+            )
+        ag.consulta_id = None
+        db.flush()
+        db.delete(consulta)
+
+    ag.status = "agendado"
+    _sincronizar_marcos_agendamento(ag)
     _upsert_lembretes_push_agendamento(db, ag, tenant_id)
     db.commit()
     db.refresh(ag)
@@ -1199,7 +2615,8 @@ def _agendamento_to_dict(ag: AgendamentoVet) -> dict:
         "pet_id": ag.pet_id,
         "cliente_id": ag.cliente_id,
         "veterinario_id": ag.veterinario_id,
-        "data_hora": ag.data_hora,
+        "consultorio_id": ag.consultorio_id,
+        "data_hora": _serializar_datetime_vet(ag.data_hora),
         "duracao_minutos": ag.duracao_minutos,
         "tipo": ag.tipo,
         "motivo": ag.motivo,
@@ -1207,10 +2624,11 @@ def _agendamento_to_dict(ag: AgendamentoVet) -> dict:
         "is_emergencia": ag.is_emergencia,
         "consulta_id": ag.consulta_id,
         "observacoes": ag.observacoes,
-        "created_at": ag.created_at,
+        "created_at": _serializar_datetime_vet(ag.created_at),
         "pet_nome": ag.pet.nome if ag.pet else None,
         "cliente_nome": ag.cliente.nome if ag.cliente else None,
         "veterinario_nome": ag.veterinario.nome if ag.veterinario else None,
+        "consultorio_nome": ag.consultorio.nome if ag.consultorio else None,
     }
 
 
@@ -1358,7 +2776,7 @@ def criar_consulta(
         tipo=body.tipo,
         queixa_principal=body.queixa_principal,
         status="em_andamento",
-        inicio_atendimento=datetime.now(),
+        inicio_atendimento=_vet_now(),
     )
     db.add(c)
     db.flush()
@@ -1373,6 +2791,7 @@ def criar_consulta(
             ag.consulta_id = c.id
             ag.status = "em_atendimento"
             ag.inicio_atendimento = c.inicio_atendimento
+            _sincronizar_marcos_agendamento(ag)
 
     db.commit()
     db.refresh(c)
@@ -1388,6 +2807,175 @@ def obter_consulta(
     user, tenant_id = _get_tenant(current)
     c = _consulta_or_404(db, consulta_id, tenant_id)
     return _consulta_to_dict(c)
+
+
+@router.get("/consultas/{consulta_id}/timeline")
+def obter_timeline_consulta(
+    consulta_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    c = _consulta_or_404(db, consulta_id, tenant_id)
+
+    eventos: list[dict] = []
+
+    def adicionar_evento(*, kind: str, item_id: int | str, titulo: str, status_item: Optional[str], data_evento: Optional[datetime], descricao: Optional[str] = None, link: Optional[str] = None, meta: Optional[dict] = None):
+        if data_evento is None:
+            return
+        data_evento_ordenacao = _normalizar_datetime_vet(data_evento) or data_evento
+        eventos.append({
+            "kind": kind,
+            "item_id": item_id,
+            "titulo": titulo,
+            "status": status_item,
+            "data_hora": _serializar_datetime_vet(data_evento),
+            "descricao": descricao,
+            "link": link,
+            "meta": meta or {},
+            "_ordem": data_evento_ordenacao,
+        })
+
+    adicionar_evento(
+        kind="consulta",
+        item_id=c.id,
+        titulo=f"Consulta #{c.id} iniciada",
+        status_item=c.status,
+        data_evento=c.inicio_atendimento or c.created_at,
+        descricao=c.queixa_principal or c.diagnostico or c.conduta,
+        link=f"/veterinario/consultas/{c.id}",
+    )
+
+    if c.finalizado_em:
+        adicionar_evento(
+            kind="alta_consulta",
+            item_id=f"consulta-finalizada-{c.id}",
+            titulo=f"Consulta #{c.id} finalizada",
+            status_item="finalizada",
+            data_evento=c.finalizado_em,
+            descricao=c.diagnostico or c.conduta or "Consulta concluída.",
+            link=f"/veterinario/consultas/{c.id}",
+        )
+
+    procedimentos = db.query(ProcedimentoConsulta).filter(
+        ProcedimentoConsulta.consulta_id == consulta_id,
+        ProcedimentoConsulta.tenant_id == tenant_id,
+    ).order_by(ProcedimentoConsulta.created_at.desc()).all()
+    for procedimento in procedimentos:
+        adicionar_evento(
+            kind="procedimento",
+            item_id=procedimento.id,
+            titulo=procedimento.nome,
+            status_item="realizado" if procedimento.realizado else "pendente",
+            data_evento=procedimento.created_at,
+            descricao=procedimento.observacoes or procedimento.descricao,
+            link=f"/veterinario/consultas/{c.id}",
+            meta={
+                "valor": _round_money(procedimento.valor),
+                "insumos": _normalizar_insumos(procedimento.insumos),
+                "estoque_baixado": bool(procedimento.estoque_baixado),
+            },
+        )
+
+    exames = db.query(ExameVet).filter(
+        ExameVet.consulta_id == consulta_id,
+        ExameVet.tenant_id == tenant_id,
+    ).order_by(ExameVet.created_at.desc()).all()
+    for exame in exames:
+        adicionar_evento(
+            kind="exame",
+            item_id=exame.id,
+            titulo=exame.nome,
+            status_item=exame.status,
+            data_evento=_date_para_datetime_vet(exame.data_resultado) or _date_para_datetime_vet(exame.data_solicitacao) or exame.created_at,
+            descricao=exame.observacoes or exame.interpretacao_ia_resumo or exame.tipo,
+            link=f"/veterinario/exames?consulta_id={c.id}&pet_id={c.pet_id}",
+            meta={
+                "tipo": exame.tipo,
+                "arquivo_nome": exame.arquivo_nome,
+                "arquivo_url": exame.arquivo_url,
+            },
+        )
+
+    vacinas = db.query(VacinaRegistro).filter(
+        VacinaRegistro.consulta_id == consulta_id,
+        VacinaRegistro.tenant_id == tenant_id,
+    ).order_by(VacinaRegistro.data_aplicacao.desc()).all()
+    for vacina in vacinas:
+        adicionar_evento(
+            kind="vacina",
+            item_id=vacina.id,
+            titulo=vacina.nome_vacina,
+            status_item="aplicada",
+            data_evento=_date_para_datetime_vet(vacina.data_aplicacao),
+            descricao=vacina.observacoes or vacina.fabricante,
+            link=f"/veterinario/vacinas?consulta_id={c.id}&pet_id={c.pet_id}",
+            meta={
+                "lote": vacina.lote,
+                "numero_dose": vacina.numero_dose,
+                "proxima_dose": vacina.data_proxima_dose.isoformat() if vacina.data_proxima_dose else None,
+            },
+        )
+
+    internacoes = db.query(InternacaoVet).filter(
+        InternacaoVet.consulta_id == consulta_id,
+        InternacaoVet.tenant_id == tenant_id,
+    ).order_by(InternacaoVet.data_entrada.desc()).all()
+    for internacao in internacoes:
+        motivo_limpo, box = _split_motivo_baia(internacao.motivo)
+        adicionar_evento(
+            kind="internacao",
+            item_id=internacao.id,
+            titulo=f"Internação #{internacao.id}",
+            status_item=internacao.status,
+            data_evento=internacao.data_entrada,
+            descricao=motivo_limpo or internacao.observacoes,
+            link=f"/veterinario/internacoes?consulta_id={c.id}",
+            meta={
+                "box": box,
+                "data_saida": _serializar_datetime_vet(internacao.data_saida).isoformat() if internacao.data_saida else None,
+            },
+        )
+        if internacao.data_saida:
+            adicionar_evento(
+                kind="alta_internacao",
+                item_id=f"alta-{internacao.id}",
+                titulo=f"Alta da internação #{internacao.id}",
+                status_item=internacao.status,
+                data_evento=internacao.data_saida,
+                descricao=internacao.observacoes,
+                link=f"/veterinario/internacoes?consulta_id={c.id}",
+                meta={"box": box},
+            )
+
+    prescricoes = db.query(PrescricaoVet).filter(
+        PrescricaoVet.consulta_id == consulta_id,
+        PrescricaoVet.tenant_id == tenant_id,
+    ).order_by(PrescricaoVet.created_at.desc()).all()
+    for prescricao in prescricoes:
+        adicionar_evento(
+            kind="prescricao",
+            item_id=prescricao.id,
+            titulo=prescricao.numero or f"Prescrição #{prescricao.id}",
+            status_item=prescricao.tipo_receituario,
+            data_evento=prescricao.created_at,
+            descricao=prescricao.observacoes,
+            link=f"/veterinario/consultas/{c.id}",
+            meta={
+                "itens": len(prescricao.itens or []),
+                "hash_receita": prescricao.hash_receita,
+            },
+        )
+
+    eventos.sort(key=lambda item: item["_ordem"], reverse=True)
+    for item in eventos:
+        item.pop("_ordem", None)
+    return {
+        "consulta_id": c.id,
+        "pet_id": c.pet_id,
+        "pet_nome": c.pet.nome if c.pet else None,
+        "eventos": eventos,
+    }
 
 
 @router.patch("/consultas/{consulta_id}", response_model=ConsultaResponse)
@@ -1440,8 +3028,8 @@ def finalizar_consulta(
         raise HTTPException(400, "Consulta já está finalizada")
 
     c.status = "finalizada"
-    c.fim_atendimento = datetime.now()
-    c.finalizado_em = datetime.now()
+    c.fim_atendimento = _vet_now()
+    c.finalizado_em = _vet_now()
     c.finalizado_por_id = user.id
 
     # Hash do prontuário para imutabilidade
@@ -1491,13 +3079,13 @@ def _consulta_to_dict(c: ConsultaVet) -> dict:
         "observacoes_internas": c.observacoes_internas,
         "observacoes_tutor": c.observacoes_tutor,
         "hash_prontuario": c.hash_prontuario,
-        "finalizado_em": c.finalizado_em,
-        "inicio_atendimento": c.inicio_atendimento,
-        "fim_atendimento": c.fim_atendimento,
+        "finalizado_em": _serializar_datetime_vet(c.finalizado_em),
+        "inicio_atendimento": _serializar_datetime_vet(c.inicio_atendimento),
+        "fim_atendimento": _serializar_datetime_vet(c.fim_atendimento),
         "pet_nome": c.pet.nome if c.pet else None,
         "cliente_nome": c.cliente.nome if c.cliente else None,
         "veterinario_nome": c.veterinario.nome if c.veterinario else None,
-        "created_at": c.created_at,
+        "created_at": _serializar_datetime_vet(c.created_at),
     }
 
 
@@ -1663,6 +3251,7 @@ def _prescricao_to_dict(p: PrescricaoVet) -> dict:
 class VacinaCreate(BaseModel):
     pet_id: int
     consulta_id: Optional[int] = None
+    agendamento_id: Optional[int] = None
     veterinario_id: Optional[int] = None
     protocolo_id: Optional[int] = None
     nome_vacina: str
@@ -1737,6 +3326,15 @@ def registrar_vacina(
     if not pet_ok:
         raise HTTPException(status_code=404, detail="Pet não encontrado neste tenant")
 
+    if body.consulta_id:
+        consulta_ok = db.query(ConsultaVet).filter(
+            ConsultaVet.id == body.consulta_id,
+            ConsultaVet.pet_id == body.pet_id,
+            ConsultaVet.tenant_id == tenant_id,
+        ).first()
+        if not consulta_ok:
+            raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
         user_id = user.get("id")
@@ -1760,6 +3358,12 @@ def registrar_vacina(
         observacoes=body.observacoes,
     )
     db.add(v)
+    _atualizar_status_agendamento(
+        db,
+        tenant_id=tenant_id,
+        agendamento_id=body.agendamento_id,
+        status_agendamento="finalizado",
+    )
     db.commit()
     db.refresh(v)
     return v
@@ -1806,6 +3410,7 @@ def vacinas_vencendo(
 class ExameCreate(BaseModel):
     pet_id: int
     consulta_id: Optional[int] = None
+    agendamento_id: Optional[int] = None
     tipo: str = "laboratorial"
     nome: str
     data_solicitacao: Optional[date] = None
@@ -1931,6 +3536,7 @@ def listar_exames_anexados(
         items.append({
             "exame_id": exame.id,
             "pet_id": exame.pet_id,
+            "consulta_id": exame.consulta_id,
             "pet_nome": pet.nome if pet else None,
             "tutor_nome": tutor_nome,
             "nome_exame": exame.nome,
@@ -1958,6 +3564,14 @@ def criar_exame(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
+    if body.consulta_id:
+        consulta_ok = db.query(ConsultaVet).filter(
+            ConsultaVet.id == body.consulta_id,
+            ConsultaVet.pet_id == body.pet_id,
+            ConsultaVet.tenant_id == tenant_id,
+        ).first()
+        if not consulta_ok:
+            raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
     e = ExameVet(
         tenant_id=tenant_id,
         pet_id=body.pet_id,
@@ -1971,6 +3585,12 @@ def criar_exame(
         status="solicitado",
     )
     db.add(e)
+    _atualizar_status_agendamento(
+        db,
+        tenant_id=tenant_id,
+        agendamento_id=body.agendamento_id,
+        status_agendamento="finalizado",
+    )
     db.commit()
     db.refresh(e)
     return e
@@ -2010,7 +3630,10 @@ def interpretar_exame_ia(
     if not exame:
         raise HTTPException(404, "Exame não encontrado")
     if not exame.resultado_texto and not exame.resultado_json:
-        raise HTTPException(400, "O exame ainda não possui resultado para interpretar")
+        if exame.arquivo_url:
+            exame = _process_exam_file_with_ai(db, tenant_id=tenant_id, exame=exame)
+        else:
+            raise HTTPException(400, "O exame ainda não possui resultado para interpretar")
 
     analise = _gerar_interpretacao_exame(exame)
     exame.interpretacao_ia = analise["conclusao"]
@@ -2020,6 +3643,28 @@ def interpretar_exame_ia(
     exame.interpretacao_ia_payload = analise["payload"]
     if exame.status in {"disponivel", "aguardando", "coletado", "solicitado"}:
         exame.status = "interpretado"
+    db.commit()
+    db.refresh(exame)
+    return exame
+
+
+@router.post("/exames/{exame_id}/processar-arquivo-ia", response_model=ExameResponse)
+def processar_arquivo_exame_ia(
+    exame_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    exame = db.query(ExameVet).filter(
+        ExameVet.id == exame_id,
+        ExameVet.tenant_id == tenant_id,
+    ).first()
+    if not exame:
+        raise HTTPException(404, "Exame não encontrado")
+    if not exame.arquivo_url:
+        raise HTTPException(400, "O exame ainda não possui arquivo anexado.")
+
+    exame = _process_exam_file_with_ai(db, tenant_id=tenant_id, exame=exame)
     db.commit()
     db.refresh(exame)
     return exame
@@ -2229,6 +3874,17 @@ class CatalogoCreate(BaseModel):
     insumos: list[dict] = Field(default_factory=list)
 
 
+class CatalogoUpdate(BaseModel):
+    nome: Optional[str] = None
+    descricao: Optional[str] = None
+    categoria: Optional[str] = None
+    valor_padrao: Optional[float] = None
+    duracao_minutos: Optional[int] = None
+    requer_anestesia: Optional[bool] = None
+    observacoes: Optional[str] = None
+    insumos: Optional[list[dict]] = None
+
+
 class CatalogoResponse(BaseModel):
     id: int
     nome: str
@@ -2287,6 +3943,53 @@ def criar_catalogo_procedimento(
     db.commit()
     db.refresh(p)
     return _serializar_catalogo(p, db, tenant_id)
+
+
+@router.patch("/catalogo/procedimentos/{catalogo_id}", response_model=CatalogoResponse)
+def atualizar_catalogo_procedimento(
+    catalogo_id: int,
+    body: CatalogoUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    catalogo = db.query(CatalogoProcedimento).filter(
+        CatalogoProcedimento.id == catalogo_id,
+        CatalogoProcedimento.tenant_id == tenant_id,
+        CatalogoProcedimento.ativo == True,  # noqa
+    ).first()
+    if not catalogo:
+        raise HTTPException(404, "Procedimento de catálogo não encontrado")
+
+    payload = body.model_dump(exclude_unset=True)
+    if "insumos" in payload:
+        catalogo.insumos = _normalizar_insumos(payload.pop("insumos"))
+    for campo, valor in payload.items():
+        setattr(catalogo, campo, valor)
+
+    db.commit()
+    db.refresh(catalogo)
+    return _serializar_catalogo(catalogo, db, tenant_id)
+
+
+@router.delete("/catalogo/procedimentos/{catalogo_id}", status_code=204)
+def remover_catalogo_procedimento(
+    catalogo_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    catalogo = db.query(CatalogoProcedimento).filter(
+        CatalogoProcedimento.id == catalogo_id,
+        CatalogoProcedimento.tenant_id == tenant_id,
+        CatalogoProcedimento.ativo == True,  # noqa
+    ).first()
+    if not catalogo:
+        raise HTTPException(404, "Procedimento de catálogo não encontrado")
+
+    catalogo.ativo = False
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/catalogo/produtos-estoque")
@@ -2417,6 +4120,25 @@ class MedicamentoCreate(BaseModel):
     observacoes: Optional[str] = None
 
 
+class MedicamentoUpdate(BaseModel):
+    nome: Optional[str] = None
+    nome_comercial: Optional[str] = None
+    principio_ativo: Optional[str] = None
+    fabricante: Optional[str] = None
+    forma_farmaceutica: Optional[str] = None
+    concentracao: Optional[str] = None
+    especies_indicadas: Optional[list] = None
+    indicacoes: Optional[str] = None
+    contraindicacoes: Optional[str] = None
+    interacoes: Optional[str] = None
+    posologia_referencia: Optional[str] = None
+    dose_min_mgkg: Optional[float] = None
+    dose_max_mgkg: Optional[float] = None
+    eh_antibiotico: Optional[bool] = None
+    eh_controlado: Optional[bool] = None
+    observacoes: Optional[str] = None
+
+
 @router.get("/catalogo/medicamentos")
 def listar_medicamentos(
     busca: Optional[str] = None,
@@ -2447,16 +4169,70 @@ def criar_medicamento(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    m = MedicamentoCatalogo(**body.model_dump())
+    m = MedicamentoCatalogo(tenant_id=tenant_id, **body.model_dump())
     db.add(m)
     db.commit()
     db.refresh(m)
     return m
 
 
+@router.patch("/catalogo/medicamentos/{medicamento_id}")
+def atualizar_medicamento(
+    medicamento_id: int,
+    body: MedicamentoUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    medicamento = db.query(MedicamentoCatalogo).filter(
+        MedicamentoCatalogo.id == medicamento_id,
+        MedicamentoCatalogo.tenant_id == tenant_id,
+        MedicamentoCatalogo.ativo == True,  # noqa
+    ).first()
+    if not medicamento:
+        raise HTTPException(404, "Medicamento não encontrado")
+
+    for campo, valor in body.model_dump(exclude_unset=True).items():
+        setattr(medicamento, campo, valor)
+
+    db.commit()
+    db.refresh(medicamento)
+    return medicamento
+
+
+@router.delete("/catalogo/medicamentos/{medicamento_id}", status_code=204)
+def remover_medicamento(
+    medicamento_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    medicamento = db.query(MedicamentoCatalogo).filter(
+        MedicamentoCatalogo.id == medicamento_id,
+        MedicamentoCatalogo.tenant_id == tenant_id,
+        MedicamentoCatalogo.ativo == True,  # noqa
+    ).first()
+    if not medicamento:
+        raise HTTPException(404, "Medicamento não encontrado")
+
+    medicamento.ativo = False
+    db.commit()
+    return Response(status_code=204)
+
+
 # ═══════════════════════════════════════════════════════════════
 # PROTOCOLOS DE VACINAS
 # ═══════════════════════════════════════════════════════════════
+
+class ProtocoloVacinaUpdate(BaseModel):
+    nome: Optional[str] = None
+    especie: Optional[str] = None
+    dose_inicial_semanas: Optional[int] = None
+    reforco_anual: Optional[bool] = None
+    numero_doses_serie: Optional[int] = None
+    intervalo_doses_dias: Optional[int] = None
+    observacoes: Optional[str] = None
+
 
 @router.get("/catalogo/protocolos-vacinas")
 def listar_protocolos_vacinas(
@@ -2474,6 +4250,7 @@ def listar_protocolos_vacinas(
 def criar_protocolo_vacina(
     nome: str,
     especie: Optional[str] = None,
+    dose_inicial_semanas: Optional[int] = None,
     reforco_anual: bool = True,
     numero_doses_serie: int = 1,
     intervalo_doses_dias: Optional[int] = None,
@@ -2483,8 +4260,10 @@ def criar_protocolo_vacina(
 ):
     user, tenant_id = _get_tenant(current)
     p = ProtocoloVacina(
+        tenant_id=tenant_id,
         nome=nome,
         especie=especie,
+        dose_inicial_semanas=dose_inicial_semanas,
         reforco_anual=reforco_anual,
         numero_doses_serie=numero_doses_serie,
         intervalo_doses_dias=intervalo_doses_dias,
@@ -2494,6 +4273,50 @@ def criar_protocolo_vacina(
     db.commit()
     db.refresh(p)
     return p
+
+
+@router.patch("/catalogo/protocolos-vacinas/{protocolo_id}")
+def atualizar_protocolo_vacina(
+    protocolo_id: int,
+    body: ProtocoloVacinaUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    protocolo = db.query(ProtocoloVacina).filter(
+        ProtocoloVacina.id == protocolo_id,
+        ProtocoloVacina.tenant_id == tenant_id,
+        ProtocoloVacina.ativo == True,  # noqa
+    ).first()
+    if not protocolo:
+        raise HTTPException(404, "Protocolo de vacina não encontrado")
+
+    for campo, valor in body.model_dump(exclude_unset=True).items():
+        setattr(protocolo, campo, valor)
+
+    db.commit()
+    db.refresh(protocolo)
+    return protocolo
+
+
+@router.delete("/catalogo/protocolos-vacinas/{protocolo_id}", status_code=204)
+def remover_protocolo_vacina(
+    protocolo_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    protocolo = db.query(ProtocoloVacina).filter(
+        ProtocoloVacina.id == protocolo_id,
+        ProtocoloVacina.tenant_id == tenant_id,
+        ProtocoloVacina.ativo == True,  # noqa
+    ).first()
+    if not protocolo:
+        raise HTTPException(404, "Protocolo de vacina não encontrado")
+
+    protocolo.ativo = False
+    db.commit()
+    return Response(status_code=204)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -2530,6 +4353,12 @@ class ProcedimentoInternacaoCreate(BaseModel):
     medicamento: str
     dose: Optional[str] = None
     via: Optional[str] = None
+    quantidade_prevista: Optional[float] = None
+    quantidade_executada: Optional[float] = None
+    quantidade_desperdicio: Optional[float] = None
+    unidade_quantidade: Optional[str] = None
+    tipo_registro: Optional[str] = "procedimento"
+    insumos: list[dict] = Field(default_factory=list)
     observacoes_agenda: Optional[str] = None
     executado_por: Optional[str] = None
     horario_execucao: Optional[datetime] = None
@@ -2583,14 +4412,15 @@ def listar_internacoes(
         result.append({
             "id": i.id,
             "pet_id": i.pet_id,
+            "consulta_id": i.consulta_id,
             "pet_nome": i.pet.nome if i.pet else None,
             "tutor_id": tutor.id if tutor else None,
             "tutor_nome": tutor.nome if tutor else None,
             "motivo": motivo_limpo,
             "box": box,
             "status": i.status,
-            "data_entrada": i.data_entrada,
-            "data_saida": i.data_saida,
+            "data_entrada": _serializar_datetime_vet(i.data_entrada),
+            "data_saida": _serializar_datetime_vet(i.data_saida),
             "observacoes_alta": i.observacoes,
         })
     return result
@@ -2622,17 +4452,20 @@ def obter_internacao(
 
     evolucoes_formatadas, procedimentos_formatados = _separar_evolucoes_e_procedimentos(evolucoes)
 
+    data_entrada_exibicao = _resolver_data_entrada_exibicao_internacao(i, evolucoes)
+
     return {
         "id": i.id,
         "pet_id": i.pet_id,
+        "consulta_id": i.consulta_id,
         "pet_nome": i.pet.nome if i.pet else None,
         "tutor_id": i.pet.cliente.id if i.pet and i.pet.cliente else None,
         "tutor_nome": i.pet.cliente.nome if i.pet and i.pet.cliente else None,
         "motivo": motivo_limpo,
         "box": box,
         "status": i.status,
-        "data_entrada": i.data_entrada,
-        "data_saida": i.data_saida,
+        "data_entrada": data_entrada_exibicao,
+        "data_saida": _serializar_datetime_vet(i.data_saida),
         "observacoes_alta": i.observacoes,
         "evolucoes": evolucoes_formatadas,
         "procedimentos": procedimentos_formatados,
@@ -2676,13 +4509,15 @@ def obter_historico_internacoes_pet(
         )
         evols, procs = _separar_evolucoes_e_procedimentos(registros)
 
+        data_entrada_exibicao = _resolver_data_entrada_exibicao_internacao(internacao, registros)
+
         historico.append({
             "internacao_id": internacao.id,
             "status": internacao.status,
             "motivo": motivo_limpo,
             "box": box,
-            "data_entrada": internacao.data_entrada,
-            "data_saida": internacao.data_saida,
+            "data_entrada": data_entrada_exibicao,
+            "data_saida": _serializar_datetime_vet(internacao.data_saida),
             "observacoes_alta": internacao.observacoes,
             "evolucoes": evols,
             "procedimentos": procs,
@@ -2722,6 +4557,15 @@ def criar_internacao(
     if not pet_ok:
         raise HTTPException(status_code=404, detail="Pet não encontrado neste tenant")
 
+    if body.consulta_id:
+        consulta_ok = db.query(ConsultaVet).filter(
+            ConsultaVet.id == body.consulta_id,
+            ConsultaVet.pet_id == body.pet_id,
+            ConsultaVet.tenant_id == tenant_id,
+        ).first()
+        if not consulta_ok:
+            raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+
     if box_normalizado:
         internacoes_ativas = (
             db.query(InternacaoVet)
@@ -2752,13 +4596,18 @@ def criar_internacao(
         user_id=user_id,
         tenant_id=tenant_id,
         motivo=_pack_motivo_baia(motivo, box),
-        data_entrada=body.data_entrada or datetime.now(),
+        data_entrada=_normalizar_datetime_vet(body.data_entrada) or _vet_now(),
         status="internado",
     )
     db.add(i)
     db.commit()
     db.refresh(i)
-    return {"id": i.id, "status": i.status, "data_entrada": i.data_entrada}
+    return {
+        "id": i.id,
+        "consulta_id": i.consulta_id,
+        "status": i.status,
+        "data_entrada": _serializar_datetime_vet(i.data_entrada),
+    }
 
 
 @router.post("/internacoes/{internacao_id}/evolucao", status_code=201)
@@ -2845,34 +4694,77 @@ def registrar_procedimento_internacao(
         if not body.horario_execucao:
             raise HTTPException(status_code=422, detail="Campo 'horario_execucao' é obrigatório para procedimento concluído")
 
-    data_referencia = body.horario_agendado or body.horario_execucao or datetime.now()
+    horario_agendado = _normalizar_datetime_vet(body.horario_agendado)
+    horario_execucao = _normalizar_datetime_vet(body.horario_execucao)
+    quantidade_prevista = _as_float(body.quantidade_prevista)
+    quantidade_executada = _as_float(body.quantidade_executada)
+    quantidade_desperdicio = _as_float(body.quantidade_desperdicio) or 0.0
 
-    payload = {
-        "status": status_procedimento,
-        "horario_agendado": body.horario_agendado.isoformat() if body.horario_agendado else None,
-        "medicamento": body.medicamento,
-        "dose": body.dose,
-        "via": body.via,
-        "observacoes_agenda": body.observacoes_agenda,
-        "executado_por": (body.executado_por or "").strip() or None,
-        "horario_execucao": body.horario_execucao.isoformat() if body.horario_execucao else None,
-        "observacao_execucao": body.observacao_execucao,
-    }
+    if quantidade_prevista is not None and quantidade_prevista < 0:
+        raise HTTPException(status_code=422, detail="Quantidade prevista nÃ£o pode ser negativa")
+    if quantidade_executada is not None and quantidade_executada < 0:
+        raise HTTPException(status_code=422, detail="Quantidade executada nÃ£o pode ser negativa")
+    if quantidade_desperdicio < 0:
+        raise HTTPException(status_code=422, detail="Quantidade de desperdÃ­cio nÃ£o pode ser negativa")
+    if status_procedimento == "concluido" and quantidade_executada is None and quantidade_prevista is not None:
+        quantidade_executada = quantidade_prevista
+
+    data_referencia = horario_agendado or horario_execucao or _vet_now()
+    insumos = _enriquecer_insumos_com_custos(db, tenant_id_registro, body.insumos or []) if body.insumos else []
 
     ev = EvolucaoInternacao(
         internacao_id=internacao_id,
         user_id=user_id,
         tenant_id=tenant_id_registro,
         data_hora=data_referencia,
-        observacoes=_build_procedimento_observacao(payload),
+        observacoes="",
     )
     db.add(ev)
+    db.flush()
+
+    estoque_baixado = False
+    estoque_movimentacao_ids: list[int] = []
+    if status_procedimento == "concluido" and insumos:
+        insumos, estoque_movimentacao_ids = _aplicar_baixa_estoque_itens(
+            db,
+            tenant_id=tenant_id_registro,
+            user_id=user_id,
+            itens=insumos,
+            motivo="procedimento_internacao",
+            referencia_id=ev.id,
+            referencia_tipo="procedimento_internacao",
+            documento=str(internacao_id),
+            observacao=f"Baixa automÃ¡tica da internaÃ§Ã£o #{internacao_id} - {body.medicamento}",
+        )
+        estoque_baixado = bool(estoque_movimentacao_ids)
+
+    payload = {
+        "status": status_procedimento,
+        "tipo_registro": (body.tipo_registro or "procedimento").strip().lower() or "procedimento",
+        "horario_agendado": horario_agendado.isoformat() if horario_agendado else None,
+        "medicamento": body.medicamento,
+        "dose": body.dose,
+        "via": body.via,
+        "quantidade_prevista": quantidade_prevista,
+        "quantidade_executada": quantidade_executada,
+        "quantidade_desperdicio": quantidade_desperdicio,
+        "unidade_quantidade": (body.unidade_quantidade or "").strip() or None,
+        "insumos": insumos,
+        "estoque_baixado": estoque_baixado,
+        "estoque_movimentacao_ids": estoque_movimentacao_ids,
+        "observacoes_agenda": body.observacoes_agenda,
+        "executado_por": (body.executado_por or "").strip() or None,
+        "horario_execucao": horario_execucao.isoformat() if horario_execucao else None,
+        "observacao_execucao": body.observacao_execucao,
+    }
+
+    ev.observacoes = _build_procedimento_observacao(payload)
     db.commit()
     db.refresh(ev)
 
     return {
         "id": ev.id,
-        "data_hora": ev.data_hora,
+        "data_hora": _serializar_datetime_vet(ev.data_hora),
         "status": status_procedimento,
         **payload,
     }
@@ -2893,11 +4785,11 @@ def dar_alta(
     if not i:
         raise HTTPException(404, "Internação não encontrada")
     i.status = "alta"
-    i.data_saida = datetime.now()
+    i.data_saida = _vet_now()
     if observacoes:
         i.observacoes = observacoes
     db.commit()
-    return {"ok": True, "status": "alta", "data_saida": i.data_saida}
+    return {"ok": True, "status": "alta", "data_saida": _serializar_datetime_vet(i.data_saida)}
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -4520,6 +6412,14 @@ def chat_exame_ia(
     if not exame:
         raise HTTPException(404, "Exame não encontrado.")
 
+    if exame.arquivo_url and not exame.resultado_texto and not exame.resultado_json:
+        try:
+            exame = _process_exam_file_with_ai(db, tenant_id=tenant_id, exame=exame)
+            db.commit()
+            db.refresh(exame)
+        except HTTPException:
+            pass
+
     pet = db.query(Pet).filter(Pet.id == exame.pet_id).first()
     pergunta = (payload.pergunta or "").strip().lower()
 
@@ -4539,6 +6439,7 @@ def chat_exame_ia(
     conclusao_ia = exame.interpretacao_ia or ""
     dados_json = exame.resultado_json or {}
     texto_resultado = exame.resultado_texto or ""
+    payload_ia = exame.interpretacao_ia_payload or {}
 
     # Base de conhecimento para Q&A clínica
     resposta = _responder_chat_exame(
@@ -4553,6 +6454,8 @@ def chat_exame_ia(
         conclusao_ia=conclusao_ia,
         dados_json=dados_json,
         texto_resultado=texto_resultado,
+        payload_ia=payload_ia,
+        tem_arquivo=bool(exame.arquivo_url),
     )
 
     return {
@@ -4581,16 +6484,24 @@ def _responder_chat_exame(
     conclusao_ia: str,
     dados_json: dict,
     texto_resultado: str,
+    payload_ia: dict,
+    tem_arquivo: bool,
 ) -> str:
     """Responde perguntas clínicas usando regras contextuais e os dados do exame."""
 
     # Interpreta se ainda não foi feito
     if not conclusao_ia and not resumo_ia:
-        resumo_ia = "Ainda sem interpretação automática. Use 'Interpretar com IA' antes de perguntar."
+        if tem_arquivo:
+            resumo_ia = "Ainda sem interpretação automática concluída. Use 'Processar arquivo + IA' para extrair o arquivo anexado."
+        else:
+            resumo_ia = "Ainda sem interpretação automática. Use 'Interpretar com IA' antes de perguntar."
         conclusao_ia = resumo_ia
 
     alertas_nomes = [a.get("campo", "") for a in alertas if isinstance(a, dict)]
     alertas_mensagens = [a.get("mensagem", "") for a in alertas if isinstance(a, dict)]
+    achados_imagem = payload_ia.get("achados_imagem") if isinstance(payload_ia, dict) else []
+    limitacoes = payload_ia.get("limitacoes") if isinstance(payload_ia, dict) else []
+    conduta_sugerida = payload_ia.get("conduta_sugerida") if isinstance(payload_ia, dict) else []
 
     # Palavras-chave e respostas contextuais
     if any(k in pergunta for k in ["resumo", "resumir", "explicar", "o que diz", "o que significa", "resultado"]):
@@ -4659,6 +6570,15 @@ def _responder_chat_exame(
 
     if any(k in pergunta for k in ["imagem", "raio", "ultrassom", "eco", "rx", "radiografia"]):
         if tipo_exame in {"radiografia", "ultrassom", "ecocardiograma", "imagem"}:
+            if achados_imagem:
+                partes = [
+                    f"**Achados sugeridos pela análise do arquivo em '{exame_nome}':**",
+                    "\n- " + "\n- ".join(str(item) for item in achados_imagem if str(item).strip()),
+                ]
+                if limitacoes:
+                    partes.append("\n**Limitações:** " + "; ".join(str(item) for item in limitacoes if str(item).strip()))
+                partes.append("\nConfirme sempre com o laudo do especialista e a correlação clínica.")
+                return "".join(partes)
             return (
                 f"O exame '{exame_nome}' é do tipo imagem. "
                 f"A interpretação de imagens requer avaliação por médico veterinário especialista. "
@@ -4674,7 +6594,12 @@ def _responder_chat_exame(
     if alertas_mensagens:
         partes_resposta.append(f"\n**Pontos de atenção:** {'; '.join(alertas_mensagens)}")
     if not conclusao_ia and not alertas:
-        partes_resposta.append("\nAinda sem interpretação. Registre o resultado e use 'Interpretar com IA' para uma análise automática.")
+        if tem_arquivo:
+            partes_resposta.append("\nAinda sem interpretação final. O arquivo já foi anexado, então você pode usar 'Processar arquivo + IA' para extrair e resumir o exame.")
+        else:
+            partes_resposta.append("\nAinda sem interpretação. Registre o resultado e use 'Interpretar com IA' para uma análise automática.")
+    if conduta_sugerida:
+        partes_resposta.append(f"\n**Sugestões de conduta:** {'; '.join(str(item) for item in conduta_sugerida if str(item).strip())}")
     partes_resposta.append(
         "\n\n_Dica: tente perguntas como 'O que diz o resultado?', 'Há alertas?', 'Qual a conduta recomendada?' ou 'Tem risco de alergia?'_"
     )
