@@ -2,6 +2,8 @@ import { useState } from 'react';
 import api from '../api';
 import { deleteImagemProduto, uploadImagemProduto } from '../api/produtos';
 
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+
 export default function useProdutosNovoImagens({ id, setImagens }) {
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -15,7 +17,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
     if (files.length === 0) return;
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = MAX_UPLOAD_SIZE_BYTES;
 
     for (const file of files) {
       if (!allowedTypes.includes(file.type)) {
@@ -23,7 +25,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
         return;
       }
       if (file.size > maxSize) {
-        alert(`${file.name}: Imagem deve ter no máximo 5MB`);
+        alert(`${file.name}: Imagem deve ter no máximo 10MB`);
         return;
       }
     }

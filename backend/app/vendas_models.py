@@ -10,6 +10,7 @@ from datetime import datetime
 from app.db import Base
 from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
+from app.services.product_image_storage import build_product_thumbnail_url
 
 
 class Venda(BaseTenantModel):
@@ -265,6 +266,7 @@ class VendaItem(BaseTenantModel):
             'produto_id': self.produto_id,
             'produto_nome': self.produto.nome if self.produto else self.servico_descricao,
             'produto_imagem_principal': self.produto.imagem_principal if self.produto else None,
+            'produto_imagem_thumbnail': build_product_thumbnail_url(self.produto.imagem_principal) if self.produto else None,
             'servico_descricao': self.servico_descricao,
             'quantidade': safe_decimal_to_float(self.quantidade),
             'preco_unitario': safe_decimal_to_float(self.preco_unitario),
@@ -283,6 +285,7 @@ class VendaItem(BaseTenantModel):
                 'nome': self.produto.nome,
                 'codigo': self.produto.codigo if hasattr(self.produto, 'codigo') else None,
                 'imagem_principal': self.produto.imagem_principal if hasattr(self.produto, 'imagem_principal') else None,
+                'imagem_principal_thumbnail': build_product_thumbnail_url(self.produto.imagem_principal) if hasattr(self.produto, 'imagem_principal') else None,
             }
         
         # Incluir detalhes do serviço se for serviço

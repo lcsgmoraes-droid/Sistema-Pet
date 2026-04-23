@@ -69,6 +69,7 @@ export function usePDVCarrinhoItens({
           produto_nome: produto.nome,
           produto_codigo: produto.codigo || null,
           produto_imagem_principal: produto.imagem_principal || null,
+          produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
           quantidade: 1,
           preco_unitario: parseFloat(produto.preco_venda),
           desconto_item: 0,

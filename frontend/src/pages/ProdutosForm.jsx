@@ -26,6 +26,9 @@ import {
 } from '../api/produtos';
 import api from '../api';
 import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
+import { resolveMediaUrl } from '../utils/mediaUrl';
+
+const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
 export default function ProdutosForm() {
   const { id } = useParams();
@@ -397,8 +400,8 @@ export default function ProdutosForm() {
       return;
     }
     
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Imagem deve ter no máximo 5MB');
+    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
+      alert('Imagem deve ter no maximo 10MB');
       return;
     }
     
@@ -437,7 +440,7 @@ export default function ProdutosForm() {
   
   const handleSetPrincipal = async (imagemId) => {
     try {
-      await api.put(`/produtos/imagens/${imagemId}`, { e_principal: true });
+      await api.put(`/produtos/imagens/${imagemId}`, { principal: true });
       setImagens(prev => prev.map(img => ({
         ...img,
         e_principal: img.id === imagemId
@@ -1047,7 +1050,7 @@ export default function ProdutosForm() {
               {imagens.map(img => (
                 <div key={img.id} className="relative group border rounded-lg overflow-hidden">
                   <img
-                    src={`${import.meta.env.VITE_API_URL || '/api'}${img.url}`}
+                    src={resolveMediaUrl(img.thumbnail_url || img.url)}
                     alt={img.descricao || 'Imagem do produto'}
                     className="w-full h-48 object-cover"
                   />
@@ -1085,7 +1088,7 @@ export default function ProdutosForm() {
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na listagem de produtos. 
-              Formatos aceitos: JPG, PNG, WebP (máx. 5MB).
+              Formatos aceitos: JPG, PNG, WebP (max. 10MB) com otimizacao automatica e thumbnail.
             </p>
           </div>
         </div>

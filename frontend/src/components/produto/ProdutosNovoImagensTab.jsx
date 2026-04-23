@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from '../../utils/mediaUrl';
+
 export default function ProdutosNovoImagensTab({
   handleDeleteImagem,
   handleSetPrincipal,
@@ -50,7 +52,7 @@ export default function ProdutosNovoImagensTab({
           {imagens.map((img) => (
             <div key={img.id} className="relative group border rounded-lg overflow-hidden">
               <img
-                src={`${import.meta.env.VITE_API_URL || '/api'}${img.url}`}
+                src={resolveMediaUrl(img.thumbnail_url || img.url)}
                 alt="Imagem do produto"
                 className="w-full h-48 object-cover"
               />
@@ -90,7 +92,7 @@ export default function ProdutosNovoImagensTab({
       <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
           <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na listagem de produtos.
-          Formatos aceitos: JPG, PNG, WebP (máx. 5MB).
+          Formatos aceitos: JPG, PNG, WebP (máx. 10MB). O sistema converte para WebP e gera miniaturas automaticamente.
         </p>
       </div>
     </div>

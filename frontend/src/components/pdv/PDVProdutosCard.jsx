@@ -14,18 +14,17 @@ import {
 import QuantidadeInput from "../QuantidadeInput";
 import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { formatarVariacao } from "../../utils/variacoes";
 
-function obterImagemPrincipalItem(item) {
-  return item?.produto_imagem_principal || item?.produto?.imagem_principal || null;
-}
-
-function resolverImagemProduto(url) {
-  if (!url) return null;
-  if (String(url).startsWith("http")) return url;
-
-  const origin = globalThis?.location?.origin || "";
-  return origin && String(url).startsWith("/") ? `${origin}${url}` : url;
+function obterImagemMiniaturaItem(item) {
+  return (
+    item?.produto_imagem_thumbnail ||
+    item?.produto?.imagem_principal_thumbnail ||
+    item?.produto_imagem_principal ||
+    item?.produto?.imagem_principal ||
+    null
+  );
 }
 
 export default function PDVProdutosCard({
@@ -161,8 +160,8 @@ export default function PDVProdutosCard({
             const isExpanded = itensKitExpandidos[index];
             const codigoProdutoExibicao =
               item.produto_codigo || item.codigo || item.sku || "";
-            const imagemProduto = resolverImagemProduto(
-              obterImagemPrincipalItem(item),
+            const imagemProduto = resolveMediaUrl(
+              obterImagemMiniaturaItem(item),
             );
             const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
             const hasComposicao =

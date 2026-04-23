@@ -10,7 +10,7 @@ Rotas para o mÃ³dulo de Produtos
 Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de Barras
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, text, or_, and_, case
 from typing import Any, List, Optional
@@ -20,6 +20,7 @@ import logging
 import traceback
 
 from .db import get_session
+from app.config import settings
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
@@ -38,6 +39,11 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 # Service Layer
 from .services.produto_service import ProdutoService
 from .services.kit_estoque_service import KitEstoqueService  # Sprint 4: ComposiÃ§Ã£o de KIT
+from .services.product_image_storage import (
+    delete_product_image_assets,
+    prepare_product_image_variants,
+    save_product_image_variants,
+)
 from .services.validade_campanha_service import (
     construir_oferta_validade,
     obter_configs_campanha_validade,
@@ -824,8 +830,12 @@ class ImagemUploadResponse(BaseModel):
     id: int
     produto_id: int
     url: str
+    thumbnail_url: Optional[str] = None
     ordem: int
     e_principal: bool
+    tamanho: Optional[int] = None
+    largura: Optional[int] = None
+    altura: Optional[int] = None
     created_at: datetime
 
 
@@ -867,6 +877,7 @@ class ProdutoResponse(ProdutoBase):
     imagens: List[ImagemUploadResponse] = Field(default_factory=list)
     lotes: List[LoteResponse] = Field(default_factory=list)
     imagem_principal: Optional[str] = None  # URL da imagem principal
+    imagem_principal_thumbnail: Optional[str] = None
     total_variacoes: Optional[int] = 0  # NÃºmero de variaÃ§Ãµes (para produtos PAI)
     # Sprint 4: KIT - ComposiÃ§Ã£o e estoque virtual
     composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
@@ -4501,15 +4512,6 @@ def relatorio_valorizacao_estoque(
 # ENDPOINTS - IMAGENS
 # ==========================================
 
-from fastapi import UploadFile, File
-from pathlib import Path
-import shutil
-import uuid
-
-# DiretÃ³rio para salvar imagens
-UPLOAD_DIR = Path("uploads/produtos")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-
 
 @router.post("/{produto_id}/imagens", response_model=ImagemUploadResponse)
 async def upload_imagem_produto(
@@ -4522,8 +4524,9 @@ async def upload_imagem_produto(
     Upload de imagem para um produto
 
     - Aceita JPG, PNG, WebP
-    - Tamanho mÃ¡ximo: 5MB
-    - Salva em /uploads/produtos/{produto_id}/{uuid}.ext
+    - Otimiza automaticamente para WebP
+    - Gera miniatura para listagens
+    - Salva em storage local ou S3-compatÃ­vel
     - Primeira imagem Ã© automaticamente marcada como principal
     """
     try:
@@ -4555,35 +4558,32 @@ async def upload_imagem_produto(
                 detail="Formato nÃ£o aceito. Use JPG, PNG ou WebP"
             )
 
-        # Validar tamanho (5MB)
-        file.file.seek(0, 2)  # Ir para o final do arquivo
-        file_size = file.file.tell()  # Obter tamanho
-        file.file.seek(0)  # Voltar ao inÃ­cio
+        file_bytes = await file.read()
+        file_size = len(file_bytes)
 
-        max_size = 5 * 1024 * 1024  # 5MB
+        max_size = int(settings.PRODUCT_IMAGE_UPLOAD_MAX_BYTES or 10 * 1024 * 1024)
         if file_size > max_size:
             logger.error(f"[UPLOAD] Arquivo muito grande: {file_size} bytes")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Arquivo muito grande. MÃ¡ximo: 5MB"
+                detail=f"Arquivo muito grande. MÃ¡ximo: {max_size // (1024 * 1024)}MB"
             )
 
         logger.info(f"[UPLOAD] Arquivo validado: {file_size} bytes")
 
-        # Gerar nome Ãºnico para o arquivo
-        ext = file.filename.split(".")[-1]
-        filename = f"{uuid.uuid4()}.{ext}"
+        try:
+            imagem_preparada = prepare_product_image_variants(file_bytes)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
 
-        # Criar pasta do produto
-        produto_dir = UPLOAD_DIR / str(produto_id)
-        produto_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"[UPLOAD] DiretÃ³rio criado: {produto_dir}")
-
-        # Salvar arquivo
-        file_path = produto_dir / filename
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        logger.info(f"[UPLOAD] Arquivo salvo: {file_path}")
+        imagem_salva = save_product_image_variants(
+            tenant_id=tenant_id,
+            produto_id=produto_id,
+            prepared_image=imagem_preparada,
+        )
 
         # Verificar se jÃ¡ existe imagem principal
         tem_principal = db.query(ProdutoImagem).filter(
@@ -4605,19 +4605,22 @@ async def upload_imagem_produto(
         nova_imagem = ProdutoImagem(
             tenant_id=tenant_id,
             produto_id=produto_id,
-            url=f"/uploads/produtos/{produto_id}/{filename}",
+            url=imagem_salva.url,
             ordem=max_ordem + 1,
-            e_principal=e_principal
+            e_principal=e_principal,
+            tamanho=imagem_preparada.original_size_bytes,
+            largura=imagem_preparada.width,
+            altura=imagem_preparada.height,
         )
 
         db.add(nova_imagem)
-        db.commit()
-        db.refresh(nova_imagem)
 
         # Se é a imagem principal, atualizar também o campo imagem_principal do produto
         if e_principal:
             produto.imagem_principal = nova_imagem.url
-            db.commit()
+
+        db.commit()
+        db.refresh(nova_imagem)
 
         logger.info(f"[UPLOAD] ✅ Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
 
@@ -4704,12 +4707,24 @@ def atualizar_imagem(
             ProdutoImagem.produto_id == imagem.produto_id,
             ProdutoImagem.e_principal == True
         ).update({"e_principal": False})
+        imagem.produto.imagem_principal = imagem.url
 
     # Atualizar campos
     if dados.ordem is not None:
         imagem.ordem = dados.ordem
     if dados.principal is not None:
         imagem.e_principal = dados.principal
+        if dados.principal is False and imagem.produto.imagem_principal == imagem.url:
+            proxima_principal = db.query(ProdutoImagem).filter(
+                ProdutoImagem.produto_id == imagem.produto_id,
+                ProdutoImagem.id != imagem.id,
+            ).order_by(
+                ProdutoImagem.ordem.asc(),
+                ProdutoImagem.id.asc(),
+            ).first()
+            imagem.produto.imagem_principal = proxima_principal.url if proxima_principal else None
+            if proxima_principal:
+                proxima_principal.e_principal = True
 
     imagem.updated_at = datetime.now()
 
@@ -4731,6 +4746,8 @@ def deletar_imagem(
     Deletar imagem do produto
     Remove o arquivo fÃ­sico e o registro do banco
     """
+    current_user, tenant_id = user_and_tenant
+
     # Buscar imagem e verificar permissÃ£o
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
@@ -4743,17 +4760,37 @@ def deletar_imagem(
             detail="Imagem nÃ£o encontrada"
         )
 
-    # Deletar arquivo fÃ­sico
+    url_removida = imagem.url
+    era_principal = bool(imagem.e_principal)
+    produto = imagem.produto
+
     try:
-        file_path = Path(f".{imagem.url}")  # Remove leading /
-        if file_path.exists():
-            file_path.unlink()
-            logger.info(f"Arquivo {file_path} deletado")
+        delete_product_image_assets(url_removida)
     except Exception as e:
-        logger.warning(f"Erro ao deletar arquivo fÃ­sico: {e}")
+        logger.warning(f"Erro ao deletar assets da imagem {imagem_id}: {e}")
 
     # Deletar registro
     db.delete(imagem)
+
+    proxima_imagem = db.query(ProdutoImagem).filter(
+        ProdutoImagem.produto_id == produto.id,
+        ProdutoImagem.id != imagem_id,
+    ).order_by(
+        ProdutoImagem.e_principal.desc(),
+        ProdutoImagem.ordem.asc(),
+        ProdutoImagem.id.asc(),
+    ).first()
+
+    if proxima_imagem:
+        if era_principal or produto.imagem_principal == url_removida:
+            db.query(ProdutoImagem).filter(
+                ProdutoImagem.produto_id == produto.id,
+            ).update({"e_principal": False})
+            proxima_imagem.e_principal = True
+            produto.imagem_principal = proxima_imagem.url
+    else:
+        produto.imagem_principal = None
+
     db.commit()
 
     logger.info(f"Imagem {imagem_id} deletada por {current_user.email}")

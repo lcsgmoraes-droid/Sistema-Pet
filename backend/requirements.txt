@@ -27,6 +27,7 @@ slowapi==0.1.9
 # HTTP e Requisições
 httpx==0.26.0
 requests==2.31.0
+boto3==1.34.34
 
 # Stone Conciliacao - descriptografia de senha (AES-256-CBC)
 pycryptodome==3.20.0

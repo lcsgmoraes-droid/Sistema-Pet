@@ -1,4 +1,15 @@
 import { X } from "lucide-react";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
+
+function obterImagemDetalheItem(item) {
+  return (
+    item?.produto_imagem_principal ||
+    item?.produto?.imagem_principal ||
+    item?.produto_imagem_thumbnail ||
+    item?.produto?.imagem_principal_thumbnail ||
+    null
+  );
+}
 
 export default function PDVDescontoItemModal({
   itemEditando,
@@ -22,36 +33,59 @@ export default function PDVDescontoItemModal({
       : totalBruto > 0
         ? (itemEditando.descontoValor / totalBruto) * 100
         : 0;
+  const imagemProduto = resolveMediaUrl(obterImagemDetalheItem(itemEditando));
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
+      <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h3 className="text-xl font-bold text-gray-900">
             Alterar item da venda
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 transition-colors hover:text-gray-600"
           >
             <X size={24} />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-gray-900">
-              {itemEditando.produto_nome}
-            </h4>
-            <p className="text-sm text-gray-600">
-              Código: {itemEditando.produto_codigo}
-            </p>
+        <div className="space-y-4 p-6">
+          <div className="flex items-start gap-4 rounded-lg bg-gray-50 p-4">
+            {imagemProduto ? (
+              <img
+                src={imagemProduto}
+                alt={itemEditando.produto_nome || "Produto"}
+                className="h-28 w-28 flex-shrink-0 rounded-xl border border-gray-200 bg-white object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <div className="flex h-28 w-28 flex-shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white text-xs text-gray-400">
+                Sem foto
+              </div>
+            )}
+            <div className="min-w-0 space-y-2">
+              <div>
+                <h4 className="text-lg font-semibold leading-tight text-gray-900">
+                  {itemEditando.produto_nome}
+                </h4>
+                <p className="text-sm text-gray-600">
+                  Codigo: {itemEditando.produto_codigo}
+                </p>
+              </div>
+              <p className="text-xs text-gray-500">
+                Confira a imagem, o preco e o desconto antes de salvar.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Preço <span className="text-red-600">*</span>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Preco <span className="text-red-600">*</span>
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-gray-500">
@@ -67,13 +101,13 @@ export default function PDVDescontoItemModal({
                       preco: parseFloat(e.target.value) || 0,
                     })
                   }
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Quantidade
               </label>
               <input
@@ -81,12 +115,12 @@ export default function PDVDescontoItemModal({
                 step="0.001"
                 value={itemEditando.quantidade}
                 readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Subtotal
               </label>
               <div className="relative">
@@ -97,14 +131,14 @@ export default function PDVDescontoItemModal({
                   type="text"
                   value={totalBruto.toFixed(2)}
                   readOnly
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                  className="w-full rounded-lg border border-gray-300 bg-gray-100 py-2 pl-10 pr-3"
                 />
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="mb-2 block text-sm font-medium text-gray-700">
               Tipo de desconto
             </label>
             <div className="flex gap-2">
@@ -116,10 +150,10 @@ export default function PDVDescontoItemModal({
                     descontoPercentual: 0,
                   })
                 }
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                className={`flex-1 rounded-lg border-2 px-4 py-2 transition-colors ${
                   itemEditando.tipoDesconto === "valor"
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-blue-400"
                 }`}
               >
                 R$
@@ -132,10 +166,10 @@ export default function PDVDescontoItemModal({
                     descontoValor: 0,
                   })
                 }
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-colors ${
+                className={`flex-1 rounded-lg border-2 px-4 py-2 transition-colors ${
                   itemEditando.tipoDesconto === "percentual"
-                    ? "bg-blue-600 border-blue-600 text-white"
-                    : "bg-white border-gray-300 text-gray-700 hover:border-blue-400"
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-gray-300 bg-white text-gray-700 hover:border-blue-400"
                 }`}
               >
                 %
@@ -144,7 +178,7 @@ export default function PDVDescontoItemModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               Valor do desconto
             </label>
             <div className="relative">
@@ -174,13 +208,13 @@ export default function PDVDescontoItemModal({
                     descontoPercentual: val,
                   });
                 }}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-3 focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
             </div>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="rounded-lg bg-blue-50 p-4">
             <div className="flex justify-between text-sm">
               <span className="text-gray-700">Total bruto</span>
               <span className="font-medium">R$ {totalBruto.toFixed(2)}</span>
@@ -188,19 +222,19 @@ export default function PDVDescontoItemModal({
             {(itemEditando.descontoValor > 0 ||
               itemEditando.descontoPercentual > 0) && (
               <>
-                <div className="flex justify-between text-sm text-red-600 mt-1">
+                <div className="mt-1 flex justify-between text-sm text-red-600">
                   <span>Desconto</span>
                   <span className="font-medium">
                     - R$ {descontoCalculado.toFixed(2)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm text-orange-600 mt-1">
+                <div className="mt-1 flex justify-between text-sm text-orange-600">
                   <span>{percentualEquivalente.toFixed(2)}% de desconto</span>
                 </div>
               </>
             )}
-            <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-blue-200">
-              <span>Total líquido</span>
+            <div className="mt-2 flex justify-between border-t border-blue-200 pt-2 text-lg font-bold">
+              <span>Total liquido</span>
               <span className="text-green-600">
                 R$ {(totalBruto - descontoCalculado).toFixed(2)}
               </span>
@@ -208,22 +242,22 @@ export default function PDVDescontoItemModal({
           </div>
         </div>
 
-        <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-between gap-3">
+        <div className="flex justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4">
           <button
             onClick={onClose}
-            className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+            className="flex-1 rounded-lg border border-gray-300 px-6 py-2 text-gray-700 transition-colors hover:bg-gray-100"
           >
             Fechar
           </button>
           <button
             onClick={onRemover}
-            className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            className="rounded-lg bg-red-600 px-6 py-2 text-white transition-colors hover:bg-red-700"
           >
             Remover
           </button>
           <button
             onClick={onSalvar}
-            className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="flex-1 rounded-lg bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700"
           >
             Salvar
           </button>

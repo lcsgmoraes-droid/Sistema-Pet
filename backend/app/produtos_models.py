@@ -11,6 +11,7 @@ from datetime import datetime
 from .db import Base
 from .base_models import BaseTenantModel
 from .models import User, Cliente  # Importar models existentes
+from .services.product_image_storage import build_product_thumbnail_url
 
 
 class Categoria(BaseTenantModel):
@@ -376,6 +377,10 @@ class Produto(BaseTenantModel):
         
         return min(l.data_validade for l in lotes_ativos)
 
+    @property
+    def imagem_principal_thumbnail(self):
+        return build_product_thumbnail_url(self.imagem_principal)
+
 
 class ProdutoImagem(BaseTenantModel):
     """Imagens do produto"""
@@ -394,6 +399,10 @@ class ProdutoImagem(BaseTenantModel):
     
     # Relationships
     produto = relationship("Produto", back_populates="imagens")
+
+    @property
+    def thumbnail_url(self):
+        return build_product_thumbnail_url(self.url)
 
 class ProdutoKitComponente(BaseTenantModel):
     """
