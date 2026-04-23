@@ -1959,7 +1959,7 @@ def _gerar_candidatos_sku_disponiveis(
         })
 
     sku_base_limpo = (sku_base or "").strip()
-    prefixo_limpo = (prefixo or "PROD").strip() or "PROD"
+    prefixo_limpo = re.sub(r"[^A-Z0-9]", "", (prefixo or "").upper()) or "PROD"
 
     if sku_base_limpo:
         adicionar_candidato(
@@ -2002,6 +2002,7 @@ def _montar_sugestao_sku_produto(
 ) -> Dict[str, Any]:
     fornecedor_nome = (nota.fornecedor_nome or "").strip()
     prefixo = gerar_prefixo_fornecedor(fornecedor_nome) if fornecedor_nome else "PROD"
+    prefixo = re.sub(r"[^A-Z0-9]", "", (prefixo or "").upper()) or "PROD"
 
     sku_base = (sku_base_customizado or item.codigo_produto or "").strip()
     if not sku_base:
