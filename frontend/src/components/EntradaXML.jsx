@@ -225,6 +225,19 @@ const CONFERENCIA_STATUS_META = {
   },
 };
 
+const BASE_CALCULO_MARGEM_OPCOES = [
+  {
+    value: 'nf',
+    label: 'Custo da NF',
+    descricao: 'Padrao. Usa o custo fiscal da NF como base da margem.',
+  },
+  {
+    value: 'cadastrado',
+    label: 'Custo cadastrado',
+    descricao: 'Usa o custo atual salvo no cadastro do produto.',
+  },
+];
+
 const ACAO_CONFERENCIA_OPCOES = [
   { value: 'sem_acao', label: 'Sem acao' },
   { value: 'contatar_fornecedor', label: 'Contatar fornecedor' },
@@ -391,6 +404,7 @@ const EntradaXML = () => {
   const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
   const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
   const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
+  const [baseCalculoMargem, setBaseCalculoMargem] = useState('nf');
   
   // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
@@ -1035,6 +1049,7 @@ const EntradaXML = () => {
 
       const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
 
+      setBaseCalculoMargem('nf');
       setPreviewProcessamento(previewComOverrides);
       setMostrarRevisaoPrecos(true);
       
@@ -1156,6 +1171,7 @@ const EntradaXML = () => {
       setNotaSelecionada(null);
       setMostrarRevisaoPrecos(false);
       setPreviewProcessamento(null);
+      setBaseCalculoMargem('nf');
       setCustosAjustados({});
       setInputsRevisaoCustos({});
       setInputsRevisaoPrecos({});
@@ -1281,7 +1297,11 @@ const EntradaXML = () => {
       produto.preco_venda_atual ??
       0
     );
-    const margemAtualizada = calcularMargem(precoAtual, custoAplicado || custoBase);
+    const baseMargem = obterInfoBaseCalculoMargem({
+      custoAnterior: Number(produto.custo_anterior || 0),
+      custoNF: custoBase,
+    });
+    const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
 
     setPrecosAjustados((prev) => ({
       ...prev,
@@ -1324,7 +1344,11 @@ const EntradaXML = () => {
       produto.preco_venda_atual ??
       0
     );
-    const margemAtualizada = calcularMargem(precoAtual, custoNormalizado);
+    const baseMargem = obterInfoBaseCalculoMargem({
+      custoAnterior: Number(produto.custo_anterior || 0),
+      custoNF: custoBase,
+    });
+    const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
     setPrecosAjustados((prev) => ({
       ...prev,
       [produto.produto_id]: {
@@ -1387,12 +1411,46 @@ const EntradaXML = () => {
     return obterCustoBasePreviewItem(item);
   };
 
+  const obterInfoBaseCalculoMargem = ({ custoAnterior = 0, custoNF = 0 }) => {
+    const custoAnteriorNormalizado = Number(custoAnterior || 0);
+    const custoNFNormalizado = Number(custoNF || 0);
+
+    if (baseCalculoMargem === 'cadastrado') {
+      if (custoAnteriorNormalizado > 0) {
+        return {
+          value: 'cadastrado',
+          label: 'Custo cadastrado',
+          valor: custoAnteriorNormalizado,
+          fallback: false,
+          descricao: 'Calculando sobre o custo cadastrado no produto.',
+        };
+      }
+
+      return {
+        value: 'nf',
+        label: 'Custo da NF',
+        valor: custoNFNormalizado,
+        fallback: true,
+        descricao: 'Sem custo cadastrado valido; usando o custo da NF.',
+      };
+    }
+
+    return {
+      value: 'nf',
+      label: 'Custo da NF',
+      valor: custoNFNormalizado,
+      fallback: false,
+      descricao: 'Calculando sobre o custo fiscal da NF.',
+    };
+  };
+
   const obterResumoCustoItem = (item) => {
     const produto = normalizarProdutoPreview(item);
     const custoAnterior = Number(produto.custo_anterior || 0);
     const custoNF = obterCustoBasePreviewItem(item);
     const custoSistema = obterCustoSistemaItem(item);
     const precoVendaAtual = Number(produto.preco_venda_atual || 0);
+    const baseMargem = obterInfoBaseCalculoMargem({ custoAnterior, custoNF });
     const variacaoCustoPercentual = custoAnterior > 0
       ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
       : 0;
@@ -1400,13 +1458,14 @@ const EntradaXML = () => {
       produto.margem_atual ??
       calcularMargem(precoVendaAtual, custoAnterior)
     );
-    const margemProjetada = calcularMargem(precoVendaAtual, custoSistema);
+    const margemProjetada = calcularMargem(precoVendaAtual, baseMargem.valor);
 
     return {
       produto,
       custoAnterior,
       custoNF,
       custoSistema,
+      baseMargem,
       custoManual: Math.abs(custoSistema - custoNF) > 0.0001,
       variacaoCustoPercentual,
       precoVendaAtual,
@@ -1414,6 +1473,79 @@ const EntradaXML = () => {
       margemProjetada,
     };
   };
+
+  useEffect(() => {
+    if (!mostrarRevisaoPrecos || !previewProcessamento?.itens?.length) {
+      return;
+    }
+
+    setPrecosAjustados((prev) => {
+      let mudou = false;
+      const proximo = { ...prev };
+
+      previewProcessamento.itens.forEach((item) => {
+        const produto = normalizarProdutoPreview(item);
+        if (!produto?.produto_id) return;
+
+        const resumoCusto = obterResumoCustoItem(item);
+        const precoAtual = Number(
+          prev[produto.produto_id]?.preco_venda ??
+          produto.preco_venda_atual ??
+          0
+        );
+        const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
+        const atual = prev[produto.produto_id];
+
+        if (
+          !atual ||
+          Math.abs(Number(atual.preco_venda || 0) - precoAtual) > 0.0001 ||
+          Math.abs(Number(atual.margem || 0) - margemAtualizada) > 0.0001
+        ) {
+          proximo[produto.produto_id] = {
+            preco_venda: precoAtual,
+            margem: margemAtualizada,
+          };
+          mudou = true;
+        }
+      });
+
+      return mudou ? proximo : prev;
+    });
+
+    setInputsRevisaoPrecos((prev) => {
+      let mudou = false;
+      const proximo = { ...prev };
+
+      previewProcessamento.itens.forEach((item) => {
+        const produto = normalizarProdutoPreview(item);
+        if (!produto?.produto_id) return;
+
+        const resumoCusto = obterResumoCustoItem(item);
+        const precoAtual = Number(
+          precosAjustados[produto.produto_id]?.preco_venda ??
+          produto.preco_venda_atual ??
+          0
+        );
+        const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
+        const precoTextoAtual = prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual);
+        const margemTextoAtual = formatBRL(margemAtualizada);
+
+        if (
+          !prev?.[produto.produto_id] ||
+          prev[produto.produto_id].preco_venda !== precoTextoAtual ||
+          prev[produto.produto_id].margem !== margemTextoAtual
+        ) {
+          proximo[produto.produto_id] = {
+            preco_venda: precoTextoAtual,
+            margem: margemTextoAtual,
+          };
+          mudou = true;
+        }
+      });
+
+      return mudou ? proximo : prev;
+    });
+  }, [baseCalculoMargem, mostrarRevisaoPrecos, previewProcessamento]);
 
   const obterHistoricoNfAnterior = (historicos, numeroNotaAtual) => {
     if (!Array.isArray(historicos) || historicos.length === 0) return null;
@@ -2583,6 +2715,7 @@ const EntradaXML = () => {
                 }
                 return notas.map((nota) => {
                   const conferenciaMeta = CONFERENCIA_STATUS_META[nota.conferencia_status || 'nao_iniciada'];
+                  const exibirBotaoConferir = nota.status === 'pendente' && (nota.conferencia_status || 'nao_iniciada') === 'nao_iniciada';
                   return (
                     <tr
                       key={nota.id}
@@ -2623,7 +2756,7 @@ const EntradaXML = () => {
                               Vincular
                             </button>
                           )}
-                          {nota.status === 'pendente' && (
+                          {exibirBotaoConferir && (
                             <button
                               onClick={() => abrirDetalhes(nota.id, { abrirConferencia: true })}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold text-sm"
@@ -2737,7 +2870,8 @@ const EntradaXML = () => {
                         <div className="font-bold text-lg text-orange-700">{resumoConferenciaAtual.itens_com_divergencia}</div>
                       </div>
                       <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Qtd recebida / estoque</div>
+                        <div className="text-gray-500 text-xs uppercase tracking-wide">Qtd recebida</div>
+                        <div className="text-[11px] text-gray-500 mt-1">Entra no estoque</div>
                         <div className="font-bold text-lg text-slate-800">{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</div>
                       </div>
                       <div className="rounded-lg border border-white/70 bg-white/80 p-3">
@@ -3284,7 +3418,7 @@ const EntradaXML = () => {
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd recebida (entra no estoque)</label>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd recebida</label>
                               <input
                                 type="number"
                                 min="0"
@@ -3294,6 +3428,7 @@ const EntradaXML = () => {
                                 onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_conferida', e.target.value)}
                                 className="w-full rounded border border-emerald-300 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500"
                               />
+                              <div className="mt-1 text-[11px] text-emerald-700 font-medium">Entra no estoque</div>
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">Qtd avariada</label>
@@ -4134,6 +4269,7 @@ const EntradaXML = () => {
                       setMostrarRevisaoPrecos(false);
                       setPreviewProcessamento(null);
                       setInputsRevisaoPrecos({});
+                      setBaseCalculoMargem('nf');
                       if (notaSelecionada) {
                         setMostrarVisualizacao(true);
                       }
@@ -4256,6 +4392,41 @@ const EntradaXML = () => {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
               <div className="space-y-6">
+                <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="max-w-3xl">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                        <span>Base da margem</span>
+                        <span
+                          className="text-slate-400 cursor-help"
+                          title={'A base da margem muda a conta do preco e da margem nesta tela. O custo gravado ao processar continua sendo o campo "Custo no sistema".'}
+                        >
+                          ⓘ
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Padrao em custo da NF. Se quiser, voce pode recalcular usando o custo cadastrado sem alterar o valor fiscal da nota.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {BASE_CALCULO_MARGEM_OPCOES.map((opcao) => (
+                        <button
+                          key={opcao.value}
+                          onClick={() => setBaseCalculoMargem(opcao.value)}
+                          title={opcao.descricao}
+                          className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                            baseCalculoMargem === opcao.value
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          {opcao.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {previewProcessamento.itens
                   .filter(item => {
                     // Verificar se tem produto vinculado (pode estar em produto_vinculado ou produto_id)
@@ -4292,11 +4463,17 @@ const EntradaXML = () => {
                     margem: formatBRL(precosAtuais.margem),
                   };
                   const custoTexto = inputsRevisaoCustos[custoItemId] || formatBRL(resumoCusto.custoSistema);
+                  const custoBaseMargem = resumoCusto.baseMargem.valor;
+                  const custoBaseMargemDiferenteDoSistema = Math.abs(custoBaseMargem - resumoCusto.custoSistema) > 0.0001;
+                  const descricaoBaseMargem = resumoCusto.baseMargem.fallback
+                    ? `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)}) - sem custo cadastrado valido, usando a NF`
+                    : `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)})`;
 
                   const tooltipMargem =
                     `Margem = ((Preço de Venda - Custo) / Preço de Venda) × 100\n` +
+                    `Base ativa: ${resumoCusto.baseMargem.label}\n` +
                     `Com os valores atuais:\n` +
-                    `(${formatBRL(precosAtuais.preco_venda)} - ${formatBRL(resumoCusto.custoSistema || 0)}) / ${formatBRL(precosAtuais.preco_venda)} × 100\n` +
+                    `(${formatBRL(precosAtuais.preco_venda)} - ${formatBRL(custoBaseMargem || 0)}) / ${formatBRL(precosAtuais.preco_venda)} × 100\n` +
                     `Resultado: ${formatPercent(precosAtuais.margem)}`;
 
                   return (
@@ -4398,7 +4575,7 @@ const EntradaXML = () => {
                                 onChange={(e) => atualizarPrecoVenda(
                                   produtoVinc.produto_id,
                                   e.target.value,
-                                  resumoCusto.custoSistema
+                                  custoBaseMargem
                                 )}
                                 onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pl-10 pr-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -4422,7 +4599,7 @@ const EntradaXML = () => {
                                 onChange={(e) => atualizarMargem(
                                   produtoVinc.produto_id,
                                   e.target.value,
-                                  resumoCusto.custoSistema
+                                  custoBaseMargem
                                 )}
                                 onBlur={() => normalizarCamposRevisaoPrecos(produtoVinc.produto_id)}
                                 className="w-full pr-10 pl-3 py-3 border-2 border-gray-300 rounded-lg text-xl font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -4430,7 +4607,10 @@ const EntradaXML = () => {
                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
                             </div>
                             <div className="mt-1 text-xs text-gray-500">
-                              Com o novo custo
+                              Base ativa: {descricaoBaseMargem}
+                              {custoBaseMargemDiferenteDoSistema
+                                ? ` | O custo salvo no processamento continua sendo ${formatMoneyBRL(resumoCusto.custoSistema || 0)} em "Custo no sistema"`
+                                : ''}
                             </div>
                           </div>
                         </div>
@@ -4467,6 +4647,7 @@ const EntradaXML = () => {
                   setMostrarRevisaoPrecos(false);
                   setPreviewProcessamento(null);
                   setInputsRevisaoPrecos({});
+                  setBaseCalculoMargem('nf');
                   if (notaSelecionada) {
                     setMostrarVisualizacao(true);
                   }
