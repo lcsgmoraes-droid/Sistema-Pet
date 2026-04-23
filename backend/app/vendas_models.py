@@ -264,6 +264,7 @@ class VendaItem(BaseTenantModel):
             'tipo': self.tipo,
             'produto_id': self.produto_id,
             'produto_nome': self.produto.nome if self.produto else self.servico_descricao,
+            'produto_imagem_principal': self.produto.imagem_principal if self.produto else None,
             'servico_descricao': self.servico_descricao,
             'quantidade': safe_decimal_to_float(self.quantidade),
             'preco_unitario': safe_decimal_to_float(self.preco_unitario),
@@ -281,6 +282,7 @@ class VendaItem(BaseTenantModel):
                 'id': self.produto.id,
                 'nome': self.produto.nome,
                 'codigo': self.produto.codigo if hasattr(self.produto, 'codigo') else None,
+                'imagem_principal': self.produto.imagem_principal if hasattr(self.produto, 'imagem_principal') else None,
             }
         
         # Incluir detalhes do serviço se for serviço

@@ -16,6 +16,18 @@ import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { formatarVariacao } from "../../utils/variacoes";
 
+function obterImagemPrincipalItem(item) {
+  return item?.produto_imagem_principal || item?.produto?.imagem_principal || null;
+}
+
+function resolverImagemProduto(url) {
+  if (!url) return null;
+  if (String(url).startsWith("http")) return url;
+
+  const origin = globalThis?.location?.origin || "";
+  return origin && String(url).startsWith("/") ? `${origin}${url}` : url;
+}
+
 export default function PDVProdutosCard({
   buscaProduto,
   buscaProdutoContainerRef,
@@ -149,6 +161,9 @@ export default function PDVProdutosCard({
             const isExpanded = itensKitExpandidos[index];
             const codigoProdutoExibicao =
               item.produto_codigo || item.codigo || item.sku || "";
+            const imagemProduto = resolverImagemProduto(
+              obterImagemPrincipalItem(item),
+            );
             const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
             const hasComposicao =
               isKit &&
@@ -192,30 +207,43 @@ export default function PDVProdutosCard({
 
                     <div className="flex-1">
                       <div className="flex flex-wrap items-start gap-2">
-                        <div className="inline-flex items-center gap-1.5">
-                          <div className="font-medium text-gray-900">
-                            {item.produto_nome}
-                          </div>
-                          {item.produto_nome && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCopiarCodigoProdutoCarrinho(
-                                  item.produto_nome,
-                                  `nome-${chaveCodigoItem}`,
-                                );
+                        <div className="inline-flex items-start gap-2">
+                          {imagemProduto && (
+                            <img
+                              src={imagemProduto}
+                              alt={item.produto_nome || "Produto"}
+                              className="w-11 h-11 rounded-lg object-cover border border-gray-200 bg-white flex-shrink-0"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
                               }}
-                              className="text-gray-400 hover:text-gray-700 transition-colors"
-                              title="Copiar nome do produto"
-                            >
-                              {copiadoCodigoItem === `nome-${chaveCodigoItem}` ? (
-                                <Check className="w-3.5 h-3.5 text-green-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            />
                           )}
+                          <div className="inline-flex items-center gap-1.5 min-w-0">
+                            <div className="font-medium text-gray-900 break-words">
+                              {item.produto_nome}
+                            </div>
+                            {item.produto_nome && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCopiarCodigoProdutoCarrinho(
+                                    item.produto_nome,
+                                    `nome-${chaveCodigoItem}`,
+                                  );
+                                }}
+                                className="text-gray-400 hover:text-gray-700 transition-colors"
+                                title="Copiar nome do produto"
+                              >
+                                {copiadoCodigoItem === `nome-${chaveCodigoItem}` ? (
+                                  <Check className="w-3.5 h-3.5 text-green-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {codigoProdutoExibicao && (
                           <div className="inline-flex items-center gap-1 text-xs text-gray-500">
