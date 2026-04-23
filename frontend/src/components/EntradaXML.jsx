@@ -232,9 +232,9 @@ const BASE_CALCULO_MARGEM_OPCOES = [
     descricao: 'Padrao. Usa o custo fiscal da NF como base da margem.',
   },
   {
-    value: 'cadastrado',
-    label: 'Custo cadastrado',
-    descricao: 'Usa o custo atual salvo no cadastro do produto.',
+    value: 'sistema',
+    label: 'Custo no sistema',
+    descricao: 'Usa o custo que sera aplicado no processamento da entrada.',
   },
 ];
 
@@ -1298,8 +1298,8 @@ const EntradaXML = () => {
       0
     );
     const baseMargem = obterInfoBaseCalculoMargem({
-      custoAnterior: Number(produto.custo_anterior || 0),
       custoNF: custoBase,
+      custoSistema: custoAplicado || custoBase,
     });
     const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
 
@@ -1345,8 +1345,8 @@ const EntradaXML = () => {
       0
     );
     const baseMargem = obterInfoBaseCalculoMargem({
-      custoAnterior: Number(produto.custo_anterior || 0),
       custoNF: custoBase,
+      custoSistema: custoNormalizado,
     });
     const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
     setPrecosAjustados((prev) => ({
@@ -1411,27 +1411,19 @@ const EntradaXML = () => {
     return obterCustoBasePreviewItem(item);
   };
 
-  const obterInfoBaseCalculoMargem = ({ custoAnterior = 0, custoNF = 0 }) => {
-    const custoAnteriorNormalizado = Number(custoAnterior || 0);
+  const obterInfoBaseCalculoMargem = ({ custoNF = 0, custoSistema = 0 }) => {
     const custoNFNormalizado = Number(custoNF || 0);
+    const custoSistemaNormalizado = Number(custoSistema || 0);
 
-    if (baseCalculoMargem === 'cadastrado') {
-      if (custoAnteriorNormalizado > 0) {
-        return {
-          value: 'cadastrado',
-          label: 'Custo cadastrado',
-          valor: custoAnteriorNormalizado,
-          fallback: false,
-          descricao: 'Calculando sobre o custo cadastrado no produto.',
-        };
-      }
-
+    if (baseCalculoMargem === 'sistema') {
       return {
-        value: 'nf',
-        label: 'Custo da NF',
-        valor: custoNFNormalizado,
-        fallback: true,
-        descricao: 'Sem custo cadastrado valido; usando o custo da NF.',
+        value: 'sistema',
+        label: 'Custo no sistema',
+        valor: custoSistemaNormalizado > 0 ? custoSistemaNormalizado : custoNFNormalizado,
+        fallback: !(custoSistemaNormalizado > 0),
+        descricao: custoSistemaNormalizado > 0
+          ? 'Calculando sobre o custo informado no sistema.'
+          : 'Sem custo informado no sistema; usando o custo da NF.',
       };
     }
 
@@ -1450,7 +1442,7 @@ const EntradaXML = () => {
     const custoNF = obterCustoBasePreviewItem(item);
     const custoSistema = obterCustoSistemaItem(item);
     const precoVendaAtual = Number(produto.preco_venda_atual || 0);
-    const baseMargem = obterInfoBaseCalculoMargem({ custoAnterior, custoNF });
+    const baseMargem = obterInfoBaseCalculoMargem({ custoNF, custoSistema });
     const variacaoCustoPercentual = custoAnterior > 0
       ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
       : 0;
@@ -4405,7 +4397,7 @@ const EntradaXML = () => {
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-600">
-                        Padrao em custo da NF. Se quiser, voce pode recalcular usando o custo cadastrado sem alterar o valor fiscal da nota.
+                        Padrao em custo da NF. Se quiser, voce pode recalcular usando o custo que vai para o sistema, sem alterar o valor fiscal da nota.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -4466,7 +4458,7 @@ const EntradaXML = () => {
                   const custoBaseMargem = resumoCusto.baseMargem.valor;
                   const custoBaseMargemDiferenteDoSistema = Math.abs(custoBaseMargem - resumoCusto.custoSistema) > 0.0001;
                   const descricaoBaseMargem = resumoCusto.baseMargem.fallback
-                    ? `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)}) - sem custo cadastrado valido, usando a NF`
+                    ? `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)}) - sem custo informado, usando a NF`
                     : `${resumoCusto.baseMargem.label} (${formatMoneyBRL(custoBaseMargem || 0)})`;
 
                   const tooltipMargem =
@@ -4608,7 +4600,7 @@ const EntradaXML = () => {
                             </div>
                             <div className="mt-1 text-xs text-gray-500">
                               Base ativa: {descricaoBaseMargem}
-                              {custoBaseMargemDiferenteDoSistema
+                              {baseCalculoMargem === 'nf' && custoBaseMargemDiferenteDoSistema
                                 ? ` | O custo salvo no processamento continua sendo ${formatMoneyBRL(resumoCusto.custoSistema || 0)} em "Custo no sistema"`
                                 : ''}
                             </div>
