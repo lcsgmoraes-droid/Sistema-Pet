@@ -27,6 +27,14 @@ function obterImagemMiniaturaItem(item) {
   );
 }
 
+function obterImagemSugestaoProduto(produto) {
+  return (
+    produto?.imagem_principal_thumbnail ||
+    produto?.imagem_principal ||
+    null
+  );
+}
+
 export default function PDVProdutosCard({
   buscaProduto,
   buscaProdutoContainerRef,
@@ -94,6 +102,9 @@ export default function PDVProdutosCard({
                       Math.floor(produto.estoque_virtual) <= 0
                     : produto.estoque_atual !== undefined &&
                       Math.floor(produto.estoque_atual) <= 0;
+                const imagemSugestao = resolveMediaUrl(
+                  obterImagemSugestaoProduto(produto),
+                );
 
                 return (
                   <button
@@ -103,37 +114,54 @@ export default function PDVProdutosCard({
                     onClick={() => onSelecionarProdutoSugerido(produto)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1.5 font-medium text-gray-900">
-                          {produto.nome}
-                          {estoqueZerado && vendaAtual.cliente && (
-                            <span
-                              onClick={(e) =>
-                                onAdicionarNaListaEsperaRapido(produto, e)
-                              }
-                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 hover:bg-orange-200 text-orange-600 hover:text-orange-800 rounded text-xs font-medium transition-colors cursor-pointer"
-                              title="Sem estoque, clique para adicionar a lista de espera"
-                            >
-                              <BookmarkPlus className="w-3 h-3" />
-                              <span>Lista de espera</span>
-                            </span>
-                          )}
-                        </div>
-                        {produto.tipo_produto === "VARIACAO" &&
-                          formatarVariacao(produto) && (
-                            <div className="text-xs text-blue-600 font-medium mt-0.5">
-                              Variacao: {formatarVariacao(produto)}
-                            </div>
-                          )}
-                        <div className="text-sm text-gray-500">
-                          {produto.codigo && `Cod: ${produto.codigo}`}
-                          {produto.tipo_produto === "KIT" &&
-                          produto.tipo_kit === "VIRTUAL"
-                            ? produto.estoque_virtual !== undefined &&
-                              ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
-                            : produto.estoque_atual !== undefined &&
-                              ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        {imagemSugestao ? (
+                          <img
+                            src={imagemSugestao}
+                            alt={produto.nome || "Produto"}
+                            className="h-12 w-12 flex-shrink-0 rounded-lg border border-gray-200 bg-white object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-gray-300">
+                            <Package className="h-5 w-5" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 font-medium text-gray-900">
+                            <span className="truncate">{produto.nome}</span>
+                            {estoqueZerado && vendaAtual.cliente && (
+                              <span
+                                onClick={(e) =>
+                                  onAdicionarNaListaEsperaRapido(produto, e)
+                                }
+                                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-orange-600 transition-colors cursor-pointer bg-orange-100 hover:bg-orange-200 hover:text-orange-800"
+                                title="Sem estoque, clique para adicionar a lista de espera"
+                              >
+                                <BookmarkPlus className="w-3 h-3" />
+                                <span>Lista de espera</span>
+                              </span>
+                            )}
+                          </div>
+                          {produto.tipo_produto === "VARIACAO" &&
+                            formatarVariacao(produto) && (
+                              <div className="text-xs text-blue-600 font-medium mt-0.5">
+                                Variacao: {formatarVariacao(produto)}
+                              </div>
+                            )}
+                          <div className="text-sm text-gray-500">
+                            {produto.codigo && `Cod: ${produto.codigo}`}
+                            {produto.tipo_produto === "KIT" &&
+                            produto.tipo_kit === "VIRTUAL"
+                              ? produto.estoque_virtual !== undefined &&
+                                ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
+                              : produto.estoque_atual !== undefined &&
+                                ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
+                          </div>
                         </div>
                       </div>
                       <div className="text-lg font-semibold text-green-600">
