@@ -96,6 +96,12 @@ export function usePDVVendasRecentes() {
 
   useEffect(() => {
     void carregarVendasRecentes();
+
+    const intervalo = setInterval(() => {
+      void carregarVendasRecentes();
+    }, 30000);
+
+    return () => clearInterval(intervalo);
   }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
 
   useEffect(() => {

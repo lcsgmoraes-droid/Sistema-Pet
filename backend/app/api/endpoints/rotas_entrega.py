@@ -70,6 +70,27 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return raio_terra_km * c
 
 
+def _sincronizar_venda_entregue_por_parada(
+    db: Session,
+    parada: RotaEntregaParada,
+    tenant_id,
+    data_entrega: Optional[datetime] = None,
+) -> Optional[Venda]:
+    """Mantem Venda e parada alinhadas para o PDV/lista de entregas abertas."""
+    entrega_em = data_entrega or parada.data_entrega or datetime.now()
+    parada.status = "entregue"
+    parada.data_entrega = entrega_em
+
+    venda = db.query(Venda).filter(
+        Venda.id == parada.venda_id,
+        Venda.tenant_id == tenant_id,
+    ).first()
+    if venda:
+        venda.status_entrega = "entregue"
+        venda.data_entrega = entrega_em
+    return venda
+
+
 @router.get("/", response_model=List[RotaEntregaResponse])
 def listar_rotas(
     status: Optional[str] = Query(None, description="Filtrar por status"),
@@ -839,6 +860,21 @@ def fechar_rota(
         Cliente.tenant_id == tenant_id
     ).first()
 
+    paradas = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.tenant_id == tenant_id,
+    ).order_by(RotaEntregaParada.ordem).all()
+
+    paradas_abertas = [p for p in paradas if p.status != "entregue"]
+    if paradas_abertas:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Marque todas as paradas como entregues antes de fechar a rota. "
+                f"Em aberto: {len(paradas_abertas)}."
+            ),
+        )
+
     # Atualizar campos
     if payload.km_final is not None:
         rota.km_final = payload.km_final
@@ -871,29 +907,50 @@ def fechar_rota(
         if dist_real_gps is not None:
             rota.distancia_real = Decimal(str(dist_real_gps))
 
+    conclusao_em = datetime.now()
+
+    for parada in paradas:
+        if parada.status == "entregue":
+            _sincronizar_venda_entregue_por_parada(
+                db,
+                parada,
+                tenant_id,
+                parada.data_entrega or conclusao_em,
+            )
+
+    if not paradas and rota.venda_id:
+        venda = db.query(Venda).filter(
+            Venda.id == rota.venda_id,
+            Venda.tenant_id == tenant_id,
+        ).first()
+        if venda:
+            venda.status_entrega = "entregue"
+            venda.data_entrega = venda.data_entrega or conclusao_em
+
     rota.tentativas = payload.tentativas or 1
     rota.observacoes = payload.observacoes
     rota.status = "concluida"
-    rota.data_conclusao = datetime.now()
+    rota.data_conclusao = conclusao_em
 
     # Calcular custo de entrega (entregador)
+    km_para_custo = rota.distancia_real or payload.distancia_real or Decimal("0")
     rota.custo_real = calcular_custo_entrega(
         entregador=entregador,
-        km=payload.distancia_real or Decimal("0"),
+        km=km_para_custo,
         tentativas=rota.tentativas,
         moto_da_loja=rota.moto_da_loja,
     )
 
     # ETAPA 8 + 11.1: Se moto da loja, calcular e armazenar custo da moto separadamente
     rota.custo_moto = Decimal("0")
-    if rota.moto_da_loja and payload.distancia_real:
+    if rota.moto_da_loja and km_para_custo:
         config_moto = db.query(ConfiguracaoCustoMoto).filter(
             ConfiguracaoCustoMoto.tenant_id == tenant_id
         ).first()
         if config_moto:
             custo_moto = calcular_custo_moto(
                 config=config_moto,
-                km=payload.distancia_real
+                km=km_para_custo
             )
             rota.custo_moto = custo_moto
             rota.custo_real += custo_moto
@@ -1333,14 +1390,7 @@ def marcar_parada_entregue(
     else:
         parada.status = "entregue"
         parada.data_entrega = datetime.now()
-
-        venda = db.query(Venda).filter(
-            Venda.id == parada.venda_id,
-            Venda.tenant_id == tenant_id,
-        ).first()
-        if venda:
-            venda.status_entrega = "entregue"
-            venda.data_entrega = parada.data_entrega
+        _sincronizar_venda_entregue_por_parada(db, parada, tenant_id)
 
         # Registrar KM da entrega (opcional)
         if km_entrega is not None:
@@ -1453,19 +1503,23 @@ def marcar_parada_nao_entregue(
         parada.observacoes = f"{obs_existente}\n[{timestamp}] Não entregue: {motivo}".strip()
 
     # Reverter venda para status pendente (para aparecer na lista de entregas em aberto)
-    venda = db.query(Venda).filter(Venda.id == parada.venda_id).first()
+    venda = db.query(Venda).filter(
+        Venda.id == parada.venda_id,
+        Venda.tenant_id == tenant_id,
+    ).first()
     if venda:
         venda.status_entrega = "pendente"
 
     # Remover parada da rota
+    venda_id = parada.venda_id
     db.delete(parada)
     db.commit()
 
-    logger.info(f"Parada {parada_id} marcada como não entregue. Venda {parada.venda_id} voltou para entregas em aberto.")
+    logger.info(f"Parada {parada_id} marcada como não entregue. Venda {venda_id} voltou para entregas em aberto.")
 
     return {
         "message": "Entrega marcada como não realizada. Venda voltou para entregas em aberto.",
-        "venda_id": parada.venda_id
+        "venda_id": venda_id
     }
 
 
@@ -1511,7 +1565,10 @@ def excluir_rota(
     vendas_liberadas = []
     for parada in paradas:
         if parada.venda_id:
-            venda = db.query(Venda).filter(Venda.id == parada.venda_id).first()
+            venda = db.query(Venda).filter(
+                Venda.id == parada.venda_id,
+                Venda.tenant_id == tenant_id,
+            ).first()
             if venda:
                 venda.status_entrega = "pendente"
                 vendas_liberadas.append(venda.id)
