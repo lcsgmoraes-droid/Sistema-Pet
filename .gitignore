@@ -22,10 +22,12 @@ backend/*.db
 # Arquivos sensíveis (CREDENCIAIS)
 backend/.env
 .env
+.env.production
 *.env
 .env.local
 .env.*.local
 .env.whatsapp-pilot
+frontend/.env.production
 backend/bling_token_control.json
 
 # Uploads (imagens, arquivos grandes)

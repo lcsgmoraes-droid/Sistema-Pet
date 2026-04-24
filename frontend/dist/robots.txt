@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://mlprohub.com.br/sitemap.xml
