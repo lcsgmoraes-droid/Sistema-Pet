@@ -942,3 +942,137 @@ Se eu estivesse liderando a próxima fase, eu faria nesta ordem:
 5. trilha de eventos e read models melhores para integrações
 
 Com essa sequência, o sistema sai do estágio "muito poderoso, porém artesanal em alguns pontos" para "produto enterprise com governança, segurança de mudança e operação escalável".
+
+## 11. Plano pre-venda app mobile e ecommerce
+
+Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o ecommerce para pilotos com clientes reais.
+
+### 11.1 O que ja foi ajustado nesta rodada
+
+- [x] app mobile deixou de depender de URL de producao hardcoded em desenvolvimento:
+  - `app-mobile/src/config.ts` agora resolve `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_DEV_API_URL` e `EXPO_PUBLIC_PROD_API_URL`
+  - fallback de desenvolvimento passou para `http://localhost:8000/api`
+  - release segue apontando para `https://mlprohub.com.br/api`
+- [x] app mobile ganhou comandos explicitos de qualidade e release:
+  - `npm run typecheck`
+  - `npm run check`
+  - builds de preview e producao separados no `package.json`
+- [x] permissoes do app foram reduzidas para o minimo operacional atual:
+  - camera para QR/barcode
+  - localizacao foreground para rotas do entregador
+  - notificacoes
+  - leitura de imagens para foto do pet
+  - vibracao
+- [x] removidas ou bloqueadas permissoes duplicadas/amplas do manifest mobile:
+  - `RECORD_AUDIO` bloqueada via `android.blockedPermissions`
+  - `WRITE_EXTERNAL_STORAGE`
+  - `RECEIVE_BOOT_COMPLETED`
+  - duplicidades de `CAMERA`, `READ_EXTERNAL_STORAGE` e `VIBRATE`
+- [x] `.env.example` do app passou a documentar URL local, URL de producao e tenant.
+- [x] checkout web e app passaram a tratar o pedido como "recebido/pendente" em vez de "pagamento confirmado", alinhando a UI com o backend atual.
+- [x] idempotencia do checkout passou a considerar forma de pagamento, retirada, drive e origem, evitando reaproveitar resposta antiga quando o cliente muda escolhas antes de reenviar.
+- [x] contrato de pagamento app/ecommerce registrado e iniciado no codigo:
+  - carrinho nao e pedido comercial
+  - carrinho nao reserva estoque
+  - formas aceitas: PIX, cartao de debito e cartao de credito
+  - dinheiro foi removido do checkout app/ecommerce
+  - webhook de pagamento tambem recusa boleto, transferencia, voucher ou metodo ausente
+  - finalizacao fica bloqueada enquanto a intermediadora de pagamento nao estiver configurada
+  - pedido so deve ser liberado para a loja/caixa depois de pagamento aprovado
+
+### 11.2 Proximas melhorias P0 antes de vender
+
+- [ ] criar ambiente de staging/homologacao para backend, frontend e app mobile
+- [ ] adicionar testes automatizados para `ecommerce_cart`, `ecommerce_checkout`, `ecommerce_entregador` e rastreio mobile
+  - [x] cobertura inicial de idempotencia do `ecommerce_checkout`
+  - [x] cobertura inicial de contrato "carrinho nao reserva estoque"
+  - [x] cobertura inicial do webhook aceitando somente PIX/cartao
+  - [x] cobertura inicial de contrato de entrega/PDV
+- [ ] formalizar o vinculo `Pedido -> Venda` em banco, evitando rastreio por texto em `observacoes`
+- [ ] definir fluxo operacional unico de pedido:
+  - carrinho
+  - pagamento enviado para intermediadora
+  - pagamento pendente de aprovacao
+  - pagamento aprovado
+  - pedido/venda gerado para a loja
+  - separado
+  - em rota ou retirada
+  - entregue/cancelado
+- [x] alinhar UI de pagamento com a realidade definida:
+  - sem dinheiro
+  - sem pedido antes de pagamento aprovado
+  - carrinho tratado como carrinho
+- [x] blindar status de entrega no PDV/app do entregador:
+  - atualizar venda no PDV nao reabre entrega ja marcada como `entregue`, `em_rota` ou cancelada
+  - marcar parada entregue ficou tolerante a reenvio do app
+  - fechar rota concluida ficou tolerante a reenvio
+  - teste cobre sincronizacao parada -> venda para a tag de entregue no PDV
+- [x] reforcar beneficios do app para piloto:
+  - Home leva para Beneficios pelo card de pontos e atalho rapido
+  - tela de beneficios normaliza resposta parcial para cliente novo
+  - cupons passaram a aceitar o contrato real do backend (`code`, `discount_value`, `discount_percent`)
+  - copia de cupom usa `expo-clipboard`
+  - sugestao de cashback corrigida para usar `or_` SQLAlchemy
+- [ ] integrar intermediadora de pagamento para PIX e cartao antes de liberar pedidos reais
+- [ ] implantar Sentry ou ferramenta equivalente para backend, frontend e app mobile
+- [x] criar smoke test de release cobrindo vitrine, carrinho, checkout bloqueado sem gateway, entrega e tag de entregue no PDV
+  - roteiro criado em `docs/SMOKE_RELEASE_APP_ECOMMERCE.md`
+  - pendente transformar o roteiro em E2E automatizado quando staging estiver pronto
+- [ ] limpar `console.log`, `TODO`, `FIXME` e artefatos de debug em codigo de producao
+- [ ] revisar termos de privacidade, politica de dados, permissao de localizacao e textos de loja do app
+
+### 11.3 Refatoracoes prioritarias desta nova fase
+
+- [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos
+- [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
+- [ ] `frontend/src/components/EntradaXML.jsx`: quebrar fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao
+- [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
+- [ ] `backend/app/routes/ecommerce_cart.py`: revisar reserva de estoque com protecao contra corrida em checkout simultaneo
+- [ ] `backend/app/api/endpoints/rotas_entrega.py`: separar sincronizacao de venda/rota/parada em servico de dominio testavel
+
+## 12. Radar comercial, veterinario e banho/tosa
+
+Atualizacao de 2026-04-24: novos clientes precisam conseguir experimentar o sistema sem bloqueios de modulos enquanto a politica comercial ainda nao esta fechada.
+
+### 12.1 Liberacao temporaria de modulos
+
+- [x] liberar temporariamente todos os modulos premium para tenants novos e existentes
+- [x] manter o controle de modulos no codigo, mas sem travar a operacao por enquanto
+- [ ] desenhar pacotes comerciais por perfil de cliente:
+  - petshop varejo
+  - clinica veterinaria
+  - banho e tosa
+  - hospital/clinica avancada
+  - enterprise completo
+- [ ] definir matriz de inclusao por pacote: PDV, estoque, fiscal, financeiro, campanhas, entregas, ecommerce, app, veterinario, banho/tosa, WhatsApp e marketplaces
+- [ ] criar fluxo de compra/upgrade/desbloqueio com auditoria, status de pagamento e trilha de alteracao por tenant
+- [ ] revisar textos de venda dos modulos bloqueados antes de reativar qualquer paywall
+
+### 12.2 Pente fino do Veterinario antes da implantacao piloto
+
+- [ ] validar jornada completa de clinica: cadastro tutor/pet, agenda, consulta, prontuario, vacinas, exames, internacao, retorno e financeiro
+- [ ] revisar permissao e escopo por veterinario, recepcao, admin e financeiro
+- [ ] conferir usabilidade da agenda veterinaria: filtros, conflito de horario, remarcacao, cancelamento e encaixe
+- [ ] padronizar prontuario com templates, campos obrigatorios por tipo de atendimento e historico claro por pet
+- [ ] revisar calculadora de doses, catalogos clinicos e guardrails de IA antes de uso real em clinica
+- [ ] validar anexos/exames: upload, preview, download, auditoria e privacidade/LGPD
+- [ ] amarrar procedimentos, produtos/medicamentos e servicos ao estoque, financeiro e comissoes/repasses
+- [ ] montar smoke test especifico do modulo veterinario para a clinica piloto
+
+### 12.3 Novo modulo Banho & Tosa enterprise
+
+- [ ] criar agenda exclusiva de banho e tosa com capacidade por profissional, sala/box, tipo de servico e porte do pet
+- [ ] permitir agendamento de taxi dog vinculado ao atendimento, com ida/volta, janela de horario, rota e custo
+- [ ] registrar check-in, inicio, pausa, termino e entrega do pet para medir tempo real do atendimento
+- [ ] parametrizar custos por porte, pelagem, servico e unidade:
+  - agua media por atendimento
+  - energia por tempo/equipamento
+  - produtos usados por tipo de banho
+  - toalhas/insumos descartaveis
+  - depreciacao/manutencao de equipamentos
+- [ ] ratear salario/encargos/comissao do funcionario por tempo ou por servico executado
+- [ ] calcular custo real, margem e lucro por atendimento, profissional, pet, porte e servico
+- [ ] integrar pacotes/assinaturas de banho, recorrencia, lembretes e campanha de retorno
+- [ ] controlar status operacional: agendado, confirmado, a caminho, chegou, em banho, em secagem, em tosa, pronto, entregue, cancelado/no-show
+- [ ] gerar dashboards de ocupacao, produtividade, custo medio, ticket medio, margem e gargalos da agenda
+- [ ] reaproveitar cadastros ja existentes: clientes, pets, funcionarios, produtos/estoque, financeiro, entregas/taxi dog e campanhas

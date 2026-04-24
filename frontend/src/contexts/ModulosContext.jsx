@@ -141,12 +141,19 @@ export const ModulosProvider = ({ children }) => {
   const carregarModulos = useCallback(async () => {
     if (!user) {
       // Sem usuário logado: libera tudo para não bloquear tela de loading
-      setModulosAtivos([]);
+      setModulosAtivos(MODULOS_PREMIUM);
       return;
     }
     try {
       const response = await api.get("/modulos/status");
-      setModulosAtivos(response.data.modulos_ativos || []);
+      const modulosApi = response.data?.modulos_ativos;
+      // Temporário: até a política comercial de pacotes ficar pronta, não
+      // bloqueamos módulos premium para novos tenants.
+      setModulosAtivos(
+        Array.isArray(modulosApi) && modulosApi.length > 0
+          ? modulosApi
+          : MODULOS_PREMIUM,
+      );
     } catch {
       // Se o endpoint não existir ainda (deploy incremental), libera tudo
       setModulosAtivos(MODULOS_PREMIUM); // todos ativos = sem bloqueio
