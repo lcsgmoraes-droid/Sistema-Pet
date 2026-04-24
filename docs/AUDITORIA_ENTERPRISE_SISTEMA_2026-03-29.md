@@ -1034,6 +1034,8 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 Atualizacao de 2026-04-24: novos clientes precisam conseguir experimentar o sistema sem bloqueios de modulos enquanto a politica comercial ainda nao esta fechada.
 
+Pente fino detalhado desta fase: `docs/PENTE_FINO_VETERINARIO_BANHO_TOSA_2026-04-24.md`.
+
 ### 12.1 Liberacao temporaria de modulos
 
 - [x] liberar temporariamente todos os modulos premium para tenants novos e existentes
@@ -1051,6 +1053,7 @@ Atualizacao de 2026-04-24: novos clientes precisam conseguir experimentar o sist
 ### 12.2 Pente fino do Veterinario antes da implantacao piloto
 
 - [ ] validar jornada completa de clinica: cadastro tutor/pet, agenda, consulta, prontuario, vacinas, exames, internacao, retorno e financeiro
+- [x] montar documento de pente fino para implantacao piloto de clinica
 - [ ] revisar permissao e escopo por veterinario, recepcao, admin e financeiro
 - [ ] conferir usabilidade da agenda veterinaria: filtros, conflito de horario, remarcacao, cancelamento e encaixe
 - [ ] padronizar prontuario com templates, campos obrigatorios por tipo de atendimento e historico claro por pet
@@ -1062,6 +1065,7 @@ Atualizacao de 2026-04-24: novos clientes precisam conseguir experimentar o sist
 ### 12.3 Novo modulo Banho & Tosa enterprise
 
 - [ ] criar agenda exclusiva de banho e tosa com capacidade por profissional, sala/box, tipo de servico e porte do pet
+- [x] registrar blueprint inicial do modulo Banho & Tosa enterprise
 - [ ] permitir agendamento de taxi dog vinculado ao atendimento, com ida/volta, janela de horario, rota e custo
 - [ ] registrar check-in, inicio, pausa, termino e entrega do pet para medir tempo real do atendimento
 - [ ] parametrizar custos por porte, pelagem, servico e unidade:

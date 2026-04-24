@@ -7,6 +7,7 @@ import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
+import { useAuth } from "../../contexts/AuthContext";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 
 const STORAGE_AGENDA = "vet_internacao_agenda_v1";
@@ -60,6 +61,7 @@ const STATUS_CORES = {
 export default function VetInternacoes() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const abrirNovaQuery = searchParams.get("abrir_nova") === "1";
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
@@ -92,6 +94,8 @@ export default function VetInternacoes() {
   const [filtroPetHistorico, setFiltroPetHistorico] = useState("");
   const [agendaProcedimentos, setAgendaProcedimentos] = useState([]);
   const [totalBaias, setTotalBaias] = useState(12);
+  const [agendaStorageCarregado, setAgendaStorageCarregado] = useState(false);
+  const [baiasStorageCarregado, setBaiasStorageCarregado] = useState(false);
   const [agendaForm, setAgendaForm] = useState({
     internacao_id: "",
     horario: "",
@@ -124,6 +128,13 @@ export default function VetInternacoes() {
     observacoes: "",
   });
   const [salvando, setSalvando] = useState(false);
+  const storageScope = useMemo(() => {
+    const tenantId = user?.tenant_id || user?.tenant?.id || "tenant";
+    const userId = user?.id || "usuario";
+    return `${tenantId}_${userId}`;
+  }, [user?.tenant_id, user?.tenant?.id, user?.id]);
+  const agendaStorageKey = `${STORAGE_AGENDA}_${storageScope}`;
+  const totalBaiasStorageKey = `${STORAGE_TOTAL_BAIAS}_${storageScope}`;
 
   useEffect(() => {
     api.get("/pets", { params: { limit: 500 } }).then((r) => setPets(r.data?.items ?? r.data ?? [])).catch(() => {});
@@ -158,36 +169,50 @@ export default function VetInternacoes() {
   }, [novoPetIdQuery]);
 
   useEffect(() => {
+    setAgendaStorageCarregado(false);
     try {
-      const salvo = localStorage.getItem(STORAGE_AGENDA);
-      if (!salvo) return;
+      const salvo = localStorage.getItem(agendaStorageKey);
+      if (!salvo) {
+        setAgendaProcedimentos([]);
+        return;
+      }
       const parsed = JSON.parse(salvo);
       if (Array.isArray(parsed)) setAgendaProcedimentos(parsed);
     } catch {
       setAgendaProcedimentos([]);
+    } finally {
+      setAgendaStorageCarregado(true);
     }
-  }, []);
+  }, [agendaStorageKey]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_AGENDA, JSON.stringify(agendaProcedimentos));
-  }, [agendaProcedimentos]);
+    if (!agendaStorageCarregado) return;
+    localStorage.setItem(agendaStorageKey, JSON.stringify(agendaProcedimentos));
+  }, [agendaProcedimentos, agendaStorageCarregado, agendaStorageKey]);
 
   useEffect(() => {
+    setBaiasStorageCarregado(false);
     try {
-      const salvo = localStorage.getItem(STORAGE_TOTAL_BAIAS);
-      if (!salvo) return;
+      const salvo = localStorage.getItem(totalBaiasStorageKey);
+      if (!salvo) {
+        setTotalBaias(12);
+        return;
+      }
       const parsed = Number.parseInt(salvo, 10);
       if (Number.isFinite(parsed) && parsed > 0) {
         setTotalBaias(parsed);
       }
     } catch {
       setTotalBaias(12);
+    } finally {
+      setBaiasStorageCarregado(true);
     }
-  }, []);
+  }, [totalBaiasStorageKey]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_TOTAL_BAIAS, String(totalBaias));
-  }, [totalBaias]);
+    if (!baiasStorageCarregado) return;
+    localStorage.setItem(totalBaiasStorageKey, String(totalBaias));
+  }, [baiasStorageCarregado, totalBaias, totalBaiasStorageKey]);
 
   const pessoas = useMemo(() => {
     const mapa = new Map();
