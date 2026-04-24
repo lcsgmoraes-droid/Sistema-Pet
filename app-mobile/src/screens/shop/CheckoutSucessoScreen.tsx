@@ -73,11 +73,11 @@ export default function CheckoutSucessoScreen() {
         <Ionicons name="checkmark-circle" size={80} color={CORES.sucesso} />
       </View>
 
-      <Text style={styles.titulo}>Pedido confirmado! 🎉</Text>
+      <Text style={styles.titulo}>Pagamento em analise</Text>
       <Text style={styles.subtitulo}>
         {isEntrega
-          ? "Seu pedido foi registrado. Entraremos em contato para combinar a entrega!"
-          : "Agora é só ir ao caixa, falar a palavra-chave e pronto!"}
+          ? "O pedido sera liberado para entrega apos aprovacao do pagamento."
+          : "O pedido sera liberado para retirada apos aprovacao do pagamento."}
       </Text>
 
       {/* Card de entrega */}
@@ -162,10 +162,10 @@ export default function CheckoutSucessoScreen() {
       <View style={styles.instrucoes}>
         {isEntrega ? (
           <>
-            <InstrucaoItem numero={1} texto="Pedido registrado com sucesso" />
+            <InstrucaoItem numero={1} texto="Pagamento enviado para aprovacao" />
             <InstrucaoItem
               numero={2}
-              texto="Aguarde o contato da loja para combinar a entrega"
+              texto="Aguarde a aprovacao da intermediadora"
             />
             <InstrucaoItem
               numero={3}
@@ -174,14 +174,14 @@ export default function CheckoutSucessoScreen() {
           </>
         ) : (
           <>
-            <InstrucaoItem numero={1} texto="Vá ao caixa da loja" />
+            <InstrucaoItem numero={1} texto="Pagamento enviado para aprovacao" />
             <InstrucaoItem
               numero={2}
               texto={`Fale a palavra "${pedido.palavra_chave_retirada?.toUpperCase()}"`}
             />
             <InstrucaoItem
               numero={3}
-              texto="O funcionário confirma e você sai!"
+              texto="A retirada sera liberada apos aprovacao"
             />
           </>
         )}

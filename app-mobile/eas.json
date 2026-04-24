@@ -7,6 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8000/api",
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
       }
     },
@@ -17,6 +18,7 @@
         "buildType": "apk"
       },
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://mlprohub.com.br/api",
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
       }
     },
@@ -24,6 +26,7 @@
       "autoIncrement": true,
       "channel": "production",
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://mlprohub.com.br/api",
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
       }
     }

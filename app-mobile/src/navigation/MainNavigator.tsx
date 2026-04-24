@@ -52,7 +52,7 @@ function LojaNavigator() {
       <LojaStack.Screen
         name="CheckoutSucesso"
         component={CheckoutSucessoScreen}
-        options={{ title: "Pedido Confirmado", headerLeft: () => null }}
+        options={{ title: "Pagamento em análise", headerLeft: () => null }}
       />
     </LojaStack.Navigator>
   );

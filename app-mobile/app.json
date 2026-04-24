@@ -21,8 +21,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.petshoppro.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Usado para escanear código de barras dos produtos.",
-        "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet."
+        "NSCameraUsageDescription": "Usado para escanear codigo de barras dos produtos.",
+        "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet.",
+        "NSLocationWhenInUseUsageDescription": "Usado para enviar a posicao do entregador durante rotas ativas."
       },
       "runtimeVersion": {
         "policy": "appVersion"
@@ -35,19 +36,11 @@
       },
       "package": "com.petshoppro.app",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "android.permission.CAMERA",
+        "POST_NOTIFICATIONS",
+        "READ_MEDIA_IMAGES",
+        "VIBRATE"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ],
       "runtimeVersion": "1.0.0"
@@ -59,7 +52,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Permite escanear códigos de barras dos produtos."
+          "cameraPermission": "Permite escanear codigos de barras dos produtos.",
+          "recordAudioAndroid": false
         }
       ],
       [
@@ -72,6 +66,18 @@
       ],
       [
         "expo-secure-store"
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Usado para enviar a posicao do entregador durante rotas ativas."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Usado para adicionar foto do seu pet."
+        }
       ],
       "expo-asset",
       "expo-font"

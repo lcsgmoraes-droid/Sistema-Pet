@@ -416,10 +416,9 @@ export default function EcommerceMVP() {
   const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
   const [checkoutResumo, setCheckoutResumo] = useState(null);
   const [checkoutResult, setCheckoutResult] = useState(null);
-  const [pagamentoTipo, setPagamentoTipo] = useState(''); // 'dinheiro'|'pix'|'debito'|'credito'
+  const [pagamentoTipo, setPagamentoTipo] = useState(''); // 'pix'|'debito'|'credito'
   const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
   const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
-  const [pagamentoTroco, setPagamentoTroco] = useState('');
   const [activeProductImage, setActiveProductImage] = useState('');
 
   const [orderIds, setOrderIds] = useState(() => {
@@ -1364,6 +1363,10 @@ export default function EcommerceMVP() {
       setError('Informe o endereço de entrega.');
       return;
     }
+    if (!pagamentoTipo) {
+      setError('Escolha PIX, debito ou credito para continuar para o pagamento.');
+      return;
+    }
 
     setCheckoutLoading(true);
     setError('');
@@ -1380,7 +1383,6 @@ export default function EcommerceMVP() {
           tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
           is_drive: deliveryMode === 'retirada' && tipoRetirada === 'proprio' ? isDrive : false,
           forma_pagamento_nome: (() => {
-            if (pagamentoTipo === 'dinheiro') return pagamentoTroco ? `Dinheiro (troco p/ R$ ${pagamentoTroco})` : 'Dinheiro';
             if (pagamentoTipo === 'pix') return 'PIX';
             if (pagamentoTipo === 'debito') return `Débito ${pagamentoBandeira}`;
             if (pagamentoTipo === 'credito') return `Crédito ${pagamentoBandeira} ${pagamentoParcelas}x`;
@@ -1413,7 +1415,7 @@ export default function EcommerceMVP() {
         await loadOrdersDetailed();
       }
 
-      setSuccess('Pedido finalizado com sucesso.');
+      setSuccess('Pagamento enviado para analise. O pedido sera liberado apos aprovacao.');
       setView('pedidos');
     } catch (err) {
       setError(extractApiErrorMessage(err, 'Erro ao finalizar checkout'));
@@ -2251,24 +2253,18 @@ export default function EcommerceMVP() {
               <div style={S.formCard}>
                 <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 12 }}>💳 Como vai pagar?</div>
                 {(() => {
-                  const opcs = [{ key: 'dinheiro', label: 'Dinheiro', icon: '💵' }, { key: 'pix', label: 'PIX', icon: '📱' }, { key: 'debito', label: 'Débito', icon: '💳' }, { key: 'credito', label: 'Crédito', icon: '💳' }];
+                  const opcs = [{ key: 'pix', label: 'PIX', icon: '📱' }, { key: 'debito', label: 'Débito', icon: '💳' }, { key: 'credito', label: 'Crédito', icon: '💳' }];
                   const bandeiras = ['Visa', 'Mastercard', 'Elo', 'Outra'];
                   return (
                     <div style={{ display: 'grid', gap: 10 }}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {opcs.map((o) => (
                           <label key={o.key} style={pagamentoTipo === o.key ? S.radioLabelActive : S.radioLabel}>
-                            <input type="radio" name="pagamentoTipo" value={o.key} checked={pagamentoTipo === o.key} onChange={() => { setPagamentoTipo(o.key); if (o.key !== 'dinheiro') setPagamentoTroco(''); }} style={{ display: 'none' }} />
+                            <input type="radio" name="pagamentoTipo" value={o.key} checked={pagamentoTipo === o.key} onChange={() => setPagamentoTipo(o.key)} style={{ display: 'none' }} />
                             {o.icon} {o.label}
                           </label>
                         ))}
                       </div>
-                      {pagamentoTipo === 'dinheiro' && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                          <span style={{ color: '#374151' }}>Troco para R$</span>
-                          <input type="number" min="0" placeholder="Ex: 100" value={pagamentoTroco} onChange={(e) => setPagamentoTroco(e.target.value)} style={{ ...S.formInput, width: 110 }} />
-                        </div>
-                      )}
                       {(pagamentoTipo === 'debito' || pagamentoTipo === 'credito') && (
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                           <span style={{ fontSize: 13, color: '#6b7280' }}>Bandeira:</span>
@@ -2292,6 +2288,9 @@ export default function EcommerceMVP() {
                     </div>
                   );
                 })()}
+                <div style={{ marginTop: 10, fontSize: 12, color: '#92400e', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 10px' }}>
+                  O carrinho ainda nao e pedido. O pedido so sera liberado apos aprovacao do pagamento online.
+                </div>
               </div>
             </div>
 
@@ -2322,7 +2321,7 @@ export default function EcommerceMVP() {
               )}
 
               <button onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete} style={S.finalizarBtn(checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete)}>
-                {checkoutLoading ? 'Finalizando...' : '✓ Finalizar pedido'}
+                {checkoutLoading ? 'Abrindo pagamento...' : 'Ir para pagamento'}
               </button>
 
               {!isProfileComplete && (
@@ -2333,8 +2332,9 @@ export default function EcommerceMVP() {
 
               {checkoutResult?.pedido_id && (
                 <div style={{ background: '#ecfdf5', border: '1.5px solid #6ee7b7', borderRadius: 12, padding: 14, marginTop: 8, display: 'grid', gap: 6 }}>
-                  <div style={{ fontWeight: 700, color: '#065f46', fontSize: 14 }}>✓ Pedido confirmado!</div>
+                  <div style={{ fontWeight: 700, color: '#065f46', fontSize: 14 }}>Pagamento em analise</div>
                   <div style={{ fontSize: 13, color: '#374151' }}>Número: <strong>{checkoutResult.pedido_id}</strong></div>
+                  <div style={{ fontSize: 12, color: '#047857' }}>O pedido sera liberado para a loja apos aprovacao do pagamento.</div>
                   {checkoutResult.palavra_chave_retirada && (
                     <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 12, textAlign: 'center', marginTop: 4 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#7c2d12', marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>

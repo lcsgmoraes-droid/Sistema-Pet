@@ -28,11 +28,10 @@ export default function CartScreen() {
   const { user } = useAuthStore();
   const [finalizando, setFinalizando] = useState(false);
 
-  // Forma de pagamento — simplificada
-  const [pagamentoTipo, setPagamentoTipo] = useState<'dinheiro' | 'pix' | 'debito' | 'credito' | ''>('');
+  // Forma de pagamento online
+  const [pagamentoTipo, setPagamentoTipo] = useState<'pix' | 'debito' | 'credito' | ''>('');
   const [pagamentoBandeira, setPagamentoBandeira] = useState<string>('Visa');
   const [pagamentoParcelas, setPagamentoParcelas] = useState<number>(1);
-  const [pagamentoTroco, setPagamentoTroco] = useState<string>('');
 
   // Modo de recebimento
   const [modo, setModo] = useState<'retirada' | 'entrega'>('retirada');
@@ -112,6 +111,11 @@ export default function CartScreen() {
       }
     }
 
+    if (!pagamentoTipo) {
+      Alert.alert('Forma de pagamento', 'Escolha PIX, debito ou credito para continuar.');
+      return;
+    }
+
     const enderecoFormatado = modo === 'entrega' ? getEnderecoEntrega() : undefined;
     const modoLabel = modo === 'retirada'
       ? tipoRetirada === 'terceiro'
@@ -120,7 +124,6 @@ export default function CartScreen() {
       : `Entrega em: ${enderecoFormatado}`;
 
     function buildPagLabel(): string {
-      if (pagamentoTipo === 'dinheiro') return pagamentoTroco ? `Dinheiro (troco p/ R$ ${pagamentoTroco})` : 'Dinheiro';
       if (pagamentoTipo === 'pix') return 'PIX';
       if (pagamentoTipo === 'debito') return `Débito ${pagamentoBandeira}`;
       if (pagamentoTipo === 'credito') return `Crédito ${pagamentoBandeira} ${pagamentoParcelas}x`;
@@ -129,12 +132,12 @@ export default function CartScreen() {
     const pagLabel = pagamentoTipo ? `\n💳 Pagamento: ${buildPagLabel()}` : '';
 
     Alert.alert(
-      'Confirmar pedido',
-      `Total: ${formatarMoeda(subtotal)}\n\n${modoLabel}${pagLabel}`,
+      'Ir para pagamento',
+      `Total: ${formatarMoeda(subtotal)}\n\n${modoLabel}${pagLabel}\n\nO carrinho ainda nao e pedido. O pedido so sera liberado apos aprovacao do pagamento online.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Confirmar',
+          text: 'Continuar',
           onPress: async () => {
             setFinalizando(true);
             try {
@@ -392,37 +395,25 @@ export default function CartScreen() {
             {/* Forma de pagamento */}
             <View style={styles.subSecao}>
               <Text style={styles.subSecaoTitulo}>💳 Forma de pagamento</Text>
+              <Text style={styles.pagamentoAviso}>
+                O carrinho ainda nao e pedido. O pedido so sera liberado apos aprovacao do pagamento online.
+              </Text>
               <View style={styles.modoRow}>
-                {(['dinheiro', 'pix', 'debito', 'credito'] as const).map((tipo) => (
+                {(['pix', 'debito', 'credito'] as const).map((tipo) => (
                   <TouchableOpacity
                     key={tipo}
                     style={[styles.pagBotao, pagamentoTipo === tipo && styles.pagBotaoAtivo]}
                     onPress={() => setPagamentoTipo(tipo)}
                   >
                     <Text style={styles.pagBotaoIcon}>
-                      {tipo === 'dinheiro' ? '💵' : tipo === 'pix' ? '📱' : '💳'}
+                      {tipo === 'pix' ? '📱' : '💳'}
                     </Text>
                     <Text style={[styles.pagBotaoTexto, pagamentoTipo === tipo && styles.pagBotaoTextoAtivo]}>
-                      {tipo === 'dinheiro' ? 'Dinheiro' : tipo === 'pix' ? 'PIX' : tipo === 'debito' ? 'Débito' : 'Crédito'}
+                      {tipo === 'pix' ? 'PIX' : tipo === 'debito' ? 'Débito' : 'Crédito'}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-
-              {pagamentoTipo === 'dinheiro' && (
-                <View style={{ marginTop: 8 }}>
-                  <Text style={styles.pagLabel}>Troco para quanto? (opcional)</Text>
-                  <TextInput
-                    style={styles.campo}
-                    placeholder="Ex: 50,00"
-                    placeholderTextColor={CORES.textoClaro}
-                    keyboardType="numeric"
-                    value={pagamentoTroco}
-                    onChangeText={setPagamentoTroco}
-                  />
-                </View>
-              )}
-
               {(pagamentoTipo === 'debito' || pagamentoTipo === 'credito') && (
                 <View style={{ marginTop: 8 }}>
                   <Text style={styles.pagLabel}>Bandeira</Text>
@@ -478,7 +469,7 @@ export default function CartScreen() {
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.botaoFinalizarTexto}>Finalizar pedido</Text>
+              <Text style={styles.botaoFinalizarTexto}>Ir para pagamento</Text>
             </>
           )}
         </TouchableOpacity>
@@ -755,6 +746,16 @@ const styles = StyleSheet.create({
   botaoCatalogoTexto: { color: CORES.primario, fontSize: FONTE.normal },
 
   // Pagamento simplificado
+  pagamentoAviso: {
+    fontSize: FONTE.pequena,
+    color: '#92400E',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+    borderWidth: 1,
+    borderRadius: RAIO.sm,
+    padding: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+  },
   pagBotao: {
     flex: 1,
     alignItems: 'center',

@@ -185,6 +185,16 @@ def calcular_totais_venda(itens: List, desconto_valor: float, desconto_percentua
     }
 
 
+def _resolver_status_entrega_atualizacao(tem_entrega: bool, status_atual: Optional[str]) -> Optional[str]:
+    """
+    Atualizacao de venda nao deve reabrir entrega ja roteirizada/concluida.
+    Sem isso, uma venda entregue pode voltar para "pendente" ao salvar o PDV.
+    """
+    if not tem_entrega:
+        return None
+    return status_atual or "pendente"
+
+
 # ============================================================================
 # ENDPOINTS - CONFIGURAÇÕES DE ENTREGA [DEPRECATED]
 # ============================================================================
@@ -545,7 +555,9 @@ def atualizar_venda(
     venda.distancia_km = dados.distancia_km if tem_entrega else None
     venda.valor_por_km = dados.valor_por_km if tem_entrega else None
     venda.observacoes_entrega = dados.observacoes_entrega if tem_entrega else None
-    venda.status_entrega = 'pendente' if tem_entrega else None
+    venda.status_entrega = _resolver_status_entrega_atualizacao(tem_entrega, venda.status_entrega)
+    if not tem_entrega:
+        venda.data_entrega = None
     venda.updated_at = datetime.now()
 
     # 🔄 DEVOLVER ESTOQUE dos produtos REMOVIDOS

@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import hashlib
 import json
 import logging
+import os
 import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
@@ -29,6 +30,7 @@ security = HTTPBearer()
 
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
 RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
+FORMAS_PAGAMENTO_ONLINE = ("pix", "cartao_debito", "cartao_credito")
 
 # Palavras do mundo pet para código de retirada por terceiro
 _PALAVRAS_PET = [
@@ -204,6 +206,52 @@ def _request_hash(data: dict) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
+def _pagamento_online_configurado() -> bool:
+    enabled = str(os.getenv("ECOMMERCE_PAYMENT_GATEWAY_ENABLED", "")).strip().lower()
+    provider = str(os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "")).strip()
+    return enabled in {"1", "true", "yes", "on"} and bool(provider)
+
+
+def _classificar_forma_pagamento_online(nome: str | None) -> str | None:
+    valor = (nome or "").strip().lower()
+    if not valor:
+        return None
+    if valor.startswith("pix"):
+        return "pix"
+    if valor.startswith("debito") or valor.startswith("débito"):
+        return "cartao_debito"
+    if valor.startswith("credito") or valor.startswith("crédito"):
+        return "cartao_credito"
+    return None
+
+
+def _validar_forma_pagamento_online(nome: str | None) -> str:
+    tipo = _classificar_forma_pagamento_online(nome)
+    if tipo not in FORMAS_PAGAMENTO_ONLINE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Forma de pagamento invalida para app/ecommerce. Use PIX, debito ou credito.",
+        )
+    return tipo
+
+
+def _checkout_idempotency_payload(
+    identity: EcommerceIdentity,
+    payload: CheckoutFinalizarRequest,
+) -> dict:
+    return {
+        "user_id": identity.user_id,
+        "tenant_id": str(UUID(identity.tenant_id)),
+        "cidade_destino": payload.cidade_destino,
+        "endereco_entrega": payload.endereco_entrega,
+        "cupom": payload.cupom,
+        "tipo_retirada": payload.tipo_retirada,
+        "is_drive": payload.is_drive,
+        "forma_pagamento_nome": payload.forma_pagamento_nome,
+        "origem": payload.origem,
+    }
+
+
 def _calcular_desconto(subtotal: float, cupom: str | None) -> tuple[str | None, int, float]:
     if not cupom:
         return None, 0, 0.0
@@ -298,17 +346,21 @@ def finalizar_checkout(
     db: Session = Depends(get_session),
 ):
     _expirar_reservas_automaticamente(db, identity.tenant_id)
+    forma_pagamento_tipo = _validar_forma_pagamento_online(payload.forma_pagamento_nome)
+
+    if not _pagamento_online_configurado():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Pagamento online ainda nao configurado para app/ecommerce. "
+                "Configure a intermediadora antes de finalizar pedidos."
+            ),
+        )
 
     endpoint_name = "POST /api/checkout/finalizar"
     idem_key_value = idempotency_key or request.headers.get("Idempotency-Key")
-    tenant_uuid = str(UUID(identity.tenant_id))
-    request_data = {
-        "user_id": identity.user_id,
-        "tenant_id": tenant_uuid,
-        "cidade_destino": payload.cidade_destino,
-        "endereco_entrega": payload.endereco_entrega,
-        "cupom": payload.cupom,
-    }
+    request_data = _checkout_idempotency_payload(identity, payload)
+    tenant_uuid = request_data["tenant_id"]
     request_hash = _request_hash(request_data)
     idem_row = None
 
@@ -384,7 +436,7 @@ def finalizar_checkout(
     carrinho.is_drive = payload.is_drive
 
     response = {
-        "status": "pedido_finalizado",
+        "status": "pagamento_pendente_aprovacao",
         "pedido_id": carrinho.pedido_id,
         "pedido_status": carrinho.status,
         "subtotal": subtotal,
@@ -398,6 +450,7 @@ def finalizar_checkout(
         "endereco_entrega": payload.endereco_entrega,
         "tipo_retirada": tipo_retirada,
         "is_drive": payload.is_drive,
+        "forma_pagamento_tipo": forma_pagamento_tipo,
         "palavra_chave_retirada": palavra_chave,
     }
 
@@ -413,8 +466,8 @@ def finalizar_checkout(
     db.commit()
 
     logger.info(
-        f"✅ Checkout finalizado: pedido #{carrinho.pedido_id} aguardando pagamento "
-        f"(tipo_retirada={tipo_retirada})"
+        f"Checkout enviado para pagamento: carrinho #{carrinho.pedido_id} "
+        f"aguardando aprovacao (tipo_retirada={tipo_retirada})"
     )
     return response
 

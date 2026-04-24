@@ -59,7 +59,7 @@ export default function HomeScreen() {
         </View>
         <TouchableOpacity
           style={styles.pontosCard}
-          onPress={() => navigation.navigate('Perfil')}
+          onPress={() => navigation.navigate('Beneficios')}
         >
           <Ionicons name="trophy" size={16} color={CORES.pontos} />
           <Text style={styles.pontosTexto}>{pontos} pts</Text>
@@ -75,7 +75,7 @@ export default function HomeScreen() {
         <View style={styles.scannerInfo}>
           <Text style={styles.scannerTitulo}>📷 Comprar sem fila</Text>
           <Text style={styles.scannerTexto}>
-            Escaneie os produtos na prateleira, pague pelo app e retire na saída com uma palavra-chave.
+            Escaneie produtos na prateleira, monte seu carrinho e acompanhe os benefícios disponíveis.
           </Text>
         </View>
         <Ionicons name="barcode-outline" size={48} color="rgba(255,255,255,0.7)" />
@@ -112,6 +112,13 @@ export default function HomeScreen() {
             cor="#FDF4FF"
             corTexto="#9333EA"
             onPress={() => navigation.navigate('Pedidos')}
+          />
+          <Atalho
+            emoji="🎁"
+            titulo="Benefícios"
+            cor="#FEF3C7"
+            corTexto="#92400E"
+            onPress={() => navigation.navigate('Beneficios')}
           />
         </View>
       </View>
@@ -258,9 +265,9 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ESPACO.sm },
   sectionTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto, marginBottom: ESPACO.sm },
   verTodos: { fontSize: FONTE.normal, color: CORES.primario, fontWeight: '500' },
-  atalhos: { flexDirection: 'row', gap: ESPACO.sm },
+  atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
   atalho: {
-    flex: 1,
+    width: '31%',
     borderRadius: RAIO.md,
     paddingVertical: ESPACO.md,
     alignItems: 'center',

@@ -16,6 +16,12 @@ from app.produtos_models import Produto
 
 router = APIRouter(prefix="/webhooks", tags=["ecommerce-webhooks"])
 
+PAYMENT_METHODS_ONLINE_ACEITOS = {
+    "pix": "pix",
+    "credit_card": "cartao_credito",
+    "debit_card": "cartao_debito",
+}
+
 
 def _get_signature_config() -> tuple[str, bool]:
     secret = (os.getenv("PAGARME_WEBHOOK_SECRET", "") or "").strip()
@@ -126,6 +132,16 @@ def _find_pedido_id(payload: dict) -> str | None:
     )
 
 
+def _normalizar_payment_method_online(payment_method: str | None) -> str:
+    raw = str(payment_method or "").strip().lower()
+    if raw not in PAYMENT_METHODS_ONLINE_ACEITOS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Forma de pagamento online nao permitida para app/ecommerce",
+        )
+    return raw
+
+
 def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
     """
     Extrai payment_method e installments do payload do Pagar.me.
@@ -133,7 +149,7 @@ def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
 
     Returns:
         tuple: (payment_method: str, installments: int)
-        payment_method values: "pix", "credit_card", "debit_card", "boleto"
+        payment_method values aceitos: "pix", "credit_card", "debit_card"
     """
     data = payload.get("data") or {}
     metadata = payload.get("metadata") or data.get("metadata") or {}
@@ -176,7 +192,7 @@ def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
         except (TypeError, ValueError):
             installments = 1
 
-    return str(payment_method or "pix").strip().lower(), installments
+    return str(payment_method or "").strip().lower(), installments
 
 
 def _mapear_forma_pagamento_ecommerce(
@@ -195,16 +211,8 @@ def _mapear_forma_pagamento_ecommerce(
     from app.financeiro_models import FormaPagamento
     from sqlalchemy import func as sa_func
 
-    tipo_map = {
-        "pix": "pix",
-        "credit_card": "cartao_credito",
-        "debit_card": "cartao_debito",
-        "boleto": "boleto",
-        "bank_slip": "boleto",
-        "transfer": "transferencia",
-        "voucher": "cartao_credito",
-    }
-    tipo = tipo_map.get(payment_method, "pix")
+    payment_method = _normalizar_payment_method_online(payment_method)
+    tipo = PAYMENT_METHODS_ONLINE_ACEITOS[payment_method]
 
     base_query = db.query(FormaPagamento).filter(
         FormaPagamento.tenant_id == tenant_id,
@@ -270,6 +278,7 @@ def _processar_pos_venda_ecommerce(
     from app.vendas_models import VendaPagamento
 
     payment_method, installments = _extrair_pagamento_do_webhook(webhook_payload)
+    payment_method = _normalizar_payment_method_online(payment_method)
     forma_pag_nome, parcelas = _mapear_forma_pagamento_ecommerce(
         payment_method, installments, tenant_id, db
     )
@@ -686,6 +695,8 @@ async def webhook_pagarme(request: Request):
                 pedido.status = pedido_status
                 updated = True
                 if pedido_status == "aprovado":
+                    payment_method, _ = _extrair_pagamento_do_webhook(payload)
+                    _normalizar_payment_method_online(payment_method)
                     venda_id = _integrar_venda_ao_motor(db, pedido, payload)
 
         response = {

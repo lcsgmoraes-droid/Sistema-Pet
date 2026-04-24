@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Clipboard,
   FlatList,
   Modal,
   RefreshControl,
@@ -15,14 +15,63 @@ import QRCode from 'react-native-qrcode-svg';
 import api from '../../services/api';
 import { CORES } from '../../theme';
 
+interface CupomApi {
+  id?: number;
+  code?: string;
+  codigo?: string;
+  coupon_type?: string;
+  tipo_desconto?: string;
+  discount_value?: number | null;
+  valor_desconto?: number | null;
+  discount_percent?: number | null;
+  desconto_formatado?: string;
+  min_purchase_value?: number | null;
+  valor_minimo_pedido?: number | null;
+  valid_until: string | null;
+  expirado: boolean;
+}
+
 interface Cupom {
+  id: string;
   codigo: string;
-  tipo_desconto: string;
-  valor_desconto: number;
   desconto_formatado: string;
   valor_minimo_pedido: number | null;
   valid_until: string | null;
   expirado: boolean;
+}
+
+function brl(valor: number): string {
+  return valor.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function normalizarCupom(item: CupomApi): Cupom | null {
+  const codigo = String(item.code || item.codigo || '').trim();
+  if (!codigo) return null;
+
+  let desconto = item.desconto_formatado;
+  if (!desconto) {
+    if (item.discount_percent != null) {
+      desconto = `${item.discount_percent}% de desconto`;
+    } else if (item.discount_value != null) {
+      desconto = `R$ ${brl(Number(item.discount_value || 0))} de desconto`;
+    } else if (item.valor_desconto != null) {
+      desconto = `R$ ${brl(Number(item.valor_desconto || 0))} de desconto`;
+    } else {
+      desconto = 'Beneficio especial';
+    }
+  }
+
+  return {
+    id: String(item.id ?? codigo),
+    codigo,
+    desconto_formatado: desconto,
+    valor_minimo_pedido: item.min_purchase_value ?? item.valor_minimo_pedido ?? null,
+    valid_until: item.valid_until ?? null,
+    expirado: Boolean(item.expirado),
+  };
 }
 
 export default function CouponsScreen() {
@@ -34,8 +83,8 @@ export default function CouponsScreen() {
 
   const carregar = useCallback(async () => {
     try {
-      const { data } = await api.get<Cupom[]>('/ecommerce/auth/meus-cupons');
-      setCupons(data);
+      const { data } = await api.get<CupomApi[]>('/ecommerce/auth/meus-cupons');
+      setCupons((Array.isArray(data) ? data : []).map(normalizarCupom).filter(Boolean) as Cupom[]);
     } catch {
       setCupons([]);
     } finally {
@@ -48,8 +97,8 @@ export default function CouponsScreen() {
     carregar();
   }, [carregar]);
 
-  const copiar = (codigo: string) => {
-    Clipboard.setString(codigo);
+  const copiar = async (codigo: string) => {
+    await Clipboard.setStringAsync(codigo);
     setCopiado(codigo);
     setTimeout(() => setCopiado(null), 2000);
   };
@@ -78,7 +127,7 @@ export default function CouponsScreen() {
     <>
     <FlatList
       data={cupons}
-      keyExtractor={(item) => item.codigo}
+      keyExtractor={(item) => item.id}
       contentContainerStyle={styles.lista}
       refreshControl={
         <RefreshControl
@@ -127,7 +176,7 @@ export default function CouponsScreen() {
             </View>
           </View>
 
-          <Text style={styles.desconto}>{item.desconto_formatado} de desconto</Text>
+          <Text style={styles.desconto}>{item.desconto_formatado}</Text>
 
           {item.valor_minimo_pedido !== null && item.valor_minimo_pedido > 0 && (
             <Text style={styles.info}>

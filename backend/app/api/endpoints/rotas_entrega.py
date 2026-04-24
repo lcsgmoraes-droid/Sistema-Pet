@@ -91,6 +91,14 @@ def _sincronizar_venda_entregue_por_parada(
     return venda
 
 
+def _contar_paradas_nao_entregues(db: Session, rota_id: int, tenant_id) -> int:
+    return db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.tenant_id == tenant_id,
+        RotaEntregaParada.status != "entregue",
+    ).count()
+
+
 @router.get("/", response_model=List[RotaEntregaResponse])
 def listar_rotas(
     status: Optional[str] = Query(None, description="Filtrar por status"),
@@ -853,7 +861,7 @@ def fechar_rota(
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     if rota.status == "concluida":
-        raise HTTPException(status_code=400, detail="Rota já concluída")
+        return rota
 
     entregador = db.query(Cliente).filter(
         Cliente.id == rota.entregador_id,
@@ -1380,7 +1388,13 @@ def marcar_parada_entregue(
         raise HTTPException(status_code=404, detail="Parada não encontrada")
 
     if parada.status == "entregue":
-        raise HTTPException(status_code=400, detail="Parada já marcada como entregue")
+        _sincronizar_venda_entregue_por_parada(db, parada, tenant_id)
+        db.commit()
+        paradas_pendentes = _contar_paradas_nao_entregues(db, rota_id, tenant_id)
+        mensagem = "Parada ja estava marcada como entregue."
+        if paradas_pendentes == 0:
+            mensagem += " Todas as paradas foram concluidas. Feche a rota."
+        return {"message": mensagem, "paradas_pendentes": paradas_pendentes}
 
     # Marcar status
     if tentativa:
@@ -1421,11 +1435,9 @@ def marcar_parada_entregue(
 
     db.commit()
 
-    # Verificar se todas as paradas foram entregues
-    paradas_pendentes = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.status == "pendente"
-    ).count()
+    # Verificar se todas as paradas foram entregues.
+    # Tentativas ainda contam como abertas para impedir fechamento acidental.
+    paradas_pendentes = _contar_paradas_nao_entregues(db, rota_id, tenant_id)
 
     if paradas_pendentes == 0:
         mensagem += " Todas as paradas foram concluídas. Feche a rota."

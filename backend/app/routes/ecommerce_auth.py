@@ -112,6 +112,14 @@ def _remaining_days_until(dt: datetime, now_ref: datetime) -> int:
     return max(0, (dt - aligned_now).days)
 
 
+def _cashback_disponivel_clause(cashback_model, now_ref: datetime):
+    return or_(
+        cashback_model.expires_at.is_(None),
+        cashback_model.expires_at > now_ref,
+        cashback_model.tx_type != "credit",
+    )
+
+
 def _extract_tenant_id_from_request(request: Request) -> UUID:
     tenant_id = _normalize_tenant_uuid(request.headers.get("X-Tenant-ID"))
     if not tenant_id:
@@ -943,11 +951,7 @@ def meus_beneficios(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now,
-                CashbackTransaction.tx_type != "credit",
-            ),
+            _cashback_disponivel_clause(CashbackTransaction, now),
         )
         .scalar()
     )
@@ -1095,11 +1099,7 @@ def meu_extrato_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now,
-                CashbackTransaction.tx_type != "credit",
-            ),
+            _cashback_disponivel_clause(CashbackTransaction, now),
         )
         .scalar()
     )
@@ -1150,11 +1150,7 @@ def minha_sugestao_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            sqlfunc.or_(
-                CashbackTransaction.expires_at.is_(None),
-                CashbackTransaction.expires_at > now,
-                CashbackTransaction.tx_type != "credit",
-            ),
+            _cashback_disponivel_clause(CashbackTransaction, now),
         )
         .scalar()
     )

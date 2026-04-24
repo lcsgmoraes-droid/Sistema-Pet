@@ -24,7 +24,9 @@ security = HTTPBearer()
 
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
 RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
-STATUS_RESERVA_ATIVA = ("carrinho", "pendente")
+# Carrinho de app/ecommerce nao reserva estoque. Estoque deve ser validado e
+# baixado somente depois de pagamento aprovado e geracao do pedido/venda.
+STATUS_RESERVA_ATIVA = ()
 
 
 class CarrinhoAdicionarRequest(BaseModel):
@@ -151,6 +153,9 @@ def _quantidade_reservada_produto(
     produto_id: int,
     excluir_pedido_id: str | None = None,
 ) -> float:
+    if not STATUS_RESERVA_ATIVA:
+        return 0.0
+
     query = (
         db.query(func.coalesce(func.sum(PedidoItem.quantidade), 0.0))
         .join(Pedido, Pedido.pedido_id == PedidoItem.pedido_id)

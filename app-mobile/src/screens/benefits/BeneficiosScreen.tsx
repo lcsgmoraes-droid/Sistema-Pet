@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import { useNavigation } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Clipboard,
   Modal,
   Pressable,
   RefreshControl,
@@ -80,7 +80,7 @@ interface Beneficios {
     thresholds: RankingThresholds;
   };
   cupons: {
-    id: number;
+    id: number | string;
     code: string;
     coupon_type: string;
     discount_value: number | null;
@@ -164,10 +164,93 @@ const THRESHOLD_MONTHS_KEY: Record<string, keyof RankingThresholds> = {
 };
 
 function brl(valor: number): string {
-  return valor.toLocaleString("pt-BR", {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function numero(valor: unknown, fallback = 0): number {
+  const n = Number(valor);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function inteiro(valor: unknown, fallback = 0): number {
+  return Math.max(0, Math.trunc(numero(valor, fallback)));
+}
+
+function nivelSeguro(nivel: unknown): string {
+  const normalizado = String(nivel || "bronze").toLowerCase();
+  return NIVEL_ORDEM.includes(normalizado) ? normalizado : "bronze";
+}
+
+function normalizarBeneficios(raw: any): Beneficios {
+  const thresholds = raw?.ranking?.thresholds || {};
+  const cuponsRaw = Array.isArray(raw?.cupons) ? raw.cupons : [];
+
+  return {
+    cashback: {
+      saldo: numero(raw?.cashback?.saldo),
+    },
+    carimbos: {
+      total_geral: inteiro(raw?.carimbos?.total_geral),
+      carimbos_no_cartao: inteiro(raw?.carimbos?.carimbos_no_cartao),
+      carimbos_ativos_brutos: inteiro(raw?.carimbos?.carimbos_ativos_brutos),
+      carimbos_comprometidos_total: inteiro(
+        raw?.carimbos?.carimbos_comprometidos_total,
+      ),
+      carimbos_convertidos: inteiro(raw?.carimbos?.carimbos_convertidos),
+      carimbos_em_debito: inteiro(raw?.carimbos?.carimbos_em_debito),
+      meta: Math.max(1, inteiro(raw?.carimbos?.meta, 10)),
+      min_purchase_value: numero(raw?.carimbos?.min_purchase_value),
+    },
+    ranking: {
+      nivel: nivelSeguro(raw?.ranking?.nivel),
+      total_spent: numero(raw?.ranking?.total_spent),
+      total_purchases: inteiro(raw?.ranking?.total_purchases),
+      thresholds: {
+        silver_min_spent: numero(thresholds.silver_min_spent, 300),
+        silver_min_purchases: inteiro(thresholds.silver_min_purchases, 4),
+        silver_min_months: inteiro(thresholds.silver_min_months, 2),
+        gold_min_spent: numero(thresholds.gold_min_spent, 1000),
+        gold_min_purchases: inteiro(thresholds.gold_min_purchases, 10),
+        gold_min_months: inteiro(thresholds.gold_min_months, 4),
+        diamond_min_spent: numero(thresholds.diamond_min_spent, 3000),
+        diamond_min_purchases: inteiro(thresholds.diamond_min_purchases, 20),
+        diamond_min_months: inteiro(thresholds.diamond_min_months, 6),
+        platinum_min_spent: numero(thresholds.platinum_min_spent, 8000),
+        platinum_min_purchases: inteiro(thresholds.platinum_min_purchases, 40),
+        platinum_min_months: inteiro(thresholds.platinum_min_months, 10),
+      },
+    },
+    cupons: cuponsRaw
+      .map((c: any) => {
+        const code = String(c?.code || c?.codigo || "").trim();
+        if (!code) return null;
+        return {
+          id: inteiro(c?.id) || code,
+          code,
+          coupon_type: String(c?.coupon_type || c?.tipo_desconto || ""),
+          discount_value:
+            c?.discount_value != null
+              ? numero(c.discount_value)
+              : c?.valor_desconto != null
+                ? numero(c.valor_desconto)
+                : null,
+          discount_percent:
+            c?.discount_percent != null ? numero(c.discount_percent) : null,
+          valid_until: c?.valid_until ?? null,
+          expirado: Boolean(c?.expirado),
+          min_purchase_value:
+            c?.min_purchase_value != null
+              ? numero(c.min_purchase_value)
+              : c?.valor_minimo_pedido != null
+                ? numero(c.valor_minimo_pedido)
+                : null,
+        };
+      })
+      .filter(Boolean) as Beneficios["cupons"],
+  };
 }
 
 function formatarDesconto(item: Beneficios["cupons"][number]): string {
@@ -538,8 +621,8 @@ function SecaoCupons({
 }) {
   const [copiado, setCopiado] = useState<string | null>(null);
 
-  const copiar = (codigo: string) => {
-    Clipboard.setString(codigo);
+  const copiar = async (codigo: string) => {
+    await Clipboard.setStringAsync(codigo);
     setCopiado(codigo);
     setTimeout(() => setCopiado(null), 2000);
   };
@@ -771,7 +854,7 @@ export default function BeneficiosScreen() {
       const { data } = await api.get<Beneficios>(
         "/ecommerce/auth/meus-beneficios",
       );
-      setDados(data);
+      setDados(normalizarBeneficios(data));
     } catch {
       setErro(true);
     } finally {
