@@ -6,7 +6,7 @@ Objetivo: organizar a proxima fase para liberar app/ecommerce em piloto, implant
 
 ## 1. App e ecommerce - release candidate
 
-Status atual: tecnicamente validado localmente, ainda nao publicado nesta rodada.
+Status atual: validado e publicado em producao em 2026-04-24, no commit `d2ae92b1`.
 
 O que esta pronto nesta leva:
 
@@ -28,11 +28,16 @@ Validacoes executadas:
 - `backend`: `py_compile` das rotas alteradas
 - `frontend`: `npm run build`
 
-Observacoes antes de subir essa leva:
+Observacoes da publicacao:
 
 - A finalizacao de checkout ficara bloqueada em producao enquanto a intermediadora de pagamento nao estiver configurada.
 - Isso esta correto para o contrato definido: nao gerar pedido/venda antes de pagamento aprovado.
-- Se houver cliente usando ecommerce para pedido manual sem gateway, essa publicacao muda o comportamento e precisa ser comunicada.
+- Se houver cliente usando ecommerce para pedido manual sem gateway, esse comportamento precisa ser comunicado.
+
+Documentos detalhados desta fase:
+
+- `docs/PENTE_FINO_VETERINARIO_CLINICA_PILOTO_2026-04-24.md`
+- `docs/BLUEPRINT_BANHO_TOSA_ENTERPRISE_2026-04-24.md`
 
 ## 2. Veterinario - leitura tecnica do estado atual
 
