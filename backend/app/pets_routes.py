@@ -269,6 +269,7 @@ def criar_pet(
     codigo = gerar_codigo_pet(db, current_user.id)
     
     pet_payload = normalize_pet_clinical_payload(pet_data.model_dump())
+    pet_payload.pop("cliente_id", None)
 
     # Criar pet
     novo_pet = Pet(

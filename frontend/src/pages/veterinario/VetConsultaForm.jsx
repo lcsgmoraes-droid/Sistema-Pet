@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Stethoscope,
   ChevronRight,
@@ -20,8 +20,8 @@ import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
+import NovoPetModal from "../../components/veterinario/NovoPetModal";
 import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
-import { buildReturnTo } from "../../utils/petReturnFlow";
 
 // ---------- helpers ----------
 function campo(label, obrigatorio = false) {
@@ -86,7 +86,6 @@ const ETAPAS = ["Triagem", "Exame Clínico", "Diagnóstico / Prescrição"];
 // ---------- componente principal ----------
 export default function VetConsultaForm() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { consultaId } = useParams();
   const [searchParams] = useSearchParams();
   const isEdicao = Boolean(consultaId);
@@ -109,6 +108,7 @@ export default function VetConsultaForm() {
   const [modalCalculadoraAberto, setModalCalculadoraAberto] = useState(false);
   const [modalNovoExameAberto, setModalNovoExameAberto] = useState(false);
   const [salvandoNovoExame, setSalvandoNovoExame] = useState(false);
+  const [modalNovoPetAberto, setModalNovoPetAberto] = useState(false);
   const [refreshExamesToken, setRefreshExamesToken] = useState(0);
   const modoSomenteLeitura = isEdicao && finalizado;
   const tituloConsulta = modoSomenteLeitura
@@ -324,10 +324,10 @@ export default function VetConsultaForm() {
     const especieValida = especie && !/\?/.test(especie);
     return especieValida ? `${petSelecionado.nome} (${especie})` : petSelecionado.nome;
   }, [petSelecionado]);
-
-  const retornoNovoPet = useMemo(
-    () => buildReturnTo(location.pathname, location.search),
-    [location.pathname, location.search]
+  const sugestoesEspecies = useMemo(
+    () =>
+      Array.from(new Set(pets.map((pet) => pet?.especie).filter((especie) => especie && !/\?/.test(especie)))),
+    [pets]
   );
   const medicamentoCalculadoraSelecionado = useMemo(
     () =>
@@ -484,6 +484,36 @@ export default function VetConsultaForm() {
     setTutoresSugeridos([]);
     setListaPetsExpandida(false);
     set("pet_id", "");
+  }
+
+  function abrirModalNovoPet() {
+    if (!tutorSelecionado) return;
+    setModalNovoPetAberto(true);
+  }
+
+  function handleNovoPetCriado(petCriado) {
+    if (!petCriado?.id) {
+      setModalNovoPetAberto(false);
+      return;
+    }
+
+    setPets((prev) => {
+      const semDuplicado = prev.filter((pet) => String(pet.id) !== String(petCriado.id));
+      return [petCriado, ...semDuplicado];
+    });
+
+    setTutorSelecionado((prev) => ({
+      id: petCriado.cliente_id,
+      nome: petCriado.cliente_nome ?? prev?.nome ?? tutorSelecionado?.nome ?? `Tutor #${petCriado.cliente_id}`,
+      telefone: petCriado.cliente_telefone ?? prev?.telefone ?? "",
+      celular: petCriado.cliente_celular ?? prev?.celular ?? "",
+    }));
+    setBuscaTutor(petCriado.cliente_nome ?? tutorSelecionado?.nome ?? buscaTutor);
+    set("pet_id", String(petCriado.id));
+    setListaPetsExpandida(false);
+    setModalNovoPetAberto(false);
+    setErro(null);
+    setSucesso(`Pet ${petCriado.nome} cadastrado e selecionado na consulta.`);
   }
 
   // ---------- Salvar rascunho ----------
@@ -1203,7 +1233,7 @@ export default function VetConsultaForm() {
                   <NovoPetButton
                     tutorId={tutorSelecionado?.id}
                     tutorNome={tutorSelecionado?.nome}
-                    returnTo={retornoNovoPet}
+                    onClick={abrirModalNovoPet}
                   />
                   <span className="text-gray-500 text-xs">
                     {tutorSelecionado ? `${petsDoTutor.length} pet(s)` : "Sem tutor"}
@@ -1795,6 +1825,14 @@ export default function VetConsultaForm() {
           </div>
         </div>
       )}
+
+      <NovoPetModal
+        isOpen={modalNovoPetAberto}
+        tutor={tutorSelecionado}
+        sugestoesEspecies={sugestoesEspecies}
+        onClose={() => setModalNovoPetAberto(false)}
+        onCreated={handleNovoPetCriado}
+      />
 
       {modalCalculadoraAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

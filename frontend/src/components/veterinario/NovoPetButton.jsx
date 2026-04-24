@@ -8,6 +8,7 @@ export default function NovoPetButton({
   tutorNome,
   returnTo,
   onBeforeNavigate,
+  onClick,
   label = "Novo pet",
   className = "",
 }) {
@@ -16,6 +17,10 @@ export default function NovoPetButton({
 
   function handleClick() {
     if (disabled) {
+      return;
+    }
+    if (typeof onClick === "function") {
+      onClick();
       return;
     }
     onBeforeNavigate?.();
@@ -47,6 +52,7 @@ NovoPetButton.propTypes = {
   tutorNome: PropTypes.string,
   returnTo: PropTypes.string,
   onBeforeNavigate: PropTypes.func,
+  onClick: PropTypes.func,
   label: PropTypes.string,
   className: PropTypes.string,
 };

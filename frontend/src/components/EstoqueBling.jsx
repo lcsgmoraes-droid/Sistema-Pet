@@ -998,6 +998,54 @@ function EstoqueBling() {
     }
   };
 
+  const handleImportImagesFromBling = async () => {
+    const confirmed = window.confirm(
+      'Importar imagens do Bling para os produtos do sistema que ainda estao sem foto? A rotina usa o SKU/codigo atual e roda mais devagar para respeitar o limite da API.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setRunningAction('importar-imagens');
+    try {
+      const response = await api.post('/estoque/sync/importar-imagens', {}, {
+        timeout: 0,
+        params: {
+          limite: 100,
+          apenas_sem_imagem: true,
+          atraso_ms: 900,
+        },
+      });
+
+      const data = response?.data || {};
+      const imported = Number(data.importados || 0);
+      const noMatch = Number(data.sem_match_por_sku || 0);
+      const noImage = Number(data.sem_imagem_no_bling || 0);
+      const errors = Number(data.erros || 0);
+
+      if (imported > 0) {
+        toast.success(
+          `Importacao concluida: ${imported} imagem(ns) nova(s). Sem match por SKU: ${noMatch}. Sem imagem no Bling: ${noImage}.`,
+        );
+      } else {
+        toast(
+          `Nenhuma imagem nova entrou nesta rodada. Sem match por SKU: ${noMatch}. Sem imagem no Bling: ${noImage}.`,
+        );
+      }
+
+      if (errors > 0) {
+        toast(`${errors} item(ns) tiveram erro e ficaram fora desta rodada.`);
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Nao foi possivel importar as imagens do Bling agora.');
+    } finally {
+      setRunningAction('');
+    }
+  };
+
   const runRowAction = async (key, action, successMessage) => {
     setRowActionKey(key);
     try {
@@ -1392,6 +1440,13 @@ function EstoqueBling() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleImportImagesFromBling}
+            disabled={refreshing || runningAction !== ''}
+            className="rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {runningAction === 'importar-imagens' ? 'Importando imagens...' : 'Importar imagens do Bling'}
+          </button>
           <button
             onClick={() => loadDashboard({
               forceRefresh: true,
