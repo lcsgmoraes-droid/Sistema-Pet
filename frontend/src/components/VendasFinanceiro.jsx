@@ -1,4 +1,3 @@
-import { saveAs } from "file-saver";
 import {
   ArrowDown,
   ArrowUp,
@@ -32,7 +31,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import * as XLSX from "xlsx";
+import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
@@ -65,6 +64,48 @@ const COLUNAS_RELATORIO_VENDAS = [
     value: (v) => Number(v.margem_sobre_custo || 0),
   },
 ];
+
+function normalizarValorExcel(valor) {
+  if (valor === null || valor === undefined) return "";
+  return valor;
+}
+
+function criarDadosExcel(linhas) {
+  return linhas.map((linha, indice) =>
+    linha.map((valor) => {
+      const celula = { value: normalizarValorExcel(valor) };
+      if (indice !== 0) return celula;
+
+      return {
+        ...celula,
+        fontWeight: "bold",
+        backgroundColor: "#DBEAFE",
+      };
+    }),
+  );
+}
+
+function criarColunasExcel(linhas) {
+  const totalColunas = Math.max(...linhas.map((linha) => linha.length), 0);
+  return Array.from({ length: totalColunas }, (_, indice) => {
+    const maiorTexto = linhas.reduce((maior, linha) => {
+      const tamanho = String(normalizarValorExcel(linha[indice])).length;
+      return Math.max(maior, tamanho);
+    }, 0);
+    return { width: Math.min(Math.max(maiorTexto + 2, 12), 42) };
+  });
+}
+
+async function exportarPlanilhasExcel(planilhas, nomeArquivo) {
+  await writeExcelFile(
+    planilhas.map(({ sheet, linhas }) => ({
+      sheet,
+      data: criarDadosExcel(linhas),
+      columns: criarColunasExcel(linhas),
+      stickyRowsCount: 1,
+    })),
+  ).toFile(nomeArquivo);
+}
 
 export default function VendasFinanceiro() {
   const { user } = useAuth();
@@ -237,7 +278,7 @@ export default function VendasFinanceiro() {
     }
   };
 
-  const exportarRelatorioListaVendas = ({ escopo }) => {
+  const exportarRelatorioListaVendas = async ({ escopo }) => {
     const dadosFiltrados = filtrarVendasParaRelatorio(escopo);
 
     if (!dadosFiltrados.length) {
@@ -254,23 +295,30 @@ export default function VendasFinanceiro() {
       return;
     }
 
-    const linhas = dadosOrdenados.map((venda) => {
-      const linha = {};
-      colunas.forEach((coluna) => {
+    const linhas = dadosOrdenados.map((venda) =>
+      colunas.map((coluna) => {
         const bruto = coluna.value(venda);
-        linha[coluna.label] = coluna.key === "data_venda" ? formatarData(bruto) : bruto;
-      });
-      return linha;
-    });
-
-    const ws = XLSX.utils.json_to_sheet(linhas);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Lista de Vendas");
+        return coluna.key === "data_venda" ? formatarData(bruto) : bruto;
+      }),
+    );
 
     const dataArquivo = new Date().toISOString().slice(0, 10);
     const sufixo = escopo === "geral" ? "geral" : "filtrado";
-    XLSX.writeFile(wb, `vendas_${sufixo}_${dataArquivo}.xlsx`);
-    toast.success(`Relatorio gerado com ${linhas.length} venda(s).`);
+    try {
+      await exportarPlanilhasExcel(
+        [
+          {
+            sheet: "Lista de Vendas",
+            linhas: [colunas.map((coluna) => coluna.label), ...linhas],
+          },
+        ],
+        `vendas_${sufixo}_${dataArquivo}.xlsx`,
+      );
+      toast.success(`Relatorio gerado com ${linhas.length} venda(s).`);
+    } catch (error) {
+      console.error("Erro ao exportar relatorio de vendas:", error);
+      toast.error("Nao foi possivel gerar o arquivo Excel.");
+    }
   };
 
   const toggleColunaRelatorio = (key) => {
@@ -422,9 +470,7 @@ export default function VendasFinanceiro() {
     }
   };
 
-  const exportarParaExcel = () => {
-    const wb = XLSX.utils.book_new();
-
+  const exportarParaExcel = async () => {
     // Aba Resumo
     const resumoData = [
       ["RELATÓRIO DE VENDAS"],
@@ -438,8 +484,12 @@ export default function VendasFinanceiro() {
       ["Em Aberto", resumo.em_aberto],
       ["Quantidade de Vendas", resumo.quantidade_vendas],
     ];
-    const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
-    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+    const planilhas = [
+      {
+        sheet: "Resumo",
+        linhas: resumoData,
+      },
+    ];
 
     // Aba Vendas por Data
     if (vendasPorData.length > 0) {
@@ -469,8 +519,10 @@ export default function VendasFinanceiro() {
           v.saldo_aberto,
         ]),
       ];
-      const wsVendas = XLSX.utils.aoa_to_sheet(vendasData);
-      XLSX.utils.book_append_sheet(wb, wsVendas, "Vendas por Data");
+      planilhas.push({
+        sheet: "Vendas por Data",
+        linhas: vendasData,
+      });
     }
 
     // Aba Formas de Recebimento
@@ -482,19 +534,20 @@ export default function VendasFinanceiro() {
           f.valor_total,
         ]),
       ];
-      const wsFormas = XLSX.utils.aoa_to_sheet(formasData);
-      XLSX.utils.book_append_sheet(wb, wsFormas, "Formas Pagamento");
+      planilhas.push({
+        sheet: "Formas Pagamento",
+        linhas: formasData,
+      });
     }
 
-    // Gerar arquivo
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "binary" });
-    const buf = new ArrayBuffer(wbout.length);
-    const view = new Uint8Array(buf);
-    for (let i = 0; i < wbout.length; i++) {
-      view[i] = (wbout.codePointAt(i) ?? 0) & 0xff;
-    }
     const fileName = `relatorio_vendas_${dataInicio}_${dataFim}.xlsx`;
-    saveAs(new Blob([buf], { type: "application/octet-stream" }), fileName);
+    try {
+      await exportarPlanilhasExcel(planilhas, fileName);
+      toast.success("Excel exportado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao exportar Excel:", error);
+      toast.error("Erro ao exportar Excel");
+    }
   };
 
   const aplicarFiltroRapido = (filtro) => {
