@@ -4,14 +4,14 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
-import TutorAutocomplete from "../../components/TutorAutocomplete";
-import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import { useInternacaoOperacional } from "./useInternacaoOperacional";
 import AltaInternacaoModal from "./internacoes/AltaInternacaoModal";
 import ConcluirProcedimentoModal from "./internacoes/ConcluirProcedimentoModal";
 import EvolucaoInternacaoModal from "./internacoes/EvolucaoInternacaoModal";
+import HistoricoInternacoesPetModal from "./internacoes/HistoricoInternacoesPetModal";
 import InsumoRapidoInternacaoModal from "./internacoes/InsumoRapidoInternacaoModal";
+import NovaInternacaoModal from "./internacoes/NovaInternacaoModal";
 import {
   STATUS_CORES,
   formatData,
@@ -596,6 +596,14 @@ export default function VetInternacoes() {
       setHistoricoPet([]);
     } finally {
       setCarregandoHistoricoPet(false);
+    }
+  }
+
+  function fecharModalNovaInternacao() {
+    setModalNova(false);
+    if (!consultaIdQuery) {
+      setTutorNovaSelecionado(null);
+      setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
     }
   }
 
@@ -1244,134 +1252,24 @@ export default function VetInternacoes() {
         </div>
       )}
 
-      {/* Modal nova internação */}
-      {modalNova && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-bold text-gray-800">Nova internação</h2>
-            <div className="space-y-3">
-              {consultaIdQuery && (
-                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
-                  Esta internação ficará vinculada à consulta <strong>#{consultaIdQuery}</strong>.
-                </div>
-              )}
-              <div>
-                <TutorAutocomplete
-                  label="Pessoa (tutor) *"
-                  inputId="internacao-tutor"
-                  selectedTutor={tutorNovaSelecionado}
-                  onSelect={(cliente) => {
-                    setTutorNovaSelecionado(cliente);
-                    setFormNova((prev) => ({
-                      ...prev,
-                      pessoa_id: cliente?.id ? String(cliente.id) : "",
-                      pet_id: "",
-                    }));
-                  }}
-                />
-              </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <label className="block text-xs font-medium text-gray-600">Pet da pessoa *</label>
-                  <NovoPetButton
-                    tutorId={formNova.pessoa_id}
-                    tutorNome={tutorAtualInternacao?.nome}
-                    returnTo={retornoNovoPet}
-                    onBeforeNavigate={() => setModalNova(false)}
-                  />
-                </div>
-                <select value={formNova.pet_id} onChange={(e) => setFormNova((p) => ({ ...p, pet_id: e.target.value }))}
-                  disabled={!formNova.pessoa_id}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white disabled:opacity-60">
-                  <option value="">Selecione…</option>
-                  {petsDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
-                </select>
-                {formNova.pessoa_id && petsDaPessoa.length === 0 && (
-                  <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para esta pessoa.</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Motivo da internação *</label>
-                <textarea value={formNova.motivo} onChange={(e) => setFormNova((p) => ({ ...p, motivo: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20" />
-              </div>
-              <div>
-                <div className="flex items-end justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600">Mapa de baias (selecione uma livre) *</label>
-                  <div className="w-28">
-                    <input
-                      type="number"
-                      min="1"
-                      max="200"
-                      value={totalBaias}
-                      onChange={(e) => {
-                        const valor = Number.parseInt(e.target.value || "0", 10);
-                        if (!Number.isFinite(valor)) return;
-                        setTotalBaias(Math.max(1, Math.min(200, valor)));
-                      }}
-                      className="w-full border border-gray-200 rounded-lg px-2 py-1 text-xs"
-                      title="Total de baias"
-                    />
-                  </div>
-                </div>
-                <div className="border border-gray-200 rounded-lg p-2 max-h-44 overflow-auto">
-                  <div className="grid grid-cols-3 gap-2">
-                    {mapaInternacao
-                      .filter((baia) => Number.isFinite(Number.parseInt(String(baia.numero), 10)))
-                      .sort((a, b) => Number(a.numero) - Number(b.numero))
-                      .map((baia) => {
-                        const numero = String(baia.numero);
-                        const ocupadaPorOutro = baia.ocupada;
-                        const selecionada = formNova.box === numero;
-                        return (
-                          <button
-                            key={`nova_baia_${numero}`}
-                            type="button"
-                            disabled={ocupadaPorOutro}
-                            onClick={() => setFormNova((p) => ({ ...p, box: numero }))}
-                            className={`rounded-md border px-2 py-2 text-left transition-colors ${
-                              ocupadaPorOutro
-                                ? "bg-red-50 border-red-200 text-red-700 cursor-not-allowed"
-                                : selecionada
-                                ? "bg-purple-600 border-purple-600 text-white"
-                                : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
-                            }`}
-                          >
-                            <p className="text-xs font-bold">Baia {numero}</p>
-                            <p className="text-[11px] truncate">
-                              {ocupadaPorOutro ? (baia.internacao?.pet_nome ?? "Ocupada") : "Disponível"}
-                            </p>
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-                <p className="text-xs mt-1 text-gray-500">
-                  Selecionada: <span className="font-semibold text-gray-800">{formNova.box || "nenhuma"}</span>
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => {
-                  setModalNova(false);
-                  if (!consultaIdQuery) {
-                    setTutorNovaSelecionado(null);
-                    setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
-                  }
-                }}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button onClick={criarInternacao} disabled={salvando || !formNova.pet_id || !formNova.motivo}
-                className="flex-1 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-60">
-                {salvando ? "Salvando…" : "Internar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NovaInternacaoModal
+        isOpen={modalNova}
+        consultaIdQuery={consultaIdQuery}
+        tutorNovaSelecionado={tutorNovaSelecionado}
+        setTutorNovaSelecionado={setTutorNovaSelecionado}
+        formNova={formNova}
+        setFormNova={setFormNova}
+        tutorAtualInternacao={tutorAtualInternacao}
+        retornoNovoPet={retornoNovoPet}
+        petsDaPessoa={petsDaPessoa}
+        mapaInternacao={mapaInternacao}
+        totalBaias={totalBaias}
+        setTotalBaias={setTotalBaias}
+        onClose={fecharModalNovaInternacao}
+        onHideForNovoPet={() => setModalNova(false)}
+        onConfirm={criarInternacao}
+        salvando={salvando}
+      />
 
       <AltaInternacaoModal
         isOpen={Boolean(modalAlta)}
@@ -1406,70 +1304,12 @@ export default function VetInternacoes() {
         salvando={salvando}
       />
 
-      {modalHistoricoPet && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl p-6 max-h-[85vh] overflow-auto">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="font-bold text-gray-800">Histórico de internações</h2>
-                <p className="text-sm text-gray-500">{modalHistoricoPet.petNome}</p>
-              </div>
-              <button
-                onClick={() => setModalHistoricoPet(null)}
-                className="px-2 py-1 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Fechar
-              </button>
-            </div>
-
-            {carregandoHistoricoPet ? (
-              <p className="text-sm text-gray-500">Carregando histórico...</p>
-            ) : historicoPet.length === 0 ? (
-              <p className="text-sm text-gray-500">Nenhuma internação encontrada para este pet.</p>
-            ) : (
-              <div className="space-y-3">
-                {historicoPet.map((hist) => (
-                  <div key={hist.internacao_id} className="border border-gray-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-gray-800">Internação #{hist.internacao_id} • {hist.box ? `Baia ${hist.box}` : "Sem baia"}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CORES[hist.status] ?? "bg-gray-100 text-gray-700"}`}>{hist.status}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Entrada: {formatDateTime(hist.data_entrada)}{hist.data_saida ? ` • Alta: ${formatDateTime(hist.data_saida)}` : ""}</p>
-                    <p className="text-xs text-gray-600 mt-1">Motivo: {hist.motivo || "—"}</p>
-                    <p className="text-xs text-gray-600 mt-1">Evoluções: {hist.evolucoes?.length ?? 0} • Procedimentos: {hist.procedimentos?.length ?? 0}</p>
-                    {Array.isArray(hist.procedimentos) && hist.procedimentos.length > 0 && (
-                      <div className="mt-3 space-y-2">
-                        {hist.procedimentos.map((proc, idx) => (
-                          <div key={`${hist.internacao_id}_proc_${proc.id ?? idx}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs">
-                            <p className="font-semibold text-gray-800">{proc.medicamento || "Procedimento"}</p>
-                            <p className="text-gray-500">
-                              {proc.horario_execucao ? formatDateTime(proc.horario_execucao) : formatDateTime(proc.data_hora)}
-                            </p>
-                            {(proc.quantidade_prevista != null || proc.quantidade_executada != null || proc.quantidade_desperdicio != null) && (
-                              <p className="mt-1 text-gray-600">
-                                Previsto: {formatQuantity(proc.quantidade_prevista, proc.unidade_quantidade)} • Feito: {formatQuantity(proc.quantidade_executada, proc.unidade_quantidade)} • Desperdício: {formatQuantity(proc.quantidade_desperdicio, proc.unidade_quantidade)}
-                              </p>
-                            )}
-                            {Array.isArray(proc.insumos) && proc.insumos.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {proc.insumos.map((insumo, insumoIdx) => (
-                                  <span key={`${hist.internacao_id}_proc_${idx}_insumo_${insumoIdx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                                    {insumo.nome || `Produto #${insumo.produto_id}`} • {formatQuantity(insumo.quantidade, insumo.unidade)}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <HistoricoInternacoesPetModal
+        historicoPetInfo={modalHistoricoPet}
+        historicoPet={historicoPet}
+        carregando={carregandoHistoricoPet}
+        onClose={() => setModalHistoricoPet(null)}
+      />
 
       <InsumoRapidoInternacaoModal
         isOpen={modalInsumoRapido}
