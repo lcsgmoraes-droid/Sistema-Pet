@@ -1,4 +1,8 @@
-"""Base de calendario preventivo veterinario."""
+"""Base e montagem de calendario preventivo veterinario."""
+
+from sqlalchemy import or_
+
+from .veterinario_models import ProtocoloVacina
 
 
 _CALENDARIO_PADRAO = {
@@ -31,3 +35,70 @@ _CALENDARIO_PADRAO = {
         {"vacina": "Antipulgas / Carrapatos", "fase": "todos", "idade_semanas_min": 8, "idade_semanas_max": None, "dose": "Mensal ou conforme produto", "reforco_anual": False, "observacoes": "Ectoparasitas — manter regularmente durante toda a vida"},
     ],
 }
+
+
+def _aliases_especie_calendario(especie: str) -> set[str]:
+    especie_norm = (especie or "").strip().lower()
+    if not especie_norm:
+        return set()
+    aliases = {especie_norm}
+    if especie_norm in {"canino", "cao", "cão", "cachorro", "dog"}:
+        aliases.update({"canino", "cao", "cão", "cachorro", "dog"})
+    if especie_norm in {"felino", "gato", "cat"}:
+        aliases.update({"felino", "gato", "cat"})
+    return aliases
+
+
+def _normalizar_especie_calendario(especie: str) -> str:
+    aliases = _aliases_especie_calendario(especie)
+    if {"canino", "cao", "cão", "cachorro", "dog"} & aliases:
+        return "cão"
+    if {"felino", "gato", "cat"} & aliases:
+        return "gato"
+    return (especie or "").strip().lower()
+
+
+def montar_calendario_preventivo(db, tenant_id, especie: str | None = None) -> dict:
+    especie_norm = _normalizar_especie_calendario(especie or "")
+    aliases = _aliases_especie_calendario(especie_norm)
+
+    calendario_base = []
+    for esp, protocolos in _CALENDARIO_PADRAO.items():
+        if not especie_norm or especie_norm in esp or esp in especie_norm or esp == "todos":
+            for protocolo in protocolos:
+                calendario_base.append({**protocolo, "especie": esp, "fonte": "padrao"})
+
+    query_protocolos = db.query(ProtocoloVacina).filter(
+        ProtocoloVacina.tenant_id == tenant_id,
+        ProtocoloVacina.ativo == True,  # noqa
+    )
+    if aliases:
+        query_protocolos = query_protocolos.filter(
+            (ProtocoloVacina.especie == None) |
+            (ProtocoloVacina.especie == "") |
+            or_(*[ProtocoloVacina.especie.ilike(f"%{alias}%") for alias in aliases])
+        )
+
+    for protocolo in query_protocolos.all():
+        idade_min = protocolo.dose_inicial_semanas
+        calendario_base.append({
+            "vacina": protocolo.nome,
+            "fase": "filhote" if (idade_min or 0) < 26 else "adulto",
+            "idade_semanas_min": idade_min,
+            "idade_semanas_max": None,
+            "dose": f"{protocolo.numero_doses_serie} dose(s)" if protocolo.numero_doses_serie > 1 else "dose única",
+            "reforco_anual": protocolo.reforco_anual,
+            "intervalo_doses_dias": protocolo.intervalo_doses_dias,
+            "observacoes": protocolo.observacoes or "",
+            "especie": protocolo.especie or "todos",
+            "fonte": "personalizado",
+            "protocolo_id": protocolo.id,
+        })
+
+    calendario_base.sort(key=lambda item: (item.get("especie", ""), item.get("idade_semanas_min") or 0))
+
+    return {
+        "especie_filtro": especie_norm or "todas",
+        "total": len(calendario_base),
+        "items": calendario_base,
+    }

@@ -100,7 +100,7 @@ from .veterinario_internacao import (
     _serializar_procedimento_agenda_internacao,
     _split_motivo_baia,
 )
-from .veterinario_preventivo import _CALENDARIO_PADRAO
+from .veterinario_preventivo import montar_calendario_preventivo
 from .veterinario_serializers import (
     _consulta_to_dict,
     _hash_prontuario_consulta,
@@ -4546,51 +4546,4 @@ def calendario_preventivo(
     mesclado com os protocolos de vacina configurados pelo tenant.
     """
     user, tenant_id = _get_tenant(current)
-
-    especie_norm = (especie or "").strip().lower()
-
-    # Monta calendário base
-    calendario_base = []
-    for esp, protocolos in _CALENDARIO_PADRAO.items():
-        if not especie_norm or especie_norm in esp or esp in especie_norm or esp == "todos":
-            for p in protocolos:
-                calendario_base.append({**p, "especie": esp, "fonte": "padrao"})
-
-    # Adiciona protocolos personalizados do tenant
-    query_protocolos = db.query(ProtocoloVacina).filter(
-        ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,  # noqa
-    )
-    if especie_norm:
-        query_protocolos = query_protocolos.filter(
-            (ProtocoloVacina.especie == None) |
-            (ProtocoloVacina.especie == "") |
-            (ProtocoloVacina.especie.ilike(f"%{especie_norm}%"))
-        )
-
-    for p in query_protocolos.all():
-        idade_min = p.dose_inicial_semanas
-
-        reforco_dias = p.intervalo_doses_dias or (365 if p.reforco_anual else None)
-        calendario_base.append({
-            "vacina": p.nome,
-            "fase": "filhote" if (idade_min or 0) < 26 else "adulto",
-            "idade_semanas_min": idade_min,
-            "idade_semanas_max": None,
-            "dose": f"{p.numero_doses_serie} dose(s)" if p.numero_doses_serie > 1 else "dose única",
-            "reforco_anual": p.reforco_anual,
-            "intervalo_doses_dias": p.intervalo_doses_dias,
-            "observacoes": p.observacoes or "",
-            "especie": p.especie or "todos",
-            "fonte": "personalizado",
-            "protocolo_id": p.id,
-        })
-
-    # Ordena por espécie e idade mínima
-    calendario_base.sort(key=lambda x: (x.get("especie", ""), x.get("idade_semanas_min") or 0))
-
-    return {
-        "especie_filtro": especie_norm or "todas",
-        "total": len(calendario_base),
-        "items": calendario_base,
-    }
+    return montar_calendario_preventivo(db, tenant_id, especie)
