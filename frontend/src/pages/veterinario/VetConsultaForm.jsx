@@ -1,29 +1,34 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  Stethoscope,
-  ChevronRight,
-  CheckCircle,
-  AlertCircle,
-  X,
-  Lock,
-  Calculator,
-  MessageSquare,
-} from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
-import NovoPetModal from "../../components/veterinario/NovoPetModal";
-import CalculadoraDoseModal from "./consultaForm/CalculadoraDoseModal";
 import ConsultaActionsFooter from "./consultaForm/ConsultaActionsFooter";
+import ConsultaFeedbackAlerts from "./consultaForm/ConsultaFeedbackAlerts";
+import ConsultaFinalizadaScreen from "./consultaForm/ConsultaFinalizadaScreen";
+import ConsultaFormModals from "./consultaForm/ConsultaFormModals";
+import ConsultaHeader from "./consultaForm/ConsultaHeader";
+import ConsultaReadonlyNotice from "./consultaForm/ConsultaReadonlyNotice";
+import ConsultaSteps from "./consultaForm/ConsultaSteps";
 import DiagnosticoTratamentoSection from "./consultaForm/DiagnosticoTratamentoSection";
 import ExameClinicoSection from "./consultaForm/ExameClinicoSection";
-import InsumoRapidoModal from "./consultaForm/InsumoRapidoModal";
-import NovoExameConsultaModal from "./consultaForm/NovoExameConsultaModal";
 import TriagemInicialSection from "./consultaForm/TriagemInicialSection";
+import {
+  buildConsultaPayload,
+  buildFinalizacaoPayload,
+  buildInsumoProcedimentoPayload,
+  buildItensPrescricao,
+  buildNovoExamePayload,
+  criarCalculadoraFormInicial,
+  criarConsultaFormInicial,
+  criarInsumoRapidoFormInicial,
+  criarNovoExameFormInicial,
+  criarPrescricaoItemInicial,
+  criarProcedimentoRealizadoInicial,
+  mapConsultaParaForm,
+} from "./consultaForm/consultaFormState";
 import {
   ETAPAS,
   css,
-  hojeIso,
   parseNumero,
 } from "./consultaForm/consultaFormUtils";
 
@@ -84,60 +89,18 @@ export default function VetConsultaForm() {
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
   const [listaPetsExpandida, setListaPetsExpandida] = useState(false);
-  const [novoExameForm, setNovoExameForm] = useState({
-    tipo: "laboratorial",
-    nome: "",
-    data_solicitacao: hojeIso(),
-    laboratorio: "",
-    observacoes: "",
-  });
+  const [novoExameForm, setNovoExameForm] = useState(criarNovoExameFormInicial);
   const [novoExameArquivo, setNovoExameArquivo] = useState(null);
-  const [calculadoraForm, setCalculadoraForm] = useState({
-    medicamento_id: "",
-    peso_kg: "",
-    dose_mg_kg: "",
-    frequencia_horas: "12",
-    dias: "7",
-  });
+  const [calculadoraForm, setCalculadoraForm] = useState(criarCalculadoraFormInicial);
   const [timelineConsulta, setTimelineConsulta] = useState([]);
   const [carregandoTimeline, setCarregandoTimeline] = useState(false);
   const [modalInsumoAberto, setModalInsumoAberto] = useState(false);
   const [salvandoInsumoRapido, setSalvandoInsumoRapido] = useState(false);
   const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
-  const [insumoRapidoForm, setInsumoRapidoForm] = useState({
-    quantidade_utilizada: "1",
-    quantidade_desperdicio: "",
-    observacoes: "",
-  });
+  const [insumoRapidoForm, setInsumoRapidoForm] = useState(criarInsumoRapidoFormInicial);
 
   // ---------- Form state ----------
-  const [form, setForm] = useState({
-    // Etapa 1 — Triagem
-    pet_id: "",
-    veterinario_id: "",
-    motivo_consulta: "",
-    peso_kg: "",
-    temperatura: "",
-    freq_cardiaca: "",
-    freq_respiratoria: "",
-    tpc: "",
-    mucosa: "",
-    estado_hidratacao: "",
-    nivel_consciencia: "",
-    nivel_dor: "",
-    // Etapa 2 — Exame clínico
-    exame_fisico: "",
-    historico_clinico: "",
-    // Etapa 3 — Diagnóstico
-    diagnostico: "",
-    prognostico: "",
-    tratamento: "",
-    observacoes: "",
-    retorno_em_dias: "",
-    // Prescrição
-    prescricao_itens: [], // [{nome, principio, dose_mg, frequencia, duracao}]
-    procedimentos_realizados: [],
-  });
+  const [form, setForm] = useState(criarConsultaFormInicial);
   // Carrega dados ao editar
   useEffect(() => {
     if (!isEdicao) return;
@@ -145,28 +108,7 @@ export default function VetConsultaForm() {
       .obterConsulta(consultaId)
       .then((res) => {
         const c = res.data;
-        setForm((prev) => ({
-          ...prev,
-          pet_id: c.pet_id ?? "",
-          veterinario_id: c.veterinario_id ?? "",
-          motivo_consulta: c.motivo_consulta ?? "",
-          peso_kg: c.peso_kg ?? "",
-          temperatura: c.temperatura ?? "",
-          freq_cardiaca: c.freq_cardiaca ?? "",
-          freq_respiratoria: c.freq_respiratoria ?? "",
-          tpc: c.tpc ?? "",
-          mucosa: c.mucosa ?? "",
-          estado_hidratacao: c.estado_hidratacao ?? "",
-          nivel_consciencia: c.nivel_consciencia ?? "",
-          nivel_dor: c.nivel_dor ?? "",
-          exame_fisico: c.exame_fisico ?? "",
-          historico_clinico: c.historico_clinico ?? "",
-          diagnostico: c.diagnostico ?? "",
-          prognostico: c.prognostico ?? "",
-          tratamento: c.tratamento ?? "",
-          observacoes: c.observacoes ?? "",
-          retorno_em_dias: c.retorno_em_dias ?? "",
-        }));
+        setForm((prev) => ({ ...prev, ...mapConsultaParaForm(c) }));
         if (c.status === "finalizada") setFinalizado(true);
       })
       .catch(() => setErro("Não foi possível carregar a consulta."))
@@ -420,11 +362,7 @@ export default function VetConsultaForm() {
       return;
     }
     setInsumoRapidoSelecionado(null);
-    setInsumoRapidoForm({
-      quantidade_utilizada: "1",
-      quantidade_desperdicio: "",
-      observacoes: "",
-    });
+    setInsumoRapidoForm(criarInsumoRapidoFormInicial());
     setModalInsumoAberto(true);
   }
 
@@ -488,31 +426,12 @@ export default function VetConsultaForm() {
         return;
       }
 
-      const payload = {
-        pet_id: form.pet_id || undefined,
-        cliente_id: petSelecionadoAtual.cliente_id,
-        veterinario_id: form.veterinario_id || undefined,
-        tipo: tipoQuery || "consulta",
-        agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
-        queixa_principal: form.motivo_consulta || undefined,
-        // Campos extras são ignorados pelo backend no create e usados no patch quando suportados.
-        peso_kg: form.peso_kg ? Number.parseFloat(form.peso_kg) : undefined,
-        temperatura: form.temperatura ? Number.parseFloat(form.temperatura) : undefined,
-        freq_cardiaca: form.freq_cardiaca ? parseInt(form.freq_cardiaca) : undefined,
-        freq_respiratoria: form.freq_respiratoria ? parseInt(form.freq_respiratoria) : undefined,
-        tpc: form.tpc || undefined,
-        mucosa: form.mucosa || undefined,
-        estado_hidratacao: form.estado_hidratacao || undefined,
-        nivel_consciencia: form.nivel_consciencia || undefined,
-        nivel_dor: form.nivel_dor ? parseInt(form.nivel_dor) : undefined,
-        exame_fisico: form.exame_fisico || undefined,
-        historico_clinico: form.historico_clinico || undefined,
-        diagnostico: form.diagnostico || undefined,
-        prognostico: form.prognostico || undefined,
-        tratamento: form.tratamento || undefined,
-        observacoes: form.observacoes || undefined,
-        retorno_em_dias: form.retorno_em_dias ? parseInt(form.retorno_em_dias) : undefined,
-      };
+      const payload = buildConsultaPayload({
+        form,
+        petSelecionadoAtual,
+        tipoQuery,
+        agendamentoIdQuery,
+      });
 
       if (!consultaIdAtual) {
         const res = await vetApi.criarConsulta(payload);
@@ -545,38 +464,10 @@ export default function VetConsultaForm() {
     setErro(null);
     try {
       // primeiro salva o que está no form
-      await vetApi.atualizarConsulta(consultaIdAtual, {
-        diagnostico: form.diagnostico || undefined,
-        prognostico: form.prognostico || undefined,
-        tratamento: form.tratamento || undefined,
-        observacoes: form.observacoes || undefined,
-        retorno_em_dias: form.retorno_em_dias ? parseInt(form.retorno_em_dias) : undefined,
-      });
+      await vetApi.atualizarConsulta(consultaIdAtual, buildFinalizacaoPayload(form));
       // cria prescrição se houver itens
       if (form.prescricao_itens.length > 0) {
-        const itensPrescricao = form.prescricao_itens
-          .map((it) => {
-            const nome = (it.nome || "").trim();
-            const frequencia = (it.frequencia || "").trim();
-            const instrucoes = (it.instrucoes || "").trim();
-            const dose = (it.dose_mg || "").toString().trim();
-            const unidade = (it.unidade || "mg").trim();
-            const posologia = [dose ? `${dose} ${unidade}` : "", frequencia, instrucoes]
-              .filter(Boolean)
-              .join(" - ");
-
-            if (!nome || !posologia) return null;
-
-            return {
-              nome_medicamento: nome,
-              concentracao: it.principio_ativo || undefined,
-              quantidade: dose || undefined,
-              posologia,
-              via_administracao: it.via || undefined,
-              duracao_dias: it.duracao_dias ? Number.parseInt(it.duracao_dias) : undefined,
-            };
-          })
-          .filter(Boolean);
+        const itensPrescricao = buildItensPrescricao(form.prescricao_itens);
 
         if (itensPrescricao.length === 0) {
           setErro("Adicione ao menos 1 item de prescrição com nome e posologia.");
@@ -624,19 +515,7 @@ export default function VetConsultaForm() {
       ...prev,
       prescricao_itens: [
         ...prev.prescricao_itens,
-        {
-          medicamento_id: "",
-          nome: "",
-          principio_ativo: "",
-          dose_mg: "",
-          unidade: "mg",
-          dose_minima_mg_kg: "",
-          dose_maxima_mg_kg: "",
-          frequencia: "",
-          duracao_dias: "",
-          via: "oral",
-          instrucoes: "",
-        },
+        criarPrescricaoItemInicial(),
       ],
     }));
   }
@@ -646,14 +525,7 @@ export default function VetConsultaForm() {
       ...prev,
       procedimentos_realizados: [
         ...prev.procedimentos_realizados,
-        {
-          catalogo_id: "",
-          nome: "",
-          descricao: "",
-          valor: "",
-          observacoes: "",
-          baixar_estoque: true,
-        },
+        criarProcedimentoRealizadoInicial(),
       ],
     }));
   }
@@ -846,16 +718,12 @@ export default function VetConsultaForm() {
     setSalvandoNovoExame(true);
     setErro(null);
     try {
-      const res = await vetApi.criarExame({
-        pet_id: Number(form.pet_id),
-        consulta_id: consultaIdAtual ? Number(consultaIdAtual) : undefined,
-        agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
-        tipo: novoExameForm.tipo,
-        nome: novoExameForm.nome.trim(),
-        data_solicitacao: novoExameForm.data_solicitacao || undefined,
-        laboratorio: novoExameForm.laboratorio?.trim() || undefined,
-        observacoes: novoExameForm.observacoes?.trim() || undefined,
-      });
+      const res = await vetApi.criarExame(buildNovoExamePayload({
+        form,
+        novoExameForm,
+        consultaIdAtual,
+        agendamentoIdQuery,
+      }));
 
       if (novoExameArquivo) {
         await vetApi.uploadArquivoExame(res.data.id, novoExameArquivo);
@@ -867,13 +735,7 @@ export default function VetConsultaForm() {
       }
 
       setModalNovoExameAberto(false);
-      setNovoExameForm({
-        tipo: "laboratorial",
-        nome: "",
-        data_solicitacao: hojeIso(),
-        laboratorio: "",
-        observacoes: "",
-      });
+      setNovoExameForm(criarNovoExameFormInicial());
       setNovoExameArquivo(null);
       setRefreshExamesToken((prev) => prev + 1);
       setSucesso("Exame vinculado à consulta com sucesso.");
@@ -912,35 +774,18 @@ export default function VetConsultaForm() {
     setSalvandoInsumoRapido(true);
     setErro(null);
     try {
-      const unidade = insumoRapidoSelecionado.unidade || "un";
-      await vetApi.adicionarProcedimento({
-        consulta_id: Number(consultaIdAtual),
-        nome: `Insumo: ${insumoRapidoSelecionado.nome}`,
-        descricao: "Lançamento rápido de insumo durante a consulta",
-        valor: 0,
-        observacoes: insumoRapidoForm.observacoes?.trim()
-          ? `${insumoRapidoForm.observacoes.trim()} | Utilizado: ${quantidadeUtilizada} ${unidade}${quantidadeDesperdicio ? ` | Desperdício: ${quantidadeDesperdicio} ${unidade}` : ""}`
-          : `Utilizado: ${quantidadeUtilizada} ${unidade}${quantidadeDesperdicio ? ` | Desperdício: ${quantidadeDesperdicio} ${unidade}` : ""}`,
-        realizado: true,
-        baixar_estoque: true,
-        insumos: [
-          {
-            produto_id: insumoRapidoSelecionado.id,
-            nome: insumoRapidoSelecionado.nome,
-            unidade,
-            quantidade: quantidadeConsumida,
-            baixar_estoque: true,
-          },
-        ],
-      });
+      await vetApi.adicionarProcedimento(buildInsumoProcedimentoPayload({
+        consultaIdAtual,
+        insumoRapidoSelecionado,
+        insumoRapidoForm,
+        quantidadeUtilizada,
+        quantidadeDesperdicio,
+        quantidadeConsumida,
+      }));
 
       setModalInsumoAberto(false);
       setInsumoRapidoSelecionado(null);
-      setInsumoRapidoForm({
-        quantidade_utilizada: "1",
-        quantidade_desperdicio: "",
-        observacoes: "",
-      });
+      setInsumoRapidoForm(criarInsumoRapidoFormInicial());
       setSucesso("Insumo lançado com sucesso na consulta.");
       await carregarTimelineConsulta();
     } catch (e) {
@@ -961,150 +806,44 @@ export default function VetConsultaForm() {
 
   if (finalizado && !isEdicao) {
     return (
-      <div className="p-6 max-w-lg mx-auto text-center space-y-4">
-        <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-          <CheckCircle size={40} className="mx-auto text-green-500 mb-2" />
-          <h2 className="text-lg font-bold text-green-700">Consulta finalizada!</h2>
-          <p className="text-sm text-gray-500 mt-1">O prontuário foi assinado digitalmente e não pode mais ser alterado.</p>
-        </div>
-        <div className="flex gap-3 justify-center">
-          <button
-            onClick={() => navigate("/veterinario/consultas")}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            Ver todas as consultas
-          </button>
-          <button
-            onClick={() => navigate("/veterinario/consultas/nova")}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Nova consulta
-          </button>
-        </div>
-      </div>
+      <ConsultaFinalizadaScreen
+        onVerConsultas={() => navigate("/veterinario/consultas")}
+        onNovaConsulta={() => navigate("/veterinario/consultas/nova")}
+      />
     );
   }
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      {/* Cabeçalho */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-xl">
-            <Stethoscope size={22} className="text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">
-              {tituloConsulta}
-            </h1>
-            <p className="text-xs text-gray-400">
-              {consultaIdAtual ? `Código da consulta: #${consultaIdAtual}` : "Ainda não salva"}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {consultaIdAtual && (
-            <button
-              type="button"
-              onClick={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
-              className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-            >
-              <MessageSquare size={16} />
-              IA da consulta
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setModalCalculadoraAberto(true)}
-            className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-700 hover:bg-cyan-100"
-          >
-            <Calculator size={16} />
-            Calculadora
-          </button>
-        </div>
-      </div>
+      <ConsultaHeader
+        tituloConsulta={tituloConsulta}
+        consultaIdAtual={consultaIdAtual}
+        onAbrirAssistente={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
+        onAbrirCalculadora={() => setModalCalculadoraAberto(true)}
+      />
 
       {modoSomenteLeitura && (
-        <div className="space-y-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
-          <div className="flex items-center gap-2">
-            <Lock size={15} />
-            <span>Consulta assinada digitalmente. Você pode visualizar todos os dados, mas não pode editar.</span>
-          </div>
-          {assinatura && (
-            <div className="text-xs text-green-800 bg-white/70 border border-green-200 rounded px-3 py-2">
-              <div>
-                Integridade do prontuário: <strong>{assinatura.hash_valido ? "válida" : "divergente"}</strong>
-              </div>
-              <div>
-                Hash: <span className="font-mono">{assinatura.hash_prontuario || "—"}</span>
-              </div>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button
-              type="button"
-              onClick={baixarProntuarioPdf}
-              disabled={baixandoPdf}
-              className="px-3 py-1.5 text-xs border border-green-300 rounded-md hover:bg-green-100 disabled:opacity-60"
-            >
-              {baixandoPdf ? "Baixando..." : "Baixar prontuário PDF"}
-            </button>
-            <button
-              type="button"
-              onClick={baixarUltimaReceitaPdf}
-              disabled={baixandoPdf}
-              className="px-3 py-1.5 text-xs border border-green-300 rounded-md hover:bg-green-100 disabled:opacity-60"
-            >
-              {baixandoPdf ? "Baixando..." : "Baixar receita PDF"}
-            </button>
-          </div>
-        </div>
+        <ConsultaReadonlyNotice
+          assinatura={assinatura}
+          baixandoPdf={baixandoPdf}
+          onBaixarProntuario={baixarProntuarioPdf}
+          onBaixarReceita={baixarUltimaReceitaPdf}
+        />
       )}
 
-      {/* Passos */}
-      <div className="flex items-center gap-1">
-        {ETAPAS.map((nome, i) => (
-          <div key={i} className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                if (modoSomenteLeitura) {
-                  setEtapa(i);
-                  return;
-                }
-                if (i < etapa) setEtapa(i);
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                i === etapa
-                  ? "bg-blue-600 text-white"
-                  : i < etapa
-                  ? "bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200"
-                  : "bg-gray-100 text-gray-400 cursor-default"
-              }`}
-            >
-              {i < etapa ? <CheckCircle size={12} /> : null}
-              {i + 1}. {nome}
-            </button>
-            {i < ETAPAS.length - 1 && <ChevronRight size={14} className="text-gray-300" />}
-          </div>
-        ))}
-      </div>
+      <ConsultaSteps
+        etapas={ETAPAS}
+        etapaAtual={etapa}
+        modoSomenteLeitura={modoSomenteLeitura}
+        onChangeEtapa={setEtapa}
+      />
 
-      {/* Erro */}
-      {erro && (
-        <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
-          <AlertCircle size={16} />
-          <span>{erro}</span>
-          <button className="ml-auto" onClick={() => setErro(null)}><X size={14} /></button>
-        </div>
-      )}
-
-      {sucesso && (
-        <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm">
-          <CheckCircle size={16} />
-          <span>{sucesso}</span>
-          <button className="ml-auto" onClick={() => setSucesso(null)}><X size={14} /></button>
-        </div>
-      )}
+      <ConsultaFeedbackAlerts
+        erro={erro}
+        sucesso={sucesso}
+        onClearErro={() => setErro(null)}
+        onClearSucesso={() => setSucesso(null)}
+      />
 
       {/* =========== ETAPA 1: TRIAGEM =========== */}
       {etapa === 0 && (
@@ -1186,46 +925,32 @@ export default function VetConsultaForm() {
         onFinalizar={finalizar}
       />
 
-      <InsumoRapidoModal
-        isOpen={modalInsumoAberto}
-        onClose={() => setModalInsumoAberto(false)}
+      <ConsultaFormModals
         css={css}
+        modalInsumoAberto={modalInsumoAberto}
+        setModalInsumoAberto={setModalInsumoAberto}
         consultaIdAtual={consultaIdAtual}
         petSelecionadoLabel={petSelecionadoLabel}
-        insumoSelecionado={insumoRapidoSelecionado}
-        setInsumoSelecionado={setInsumoRapidoSelecionado}
-        insumoForm={insumoRapidoForm}
-        setInsumoForm={setInsumoRapidoForm}
-        salvarInsumo={salvarInsumoRapidoConsulta}
-        salvandoInsumo={salvandoInsumoRapido}
-      />
-
-      <NovoPetModal
-        isOpen={modalNovoPetAberto}
-        tutor={tutorSelecionado}
+        insumoRapidoSelecionado={insumoRapidoSelecionado}
+        setInsumoRapidoSelecionado={setInsumoRapidoSelecionado}
+        insumoRapidoForm={insumoRapidoForm}
+        setInsumoRapidoForm={setInsumoRapidoForm}
+        salvarInsumoRapidoConsulta={salvarInsumoRapidoConsulta}
+        salvandoInsumoRapido={salvandoInsumoRapido}
+        modalNovoPetAberto={modalNovoPetAberto}
+        setModalNovoPetAberto={setModalNovoPetAberto}
+        tutorSelecionado={tutorSelecionado}
         sugestoesEspecies={sugestoesEspecies}
-        onClose={() => setModalNovoPetAberto(false)}
-        onCreated={handleNovoPetCriado}
-      />
-
-      <CalculadoraDoseModal
-        isOpen={modalCalculadoraAberto}
-        onClose={() => setModalCalculadoraAberto(false)}
-        css={css}
-        petSelecionadoLabel={petSelecionadoLabel}
+        handleNovoPetCriado={handleNovoPetCriado}
+        modalCalculadoraAberto={modalCalculadoraAberto}
+        setModalCalculadoraAberto={setModalCalculadoraAberto}
         calculadoraForm={calculadoraForm}
         setCalculadoraForm={setCalculadoraForm}
         medicamentosCatalogo={medicamentosCatalogo}
-        medicamentoSelecionado={medicamentoCalculadoraSelecionado}
-        resultado={calculadoraResultado}
-      />
-
-      <NovoExameConsultaModal
-        isOpen={modalNovoExameAberto}
-        onClose={() => setModalNovoExameAberto(false)}
-        css={css}
-        consultaIdAtual={consultaIdAtual}
-        petSelecionadoLabel={petSelecionadoLabel}
+        medicamentoCalculadoraSelecionado={medicamentoCalculadoraSelecionado}
+        calculadoraResultado={calculadoraResultado}
+        modalNovoExameAberto={modalNovoExameAberto}
+        setModalNovoExameAberto={setModalNovoExameAberto}
         petId={form.pet_id}
         novoExameForm={novoExameForm}
         setNovoExameForm={setNovoExameForm}
