@@ -19,8 +19,18 @@ import { api } from "../../services/api";
 import { formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import NovoPetModal from "../../components/veterinario/NovoPetModal";
-import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
 import ExameChatIAAvancada from "./components/ExameChatIAAvancada";
+import CalculadoraDoseModal from "./consultaForm/CalculadoraDoseModal";
+import InsumoRapidoModal from "./consultaForm/InsumoRapidoModal";
+import NovoExameConsultaModal from "./consultaForm/NovoExameConsultaModal";
+import TimelineConsultaPanel from "./consultaForm/TimelineConsultaPanel";
+import {
+  ETAPAS,
+  css,
+  hojeIso,
+  obterResumoProcedimentoSelecionado,
+  parseNumero,
+} from "./consultaForm/consultaFormUtils";
 
 // ---------- helpers ----------
 function campo(label, obrigatorio = false) {
@@ -35,52 +45,6 @@ function campo(label, obrigatorio = false) {
     );
   };
 }
-
-function toNumber(value) {
-  if (value == null || value === "") return 0;
-  return Number(String(value).replace(",", ".")) || 0;
-}
-
-function hojeIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatDateTimeBR(value) {
-  if (!value) return "—";
-  return new Date(value).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function obterResumoProcedimentoSelecionado(item, catalogos) {
-  const catalogo = catalogos.find((proc) => String(proc.id) === String(item.catalogo_id));
-  const valorCobrado = toNumber(item.valor || catalogo?.valor_padrao || 0);
-  const custoTotal = toNumber(catalogo?.custo_estimado || 0);
-  const margemValor = valorCobrado - custoTotal;
-  const margemPercentual = valorCobrado > 0 ? (margemValor / valorCobrado) * 100 : 0;
-  return {
-    possuiCatalogo: Boolean(catalogo),
-    valorCobrado,
-    custoTotal,
-    margemValor,
-    margemPercentual,
-  };
-}
-
-const css = {
-  input:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300",
-  textarea:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-y min-h-[80px]",
-  select:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white",
-};
-
-const ETAPAS = ["Triagem", "Exame Clínico", "Diagnóstico / Prescrição"];
 
 // ---------- componente principal ----------
 export default function VetConsultaForm() {
@@ -742,13 +706,6 @@ export default function VetConsultaForm() {
       itens[idx] = { ...itens[idx], [chave]: valor };
       return { ...prev, prescricao_itens: itens };
     });
-  }
-
-  function parseNumero(valor) {
-    if (valor === null || valor === undefined) return NaN;
-    const texto = String(valor).trim().replace(",", ".");
-    if (!texto) return NaN;
-    return Number.parseFloat(texto);
   }
 
   function calcularDosePorPeso(item) {
@@ -1602,78 +1559,13 @@ export default function VetConsultaForm() {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Timeline clínica da consulta</h3>
-                <p className="text-xs text-slate-500">
-                  Consulta, exames, vacinas, procedimentos, insumos e internações vinculados ficam centralizados aqui.
-                </p>
-              </div>
-              {consultaIdAtual && (
-                <button
-                  type="button"
-                  onClick={() => carregarTimelineConsulta()}
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <RefreshCw size={14} />
-                  Atualizar timeline
-                </button>
-              )}
-            </div>
-
-            {!consultaIdAtual ? (
-              <p className="mt-4 text-xs text-slate-500">Salve a consulta para começar a montar a timeline clínica.</p>
-            ) : carregandoTimeline ? (
-              <div className="mt-4 flex items-center justify-center py-8">
-                <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-slate-500" />
-              </div>
-            ) : timelineConsulta.length === 0 ? (
-              <p className="mt-4 text-xs text-slate-500">Nenhum evento clínico vinculado ainda.</p>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {timelineConsulta.map((evento) => (
-                  <div key={`${evento.kind}_${evento.item_id}`} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                            {evento.kind.replaceAll("_", " ")}
-                          </span>
-                          {evento.status ? (
-                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                              {evento.status}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">{evento.titulo}</p>
-                        <p className="text-xs text-slate-500">{formatDateTimeBR(evento.data_hora)}</p>
-                        {evento.descricao ? <p className="mt-2 text-sm text-slate-600">{evento.descricao}</p> : null}
-                        {Array.isArray(evento.meta?.insumos) && evento.meta.insumos.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {evento.meta.insumos.map((insumo, idx) => (
-                              <span key={`${evento.kind}_${evento.item_id}_insumo_${idx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                                {insumo.nome || `Produto #${insumo.produto_id}`} • {insumo.quantidade} {insumo.unidade || "un"}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      {evento.link ? (
-                        <button
-                          type="button"
-                          onClick={() => navigate(evento.link)}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                          Abrir
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <TimelineConsultaPanel
+            consultaIdAtual={consultaIdAtual}
+            carregandoTimeline={carregandoTimeline}
+            timelineConsulta={timelineConsulta}
+            onRefresh={() => carregarTimelineConsulta()}
+            onOpenLink={(link) => navigate(link)}
+          />
         </div>
       )}
 
@@ -1740,90 +1632,19 @@ export default function VetConsultaForm() {
         </div>
       </div>
 
-      {modalInsumoAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Lançar insumo rápido</h2>
-                <p className="text-sm text-gray-500">
-                  Consulta #{consultaIdAtual || "—"} • {petSelecionadoLabel}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalInsumoAberto(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Fechar modal de insumo"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-4">
-              <ProdutoEstoqueAutocomplete
-                selectedProduct={insumoRapidoSelecionado}
-                onSelect={setInsumoRapidoSelecionado}
-                helperText="Pesquise o material, medicamento ou item de consumo usado durante a consulta."
-              />
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Quantidade utilizada *</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={insumoRapidoForm.quantidade_utilizada}
-                    onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))}
-                    className={css.input}
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Desperdício / perda</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={insumoRapidoForm.quantidade_desperdicio}
-                    onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))}
-                    className={css.input}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
-                <textarea
-                  value={insumoRapidoForm.observacoes}
-                  onChange={(e) => setInsumoRapidoForm((prev) => ({ ...prev, observacoes: e.target.value }))}
-                  rows={4}
-                  className={css.textarea}
-                  placeholder="Ex.: usado 1 tapete agora e outro precisou ser descartado, bolsa de soro conectada, desinfecção do campo..."
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setModalInsumoAberto(false)}
-                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={salvarInsumoRapidoConsulta}
-                disabled={salvandoInsumoRapido}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {salvandoInsumoRapido ? "Salvando..." : "Registrar insumo"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InsumoRapidoModal
+        isOpen={modalInsumoAberto}
+        onClose={() => setModalInsumoAberto(false)}
+        css={css}
+        consultaIdAtual={consultaIdAtual}
+        petSelecionadoLabel={petSelecionadoLabel}
+        insumoSelecionado={insumoRapidoSelecionado}
+        setInsumoSelecionado={setInsumoRapidoSelecionado}
+        insumoForm={insumoRapidoForm}
+        setInsumoForm={setInsumoRapidoForm}
+        salvarInsumo={salvarInsumoRapidoConsulta}
+        salvandoInsumo={salvandoInsumoRapido}
+      />
 
       <NovoPetModal
         isOpen={modalNovoPetAberto}
@@ -1833,255 +1654,31 @@ export default function VetConsultaForm() {
         onCreated={handleNovoPetCriado}
       />
 
-      {modalCalculadoraAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Calculadora rápida de dose</h2>
-                <p className="text-sm text-gray-500">
-                  Modal livre para cálculo rápido durante a consulta.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalCalculadoraAberto(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Fechar calculadora"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <CalculadoraDoseModal
+        isOpen={modalCalculadoraAberto}
+        onClose={() => setModalCalculadoraAberto(false)}
+        css={css}
+        petSelecionadoLabel={petSelecionadoLabel}
+        calculadoraForm={calculadoraForm}
+        setCalculadoraForm={setCalculadoraForm}
+        medicamentosCatalogo={medicamentosCatalogo}
+        medicamentoSelecionado={medicamentoCalculadoraSelecionado}
+        resultado={calculadoraResultado}
+      />
 
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Pet</label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                  {petSelecionadoLabel}
-                </div>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Peso atual (kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={calculadoraForm.peso_kg}
-                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, peso_kg: e.target.value }))}
-                  className={css.input}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Medicamento</label>
-                <select
-                  value={calculadoraForm.medicamento_id}
-                  onChange={(e) => {
-                    setCalculadoraForm((prev) => ({
-                      ...prev,
-                      medicamento_id: e.target.value,
-                      dose_mg_kg: "",
-                    }));
-                  }}
-                  className={css.select}
-                >
-                  <option value="">Selecione…</option>
-                  {medicamentosCatalogo.map((med) => (
-                    <option key={med.id} value={med.id}>
-                      {med.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Dose (mg/kg)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={calculadoraForm.dose_mg_kg}
-                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, dose_mg_kg: e.target.value }))}
-                  className={css.input}
-                />
-                {(medicamentoCalculadoraSelecionado?.dose_minima_mg_kg || medicamentoCalculadoraSelecionado?.dose_maxima_mg_kg) && (
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Faixa do catálogo: {medicamentoCalculadoraSelecionado?.dose_minima_mg_kg || "—"}
-                    {medicamentoCalculadoraSelecionado?.dose_maxima_mg_kg
-                      ? ` a ${medicamentoCalculadoraSelecionado.dose_maxima_mg_kg}`
-                      : ""} mg/kg
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Frequência (horas)</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={calculadoraForm.frequencia_horas}
-                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, frequencia_horas: e.target.value }))}
-                  className={css.input}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Dias de tratamento</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={calculadoraForm.dias}
-                  onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, dias: e.target.value }))}
-                  className={css.input}
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-cyan-100 bg-cyan-50 p-4">
-              {!calculadoraResultado ? (
-                <p className="text-sm text-cyan-700">
-                  Informe peso e dose para calcular. Se quiser, você ainda pode abrir a calculadora completa depois.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg por dose</p>
-                    <p className="text-lg font-semibold text-cyan-900">{calculadoraResultado.mgPorDose.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">doses / dia</p>
-                    <p className="text-lg font-semibold text-cyan-900">
-                      {calculadoraResultado.dosesPorDia ? calculadoraResultado.dosesPorDia.toFixed(2) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg / dia</p>
-                    <p className="text-lg font-semibold text-cyan-900">
-                      {calculadoraResultado.mgDia ? calculadoraResultado.mgDia.toFixed(2) : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-cyan-600">mg tratamento</p>
-                    <p className="text-lg font-semibold text-cyan-900">
-                      {calculadoraResultado.mgTratamento ? calculadoraResultado.mgTratamento.toFixed(2) : "—"}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setModalCalculadoraAberto(false)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modalNovoExameAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Novo exame vinculado à consulta</h2>
-                <p className="text-sm text-gray-500">
-                  Consulta #{consultaIdAtual || "—"} • {petSelecionadoLabel}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalNovoExameAberto(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Fechar modal de exame"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Tipo</label>
-                <select
-                  value={novoExameForm.tipo}
-                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, tipo: e.target.value }))}
-                  className={css.select}
-                >
-                  <option value="laboratorial">Laboratorial</option>
-                  <option value="imagem">Imagem</option>
-                  <option value="clinico">Clínico</option>
-                  <option value="outro">Outro</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Data da solicitação</label>
-                <input
-                  type="date"
-                  value={novoExameForm.data_solicitacao}
-                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, data_solicitacao: e.target.value }))}
-                  className={css.input}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Nome do exame</label>
-                <input
-                  type="text"
-                  value={novoExameForm.nome}
-                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, nome: e.target.value }))}
-                  placeholder="Ex: hemograma, ultrassom, perfil renal..."
-                  className={css.input}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Laboratório</label>
-                <input
-                  type="text"
-                  value={novoExameForm.laboratorio}
-                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, laboratorio: e.target.value }))}
-                  className={css.input}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
-                <textarea
-                  value={novoExameForm.observacoes}
-                  onChange={(e) => setNovoExameForm((prev) => ({ ...prev, observacoes: e.target.value }))}
-                  rows={4}
-                  className={css.textarea}
-                  placeholder="Contexto clínico, o que espera confirmar, prioridade..."
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Arquivo do exame</label>
-                <input
-                  type="file"
-                  onChange={(e) => setNovoExameArquivo(e.target.files?.[0] ?? null)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-blue-700"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Pode registrar sem arquivo agora e anexar depois, mas com anexo a IA já ganha contexto melhor.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setModalNovoExameAberto(false)}
-                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={salvarNovoExameRapido}
-                disabled={salvandoNovoExame || !form.pet_id || !novoExameForm.nome.trim()}
-                className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-              >
-                {salvandoNovoExame ? "Salvando..." : "Salvar exame"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NovoExameConsultaModal
+        isOpen={modalNovoExameAberto}
+        onClose={() => setModalNovoExameAberto(false)}
+        css={css}
+        consultaIdAtual={consultaIdAtual}
+        petSelecionadoLabel={petSelecionadoLabel}
+        petId={form.pet_id}
+        novoExameForm={novoExameForm}
+        setNovoExameForm={setNovoExameForm}
+        setNovoExameArquivo={setNovoExameArquivo}
+        salvarNovoExameRapido={salvarNovoExameRapido}
+        salvandoNovoExame={salvandoNovoExame}
+      />
     </div>
   );
 }
