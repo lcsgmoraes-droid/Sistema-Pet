@@ -9,6 +9,12 @@ from app.veterinario_ia import (
     _normalizar_modo_ia,
     _responder_chat_exame,
 )
+from app.veterinario_exames_ia import (
+    _basic_lab_values_from_text,
+    _gerar_interpretacao_exame,
+    _normalize_ai_alerts,
+    _parse_llm_json_payload,
+)
 
 
 def _chat(**overrides):
@@ -110,3 +116,40 @@ def test_resposta_interacao_detecta_principio_duplicado():
 
     assert "mesmo princípio ativo" in resposta
     assert "duplicidade terapêutica" in resposta
+
+
+def test_exame_ia_extrai_valores_laboratoriais_do_texto():
+    dados = _basic_lab_values_from_text("Creatinina: 2,4 mg/dL\nUreia: 72\nPlaquetas: 190000")
+
+    assert dados["creatinina"] == 2.4
+    assert dados["ureia"] == 72
+    assert dados["plaquetas"] == 190000
+
+
+def test_exame_ia_parse_json_com_markdown():
+    payload = _parse_llm_json_payload('```json\n{"resumo": "ok", "confianca": 0.8}\n```')
+
+    assert payload == {"resumo": "ok", "confianca": 0.8}
+
+
+def test_exame_ia_normaliza_alertas_texto_e_dict():
+    alertas = _normalize_ai_alerts([
+        "Revisar creatinina",
+        {"campo": "ureia", "status": "alto", "mensagem": "Ureia elevada"},
+        {"campo": "sem mensagem"},
+    ])
+
+    assert alertas == [
+        {"campo": "atencao", "status": "atencao", "mensagem": "Revisar creatinina"},
+        {"campo": "ureia", "status": "alto", "mensagem": "Ureia elevada"},
+    ]
+
+
+def test_exame_ia_gera_alerta_para_creatinina_alta():
+    exame = SimpleNamespace(resultado_json={"creatinina": 2.4}, resultado_texto="")
+
+    analise = _gerar_interpretacao_exame(exame)
+
+    assert analise["alertas"][0]["campo"] == "creatinina"
+    assert analise["alertas"][0]["status"] == "alto"
+    assert analise["confianca"] >= 0.55

@@ -20,7 +20,7 @@ Por que da para pilotar:
 
 Por que ainda nao da para vender sem ressalva:
 
-- `backend/app/veterinario_routes.py` ainda tem 5816 linhas e mistura agenda, prontuario, exames, catalogo, IA e relatorios, mesmo apos as primeiras extracoes de calendario, financeiro, core, IA auxiliar, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py` ainda tem 5600 linhas e mistura agenda, prontuario, exames, catalogo e relatorios, mesmo apos as primeiras extracoes de calendario, financeiro, core, IA auxiliar, IA de exames, preventivo e helpers de internacao.
 - `VetConsultaForm.jsx`, `VetInternacoes.jsx`, `VetAgenda.jsx`, `VetCatalogo.jsx` e `VetExamesAnexados.jsx` sao grandes demais para manutencao segura no medio prazo.
 - A maior parte do modulo ainda nao tem testes de contrato dedicados.
 - Internacao ainda tem parte operacional local no navegador, mesmo com escopo por tenant/usuario corrigido.
@@ -41,19 +41,21 @@ Atualizacao tecnica em 2026-04-24:
 - Helpers operacionais de internacao foram extraidos para `veterinario_internacao.py`, incluindo baia, payload de procedimento agendado, serializacao de agenda e separacao entre evolucoes e procedimentos.
 - Helpers compartilhados de tenant, datas veterinarias e parse numerico foram extraidos para `veterinario_core.py`.
 - Helpers do assistente IA veterinario foram extraidos para `veterinario_ia.py`, incluindo chat de exame, memoria, regras de dose/interacao/sintomas/plano e fallback LLM.
-- `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg e duplicidade de principio ativo.
+- Helpers de triagem, normalizacao e interpretacao automatica de exames foram extraidos para `veterinario_exames_ia.py`.
+- `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames.
 - Base fixa do calendario preventivo foi extraida para `veterinario_preventivo.py`.
 
 ## 2. Inventario tecnico encontrado
 
 Backend:
 
-- `backend/app/veterinario_routes.py`: 5816 linhas apos extracao inicial de calendario, financeiro, core, IA auxiliar, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py`: 5600 linhas apos extracao inicial de calendario, financeiro, core, IA auxiliar, IA de exames, preventivo e helpers de internacao.
 - `backend/app/veterinario_calendar.py`: 220 linhas.
 - `backend/app/veterinario_financeiro.py`: 380 linhas.
 - `backend/app/veterinario_core.py`: 91 linhas.
 - `backend/app/veterinario_internacao.py`: 213 linhas.
 - `backend/app/veterinario_ia.py`: 601 linhas.
+- `backend/app/veterinario_exames_ia.py`: 241 linhas.
 - `backend/app/veterinario_preventivo.py`: 33 linhas.
 - `backend/app/veterinario_models.py`: 576 linhas.
 - `backend/app/pdf_veterinario.py`: geracao de prontuario e receituario.
