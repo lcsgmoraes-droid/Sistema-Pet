@@ -20,7 +20,7 @@ Por que da para pilotar:
 
 Por que ainda nao da para vender sem ressalva:
 
-- `backend/app/veterinario_routes.py` ainda tem 4030 linhas e mistura handlers de agenda, prontuario, exames, catalogo, internacao, relatorios, parceiros e IA; os schemas, helpers de agenda, clinicos, calendario, financeiro/estoque, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e internacao ja foram extraidos.
+- `backend/app/veterinario_routes.py` ainda tem 2258 linhas e mistura handlers de consultas, prontuario, exames, catalogo, relatorios e parceiros; schemas e routers de agenda, internacao e IA ja foram extraidos, alem dos helpers de agenda, clinicos, calendario, financeiro/estoque, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e internacao.
 - `VetConsultaForm.jsx`, `VetInternacoes.jsx`, `VetAgenda.jsx`, `VetCatalogo.jsx` e `VetExamesAnexados.jsx` sao grandes demais para manutencao segura no medio prazo.
 - A maior parte do modulo ainda nao tem testes de contrato dedicados.
 - Internacao ainda tem parte operacional local no navegador, mesmo com escopo por tenant/usuario corrigido.
@@ -51,15 +51,19 @@ Atualizacao tecnica em 2026-04-24:
 - Upload de arquivo de exame passou a usar helper dedicado com `secrets` importado corretamente, evitando erro de runtime no nome seguro do arquivo.
 - Montagem do calendario preventivo foi extraida para `veterinario_preventivo.py`, com aliases de especie para `canino/cao/cão` e `felino/gato`.
 - Schemas Pydantic do modulo veterinario foram extraidos para `veterinario_schemas.py`, reduzindo a rota sem alterar contratos publicos.
-- `test_vet_schemas.py` cobre defaults/validacoes principais dos schemas; `test_vet_preventivo.py` cobre calendario preventivo e aliases de especie; `test_vet_financeiro_estoque.py` cobre baixa de estoque, enriquecimento de custos e bloqueio de estoque insuficiente; `test_vet_clinico_helpers.py` cobre bloqueio de consulta finalizada, aliases de especie, idade inicial de vacina, status vacinal e alertas do pet; `test_vet_agendamentos_helpers.py` cobre marcos de atendimento, intervalo, deteccao de conteudo clinico e contrato de serializacao de agenda; `test_vet_serializers.py` cobre contratos de consulta, prescricao e hash de prontuario; `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames; `test_vet_exames_arquivos.py` cobre persistencia e validacao de upload de exame.
-- Proxima reducao relevante: separar routers por dominio (`agenda`, `consultas`, `exames`, `catalogo`, `internacao`, `relatorios/repasse` e `ia`). Nao e bloqueador para piloto, mas e o caminho para manutencao enterprise.
+- Routers de `agenda/base`, `internacao` e `IA veterinaria` foram extraidos para `veterinario_agenda_routes.py`, `veterinario_internacao_routes.py` e `veterinario_ia_routes.py`, mantendo os mesmos contratos publicos em `/vet`.
+- `test_vet_schemas.py` cobre defaults/validacoes principais dos schemas; `test_vet_router_contracts.py` garante endpoints movidos, ausencia de duplicidade metodo/path e precedencia das rotas estaticas de internacao; `test_vet_preventivo.py` cobre calendario preventivo e aliases de especie; `test_vet_financeiro_estoque.py` cobre baixa de estoque, enriquecimento de custos e bloqueio de estoque insuficiente; `test_vet_clinico_helpers.py` cobre bloqueio de consulta finalizada, aliases de especie, idade inicial de vacina, status vacinal e alertas do pet; `test_vet_agendamentos_helpers.py` cobre marcos de atendimento, intervalo, deteccao de conteudo clinico e contrato de serializacao de agenda; `test_vet_serializers.py` cobre contratos de consulta, prescricao e hash de prontuario; `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames; `test_vet_exames_arquivos.py` cobre persistencia e validacao de upload de exame.
+- Proxima reducao relevante: separar routers por dominio (`consultas/prontuario`, `exames`, `catalogo`, `relatorios/repasse` e `parceiros`). Nao e bloqueador para piloto, mas e o caminho para manutencao enterprise.
 
 ## 2. Inventario tecnico encontrado
 
 Backend:
 
-- `backend/app/veterinario_routes.py`: 4030 linhas apos extracao inicial de schemas, agenda, helpers clinicos, serializadores, calendario, financeiro, estoque/insumos, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py`: 2258 linhas apos extracao inicial de schemas, routers de agenda/internacao/IA, helpers clinicos, serializadores, calendario, financeiro, estoque/insumos, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
 - `backend/app/veterinario_schemas.py`: 563 linhas.
+- `backend/app/veterinario_agenda_routes.py`: 680 linhas.
+- `backend/app/veterinario_internacao_routes.py`: 742 linhas.
+- `backend/app/veterinario_ia_routes.py`: 479 linhas.
 - `backend/app/veterinario_agendamentos.py`: 242 linhas.
 - `backend/app/veterinario_clinico.py`: 310 linhas.
 - `backend/app/veterinario_serializers.py`: 83 linhas.
@@ -342,16 +346,16 @@ Semana 2 - estabilizacao:
 
 Semana 3 - refatoracao tecnica:
 
-- Quebrar `veterinario_routes.py` por dominio:
-  - `vet_agenda_routes.py` ou service/router equivalente para agenda clinica
+- Continuar a quebra de `veterinario_routes.py` por dominio:
+  - `veterinario_agenda_routes.py` concluido para agenda/base clinica
   - `vet_consultas_routes.py`
   - `vet_exames_routes.py`
   - `vet_catalogo_routes.py`
-  - `vet_internacoes_routes.py`
+  - `veterinario_internacao_routes.py` concluido para internacao
   - `vet_financeiro_routes.py`
-  - `vet_ia_routes.py`
+  - `veterinario_ia_routes.py` concluido para IA veterinaria
   - `vet_relatorios_routes.py`
-- Continuar a reducao do `veterinario_routes.py`, agora priorizando separar consultas, exames, internacao e IA em routers proprios.
+- Continuar a reducao do `veterinario_routes.py`, agora priorizando separar consultas/prontuario, exames, catalogo, parceiros e relatorios/repasse em routers proprios.
 - Quebrar `VetConsultaForm.jsx` em etapas e hooks.
 - Quebrar `VetInternacoes.jsx` em mapa, lista, agenda, historico e procedimentos.
 - Continuar a refatoracao frontend ja iniciada, especialmente `VetInternacoes.jsx` e `VetConsultaForm.jsx`, separando blocos visuais restantes em componentes pequenos.
