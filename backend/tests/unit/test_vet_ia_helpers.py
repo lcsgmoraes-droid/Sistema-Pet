@@ -1,4 +1,14 @@
-from app.veterinario_ia import _responder_chat_exame
+import os
+from types import SimpleNamespace
+
+os.environ["DEBUG"] = "false"
+
+from app.veterinario_ia import (
+    _montar_resposta_dose,
+    _montar_resposta_interacao,
+    _normalizar_modo_ia,
+    _responder_chat_exame,
+)
 
 
 def _chat(**overrides):
@@ -58,3 +68,45 @@ def test_chat_exame_orienta_processamento_quando_arquivo_sem_interpretacao():
     )
 
     assert "Processar arquivo + IA" in resposta
+
+
+def test_normalizar_modo_ia_restringe_valores_validos():
+    assert _normalizar_modo_ia("atendimento") == "atendimento"
+    assert _normalizar_modo_ia("qualquer coisa") == "livre"
+
+
+def test_resposta_dose_calcula_faixa_mgkg():
+    med = SimpleNamespace(
+        nome="Amoxicilina",
+        nome_comercial="",
+        principio_ativo="amoxicilina",
+        dose_min_mgkg=10,
+        dose_max_mgkg=20,
+    )
+
+    resposta = _montar_resposta_dose("qual dose de amoxicilina?", [med], 5, "canino")
+
+    assert "10.00 a 20.00 mg/kg" in resposta
+    assert "50.00 mg a 100.00 mg" in resposta
+
+
+def test_resposta_interacao_detecta_principio_duplicado():
+    meds = [
+        SimpleNamespace(
+            nome="Med A",
+            nome_comercial="",
+            principio_ativo="dipirona",
+            interacoes="",
+        ),
+        SimpleNamespace(
+            nome="Med B",
+            nome_comercial="",
+            principio_ativo="dipirona",
+            interacoes="",
+        ),
+    ]
+
+    resposta = _montar_resposta_interacao("pode associar?", meds, "Med A", "Med B")
+
+    assert "mesmo princípio ativo" in resposta
+    assert "duplicidade terapêutica" in resposta
