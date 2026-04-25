@@ -5,20 +5,19 @@ import {
   ChevronRight,
   CheckCircle,
   AlertCircle,
-  Save,
   X,
   Lock,
   Calculator,
   MessageSquare,
-  FlaskConical,
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import NovoPetModal from "../../components/veterinario/NovoPetModal";
-import ExameChatIAAvancada from "./components/ExameChatIAAvancada";
 import CalculadoraDoseModal from "./consultaForm/CalculadoraDoseModal";
+import ConsultaActionsFooter from "./consultaForm/ConsultaActionsFooter";
 import DiagnosticoTratamentoSection from "./consultaForm/DiagnosticoTratamentoSection";
+import ExameClinicoSection from "./consultaForm/ExameClinicoSection";
 import InsumoRapidoModal from "./consultaForm/InsumoRapidoModal";
 import NovoExameConsultaModal from "./consultaForm/NovoExameConsultaModal";
 import {
@@ -1284,66 +1283,17 @@ export default function VetConsultaForm() {
 
       {/* =========== ETAPA 2: EXAME CLÍNICO =========== */}
       {etapa === 1 && (
-        <>
-          <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
-            <h2 className="font-semibold text-gray-700">Exame clínico</h2>
-            {campo("Histórico clínico")(
-              <textarea
-                value={form.historico_clinico}
-                onChange={(e) => set("historico_clinico", e.target.value)}
-                className={css.textarea}
-                placeholder="Histórico médico, cirurgias anteriores, medicações em uso…"
-              />
-            )}
-            {campo("Exame físico detalhado")(
-              <textarea
-                value={form.exame_fisico}
-                onChange={(e) => set("exame_fisico", e.target.value)}
-                className={css.textarea}
-                style={{ minHeight: 200 }}
-                placeholder="Descrição sistemática: cabeça, tórax, abdômen, membros, pele…"
-              />
-            )}
-          </fieldset>
-
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-blue-900">Exames ligados a esta consulta</h3>
-                <p className="text-xs text-blue-700">
-                  Cadastre o exame já com anexo e mantenha a IA olhando o mesmo caso clínico.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setModalNovoExameAberto(true)}
-                  disabled={modoSomenteLeitura || !form.pet_id || !consultaIdAtual}
-                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
-                >
-                  <FlaskConical size={15} />
-                  Novo exame / anexo
-                </button>
-                {consultaIdAtual && (
-                  <button
-                    type="button"
-                    onClick={() => abrirFluxoConsulta("/veterinario/exames", { acao: "novo" })}
-                    className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
-                  >
-                    Ver tela de exames
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Painel chat IA de exames */}
-          <ExameChatIAAvancada
-            petId={form.pet_id}
-            refreshToken={refreshExamesToken}
-            onNovoExame={() => setModalNovoExameAberto(true)}
-          />
-        </>
+        <ExameClinicoSection
+          modoSomenteLeitura={modoSomenteLeitura}
+          form={form}
+          setCampo={set}
+          css={css}
+          renderCampo={campo}
+          consultaIdAtual={consultaIdAtual}
+          refreshExamesToken={refreshExamesToken}
+          onNovoExame={() => setModalNovoExameAberto(true)}
+          abrirFluxoConsulta={abrirFluxoConsulta}
+        />
       )}
 
       {/* =========== ETAPA 3: DIAGNÓSTICO =========== */}
@@ -1373,68 +1323,18 @@ export default function VetConsultaForm() {
         />
       )}
 
-      {/* Rodapé de ações */}
-      <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={() => navigate(-1)}
-          className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          Cancelar
-        </button>
-
-        <div className="flex gap-3">
-          {modoSomenteLeitura ? (
-            <button
-              onClick={() => navigate("/veterinario/consultas")}
-              className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              Voltar para consultas
-            </button>
-          ) : (
-            <>
-          {etapa > 0 && (
-            <button
-              onClick={() => setEtapa((e) => e - 1)}
-              className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-            >
-              ← Voltar
-            </button>
-          )}
-
-          {etapa < ETAPAS.length - 1 ? (
-            <button
-              onClick={salvarRascunho}
-              disabled={salvando}
-              className="flex items-center gap-2 px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
-            >
-              <Save size={14} />
-              {salvando ? "Salvando…" : "Salvar e continuar"}
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={salvarRascunho}
-                disabled={salvando}
-                className="flex items-center gap-2 px-4 py-2 text-sm border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-60"
-              >
-                <Save size={14} />
-                {salvando ? "Salvando…" : "Salvar rascunho"}
-              </button>
-              <button
-                onClick={finalizar}
-                disabled={salvando || !form.diagnostico}
-                className="flex items-center gap-2 px-5 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60"
-                title={!form.diagnostico ? "Preencha o diagnóstico para finalizar" : ""}
-              >
-                <Lock size={14} />
-                {salvando ? "Finalizando…" : "Dar alta / finalizar"}
-              </button>
-            </div>
-          )}
-            </>
-          )}
-        </div>
-      </div>
+      <ConsultaActionsFooter
+        modoSomenteLeitura={modoSomenteLeitura}
+        etapa={etapa}
+        totalEtapas={ETAPAS.length}
+        salvando={salvando}
+        diagnosticoPreenchido={Boolean(form.diagnostico)}
+        onCancel={() => navigate(-1)}
+        onVoltarConsultas={() => navigate("/veterinario/consultas")}
+        onVoltarEtapa={() => setEtapa((e) => e - 1)}
+        onSalvarRascunho={salvarRascunho}
+        onFinalizar={finalizar}
+      />
 
       <InsumoRapidoModal
         isOpen={modalInsumoAberto}
