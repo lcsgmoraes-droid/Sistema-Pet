@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
-import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import NovoPetModal from "../../components/veterinario/NovoPetModal";
 import CalculadoraDoseModal from "./consultaForm/CalculadoraDoseModal";
 import ConsultaActionsFooter from "./consultaForm/ConsultaActionsFooter";
@@ -20,6 +19,7 @@ import DiagnosticoTratamentoSection from "./consultaForm/DiagnosticoTratamentoSe
 import ExameClinicoSection from "./consultaForm/ExameClinicoSection";
 import InsumoRapidoModal from "./consultaForm/InsumoRapidoModal";
 import NovoExameConsultaModal from "./consultaForm/NovoExameConsultaModal";
+import TriagemInicialSection from "./consultaForm/TriagemInicialSection";
 import {
   ETAPAS,
   css,
@@ -1108,177 +1108,27 @@ export default function VetConsultaForm() {
 
       {/* =========== ETAPA 1: TRIAGEM =========== */}
       {etapa === 0 && (
-        <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
-          <h2 className="font-semibold text-gray-700">Triagem inicial</h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            {campo("Tutor (nome/telefone)", true)(
-              <div className="relative">
-                <input
-                  type="text"
-                  value={buscaTutor}
-                  onChange={(e) => {
-                    setBuscaTutor(e.target.value);
-                    if (tutorSelecionado) {
-                      setTutorSelecionado(null);
-                      set("pet_id", "");
-                    }
-                  }}
-                  placeholder="Digite nome ou telefone do tutor..."
-                  className={css.input}
-                  disabled={isEdicao}
-                />
-                {!isEdicao && tutorSelecionado && (
-                  <button
-                    type="button"
-                    onClick={limparTutor}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    limpar
-                  </button>
-                )}
-
-                {!isEdicao && buscaTutor.trim().length >= 1 && !tutorSelecionado && tutoresSugeridos.length > 0 && (
-                  <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                    {tutoresSugeridos.map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => selecionarTutor(t)}
-                        className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                      >
-                        <div className="text-sm font-medium text-gray-800">{t.nome}</div>
-                        <div className="text-xs text-gray-500">
-                          {[t.telefone, t.celular].filter(Boolean).join(" • ") || "Sem telefone"}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {campo("Veterinário")(
-              <select value={form.veterinario_id} onChange={(e) => set("veterinario_id", e.target.value)} className={css.select}>
-                <option value="">Selecione…</option>
-                {veterinarios.map((v) => (
-                  <option key={v.id} value={v.id}>{v.nome}</option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              {campo("Pet", true)(
-              <div className="border border-gray-200 rounded-lg bg-white overflow-hidden">
-                <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => tutorSelecionado && setListaPetsExpandida((prev) => !prev)}
-                    disabled={!tutorSelecionado || isEdicao}
-                    className="flex-1 text-left text-sm disabled:opacity-60"
-                  >
-                    <span>{petSelecionadoLabel}</span>
-                  </button>
-                  <NovoPetButton
-                    tutorId={tutorSelecionado?.id}
-                    tutorNome={tutorSelecionado?.nome}
-                    onClick={abrirModalNovoPet}
-                  />
-                  <span className="text-gray-500 text-xs">
-                    {tutorSelecionado ? `${petsDoTutor.length} pet(s)` : "Sem tutor"}
-                  </span>
-                </div>
-
-                {listaPetsExpandida && tutorSelecionado && !isEdicao && (
-                  <div className="border-t border-gray-200 max-h-52 overflow-y-auto p-2 space-y-1">
-                    {petsDoTutor.map((p) => {
-                      const ativo = String(form.pet_id) === String(p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            set("pet_id", p.id);
-                            setListaPetsExpandida(false);
-                          }}
-                          className={`w-full text-left px-2.5 py-2 rounded text-sm transition-colors ${
-                            ativo ? "bg-blue-50 border border-blue-200 text-blue-700" : "hover:bg-gray-50"
-                          }`}
-                        >
-                          <div className="font-medium">{p.nome}</div>
-                          <div className="text-xs text-gray-500">
-                            {p.especie && !/\?/.test(p.especie) ? p.especie : "Pet"}
-                            {p.codigo ? ` • ${p.codigo}` : ""}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-              )}
-            </div>
-          </div>
-
-          {!isEdicao && tutorSelecionado && petsDoTutor.length === 0 && (
-            <p className="text-xs text-amber-600">
-              Nenhum pet ativo vinculado a esse tutor.
-            </p>
-          )}
-
-          {campo("Motivo da consulta", true)(
-            <textarea
-              value={form.motivo_consulta}
-              onChange={(e) => set("motivo_consulta", e.target.value)}
-              className={css.textarea}
-              placeholder="Descreva o motivo da consulta…"
-            />
-          )}
-
-          <h3 className="text-sm font-medium text-gray-500 pt-2">Sinais vitais</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {campo("Peso (kg)")(
-              <input type="number" step="0.1" value={form.peso_kg} onChange={(e) => set("peso_kg", e.target.value)} className={css.input} placeholder="ex: 12,5" />
-            )}
-            {campo("Temperatura (°C)")(
-              <input type="number" step="0.1" value={form.temperatura} onChange={(e) => set("temperatura", e.target.value)} className={css.input} placeholder="ex: 38,5" />
-            )}
-            {campo("FC (bpm)")(
-              <input type="number" value={form.freq_cardiaca} onChange={(e) => set("freq_cardiaca", e.target.value)} className={css.input} placeholder="ex: 80" />
-            )}
-            {campo("FR (rpm)")(
-              <input type="number" value={form.freq_respiratoria} onChange={(e) => set("freq_respiratoria", e.target.value)} className={css.input} placeholder="ex: 20" />
-            )}
-            {campo("TPC")(
-              <input type="text" value={form.tpc} onChange={(e) => set("tpc", e.target.value)} className={css.input} placeholder="ex: < 2 seg" />
-            )}
-            {campo("Mucosa")(
-              <select value={form.mucosa} onChange={(e) => set("mucosa", e.target.value)} className={css.select}>
-                <option value="">—</option>
-                <option>Rósea</option><option>Pálida</option><option>Ictérica</option>
-                <option>Cianótica</option><option>Hiperêmica</option>
-              </select>
-            )}
-            {campo("Hidratação")(
-              <select value={form.estado_hidratacao} onChange={(e) => set("estado_hidratacao", e.target.value)} className={css.select}>
-                <option value="">—</option>
-                <option>Normal</option><option>Leve desidratação</option>
-                <option>Moderada desidratação</option><option>Grave desidratação</option>
-              </select>
-            )}
-            {campo("Consciência")(
-              <select value={form.nivel_consciencia} onChange={(e) => set("nivel_consciencia", e.target.value)} className={css.select}>
-                <option value="">—</option>
-                <option>Alerta</option><option>Deprimido</option><option>Estupor</option><option>Coma</option>
-              </select>
-            )}
-            {campo("Dor (0–10)")(
-              <input type="number" min={0} max={10} value={form.nivel_dor} onChange={(e) => set("nivel_dor", e.target.value)} className={css.input} placeholder="0 = sem dor" />
-            )}
-          </div>
-        </fieldset>
+        <TriagemInicialSection
+          modoSomenteLeitura={modoSomenteLeitura}
+          isEdicao={isEdicao}
+          form={form}
+          setCampo={set}
+          css={css}
+          renderCampo={campo}
+          buscaTutor={buscaTutor}
+          setBuscaTutor={setBuscaTutor}
+          tutorSelecionado={tutorSelecionado}
+          setTutorSelecionado={setTutorSelecionado}
+          tutoresSugeridos={tutoresSugeridos}
+          selecionarTutor={selecionarTutor}
+          limparTutor={limparTutor}
+          veterinarios={veterinarios}
+          listaPetsExpandida={listaPetsExpandida}
+          setListaPetsExpandida={setListaPetsExpandida}
+          petSelecionadoLabel={petSelecionadoLabel}
+          petsDoTutor={petsDoTutor}
+          abrirModalNovoPet={abrirModalNovoPet}
+        />
       )}
 
       {/* =========== ETAPA 2: EXAME CLÍNICO =========== */}
