@@ -6,54 +6,20 @@ import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
-import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import { useInternacaoOperacional } from "./useInternacaoOperacional";
-
-function formatData(iso) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function parseQuantity(value) {
-  if (value == null || value === "") return null;
-  const parsed = Number(String(value).replace(",", "."));
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatQuantity(value, unidade = "") {
-  if (value == null || value === "" || Number.isNaN(Number(value))) return "—";
-  const numero = Number(value);
-  const texto = Number.isInteger(numero)
-    ? numero.toLocaleString("pt-BR")
-    : numero.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  return unidade ? `${texto} ${unidade}` : texto;
-}
-
-function montarSerieEvolucao(registros = []) {
-  return registros
-    .filter((item) => item?.data_hora)
-    .map((item) => ({
-      horario: new Date(item.data_hora).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
-      temperatura: item.temperatura ?? null,
-      fc: item.freq_cardiaca ?? null,
-      fr: item.freq_respiratoria ?? null,
-      peso: item.peso ?? null,
-    }));
-}
-
-const STATUS_CORES = {
-  internado: "bg-blue-100 text-blue-700",
-  ativa: "bg-blue-100 text-blue-700",
-  alta: "bg-green-100 text-green-700",
-  transferida: "bg-yellow-100 text-yellow-700",
-  obito: "bg-red-100 text-red-700",
-};
+import AltaInternacaoModal from "./internacoes/AltaInternacaoModal";
+import ConcluirProcedimentoModal from "./internacoes/ConcluirProcedimentoModal";
+import EvolucaoInternacaoModal from "./internacoes/EvolucaoInternacaoModal";
+import InsumoRapidoInternacaoModal from "./internacoes/InsumoRapidoInternacaoModal";
+import {
+  STATUS_CORES,
+  formatData,
+  formatDateTime,
+  formatQuantity,
+  montarSerieEvolucao,
+  parseQuantity,
+} from "./internacoes/internacaoUtils";
 
 export default function VetInternacoes() {
   const navigate = useNavigate();
@@ -1407,178 +1373,38 @@ export default function VetInternacoes() {
         </div>
       )}
 
-      {/* Modal dar alta */}
-      {modalAlta && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-bold text-gray-800">Dar alta</h2>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Observações de alta</label>
-              <textarea value={formAlta} onChange={(e) => setFormAlta(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-28"
-                placeholder="Instruções para o tutor, condição na saída…" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button onClick={() => setModalAlta(null)} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-              <button onClick={darAlta} disabled={salvando}
-                className="flex-1 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60">
-                {salvando ? "Processando…" : "Confirmar alta"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AltaInternacaoModal
+        isOpen={Boolean(modalAlta)}
+        formAlta={formAlta}
+        setFormAlta={setFormAlta}
+        onClose={() => setModalAlta(null)}
+        onConfirm={darAlta}
+        salvando={salvando}
+      />
 
-      {/* Modal evolução */}
-      {modalEvolucao && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-bold text-gray-800">Registrar evolução</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Temp. (°C)</label>
-                <input type="number" step="0.1" value={formEvolucao.temperatura} onChange={(e) => setFormEvolucao((p) => ({ ...p, temperatura: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">FC (bpm)</label>
-                <input type="number" value={formEvolucao.fc} onChange={(e) => setFormEvolucao((p) => ({ ...p, fc: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">FR (rpm)</label>
-                <input type="number" value={formEvolucao.fr} onChange={(e) => setFormEvolucao((p) => ({ ...p, fr: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Observações</label>
-              <textarea value={formEvolucao.observacoes} onChange={(e) => setFormEvolucao((p) => ({ ...p, observacoes: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20" />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button onClick={() => setModalEvolucao(null)} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-              <button onClick={registrarEvolucao} disabled={salvando}
-                className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60">
-                {salvando ? "Salvando…" : "Registrar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EvolucaoInternacaoModal
+        isOpen={Boolean(modalEvolucao)}
+        formEvolucao={formEvolucao}
+        setFormEvolucao={setFormEvolucao}
+        onClose={() => setModalEvolucao(null)}
+        onConfirm={registrarEvolucao}
+        salvando={salvando}
+      />
 
-      {/* Modal concluir procedimento */}
-      {modalFeito && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-bold text-gray-800">Concluir procedimento</h2>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-              <p className="text-xs text-purple-700 font-semibold">{modalFeito.pet_nome}</p>
-              <p className="text-sm font-bold text-purple-900">{modalFeito.medicamento}</p>
-              <p className="text-xs text-purple-700">Dose: {modalFeito.dose || "—"} • Baia: {(internacaoPorId.get(String(modalFeito.internacao_id))?.box || modalFeito.baia || "Sem baia")}</p>
-            </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Informe o que estava previsto, quanto realmente foi administrado e quanto virou desperdício/excesso. Assim o registro clínico fica fiel ao que aconteceu no atendimento.
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Responsável veterinário *</label>
-              <select
-                value={formFeito.feito_por}
-                onChange={(e) => setFormFeito((p) => ({ ...p, feito_por: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Selecione…</option>
-                {veterinarios.map((vet) => (
-                  <option key={vet.id} value={vet.nome}>
-                    {vet.nome}{vet.crmv ? ` - CRMV ${vet.crmv}` : ""}
-                  </option>
-                ))}
-                {formFeito.feito_por && !veterinarios.some((vet) => vet.nome === formFeito.feito_por) && (
-                  <option value={formFeito.feito_por}>{formFeito.feito_por}</option>
-                )}
-              </select>
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. prevista</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formFeito.quantidade_prevista}
-                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_prevista: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
-                <input
-                  type="text"
-                  value={formFeito.unidade_quantidade}
-                  onChange={(e) => setFormFeito((p) => ({ ...p, unidade_quantidade: e.target.value }))}
-                  placeholder="mL, mg, comp, un..."
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. efetivamente feita</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formFeito.quantidade_executada}
-                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_executada: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Desperdício / excesso</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formFeito.quantidade_desperdicio}
-                  onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_desperdicio: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Horário da execução *</label>
-              <input
-                type="datetime-local"
-                value={formFeito.horario_execucao}
-                onChange={(e) => setFormFeito((p) => ({ ...p, horario_execucao: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Observação da execução (opcional)</label>
-              <textarea
-                value={formFeito.observacao_execucao}
-                onChange={(e) => setFormFeito((p) => ({ ...p, observacao_execucao: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none h-20"
-                placeholder="Ex.: pet aceitou bem, sem reação"
-              />
-            </div>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => setModalFeito(null)}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={confirmarProcedimentoFeito}
-                disabled={salvando}
-                className="flex-1 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60"
-              >
-                {salvando ? "Salvando..." : "Confirmar feito"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConcluirProcedimentoModal
+        procedimento={modalFeito}
+        baiaExibicao={
+          modalFeito
+            ? (internacaoPorId.get(String(modalFeito.internacao_id))?.box || modalFeito.baia || "Sem baia")
+            : "Sem baia"
+        }
+        formFeito={formFeito}
+        setFormFeito={setFormFeito}
+        veterinarios={veterinarios}
+        onClose={() => setModalFeito(null)}
+        onConfirm={confirmarProcedimentoFeito}
+        salvando={salvando}
+      />
 
       {modalHistoricoPet && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -1645,129 +1471,18 @@ export default function VetInternacoes() {
         </div>
       )}
 
-      {modalInsumoRapido && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Lançar insumo rápido</h2>
-                <p className="text-sm text-gray-500">
-                  Registre materiais ou medicamentos consumidos durante a internação com baixa automática do estoque.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setModalInsumoRapido(false)}
-                className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                aria-label="Fechar modal de insumo"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Internado *</label>
-                <select
-                  value={formInsumoRapido.internacao_id}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, internacao_id: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
-                >
-                  <option value="">Selecione…</option>
-                  {internacoesOrdenadas.map((internacao) => (
-                    <option key={`insumo_internacao_${internacao.id}`} value={internacao.id}>
-                      {internacao.pet_nome ?? `Pet #${internacao.pet_id}`}{internacao.box ? ` • ${internacao.box}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Responsável *</label>
-                <select
-                  value={formInsumoRapido.responsavel}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, responsavel: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white"
-                >
-                  <option value="">Selecione…</option>
-                  {veterinarios.map((vet) => (
-                    <option key={`insumo_vet_${vet.id}`} value={vet.nome}>
-                      {vet.nome}{vet.crmv ? ` • CRMV ${vet.crmv}` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="md:col-span-2">
-                <ProdutoEstoqueAutocomplete
-                  selectedProduct={insumoRapidoSelecionado}
-                  onSelect={setInsumoRapidoSelecionado}
-                  helperText="Pesquise pelo nome ou código do insumo que foi consumido na internação."
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Quantidade utilizada *</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formInsumoRapido.quantidade_utilizada}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Desperdício / perda</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formInsumoRapido.quantidade_desperdicio}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Horário do uso *</label>
-                <input
-                  type="datetime-local"
-                  value={formInsumoRapido.horario_execucao}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, horario_execucao: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Observações</label>
-                <textarea
-                  value={formInsumoRapido.observacoes}
-                  onChange={(e) => setFormInsumoRapido((prev) => ({ ...prev, observacoes: e.target.value }))}
-                  rows={3}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                  placeholder="Ex.: trocado tapete, perdido 5 mL na manipulação, pet removeu curativo..."
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setModalInsumoRapido(false)}
-                className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarInsumoRapido}
-                disabled={salvando}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {salvando ? "Salvando..." : "Registrar insumo"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <InsumoRapidoInternacaoModal
+        isOpen={modalInsumoRapido}
+        onClose={() => setModalInsumoRapido(false)}
+        formInsumoRapido={formInsumoRapido}
+        setFormInsumoRapido={setFormInsumoRapido}
+        internacoesOrdenadas={internacoesOrdenadas}
+        veterinarios={veterinarios}
+        insumoRapidoSelecionado={insumoRapidoSelecionado}
+        setInsumoRapidoSelecionado={setInsumoRapidoSelecionado}
+        onConfirm={confirmarInsumoRapido}
+        salvando={salvando}
+      />
     </div>
   );
 }
