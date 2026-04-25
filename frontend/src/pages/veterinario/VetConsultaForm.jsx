@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { vetApi } from "./vetApi";
 import ConsultaActionsFooter from "./consultaForm/ConsultaActionsFooter";
@@ -20,9 +20,6 @@ import {
   criarConsultaFormInicial,
   criarInsumoRapidoFormInicial,
   criarNovoExameFormInicial,
-  criarPrescricaoItemInicial,
-  criarProcedimentoRealizadoInicial,
-  mapConsultaParaForm,
 } from "./consultaForm/consultaFormState";
 import {
   ETAPAS,
@@ -30,8 +27,12 @@ import {
   parseNumero,
 } from "./consultaForm/consultaFormUtils";
 import useCalculadoraDoseConsulta from "./consultaForm/useCalculadoraDoseConsulta";
+import useConsultaAssinatura from "./consultaForm/useConsultaAssinatura";
 import useConsultaCatalogos from "./consultaForm/useConsultaCatalogos";
+import useConsultaEdicaoLoader from "./consultaForm/useConsultaEdicaoLoader";
+import useConsultaPdfDownloads from "./consultaForm/useConsultaPdfDownloads";
 import useConsultaTimeline from "./consultaForm/useConsultaTimeline";
+import usePrescricaoProcedimentosConsulta from "./consultaForm/usePrescricaoProcedimentosConsulta";
 import useTutorPetSelection from "./consultaForm/useTutorPetSelection";
 
 // ---------- helpers ----------
@@ -66,21 +67,11 @@ export default function VetConsultaForm() {
   const [erro, setErro] = useState(null);
   const [sucesso, setSucesso] = useState(null);
   const [consultaIdAtual, setConsultaIdAtual] = useState(consultaId ?? null);
-  const [finalizado, setFinalizado] = useState(false);
-  const [carregando, setCarregando] = useState(isEdicao);
-  const [assinatura, setAssinatura] = useState(null);
-  const [baixandoPdf, setBaixandoPdf] = useState(false);
   const [modalCalculadoraAberto, setModalCalculadoraAberto] = useState(false);
   const [modalNovoExameAberto, setModalNovoExameAberto] = useState(false);
   const [salvandoNovoExame, setSalvandoNovoExame] = useState(false);
   const [modalNovoPetAberto, setModalNovoPetAberto] = useState(false);
   const [refreshExamesToken, setRefreshExamesToken] = useState(0);
-  const modoSomenteLeitura = isEdicao && finalizado;
-  const tituloConsulta = modoSomenteLeitura
-    ? "Consulta finalizada (somente visualização)"
-    : isEdicao
-      ? "Continuar consulta"
-      : "Nova consulta";
 
   const {
     pets,
@@ -101,6 +92,22 @@ export default function VetConsultaForm() {
   const set = useCallback((campo, valor) => {
     setForm((prev) => ({ ...prev, [campo]: valor }));
   }, []);
+  const {
+    carregando,
+    finalizado,
+    setFinalizado,
+  } = useConsultaEdicaoLoader({
+    isEdicao,
+    consultaId,
+    setForm,
+    setErro,
+  });
+  const modoSomenteLeitura = isEdicao && finalizado;
+  const tituloConsulta = modoSomenteLeitura
+    ? "Consulta finalizada (somente visualização)"
+    : isEdicao
+      ? "Continuar consulta"
+      : "Nova consulta";
 
   const {
     buscaTutor,
@@ -143,28 +150,35 @@ export default function VetConsultaForm() {
     carregandoTimeline,
     carregarTimelineConsulta,
   } = useConsultaTimeline(consultaIdAtual);
-
-  // Carrega dados ao editar
-  useEffect(() => {
-    if (!isEdicao) return;
-    vetApi
-      .obterConsulta(consultaId)
-      .then((res) => {
-        const c = res.data;
-        setForm((prev) => ({ ...prev, ...mapConsultaParaForm(c) }));
-        if (c.status === "finalizada") setFinalizado(true);
-      })
-      .catch(() => setErro("Não foi possível carregar a consulta."))
-      .finally(() => setCarregando(false));
-  }, [consultaId, isEdicao]);
-
-  useEffect(() => {
-    if (!modoSomenteLeitura || !consultaIdAtual) return;
-    vetApi
-      .validarAssinaturaConsulta(consultaIdAtual)
-      .then((res) => setAssinatura(res.data))
-      .catch(() => setAssinatura(null));
-  }, [modoSomenteLeitura, consultaIdAtual]);
+  const assinatura = useConsultaAssinatura({
+    modoSomenteLeitura,
+    consultaIdAtual,
+  });
+  const {
+    baixandoPdf,
+    baixarProntuarioPdf,
+    baixarUltimaReceitaPdf,
+  } = useConsultaPdfDownloads({
+    consultaIdAtual,
+    setErro,
+  });
+  const {
+    adicionarItem,
+    removerItem,
+    setItem,
+    selecionarMedicamentoNoItem,
+    recalcularDoseItem,
+    adicionarProcedimento,
+    removerProcedimento,
+    setProcedimentoItem,
+    selecionarProcedimentoCatalogo,
+  } = usePrescricaoProcedimentosConsulta({
+    form,
+    setForm,
+    medicamentosCatalogo,
+    procedimentosCatalogo,
+    setErro,
+  });
 
   const contextoConsultaParams = useMemo(() => {
     if (!form.pet_id) return "";
@@ -298,193 +312,6 @@ export default function VetConsultaForm() {
       setErro(e?.response?.data?.detail ?? "Erro ao finalizar.");
     } finally {
       setSalvando(false);
-    }
-  }
-
-  // ---------- Prescrição helpers ----------
-  function adicionarItem() {
-    setForm((prev) => ({
-      ...prev,
-      prescricao_itens: [
-        ...prev.prescricao_itens,
-        criarPrescricaoItemInicial(),
-      ],
-    }));
-  }
-
-  function adicionarProcedimento() {
-    setForm((prev) => ({
-      ...prev,
-      procedimentos_realizados: [
-        ...prev.procedimentos_realizados,
-        criarProcedimentoRealizadoInicial(),
-      ],
-    }));
-  }
-
-  function removerProcedimento(idx) {
-    setForm((prev) => ({
-      ...prev,
-      procedimentos_realizados: prev.procedimentos_realizados.filter((_, i) => i !== idx),
-    }));
-  }
-
-  function setProcedimentoItem(idx, campo, valor) {
-    setForm((prev) => {
-      const itens = [...prev.procedimentos_realizados];
-      itens[idx] = { ...itens[idx], [campo]: valor };
-      return { ...prev, procedimentos_realizados: itens };
-    });
-  }
-
-  function selecionarProcedimentoCatalogo(idx, catalogoId) {
-    const procedimento = procedimentosCatalogo.find((item) => String(item.id) === String(catalogoId));
-    setForm((prev) => {
-      const itens = [...prev.procedimentos_realizados];
-      itens[idx] = {
-        ...itens[idx],
-        catalogo_id: catalogoId,
-        nome: procedimento?.nome || itens[idx].nome,
-        descricao: procedimento?.descricao || "",
-        valor: procedimento?.valor_padrao != null ? String(procedimento.valor_padrao) : itens[idx].valor,
-      };
-      return { ...prev, procedimentos_realizados: itens };
-    });
-  }
-
-  function removerItem(idx) {
-    setForm((prev) => ({
-      ...prev,
-      prescricao_itens: prev.prescricao_itens.filter((_, i) => i !== idx),
-    }));
-  }
-
-  function setItem(idx, chave, valor) {
-    setForm((prev) => {
-      const itens = [...prev.prescricao_itens];
-      itens[idx] = { ...itens[idx], [chave]: valor };
-      return { ...prev, prescricao_itens: itens };
-    });
-  }
-
-  function calcularDosePorPeso(item) {
-    const peso = parseNumero(form.peso_kg);
-    if (!Number.isFinite(peso) || peso <= 0) {
-      setErro("Informe o peso do pet para calcular a dose automaticamente.");
-      return null;
-    }
-
-    const doseMin = parseNumero(item.dose_minima_mg_kg);
-    const doseMax = parseNumero(item.dose_maxima_mg_kg);
-    let doseMgKg = Number.isFinite(doseMin) ? doseMin : NaN;
-
-    if (Number.isFinite(doseMin) && Number.isFinite(doseMax)) {
-      doseMgKg = (doseMin + doseMax) / 2;
-    } else if (!Number.isFinite(doseMgKg) && Number.isFinite(doseMax)) {
-      doseMgKg = doseMax;
-    }
-
-    if (!Number.isFinite(doseMgKg) || doseMgKg <= 0) {
-      setErro("Esse medicamento não tem dose mg/kg cadastrada no catálogo.");
-      return null;
-    }
-
-    return {
-      dose_mg: (doseMgKg * peso).toFixed(2),
-      unidade: "mg",
-    };
-  }
-
-  function selecionarMedicamentoNoItem(idx, medicamentoId) {
-    const medicamento = medicamentosCatalogo.find((m) => String(m.id) === String(medicamentoId));
-    if (!medicamento) return;
-
-    setForm((prev) => {
-      const itens = [...prev.prescricao_itens];
-      const itemAtual = itens[idx] ?? {};
-      const itemAtualizado = {
-        ...itemAtual,
-        medicamento_id: medicamento.id,
-        nome: medicamento.nome ?? itemAtual.nome ?? "",
-        principio_ativo: medicamento.principio_ativo ?? itemAtual.principio_ativo ?? "",
-        via: medicamento.via_administracao ?? itemAtual.via ?? "oral",
-        dose_minima_mg_kg: medicamento.dose_minima_mg_kg,
-        dose_maxima_mg_kg: medicamento.dose_maxima_mg_kg,
-      };
-
-      const doseCalculada = calcularDosePorPeso(itemAtualizado);
-      if (doseCalculada) {
-        itemAtualizado.dose_mg = doseCalculada.dose_mg;
-        itemAtualizado.unidade = doseCalculada.unidade;
-      }
-
-      itens[idx] = itemAtualizado;
-      return { ...prev, prescricao_itens: itens };
-    });
-  }
-
-  function recalcularDoseItem(idx) {
-    const item = form.prescricao_itens[idx];
-    if (!item) return;
-
-    const doseCalculada = calcularDosePorPeso(item);
-    if (!doseCalculada) return;
-
-    setForm((prev) => {
-      const itens = [...prev.prescricao_itens];
-      itens[idx] = {
-        ...itens[idx],
-        dose_mg: doseCalculada.dose_mg,
-        unidade: doseCalculada.unidade,
-      };
-      return { ...prev, prescricao_itens: itens };
-    });
-  }
-
-  function baixarArquivo(blob, nomeArquivo) {
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = nomeArquivo;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  }
-
-  async function baixarProntuarioPdf() {
-    if (!consultaIdAtual) return;
-    setBaixandoPdf(true);
-    setErro(null);
-    try {
-      const res = await vetApi.baixarProntuarioPdf(consultaIdAtual);
-      baixarArquivo(res.data, `prontuario_consulta_${consultaIdAtual}.pdf`);
-    } catch (e) {
-      setErro(e?.response?.data?.detail ?? "Não foi possível baixar o prontuário em PDF.");
-    } finally {
-      setBaixandoPdf(false);
-    }
-  }
-
-  async function baixarUltimaReceitaPdf() {
-    if (!consultaIdAtual) return;
-    setBaixandoPdf(true);
-    setErro(null);
-    try {
-      const lista = await vetApi.listarPrescricoes(consultaIdAtual);
-      const prescricoes = Array.isArray(lista.data) ? lista.data : (lista.data?.items ?? []);
-      if (!prescricoes.length) {
-        setErro("Essa consulta não tem prescrição emitida.");
-        return;
-      }
-
-      const ultima = prescricoes[prescricoes.length - 1];
-      const res = await vetApi.baixarPrescricaoPdf(ultima.id);
-      baixarArquivo(res.data, `${ultima.numero || `prescricao_${ultima.id}`}.pdf`);
-    } catch (e) {
-      setErro(e?.response?.data?.detail ?? "Não foi possível baixar a receita em PDF.");
-    } finally {
-      setBaixandoPdf(false);
     }
   }
 
