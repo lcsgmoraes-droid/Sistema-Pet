@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
-import { jsPDF } from 'jspdf';
 import CardFiscal from './CardFiscal';
 import TooltipComposicao from './TooltipComposicao';
 
@@ -1708,6 +1707,7 @@ const EntradaXML = () => {
     try {
       setGerandoRelatorioCustos(true);
       const linhas = await montarDadosRelatorioCustosMaiores();
+      const { jsPDF } = await import('jspdf');
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const marginX = 10;
       const pageWidth = doc.internal.pageSize.getWidth();
