@@ -1,17 +1,14 @@
 from datetime import datetime
 import os
-import sys
-import types
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
 os.environ["DEBUG"] = "false"
-sys.modules.setdefault("pdfplumber", types.SimpleNamespace())
 
-from app.veterinario_routes import (
-    _bloquear_lancamento_em_consulta_finalizada,
+from app.veterinario_clinico import _bloquear_lancamento_em_consulta_finalizada
+from app.veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
     _serializar_procedimento_agenda_internacao,
 )
