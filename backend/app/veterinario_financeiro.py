@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .financeiro_models import CategoriaFinanceira, ContaReceber
-from .produtos_models import Produto
+from .produtos_models import EstoqueMovimentacao, Produto
 from .utils.timezone import to_brasilia
 from .veterinario_models import (
     CatalogoProcedimento,
@@ -100,6 +100,92 @@ def _enriquecer_insumos_com_custos(db: Session, tenant_id, insumos: Optional[lis
         })
 
     return enriquecidos
+
+
+def _aplicar_baixa_estoque_itens(
+    db: Session,
+    *,
+    tenant_id,
+    user_id: int,
+    itens: Optional[list],
+    motivo: str,
+    referencia_id: int,
+    referencia_tipo: str,
+    documento: str,
+    observacao: str,
+) -> tuple[list[dict], list[int]]:
+    itens = _normalizar_insumos(itens)
+    produtos = _buscar_produtos_por_ids(db, tenant_id, [item["produto_id"] for item in itens])
+    movimentacoes_ids = []
+    for item in itens:
+        if not item["baixar_estoque"]:
+            continue
+
+        produto = produtos.get(item["produto_id"])
+        if not produto:
+            raise HTTPException(status_code=404, detail=f"Produto {item['produto_id']} não encontrado para o procedimento")
+        if not produto.ativo:
+            raise HTTPException(status_code=404, detail=f"Produto {item['produto_id']} não encontrado para o procedimento")
+
+        estoque_atual = float(produto.estoque_atual or 0)
+        if estoque_atual < item["quantidade"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estoque insuficiente para {produto.nome}. Disponível: {estoque_atual}, necessário: {item['quantidade']}",
+            )
+
+        quantidade_anterior = estoque_atual
+        quantidade_nova = estoque_atual - item["quantidade"]
+        produto.estoque_atual = quantidade_nova
+        custo_unitario = _round_money(produto.preco_custo)
+        custo_total = _round_money(custo_unitario * item["quantidade"])
+
+        movimentacao = EstoqueMovimentacao(
+            tenant_id=str(tenant_id),
+            produto_id=produto.id,
+            tipo="saida",
+            motivo=motivo,
+            quantidade=item["quantidade"],
+            quantidade_anterior=quantidade_anterior,
+            quantidade_nova=quantidade_nova,
+            custo_unitario=custo_unitario,
+            valor_total=custo_total,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            documento=documento,
+            observacao=observacao,
+            user_id=user_id,
+        )
+        db.add(movimentacao)
+        db.flush()
+        movimentacoes_ids.append(movimentacao.id)
+        item["nome"] = item.get("nome") or produto.nome
+        item["unidade"] = item.get("unidade") or produto.unidade
+        item["custo_unitario"] = custo_unitario
+        item["custo_total"] = custo_total
+
+    return itens, movimentacoes_ids
+
+
+def _aplicar_baixa_estoque_procedimento(db: Session, procedimento: ProcedimentoConsulta, tenant_id, user_id: int) -> None:
+    if not procedimento.realizado or procedimento.estoque_baixado:
+        return
+
+    itens, movimentacoes_ids = _aplicar_baixa_estoque_itens(
+        db,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        itens=procedimento.insumos,
+        motivo="procedimento_veterinario",
+        referencia_id=procedimento.id,
+        referencia_tipo="procedimento_veterinario",
+        documento=str(procedimento.consulta_id),
+        observacao=f"Baixa automática do procedimento {procedimento.nome}",
+    )
+
+    procedimento.insumos = itens
+    procedimento.estoque_baixado = bool(movimentacoes_ids) or procedimento.estoque_baixado
+    procedimento.estoque_movimentacao_ids = movimentacoes_ids or procedimento.estoque_movimentacao_ids
 
 
 def _resumo_financeiro_insumos(insumos: Optional[list]) -> dict:
