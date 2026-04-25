@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Activity,
   AlertCircle,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Download,
   Link2,
   Plus,
@@ -14,16 +12,14 @@ import {
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import { buildReturnTo } from "../../utils/petReturnFlow";
+import AgendaDiasView from "./agenda/AgendaDiasView";
+import AgendaMesView from "./agenda/AgendaMesView";
 import GerenciarAgendamentoModal from "./agenda/GerenciarAgendamentoModal";
 import NovoAgendamentoModal from "./agenda/NovoAgendamentoModal";
 import {
   FORM_NOVO_INICIAL,
   HORARIOS_BASE,
-  STATUS_BADGE,
-  STATUS_COLOR,
-  STATUS_LABEL,
   TIPO_ACAO,
-  TIPO_BADGE,
   TIPO_LABEL,
   TIPO_OPTIONS,
   addDias,
@@ -744,173 +740,23 @@ export default function VetAgenda() {
           <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-500" />
         </div>
       ) : modo === "mes" ? (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-          <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((nomeDia) => (
-              <div key={nomeDia} className="px-3 py-2 text-center text-xs font-semibold text-gray-600">
-                {nomeDia}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-7">
-            {diasMes.map((dia) => {
-              const ags = agsDia(dia);
-              const ehHoje = isoDate(dia) === isoDate(new Date());
-              const foraDoMes = dia.getMonth() !== dataRef.getMonth();
-              return (
-                <div
-                  key={isoDate(dia)}
-                  onClick={() => abrirModalNovo(dia)}
-                  className={`min-h-[110px] cursor-pointer border-b border-r border-gray-100 p-2 transition-colors hover:bg-blue-50 ${
-                    foraDoMes ? "bg-gray-50" : "bg-white"
-                  }`}
-                >
-                  <div className="mb-1 flex items-center justify-between">
-                    <span
-                      className={`text-xs font-medium ${
-                        ehHoje ? "text-blue-700" : foraDoMes ? "text-gray-400" : "text-gray-700"
-                      }`}
-                    >
-                      {String(dia.getDate()).padStart(2, "0")}
-                    </span>
-                    {ags.length > 0 && (
-                      <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">
-                        {ags.length}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-1">
-                    {ags.slice(0, 2).map((ag) => (
-                      <button
-                        key={ag.id}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          abrirGerenciarAgendamento(ag);
-                        }}
-                        className={`w-full rounded border-l-2 px-1.5 py-1 text-left text-[11px] ${
-                          STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"
-                        }`}
-                      >
-                        <p className="truncate">
-                          {String(ag.data_hora || "").slice(11, 16)} -{" "}
-                          {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
-                        </p>
-                        <p className="mt-0.5 truncate text-[10px] text-gray-500">
-                          {[ag.veterinario_nome, ag.consultorio_nome].filter(Boolean).join(" • ") || "Sem profissional/sala"}
-                        </p>
-                        <div className="mt-1 flex items-center gap-1">
-                          <span
-                            className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                              TIPO_BADGE[normalizarTipoAgendamento(ag.tipo)] ?? "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {TIPO_LABEL[normalizarTipoAgendamento(ag.tipo)] ?? "Consulta"}
-                          </span>
-                          {abrindoAgendamentoId === ag.id && (
-                            <span className="text-[10px] text-blue-600">Abrindo...</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                    {ags.length > 2 && <p className="text-[10px] text-gray-400">+{ags.length - 2} mais</p>}
-                    {ags.length === 0 && <p className="pt-1 text-[10px] text-gray-300">Clique para agendar</p>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <AgendaMesView
+          diasMes={diasMes}
+          dataRef={dataRef}
+          agsDia={agsDia}
+          abrindoAgendamentoId={abrindoAgendamentoId}
+          onAbrirNovo={abrirModalNovo}
+          onGerenciarAgendamento={abrirGerenciarAgendamento}
+        />
       ) : (
-        <div className={`grid gap-4 ${modo === "semana" ? "grid-cols-7" : "grid-cols-1"}`}>
-          {diasVisiveis.map((dia) => {
-            const ags = agsDia(dia);
-            const ehHoje = isoDate(dia) === isoDate(new Date());
-            return (
-              <div
-                key={isoDate(dia)}
-                onClick={() => abrirModalNovo(dia)}
-                className={`cursor-pointer overflow-hidden rounded-xl border transition-colors hover:border-blue-300 ${
-                  ehHoje ? "border-blue-300" : "border-gray-200"
-                } bg-white`}
-              >
-                <div
-                  className={`border-b px-3 py-2 text-xs font-semibold ${
-                    ehHoje ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600"
-                  }`}
-                >
-                  <span className="capitalize">
-                    {dia.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" })}
-                  </span>
-                  {ags.length > 0 && (
-                    <span
-                      className={`ml-1 rounded-full px-1.5 py-0.5 text-xs ${
-                        ehHoje ? "bg-white text-blue-700" : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      {ags.length}
-                    </span>
-                  )}
-                </div>
-
-                <div className="min-h-[80px] divide-y divide-gray-50">
-                  {ags.length === 0 && (
-                    <div className="px-3 py-4 text-center">
-                      <p className="text-xs text-gray-300">Livre</p>
-                      <p className="mt-1 text-[11px] text-blue-500">Clique para agendar</p>
-                    </div>
-                  )}
-                  {ags.map((ag) => (
-                    <div
-                      key={ag.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        abrirGerenciarAgendamento(ag);
-                      }}
-                      className={`cursor-pointer border-l-4 px-3 py-2 transition-opacity hover:opacity-80 ${
-                        STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"
-                      }`}
-                    >
-                      <div className="mb-0.5 flex items-center gap-1">
-                        <Clock size={10} className="text-gray-400" />
-                        <span className="text-xs text-gray-500">
-                          {String(ag.data_hora || "").slice(11, 16)}
-                        </span>
-                        <span
-                          className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                            TIPO_BADGE[normalizarTipoAgendamento(ag.tipo)] ?? "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {TIPO_LABEL[normalizarTipoAgendamento(ag.tipo)] ?? "Consulta"}
-                        </span>
-                        {ag.is_emergencia && <Activity size={10} className="ml-auto text-red-500" />}
-                      </div>
-                      <p className="truncate text-xs font-medium text-gray-700">
-                        {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
-                      </p>
-                      <p className="truncate text-[11px] text-gray-500">
-                        {[ag.veterinario_nome, ag.consultorio_nome].filter(Boolean).join(" • ") || "Sem profissional/sala"}
-                      </p>
-                      <p className="truncate text-xs text-gray-400">{ag.motivo ?? "-"}</p>
-                      <span
-                        className={`mt-1 inline-flex rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                          STATUS_BADGE[ag.status] ?? "bg-gray-100"
-                        }`}
-                      >
-                        {STATUS_LABEL[ag.status] ?? ag.status}
-                      </span>
-                      {abrindoAgendamentoId === ag.id && (
-                        <span className="ml-2 text-[11px] font-medium text-blue-600">Abrindo...</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <AgendaDiasView
+          modo={modo}
+          diasVisiveis={diasVisiveis}
+          agsDia={agsDia}
+          abrindoAgendamentoId={abrindoAgendamentoId}
+          onAbrirNovo={abrirModalNovo}
+          onGerenciarAgendamento={abrirGerenciarAgendamento}
+        />
       )}
 
       <GerenciarAgendamentoModal
