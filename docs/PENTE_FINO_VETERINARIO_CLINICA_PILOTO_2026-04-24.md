@@ -36,6 +36,7 @@ Atualizacao tecnica em 2026-04-24:
 - Atualizacao/upload/processamento/interpretacao de exame ligado a consulta finalizada continua permitido, mas passa a gerar auditoria em `audit_logs`.
 - Foi criada migration `i0j1k2l3m4n5_add_vet_internacao_agenda_config.py` e testes unitarios de contrato para agenda de internacao e bloqueio de consulta finalizada.
 - `VetInternacoes.jsx` teve a carga/salvamento operacional extraida para `useInternacaoOperacional.js`, reduzindo acoplamento sem mudar a UI principal.
+- Refatoracao frontend iniciada: `VetCatalogo.jsx` virou uma tela shell com abas separadas, os paineis de IA de consulta/exames foram isolados em componentes dedicados e os utilitarios de calendario da agenda foram movidos para modulo proprio.
 
 ## 2. Inventario tecnico encontrado
 
@@ -324,6 +325,7 @@ Semana 3 - refatoracao tecnica:
   - `vet_relatorios_routes.py`
 - Quebrar `VetConsultaForm.jsx` em etapas e hooks.
 - Quebrar `VetInternacoes.jsx` em mapa, lista, agenda, historico e procedimentos.
+- Continuar a refatoracao frontend ja iniciada, especialmente `VetInternacoes.jsx` e `VetConsultaForm.jsx`, separando blocos visuais restantes em componentes pequenos.
 - Criar suite E2E Playwright dos fluxos clinicos.
 
 ## 7. Definition of Done para vender o veterinario
