@@ -202,7 +202,7 @@ def get_cliente_info_pdv(
         restricoes_lista = getattr(pet, "restricoes_alimentares_lista", None) or []
         vacinas_vencidas = []
         try:
-            from app.veterinario_routes import _status_vacinal_pet
+            from app.veterinario_clinico import _status_vacinal_pet
             status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
             vacinas_vencidas = status_vacinal.get("vencidas", [])
         except Exception:

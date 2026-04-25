@@ -20,7 +20,7 @@ Por que da para pilotar:
 
 Por que ainda nao da para vender sem ressalva:
 
-- `backend/app/veterinario_routes.py` ainda tem 1124 linhas e concentra principalmente vacinas, peso, perfil comportamental, dashboard, relatorios, PDFs, parceiros/repasse e calendario preventivo; schemas e routers de agenda, consultas/prescricoes, exames, procedimentos/catalogos, internacao e IA ja foram extraidos, alem dos helpers de agenda, clinicos, calendario, financeiro/estoque, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e internacao.
+- `backend/app/veterinario_routes.py` virou agregador enxuto com 24 linhas; os dominios de agenda, consultas/prescricoes, exames, procedimentos/catalogos, acompanhamento do pet, internacao, IA, relatorios/PDFs e parcerias/repasse ficam em routers dedicados.
 - `VetConsultaForm.jsx`, `VetInternacoes.jsx`, `VetAgenda.jsx`, `VetCatalogo.jsx` e `VetExamesAnexados.jsx` sao grandes demais para manutencao segura no medio prazo.
 - A maior parte do modulo ainda nao tem testes de contrato dedicados.
 - Internacao ainda tem parte operacional local no navegador, mesmo com escopo por tenant/usuario corrigido.
@@ -51,22 +51,25 @@ Atualizacao tecnica em 2026-04-24:
 - Upload de arquivo de exame passou a usar helper dedicado com `secrets` importado corretamente, evitando erro de runtime no nome seguro do arquivo.
 - Montagem do calendario preventivo foi extraida para `veterinario_preventivo.py`, com aliases de especie para `canino/cao/cão` e `felino/gato`.
 - Schemas Pydantic do modulo veterinario foram extraidos para `veterinario_schemas.py`, reduzindo a rota sem alterar contratos publicos.
-- Routers de `agenda/base`, `consultas/prescricoes`, `exames`, `procedimentos/catalogos`, `internacao` e `IA veterinaria` foram extraidos para arquivos dedicados, mantendo os mesmos contratos publicos em `/vet`.
+- Routers de `agenda/base`, `consultas/prescricoes`, `exames`, `procedimentos/catalogos`, `acompanhamento do pet`, `internacao`, `IA veterinaria`, `relatorios/PDFs` e `parcerias/repasse` foram extraidos para arquivos dedicados, mantendo os mesmos contratos publicos em `/vet`.
 - `test_vet_schemas.py` cobre defaults/validacoes principais dos schemas; `test_vet_router_contracts.py` garante endpoints movidos, ausencia de duplicidade metodo/path e precedencia das rotas estaticas de internacao; `test_vet_preventivo.py` cobre calendario preventivo e aliases de especie; `test_vet_financeiro_estoque.py` cobre baixa de estoque, enriquecimento de custos e bloqueio de estoque insuficiente; `test_vet_clinico_helpers.py` cobre bloqueio de consulta finalizada, aliases de especie, idade inicial de vacina, status vacinal e alertas do pet; `test_vet_agendamentos_helpers.py` cobre marcos de atendimento, intervalo, deteccao de conteudo clinico e contrato de serializacao de agenda; `test_vet_serializers.py` cobre contratos de consulta, prescricao e hash de prontuario; `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames; `test_vet_exames_arquivos.py` cobre persistencia e validacao de upload de exame.
-- Proxima reducao relevante: separar routers de `vacinas/peso/perfil`, `dashboard/relatorios/PDFs`, `parceiros/repasse` e `calendario preventivo`. Nao e bloqueador para piloto, mas e o caminho para manutencao enterprise.
+- Proxima reducao relevante: quebrar services internos dos routers maiores (`agenda`, `internacao`, `catalogo` e `relatorios`) e iniciar a mesma limpeza nos componentes frontend grandes. Nao e bloqueador para piloto, mas e o caminho para manutencao enterprise.
 
 ## 2. Inventario tecnico encontrado
 
 Backend:
 
-- `backend/app/veterinario_routes.py`: 1124 linhas apos extracao inicial de schemas, routers de agenda/consultas/exames/catalogo/internacao/IA, helpers clinicos, serializadores, calendario, financeiro, estoque/insumos, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py`: 24 linhas como agregador de subrouters.
 - `backend/app/veterinario_schemas.py`: 563 linhas.
+- `backend/app/veterinario_acompanhamento_routes.py`: 237 linhas.
 - `backend/app/veterinario_agenda_routes.py`: 680 linhas.
 - `backend/app/veterinario_consultas_routes.py`: 447 linhas.
 - `backend/app/veterinario_exames_routes.py`: 318 linhas.
 - `backend/app/veterinario_catalogo_routes.py`: 462 linhas.
 - `backend/app/veterinario_internacao_routes.py`: 742 linhas.
 - `backend/app/veterinario_ia_routes.py`: 479 linhas.
+- `backend/app/veterinario_relatorios_routes.py`: 445 linhas.
+- `backend/app/veterinario_parcerias_routes.py`: 269 linhas.
 - `backend/app/veterinario_agendamentos.py`: 242 linhas.
 - `backend/app/veterinario_clinico.py`: 310 linhas.
 - `backend/app/veterinario_serializers.py`: 83 linhas.
@@ -355,10 +358,12 @@ Semana 3 - refatoracao tecnica:
   - `veterinario_exames_routes.py` concluido para exames, upload e interpretacao IA
   - `veterinario_catalogo_routes.py` concluido para procedimentos, catalogos, medicamentos, protocolos e apoio ao pet
   - `veterinario_internacao_routes.py` concluido para internacao
-  - `vet_financeiro_routes.py`
+  - `veterinario_financeiro.py` concluido como helper/service financeiro de procedimentos e repasses
   - `veterinario_ia_routes.py` concluido para IA veterinaria
-  - `vet_relatorios_routes.py`
-- Continuar a reducao do `veterinario_routes.py`, agora priorizando vacinas/peso/perfil, dashboard/relatorios/PDFs e parceiros/repasse em routers proprios.
+  - `veterinario_acompanhamento_routes.py` concluido para vacinas, peso, perfil e calendario preventivo
+  - `veterinario_relatorios_routes.py` concluido para dashboard, relatorios, CSV e PDFs
+  - `veterinario_parcerias_routes.py` concluido para parceiros e repasse
+- Continuar a reducao tecnica agora dentro dos routers maiores, extraindo services/use cases onde fizer sentido.
 - Quebrar `VetConsultaForm.jsx` em etapas e hooks.
 - Quebrar `VetInternacoes.jsx` em mapa, lista, agenda, historico e procedimentos.
 - Continuar a refatoracao frontend ja iniciada, especialmente `VetInternacoes.jsx` e `VetConsultaForm.jsx`, separando blocos visuais restantes em componentes pequenos.

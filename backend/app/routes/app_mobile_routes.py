@@ -333,7 +333,7 @@ def obter_carteirinha_pet_app(
     db: Session = Depends(get_session),
 ):
     pet = _get_pet_owned_or_404(db, pet_id, current_user)
-    from app.veterinario_routes import _montar_alertas_pet, _status_vacinal_pet
+    from app.veterinario_clinico import _montar_alertas_pet, _status_vacinal_pet
 
     tenant_id = str(current_user.tenant_id)
     status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
