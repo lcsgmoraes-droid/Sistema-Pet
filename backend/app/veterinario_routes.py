@@ -56,6 +56,7 @@ from .veterinario_financeiro import (
     _serializar_procedimento,
     _sincronizar_financeiro_procedimento,
 )
+from .veterinario_ia import _responder_chat_exame
 from .veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
     _build_procedimento_observacao,
@@ -68,6 +69,7 @@ from .veterinario_internacao import (
     _serializar_procedimento_agenda_internacao,
     _split_motivo_baia,
 )
+from .veterinario_preventivo import _CALENDARIO_PADRAO
 from .veterinario_models import (
     AgendamentoVet,
     CatalogoProcedimento,
@@ -6180,177 +6182,9 @@ def chat_exame_ia(
     }
 
 
-def _responder_chat_exame(
-    *,
-    pergunta: str,
-    exame_nome: str,
-    tipo_exame: str,
-    especie: str,
-    nome_pet: str,
-    alergias: list,
-    alertas: list,
-    resumo_ia: str,
-    conclusao_ia: str,
-    dados_json: dict,
-    texto_resultado: str,
-    payload_ia: dict,
-    tem_arquivo: bool,
-) -> str:
-    """Responde perguntas clínicas usando regras contextuais e os dados do exame."""
-
-    # Interpreta se ainda não foi feito
-    if not conclusao_ia and not resumo_ia:
-        if tem_arquivo:
-            resumo_ia = "Ainda sem interpretação automática concluída. Use 'Processar arquivo + IA' para extrair o arquivo anexado."
-        else:
-            resumo_ia = "Ainda sem interpretação automática. Use 'Interpretar com IA' antes de perguntar."
-        conclusao_ia = resumo_ia
-
-    alertas_nomes = [a.get("campo", "") for a in alertas if isinstance(a, dict)]
-    alertas_mensagens = [a.get("mensagem", "") for a in alertas if isinstance(a, dict)]
-    achados_imagem = payload_ia.get("achados_imagem") if isinstance(payload_ia, dict) else []
-    limitacoes = payload_ia.get("limitacoes") if isinstance(payload_ia, dict) else []
-    conduta_sugerida = payload_ia.get("conduta_sugerida") if isinstance(payload_ia, dict) else []
-
-    # Palavras-chave e respostas contextuais
-    if any(k in pergunta for k in ["resumo", "resumir", "explicar", "o que diz", "o que significa", "resultado"]):
-        if not texto_resultado and not dados_json:
-            return f"O exame '{exame_nome}' ainda não tem resultado registrado. Adicione o resultado antes de solicitar a interpretação."
-        partes = []
-        if conclusao_ia:
-            partes.append(f"**Conclusão da triagem automática:** {conclusao_ia}")
-        if resumo_ia and resumo_ia != conclusao_ia:
-            partes.append(f"**Detalhes:** {resumo_ia}")
-        if alertas_mensagens:
-            partes.append("**Alertas encontrados:** " + "; ".join(alertas_mensagens))
-        return "\n\n".join(partes) if partes else "Nenhuma interpretação disponível ainda."
-
-    if any(k in pergunta for k in ["alerta", "preocupante", "crítico", "grave", "urgente", "emergência"]):
-        if not alertas:
-            return f"A triagem automática do exame '{exame_nome}' não encontrou alertas críticos. Isso não substitui a avaliação clínica — verifique os valores numericamente se disponíveis."
-        msgs = "\n- ".join(alertas_mensagens) if alertas_mensagens else "Alertas detectados, mas sem detalhes textuais."
-        return f"**Pontos de atenção encontrados no exame {exame_nome}:**\n\n- {msgs}\n\nRecomendo revisão clínica presencial."
-
-    if any(k in pergunta for k in ["normal", "status", "tudo certo", "está bem", "dentro do normal"]):
-        if not alertas:
-            return f"A triagem automática não encontrou valores fora do padrão em '{exame_nome}'. O exame parece dentro da normalidade pelos critérios automatizados — confirme com avaliação clínica."
-        return f"Foram encontrados {len(alertas)} ponto(s) de atenção: {resumo_ia}. Revise os valores clínicamente."
-
-    if any(k in pergunta for k in ["próximo passo", "conduta", "tratamento", "o que fazer", "recomendação"]):
-        if alertas:
-            return (
-                f"Com base nos alertas encontrados em '{exame_nome}' ({especie}), a conduta sugerida é:\n\n"
-                f"1. Avaliar os itens fora do normal diretamente nos valores do resultado\n"
-                f"2. Correlacionar com sinais clínicos de {nome_pet}\n"
-                f"3. Considerar exames complementares se necessário\n"
-                f"4. Registrar diagnóstico e tratamento na consulta\n\n"
-                f"_Alertas identificados: {resumo_ia}_"
-            )
-        return (
-            f"A triagem automática de '{exame_nome}' não indicou alterações críticas.\n"
-            f"Sugestões gerais de conduta:\n\n"
-            f"1. Confirmar valores com referências da espécie ({especie})\n"
-            f"2. Correlacionar com os sinais clínicos de {nome_pet}\n"
-            f"3. Repetir o exame conforme evolução clínica\n"
-        )
-
-    if any(k in pergunta for k in ["alergia", "medicamento", "contraindicado", "intolerância"]):
-        if alergias:
-            lista_al = ", ".join(alergias)
-            return (
-                f"{nome_pet} tem alergias registradas: **{lista_al}**.\n\n"
-                f"Ao definir o tratamento com base no exame '{exame_nome}', evite medicamentos ou substâncias relacionadas."
-            )
-        return f"Não há alergias registradas para {nome_pet}. Verifique a ficha clínica para mais segurança."
-
-    if any(k in pergunta for k in ["leucocit", "hemograma", "glóbulo", "eritrocit"]):
-        dados_hemo = {k: v for k, v in dados_json.items() if any(t in k.lower() for t in ["leuco", "eritro", "hemo", "plaqueta", "glob"])}
-        if dados_hemo:
-            linhas = "\n".join(f"- {k}: {v}" for k, v in dados_hemo.items())
-            return f"Valores hematológicos registrados no resultado:\n{linhas}\n\nInterpretação geral: {resumo_ia or 'sem interpretação automática disponível'}"
-        return f"Não há valores hematológicos estruturados no resultado do exame '{exame_nome}'. Verifique o texto do laudo ou reenvie como JSON estruturado."
-
-    if any(k in pergunta for k in ["rim", "renal", "creatinina", "ureia", "uréia"]):
-        dados_renal = {k: v for k, v in dados_json.items() if any(t in k.lower() for t in ["creat", "ureia", "uria", "rim", "renal", "tgo", "tgp"])}
-        if dados_renal:
-            linhas = "\n".join(f"- {k}: {v}" for k, v in dados_renal.items())
-            return f"Valores relacionados à função renal/hepática:\n{linhas}\n\n{resumo_ia or 'Consulte a interpretação automática.'}"
-        return "Não há parâmetros renais estruturados no resultado. Verifique o laudo original."
-
-    if any(k in pergunta for k in ["imagem", "raio", "ultrassom", "eco", "rx", "radiografia"]):
-        if tipo_exame in {"radiografia", "ultrassom", "ecocardiograma", "imagem"}:
-            if achados_imagem:
-                partes = [
-                    f"**Achados sugeridos pela análise do arquivo em '{exame_nome}':**",
-                    "\n- " + "\n- ".join(str(item) for item in achados_imagem if str(item).strip()),
-                ]
-                if limitacoes:
-                    partes.append("\n**Limitações:** " + "; ".join(str(item) for item in limitacoes if str(item).strip()))
-                partes.append("\nConfirme sempre com o laudo do especialista e a correlação clínica.")
-                return "".join(partes)
-            return (
-                f"O exame '{exame_nome}' é do tipo imagem. "
-                f"A interpretação de imagens requer avaliação por médico veterinário especialista. "
-                f"Use os campos de resultado para registrar o laudo textual do radiologista/ultrassonografista, "
-                f"que será incluído automaticamente na triagem."
-            )
-        return "Este exame não é do tipo imagem. Verifique o tipo de exame cadastrado."
-
-    # Resposta genérica baseada no contexto disponível
-    partes_resposta = [f"Sobre o exame **{exame_nome}** de {nome_pet} ({especie}):"]
-    if conclusao_ia:
-        partes_resposta.append(f"\n**Interpretação automática:** {conclusao_ia}")
-    if alertas_mensagens:
-        partes_resposta.append(f"\n**Pontos de atenção:** {'; '.join(alertas_mensagens)}")
-    if not conclusao_ia and not alertas:
-        if tem_arquivo:
-            partes_resposta.append("\nAinda sem interpretação final. O arquivo já foi anexado, então você pode usar 'Processar arquivo + IA' para extrair e resumir o exame.")
-        else:
-            partes_resposta.append("\nAinda sem interpretação. Registre o resultado e use 'Interpretar com IA' para uma análise automática.")
-    if conduta_sugerida:
-        partes_resposta.append(f"\n**Sugestões de conduta:** {'; '.join(str(item) for item in conduta_sugerida if str(item).strip())}")
-    partes_resposta.append(
-        "\n\n_Dica: tente perguntas como 'O que diz o resultado?', 'Há alertas?', 'Qual a conduta recomendada?' ou 'Tem risco de alergia?'_"
-    )
-    return "".join(partes_resposta)
-
-
 # ═══════════════════════════════════════════════════════════════
 # CALENDÁRIO PREVENTIVO — protocolos por espécie
 # ═══════════════════════════════════════════════════════════════
-
-# Protocolos padrão integrados (baseados em médias CFMV)
-_CALENDARIO_PADRAO = {
-    "cão": [
-        {"vacina": "V8 / V10 (1ª dose)", "fase": "filhote", "idade_semanas_min": 6, "idade_semanas_max": 8, "dose": "1ª dose", "reforco_anual": False, "observacoes": "Iniciar série em filhotes a partir de 6 semanas"},
-        {"vacina": "V8 / V10 (2ª dose)", "fase": "filhote", "idade_semanas_min": 9, "idade_semanas_max": 11, "dose": "2ª dose", "reforco_anual": False, "observacoes": "21-28 dias após a 1ª dose"},
-        {"vacina": "V8 / V10 (3ª dose)", "fase": "filhote", "idade_semanas_min": 12, "idade_semanas_max": 16, "dose": "3ª dose", "reforco_anual": False, "observacoes": "21-28 dias após a 2ª dose — completar série"},
-        {"vacina": "V8 / V10 (reforço adulto)", "fase": "adulto", "idade_semanas_min": 52, "idade_semanas_max": None, "dose": "Reforço anual", "reforco_anual": True, "observacoes": "Reforço anual após completar a série filhote"},
-        {"vacina": "Antirrábica", "fase": "filhote", "idade_semanas_min": 12, "idade_semanas_max": 16, "dose": "1ª dose", "reforco_anual": True, "observacoes": "Obrigatória por lei. Reforço anual"},
-        {"vacina": "Bordetella (tosse dos canis)", "fase": "filhote", "idade_semanas_min": 8, "idade_semanas_max": 12, "dose": "1ª dose", "reforco_anual": True, "observacoes": "Especialmente para cães em contato com outros cães"},
-        {"vacina": "Leishmaniose", "fase": "adulto", "idade_semanas_min": 24, "idade_semanas_max": None, "dose": "3 doses (0, 21, 42 dias)", "reforco_anual": True, "observacoes": "Recomendada em áreas endêmicas. Requer teste negativo antes"},
-        {"vacina": "Giárdia", "fase": "filhote", "idade_semanas_min": 8, "idade_semanas_max": None, "dose": "2 doses (21 dias)", "reforco_anual": True, "observacoes": "Para cães com risco de exposição"},
-        {"vacina": "Leptospirose", "fase": "filhote", "idade_semanas_min": 8, "idade_semanas_max": 12, "dose": "2 doses (21 dias)", "reforco_anual": True, "observacoes": "Geralmente inclusa na V8/V10. Reforço semestral em áreas de risco"},
-    ],
-    "gato": [
-        {"vacina": "Tríplice Felina V3 (1ª dose)", "fase": "filhote", "idade_semanas_min": 8, "idade_semanas_max": 10, "dose": "1ª dose", "reforco_anual": False, "observacoes": "Cobre herpevírus, calicivírus e panleucopenia"},
-        {"vacina": "Tríplice Felina V3 (2ª dose)", "fase": "filhote", "idade_semanas_min": 11, "idade_semanas_max": 13, "dose": "2ª dose", "reforco_anual": False, "observacoes": "21 dias após a 1ª dose"},
-        {"vacina": "Tríplice Felina V3 (3ª dose)", "fase": "filhote", "idade_semanas_min": 14, "idade_semanas_max": 16, "dose": "3ª dose + início anual", "reforco_anual": True, "observacoes": "Completar série. Após: reforço anual"},
-        {"vacina": "Antirrábica", "fase": "filhote", "idade_semanas_min": 12, "idade_semanas_max": 16, "dose": "1ª dose", "reforco_anual": True, "observacoes": "Recomendada. Reforço anual"},
-        {"vacina": "FeLV (Leucemia Felina)", "fase": "filhote", "idade_semanas_min": 8, "idade_semanas_max": 12, "dose": "2 doses (28 dias)", "reforco_anual": True, "observacoes": "Para gatos com acesso à rua ou contato com outros felinos. Requer teste FeLV negativo antes"},
-        {"vacina": "FIV/FeLV combo", "fase": "adulto", "idade_semanas_min": 26, "idade_semanas_max": None, "dose": "3 doses (21 dias)", "reforco_anual": True, "observacoes": "Para gatos de exterior. Teste negativo obrigatório antes"},
-        {"vacina": "Clamidofilose (V4)", "fase": "filhote", "idade_semanas_min": 9, "idade_semanas_max": None, "dose": "2 doses (21 dias)", "reforco_anual": True, "observacoes": "Para gatos em criações ou com outros felinos"},
-    ],
-    "coelho": [
-        {"vacina": "Calicivírus Hemorrágico (VHD)", "fase": "adulto", "idade_semanas_min": 12, "idade_semanas_max": None, "dose": "1ª dose", "reforco_anual": True, "observacoes": "Alta mortalidade. Disponibilidade varia por região"},
-        {"vacina": "Mixomatose", "fase": "adulto", "idade_semanas_min": 6, "idade_semanas_max": None, "dose": "1ª dose", "reforco_anual": True, "observacoes": "Principalmente para coelhos com acesso a áreas externas"},
-    ],
-    "todos": [
-        {"vacina": "Antiparasitário (vermífugo)", "fase": "filhote", "idade_semanas_min": 2, "idade_semanas_max": None, "dose": "Preventivo", "reforco_anual": False, "observacoes": "A cada 15 dias até 3 meses, depois trimestral"},
-        {"vacina": "Antipulgas / Carrapatos", "fase": "todos", "idade_semanas_min": 8, "idade_semanas_max": None, "dose": "Mensal ou conforme produto", "reforco_anual": False, "observacoes": "Ectoparasitas — manter regularmente durante toda a vida"},
-    ],
-}
-
 
 @router.get("/catalogo/calendario-preventivo", summary="Calendário preventivo por espécie")
 def calendario_preventivo(
