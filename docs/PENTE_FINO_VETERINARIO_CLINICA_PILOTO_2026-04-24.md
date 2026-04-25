@@ -20,7 +20,7 @@ Por que da para pilotar:
 
 Por que ainda nao da para vender sem ressalva:
 
-- `backend/app/veterinario_routes.py` ainda tem 5263 linhas e mistura agenda, prontuario, exames, catalogo e relatorios, mesmo apos as primeiras extracoes de calendario, financeiro, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py` ainda tem 5054 linhas e mistura prontuario, exames, catalogo e relatorios, mesmo apos as primeiras extracoes de agenda, calendario, financeiro, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
 - `VetConsultaForm.jsx`, `VetInternacoes.jsx`, `VetAgenda.jsx`, `VetCatalogo.jsx` e `VetExamesAnexados.jsx` sao grandes demais para manutencao segura no medio prazo.
 - A maior parte do modulo ainda nao tem testes de contrato dedicados.
 - Internacao ainda tem parte operacional local no navegador, mesmo com escopo por tenant/usuario corrigido.
@@ -39,19 +39,21 @@ Atualizacao tecnica em 2026-04-24:
 - Refatoracao frontend iniciada: `VetCatalogo.jsx` virou uma tela shell com abas separadas, os paineis de IA de consulta/exames foram isolados em componentes dedicados e os utilitarios de calendario da agenda foram movidos para modulo proprio.
 - Refatoracao backend iniciada: helpers de calendario/ICS foram extraidos para `veterinario_calendar.py` e helpers financeiros/de insumos de procedimentos foram extraidos para `veterinario_financeiro.py`, mantendo as rotas publicas em `/vet`.
 - Helpers operacionais de internacao foram extraidos para `veterinario_internacao.py`, incluindo baia, payload de procedimento agendado, serializacao de agenda e separacao entre evolucoes e procedimentos.
+- Helpers de agenda e validacoes de consulta foram extraidos para `veterinario_agendamentos.py`, incluindo marcos de inicio/fim, conflito de horario, serializacao de agendamento e deteccao de conteudo/dependencias de consulta.
 - Helpers compartilhados de tenant, datas veterinarias e parse numerico foram extraidos para `veterinario_core.py`.
 - Helpers do assistente IA veterinario foram extraidos para `veterinario_ia.py`, incluindo chat de exame, memoria, regras de dose/interacao/sintomas/plano e fallback LLM.
 - Helpers de triagem, normalizacao e interpretacao automatica de exames foram extraidos para `veterinario_exames_ia.py`.
 - Helpers de upload, extracao de PDF/imagem e processamento de arquivo + IA de exames foram extraidos para `veterinario_exames_arquivos.py`.
 - Upload de arquivo de exame passou a usar helper dedicado com `secrets` importado corretamente, evitando erro de runtime no nome seguro do arquivo.
-- `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames; `test_vet_exames_arquivos.py` cobre persistencia e validacao de upload de exame.
+- `test_vet_agendamentos_helpers.py` cobre marcos de atendimento, intervalo, deteccao de conteudo clinico e contrato de serializacao de agenda; `test_vet_ia_helpers.py` cobre respostas de chat de exame, normalizacao de modo, dose mg/kg, duplicidade de principio ativo e helpers de IA de exames; `test_vet_exames_arquivos.py` cobre persistencia e validacao de upload de exame.
 - Base fixa do calendario preventivo foi extraida para `veterinario_preventivo.py`.
 
 ## 2. Inventario tecnico encontrado
 
 Backend:
 
-- `backend/app/veterinario_routes.py`: 5263 linhas apos extracao inicial de calendario, financeiro, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
+- `backend/app/veterinario_routes.py`: 5054 linhas apos extracao inicial de agenda, calendario, financeiro, core, IA auxiliar, IA de exames, arquivos de exames, preventivo e helpers de internacao.
+- `backend/app/veterinario_agendamentos.py`: 242 linhas.
 - `backend/app/veterinario_calendar.py`: 220 linhas.
 - `backend/app/veterinario_financeiro.py`: 380 linhas.
 - `backend/app/veterinario_core.py`: 91 linhas.
