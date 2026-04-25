@@ -20,7 +20,7 @@ Por que da para pilotar:
 
 Por que ainda nao da para vender sem ressalva:
 
-- `backend/app/veterinario_routes.py` tem 5833 linhas e mistura agenda, prontuario, exames, catalogo, financeiro, internacao, IA e relatorios.
+- `backend/app/veterinario_routes.py` ainda tem 5809 linhas e mistura agenda, prontuario, exames, catalogo, internacao, IA e relatorios, mesmo apos a primeira extracao de calendario/financeiro.
 - `VetConsultaForm.jsx`, `VetInternacoes.jsx`, `VetAgenda.jsx`, `VetCatalogo.jsx` e `VetExamesAnexados.jsx` sao grandes demais para manutencao segura no medio prazo.
 - A maior parte do modulo ainda nao tem testes de contrato dedicados.
 - Internacao ainda tem parte operacional local no navegador, mesmo com escopo por tenant/usuario corrigido.
@@ -37,12 +37,15 @@ Atualizacao tecnica em 2026-04-24:
 - Foi criada migration `i0j1k2l3m4n5_add_vet_internacao_agenda_config.py` e testes unitarios de contrato para agenda de internacao e bloqueio de consulta finalizada.
 - `VetInternacoes.jsx` teve a carga/salvamento operacional extraida para `useInternacaoOperacional.js`, reduzindo acoplamento sem mudar a UI principal.
 - Refatoracao frontend iniciada: `VetCatalogo.jsx` virou uma tela shell com abas separadas, os paineis de IA de consulta/exames foram isolados em componentes dedicados e os utilitarios de calendario da agenda foram movidos para modulo proprio.
+- Refatoracao backend iniciada: helpers de calendario/ICS foram extraidos para `veterinario_calendar.py` e helpers financeiros/de insumos de procedimentos foram extraidos para `veterinario_financeiro.py`, mantendo as rotas publicas em `/vet`.
 
 ## 2. Inventario tecnico encontrado
 
 Backend:
 
-- `backend/app/veterinario_routes.py`: 5833 linhas.
+- `backend/app/veterinario_routes.py`: 5809 linhas apos extracao inicial de calendario e financeiro.
+- `backend/app/veterinario_calendar.py`: 188 linhas.
+- `backend/app/veterinario_financeiro.py`: 331 linhas.
 - `backend/app/veterinario_models.py`: 412 linhas.
 - `backend/app/pdf_veterinario.py`: geracao de prontuario e receituario.
 - `backend/app/scripts/seed_veterinario_base.py`: seed idempotente por tenant com materiais, medicamentos, protocolos, procedimentos e opcional de lancamentos de teste.
@@ -66,15 +69,15 @@ Modelos principais:
 Frontend:
 
 - `VetDashboard.jsx`: 442 linhas.
-- `VetAgenda.jsx`: 1402 linhas.
+- `VetAgenda.jsx`: 1326 linhas.
 - `VetConsultas.jsx`: 215 linhas.
-- `VetConsultaForm.jsx`: 2549 linhas.
-- `VetExamesAnexados.jsx`: 954 linhas.
+- `VetConsultaForm.jsx`: 1955 linhas.
+- `VetExamesAnexados.jsx`: 574 linhas.
 - `VetAssistenteIA.jsx`: 580 linhas.
 - `VetCalculadoraDoses.jsx`: 289 linhas.
 - `VetVacinas.jsx`: 647 linhas.
 - `VetInternacoes.jsx`: 1741 linhas.
-- `VetCatalogo.jsx`: 1146 linhas.
+- `VetCatalogo.jsx`: 49 linhas shell + abas separadas em `catalogo/`.
 - `VetRepasse.jsx`: 273 linhas.
 - `VetConfiguracoes.jsx`: 488 linhas.
 - `vetApi.js`: 174 linhas.
@@ -315,7 +318,7 @@ Semana 2 - estabilizacao:
 Semana 3 - refatoracao tecnica:
 
 - Quebrar `veterinario_routes.py` por dominio:
-  - `vet_agenda_routes.py`
+  - `vet_agenda_routes.py` ou service/router equivalente para agenda clinica
   - `vet_consultas_routes.py`
   - `vet_exames_routes.py`
   - `vet_catalogo_routes.py`
@@ -323,6 +326,7 @@ Semana 3 - refatoracao tecnica:
   - `vet_financeiro_routes.py`
   - `vet_ia_routes.py`
   - `vet_relatorios_routes.py`
+- Continuar a reducao do `veterinario_routes.py`, agora priorizando separar consultas, exames, internacao e IA em routers proprios.
 - Quebrar `VetConsultaForm.jsx` em etapas e hooks.
 - Quebrar `VetInternacoes.jsx` em mapa, lista, agenda, historico e procedimentos.
 - Continuar a refatoracao frontend ja iniciada, especialmente `VetInternacoes.jsx` e `VetConsultaForm.jsx`, separando blocos visuais restantes em componentes pequenos.

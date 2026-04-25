@@ -7,12 +7,10 @@ import hashlib
 import json
 import os
 import re
-import secrets
 import csv
 import base64
 import mimetypes
-from decimal import Decimal
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta
 from io import StringIO
 from pathlib import Path
 from typing import List, Optional
@@ -26,13 +24,30 @@ from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
-from .financeiro_models import CategoriaFinanceira, ContaReceber
+from .financeiro_models import ContaReceber
 from .ia.aba6_models import Conversa, MensagemChat
 from .models import AuditLog, Cliente, Pet, Tenant, User
 from .pdf_veterinario import gerar_pdf_prontuario, gerar_pdf_receita
 from .produtos_models import EstoqueMovimentacao, Produto
 from .utils.timezone import now_brasilia, to_brasilia
+from .veterinario_calendar import (
+    buscar_agendamentos_para_calendario,
+    gerar_calendario_ics,
+    gerar_token_calendario_vet,
+    montar_payload_calendario_vet,
+)
+from .veterinario_financeiro import (
+    _as_float,
+    _buscar_produtos_por_ids,
+    _enriquecer_insumos_com_custos,
+    _normalizar_insumos,
+    _obter_regra_financeira_veterinaria,
+    _resumo_financeiro_procedimento,
+    _round_money,
+    _serializar_catalogo,
+    _serializar_procedimento,
+    _sincronizar_financeiro_procedimento,
+)
 from .veterinario_models import (
     AgendamentoVet,
     CatalogoProcedimento,
@@ -61,22 +76,6 @@ router = APIRouter(prefix="/vet", tags=["Veterinário"])
 # /app, que é onde o volume de uploads está montado. `parents[2]` subiria até /
 # e faria o upload tentar gravar em /uploads, gerando erro 500.
 UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads" / "veterinario" / "exames"
-CALENDARIO_VET_DIAS_PASSADOS = 30
-CALENDARIO_VET_DIAS_FUTUROS = 180
-TIPO_AGENDAMENTO_LABEL = {
-    "consulta": "Consulta",
-    "retorno": "Retorno",
-    "vacina": "Vacina",
-    "exame": "Exame",
-}
-STATUS_AGENDAMENTO_LABEL = {
-    "agendado": "Agendado",
-    "confirmado": "Confirmado",
-    "aguardando": "Aguardando",
-    "em_atendimento": "Em atendimento",
-    "finalizado": "Finalizado",
-    "cancelado": "Cancelado",
-}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -153,190 +152,6 @@ def _resolver_data_entrada_exibicao_internacao(
     return data_entrada
 
 
-def _gerar_token_calendario_vet(db: Session) -> str:
-    while True:
-        token = secrets.token_urlsafe(32)
-        existe = db.query(User.id).filter(User.vet_calendar_token == token).first()
-        if not existe:
-            return token
-
-
-def _garantir_token_calendario_vet(db: Session, user: User) -> str:
-    if getattr(user, "vet_calendar_token", None):
-        return user.vet_calendar_token
-    user.vet_calendar_token = _gerar_token_calendario_vet(db)
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user.vet_calendar_token
-
-
-def _resolver_veterinario_por_usuario(db: Session, tenant_id, user: Optional[User]) -> Optional[Cliente]:
-    email = (getattr(user, "email", None) or "").strip().lower()
-    if not email:
-        return None
-
-    return (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "veterinario",
-            Cliente.ativo == True,
-            func.lower(Cliente.email) == email,
-        )
-        .order_by(Cliente.id.asc())
-        .first()
-    )
-
-
-def _montar_urls_calendario_vet(request: Request, token: str) -> tuple[str, str]:
-    base_url = str(request.base_url).rstrip("/")
-    feed_url = f"{base_url}/api/vet/agenda/feed/{token}.ics"
-    if feed_url.startswith("https://"):
-        webcal_url = f"webcal://{feed_url[len('https://'):]}"
-    elif feed_url.startswith("http://"):
-        webcal_url = f"webcal://{feed_url[len('http://'):]}"
-    else:
-        webcal_url = feed_url
-    return feed_url, webcal_url
-
-
-def _buscar_agendamentos_para_calendario(
-    db: Session,
-    *,
-    tenant_id,
-    veterinario_id: Optional[int] = None,
-) -> list[AgendamentoVet]:
-    data_inicio = datetime.now() - timedelta(days=CALENDARIO_VET_DIAS_PASSADOS)
-    data_fim = datetime.now() + timedelta(days=CALENDARIO_VET_DIAS_FUTUROS)
-    consulta = (
-        db.query(AgendamentoVet)
-        .options(
-            joinedload(AgendamentoVet.pet),
-            joinedload(AgendamentoVet.cliente),
-            joinedload(AgendamentoVet.veterinario),
-            joinedload(AgendamentoVet.consultorio),
-        )
-        .filter(
-            AgendamentoVet.tenant_id == tenant_id,
-            AgendamentoVet.data_hora >= data_inicio,
-            AgendamentoVet.data_hora <= data_fim,
-            AgendamentoVet.status != "cancelado",
-        )
-    )
-    if veterinario_id:
-        consulta = consulta.filter(AgendamentoVet.veterinario_id == veterinario_id)
-    return consulta.order_by(AgendamentoVet.data_hora.asc()).all()
-
-
-def _escape_ics(value: Optional[str]) -> str:
-    texto = str(value or "")
-    texto = texto.replace("\\", "\\\\")
-    texto = texto.replace(";", "\\;")
-    texto = texto.replace(",", "\\,")
-    texto = texto.replace("\r\n", "\\n").replace("\n", "\\n")
-    return texto
-
-
-def _formatar_datetime_ics(data_hora: datetime) -> str:
-    if data_hora.tzinfo:
-        return data_hora.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return data_hora.strftime("%Y%m%dT%H%M%S")
-
-
-def _gerar_calendario_ics(
-    agendamentos: list[AgendamentoVet],
-    *,
-    nome_calendario: str,
-) -> str:
-    linhas = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Sistema Pet//Agenda Veterinaria//PT-BR",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-        "X-WR-CALNAME:" + _escape_ics(nome_calendario),
-        "X-WR-TIMEZONE:America/Sao_Paulo",
-    ]
-
-    for ag in agendamentos:
-        data_inicio = ag.data_hora
-        data_fim = data_inicio + timedelta(minutes=ag.duracao_minutos or 30)
-        pet_nome = ag.pet.nome if ag.pet else f"Pet #{ag.pet_id}"
-        tutor_nome = ag.cliente.nome if ag.cliente else None
-        vet_nome = ag.veterinario.nome if ag.veterinario else None
-        consultorio_nome = ag.consultorio.nome if ag.consultorio else None
-        tipo_label = TIPO_AGENDAMENTO_LABEL.get(ag.tipo, (ag.tipo or "Consulta").title())
-        status_label = STATUS_AGENDAMENTO_LABEL.get(ag.status, ag.status or "Agendado")
-
-        detalhes = [
-            f"Tipo: {tipo_label}",
-            f"Status: {status_label}",
-        ]
-        if tutor_nome:
-            detalhes.append(f"Tutor: {tutor_nome}")
-        if vet_nome:
-            detalhes.append(f"Veterinario: {vet_nome}")
-        if consultorio_nome:
-            detalhes.append(f"Consultorio: {consultorio_nome}")
-        if ag.motivo:
-            detalhes.append(f"Motivo: {ag.motivo}")
-        if ag.observacoes:
-            detalhes.append(f"Observacoes: {ag.observacoes}")
-
-        linhas.extend([
-            "BEGIN:VEVENT",
-            f"UID:vet-agendamento-{ag.id}@sistemapet",
-            f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
-            f"DTSTART:{_formatar_datetime_ics(data_inicio)}",
-            f"DTEND:{_formatar_datetime_ics(data_fim)}",
-            "SUMMARY:" + _escape_ics(f"{tipo_label} - {pet_nome}"),
-            "DESCRIPTION:" + _escape_ics("\n".join(detalhes)),
-            "STATUS:CONFIRMED",
-        ])
-        if consultorio_nome:
-            linhas.append("LOCATION:" + _escape_ics(consultorio_nome))
-        linhas.append("END:VEVENT")
-
-    linhas.append("END:VCALENDAR")
-    return "\r\n".join(linhas)
-
-
-def _montar_payload_calendario_vet(
-    db: Session,
-    request: Request,
-    *,
-    user: User,
-    tenant_id,
-) -> dict:
-    token = _garantir_token_calendario_vet(db, user)
-    feed_url, webcal_url = _montar_urls_calendario_vet(request, token)
-    veterinario = _resolver_veterinario_por_usuario(db, tenant_id, user)
-    mensagem_escopo = None
-    if veterinario:
-        escopo = "veterinario"
-        veterinario_id = veterinario.id
-        veterinario_nome = veterinario.nome
-        mensagem_escopo = "O calendario exibe apenas os agendamentos vinculados ao seu usuario veterinario."
-    else:
-        escopo = "tenant"
-        veterinario_id = None
-        veterinario_nome = None
-        mensagem_escopo = "Nao encontramos um cadastro de veterinario com o mesmo e-mail deste usuario. O calendario vai mostrar a agenda geral da empresa."
-
-    return {
-        "feed_token": token,
-        "feed_url": feed_url,
-        "webcal_url": webcal_url,
-        "escopo": escopo,
-        "veterinario_id": veterinario_id,
-        "veterinario_nome": veterinario_nome,
-        "mensagem_escopo": mensagem_escopo,
-        "janela_dias_passados": CALENDARIO_VET_DIAS_PASSADOS,
-        "janela_dias_futuros": CALENDARIO_VET_DIAS_FUTUROS,
-    }
-
-
 def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
     """Retorna lista de empresa_tenant_ids onde este vet é parceiro ativo."""
     links = db.query(VetPartnerLink).filter(
@@ -349,15 +164,6 @@ def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
 def _all_accessible_tenant_ids(db: Session, tenant_id) -> list:
     """Retorna tenant_id atual + todos os tenants das empresas parceiras vinculadas."""
     return [str(tenant_id)] + _get_partner_tenant_ids(db, tenant_id)
-
-
-def _as_float(value) -> Optional[float]:
-    try:
-        if value is None or value == "":
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _parse_numeric_text(value) -> Optional[float]:
@@ -817,346 +623,6 @@ def _process_exam_file_with_ai(
         payload_extra=payload_extra,
     )
     return exame
-
-
-def _normalizar_insumos(insumos: Optional[list]) -> list[dict]:
-    normalizados = []
-    if not isinstance(insumos, list):
-        return normalizados
-
-    for item in insumos:
-        if not isinstance(item, dict):
-            continue
-        produto_id = item.get("produto_id")
-        quantidade = _as_float(item.get("quantidade"))
-        if not produto_id or not quantidade or quantidade <= 0:
-            continue
-        normalizados.append({
-            "produto_id": int(produto_id),
-            "quantidade": quantidade,
-            "nome": (item.get("nome") or "").strip() or None,
-            "unidade": (item.get("unidade") or "").strip() or None,
-            "observacoes": (item.get("observacoes") or "").strip() or None,
-            "baixar_estoque": bool(item.get("baixar_estoque", True)),
-            "custo_unitario": _as_float(item.get("custo_unitario")) or 0.0,
-            "custo_total": _as_float(item.get("custo_total")) or 0.0,
-        })
-    return normalizados
-
-
-def _round_money(value: Optional[float]) -> float:
-    return round(_as_float(value) or 0.0, 2)
-
-
-def _buscar_produtos_por_ids(db: Session, tenant_id, produto_ids: list[int]) -> dict[int, Produto]:
-    if not produto_ids:
-        return {}
-
-    produtos = db.query(Produto).filter(
-        Produto.tenant_id == str(tenant_id),
-        Produto.id.in_(produto_ids),
-    ).all()
-    return {produto.id: produto for produto in produtos}
-
-
-def _enriquecer_insumos_com_custos(db: Session, tenant_id, insumos: Optional[list]) -> list[dict]:
-    normalizados = _normalizar_insumos(insumos)
-    produtos = _buscar_produtos_por_ids(db, tenant_id, [item["produto_id"] for item in normalizados])
-
-    enriquecidos = []
-    for item in normalizados:
-        produto = produtos.get(item["produto_id"])
-        if not produto:
-            raise HTTPException(status_code=404, detail=f"Produto {item['produto_id']} não encontrado para o procedimento")
-
-        custo_unitario = _round_money(produto.preco_custo)
-        enriquecidos.append({
-            **item,
-            "nome": item.get("nome") or produto.nome,
-            "unidade": item.get("unidade") or produto.unidade,
-            "custo_unitario": custo_unitario,
-            "custo_total": _round_money(custo_unitario * item["quantidade"]),
-        })
-
-    return enriquecidos
-
-
-def _resumo_financeiro_insumos(insumos: Optional[list]) -> dict:
-    itens = _normalizar_insumos(insumos)
-    custo_total = _round_money(sum((_as_float(item.get("custo_total")) or 0.0) for item in itens))
-    return {
-        "insumos": itens,
-        "custo_total": custo_total,
-    }
-
-
-def _obter_regra_financeira_veterinaria(db: Session, tenant_id) -> dict:
-    link = db.query(VetPartnerLink).filter(
-        VetPartnerLink.vet_tenant_id == str(tenant_id),
-        VetPartnerLink.ativo == True,
-    ).order_by(VetPartnerLink.id.desc()).first()
-
-    if link and link.tipo_relacao == "parceiro":
-        return {
-            "modo_operacional": "parceiro",
-            "comissao_empresa_pct": _round_money(link.comissao_empresa_pct),
-            "empresa_tenant_id": str(link.empresa_tenant_id),
-            "tenant_recebedor_id": str(link.vet_tenant_id),
-        }
-
-    return {
-        "modo_operacional": "funcionario",
-        "comissao_empresa_pct": 0.0,
-        "empresa_tenant_id": str(tenant_id),
-        "tenant_recebedor_id": str(tenant_id),
-    }
-
-
-def _resumo_financeiro_procedimento(valor, insumos: Optional[list], regra_financeira: Optional[dict] = None) -> dict:
-    valor_cobrado = _round_money(valor)
-    resumo_insumos = _resumo_financeiro_insumos(insumos)
-    custo_total = resumo_insumos["custo_total"]
-    margem_valor = _round_money(valor_cobrado - custo_total)
-    margem_percentual = round((margem_valor / valor_cobrado) * 100, 2) if valor_cobrado > 0 else 0.0
-    regra = regra_financeira or {
-        "modo_operacional": "funcionario",
-        "comissao_empresa_pct": 0.0,
-        "empresa_tenant_id": None,
-        "tenant_recebedor_id": None,
-    }
-    repasse_empresa_valor = 0.0
-    receita_tenant_valor = valor_cobrado
-    entrada_empresa_valor = valor_cobrado
-    if regra["modo_operacional"] == "parceiro":
-        repasse_empresa_valor = _round_money(valor_cobrado * ((_as_float(regra.get("comissao_empresa_pct")) or 0.0) / 100))
-        receita_tenant_valor = _round_money(valor_cobrado - repasse_empresa_valor)
-        entrada_empresa_valor = repasse_empresa_valor
-
-    return {
-        "valor_cobrado": valor_cobrado,
-        "custo_total": custo_total,
-        "margem_valor": margem_valor,
-        "margem_percentual": margem_percentual,
-        "modo_operacional": regra["modo_operacional"],
-        "comissao_empresa_pct": _round_money(regra.get("comissao_empresa_pct")),
-        "repasse_empresa_valor": repasse_empresa_valor,
-        "receita_tenant_valor": receita_tenant_valor,
-        "entrada_empresa_valor": entrada_empresa_valor,
-        "insumos": resumo_insumos["insumos"],
-    }
-
-
-def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
-    subcategoria = db.query(DRESubcategoria).join(
-        DRECategoria, DRECategoria.id == DRESubcategoria.categoria_id
-    ).filter(
-        DRESubcategoria.tenant_id == str(tenant_id),
-        DRECategoria.tenant_id == str(tenant_id),
-        DRESubcategoria.ativo == True,
-        DRECategoria.ativo == True,
-        DRECategoria.natureza == NaturezaDRE.RECEITA,
-    ).order_by(DRECategoria.ordem.asc(), DRESubcategoria.id.asc()).first()
-    return subcategoria.id if subcategoria else 1
-
-
-def _obter_ou_criar_categoria_financeira_vet(
-    db: Session,
-    tenant_id,
-    user_id: int,
-    nome: str,
-    descricao: str,
-) -> CategoriaFinanceira:
-    categoria = db.query(CategoriaFinanceira).filter(
-        CategoriaFinanceira.tenant_id == str(tenant_id),
-        CategoriaFinanceira.nome == nome,
-        CategoriaFinanceira.tipo == "receita",
-    ).first()
-    if categoria:
-        return categoria
-
-    categoria = CategoriaFinanceira(
-        tenant_id=str(tenant_id),
-        nome=nome,
-        tipo="receita",
-        descricao=descricao,
-        dre_subcategoria_id=_obter_dre_subcategoria_receita_padrao(db, tenant_id),
-        ativo=True,
-        user_id=user_id,
-    )
-    db.add(categoria)
-    db.flush()
-    return categoria
-
-
-def _criar_conta_receber_procedimento(
-    db: Session,
-    *,
-    tenant_id,
-    user_id: int,
-    cliente_id: Optional[int],
-    categoria_id: int,
-    dre_subcategoria_id: int,
-    descricao: str,
-    valor: float,
-    documento: str,
-    observacoes: Optional[str] = None,
-):
-    existente = db.query(ContaReceber).filter(
-        ContaReceber.tenant_id == str(tenant_id),
-        ContaReceber.documento == documento,
-    ).first()
-    if existente:
-        return existente
-
-    conta = ContaReceber(
-        tenant_id=str(tenant_id),
-        descricao=descricao,
-        cliente_id=cliente_id,
-        categoria_id=categoria_id,
-        dre_subcategoria_id=dre_subcategoria_id,
-        canal="loja_fisica",
-        valor_original=Decimal(str(_round_money(valor))),
-        valor_recebido=Decimal("0"),
-        valor_final=Decimal(str(_round_money(valor))),
-        data_emissao=date.today(),
-        data_vencimento=date.today(),
-        status="pendente",
-        documento=documento,
-        observacoes=observacoes,
-        user_id=user_id,
-    )
-    db.add(conta)
-    db.flush()
-    return conta
-
-
-def _sincronizar_financeiro_procedimento(
-    db: Session,
-    procedimento: ProcedimentoConsulta,
-    tenant_id,
-    user_id: int,
-) -> None:
-    consulta = db.query(ConsultaVet).filter(
-        ConsultaVet.id == procedimento.consulta_id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).first()
-    if not consulta:
-        return
-
-    regra = _obter_regra_financeira_veterinaria(db, tenant_id)
-    resumo = _resumo_financeiro_procedimento(procedimento.valor, procedimento.insumos, regra)
-
-    categoria_empresa = _obter_ou_criar_categoria_financeira_vet(
-        db,
-        regra["empresa_tenant_id"],
-        user_id,
-        "Veterinário - Procedimentos",
-        "Receitas de procedimentos veterinários.",
-    )
-
-    if regra["modo_operacional"] == "parceiro":
-        categoria_vet = _obter_ou_criar_categoria_financeira_vet(
-            db,
-            tenant_id,
-            user_id,
-            "Veterinário - Receita Líquida",
-            "Receita líquida do veterinário após repasse da empresa.",
-        )
-
-        if resumo["receita_tenant_valor"] > 0:
-            _criar_conta_receber_procedimento(
-                db,
-                tenant_id=tenant_id,
-                user_id=user_id,
-                cliente_id=consulta.cliente_id,
-                categoria_id=categoria_vet.id,
-                dre_subcategoria_id=categoria_vet.dre_subcategoria_id or _obter_dre_subcategoria_receita_padrao(db, tenant_id),
-                descricao=f"Procedimento vet #{procedimento.id} - líquido {procedimento.nome}",
-                valor=resumo["receita_tenant_valor"],
-                documento=f"VET-PROC-{procedimento.id}-LIQUIDO-VET",
-                observacoes=f"Receita líquida após repasse de {resumo['comissao_empresa_pct']}% para a empresa.",
-            )
-
-        if resumo["repasse_empresa_valor"] > 0:
-            _criar_conta_receber_procedimento(
-                db,
-                tenant_id=regra["empresa_tenant_id"],
-                user_id=user_id,
-                cliente_id=None,
-                categoria_id=categoria_empresa.id,
-                dre_subcategoria_id=categoria_empresa.dre_subcategoria_id or _obter_dre_subcategoria_receita_padrao(db, regra["empresa_tenant_id"]),
-                descricao=f"Repasse vet #{procedimento.id} - {procedimento.nome}",
-                valor=resumo["repasse_empresa_valor"],
-                documento=f"VET-PROC-{procedimento.id}-REPASSE-EMPRESA",
-                observacoes=f"Base de repasse do parceiro veterinário ({resumo['comissao_empresa_pct']}%).",
-            )
-        return
-
-    _criar_conta_receber_procedimento(
-        db,
-        tenant_id=tenant_id,
-        user_id=user_id,
-        cliente_id=consulta.cliente_id,
-        categoria_id=categoria_empresa.id,
-        dre_subcategoria_id=categoria_empresa.dre_subcategoria_id or _obter_dre_subcategoria_receita_padrao(db, tenant_id),
-        descricao=f"Procedimento vet #{procedimento.id} - {procedimento.nome}",
-        valor=resumo["entrada_empresa_valor"],
-        documento=f"VET-PROC-{procedimento.id}-EMPRESA",
-        observacoes="Receita gerada automaticamente a partir do procedimento veterinário.",
-    )
-
-
-def _serializar_procedimento(procedimento: ProcedimentoConsulta, db: Session, tenant_id) -> dict:
-    regra = _obter_regra_financeira_veterinaria(db, tenant_id)
-    resumo = _resumo_financeiro_procedimento(procedimento.valor, procedimento.insumos, regra)
-    return {
-        "id": procedimento.id,
-        "consulta_id": procedimento.consulta_id,
-        "catalogo_id": procedimento.catalogo_id,
-        "nome": procedimento.nome,
-        "descricao": procedimento.descricao,
-        "valor": procedimento.valor,
-        "valor_cobrado": resumo["valor_cobrado"],
-        "realizado": procedimento.realizado,
-        "observacoes": procedimento.observacoes,
-        "insumos": resumo["insumos"],
-        "custo_total": resumo["custo_total"],
-        "margem_valor": resumo["margem_valor"],
-        "margem_percentual": resumo["margem_percentual"],
-        "modo_operacional": resumo["modo_operacional"],
-        "comissao_empresa_pct": resumo["comissao_empresa_pct"],
-        "repasse_empresa_valor": resumo["repasse_empresa_valor"],
-        "receita_tenant_valor": resumo["receita_tenant_valor"],
-        "entrada_empresa_valor": resumo["entrada_empresa_valor"],
-        "estoque_baixado": bool(procedimento.estoque_baixado),
-        "estoque_movimentacao_ids": procedimento.estoque_movimentacao_ids or [],
-        "created_at": _serializar_datetime_vet(procedimento.created_at),
-    }
-
-
-def _serializar_catalogo(catalogo: CatalogoProcedimento, db: Session, tenant_id) -> dict:
-    insumos = _enriquecer_insumos_com_custos(db, tenant_id, catalogo.insumos or []) if catalogo.insumos else []
-    regra = _obter_regra_financeira_veterinaria(db, tenant_id)
-    resumo = _resumo_financeiro_procedimento(catalogo.valor_padrao, insumos, regra)
-    return {
-        "id": catalogo.id,
-        "nome": catalogo.nome,
-        "descricao": catalogo.descricao,
-        "categoria": catalogo.categoria,
-        "valor_padrao": catalogo.valor_padrao,
-        "duracao_minutos": catalogo.duracao_minutos,
-        "requer_anestesia": catalogo.requer_anestesia,
-        "observacoes": catalogo.observacoes,
-        "insumos": resumo["insumos"],
-        "custo_estimado": resumo["custo_total"],
-        "margem_estimada": resumo["margem_valor"],
-        "margem_percentual_estimada": resumo["margem_percentual"],
-        "modo_operacional": resumo["modo_operacional"],
-        "comissao_empresa_pct": resumo["comissao_empresa_pct"],
-        "repasse_empresa_estimado": resumo["repasse_empresa_valor"],
-        "receita_tenant_estimada": resumo["receita_tenant_valor"],
-        "ativo": catalogo.ativo,
-    }
 
 
 def _meses_desde(data_base: Optional[date], referencia: Optional[date] = None) -> Optional[int]:
@@ -2250,7 +1716,7 @@ def obter_calendario_agenda_vet(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    return _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    return montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
 
 
 @router.post("/agenda/calendario/token")
@@ -2260,11 +1726,11 @@ def regenerar_token_calendario_agenda_vet(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    user.vet_calendar_token = _gerar_token_calendario_vet(db)
+    user.vet_calendar_token = gerar_token_calendario_vet(db)
     db.add(user)
     db.commit()
     db.refresh(user)
-    return _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    return montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
 
 
 @router.get("/agenda/calendario.ics")
@@ -2274,8 +1740,8 @@ def baixar_calendario_agenda_vet(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    payload = _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
-    agendamentos = _buscar_agendamentos_para_calendario(
+    payload = montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    agendamentos = buscar_agendamentos_para_calendario(
         db,
         tenant_id=tenant_id,
         veterinario_id=payload["veterinario_id"],
@@ -2285,7 +1751,7 @@ def baixar_calendario_agenda_vet(
         if payload["veterinario_nome"]
         else "Agenda Veterinaria"
     )
-    conteudo = _gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
+    conteudo = gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
     headers = {
         "Content-Disposition": 'attachment; filename="agenda-veterinaria.ics"',
         "Cache-Control": "no-store",
@@ -2304,8 +1770,8 @@ def feed_publico_calendario_agenda_vet(
         raise HTTPException(status_code=404, detail="Calendario nao encontrado")
 
     tenant_id = user.tenant_id
-    payload = _montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
-    agendamentos = _buscar_agendamentos_para_calendario(
+    payload = montar_payload_calendario_vet(db, request, user=user, tenant_id=tenant_id)
+    agendamentos = buscar_agendamentos_para_calendario(
         db,
         tenant_id=tenant_id,
         veterinario_id=payload["veterinario_id"],
@@ -2315,7 +1781,7 @@ def feed_publico_calendario_agenda_vet(
         if payload["veterinario_nome"]
         else "Agenda Veterinaria"
     )
-    conteudo = _gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
+    conteudo = gerar_calendario_ics(agendamentos, nome_calendario=nome_calendario)
     return Response(content=conteudo, media_type="text/calendar; charset=utf-8")
 
 
