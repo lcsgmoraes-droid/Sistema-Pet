@@ -7,24 +7,12 @@ from typing import Optional
 
 from fastapi import HTTPException
 
-from .utils.timezone import to_brasilia
+from .veterinario_core import _serializar_datetime_vet
 from .veterinario_models import EvolucaoInternacao, InternacaoProcedimentoAgenda, InternacaoVet
 
 
 _BAIA_MOTIVO_RE = re.compile(r"\s*\[BAIA:(?P<baia>[^\]]+)\]\s*$")
 _PROC_PREFIX = "[PROC_INT]"
-
-
-def _serializar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    try:
-        if getattr(value, "tzinfo", None):
-            return to_brasilia(value).replace(tzinfo=None)
-    except Exception:
-        if getattr(value, "tzinfo", None):
-            return value.replace(tzinfo=None)
-    return value
 
 
 def _resolver_data_entrada_exibicao_internacao(
