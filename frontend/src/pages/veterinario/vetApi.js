@@ -90,6 +90,15 @@ export const vetApi = {
   criarInternacao: (data) => api.post(`${BASE}/internacoes`, data),
   registrarEvolucao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/evolucao`, data),
   registrarProcedimentoInternacao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/procedimento`, data),
+  obterConfigInternacao: () => api.get(`${BASE}/internacoes/config`),
+  atualizarConfigInternacao: (data) => api.put(`${BASE}/internacoes/config`, data),
+  listarProcedimentosAgendaInternacao: (params) => api.get(`${BASE}/internacoes/procedimentos-agenda`, { params }),
+  criarProcedimentoAgendaInternacao: (internacaoId, data) =>
+    api.post(`${BASE}/internacoes/${internacaoId}/procedimentos-agenda`, data),
+  concluirProcedimentoAgendaInternacao: (agendaId, data) =>
+    api.patch(`${BASE}/internacoes/procedimentos-agenda/${agendaId}/concluir`, data),
+  removerProcedimentoAgendaInternacao: (agendaId) =>
+    api.delete(`${BASE}/internacoes/procedimentos-agenda/${agendaId}`),
   historicoInternacoesPet: async (petId) => {
     const base = await api.get(`${BASE}/internacoes`, {
       params: {

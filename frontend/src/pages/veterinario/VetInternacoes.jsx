@@ -7,11 +7,8 @@ import { api } from "../../services/api";
 import TutorAutocomplete from "../../components/TutorAutocomplete";
 import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import ProdutoEstoqueAutocomplete from "../../components/veterinario/ProdutoEstoqueAutocomplete";
-import { useAuth } from "../../contexts/AuthContext";
 import { buildReturnTo } from "../../utils/petReturnFlow";
-
-const STORAGE_AGENDA = "vet_internacao_agenda_v1";
-const STORAGE_TOTAL_BAIAS = "vet_internacao_total_baias_v1";
+import { useInternacaoOperacional } from "./useInternacaoOperacional";
 
 function formatData(iso) {
   if (!iso) return "—";
@@ -61,7 +58,6 @@ const STATUS_CORES = {
 export default function VetInternacoes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const abrirNovaQuery = searchParams.get("abrir_nova") === "1";
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
@@ -92,10 +88,6 @@ export default function VetInternacoes() {
   const [filtroDataAltaFim, setFiltroDataAltaFim] = useState("");
   const [filtroPessoaHistorico, setFiltroPessoaHistorico] = useState("");
   const [filtroPetHistorico, setFiltroPetHistorico] = useState("");
-  const [agendaProcedimentos, setAgendaProcedimentos] = useState([]);
-  const [totalBaias, setTotalBaias] = useState(12);
-  const [agendaStorageCarregado, setAgendaStorageCarregado] = useState(false);
-  const [baiasStorageCarregado, setBaiasStorageCarregado] = useState(false);
   const [agendaForm, setAgendaForm] = useState({
     internacao_id: "",
     horario: "",
@@ -128,13 +120,14 @@ export default function VetInternacoes() {
     observacoes: "",
   });
   const [salvando, setSalvando] = useState(false);
-  const storageScope = useMemo(() => {
-    const tenantId = user?.tenant_id || user?.tenant?.id || "tenant";
-    const userId = user?.id || "usuario";
-    return `${tenantId}_${userId}`;
-  }, [user?.tenant_id, user?.tenant?.id, user?.id]);
-  const agendaStorageKey = `${STORAGE_AGENDA}_${storageScope}`;
-  const totalBaiasStorageKey = `${STORAGE_TOTAL_BAIAS}_${storageScope}`;
+  const {
+    agendaCarregando,
+    agendaProcedimentos,
+    carregarAgendaProcedimentos,
+    setAgendaProcedimentos,
+    setTotalBaias,
+    totalBaias,
+  } = useInternacaoOperacional({ setErro });
 
   useEffect(() => {
     api.get("/pets", { params: { limit: 500 } }).then((r) => setPets(r.data?.items ?? r.data ?? [])).catch(() => {});
@@ -167,52 +160,6 @@ export default function VetInternacoes() {
       pet_id: String(novoPetIdQuery),
     }));
   }, [novoPetIdQuery]);
-
-  useEffect(() => {
-    setAgendaStorageCarregado(false);
-    try {
-      const salvo = localStorage.getItem(agendaStorageKey);
-      if (!salvo) {
-        setAgendaProcedimentos([]);
-        return;
-      }
-      const parsed = JSON.parse(salvo);
-      if (Array.isArray(parsed)) setAgendaProcedimentos(parsed);
-    } catch {
-      setAgendaProcedimentos([]);
-    } finally {
-      setAgendaStorageCarregado(true);
-    }
-  }, [agendaStorageKey]);
-
-  useEffect(() => {
-    if (!agendaStorageCarregado) return;
-    localStorage.setItem(agendaStorageKey, JSON.stringify(agendaProcedimentos));
-  }, [agendaProcedimentos, agendaStorageCarregado, agendaStorageKey]);
-
-  useEffect(() => {
-    setBaiasStorageCarregado(false);
-    try {
-      const salvo = localStorage.getItem(totalBaiasStorageKey);
-      if (!salvo) {
-        setTotalBaias(12);
-        return;
-      }
-      const parsed = Number.parseInt(salvo, 10);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        setTotalBaias(parsed);
-      }
-    } catch {
-      setTotalBaias(12);
-    } finally {
-      setBaiasStorageCarregado(true);
-    }
-  }, [totalBaiasStorageKey]);
-
-  useEffect(() => {
-    if (!baiasStorageCarregado) return;
-    localStorage.setItem(totalBaiasStorageKey, String(totalBaias));
-  }, [baiasStorageCarregado, totalBaias, totalBaiasStorageKey]);
 
   const pessoas = useMemo(() => {
     const mapa = new Map();
@@ -459,39 +406,23 @@ export default function VetInternacoes() {
     setSalvando(true);
 
     try {
-      const response = await vetApi.registrarProcedimentoInternacao(agendaForm.internacao_id, {
-        status: "agendado",
+      const lembreteMin = Number.parseInt(agendaForm.lembrete_min || "30", 10);
+      const response = await vetApi.criarProcedimentoAgendaInternacao(agendaForm.internacao_id, {
         horario_agendado: agendaForm.horario,
-        medicamento: agendaForm.medicamento,
+        medicamento: agendaForm.medicamento.trim(),
         dose: agendaForm.dose || undefined,
         quantidade_prevista: parseQuantity(agendaForm.quantidade_prevista) ?? undefined,
         unidade_quantidade: agendaForm.unidade_quantidade?.trim() || undefined,
         via: agendaForm.via || undefined,
+        lembrete_min: Number.isFinite(lembreteMin) ? lembreteMin : 30,
         observacoes_agenda: agendaForm.observacoes || undefined,
       });
 
-      const internacao = internacaoPorId.get(String(agendaForm.internacao_id));
-      const item = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        backend_id: response.data?.id,
-        internacao_id: String(agendaForm.internacao_id),
-        pet_nome: internacao?.pet_nome ?? "Pet",
-        baia: (internacao?.box || "").trim() || "Sem baia",
-        horario: agendaForm.horario,
-        medicamento: agendaForm.medicamento,
-        dose: agendaForm.dose,
-        quantidade_prevista: agendaForm.quantidade_prevista,
-        unidade_quantidade: agendaForm.unidade_quantidade,
-        via: agendaForm.via,
-        lembrete_min: Number.parseInt(agendaForm.lembrete_min || "30", 10),
-        observacoes: agendaForm.observacoes,
-        feito: false,
-        feito_por: "",
-        horario_execucao: "",
-        observacao_execucao: "",
-      };
-
-      setAgendaProcedimentos((prev) => [item, ...prev]);
+      if (response.data?.id) {
+        setAgendaProcedimentos((prev) => [response.data, ...prev]);
+      } else {
+        await carregarAgendaProcedimentos();
+      }
       await carregarDetalheInternacao(agendaForm.internacao_id, expandida === Number(agendaForm.internacao_id));
       setAgendaForm((prev) => ({
         ...prev,
@@ -541,28 +472,24 @@ export default function VetInternacoes() {
     setSalvando(true);
 
     try {
-      await vetApi.registrarProcedimentoInternacao(modalFeito.internacao_id, {
-        horario_agendado: modalFeito.horario || undefined,
-        medicamento: modalFeito.medicamento,
-        dose: modalFeito.dose || undefined,
-        via: modalFeito.via || undefined,
+      const response = await vetApi.concluirProcedimentoAgendaInternacao(modalFeito.id, {
         quantidade_prevista: parseQuantity(formFeito.quantidade_prevista) ?? undefined,
         quantidade_executada: parseQuantity(formFeito.quantidade_executada) ?? undefined,
         quantidade_desperdicio: parseQuantity(formFeito.quantidade_desperdicio) ?? undefined,
         unidade_quantidade: formFeito.unidade_quantidade?.trim() || undefined,
-        observacoes_agenda: modalFeito.observacoes || undefined,
         executado_por: formFeito.feito_por.trim(),
         horario_execucao: formFeito.horario_execucao,
         observacao_execucao: formFeito.observacao_execucao?.trim() || undefined,
       });
 
-      await carregarDetalheInternacao(modalFeito.internacao_id, expandida === modalFeito.internacao_id);
+      await carregarDetalheInternacao(modalFeito.internacao_id, String(expandida) === String(modalFeito.internacao_id));
 
       setAgendaProcedimentos((prev) => prev.map((p) => {
-        if (p.id !== modalFeito.id) return p;
-        return {
+        if (String(p.id) !== String(modalFeito.id)) return p;
+        return response.data?.id ? response.data : {
           ...p,
           feito: true,
+          status: "concluido",
           feito_por: formFeito.feito_por.trim(),
           horario_execucao: formFeito.horario_execucao,
           observacao_execucao: formFeito.observacao_execucao?.trim() || "",
@@ -675,21 +602,20 @@ export default function VetInternacoes() {
     }
   }
 
-  function reabrirProcedimento(id) {
-    setAgendaProcedimentos((prev) => prev.map((p) => {
-      if (p.id !== id) return p;
-      return {
-        ...p,
-        feito: false,
-        feito_por: "",
-        horario_execucao: "",
-        observacao_execucao: "",
-      };
-    }));
+  function reabrirProcedimento() {
+    setErro("Procedimento concluido ja faz parte do historico clinico. Para corrigir, registre um novo ajuste/evolucao.");
   }
 
-  function removerProcedimentoAgenda(id) {
-    setAgendaProcedimentos((prev) => prev.filter((p) => p.id !== id));
+  async function removerProcedimentoAgenda(id) {
+    setSalvando(true);
+    try {
+      await vetApi.removerProcedimentoAgendaInternacao(id);
+      setAgendaProcedimentos((prev) => prev.filter((p) => String(p.id) !== String(id)));
+    } catch (e) {
+      setErro(e?.response?.data?.detail ?? "Erro ao remover procedimento da agenda.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
   async function abrirHistoricoPet(petId, petNome) {
@@ -1238,16 +1164,19 @@ export default function VetInternacoes() {
                   />
                   <button
                     onClick={adicionarProcedimentoAgenda}
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-2 text-sm"
+                    disabled={salvando}
+                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-60"
                   >
-                    Adicionar na agenda
+                    {salvando ? "Salvando..." : "Adicionar na agenda"}
                   </button>
                 </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Horários de hoje e próximos</p>
-                {agendaOrdenada.length === 0 ? (
+                {agendaCarregando ? (
+                  <p className="text-xs text-gray-400">Carregando agenda de procedimentos...</p>
+                ) : agendaOrdenada.length === 0 ? (
                   <p className="text-xs text-gray-400">Nenhum procedimento agendado ainda.</p>
                 ) : (
                   <div className="space-y-2">
@@ -1309,16 +1238,30 @@ export default function VetInternacoes() {
                             )}
                           </div>
                           <div className="flex gap-2">
-                            <button
-                              onClick={() => (item.feito ? reabrirProcedimento(item.id) : abrirModalFeito(item))}
-                              className="px-2.5 py-1.5 text-xs border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors flex items-center gap-1"
-                            >
-                              <Check size={12} />
-                              {item.feito ? "Reabrir" : "Feito"}
-                            </button>
+                            {item.feito ? (
+                              <button
+                                type="button"
+                                onClick={reabrirProcedimento}
+                                className="px-2.5 py-1.5 text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg transition-colors flex items-center gap-1"
+                              >
+                                <Check size={12} />
+                                Concluido
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => abrirModalFeito(item)}
+                                disabled={salvando}
+                                className="px-2.5 py-1.5 text-xs border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors flex items-center gap-1 disabled:opacity-60"
+                              >
+                                <Check size={12} />
+                                Feito
+                              </button>
+                            )}
                             <button
                               onClick={() => removerProcedimentoAgenda(item.id)}
-                              className="px-2.5 py-1.5 text-xs border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors flex items-center gap-1"
+                              disabled={salvando || item.feito}
+                              title={item.feito ? "Procedimento concluido nao pode ser excluido do historico clinico." : "Excluir procedimento agendado"}
+                              className="px-2.5 py-1.5 text-xs border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Trash2 size={12} />
                               Excluir

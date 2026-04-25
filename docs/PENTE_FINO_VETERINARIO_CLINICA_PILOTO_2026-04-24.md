@@ -27,6 +27,16 @@ Por que ainda nao da para vender sem ressalva:
 - Fluxos de permissao por perfil clinico precisam ser homologados com usuarios reais.
 - A IA tem fallback e memoria, mas precisa guardrails e mensagens de responsabilidade antes de uso clinico diario.
 
+Atualizacao tecnica em 2026-04-24:
+
+- Agenda de procedimentos de internacao e total de baias deixaram de depender de `localStorage` e passaram a ser persistidos no backend.
+- Procedimento agendado concluido agora gera registro clinico de procedimento na evolucao da internacao.
+- Procedimento concluido nao pode ser excluido/reaberto como se nunca tivesse acontecido; correcoes devem ser registradas como novo ajuste/evolucao.
+- Consulta finalizada passou a bloquear novos lancamentos satelites vinculados: prescricao, procedimento, vacina e nova solicitacao de exame.
+- Atualizacao/upload/processamento/interpretacao de exame ligado a consulta finalizada continua permitido, mas passa a gerar auditoria em `audit_logs`.
+- Foi criada migration `i0j1k2l3m4n5_add_vet_internacao_agenda_config.py` e testes unitarios de contrato para agenda de internacao e bloqueio de consulta finalizada.
+- `VetInternacoes.jsx` teve a carga/salvamento operacional extraida para `useInternacaoOperacional.js`, reduzindo acoplamento sem mudar a UI principal.
+
 ## 2. Inventario tecnico encontrado
 
 Backend:
@@ -164,11 +174,13 @@ Acao: definir regra comercial/clinica e criar testes:
 - procedimento pos-finalizacao exige reabertura controlada ou fica bloqueado.
 - anexo de exame pos-finalizacao deve gerar evento auditavel.
 
-3. Internacao ainda tem estado operacional local.
+3. Internacao ainda tem estado operacional local. [RESOLVIDO EM CODIGO]
 
 Risco: agenda de procedimentos de internacao e total de baias ficaram isolados por tenant/usuario, mas ainda dependem de `localStorage`.
 
 Acao: migrar agenda de procedimentos de internacao, baias e configuracoes para backend antes de uso intenso com mais de um computador.
+
+Status: implementado em backend/frontend. Pendente apenas aplicar migration em producao/staging e fazer smoke autenticado com dois usuarios/navegadores.
 
 4. Seed veterinario precisa de politica de producao.
 
@@ -293,7 +305,7 @@ Semana 1 - liberar clinica piloto com seguranca:
 
 Semana 2 - estabilizacao:
 
-- Migrar agenda local de internacao/baias para backend.
+- Migrar agenda local de internacao/baias para backend. [feito em codigo; falta deploy/smoke]
 - Padronizar modais no lugar de `window.confirm`.
 - Reduzir carregamento de pets em massa (`limit=500`) para busca paginada/autocomplete.
 - Melhorar mensagens de erro para recepcao/veterinario.
@@ -325,4 +337,3 @@ Semana 3 - refatoracao tecnica:
 - Push homologado em dispositivo real ou funcionalidade marcada como beta.
 - Testes de contrato cobrindo agenda, consulta finalizada, prescricao/procedimento, internacao e repasse.
 - Primeiro ciclo real da clinica concluido: agendamento, atendimento, financeiro e retorno.
-

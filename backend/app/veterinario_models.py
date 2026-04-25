@@ -400,6 +400,17 @@ class InternacaoVet(BaseTenantModel):
     veterinario = relationship("Cliente", foreign_keys=[veterinario_id])
 
 
+class InternacaoConfig(BaseTenantModel):
+    """Configuracoes operacionais da area de internacao por tenant."""
+    __tablename__ = "vet_internacao_configuracoes"
+    __table_args__ = (
+        Index("ux_vet_internacao_config_tenant", "tenant_id", unique=True),
+    )
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    total_baias = Column(Integer, nullable=False, default=12)
+
+
 class EvolucaoInternacao(BaseTenantModel):
     """Registro de sinais vitais durante internação (frequência horária/diária)."""
     __tablename__ = "vet_evolucoes_internacao"
@@ -420,6 +431,37 @@ class EvolucaoInternacao(BaseTenantModel):
 
     # Relacionamentos
     internacao = relationship("InternacaoVet", back_populates="evolucoes")
+
+
+class InternacaoProcedimentoAgenda(BaseTenantModel):
+    """Agenda operacional de procedimentos/medicacoes da internacao."""
+    __tablename__ = "vet_internacao_procedimentos_agenda"
+
+    internacao_id = Column(Integer, ForeignKey("vet_internacoes.id"), nullable=False, index=True)
+    pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    procedimento_evolucao_id = Column(Integer, ForeignKey("vet_evolucoes_internacao.id"), nullable=True, index=True)
+
+    horario_agendado = Column(DateTime(timezone=True), nullable=False, index=True)
+    medicamento = Column(String(255), nullable=False)
+    dose = Column(String(255), nullable=True)
+    via = Column(String(100), nullable=True)
+    quantidade_prevista = Column(Float, nullable=True)
+    quantidade_executada = Column(Float, nullable=True)
+    quantidade_desperdicio = Column(Float, nullable=True)
+    unidade_quantidade = Column(String(50), nullable=True)
+    lembrete_minutos = Column(Integer, nullable=False, default=30)
+    observacoes_agenda = Column(Text, nullable=True)
+
+    executado_por = Column(String(255), nullable=True)
+    horario_execucao = Column(DateTime(timezone=True), nullable=True)
+    observacao_execucao = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="agendado", index=True)
+    # agendado | concluido | cancelado
+
+    internacao = relationship("InternacaoVet", foreign_keys=[internacao_id])
+    pet = relationship("Pet", foreign_keys=[pet_id])
+    procedimento_evolucao = relationship("EvolucaoInternacao", foreign_keys=[procedimento_evolucao_id])
 
 
 # ==============================================================

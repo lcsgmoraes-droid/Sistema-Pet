@@ -29,7 +29,7 @@ from .db import get_session
 from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .financeiro_models import CategoriaFinanceira, ContaReceber
 from .ia.aba6_models import Conversa, MensagemChat
-from .models import Cliente, Pet, Tenant, User
+from .models import AuditLog, Cliente, Pet, Tenant, User
 from .pdf_veterinario import gerar_pdf_prontuario, gerar_pdf_receita
 from .produtos_models import EstoqueMovimentacao, Produto
 from .utils.timezone import now_brasilia, to_brasilia
@@ -40,6 +40,8 @@ from .veterinario_models import (
     ConsultorioVet,
     ExameVet,
     FotoClinica,
+    InternacaoConfig,
+    InternacaoProcedimentoAgenda,
     InternacaoVet,
     EvolucaoInternacao,
     ItemPrescricao,
@@ -1504,6 +1506,60 @@ def _consulta_or_404(db: Session, consulta_id: int, tenant_id) -> ConsultaVet:
     if not c:
         raise HTTPException(status_code=404, detail="Consulta não encontrada")
     return c
+
+
+def _consulta_esta_finalizada(consulta: Optional[ConsultaVet]) -> bool:
+    return (getattr(consulta, "status", None) or "").strip().lower() == "finalizada"
+
+
+def _bloquear_lancamento_em_consulta_finalizada(consulta: Optional[ConsultaVet], acao: str) -> None:
+    if not _consulta_esta_finalizada(consulta):
+        return
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            f"Consulta finalizada nao permite {acao}. "
+            "Registre uma nova consulta/retorno ou reabra o fluxo com auditoria controlada."
+        ),
+    )
+
+
+def _auditar_exame_pos_finalizacao(
+    db: Session,
+    *,
+    tenant_id,
+    user_id: Optional[int],
+    exame: ExameVet,
+    action: str,
+    details: dict,
+    old_value: Optional[dict] = None,
+    new_value: Optional[dict] = None,
+) -> None:
+    if not exame.consulta_id:
+        return
+
+    consulta = db.query(ConsultaVet).filter(
+        ConsultaVet.id == exame.consulta_id,
+        ConsultaVet.tenant_id == tenant_id,
+    ).first()
+    if not _consulta_esta_finalizada(consulta):
+        return
+
+    db.add(AuditLog(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        action=action,
+        entity_type="vet_exame",
+        entity_id=exame.id,
+        old_value=json.dumps(old_value, ensure_ascii=True, default=str) if old_value else None,
+        new_value=json.dumps(new_value, ensure_ascii=True, default=str) if new_value else None,
+        details=json.dumps({
+            "consulta_id": exame.consulta_id,
+            "consulta_finalizada": True,
+            **details,
+        }, ensure_ascii=True, default=str),
+        timestamp=_vet_now(),
+    ))
 
 
 def _prescricao_or_404(db: Session, prescricao_id: int, tenant_id) -> PrescricaoVet:
@@ -3172,6 +3228,9 @@ def criar_prescricao(
         raise HTTPException(status_code=404, detail="Consulta não encontrada neste tenant")
 
     # Número sequencial
+    if consulta_ok.pet_id != body.pet_id:
+        raise HTTPException(status_code=422, detail="Pet da prescricao nao confere com o pet da consulta")
+    _bloquear_lancamento_em_consulta_finalizada(consulta_ok, "nova prescricao vinculada")
     total = db.query(func.count(PrescricaoVet.id)).filter(PrescricaoVet.tenant_id == tenant_id).scalar() or 0
     numero = f"REC-{total + 1:05d}"
 
@@ -3334,6 +3393,9 @@ def registrar_vacina(
         ).first()
         if not consulta_ok:
             raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+
+    if body.consulta_id:
+        _bloquear_lancamento_em_consulta_finalizada(consulta_ok, "novo registro de vacina vinculado")
 
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
@@ -3572,6 +3634,9 @@ def criar_exame(
         ).first()
         if not consulta_ok:
             raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+    if body.consulta_id:
+        _bloquear_lancamento_em_consulta_finalizada(consulta_ok, "nova solicitacao de exame vinculada")
+
     e = ExameVet(
         tenant_id=tenant_id,
         pet_id=body.pet_id,
@@ -3607,10 +3672,34 @@ def atualizar_exame(
     e = db.query(ExameVet).filter(ExameVet.id == exame_id, ExameVet.tenant_id == tenant_id).first()
     if not e:
         raise HTTPException(404, "Exame não encontrado")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    dados_update = body.model_dump(exclude_unset=True)
+    audit_old = {
+        "status": e.status,
+        "data_resultado": e.data_resultado,
+        "resultado_texto": e.resultado_texto,
+        "resultado_json": e.resultado_json,
+        "arquivo_url": e.arquivo_url,
+    }
+    for field, value in dados_update.items():
         setattr(e, field, value)
     if body.data_resultado and e.status == "solicitado":
         e.status = "disponivel"
+    _auditar_exame_pos_finalizacao(
+        db,
+        tenant_id=tenant_id,
+        user_id=_resolver_user_id_vet(user, "Usuario invalido para auditar exame"),
+        exame=e,
+        action="vet_exame_update_pos_finalizacao",
+        details={"campos": sorted(dados_update.keys())},
+        old_value=audit_old,
+        new_value={
+            "status": e.status,
+            "data_resultado": e.data_resultado,
+            "resultado_texto": e.resultado_texto,
+            "resultado_json": e.resultado_json,
+            "arquivo_url": e.arquivo_url,
+        },
+    )
     db.commit()
     db.refresh(e)
     return e
@@ -3622,7 +3711,7 @@ def interpretar_exame_ia(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
+    user, tenant_id = _get_tenant(current)
     exame = db.query(ExameVet).filter(
         ExameVet.id == exame_id,
         ExameVet.tenant_id == tenant_id,
@@ -3643,6 +3732,15 @@ def interpretar_exame_ia(
     exame.interpretacao_ia_payload = analise["payload"]
     if exame.status in {"disponivel", "aguardando", "coletado", "solicitado"}:
         exame.status = "interpretado"
+    _auditar_exame_pos_finalizacao(
+        db,
+        tenant_id=tenant_id,
+        user_id=_resolver_user_id_vet(user, "Usuario invalido para auditar exame"),
+        exame=exame,
+        action="vet_exame_ia_pos_finalizacao",
+        details={"origem": "interpretar_ia"},
+        new_value={"status": exame.status, "interpretacao_ia_resumo": exame.interpretacao_ia_resumo},
+    )
     db.commit()
     db.refresh(exame)
     return exame
@@ -3654,7 +3752,7 @@ def processar_arquivo_exame_ia(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
+    user, tenant_id = _get_tenant(current)
     exame = db.query(ExameVet).filter(
         ExameVet.id == exame_id,
         ExameVet.tenant_id == tenant_id,
@@ -3665,6 +3763,15 @@ def processar_arquivo_exame_ia(
         raise HTTPException(400, "O exame ainda não possui arquivo anexado.")
 
     exame = _process_exam_file_with_ai(db, tenant_id=tenant_id, exame=exame)
+    _auditar_exame_pos_finalizacao(
+        db,
+        tenant_id=tenant_id,
+        user_id=_resolver_user_id_vet(user, "Usuario invalido para auditar exame"),
+        exame=exame,
+        action="vet_exame_process_file_ia_pos_finalizacao",
+        details={"origem": "processar_arquivo_ia"},
+        new_value={"status": exame.status, "resultado_texto": exame.resultado_texto},
+    )
     db.commit()
     db.refresh(exame)
     return exame
@@ -3677,13 +3784,20 @@ def upload_arquivo_exame(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
+    user, tenant_id = _get_tenant(current)
     exame = db.query(ExameVet).filter(
         ExameVet.id == exame_id,
         ExameVet.tenant_id == tenant_id,
     ).first()
     if not exame:
         raise HTTPException(404, "Exame não encontrado")
+
+    audit_old = {
+        "arquivo_url": exame.arquivo_url,
+        "arquivo_nome": exame.arquivo_nome,
+        "status": exame.status,
+        "data_resultado": exame.data_resultado,
+    }
 
     nome_original = (arquivo.filename or "resultado").strip()
     extensao = Path(nome_original).suffix.lower()
@@ -3711,6 +3825,21 @@ def upload_arquivo_exame(
         exame.data_resultado = date.today()
     if exame.status == "solicitado":
         exame.status = "disponivel"
+    _auditar_exame_pos_finalizacao(
+        db,
+        tenant_id=tenant_id,
+        user_id=_resolver_user_id_vet(user, "Usuario invalido para auditar exame"),
+        exame=exame,
+        action="vet_exame_upload_pos_finalizacao",
+        details={"arquivo_nome": nome_original},
+        old_value=audit_old,
+        new_value={
+            "arquivo_url": exame.arquivo_url,
+            "arquivo_nome": exame.arquivo_nome,
+            "status": exame.status,
+            "data_resultado": exame.data_resultado,
+        },
+    )
     db.commit()
     db.refresh(exame)
     return exame
@@ -3823,6 +3952,9 @@ def adicionar_procedimento(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
+    consulta = _consulta_or_404(db, body.consulta_id, tenant_id)
+    _bloquear_lancamento_em_consulta_finalizada(consulta, "novo procedimento vinculado")
+
     catalogo = None
     if body.catalogo_id:
         catalogo = db.query(CatalogoProcedimento).filter(
@@ -4366,6 +4498,109 @@ class ProcedimentoInternacaoCreate(BaseModel):
     status: Optional[str] = "concluido"
 
 
+class InternacaoConfigUpdate(BaseModel):
+    total_baias: int = Field(..., ge=1, le=200)
+
+
+class ProcedimentoAgendaInternacaoCreate(BaseModel):
+    horario_agendado: datetime
+    medicamento: str
+    dose: Optional[str] = None
+    via: Optional[str] = None
+    quantidade_prevista: Optional[float] = None
+    unidade_quantidade: Optional[str] = None
+    lembrete_min: Optional[int] = Field(30, ge=0, le=1440)
+    observacoes_agenda: Optional[str] = None
+
+
+class ProcedimentoAgendaInternacaoConcluir(BaseModel):
+    executado_por: str
+    horario_execucao: datetime
+    observacao_execucao: Optional[str] = None
+    quantidade_prevista: Optional[float] = None
+    quantidade_executada: Optional[float] = None
+    quantidade_desperdicio: Optional[float] = None
+    unidade_quantidade: Optional[str] = None
+
+
+def _resolver_user_id_vet(user, detail: str) -> int:
+    user_id = getattr(user, "id", None)
+    if user_id is None and isinstance(user, dict):
+        user_id = user.get("id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail=detail)
+    return user_id
+
+
+def _resolver_tenant_id_vet(user, tenant_id, detail: str):
+    if tenant_id is None:
+        tenant_id = getattr(user, "tenant_id", None)
+    if tenant_id is None and isinstance(user, dict):
+        tenant_id = user.get("tenant_id")
+    if tenant_id is None:
+        raise HTTPException(status_code=401, detail=detail)
+    return tenant_id
+
+
+def _datetime_iso_vet(value: Optional[datetime]) -> Optional[str]:
+    serializado = _serializar_datetime_vet(value)
+    return serializado.isoformat() if serializado else None
+
+
+def _serializar_procedimento_agenda_internacao(item: InternacaoProcedimentoAgenda) -> dict:
+    _, box = _split_motivo_baia(item.internacao.motivo if item.internacao else None)
+    pet_nome = item.pet.nome if item.pet else None
+    return {
+        "id": item.id,
+        "backend_id": item.id,
+        "internacao_id": item.internacao_id,
+        "pet_id": item.pet_id,
+        "pet_nome": pet_nome or f"Pet #{item.pet_id}",
+        "baia": box or "Sem baia",
+        "horario": _serializar_datetime_vet(item.horario_agendado),
+        "horario_agendado": _serializar_datetime_vet(item.horario_agendado),
+        "medicamento": item.medicamento,
+        "dose": item.dose,
+        "quantidade_prevista": item.quantidade_prevista,
+        "quantidade_executada": item.quantidade_executada,
+        "quantidade_desperdicio": item.quantidade_desperdicio,
+        "unidade_quantidade": item.unidade_quantidade,
+        "via": item.via,
+        "lembrete_min": item.lembrete_minutos,
+        "observacoes": item.observacoes_agenda,
+        "observacoes_agenda": item.observacoes_agenda,
+        "status": item.status,
+        "feito": item.status == "concluido",
+        "feito_por": item.executado_por or "",
+        "executado_por": item.executado_por,
+        "horario_execucao": _serializar_datetime_vet(item.horario_execucao),
+        "observacao_execucao": item.observacao_execucao or "",
+        "procedimento_evolucao_id": item.procedimento_evolucao_id,
+    }
+
+
+def _build_payload_procedimento_agenda_internacao(item: InternacaoProcedimentoAgenda) -> dict:
+    return {
+        "status": item.status,
+        "tipo_registro": "procedimento_agendado",
+        "horario_agendado": _datetime_iso_vet(item.horario_agendado),
+        "medicamento": item.medicamento,
+        "dose": item.dose,
+        "via": item.via,
+        "quantidade_prevista": item.quantidade_prevista,
+        "quantidade_executada": item.quantidade_executada,
+        "quantidade_desperdicio": item.quantidade_desperdicio or 0,
+        "unidade_quantidade": item.unidade_quantidade,
+        "insumos": [],
+        "estoque_baixado": False,
+        "estoque_movimentacao_ids": [],
+        "observacoes_agenda": item.observacoes_agenda,
+        "executado_por": item.executado_por,
+        "horario_execucao": _datetime_iso_vet(item.horario_execucao),
+        "observacao_execucao": item.observacao_execucao,
+    }
+
+
 @router.get("/internacoes")
 def listar_internacoes(
     status: Optional[str] = "internado",
@@ -4424,6 +4659,277 @@ def listar_internacoes(
             "observacoes_alta": i.observacoes,
         })
     return result
+
+
+@router.get("/internacoes/config")
+def obter_config_internacao(
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para configuracao de internacao")
+    user_id = _resolver_user_id_vet(user, "Usuario invalido para configuracao de internacao")
+
+    config = db.query(InternacaoConfig).filter(InternacaoConfig.tenant_id == tenant_id).first()
+    if not config:
+        config = InternacaoConfig(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            total_baias=12,
+        )
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+
+    return {
+        "id": config.id,
+        "total_baias": config.total_baias,
+    }
+
+
+@router.put("/internacoes/config")
+def atualizar_config_internacao(
+    body: InternacaoConfigUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para configuracao de internacao")
+    user_id = _resolver_user_id_vet(user, "Usuario invalido para configuracao de internacao")
+
+    config = db.query(InternacaoConfig).filter(InternacaoConfig.tenant_id == tenant_id).first()
+    if not config:
+        config = InternacaoConfig(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            total_baias=body.total_baias,
+        )
+        db.add(config)
+    else:
+        config.user_id = user_id
+        config.total_baias = body.total_baias
+
+    db.commit()
+    db.refresh(config)
+    return {
+        "id": config.id,
+        "total_baias": config.total_baias,
+    }
+
+
+@router.get("/internacoes/procedimentos-agenda")
+def listar_procedimentos_agenda_internacao(
+    status: Optional[str] = Query("ativos"),
+    internacao_id: Optional[int] = None,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+
+    status_normalizado = (status or "ativos").strip().lower()
+    if status_normalizado in {"", "ativos", "ativo"}:
+        status_filtro = ["agendado", "concluido"]
+    elif status_normalizado in {"pendente", "pendentes", "agendado"}:
+        status_filtro = ["agendado"]
+    elif status_normalizado in {"feito", "feitos", "concluido", "concluidos"}:
+        status_filtro = ["concluido"]
+    elif status_normalizado in {"cancelado", "cancelados"}:
+        status_filtro = ["cancelado"]
+    else:
+        raise HTTPException(status_code=422, detail="Status da agenda de internacao invalido")
+
+    query = (
+        db.query(InternacaoProcedimentoAgenda)
+        .options(
+            joinedload(InternacaoProcedimentoAgenda.internacao),
+            joinedload(InternacaoProcedimentoAgenda.pet),
+        )
+        .filter(
+            InternacaoProcedimentoAgenda.tenant_id == tenant_id,
+            InternacaoProcedimentoAgenda.status.in_(status_filtro),
+        )
+    )
+    if internacao_id:
+        query = query.filter(InternacaoProcedimentoAgenda.internacao_id == internacao_id)
+
+    itens = query.order_by(InternacaoProcedimentoAgenda.horario_agendado.asc()).all()
+    return [_serializar_procedimento_agenda_internacao(item) for item in itens]
+
+
+@router.post("/internacoes/{internacao_id}/procedimentos-agenda", status_code=201)
+def criar_procedimento_agenda_internacao(
+    internacao_id: int,
+    body: ProcedimentoAgendaInternacaoCreate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    user_id = _resolver_user_id_vet(user, "Usuario invalido para agenda de internacao")
+
+    internacao = (
+        db.query(InternacaoVet)
+        .options(joinedload(InternacaoVet.pet))
+        .filter(
+            InternacaoVet.id == internacao_id,
+            InternacaoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not internacao:
+        raise HTTPException(404, "Internacao nao encontrada")
+    if internacao.status != "internado":
+        raise HTTPException(status_code=409, detail="Agenda de procedimento so pode ser criada para internacao ativa")
+
+    medicamento = (body.medicamento or "").strip()
+    if not medicamento:
+        raise HTTPException(status_code=422, detail="Medicamento/procedimento e obrigatorio")
+
+    horario_agendado = _normalizar_datetime_vet(body.horario_agendado)
+    if not horario_agendado:
+        raise HTTPException(status_code=422, detail="Horario agendado e obrigatorio")
+
+    quantidade_prevista = _as_float(body.quantidade_prevista)
+    if quantidade_prevista is not None and quantidade_prevista < 0:
+        raise HTTPException(status_code=422, detail="Quantidade prevista nao pode ser negativa")
+
+    item = InternacaoProcedimentoAgenda(
+        tenant_id=tenant_id,
+        user_id=user_id,
+        internacao_id=internacao.id,
+        pet_id=internacao.pet_id,
+        horario_agendado=horario_agendado,
+        medicamento=medicamento,
+        dose=(body.dose or "").strip() or None,
+        via=(body.via or "").strip() or None,
+        quantidade_prevista=quantidade_prevista,
+        unidade_quantidade=(body.unidade_quantidade or "").strip() or None,
+        lembrete_minutos=body.lembrete_min if body.lembrete_min is not None else 30,
+        observacoes_agenda=(body.observacoes_agenda or "").strip() or None,
+        status="agendado",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    item.internacao = internacao
+    item.pet = internacao.pet
+    return _serializar_procedimento_agenda_internacao(item)
+
+
+@router.patch("/internacoes/procedimentos-agenda/{agenda_id}/concluir")
+def concluir_procedimento_agenda_internacao(
+    agenda_id: int,
+    body: ProcedimentoAgendaInternacaoConcluir,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    user_id = _resolver_user_id_vet(user, "Usuario invalido para agenda de internacao")
+
+    item = (
+        db.query(InternacaoProcedimentoAgenda)
+        .options(
+            joinedload(InternacaoProcedimentoAgenda.internacao),
+            joinedload(InternacaoProcedimentoAgenda.pet),
+        )
+        .filter(
+            InternacaoProcedimentoAgenda.id == agenda_id,
+            InternacaoProcedimentoAgenda.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not item:
+        raise HTTPException(404, "Procedimento agendado nao encontrado")
+    if item.status == "cancelado":
+        raise HTTPException(status_code=409, detail="Procedimento cancelado nao pode ser concluido")
+
+    executado_por = (body.executado_por or "").strip()
+    if not executado_por:
+        raise HTTPException(status_code=422, detail="Campo 'executado_por' e obrigatorio")
+
+    horario_execucao = _normalizar_datetime_vet(body.horario_execucao)
+    if not horario_execucao:
+        raise HTTPException(status_code=422, detail="Campo 'horario_execucao' e obrigatorio")
+
+    quantidade_prevista = _as_float(body.quantidade_prevista)
+    quantidade_executada = _as_float(body.quantidade_executada)
+    quantidade_desperdicio = _as_float(body.quantidade_desperdicio) or 0.0
+
+    if quantidade_prevista is not None and quantidade_prevista < 0:
+        raise HTTPException(status_code=422, detail="Quantidade prevista nao pode ser negativa")
+    if quantidade_executada is not None and quantidade_executada < 0:
+        raise HTTPException(status_code=422, detail="Quantidade executada nao pode ser negativa")
+    if quantidade_desperdicio < 0:
+        raise HTTPException(status_code=422, detail="Quantidade de desperdicio nao pode ser negativa")
+    if quantidade_executada is None and quantidade_prevista is not None:
+        quantidade_executada = quantidade_prevista
+
+    item.status = "concluido"
+    item.executado_por = executado_por
+    item.horario_execucao = horario_execucao
+    item.observacao_execucao = (body.observacao_execucao or "").strip() or None
+    item.quantidade_prevista = quantidade_prevista if quantidade_prevista is not None else item.quantidade_prevista
+    item.quantidade_executada = quantidade_executada
+    item.quantidade_desperdicio = quantidade_desperdicio
+    item.unidade_quantidade = (body.unidade_quantidade or "").strip() or item.unidade_quantidade
+
+    payload = _build_payload_procedimento_agenda_internacao(item)
+    if item.procedimento_evolucao_id:
+        evolucao = db.query(EvolucaoInternacao).filter(
+            EvolucaoInternacao.id == item.procedimento_evolucao_id,
+            EvolucaoInternacao.tenant_id == tenant_id,
+        ).first()
+        if evolucao:
+            evolucao.user_id = user_id
+            evolucao.data_hora = horario_execucao
+            evolucao.observacoes = _build_procedimento_observacao(payload)
+        else:
+            item.procedimento_evolucao_id = None
+
+    if not item.procedimento_evolucao_id:
+        evolucao = EvolucaoInternacao(
+            internacao_id=item.internacao_id,
+            user_id=user_id,
+            tenant_id=tenant_id,
+            data_hora=horario_execucao,
+            observacoes=_build_procedimento_observacao(payload),
+        )
+        db.add(evolucao)
+        db.flush()
+        item.procedimento_evolucao_id = evolucao.id
+
+    db.commit()
+    db.refresh(item)
+    return _serializar_procedimento_agenda_internacao(item)
+
+
+@router.delete("/internacoes/procedimentos-agenda/{agenda_id}", status_code=204)
+def remover_procedimento_agenda_internacao(
+    agenda_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, tenant_id = _get_tenant(current)
+    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+
+    item = db.query(InternacaoProcedimentoAgenda).filter(
+        InternacaoProcedimentoAgenda.id == agenda_id,
+        InternacaoProcedimentoAgenda.tenant_id == tenant_id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Procedimento agendado nao encontrado")
+    if item.status == "concluido":
+        raise HTTPException(
+            status_code=409,
+            detail="Procedimento concluido ja compoe o historico clinico e nao pode ser excluido",
+        )
+
+    item.status = "cancelado"
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/internacoes/{internacao_id}")
