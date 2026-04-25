@@ -22,6 +22,18 @@ def test_vet_router_preserva_endpoints_movidos():
     assert ("/vet/internacoes", "GET") in routes
     assert ("/vet/internacoes/config", "GET") in routes
     assert ("/vet/internacoes/procedimentos-agenda", "GET") in routes
+    assert ("/vet/consultas", "GET") in routes
+    assert ("/vet/consultas", "POST") in routes
+    assert ("/vet/consultas/{consulta_id}/timeline", "GET") in routes
+    assert ("/vet/consultas/{consulta_id}/prescricoes", "GET") in routes
+    assert ("/vet/prescricoes", "POST") in routes
+    assert ("/vet/exames", "GET") in routes
+    assert ("/vet/exames", "POST") in routes
+    assert ("/vet/exames/{exame_id}/arquivo", "POST") in routes
+    assert ("/vet/catalogo/procedimentos", "GET") in routes
+    assert ("/vet/procedimentos", "POST") in routes
+    assert ("/vet/catalogo/medicamentos", "GET") in routes
+    assert ("/vet/catalogo/protocolos-vacinas", "GET") in routes
     assert ("/vet/ia/assistente", "POST") in routes
     assert ("/vet/ia/conversas", "GET") in routes
     assert ("/vet/exames/{exame_id}/chat", "POST") in routes
