@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { vetApi } from "./vetApi";
-import { api } from "../../services/api";
 import ConsultaActionsFooter from "./consultaForm/ConsultaActionsFooter";
 import ConsultaFeedbackAlerts from "./consultaForm/ConsultaFeedbackAlerts";
 import ConsultaFinalizadaScreen from "./consultaForm/ConsultaFinalizadaScreen";
@@ -18,7 +17,6 @@ import {
   buildInsumoProcedimentoPayload,
   buildItensPrescricao,
   buildNovoExamePayload,
-  criarCalculadoraFormInicial,
   criarConsultaFormInicial,
   criarInsumoRapidoFormInicial,
   criarNovoExameFormInicial,
@@ -31,6 +29,10 @@ import {
   css,
   parseNumero,
 } from "./consultaForm/consultaFormUtils";
+import useCalculadoraDoseConsulta from "./consultaForm/useCalculadoraDoseConsulta";
+import useConsultaCatalogos from "./consultaForm/useConsultaCatalogos";
+import useConsultaTimeline from "./consultaForm/useConsultaTimeline";
+import useTutorPetSelection from "./consultaForm/useTutorPetSelection";
 
 // ---------- helpers ----------
 function campo(label, obrigatorio = false) {
@@ -80,20 +82,15 @@ export default function VetConsultaForm() {
       ? "Continuar consulta"
       : "Nova consulta";
 
-  // listas externas
-  const [pets, setPets] = useState([]);
-  const [veterinarios, setVeterinarios] = useState([]);
-  const [medicamentosCatalogo, setMedicamentosCatalogo] = useState([]);
-  const [procedimentosCatalogo, setProcedimentosCatalogo] = useState([]);
-  const [buscaTutor, setBuscaTutor] = useState("");
-  const [tutorSelecionado, setTutorSelecionado] = useState(null);
-  const [tutoresSugeridos, setTutoresSugeridos] = useState([]);
-  const [listaPetsExpandida, setListaPetsExpandida] = useState(false);
+  const {
+    pets,
+    setPets,
+    veterinarios,
+    medicamentosCatalogo,
+    procedimentosCatalogo,
+  } = useConsultaCatalogos();
   const [novoExameForm, setNovoExameForm] = useState(criarNovoExameFormInicial);
   const [novoExameArquivo, setNovoExameArquivo] = useState(null);
-  const [calculadoraForm, setCalculadoraForm] = useState(criarCalculadoraFormInicial);
-  const [timelineConsulta, setTimelineConsulta] = useState([]);
-  const [carregandoTimeline, setCarregandoTimeline] = useState(false);
   const [modalInsumoAberto, setModalInsumoAberto] = useState(false);
   const [salvandoInsumoRapido, setSalvandoInsumoRapido] = useState(false);
   const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
@@ -101,6 +98,52 @@ export default function VetConsultaForm() {
 
   // ---------- Form state ----------
   const [form, setForm] = useState(criarConsultaFormInicial);
+  const set = useCallback((campo, valor) => {
+    setForm((prev) => ({ ...prev, [campo]: valor }));
+  }, []);
+
+  const {
+    buscaTutor,
+    setBuscaTutor,
+    tutorSelecionado,
+    setTutorSelecionado,
+    tutoresSugeridos,
+    listaPetsExpandida,
+    setListaPetsExpandida,
+    petsDoTutor,
+    petSelecionado,
+    petSelecionadoLabel,
+    sugestoesEspecies,
+    selecionarTutor,
+    limparTutor,
+    selecionarPetCriado,
+  } = useTutorPetSelection({
+    pets,
+    setPets,
+    formPetId: form.pet_id,
+    setCampo: set,
+    isEdicao,
+    petIdQuery,
+    novoPetIdQuery,
+    tutorIdQuery,
+    tutorNomeQuery,
+  });
+  const {
+    calculadoraForm,
+    setCalculadoraForm,
+    medicamentoCalculadoraSelecionado,
+    calculadoraResultado,
+  } = useCalculadoraDoseConsulta({
+    formPesoKg: form.peso_kg,
+    petSelecionado,
+    medicamentosCatalogo,
+  });
+  const {
+    timelineConsulta,
+    carregandoTimeline,
+    carregarTimelineConsulta,
+  } = useConsultaTimeline(consultaIdAtual);
+
   // Carrega dados ao editar
   useEffect(() => {
     if (!isEdicao) return;
@@ -123,140 +166,6 @@ export default function VetConsultaForm() {
       .catch(() => setAssinatura(null));
   }, [modoSomenteLeitura, consultaIdAtual]);
 
-  // Carrega pets e veterinários
-  useEffect(() => {
-    api
-      .get("/vet/pets", { params: { limit: 500 } })
-      .then((r) => setPets(r.data?.items ?? r.data ?? []))
-      .catch(() => {});
-    api
-      .get("/vet/veterinarios")
-      .then((r) => setVeterinarios(r.data ?? []))
-      .catch(() => {});
-
-    vetApi
-      .listarMedicamentos()
-      .then((r) => setMedicamentosCatalogo(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
-      .catch(() => {});
-    vetApi
-      .listarCatalogoProcedimentos()
-      .then((r) => setProcedimentosCatalogo(Array.isArray(r.data) ? r.data : (r.data?.items ?? [])))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (isEdicao) return;
-    const petIdAlvo = novoPetIdQuery || petIdQuery;
-    if (!petIdAlvo || !pets.length) return;
-
-    const petEncontrado = pets.find((p) => String(p.id) === String(petIdAlvo));
-    if (!petEncontrado) return;
-
-    set("pet_id", String(petEncontrado.id));
-    setTutorSelecionado({
-      id: petEncontrado.cliente_id,
-      nome: petEncontrado.cliente_nome ?? `Tutor #${petEncontrado.cliente_id}`,
-      telefone: petEncontrado.cliente_telefone ?? "",
-      celular: petEncontrado.cliente_celular ?? "",
-    });
-    setBuscaTutor(petEncontrado.cliente_nome ?? "");
-    setListaPetsExpandida(false);
-  }, [isEdicao, petIdQuery, novoPetIdQuery, pets]);
-
-  useEffect(() => {
-    if (isEdicao || !tutorIdQuery) return;
-    setTutorSelecionado((prev) => {
-      if (prev?.id && String(prev.id) === String(tutorIdQuery)) return prev;
-      return {
-        id: String(tutorIdQuery),
-        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
-        telefone: "",
-        celular: "",
-      };
-    });
-    setBuscaTutor((prev) => prev || tutorNomeQuery || "");
-  }, [isEdicao, tutorIdQuery, tutorNomeQuery]);
-
-  function set(campo, valor) {
-    setForm((prev) => ({ ...prev, [campo]: valor }));
-  }
-
-  const tutoresIndex = useMemo(() => {
-    const mapa = new Map();
-    for (const p of pets) {
-      const tutorId = p.cliente_id;
-      if (!tutorId) continue;
-      if (!mapa.has(tutorId)) {
-        mapa.set(tutorId, {
-          id: tutorId,
-          nome: p.cliente_nome ?? `Tutor #${tutorId}`,
-          telefone: p.cliente_telefone ?? "",
-          celular: p.cliente_celular ?? "",
-        });
-      }
-    }
-    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [pets]);
-
-  const petsDoTutor = useMemo(() => {
-    if (!tutorSelecionado) return [];
-
-    const petsTutor = pets.filter(
-      (p) => String(p.cliente_id) === String(tutorSelecionado.id) && p.ativo !== false
-    );
-
-    // Evita duplicidade visual caso a API devolva itens repetidos
-    const porId = new Map();
-    for (const pet of petsTutor) {
-      porId.set(String(pet.id), pet);
-    }
-    return Array.from(porId.values());
-  }, [pets, tutorSelecionado]);
-
-  const petSelecionado = useMemo(
-    () => pets.find((p) => String(p.id) === String(form.pet_id)) ?? null,
-    [pets, form.pet_id]
-  );
-
-  const petSelecionadoLabel = useMemo(() => {
-    if (!petSelecionado) return "Selecione o pet";
-    const especie = petSelecionado.especie;
-    const especieValida = especie && !/\?/.test(especie);
-    return especieValida ? `${petSelecionado.nome} (${especie})` : petSelecionado.nome;
-  }, [petSelecionado]);
-  const sugestoesEspecies = useMemo(
-    () =>
-      Array.from(new Set(pets.map((pet) => pet?.especie).filter((especie) => especie && !/\?/.test(especie)))),
-    [pets]
-  );
-  const medicamentoCalculadoraSelecionado = useMemo(
-    () =>
-      medicamentosCatalogo.find(
-        (item) => String(item.id) === String(calculadoraForm.medicamento_id)
-      ) ?? null,
-    [medicamentosCatalogo, calculadoraForm.medicamento_id]
-  );
-  const calculadoraResultado = useMemo(() => {
-    const peso = parseNumero(calculadoraForm.peso_kg);
-    const dose = parseNumero(calculadoraForm.dose_mg_kg);
-    const frequencia = parseNumero(calculadoraForm.frequencia_horas);
-    const dias = parseNumero(calculadoraForm.dias);
-    if (!Number.isFinite(peso) || peso <= 0 || !Number.isFinite(dose) || dose <= 0) {
-      return null;
-    }
-
-    const mgPorDose = peso * dose;
-    const dosesPorDia = Number.isFinite(frequencia) && frequencia > 0 ? 24 / frequencia : null;
-    const mgDia = dosesPorDia ? mgPorDose * dosesPorDia : null;
-    const mgTratamento = mgDia && Number.isFinite(dias) && dias > 0 ? mgDia * dias : null;
-
-    return {
-      mgPorDose,
-      dosesPorDia,
-      mgDia,
-      mgTratamento,
-    };
-  }, [calculadoraForm]);
   const contextoConsultaParams = useMemo(() => {
     if (!form.pet_id) return "";
     const params = new URLSearchParams();
@@ -268,94 +177,6 @@ export default function VetConsultaForm() {
     return params.toString();
   }, [form.pet_id, consultaIdAtual, agendamentoIdQuery, tutorSelecionado]);
 
-  useEffect(() => {
-    const termo = buscaTutor.trim();
-    if (!termo) {
-      setTutoresSugeridos([]);
-      return;
-    }
-
-    const termoLower = termo.toLowerCase();
-    const termoDigitos = termo.replaceAll(/\D/g, "");
-
-    const sugestoes = tutoresIndex
-      .filter((t) => {
-        const nome = (t.nome ?? "").toLowerCase();
-        const telefone = (t.telefone ?? "").toLowerCase();
-        const celular = (t.celular ?? "").toLowerCase();
-        const telefoneDigitos = telefone.replaceAll(/\D/g, "");
-        const celularDigitos = celular.replaceAll(/\D/g, "");
-
-        return (
-          nome.includes(termoLower) ||
-          telefone.includes(termoLower) ||
-          celular.includes(termoLower) ||
-          (termoDigitos && (telefoneDigitos.includes(termoDigitos) || celularDigitos.includes(termoDigitos)))
-        );
-      })
-      .slice(0, 20);
-
-    setTutoresSugeridos(sugestoes);
-  }, [buscaTutor, tutoresIndex]);
-
-  useEffect(() => {
-    if (!form.pet_id || !pets.length) return;
-    const petAtual = pets.find((p) => String(p.id) === String(form.pet_id));
-    if (!petAtual) return;
-
-    setTutorSelecionado((prev) => {
-      if (prev && String(prev.id) === String(petAtual.cliente_id)) return prev;
-      return {
-        id: petAtual.cliente_id,
-        nome: petAtual.cliente_nome ?? `Tutor #${petAtual.cliente_id}`,
-        telefone: petAtual.cliente_telefone ?? "",
-        celular: petAtual.cliente_celular ?? "",
-      };
-    });
-    setBuscaTutor((prev) => prev || petAtual.cliente_nome || "");
-  }, [form.pet_id, pets]);
-
-  useEffect(() => {
-    setCalculadoraForm((prev) => ({
-      ...prev,
-      peso_kg: prev.peso_kg || form.peso_kg || String(petSelecionado?.peso || ""),
-    }));
-  }, [form.peso_kg, petSelecionado]);
-
-  useEffect(() => {
-    if (!medicamentoCalculadoraSelecionado) return;
-    const doseMin = parseNumero(medicamentoCalculadoraSelecionado.dose_minima_mg_kg);
-    const doseMax = parseNumero(medicamentoCalculadoraSelecionado.dose_maxima_mg_kg);
-    const doseMedia = Number.isFinite(doseMin) && Number.isFinite(doseMax)
-      ? ((doseMin + doseMax) / 2).toFixed(2)
-      : doseMin || doseMax || "";
-    setCalculadoraForm((prev) => ({
-      ...prev,
-      dose_mg_kg: prev.dose_mg_kg || String(doseMedia || ""),
-    }));
-  }, [medicamentoCalculadoraSelecionado]);
-
-  useEffect(() => {
-    if (!consultaIdAtual) {
-      setTimelineConsulta([]);
-      return;
-    }
-    carregarTimelineConsulta(consultaIdAtual);
-  }, [consultaIdAtual]);
-
-  async function carregarTimelineConsulta(id = consultaIdAtual) {
-    if (!id) return;
-    setCarregandoTimeline(true);
-    try {
-      const res = await vetApi.obterTimelineConsulta(id);
-      setTimelineConsulta(Array.isArray(res.data?.eventos) ? res.data.eventos : []);
-    } catch {
-      setTimelineConsulta([]);
-    } finally {
-      setCarregandoTimeline(false);
-    }
-  }
-
   function abrirModalInsumoRapido() {
     if (!consultaIdAtual) {
       setErro("Salve a consulta primeiro para lançar insumos rápidos.");
@@ -364,22 +185,6 @@ export default function VetConsultaForm() {
     setInsumoRapidoSelecionado(null);
     setInsumoRapidoForm(criarInsumoRapidoFormInicial());
     setModalInsumoAberto(true);
-  }
-
-  function selecionarTutor(tutor) {
-    setTutorSelecionado(tutor);
-    setBuscaTutor(tutor.nome);
-    setTutoresSugeridos([]);
-    setListaPetsExpandida(true);
-    set("pet_id", "");
-  }
-
-  function limparTutor() {
-    setTutorSelecionado(null);
-    setBuscaTutor("");
-    setTutoresSugeridos([]);
-    setListaPetsExpandida(false);
-    set("pet_id", "");
   }
 
   function abrirModalNovoPet() {
@@ -393,23 +198,10 @@ export default function VetConsultaForm() {
       return;
     }
 
-    setPets((prev) => {
-      const semDuplicado = prev.filter((pet) => String(pet.id) !== String(petCriado.id));
-      return [petCriado, ...semDuplicado];
-    });
-
-    setTutorSelecionado((prev) => ({
-      id: petCriado.cliente_id,
-      nome: petCriado.cliente_nome ?? prev?.nome ?? tutorSelecionado?.nome ?? `Tutor #${petCriado.cliente_id}`,
-      telefone: petCriado.cliente_telefone ?? prev?.telefone ?? "",
-      celular: petCriado.cliente_celular ?? prev?.celular ?? "",
-    }));
-    setBuscaTutor(petCriado.cliente_nome ?? tutorSelecionado?.nome ?? buscaTutor);
-    set("pet_id", String(petCriado.id));
-    setListaPetsExpandida(false);
+    const mensagem = selecionarPetCriado(petCriado);
     setModalNovoPetAberto(false);
     setErro(null);
-    setSucesso(`Pet ${petCriado.nome} cadastrado e selecionado na consulta.`);
+    setSucesso(mensagem);
   }
 
   // ---------- Salvar rascunho ----------
