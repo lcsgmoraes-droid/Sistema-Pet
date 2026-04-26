@@ -5,7 +5,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.banho_tosa_models import BanhoTosaParametroPorte
+from app.banho_tosa_models import (
+    BanhoTosaInsumoPrevisto,
+    BanhoTosaParametroPorte,
+    BanhoTosaPrecoServico,
+)
 from app.banho_tosa_schemas import (
     BanhoTosaParametroPorteCreate,
     BanhoTosaParametroPorteResponse,
@@ -52,6 +56,52 @@ def criar_parametro_porte(
     db.commit()
     db.refresh(parametro)
     return parametro
+
+
+@router.delete("/parametros-porte/{porte_id}")
+def excluir_parametro_porte(
+    porte_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    parametro = db.query(BanhoTosaParametroPorte).filter(
+        BanhoTosaParametroPorte.id == porte_id,
+        BanhoTosaParametroPorte.tenant_id == tenant_id,
+    ).first()
+    if not parametro:
+        raise HTTPException(status_code=404, detail="Parametro de porte nao encontrado")
+
+    if _porte_tem_vinculos(db, tenant_id, porte_id):
+        parametro.ativo = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": "Porte possui historico e foi desativado para preservar os registros.",
+        }
+
+    db.delete(parametro)
+    db.commit()
+    return {
+        "deleted": True,
+        "deactivated": False,
+        "message": "Porte excluido.",
+    }
+
+
+def _porte_tem_vinculos(db: Session, tenant_id, porte_id: int) -> bool:
+    checks = [
+        db.query(BanhoTosaPrecoServico.id).filter(
+            BanhoTosaPrecoServico.tenant_id == tenant_id,
+            BanhoTosaPrecoServico.porte_id == porte_id,
+        ),
+        db.query(BanhoTosaInsumoPrevisto.id).filter(
+            BanhoTosaInsumoPrevisto.tenant_id == tenant_id,
+            BanhoTosaInsumoPrevisto.porte_id == porte_id,
+        ),
+    ]
+    return any(query.first() is not None for query in checks)
 
 @router.patch("/parametros-porte/{porte_id}", response_model=BanhoTosaParametroPorteResponse)
 def atualizar_parametro_porte(

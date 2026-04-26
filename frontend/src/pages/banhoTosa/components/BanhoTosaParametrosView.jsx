@@ -4,22 +4,16 @@ import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 import BanhoTosaParametrosLista from "./BanhoTosaParametrosLista";
-
-const initialPorteForm = {
-  porte: "",
-  peso_min_kg: "",
-  peso_max_kg: "",
-  agua_padrao_litros: "0",
-  energia_padrao_kwh: "0",
-  tempo_banho_min: "0",
-  tempo_secagem_min: "0",
-  tempo_tosa_min: "0",
-  multiplicador_preco: "1",
-};
+import BanhoTosaPorteForm, {
+  formFromParametroPorte,
+  initialPorteForm,
+  payloadFromPorteForm,
+} from "./BanhoTosaPorteForm";
 
 export default function BanhoTosaParametrosView({ config, parametros, onChanged }) {
   const [configForm, setConfigForm] = useState(null);
   const [porteForm, setPorteForm] = useState(initialPorteForm);
+  const [editingPorte, setEditingPorte] = useState(null);
   const [savingConfig, setSavingConfig] = useState(false);
   const [savingPorte, setSavingPorte] = useState(false);
 
@@ -88,7 +82,18 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
     }
   }
 
-  async function criarPorte(event) {
+  function editarPorte(item) {
+    setEditingPorte(item);
+    setPorteForm(formFromParametroPorte(item));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelarEdicaoPorte() {
+    setEditingPorte(null);
+    setPorteForm(initialPorteForm);
+  }
+
+  async function salvarPorte(event) {
     event.preventDefault();
     if (!porteForm.porte.trim()) {
       toast.error("Informe o porte.");
@@ -97,25 +102,47 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
 
     setSavingPorte(true);
     try {
-      await banhoTosaApi.criarParametroPorte({
-        porte: porteForm.porte.trim(),
-        peso_min_kg: porteForm.peso_min_kg ? toApiDecimal(porteForm.peso_min_kg) : null,
-        peso_max_kg: porteForm.peso_max_kg ? toApiDecimal(porteForm.peso_max_kg) : null,
-        agua_padrao_litros: toApiDecimal(porteForm.agua_padrao_litros),
-        energia_padrao_kwh: toApiDecimal(porteForm.energia_padrao_kwh),
-        tempo_banho_min: Number(porteForm.tempo_banho_min || 0),
-        tempo_secagem_min: Number(porteForm.tempo_secagem_min || 0),
-        tempo_tosa_min: Number(porteForm.tempo_tosa_min || 0),
-        multiplicador_preco: toApiDecimal(porteForm.multiplicador_preco, "1"),
-        ativo: true,
-      });
-      toast.success("Porte cadastrado.");
-      setPorteForm(initialPorteForm);
+      const payload = payloadFromPorteForm(porteForm);
+      if (editingPorte) {
+        await banhoTosaApi.atualizarParametroPorte(editingPorte.id, payload);
+        toast.success("Porte atualizado.");
+      } else {
+        await banhoTosaApi.criarParametroPorte(payload);
+        toast.success("Porte cadastrado.");
+      }
+      cancelarEdicaoPorte();
       await onChanged(true);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel cadastrar porte."));
+      toast.error(getApiErrorMessage(error, "Nao foi possivel salvar porte."));
     } finally {
       setSavingPorte(false);
+    }
+  }
+
+  async function togglePorteAtivo(item) {
+    try {
+      await banhoTosaApi.atualizarParametroPorte(item.id, { ativo: !item.ativo });
+      await onChanged(true);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel atualizar o porte."));
+    }
+  }
+
+  async function excluirPorte(item) {
+    const confirmou = window.confirm(
+      `Excluir o porte "${item.porte}"? Se ele ja tiver historico, o sistema vai apenas desativar.`,
+    );
+    if (!confirmou) return;
+
+    try {
+      const response = await banhoTosaApi.removerParametroPorte(item.id);
+      toast.success(response.data?.message || "Porte excluido.");
+      if (editingPorte?.id === item.id) {
+        cancelarEdicaoPorte();
+      }
+      await onChanged(true);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel excluir o porte."));
     }
   }
 
@@ -165,43 +192,26 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
           </button>
         </form>
 
-        <form
-          onSubmit={criarPorte}
-          className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm"
-        >
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-            Portes
-          </p>
-          <h2 className="mt-2 text-xl font-black text-slate-900">
-            Novo parametro por porte
-          </h2>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <TextField label="Porte" value={porteForm.porte} onChange={(value) => updatePorte("porte", value)} />
-            <TextField label="Multiplicador preco" type="number" value={porteForm.multiplicador_preco} onChange={(value) => updatePorte("multiplicador_preco", value)} help="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />
-            <TextField label="Peso min kg" type="number" value={porteForm.peso_min_kg} onChange={(value) => updatePorte("peso_min_kg", value)} />
-            <TextField label="Peso max kg" type="number" value={porteForm.peso_max_kg} onChange={(value) => updatePorte("peso_max_kg", value)} />
-            <TextField label="Agua padrao L" type="number" value={porteForm.agua_padrao_litros} onChange={(value) => updatePorte("agua_padrao_litros", value)} help="Estimativa usada quando nao houver medicao real do banho." />
-            <TextField label="Energia padrao kWh" type="number" value={porteForm.energia_padrao_kwh} onChange={(value) => updatePorte("energia_padrao_kwh", value)} help="Energia media esperada para secagem/equipamentos deste porte." />
-            <TextField label="Tempo banho min" type="number" value={porteForm.tempo_banho_min} onChange={(value) => updatePorte("tempo_banho_min", value)} help="Tempo medio de banho para calcular agenda, mao de obra e agua." />
-            <TextField label="Tempo secagem min" type="number" value={porteForm.tempo_secagem_min} onChange={(value) => updatePorte("tempo_secagem_min", value)} help="Tempo medio de secagem para energia e ocupacao de recurso." />
-            <TextField label="Tempo tosa min" type="number" value={porteForm.tempo_tosa_min} onChange={(value) => updatePorte("tempo_tosa_min", value)} help="Tempo medio de tosa para agenda e mao de obra." />
-          </div>
-
-          <button
-            type="submit"
-            disabled={savingPorte}
-            className="mt-6 w-full rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-60"
-          >
-            {savingPorte ? "Salvando..." : "Cadastrar porte"}
-          </button>
-        </form>
+        <BanhoTosaPorteForm
+          form={porteForm}
+          editing={Boolean(editingPorte)}
+          saving={savingPorte}
+          onChangeField={updatePorte}
+          onCancelEdit={cancelarEdicaoPorte}
+          onSubmit={salvarPorte}
+        />
       </div>
 
-      <BanhoTosaParametrosLista parametros={parametros} />
+      <BanhoTosaParametrosLista
+        parametros={parametros}
+        onEdit={editarPorte}
+        onDelete={excluirPorte}
+        onToggleAtivo={togglePorteAtivo}
+      />
     </div>
   );
 }
+
 
 function TextField({ label, value, onChange, type = "text", help }) {
   return (

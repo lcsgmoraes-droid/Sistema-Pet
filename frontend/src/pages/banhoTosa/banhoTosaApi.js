@@ -14,6 +14,7 @@ export const banhoTosaApi = {
   listarRecursos: (params) => api.get(`${BASE}/recursos`, { params }),
   criarRecurso: (data) => api.post(`${BASE}/recursos`, data),
   atualizarRecurso: (id, data) => api.patch(`${BASE}/recursos/${id}`, data),
+  removerRecurso: (id) => api.delete(`${BASE}/recursos/${id}`),
   listarServicos: (params) => api.get(`${BASE}/servicos`, { params }),
   criarServico: (data) => api.post(`${BASE}/servicos`, data),
   atualizarServico: (id, data) => api.patch(`${BASE}/servicos/${id}`, data),
@@ -23,6 +24,7 @@ export const banhoTosaApi = {
   criarParametroPorte: (data) => api.post(`${BASE}/parametros-porte`, data),
   atualizarParametroPorte: (id, data) =>
     api.patch(`${BASE}/parametros-porte/${id}`, data),
+  removerParametroPorte: (id) => api.delete(`${BASE}/parametros-porte/${id}`),
   listarAgendamentos: (params) => api.get(`${BASE}/agendamentos`, { params }),
   obterCapacidadeAgenda: (dataReferencia) =>
     api.get(`${BASE}/agendamentos/capacidade`, {
@@ -88,6 +90,7 @@ export const banhoTosaApi = {
   listarPacotes: (params) => api.get(`${BASE}/pacotes`, { params }),
   criarPacote: (data) => api.post(`${BASE}/pacotes`, data),
   atualizarPacote: (id, data) => api.patch(`${BASE}/pacotes/${id}`, data),
+  removerPacote: (id) => api.delete(`${BASE}/pacotes/${id}`),
   listarCreditosPacote: (params) =>
     api.get(`${BASE}/pacotes/creditos`, { params }),
   criarCreditoPacote: (data) => api.post(`${BASE}/pacotes/creditos`, data),

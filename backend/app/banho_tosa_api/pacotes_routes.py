@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.banho_tosa_api.pacotes_helpers import (
@@ -77,6 +77,32 @@ def criar_pacote(
     return serializar_pacote(pacote)
 
 
+@router.delete("/pacotes/{pacote_id}")
+def excluir_pacote(
+    pacote_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    pacote = obter_pacote(db, tenant_id, pacote_id)
+    if _pacote_tem_creditos(db, tenant_id, pacote_id):
+        pacote.ativo = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": "Pacote possui creditos emitidos e foi desativado para preservar o historico.",
+        }
+
+    db.delete(pacote)
+    db.commit()
+    return {
+        "deleted": True,
+        "deactivated": False,
+        "message": "Pacote excluido.",
+    }
+
+
 @router.patch("/pacotes/{pacote_id}", response_model=BanhoTosaPacoteResponse)
 def atualizar_pacote(
     pacote_id: int,
@@ -121,6 +147,13 @@ def listar_creditos(
         query = query.filter(BanhoTosaPacoteCredito.status == "ativo", BanhoTosaPacoteCredito.data_validade >= date.today())
     creditos = query.order_by(BanhoTosaPacoteCredito.data_validade.asc()).limit(limit).all()
     return [serializar_credito(item) for item in creditos]
+
+
+def _pacote_tem_creditos(db: Session, tenant_id, pacote_id: int) -> bool:
+    return db.query(BanhoTosaPacoteCredito.id).filter(
+        BanhoTosaPacoteCredito.tenant_id == tenant_id,
+        BanhoTosaPacoteCredito.pacote_id == pacote_id,
+    ).first() is not None
 
 
 @router.post("/pacotes/creditos", response_model=BanhoTosaPacoteCreditoResponse, status_code=201)

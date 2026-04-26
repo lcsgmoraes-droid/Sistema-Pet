@@ -10,6 +10,7 @@ import BanhoTosaPacotesList from "./BanhoTosaPacotesList";
 export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   const [pacotes, setPacotes] = useState([]);
   const [creditos, setCreditos] = useState([]);
+  const [editingPacote, setEditingPacote] = useState(null);
   const [loading, setLoading] = useState(false);
 
   async function carregar() {
@@ -33,6 +34,29 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   async function recarregarTudo() {
     await carregar();
     await onChanged?.(true);
+  }
+
+  function editarPacote(pacote) {
+    setEditingPacote(pacote);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function excluirPacote(pacote) {
+    const confirmou = window.confirm(
+      `Excluir o pacote "${pacote.nome}"? Se ele ja tiver creditos emitidos, o sistema vai apenas desativar.`,
+    );
+    if (!confirmou) return;
+
+    try {
+      const response = await banhoTosaApi.removerPacote(pacote.id);
+      toast.success(response.data?.message || "Pacote excluido.");
+      if (editingPacote?.id === pacote.id) {
+        setEditingPacote(null);
+      }
+      await recarregarTudo();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel excluir pacote."));
+    }
   }
 
   useEffect(() => {
@@ -65,11 +89,24 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <BanhoTosaPacoteForm servicos={servicos} onChanged={recarregarTudo} />
+        <BanhoTosaPacoteForm
+          servicos={servicos}
+          editingPacote={editingPacote}
+          onCancelEdit={() => setEditingPacote(null)}
+          onChanged={async () => {
+            setEditingPacote(null);
+            await recarregarTudo();
+          }}
+        />
         <BanhoTosaCreditoForm pacotes={pacotes} onChanged={recarregarTudo} />
       </div>
 
-      <BanhoTosaPacotesList pacotes={pacotes} onChanged={recarregarTudo} />
+      <BanhoTosaPacotesList
+        pacotes={pacotes}
+        onChanged={recarregarTudo}
+        onEdit={editarPacote}
+        onDelete={excluirPacote}
+      />
       <BanhoTosaCreditosList creditos={creditos} />
     </div>
   );

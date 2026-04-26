@@ -2,7 +2,12 @@ import toast from "react-hot-toast";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
-export default function BanhoTosaPacotesList({ pacotes = [], onChanged }) {
+export default function BanhoTosaPacotesList({
+  pacotes = [],
+  onChanged,
+  onEdit,
+  onDelete,
+}) {
   async function toggleAtivo(pacote) {
     try {
       await banhoTosaApi.atualizarPacote(pacote.id, { ativo: !pacote.ativo });
@@ -33,15 +38,19 @@ export default function BanhoTosaPacotesList({ pacotes = [], onChanged }) {
             </div>
             <Info label="Creditos" value={formatNumber(pacote.quantidade_creditos, 0)} />
             <Info label="Preco" value={formatCurrency(pacote.preco)} />
-            <button
-              type="button"
-              onClick={() => toggleAtivo(pacote)}
-              className={`rounded-full px-3 py-2 text-xs font-bold ${
-                pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {pacote.ativo ? "Ativo" : "Inativo"}
-            </button>
+            <div className="flex flex-wrap justify-start gap-2 md:justify-end">
+              <button
+                type="button"
+                onClick={() => toggleAtivo(pacote)}
+                className={`rounded-full px-3 py-2 text-xs font-bold ${
+                  pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {pacote.ativo ? "Ativo" : "Inativo"}
+              </button>
+              <ActionButton onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
+              <ActionButton danger onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
+            </div>
           </div>
         ))}
         {pacotes.length === 0 && (
@@ -49,6 +58,22 @@ export default function BanhoTosaPacotesList({ pacotes = [], onChanged }) {
         )}
       </div>
     </section>
+  );
+}
+
+function ActionButton({ children, danger = false, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-2 text-xs font-black transition ${
+        danger
+          ? "bg-red-50 text-red-700 hover:bg-red-100"
+          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

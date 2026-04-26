@@ -5,7 +5,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.banho_tosa_models import BanhoTosaRecurso
+from app.banho_tosa_models import (
+    BanhoTosaAgendamento,
+    BanhoTosaEtapa,
+    BanhoTosaRecurso,
+)
 from app.banho_tosa_schemas import (
     BanhoTosaRecursoCreate,
     BanhoTosaRecursoResponse,
@@ -58,6 +62,52 @@ def criar_recurso(
     db.commit()
     db.refresh(recurso)
     return recurso
+
+
+@router.delete("/recursos/{recurso_id}")
+def excluir_recurso(
+    recurso_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    recurso = db.query(BanhoTosaRecurso).filter(
+        BanhoTosaRecurso.id == recurso_id,
+        BanhoTosaRecurso.tenant_id == tenant_id,
+    ).first()
+    if not recurso:
+        raise HTTPException(status_code=404, detail="Recurso nao encontrado")
+
+    if _recurso_tem_vinculos(db, tenant_id, recurso_id):
+        recurso.ativo = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": "Recurso possui historico e foi desativado para preservar os registros.",
+        }
+
+    db.delete(recurso)
+    db.commit()
+    return {
+        "deleted": True,
+        "deactivated": False,
+        "message": "Recurso excluido.",
+    }
+
+
+def _recurso_tem_vinculos(db: Session, tenant_id, recurso_id: int) -> bool:
+    checks = [
+        db.query(BanhoTosaAgendamento.id).filter(
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+            BanhoTosaAgendamento.recurso_id == recurso_id,
+        ),
+        db.query(BanhoTosaEtapa.id).filter(
+            BanhoTosaEtapa.tenant_id == tenant_id,
+            BanhoTosaEtapa.recurso_id == recurso_id,
+        ),
+    ]
+    return any(query.first() is not None for query in checks)
 
 @router.patch("/recursos/{recurso_id}", response_model=BanhoTosaRecursoResponse)
 def atualizar_recurso(
