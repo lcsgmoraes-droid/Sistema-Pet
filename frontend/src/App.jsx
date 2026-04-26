@@ -64,6 +64,7 @@ const VetConfiguracoes = lazy(() => import("./pages/veterinario/VetConfiguracoes
 const VetRepasse = lazy(() => import("./pages/veterinario/VetRepasse"));
 const VetExamesAnexados = lazy(() => import("./pages/veterinario/VetExamesAnexados"));
 const VetAssistenteIA = lazy(() => import("./pages/veterinario/VetAssistenteIA"));
+const BanhoTosaPage = lazy(() => import("./pages/banhoTosa/BanhoTosaPage"));
 
 const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
@@ -365,6 +366,19 @@ function App() {
                   <Route path="veterinario/catalogo" element={<VetCatalogo />} />
                   <Route path="veterinario/configuracoes" element={<VetConfiguracoes />} />
                   <Route path="veterinario/repasse" element={<VetRepasse />} />
+
+                  {/* Modulo Banho & Tosa */}
+                  <Route path="banho-tosa" element={<BanhoTosaPage view="dashboard" />} />
+                  <Route path="banho-tosa/servicos" element={<BanhoTosaPage view="servicos" />} />
+                  <Route path="banho-tosa/parametros" element={<BanhoTosaPage view="parametros" />} />
+                  <Route path="banho-tosa/recursos" element={<BanhoTosaPage view="recursos" />} />
+                  <Route path="banho-tosa/agenda" element={<BanhoTosaPage view="agenda" />} />
+                  <Route path="banho-tosa/fila" element={<BanhoTosaPage view="fila" />} />
+                  <Route path="banho-tosa/fechamentos" element={<BanhoTosaPage view="fechamentos" />} />
+                  <Route path="banho-tosa/pacotes" element={<BanhoTosaPage view="pacotes" />} />
+                  <Route path="banho-tosa/retornos" element={<BanhoTosaPage view="retornos" />} />
+                  <Route path="banho-tosa/taxi-dog" element={<BanhoTosaPage view="taxi-dog" />} />
+                  <Route path="banho-tosa/relatorios" element={<BanhoTosaPage view="relatorios" />} />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS

@@ -8,6 +8,7 @@ export default function ProdutoEstoqueAutocomplete({
   selectedProduct,
   onSelect,
   helperText = "",
+  searchProducts,
 }) {
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -24,7 +25,9 @@ export default function ProdutoEstoqueAutocomplete({
     const timer = setTimeout(async () => {
       setCarregando(true);
       try {
-        const res = await vetApi.listarProdutosEstoque(termo);
+        const res = searchProducts
+          ? await searchProducts(termo)
+          : await vetApi.listarProdutosEstoque(termo);
         const lista = Array.isArray(res.data) ? res.data : (res.data?.items ?? []);
         setSugestoes(lista.slice(0, 8));
       } catch {
@@ -35,7 +38,7 @@ export default function ProdutoEstoqueAutocomplete({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [busca, selectedProduct]);
+  }, [busca, selectedProduct, searchProducts]);
 
   const estoqueLabel = useMemo(() => {
     if (!selectedProduct) return "";

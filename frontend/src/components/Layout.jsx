@@ -1,4 +1,4 @@
-import { CalendarDays, FlaskConical, PawPrint, Stethoscope, Syringe } from "lucide-react";
+import { CalendarDays, FlaskConical, PawPrint, Scissors, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FiBarChart2,
@@ -444,6 +444,70 @@ const Layout = () => {
         },
       ],
     },
+    {
+      path: "/banho-tosa",
+      icon: Scissors,
+      label: "Banho & Tosa",
+      highlight: true,
+      permission: null,
+      submenu: [
+        {
+          path: "/banho-tosa",
+          label: "Dashboard",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/servicos",
+          label: "Servicos",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/parametros",
+          label: "Parametros",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/recursos",
+          label: "Recursos",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/agenda",
+          label: "Agenda",
+          permission: null,
+        },
+          {
+            path: "/banho-tosa/fila",
+            label: "Fila do dia",
+            permission: null,
+          },
+          {
+            path: "/banho-tosa/fechamentos",
+            label: "Fechamentos",
+            permission: null,
+          },
+          {
+            path: "/banho-tosa/pacotes",
+            label: "Pacotes",
+            permission: null,
+          },
+          {
+            path: "/banho-tosa/retornos",
+            label: "Retornos",
+            permission: null,
+          },
+          {
+            path: "/banho-tosa/taxi-dog",
+            label: "Taxi dog",
+            permission: null,
+          },
+          {
+            path: "/banho-tosa/relatorios",
+            label: "Relatorios",
+            permission: null,
+          },
+        ],
+      },
     {
       path: "/produtos",
       icon: FiPackage,

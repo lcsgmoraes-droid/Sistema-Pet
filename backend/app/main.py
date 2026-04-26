@@ -152,6 +152,7 @@ from app.routes.ecommerce_auth import router as ecommerce_auth_router
 from app.routes.ecommerce_public import router as ecommerce_public_router
 from app.routes.ecommerce_cart import router as ecommerce_cart_router
 from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
+from app.routes.app_banho_tosa_routes import router as app_banho_tosa_router
 from app.routes.app_mobile_routes import router as app_mobile_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
@@ -165,6 +166,8 @@ from app.routes.modulos_routes import router as modulos_router
 from app.pedido_models import Pedido  # Modelo base ecommerce
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 import app.veterinario_models  # noqa: F401 — garante registro no SQLAlchemy
+from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
+import app.banho_tosa_models  # noqa: F401 - garante registro no SQLAlchemy
 
 # ============================================================================
 # CAMPANHAS — Motor de Campanhas (Fase 1)
@@ -794,6 +797,7 @@ app.include_router(permissions_router, tags=["Permissions & RBAC"])
 app.include_router(clientes_router, tags=["Clientes & Pets"])
 app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
 app.include_router(veterinario_router, tags=["Veterinário"])  # Módulo Veterinário
+app.include_router(banho_tosa_router, tags=["Banho & Tosa"])  # Modulo Banho & Tosa
 app.include_router(cadastros_router, tags=["Cadastros - Espécies & Raças"])  # Cadastros básicos
 app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
 app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!
@@ -914,6 +918,7 @@ app.include_router(ecommerce_analytics_router)
 app.include_router(ecommerce_drive_router)     # Drive pickup — PDV + cliente
 app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
+app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
 app.include_router(campaigns_router)   # Motor de Campanhas
 app.include_router(canal_descontos_router)  # Descontos Globais por Canal (Ecommerce / App)
 app.include_router(modulos_router)     # Módulos Premium

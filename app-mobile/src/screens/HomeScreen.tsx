@@ -107,6 +107,13 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate('Pets', { screen: 'CalculadoraRacao' })}
           />
           <Atalho
+            emoji="BT"
+            titulo="Banho & Tosa"
+            cor="#ECFEFF"
+            corTexto="#0E7490"
+            onPress={() => navigation.navigate('Pets', { screen: 'BanhoTosa' })}
+          />
+          <Atalho
             emoji="📦"
             titulo="Pedidos"
             cor="#FDF4FF"

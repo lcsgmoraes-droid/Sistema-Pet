@@ -114,6 +114,40 @@ export interface PushStatus {
   observacao?: string | null;
 }
 
+export interface BanhoTosaStatusItem {
+  tipo: "agendamento" | "atendimento";
+  atendimento_id?: number | null;
+  agendamento_id?: number | null;
+  pet_id: number;
+  pet_nome?: string | null;
+  status: string;
+  status_label: string;
+  progresso_percentual: number;
+  etapa_atual?: string | null;
+  data_hora_inicio?: string | null;
+  data_hora_fim_prevista?: string | null;
+  checkin_em?: string | null;
+  inicio_em?: string | null;
+  fim_em?: string | null;
+  entregue_em?: string | null;
+  valor_previsto?: number | null;
+  servicos: { nome: string; quantidade: number }[];
+  pode_avaliar: boolean;
+  avaliacao?: {
+    id: number;
+    nota_nps: number;
+    nota_servico?: number | null;
+    comentario?: string | null;
+    origem?: string | null;
+    created_at?: string | null;
+  } | null;
+}
+
+export interface BanhoTosaStatusResponse {
+  total: number;
+  itens: BanhoTosaStatusItem[];
+}
+
 export interface PetFormData {
   nome: string;
   especie: string;

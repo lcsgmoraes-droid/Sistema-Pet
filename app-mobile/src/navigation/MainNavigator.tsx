@@ -19,6 +19,7 @@ import PetDetailScreen from "../screens/pets/PetDetailScreen";
 import PetFormScreen from "../screens/pets/PetFormScreen";
 import PetListScreen from "../screens/pets/PetListScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
+import BanhoTosaScreen from "../screens/services/BanhoTosaScreen";
 import BarcodeScannerScreen from "../screens/shop/BarcodeScannerScreen";
 import CartScreen from "../screens/shop/CartScreen";
 import CatalogScreen from "../screens/shop/CatalogScreen";
@@ -82,6 +83,11 @@ function PetsNavigator() {
         name="CalculadoraRacao"
         component={FoodCalculatorScreen}
         options={{ title: "Calculadora de Ração" }}
+      />
+      <PetsStack.Screen
+        name="BanhoTosa"
+        component={BanhoTosaScreen}
+        options={{ title: "Banho & Tosa" }}
       />
     </PetsStack.Navigator>
   );

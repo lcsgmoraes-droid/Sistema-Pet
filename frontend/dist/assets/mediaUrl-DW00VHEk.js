@@ -1,0 +1,1 @@
+function e(i){if(!i)return null;const t=String(i).trim();if(!t)return null;if(/^https?:\/\//i.test(t))return t;const n="/api".replace(/\/$/,""),r=t.startsWith("/")?t:`/${t}`;return r.startsWith("/uploads/")?`${n}${r}`:r}export{e as r};

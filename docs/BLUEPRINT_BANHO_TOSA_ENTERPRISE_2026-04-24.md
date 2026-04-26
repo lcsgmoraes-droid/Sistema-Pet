@@ -790,3 +790,57 @@ E2E:
 - Definir categorias DRE padrao.
 - Definir se havera controle por sala/box desde o MVP ou so por profissional.
 
+## 15. Progresso de implementacao
+
+Atualizado em 2026-04-26.
+
+Implementado no primeiro bloco:
+
+- Modelos e migracao base do modulo Banho & Tosa.
+- Registro dos modelos no Alembic e importacao do router no FastAPI.
+- Motor puro de calculo de custo/margem por atendimento.
+- Testes unitarios para agua, energia, insumos, mao de obra, comissao, taxi dog, snapshot de margem e bloqueio de reabertura de status final.
+- Rotas iniciais para configuracao, servicos, parametros por porte, simulacao de custo e dashboard.
+- Entrada no menu lateral e rotas frontend `/banho-tosa`, `/banho-tosa/servicos`, `/banho-tosa/parametros`, `/banho-tosa/agenda` e `/banho-tosa/fila`.
+- Tela inicial com dashboard, cadastro de servicos, parametros gerais/portes e simulador de margem.
+- Agenda basica com tutor, pet, servico, conflito de horario por pet/profissional e check-in.
+- Fila inicial com avancos de status ate pronto/entregue e sincronizacao do status final com o agendamento.
+- Refatoracao das rotas backend em arquivos menores por responsabilidade.
+- Cadastro de recursos/equipamentos operacionais.
+- Ficha operacional inicial do atendimento com etapas, inicio/fim, recurso usado e duracao.
+- Apoio de funcionarios/responsaveis nas etapas para preparar produtividade e custo real de mao de obra.
+- Snapshot operacional de custo real por atendimento, usando etapas, responsaveis, cargos/salarios, encargos, agua, energia, recursos, taxas e rateios.
+- Parametrizacao de horas produtivas mensais, toalha e higienizacao padrao por atendimento.
+- Painel de margem dentro da ficha operacional, com recalculo manual e recalculo silencioso apos mudancas em etapas/insumos.
+- Registro de insumos reais usados no atendimento com custo por produto e opcao segura de baixar estoque no momento do lancamento.
+- Busca de produtos/insumos propria do modulo, sem depender do endpoint veterinario.
+- Refatoracao dos schemas e models em partes menores, mantendo agregadores compativeis para evitar arquivos grandes.
+- Registro de ocorrencias estruturadas por atendimento, com tipo, gravidade, descricao, responsavel e data/hora.
+- Registro de fotos por URL para entrada/antes/depois/ocorrencia.
+- Agenda com recurso/box selecionavel, validacao de capacidade simultanea e bloqueio de conflito por pet, equipe e recurso.
+- Painel de capacidade do dia por recurso, com janela operacional, ocupacao percentual, pico simultaneo e alertas de agenda sem recurso.
+- Estorno controlado de insumo com baixa de estoque: impede editar quantidade/custo apos baixa, cria movimentacao de entrada e libera remocao apenas depois do estorno.
+- Alertas veterinarios consumidos no Banho & Tosa: snapshots de alergias, condicoes, medicamentos e restricoes aparecem na agenda, fila e ficha operacional.
+- Endpoint de sugestao automatica de slots livres por data, duracao e recurso, considerando capacidade simultanea e ocupacao do dia.
+- Tela de agenda com sugestoes clicaveis para preencher horario/recurso e grade visual por horario x recurso.
+- Upload dedicado de fotos do atendimento, com armazenamento local em `/uploads/banho_tosa`, conversao para WebP, miniaturas e remocao segura dos arquivos ao excluir a foto.
+- Fluxo inicial de taxi dog vinculado ao agendamento, com motorista, janela, origem/destino, km, valor/custo, avancos de status e recalculo do custo real do atendimento quando ja existe check-in.
+- Relatorio operacional do modulo com resumo financeiro, margem por servico/porte, produtividade por responsavel, ocupacao por recurso, desperdicio de insumos e alertas de parametrizacao.
+- Fechamento inicial do atendimento com geracao de venda em aberto no PDV, vinculo `atendimento -> venda`, canal `banho_tosa` e botao na ficha operacional para cobranca pelo caixa.
+- Indicador no dashboard de atendimentos prontos sem venda gerada, para reduzir risco de entrega sem cobranca.
+- Sincronizacao de fechamento do atendimento com venda, pagamentos e contas a receber, incluindo alertas de cobranca pendente e indicador de vendas abertas no dashboard.
+- Tela operacional `/banho-tosa/fechamentos` para listar pendencias de cobranca, gerar venda, sincronizar contas e abrir o PDV por atendimento.
+- Modelos, migracao, rotas e tela `/banho-tosa/pacotes` para cadastrar pacotes, liberar creditos por tutor/pet, acompanhar saldo, validade e status.
+- Consumo de credito de pacote dentro da ficha do atendimento, com estorno controlado, bloqueio de saldo negativo e bloqueio de venda duplicada quando o atendimento ja foi quitado por pacote.
+- Rotas base de recorrencia de Banho & Tosa para preparar lembretes/retornos por tutor, pet, servico, intervalo e canal, sem depender ainda de app/ecommerce ou pagamento online.
+- Central `/banho-tosa/retornos` com sugestoes de contato por recorrencia vencendo/vencida, pacote vencendo/saldo baixo e pets sem banho recente.
+- Acao para avancar recorrencia para o proximo ciclo e enfileirar lembretes idempotentes no app a partir das sugestoes de retorno.
+- Templates configuraveis de campanha de retorno, com segmento por tipo, canal app/e-mail, variaveis de mensagem e disparo idempotente pela central de retornos.
+- App do tutor com tela de Banho & Tosa para acompanhar agenda/status do atendimento e registrar NPS apos entrega do pet.
+- Indicadores de NPS/avaliacoes no dashboard e no relatorio operacional para acompanhar qualidade percebida do servico.
+
+Proximo bloco sugerido:
+
+- Automatizar gatilhos pos-PDV para sincronizar fechamento sem acao manual, quando o fluxo de eventos do PDV estiver consolidado.
+- Preparar automacoes pos-atendimento: pedido de avaliacao por push/e-mail e retorno inteligente conforme NPS.
+- Preparar testes assistidos em ambiente de producao/homologacao com agenda, check-in, fotos, taxi dog, custos reais e relatorio operacional.
