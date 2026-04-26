@@ -7,6 +7,7 @@ export default function BanhoTosaFechamentosView() {
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
+  const [cancelingId, setCancelingId] = useState(null);
   const [syncingAll, setSyncingAll] = useState(false);
 
   async function carregar() {
@@ -66,9 +67,41 @@ export default function BanhoTosaFechamentosView() {
     }
   }
 
+  async function cancelarProcesso(item) {
+    const motivo = window.prompt(
+      `Informe o motivo para cancelar o atendimento #${item.atendimento_id} e todo o processo financeiro vinculado:`,
+      "Lancado por engano",
+    );
+    if (motivo === null) return;
+    if (!motivo.trim()) {
+      toast.error("Informe um motivo para cancelar.");
+      return;
+    }
+
+    const confirmar = window.confirm(
+      "Confirma o cancelamento do atendimento? Se existir venda/recebimento vinculado, o sistema tambem vai cancelar/estornar esse processo.",
+    );
+    if (!confirmar) return;
+
+    setCancelingId(item.atendimento_id);
+    try {
+      const response = await banhoTosaApi.cancelarProcessoAtendimento(item.atendimento_id, {
+        motivo: motivo.trim(),
+      });
+      toast.success(response.data?.mensagem || "Processo cancelado.");
+      await carregar();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel cancelar o processo."));
+    } finally {
+      setCancelingId(null);
+    }
+  }
+
   const semVenda = itens.filter((item) => !item.venda_id).length;
   const abertas = itens.filter((item) => ["aberta", "baixa_parcial"].includes(item.venda_status)).length;
-  const semConta = itens.filter((item) => item.venda_id && !item.conta_receber_id).length;
+  const semConta = itens.filter(
+    (item) => item.venda_id && item.venda_status === "finalizada" && !item.conta_receber_id,
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -96,10 +129,11 @@ export default function BanhoTosaFechamentosView() {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Metric label="Pendencias" value={itens.length} />
-        <Metric label="Sem venda" value={semVenda} />
-        <Metric label="Venda aberta" value={abertas + semConta} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="Pendencias" value={itens.length} detail="Atendimentos na fila de cobranca" />
+        <Metric label="Sem venda" value={semVenda} detail="Precisa gerar PDV" />
+        <Metric label="Venda aberta" value={abertas} detail="Aguardando recebimento no caixa" />
+        <Metric label="Sem conta" value={semConta} detail="Finalizada sem financeiro sincronizado" />
       </div>
 
       {loading ? (
@@ -118,8 +152,10 @@ export default function BanhoTosaFechamentosView() {
               key={item.atendimento_id}
               item={item}
               processing={processingId === item.atendimento_id}
+              canceling={cancelingId === item.atendimento_id}
               onGerarVenda={gerarVenda}
               onSincronizar={sincronizar}
+              onCancelarProcesso={cancelarProcesso}
             />
           ))}
         </div>
@@ -128,7 +164,14 @@ export default function BanhoTosaFechamentosView() {
   );
 }
 
-function FechamentoCard({ item, processing, onGerarVenda, onSincronizar }) {
+function FechamentoCard({
+  item,
+  processing,
+  canceling,
+  onGerarVenda,
+  onSincronizar,
+  onCancelarProcesso,
+}) {
   return (
     <article className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -173,6 +216,14 @@ function FechamentoCard({ item, processing, onGerarVenda, onSincronizar }) {
               </button>
             </>
           )}
+          <button
+            type="button"
+            disabled={processing || canceling}
+            onClick={() => onCancelarProcesso(item)}
+            className="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-100 disabled:opacity-60"
+          >
+            {canceling ? "Cancelando..." : "Cancelar processo"}
+          </button>
         </div>
       </div>
     </article>
@@ -192,11 +243,12 @@ function Alertas({ alertas = [] }) {
   );
 }
 
-function Metric({ label, value }) {
+function Metric({ label, value, detail }) {
   return (
     <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
       <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
+      {detail && <p className="mt-1 text-xs font-semibold text-slate-400">{detail}</p>}
     </div>
   );
 }

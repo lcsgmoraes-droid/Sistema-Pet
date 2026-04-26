@@ -57,3 +57,19 @@ class BanhoTosaFechamentoSincronizacaoLoteResponse(BaseModel):
     sincronizados: int
     sem_venda: int
     pendentes_restantes: int
+
+
+class BanhoTosaCancelamentoInput(BaseModel):
+    motivo: str = Field(..., min_length=3, max_length=500)
+
+
+class BanhoTosaCancelamentoResponse(BaseModel):
+    atendimento_id: int
+    status_atendimento: str
+    agendamento_id: Optional[int] = None
+    status_agendamento: Optional[str] = None
+    venda_ids: List[int] = Field(default_factory=list)
+    vendas_canceladas: int = 0
+    vendas_ja_canceladas: int = 0
+    pacote_estornado: bool = False
+    mensagem: str

@@ -19,11 +19,14 @@ from app.banho_tosa_api.utils import (
     serializar_etapa,
 )
 from app.banho_tosa_custos import validar_transicao_status
+from app.banho_tosa_cancelamento import cancelar_processo_atendimento
 from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaEtapa,
 )
 from app.banho_tosa_schemas import (
+    BanhoTosaCancelamentoInput,
+    BanhoTosaCancelamentoResponse,
     BanhoTosaAtendimentoResponse,
     BanhoTosaAtendimentoStatusUpdate,
     BanhoTosaEtapaCreate,
@@ -88,6 +91,26 @@ def atualizar_status_atendimento(
     db.refresh(atendimento)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
     return serializar_atendimento(atendimento)
+
+
+@router.post(
+    "/atendimentos/{atendimento_id}/cancelar-processo",
+    response_model=BanhoTosaCancelamentoResponse,
+)
+def cancelar_processo(
+    atendimento_id: int,
+    body: BanhoTosaCancelamentoInput,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = _get_tenant(current)
+    return cancelar_processo_atendimento(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        atendimento_id=atendimento_id,
+        motivo=body.motivo,
+    )
 
 
 @router.post("/atendimentos/{atendimento_id}/etapas", response_model=BanhoTosaEtapaResponse, status_code=201)

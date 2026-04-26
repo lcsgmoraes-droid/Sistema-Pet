@@ -6,6 +6,7 @@ import { formatCurrency, getApiErrorMessage } from "../banhoTosaUtils";
 export default function BanhoTosaFechamentoPanel({ atendimento, onChanged }) {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [canceling, setCanceling] = useState(false);
 
   async function gerarVenda() {
     setSaving(true);
@@ -35,6 +36,36 @@ export default function BanhoTosaFechamentoPanel({ atendimento, onChanged }) {
     }
   }
 
+  async function cancelarProcesso() {
+    const motivo = window.prompt(
+      `Informe o motivo para cancelar o atendimento #${atendimento.id} e todo o processo financeiro vinculado:`,
+      "Lancado por engano",
+    );
+    if (motivo === null) return;
+    if (!motivo.trim()) {
+      toast.error("Informe um motivo para cancelar.");
+      return;
+    }
+
+    const confirmar = window.confirm(
+      "Confirma o cancelamento do atendimento? Se existir venda/recebimento vinculado, o sistema tambem vai cancelar/estornar esse processo.",
+    );
+    if (!confirmar) return;
+
+    setCanceling(true);
+    try {
+      const response = await banhoTosaApi.cancelarProcessoAtendimento(atendimento.id, {
+        motivo: motivo.trim(),
+      });
+      toast.success(response.data?.mensagem || "Processo cancelado.");
+      await onChanged?.();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel cancelar o processo."));
+    } finally {
+      setCanceling(false);
+    }
+  }
+
   const temVenda = Boolean(atendimento?.venda_id);
   const quitadoPorPacote = Boolean(atendimento?.pacote_credito_id);
   const alertas = atendimento?.fechamento_alertas || [];
@@ -49,6 +80,14 @@ export default function BanhoTosaFechamentoPanel({ atendimento, onChanged }) {
         <p className="mt-1 text-sm font-semibold text-emerald-700">
           Este atendimento consumiu credito de {atendimento.pacote_nome || "pacote"} e nao deve gerar venda avulsa no PDV.
         </p>
+        <button
+          type="button"
+          disabled={canceling}
+          onClick={cancelarProcesso}
+          className="mt-4 rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-60"
+        >
+          {canceling ? "Cancelando..." : "Cancelar processo"}
+        </button>
       </div>
     );
   }
@@ -92,16 +131,34 @@ export default function BanhoTosaFechamentoPanel({ atendimento, onChanged }) {
             >
               Abrir no PDV
             </button>
+            <button
+              type="button"
+              disabled={canceling}
+              onClick={cancelarProcesso}
+              className="rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-60"
+            >
+              {canceling ? "Cancelando..." : "Cancelar processo"}
+            </button>
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={saving}
-            onClick={gerarVenda}
-            className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-60"
-          >
-            {saving ? "Gerando..." : "Gerar venda"}
-          </button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={gerarVenda}
+              className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-600 disabled:opacity-60"
+            >
+              {saving ? "Gerando..." : "Gerar venda"}
+            </button>
+            <button
+              type="button"
+              disabled={canceling}
+              onClick={cancelarProcesso}
+              className="rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:opacity-60"
+            >
+              {canceling ? "Cancelando..." : "Cancelar processo"}
+            </button>
+          </div>
         )}
       </div>
       {alertas.length > 0 && (
