@@ -8,6 +8,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.banho_tosa_api.utils import STATUS_AGENDAMENTO_FINAIS, obter_ou_criar_configuracao
+from app.banho_tosa_datetime import normalizar_data_operacional
 from app.banho_tosa_models import BanhoTosaAgendamento, BanhoTosaRecurso
 
 
@@ -97,8 +98,8 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
             sem_recurso += 1
             continue
 
-        inicio = agendamento.data_hora_inicio
-        fim = agendamento.data_hora_fim_prevista or agendamento.data_hora_inicio
+        inicio = normalizar_data_operacional(agendamento.data_hora_inicio)
+        fim = normalizar_data_operacional(agendamento.data_hora_fim_prevista) or inicio
         duracao = _duracao_minutos(inicio, fim)
         item = por_recurso[agendamento.recurso_id]
         item["agendamentos"] += 1
@@ -174,14 +175,16 @@ def _base_recurso(recurso: BanhoTosaRecurso, minutos_disponiveis: int) -> dict:
 
 
 def _duracao_minutos(inicio: datetime, fim: datetime) -> int:
-    return max(int((fim - inicio).total_seconds() // 60), 0)
+    inicio_normalizado = normalizar_data_operacional(inicio)
+    fim_normalizado = normalizar_data_operacional(fim)
+    return max(int((fim_normalizado - inicio_normalizado).total_seconds() // 60), 0)
 
 
 def _calcular_pico(janelas: list[tuple[datetime, datetime]]) -> int:
     eventos = []
     for inicio, fim in janelas:
-        eventos.append((inicio, 1))
-        eventos.append((fim, -1))
+        eventos.append((normalizar_data_operacional(inicio), 1))
+        eventos.append((normalizar_data_operacional(fim), -1))
 
     atual = 0
     pico = 0

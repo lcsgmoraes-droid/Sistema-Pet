@@ -6,6 +6,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.banho_tosa_api.utils import STATUS_AGENDAMENTO_FINAIS, obter_ou_criar_configuracao
+from app.banho_tosa_datetime import normalizar_data_operacional
 from app.banho_tosa_models import BanhoTosaAgendamento, BanhoTosaRecurso
 
 
@@ -86,12 +87,14 @@ def _avaliar_recursos_no_slot(recursos, agendamentos, inicio: datetime, fim: dat
 
 def _ocupacao_recurso_no_slot(agendamentos, recurso_id: int, inicio: datetime, fim: datetime) -> int:
     total = 0
+    inicio_slot = normalizar_data_operacional(inicio)
+    fim_slot = normalizar_data_operacional(fim)
     for agendamento in agendamentos:
         if agendamento.recurso_id != recurso_id:
             continue
-        ag_inicio = agendamento.data_hora_inicio
-        ag_fim = agendamento.data_hora_fim_prevista or ag_inicio
-        if ag_inicio < fim and ag_fim > inicio:
+        ag_inicio = normalizar_data_operacional(agendamento.data_hora_inicio)
+        ag_fim = normalizar_data_operacional(agendamento.data_hora_fim_prevista) or ag_inicio
+        if ag_inicio < fim_slot and ag_fim > inicio_slot:
             total += 1
     return total
 
