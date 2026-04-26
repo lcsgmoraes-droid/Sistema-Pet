@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Scissors,
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -27,6 +28,14 @@ function getCanalInfo(canal) {
         bg: "bg-blue-50",
         icon: "\uD83C\uDFEA",
         label: "PDV",
+      },
+      banho_tosa: {
+        cor: "border-l-cyan-500",
+        bg: "bg-cyan-50",
+        Icon: Scissors,
+        iconColor: "text-cyan-700",
+        label: "Banho & Tosa",
+        title: "Venda gerada pelo modulo Banho & Tosa",
       },
     }[canal] || {
       cor: "border-l-gray-400",
@@ -189,6 +198,7 @@ export default function PDVVendasRecentesSidebar({
             ) : (
               vendasRecentes.map((venda) => {
                 const canalInfo = getCanalInfo(venda.canal);
+                const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
 
                 return (
@@ -198,8 +208,18 @@ export default function PDVVendasRecentesSidebar({
                     className={`rounded-lg p-2.5 border border-gray-200 border-l-4 ${canalInfo.cor} hover:border-blue-300 cursor-pointer transition-colors ${canalInfo.bg}`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
-                        <span>{canalInfo.icon}</span>
+                      <span
+                        className="text-[10px] text-gray-500 flex items-center gap-0.5"
+                        title={canalInfo.title || canalInfo.label}
+                      >
+                        {CanalIcon ? (
+                          <CanalIcon
+                            className={`w-3 h-3 ${canalInfo.iconColor || "text-gray-500"}`}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <span>{canalInfo.icon}</span>
+                        )}
                         <span>{canalInfo.label}</span>
                         {venda.tem_entrega && (
                           <span className="ml-1" title="Entrega">
