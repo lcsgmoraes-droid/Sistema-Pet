@@ -8,14 +8,14 @@ import BanhoTosaAgendaGrade from "./BanhoTosaAgendaGrade";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
 import BanhoTosaCapacidadePanel from "./BanhoTosaCapacidadePanel";
 const todayIso = () => new Date().toISOString().slice(0, 10);
-const initialForm = {
+const criarFormularioInicial = () => ({
   pet_id: "",
   hora: "09:00",
   recurso_id: "",
   servico_id: "",
   valor_unitario: "0",
   observacoes: "",
-};
+});
 export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged }) {
   const [dataRef, setDataRef] = useState(todayIso());
   const [agendamentos, setAgendamentos] = useState([]);
@@ -27,7 +27,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [petsDoTutor, setPetsDoTutor] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(criarFormularioInicial);
   async function carregarAgenda() {
     setLoadingAgenda(true);
     try {
@@ -99,6 +99,12 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
     setForm((prev) => ({ ...prev, servico_id: servicoId }));
   }
 
+  function resetarFormularioAgendamento() {
+    setTutorSelecionado(null);
+    setPetsDoTutor([]);
+    setForm(criarFormularioInicial());
+  }
+
   async function carregarSugestoes() {
     setLoadingSugestoes(true);
     try {
@@ -138,7 +144,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       });
 
       toast.success("Agendamento criado.");
-      setForm(initialForm);
+      resetarFormularioAgendamento();
       await carregarAgenda();
       await carregarSugestoes();
       await onChanged(true);
