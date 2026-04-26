@@ -1,25 +1,75 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { BedDouble, Plus, Activity, ArrowUpCircle, AlertCircle, Clock, Map as MapIcon, List, LayoutGrid, BellRing, Trash2, Check } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import { useInternacaoOperacional } from "./useInternacaoOperacional";
+import AgendaProcedimentosPanel from "./internacoes/AgendaProcedimentosPanel";
 import AltaInternacaoModal from "./internacoes/AltaInternacaoModal";
+import CentroInternacaoTabs from "./internacoes/CentroInternacaoTabs";
 import ConcluirProcedimentoModal from "./internacoes/ConcluirProcedimentoModal";
 import EvolucaoInternacaoModal from "./internacoes/EvolucaoInternacaoModal";
+import HistoricoInternacoesFiltros from "./internacoes/HistoricoInternacoesFiltros";
 import HistoricoInternacoesPetModal from "./internacoes/HistoricoInternacoesPetModal";
 import InsumoRapidoInternacaoModal from "./internacoes/InsumoRapidoInternacaoModal";
+import InternacoesHeader from "./internacoes/InternacoesHeader";
+import InternacoesListaPanel from "./internacoes/InternacoesListaPanel";
+import { InternacoesEmptyState, InternacoesLoadingState } from "./internacoes/InternacoesLoadingEmpty";
+import InternacoesTabs from "./internacoes/InternacoesTabs";
+import InternacoesWidgetPanel from "./internacoes/InternacoesWidgetPanel";
+import MapaInternacaoPanel from "./internacoes/MapaInternacaoPanel";
 import NovaInternacaoModal from "./internacoes/NovaInternacaoModal";
 import {
-  STATUS_CORES,
-  formatData,
-  formatDateTime,
   formatQuantity,
-  montarSerieEvolucao,
   parseQuantity,
 } from "./internacoes/internacaoUtils";
+
+const FORM_NOVA_INTERNACAO_INICIAL = {
+  pessoa_id: "",
+  pet_id: "",
+  motivo: "",
+  box: "",
+  responsavel: "",
+};
+
+const FORM_EVOLUCAO_INICIAL = {
+  temperatura: "",
+  fc: "",
+  fr: "",
+  observacoes: "",
+};
+
+const AGENDA_FORM_INICIAL = {
+  internacao_id: "",
+  horario: "",
+  medicamento: "",
+  dose: "",
+  quantidade_prevista: "",
+  unidade_quantidade: "",
+  via: "",
+  lembrete_min: "30",
+  observacoes: "",
+};
+
+const FORM_FEITO_INICIAL = {
+  feito_por: "",
+  horario_execucao: "",
+  observacao_execucao: "",
+  quantidade_prevista: "",
+  quantidade_executada: "",
+  quantidade_desperdicio: "",
+  unidade_quantidade: "",
+};
+
+const FORM_INSUMO_RAPIDO_INICIAL = {
+  internacao_id: "",
+  responsavel: "",
+  horario_execucao: "",
+  quantidade_utilizada: "1",
+  quantidade_desperdicio: "",
+  observacoes: "",
+};
 
 export default function VetInternacoes() {
   const navigate = useNavigate();
@@ -30,61 +80,36 @@ export default function VetInternacoes() {
   const consultaIdQuery = searchParams.get("consulta_id") || "";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
-  const [aba, setAba] = useState("ativas"); // "ativas" | "historico"
-  const [centroAba, setCentroAba] = useState("widget"); // "mapa" | "lista" | "widget" | "agenda"
+  const [aba, setAba] = useState("ativas");
+  const [centroAba, setCentroAba] = useState("widget");
   const [internacoes, setInternacoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
-  const [expandida, setExpandida] = useState(null); // id da internação aberta
-  const [evolucoes, setEvolucoes] = useState({}); // { [internacaoId]: [...] }
-  const [procedimentosInternacao, setProcedimentosInternacao] = useState({}); // { [internacaoId]: [...] }
+  const [expandida, setExpandida] = useState(null);
+  const [evolucoes, setEvolucoes] = useState({});
+  const [procedimentosInternacao, setProcedimentosInternacao] = useState({});
   const [modalNova, setModalNova] = useState(false);
-  const [modalAlta, setModalAlta] = useState(null); // id
-  const [modalEvolucao, setModalEvolucao] = useState(null); // id
-  const [modalHistoricoPet, setModalHistoricoPet] = useState(null); // { petId, petNome }
+  const [modalAlta, setModalAlta] = useState(null);
+  const [modalEvolucao, setModalEvolucao] = useState(null);
+  const [modalHistoricoPet, setModalHistoricoPet] = useState(null);
   const [historicoPet, setHistoricoPet] = useState([]);
   const [carregandoHistoricoPet, setCarregandoHistoricoPet] = useState(false);
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
-  const [formNova, setFormNova] = useState({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+  const [formNova, setFormNova] = useState(() => ({ ...FORM_NOVA_INTERNACAO_INICIAL }));
   const [tutorNovaSelecionado, setTutorNovaSelecionado] = useState(null);
   const [formAlta, setFormAlta] = useState("");
-  const [formEvolucao, setFormEvolucao] = useState({ temperatura: "", fc: "", fr: "", observacoes: "" });
+  const [formEvolucao, setFormEvolucao] = useState(() => ({ ...FORM_EVOLUCAO_INICIAL }));
   const [filtroDataAltaInicio, setFiltroDataAltaInicio] = useState("");
   const [filtroDataAltaFim, setFiltroDataAltaFim] = useState("");
   const [filtroPessoaHistorico, setFiltroPessoaHistorico] = useState("");
   const [filtroPetHistorico, setFiltroPetHistorico] = useState("");
-  const [agendaForm, setAgendaForm] = useState({
-    internacao_id: "",
-    horario: "",
-    medicamento: "",
-    dose: "",
-    quantidade_prevista: "",
-    unidade_quantidade: "",
-    via: "",
-    lembrete_min: "30",
-    observacoes: "",
-  });
-  const [modalFeito, setModalFeito] = useState(null); // item completo da agenda
-  const [formFeito, setFormFeito] = useState({
-    feito_por: "",
-    horario_execucao: "",
-    observacao_execucao: "",
-    quantidade_prevista: "",
-    quantidade_executada: "",
-    quantidade_desperdicio: "",
-    unidade_quantidade: "",
-  });
+  const [agendaForm, setAgendaForm] = useState(() => ({ ...AGENDA_FORM_INICIAL }));
+  const [modalFeito, setModalFeito] = useState(null);
+  const [formFeito, setFormFeito] = useState(() => ({ ...FORM_FEITO_INICIAL }));
   const [modalInsumoRapido, setModalInsumoRapido] = useState(false);
   const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
-  const [formInsumoRapido, setFormInsumoRapido] = useState({
-    internacao_id: "",
-    responsavel: "",
-    horario_execucao: "",
-    quantidade_utilizada: "1",
-    quantidade_desperdicio: "",
-    observacoes: "",
-  });
+  const [formInsumoRapido, setFormInsumoRapido] = useState(() => ({ ...FORM_INSUMO_RAPIDO_INICIAL }));
   const [salvando, setSalvando] = useState(false);
   const {
     agendaCarregando,
@@ -96,8 +121,13 @@ export default function VetInternacoes() {
   } = useInternacaoOperacional({ setErro });
 
   useEffect(() => {
-    api.get("/pets", { params: { limit: 500 } }).then((r) => setPets(r.data?.items ?? r.data ?? [])).catch(() => {});
-    vetApi.listarVeterinarios().then((r) => setVeterinarios(Array.isArray(r.data) ? r.data : [])).catch(() => setVeterinarios([]));
+    api.get("/pets", { params: { limit: 500 } })
+      .then((res) => setPets(res.data?.items ?? res.data ?? []))
+      .catch(() => {});
+
+    vetApi.listarVeterinarios()
+      .then((res) => setVeterinarios(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setVeterinarios([]));
   }, []);
 
   useEffect(() => {
@@ -108,6 +138,7 @@ export default function VetInternacoes() {
 
   useEffect(() => {
     if (!tutorIdQuery) return;
+
     setFormNova((prev) => ({
       ...prev,
       pessoa_id: prev.pessoa_id || String(tutorIdQuery),
@@ -120,6 +151,7 @@ export default function VetInternacoes() {
 
   useEffect(() => {
     if (!novoPetIdQuery) return;
+
     setModalNova(true);
     setFormNova((prev) => ({
       ...prev,
@@ -129,12 +161,12 @@ export default function VetInternacoes() {
 
   const pessoas = useMemo(() => {
     const mapa = new Map();
-    for (const p of pets) {
-      if (!p?.cliente_id) continue;
-      if (mapa.has(String(p.cliente_id))) continue;
-      mapa.set(String(p.cliente_id), {
-        id: String(p.cliente_id),
-        nome: p.cliente_nome ?? `Pessoa #${p.cliente_id}`,
+    for (const pet of pets) {
+      if (!pet?.cliente_id) continue;
+      if (mapa.has(String(pet.cliente_id))) continue;
+      mapa.set(String(pet.cliente_id), {
+        id: String(pet.cliente_id),
+        nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}`,
       });
     }
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
@@ -143,7 +175,7 @@ export default function VetInternacoes() {
   const petsDaPessoa = useMemo(() => {
     if (!formNova.pessoa_id) return [];
     return pets.filter(
-      (p) => String(p.cliente_id) === String(formNova.pessoa_id) && p.ativo !== false
+      (pet) => String(pet.cliente_id) === String(formNova.pessoa_id) && pet.ativo !== false
     );
   }, [pets, formNova.pessoa_id]);
 
@@ -161,7 +193,7 @@ export default function VetInternacoes() {
   const petsHistoricoDaPessoa = useMemo(() => {
     if (!filtroPessoaHistorico) return [];
     return pets.filter(
-      (p) => String(p.cliente_id) === String(filtroPessoaHistorico) && p.ativo !== false
+      (pet) => String(pet.cliente_id) === String(filtroPessoaHistorico) && pet.ativo !== false
     );
   }, [pets, filtroPessoaHistorico]);
 
@@ -172,10 +204,10 @@ export default function VetInternacoes() {
 
   const ocupacaoPorBaia = useMemo(() => {
     const mapa = new Map();
-    for (const i of internacoesOrdenadas) {
-      const chave = (i.box || "").trim();
+    for (const internacao of internacoesOrdenadas) {
+      const chave = (internacao.box || "").trim();
       if (!chave) continue;
-      mapa.set(chave, i);
+      mapa.set(chave, internacao);
     }
     return mapa;
   }, [internacoesOrdenadas]);
@@ -192,7 +224,6 @@ export default function VetInternacoes() {
       });
     }
 
-    // Baias fora da faixa configurada continuam visíveis para não esconder dados.
     for (const [chave, internacao] of ocupacaoPorBaia.entries()) {
       const asNumero = Number.parseInt(chave, 10);
       if (Number.isFinite(asNumero) && asNumero >= 1 && asNumero <= totalBaias) continue;
@@ -208,14 +239,19 @@ export default function VetInternacoes() {
 
   const indicadoresInternacao = useMemo(() => {
     const total = internacoes.length;
-    const semBaia = internacoes.filter((i) => !i.box).length;
-    const comEvolucao = internacoes.filter((i) => (evolucoes[i.id] ?? []).length > 0).length;
-    const procedimentosPendentes = agendaProcedimentos.filter((p) => !p.feito).length;
-    const procedimentosAtrasados = agendaProcedimentos.filter((p) => !p.feito && new Date(p.horario).getTime() <= Date.now()).length;
+    const semBaia = internacoes.filter((internacao) => !internacao.box).length;
+    const comEvolucao = internacoes.filter((internacao) => (evolucoes[internacao.id] ?? []).length > 0).length;
+    const procedimentosPendentes = agendaProcedimentos.filter((procedimento) => !procedimento.feito).length;
+    const procedimentosAtrasados = agendaProcedimentos.filter(
+      (procedimento) => !procedimento.feito && new Date(procedimento.horario).getTime() <= Date.now()
+    ).length;
     const mediaDias = total === 0
       ? 0
-      : internacoes.reduce((acc, i) => {
-          const dias = Math.max(0, Math.floor((Date.now() - new Date(i.data_entrada).getTime()) / 86400000));
+      : internacoes.reduce((acc, internacao) => {
+          const dias = Math.max(
+            0,
+            Math.floor((Date.now() - new Date(internacao.data_entrada).getTime()) / 86400000)
+          );
           return acc + dias;
         }, 0) / total;
 
@@ -232,13 +268,14 @@ export default function VetInternacoes() {
     };
   }, [internacoes, evolucoes, agendaProcedimentos, ocupacaoPorBaia, totalBaias]);
 
-  const agendaOrdenada = useMemo(() => {
-    return [...agendaProcedimentos].sort((a, b) => new Date(a.horario).getTime() - new Date(b.horario).getTime());
-  }, [agendaProcedimentos]);
+  const agendaOrdenada = useMemo(
+    () => [...agendaProcedimentos].sort((a, b) => new Date(a.horario).getTime() - new Date(b.horario).getTime()),
+    [agendaProcedimentos]
+  );
 
   const internacaoPorId = useMemo(() => {
     const mapa = new Map();
-    for (const i of internacoes) mapa.set(String(i.id), i);
+    for (const internacao of internacoes) mapa.set(String(internacao.id), internacao);
     return mapa;
   }, [internacoes]);
 
@@ -248,10 +285,10 @@ export default function VetInternacoes() {
   }, [agendaForm.internacao_id, internacaoPorId]);
 
   const sugestaoHorario = useMemo(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 30);
-    const pad = (v) => String(v).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const data = new Date();
+    data.setMinutes(data.getMinutes() + 30);
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${data.getFullYear()}-${pad(data.getMonth() + 1)}-${pad(data.getDate())}T${pad(data.getHours())}:${pad(data.getMinutes())}`;
   }, []);
 
   useEffect(() => {
@@ -259,7 +296,9 @@ export default function VetInternacoes() {
   }, [sugestaoHorario]);
 
   useEffect(() => {
-    setFormInsumoRapido((prev) => (prev.horario_execucao ? prev : { ...prev, horario_execucao: sugestaoHorario }));
+    setFormInsumoRapido((prev) => (
+      prev.horario_execucao ? prev : { ...prev, horario_execucao: sugestaoHorario }
+    ));
   }, [sugestaoHorario]);
 
   const carregar = useCallback(async () => {
@@ -283,7 +322,9 @@ export default function VetInternacoes() {
     }
   }, [aba, filtroDataAltaInicio, filtroDataAltaFim, filtroPessoaHistorico, filtroPetHistorico]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   async function carregarDetalheInternacao(id, manterExpandido = true) {
     try {
@@ -302,12 +343,31 @@ export default function VetInternacoes() {
     }
   }
 
+  function abrirNovaInternacao() {
+    setAba("ativas");
+    setTutorNovaSelecionado(null);
+    setFormNova({ ...FORM_NOVA_INTERNACAO_INICIAL });
+    setModalNova(true);
+  }
+
+  function selecionarInternacaoNoMapa(internacaoId) {
+    setAba("ativas");
+    setCentroAba("lista");
+    abrirDetalhe(internacaoId);
+  }
+
+  function selecionarPessoaHistorico(pessoaId) {
+    setFiltroPessoaHistorico(pessoaId);
+    setFiltroPetHistorico("");
+  }
+
   async function criarInternacao() {
     if (!formNova.pet_id || !formNova.motivo) return;
     if (!formNova.box) {
       setErro("Selecione uma baia livre no mapa para internar.");
       return;
     }
+
     setSalvando(true);
     try {
       await vetApi.criarInternacao({
@@ -317,7 +377,7 @@ export default function VetInternacoes() {
         box: formNova.box || undefined,
       });
       setModalNova(false);
-      setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+      setFormNova({ ...FORM_NOVA_INTERNACAO_INICIAL });
       setTutorNovaSelecionado(null);
       await carregar();
     } catch (e) {
@@ -355,7 +415,7 @@ export default function VetInternacoes() {
       });
       await carregarDetalheInternacao(internacaoId, true);
       setModalEvolucao(null);
-      setFormEvolucao({ temperatura: "", fc: "", fr: "", observacoes: "" });
+      setFormEvolucao({ ...FORM_EVOLUCAO_INICIAL });
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao registrar evolução.");
     } finally {
@@ -409,7 +469,7 @@ export default function VetInternacoes() {
 
   function abrirModalFeito(item) {
     const agora = new Date();
-    const pad = (v) => String(v).padStart(2, "0");
+    const pad = (value) => String(value).padStart(2, "0");
     const valorPadrao = `${agora.getFullYear()}-${pad(agora.getMonth() + 1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
 
     setModalFeito(item);
@@ -448,12 +508,15 @@ export default function VetInternacoes() {
         observacao_execucao: formFeito.observacao_execucao?.trim() || undefined,
       });
 
-      await carregarDetalheInternacao(modalFeito.internacao_id, String(expandida) === String(modalFeito.internacao_id));
+      await carregarDetalheInternacao(
+        modalFeito.internacao_id,
+        String(expandida) === String(modalFeito.internacao_id)
+      );
 
-      setAgendaProcedimentos((prev) => prev.map((p) => {
-        if (String(p.id) !== String(modalFeito.id)) return p;
+      setAgendaProcedimentos((prev) => prev.map((procedimento) => {
+        if (String(procedimento.id) !== String(modalFeito.id)) return procedimento;
         return response.data?.id ? response.data : {
-          ...p,
+          ...procedimento,
           feito: true,
           status: "concluido",
           feito_por: formFeito.feito_por.trim(),
@@ -466,15 +529,7 @@ export default function VetInternacoes() {
         };
       }));
       setModalFeito(null);
-      setFormFeito({
-        feito_por: "",
-        horario_execucao: "",
-        observacao_execucao: "",
-        quantidade_prevista: "",
-        quantidade_executada: "",
-        quantidade_desperdicio: "",
-        unidade_quantidade: "",
-      });
+      setFormFeito({ ...FORM_FEITO_INICIAL });
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao registrar procedimento concluído.");
     } finally {
@@ -486,12 +541,9 @@ export default function VetInternacoes() {
     setModalInsumoRapido(true);
     setInsumoRapidoSelecionado(null);
     setFormInsumoRapido({
+      ...FORM_INSUMO_RAPIDO_INICIAL,
       internacao_id: internacaoId ? String(internacaoId) : "",
-      responsavel: "",
       horario_execucao: sugestaoHorario,
-      quantidade_utilizada: "1",
-      quantidade_desperdicio: "",
-      observacoes: "",
     });
   }
 
@@ -554,12 +606,8 @@ export default function VetInternacoes() {
       setModalInsumoRapido(false);
       setInsumoRapidoSelecionado(null);
       setFormInsumoRapido({
-        internacao_id: "",
-        responsavel: "",
+        ...FORM_INSUMO_RAPIDO_INICIAL,
         horario_execucao: sugestaoHorario,
-        quantidade_utilizada: "1",
-        quantidade_desperdicio: "",
-        observacoes: "",
       });
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao lançar insumo rápido.");
@@ -569,14 +617,14 @@ export default function VetInternacoes() {
   }
 
   function reabrirProcedimento() {
-    setErro("Procedimento concluido ja faz parte do historico clinico. Para corrigir, registre um novo ajuste/evolucao.");
+    setErro("Procedimento concluído já faz parte do histórico clínico. Para corrigir, registre um novo ajuste/evolução.");
   }
 
   async function removerProcedimentoAgenda(id) {
     setSalvando(true);
     try {
       await vetApi.removerProcedimentoAgendaInternacao(id);
-      setAgendaProcedimentos((prev) => prev.filter((p) => String(p.id) !== String(id)));
+      setAgendaProcedimentos((prev) => prev.filter((procedimento) => String(procedimento.id) !== String(id)));
     } catch (e) {
       setErro(e?.response?.data?.detail ?? "Erro ao remover procedimento da agenda.");
     } finally {
@@ -603,651 +651,102 @@ export default function VetInternacoes() {
     setModalNova(false);
     if (!consultaIdQuery) {
       setTutorNovaSelecionado(null);
-      setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
+      setFormNova({ ...FORM_NOVA_INTERNACAO_INICIAL });
     }
   }
 
   return (
     <div className="p-6 space-y-5">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-purple-100 rounded-xl">
-            <BedDouble size={22} className="text-purple-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Internações</h1>
-        </div>
-        <button
-          onClick={() => {
-            setAba("ativas");
-            setTutorNovaSelecionado(null);
-            setFormNova({ pessoa_id: "", pet_id: "", motivo: "", box: "", responsavel: "" });
-            setModalNova(true);
-          }}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          <Plus size={15} />
-          Nova internação
-        </button>
-      </div>
+      <InternacoesHeader onNovaInternacao={abrirNovaInternacao} />
 
-      {/* Abas */}
-      <div className="flex border-b border-gray-200">
-        {[{ id: "ativas", label: "Ativas" }, { id: "historico", label: "Histórico" }].map((a) => (
-          <button key={a.id} onClick={() => setAba(a.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${aba === a.id ? "border-purple-500 text-purple-600" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
-            {a.label}
-          </button>
-        ))}
-      </div>
+      <InternacoesTabs aba={aba} onChangeAba={setAba} />
 
-      {/* Erro */}
       {erro && (
         <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm">
           <AlertCircle size={16} />
           <span>{erro}</span>
-          <button className="ml-auto" onClick={() => setErro(null)}>✕</button>
+          <button type="button" className="ml-auto" onClick={() => setErro(null)} aria-label="Fechar alerta">
+            x
+          </button>
         </div>
       )}
 
       {aba === "historico" && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Filtros do histórico</p>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Alta de</label>
-              <input
-                type="date"
-                value={filtroDataAltaInicio}
-                onChange={(e) => setFiltroDataAltaInicio(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Alta até</label>
-              <input
-                type="date"
-                value={filtroDataAltaFim}
-                onChange={(e) => setFiltroDataAltaFim(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Pessoa (tutor)</label>
-              <select
-                value={filtroPessoaHistorico}
-                onChange={(e) => {
-                  setFiltroPessoaHistorico(e.target.value);
-                  setFiltroPetHistorico("");
-                }}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="">Todas</option>
-                {pessoas.map((pessoa) => <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Pet</label>
-              <select
-                value={filtroPetHistorico}
-                onChange={(e) => setFiltroPetHistorico(e.target.value)}
-                disabled={!filtroPessoaHistorico}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white disabled:opacity-60"
-              >
-                <option value="">Todos</option>
-                {petsHistoricoDaPessoa.map((p) => <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
+        <HistoricoInternacoesFiltros
+          pessoas={pessoas}
+          petsHistoricoDaPessoa={petsHistoricoDaPessoa}
+          filtroDataAltaInicio={filtroDataAltaInicio}
+          filtroDataAltaFim={filtroDataAltaFim}
+          filtroPessoaHistorico={filtroPessoaHistorico}
+          filtroPetHistorico={filtroPetHistorico}
+          onChangeDataAltaInicio={setFiltroDataAltaInicio}
+          onChangeDataAltaFim={setFiltroDataAltaFim}
+          onChangePessoaHistorico={selecionarPessoaHistorico}
+          onChangePetHistorico={setFiltroPetHistorico}
+        />
       )}
 
-      {/* Centro de Internação */}
       {carregando ? (
-        <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
-        </div>
+        <InternacoesLoadingState />
       ) : internacoes.length === 0 ? (
-        <div className="p-10 text-center bg-white border border-gray-200 rounded-xl">
-          <BedDouble size={36} className="mx-auto text-gray-200 mb-3" />
-          <p className="text-gray-400 text-sm">Nenhuma internação {aba === "ativas" ? "ativa" : "registrada"}.</p>
-        </div>
+        <InternacoesEmptyState aba={aba} />
       ) : (
         <div className="space-y-3">
           {aba === "ativas" && (
-            <div className="flex flex-wrap gap-2 bg-white border border-gray-200 rounded-xl p-2">
-              {[
-                { id: "widget", label: "Widget (resumo)", icon: LayoutGrid },
-                { id: "mapa", label: "Mapa da internação", icon: MapIcon },
-                { id: "lista", label: "Lista de internados", icon: List },
-                { id: "agenda", label: "Agenda de procedimentos", icon: BellRing },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setCentroAba(item.id)}
-                    className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-colors ${
-                      centroAba === item.id
-                        ? "bg-purple-600 text-white border-purple-600"
-                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    <Icon size={13} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
+            <CentroInternacaoTabs
+              centroAba={centroAba}
+              onChangeCentroAba={setCentroAba}
+            />
           )}
 
           {aba === "ativas" && centroAba === "mapa" && (
-            <div className="space-y-3">
-              <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col md:flex-row md:items-end gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Mapa visual de baias</p>
-                  <p className="text-xs text-gray-500">Estilo assento: vermelho ocupado, verde disponível.</p>
-                </div>
-                <div className="md:ml-auto w-full md:w-56">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Total de baias no local</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="200"
-                    value={totalBaias}
-                    onChange={(e) => {
-                      const valor = Number.parseInt(e.target.value || "0", 10);
-                      if (!Number.isFinite(valor)) return;
-                      setTotalBaias(Math.max(1, Math.min(200, valor)));
-                    }}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
-                  {mapaInternacao.map((baia) => {
-                    const ocupada = baia.ocupada;
-                    const intern = baia.internacao;
-                    return (
-                      <div
-                        key={String(baia.numero)}
-                        onClick={() => {
-                          if (!intern?.id) return;
-                          setAba("ativas");
-                          setCentroAba("lista");
-                          abrirDetalhe(intern.id);
-                        }}
-                        className={`rounded-xl border p-3 min-h-[92px] transition-colors ${
-                          ocupada
-                            ? "border-red-300 bg-red-50"
-                            : "border-emerald-300 bg-emerald-50"
-                        } ${ocupada ? "cursor-pointer hover:shadow-sm" : ""}`}
-                      >
-                        <p className={`text-sm font-bold ${ocupada ? "text-red-700" : "text-emerald-700"}`}>
-                          Baia {baia.numero}
-                        </p>
-                        {ocupada ? (
-                          <>
-                            <p className="text-xs font-semibold text-gray-800 mt-2 truncate">{intern?.pet_nome ?? "Internado"}</p>
-                            <p className="text-[11px] text-gray-600 truncate">{intern?.motivo ?? "Sem motivo"}</p>
-                          </>
-                        ) : (
-                          <p className="text-xs text-emerald-700 mt-2">Disponível</p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 mb-2">Legenda</p>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-red-100 text-red-700 border border-red-200">Baia ocupada</span>
-                  <span className="px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">Baia disponível</span>
-                </div>
-              </div>
-            </div>
+            <MapaInternacaoPanel
+              mapaInternacao={mapaInternacao}
+              totalBaias={totalBaias}
+              setTotalBaias={setTotalBaias}
+              onSelecionarInternacao={selecionarInternacaoNoMapa}
+            />
           )}
 
           {(aba === "historico" || (aba === "ativas" && centroAba === "lista")) && (
-            <div className="space-y-3">
-              {aba === "ativas" && (
-                <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
-                  <p className="text-sm font-semibold text-gray-700">Ficha de internados</p>
-                  <p className="text-xs text-gray-500">Evoluções + procedimentos concluídos ficam centralizados por internação.</p>
-                </div>
-              )}
-              {internacoesOrdenadas.map((intern) => {
-                const aberta = expandida === intern.id;
-                return (
-                  <div key={intern.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                    <div
-                      className="flex items-center gap-4 px-5 py-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => abrirDetalhe(intern.id)}
-                    >
-                      <BedDouble size={18} className="text-purple-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-800">{intern.pet_nome ?? `Pet #${String(intern.pet_id ?? "").slice(0, 6)}`}</p>
-                        {intern.tutor_nome && <p className="text-xs text-gray-500">Tutor: {intern.tutor_nome}</p>}
-                        <p className="text-xs text-gray-400 truncate">{intern.motivo ?? intern.motivo_internacao}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs text-gray-400">Entrada: {formatData(intern.data_entrada)}</p>
-                        {intern.data_saida && <p className="text-xs text-gray-400">Alta: {formatData(intern.data_saida)}</p>}
-                        {intern.box && <p className="text-xs text-gray-500">Box: {intern.box}</p>}
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CORES[intern.status] ?? "bg-gray-100"}`}>
-                        {intern.status}
-                      </span>
-                      {(intern.status === "ativa" || intern.status === "internado") && (
-                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => abrirModalInsumoRapido(intern.id)}
-                            className="flex items-center gap-1 text-xs px-2 py-1 border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50"
-                          >
-                            + Insumo
-                          </button>
-                          <button
-                            onClick={() => setModalEvolucao(intern.id)}
-                            className="flex items-center gap-1 text-xs px-2 py-1 border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-50"
-                          >
-                            <Activity size={12} />
-                            Evolução
-                          </button>
-                          <button
-                            onClick={() => setModalAlta(intern.id)}
-                            className="flex items-center gap-1 text-xs px-2 py-1 border border-green-200 text-green-600 rounded-lg hover:bg-green-50"
-                          >
-                            <ArrowUpCircle size={12} />
-                            Alta
-                          </button>
-                          <button
-                            onClick={() => navigate(`/pets/${intern.pet_id}`)}
-                            className="flex items-center gap-1 text-xs px-2 py-1 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
-                          >
-                            Ficha do pet
-                          </button>
-                          <button
-                            onClick={() => abrirHistoricoPet(intern.pet_id, intern.pet_nome ?? `Pet #${intern.pet_id}`)}
-                            className="flex items-center gap-1 text-xs px-2 py-1 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50"
-                          >
-                            Detalhes
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {aberta && (
-                      <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
-                        {(() => {
-                          const serie = montarSerieEvolucao(evolucoes[intern.id] ?? []);
-                          if (serie.length < 2) return null;
-                          return (
-                            <div className="mb-4 rounded-xl border border-blue-100 bg-white p-4">
-                              <p className="text-xs font-semibold text-gray-500 mb-3">Curva de evolução</p>
-                              <ResponsiveContainer width="100%" height={240}>
-                                <LineChart data={serie}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                                  <XAxis dataKey="horario" tick={{ fontSize: 11 }} />
-                                  <YAxis yAxisId="vital" tick={{ fontSize: 11 }} />
-                                  <YAxis yAxisId="peso" orientation="right" tick={{ fontSize: 11 }} />
-                                  <Tooltip />
-                                  <Legend />
-                                  <Line yAxisId="vital" type="monotone" dataKey="temperatura" name="Temperatura" stroke="#ef4444" strokeWidth={2} dot={false} connectNulls />
-                                  <Line yAxisId="vital" type="monotone" dataKey="fc" name="FC" stroke="#2563eb" strokeWidth={2} dot={false} connectNulls />
-                                  <Line yAxisId="vital" type="monotone" dataKey="fr" name="FR" stroke="#14b8a6" strokeWidth={2} dot={false} connectNulls />
-                                  <Line yAxisId="peso" type="monotone" dataKey="peso" name="Peso" stroke="#7c3aed" strokeWidth={2} dot={false} connectNulls />
-                                </LineChart>
-                              </ResponsiveContainer>
-                            </div>
-                          );
-                        })()}
-
-                        {(intern.observacoes_alta || intern.observacoes) && (
-                          <div className="mb-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                            <p className="text-xs font-semibold text-green-700 mb-1">Observação da alta</p>
-                            <p className="text-xs text-green-800">{intern.observacoes_alta || intern.observacoes}</p>
-                          </div>
-                        )}
-                        <p className="text-xs font-semibold text-gray-500 mb-3">Evoluções</p>
-                        {(evolucoes[intern.id] ?? []).length === 0 ? (
-                          <p className="text-xs text-gray-400">Nenhuma evolução registrada ainda.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {(evolucoes[intern.id] ?? []).map((ev, i) => (
-                              <div key={i} className="bg-white border border-gray-100 rounded-lg px-3 py-2 text-xs">
-                                <div className="flex items-center gap-2 text-gray-400 mb-1">
-                                  <Clock size={10} />
-                                  <span>{formatDateTime(ev.data_hora)}</span>
-                                </div>
-                                <div className="flex gap-4 text-gray-600">
-                                  {ev.temperatura && <span>Temp: {ev.temperatura}°C</span>}
-                                  {ev.freq_cardiaca && <span>FC: {ev.freq_cardiaca} bpm</span>}
-                                  {ev.freq_respiratoria && <span>FR: {ev.freq_respiratoria} rpm</span>}
-                                </div>
-                                {ev.observacoes && <p className="text-gray-500 mt-1">{ev.observacoes}</p>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="mt-4">
-                          <p className="text-xs font-semibold text-gray-500 mb-2">Procedimentos desta internação</p>
-                          {(procedimentosInternacao[intern.id] ?? []).length === 0 ? (
-                            <p className="text-xs text-gray-400">Nenhum procedimento registrado ainda.</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {(procedimentosInternacao[intern.id] ?? []).map((proc, idx) => (
-                                <div key={`${proc.id ?? idx}_proc`} className="bg-white border border-emerald-100 rounded-lg px-3 py-2 text-xs">
-                                  <div className="flex items-center gap-2 text-emerald-700 mb-1">
-                                    <Clock size={10} />
-                                    <span>{proc.horario_execucao ? formatDateTime(proc.horario_execucao) : formatDateTime(proc.data_hora)}</span>
-                                  </div>
-                                  <div className="mb-1">
-                                    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${proc.status === "agendado" ? "bg-amber-100 text-amber-700 border border-amber-200" : "bg-emerald-100 text-emerald-700 border border-emerald-200"}`}>
-                                      {proc.status === "agendado" ? "Agendado" : "Concluído"}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm font-semibold text-emerald-800">{proc.medicamento || "Procedimento"}</p>
-                                  <p className="text-gray-600">Dose: {proc.dose || "—"} • Via: {proc.via || "—"}</p>
-                                  {(proc.quantidade_prevista != null || proc.quantidade_executada != null || proc.quantidade_desperdicio != null) && (
-                                    <p className="text-gray-600">
-                                      Previsto: {formatQuantity(proc.quantidade_prevista, proc.unidade_quantidade)} • Feito: {formatQuantity(proc.quantidade_executada, proc.unidade_quantidade)} • Desperdício: {formatQuantity(proc.quantidade_desperdicio, proc.unidade_quantidade)}
-                                    </p>
-                                  )}
-                                  <p className="text-gray-500">Responsável: {proc.executado_por || "—"}</p>
-                                  {Array.isArray(proc.insumos) && proc.insumos.length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                      {proc.insumos.map((insumo, insumoIdx) => (
-                                        <span key={`${proc.id ?? idx}_insumo_${insumoIdx}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700">
-                                          {insumo.nome || `Produto #${insumo.produto_id}`} • {formatQuantity(insumo.quantidade, insumo.unidade)}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  {proc.observacao_execucao && <p className="text-gray-500 mt-1">Obs.: {proc.observacao_execucao}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <InternacoesListaPanel
+              aba={aba}
+              internacoesOrdenadas={internacoesOrdenadas}
+              expandida={expandida}
+              evolucoes={evolucoes}
+              procedimentosInternacao={procedimentosInternacao}
+              onAbrirDetalhe={abrirDetalhe}
+              onAbrirInsumoRapido={abrirModalInsumoRapido}
+              onAbrirEvolucao={setModalEvolucao}
+              onAbrirAlta={setModalAlta}
+              onAbrirFichaPet={(petId) => navigate(`/pets/${petId}`)}
+              onAbrirHistoricoPet={abrirHistoricoPet}
+            />
           )}
 
           {aba === "ativas" && centroAba === "widget" && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Internados agora</p>
-                  <p className="text-2xl font-bold text-purple-700">{indicadoresInternacao.total}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Sem baia definida</p>
-                  <p className="text-2xl font-bold text-amber-600">{indicadoresInternacao.semBaia}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Com evolução</p>
-                  <p className="text-2xl font-bold text-green-600">{indicadoresInternacao.comEvolucao}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Sem evolução</p>
-                  <p className="text-2xl font-bold text-red-600">{indicadoresInternacao.semEvolucao}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Média dias internado</p>
-                  <p className="text-2xl font-bold text-blue-700">{indicadoresInternacao.mediaDias}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Baias ocupadas</p>
-                  <p className="text-2xl font-bold text-red-700">{indicadoresInternacao.baiasOcupadas}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Baias livres</p>
-                  <p className="text-2xl font-bold text-emerald-700">{indicadoresInternacao.baiasLivres}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Procedimentos pendentes</p>
-                  <p className="text-2xl font-bold text-amber-700">{indicadoresInternacao.procedimentosPendentes}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <p className="text-xs text-gray-500">Procedimentos atrasados</p>
-                  <p className="text-2xl font-bold text-rose-700">{indicadoresInternacao.procedimentosAtrasados}</p>
-                </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 mb-2">Widget rápido de internados</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {internacoesOrdenadas.map((intern) => (
-                    <div key={intern.id} className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{intern.pet_nome ?? `Pet #${intern.pet_id}`}</p>
-                        <p className="text-xs text-gray-500">{intern.box || "Sem baia"} • {formatData(intern.data_entrada)}</p>
-                      </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_CORES[intern.status] ?? "bg-gray-100"}`}>
-                        {intern.status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <InternacoesWidgetPanel
+              indicadoresInternacao={indicadoresInternacao}
+              internacoesOrdenadas={internacoesOrdenadas}
+            />
           )}
 
           {aba === "ativas" && centroAba === "agenda" && (
-            <div className="space-y-3">
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Novo procedimento / lembrete</p>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Preencha o que estava previsto para o paciente: horário, nome do medicamento/procedimento,
-                      dose clínica, quantidade prevista e via. Se quiser apenas baixar um material usado na rotina,
-                      use o botão de insumo rápido.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => abrirModalInsumoRapido(agendaForm.internacao_id)}
-                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-                  >
-                    + Lançar insumo rápido
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <select
-                    value={agendaForm.internacao_id}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, internacao_id: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-                  >
-                    <option value="">Selecione o internado…</option>
-                    {internacoesOrdenadas.map((i) => (
-                      <option key={i.id} value={i.id}>{i.pet_nome ?? `Pet #${i.pet_id}`}{i.box ? ` (${i.box})` : ""}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="datetime-local"
-                    value={agendaForm.horario}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, horario: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Medicamento / procedimento"
-                    value={agendaForm.medicamento}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, medicamento: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Dose"
-                    value={agendaForm.dose}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, dose: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Qtd. prevista"
-                    value={agendaForm.quantidade_prevista}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, quantidade_prevista: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Unidade (mL, mg, comp, un...)"
-                    value={agendaForm.unidade_quantidade}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, unidade_quantidade: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Via (oral, IV, IM...)"
-                    value={agendaForm.via}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, via: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    value={agendaForm.internacao_id ? (internacaoSelecionadaAgenda?.box || "Sem baia") : "Selecione um internado"}
-                    disabled
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Lembrete (min)"
-                    value={agendaForm.lembrete_min}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, lembrete_min: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Observações"
-                    value={agendaForm.observacoes}
-                    onChange={(e) => setAgendaForm((p) => ({ ...p, observacoes: e.target.value }))}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-                  />
-                  <button
-                    onClick={adicionarProcedimentoAgenda}
-                    disabled={salvando}
-                    className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-60"
-                  >
-                    {salvando ? "Salvando..." : "Adicionar na agenda"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Horários de hoje e próximos</p>
-                {agendaCarregando ? (
-                  <p className="text-xs text-gray-400">Carregando agenda de procedimentos...</p>
-                ) : agendaOrdenada.length === 0 ? (
-                  <p className="text-xs text-gray-400">Nenhum procedimento agendado ainda.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {agendaOrdenada.map((item) => {
-                      const internacaoAtual = internacaoPorId.get(String(item.internacao_id));
-                      const baiaExibicao = (internacaoAtual?.box || item.baia || "").trim() || "Sem baia";
-                      const ts = new Date(item.horario).getTime();
-                      const diffMin = Math.round((ts - Date.now()) / 60000);
-                      const alerta = item.feito
-                        ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                        : diffMin <= 0
-                        ? "bg-rose-100 text-rose-700 border border-rose-200"
-                        : diffMin <= Number(item.lembrete_min || 30)
-                        ? "bg-amber-100 text-amber-700 border border-amber-200"
-                        : "bg-sky-100 text-sky-700 border border-sky-200";
-
-                      return (
-                        <div key={item.id} className="border border-slate-200 rounded-xl p-3 bg-gradient-to-r from-white to-slate-50/40 shadow-sm flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
-                          <div className="min-w-[160px] bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                            <p className="text-lg font-semibold text-slate-800 leading-none tabular-nums">{formatDateTime(item.horario)}</p>
-                            <span className={`inline-block mt-2 text-[11px] px-2 py-0.5 rounded-full font-medium ${alerta}`}>
-                              {item.feito ? "Concluído" : diffMin <= 0 ? "Atrasado" : `Em ${diffMin} min`}
-                            </span>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-base font-semibold text-indigo-800 leading-tight">{item.medicamento}</p>
-                            <p className="text-sm text-slate-600 mt-0.5">{item.pet_nome} • Baia {baiaExibicao}</p>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">
-                                Dose: {item.dose || "—"}
-                              </span>
-                              {(item.quantidade_prevista || item.unidade_quantidade) && (
-                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                                  Previsto: {formatQuantity(item.quantidade_prevista, item.unidade_quantidade)}
-                                </span>
-                              )}
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                Via: {item.via || "—"}
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                                Lembrete: {item.lembrete_min || 30} min
-                              </span>
-                            </div>
-                            {item.observacoes && <p className="text-xs text-slate-500 mt-2 italic">{item.observacoes}</p>}
-                            {item.feito && (
-                              <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
-                                <p className="text-[11px] text-emerald-700 font-semibold">
-                                  Feito por: {item.feito_por || "—"} • {item.horario_execucao ? formatDateTime(item.horario_execucao) : "—"}
-                                </p>
-                                {(item.quantidade_executada || item.quantidade_desperdicio) && (
-                                  <p className="text-[11px] text-emerald-800">
-                                    Feito: {formatQuantity(item.quantidade_executada, item.unidade_quantidade)} • Desperdício: {formatQuantity(item.quantidade_desperdicio, item.unidade_quantidade)}
-                                  </p>
-                                )}
-                                {item.observacao_execucao && (
-                                  <p className="text-[11px] text-emerald-800">Obs. execução: {item.observacao_execucao}</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            {item.feito ? (
-                              <button
-                                type="button"
-                                onClick={reabrirProcedimento}
-                                className="px-2.5 py-1.5 text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg transition-colors flex items-center gap-1"
-                              >
-                                <Check size={12} />
-                                Concluido
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => abrirModalFeito(item)}
-                                disabled={salvando}
-                                className="px-2.5 py-1.5 text-xs border border-emerald-200 text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors flex items-center gap-1 disabled:opacity-60"
-                              >
-                                <Check size={12} />
-                                Feito
-                              </button>
-                            )}
-                            <button
-                              onClick={() => removerProcedimentoAgenda(item.id)}
-                              disabled={salvando || item.feito}
-                              title={item.feito ? "Procedimento concluido nao pode ser excluido do historico clinico." : "Excluir procedimento agendado"}
-                              className="px-2.5 py-1.5 text-xs border border-rose-200 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors flex items-center gap-1 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              <Trash2 size={12} />
-                              Excluir
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
+            <AgendaProcedimentosPanel
+              agendaForm={agendaForm}
+              setAgendaForm={setAgendaForm}
+              internacoesOrdenadas={internacoesOrdenadas}
+              internacaoSelecionadaAgenda={internacaoSelecionadaAgenda}
+              agendaCarregando={agendaCarregando}
+              agendaOrdenada={agendaOrdenada}
+              internacaoPorId={internacaoPorId}
+              salvando={salvando}
+              onAdicionarProcedimentoAgenda={adicionarProcedimentoAgenda}
+              onAbrirInsumoRapido={abrirModalInsumoRapido}
+              onReabrirProcedimento={reabrirProcedimento}
+              onAbrirModalFeito={abrirModalFeito}
+              onRemoverProcedimentoAgenda={removerProcedimentoAgenda}
+            />
           )}
         </div>
       )}
