@@ -1,34 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import {
-  AlertCircle,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Link2,
-  Plus,
-} from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
 import { buildReturnTo } from "../../utils/petReturnFlow";
-import AgendaDiasView from "./agenda/AgendaDiasView";
-import AgendaMesView from "./agenda/AgendaMesView";
+import AgendaCalendarioCard from "./agenda/AgendaCalendarioCard";
+import AgendaConteudo from "./agenda/AgendaConteudo";
+import AgendaHeader from "./agenda/AgendaHeader";
+import AgendaPeriodoNav from "./agenda/AgendaPeriodoNav";
 import GerenciarAgendamentoModal from "./agenda/GerenciarAgendamentoModal";
 import NovoAgendamentoModal from "./agenda/NovoAgendamentoModal";
 import {
   FORM_NOVO_INICIAL,
-  HORARIOS_BASE,
   TIPO_ACAO,
-  TIPO_LABEL,
-  TIPO_OPTIONS,
   addDias,
   fimMes,
-  inicioDaGradeMensal,
   inicioMes,
   isoDate,
   normalizarTipoAgendamento,
 } from "./agenda/agendaUtils";
+import {
+  MOTIVO_PLACEHOLDER_POR_TIPO,
+  diagnosticarConflitoAgendamento,
+  formatTituloAgenda,
+  listarAgendamentosDia,
+  montarDiasMes,
+  montarDiasVisiveis,
+  montarHorariosAgendaModal,
+  montarMensagemGerenciamento,
+  obterDicaTipoAgendamento,
+  sugerirHoraLivreAgenda,
+} from "./agenda/agendaFormUtils";
 
 export default function VetAgenda() {
   const navigate = useNavigate();
@@ -253,43 +255,12 @@ export default function VetAgenda() {
     setDataRef((d) => addDias(d, direcao * delta));
   }
 
-  function formatTitulo() {
-    if (modo === "dia") {
-      return dataRef.toLocaleDateString("pt-BR", {
-        weekday: "long",
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-    }
-    if (modo === "mes") {
-      return dataRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-    }
-    return `${inicioSemana.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-    })} - ${fimSemana.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })}`;
-  }
-
   function agsDia(data) {
-    const key = isoDate(data);
-    return agendamentos
-      .filter((a) => (a.data_hora ?? "").startsWith(key))
-      .sort((a, b) => (a.data_hora ?? "").localeCompare(b.data_hora ?? ""));
+    return listarAgendamentosDia(agendamentos, data);
   }
 
   function sugerirHoraLivre(data) {
-    const ocupados = new Set(
-      agsDia(data)
-        .filter((ag) => ag.status !== "cancelado")
-        .map((ag) => String(ag.data_hora || "").slice(11, 16))
-        .filter(Boolean)
-    );
-    return HORARIOS_BASE.find((horario) => !ocupados.has(horario)) || "09:00";
+    return sugerirHoraLivreAgenda(agsDia(data));
   }
 
   function abrirModalNovo(dataBase = dataRef, agendamentoBase = null) {
@@ -414,30 +385,12 @@ export default function VetAgenda() {
     }
   }
 
-  const diasVisiveis =
-    modo === "semana" ? Array.from({ length: 7 }, (_, i) => addDias(inicioSemana, i)) : [dataRef];
-
-  const diasMes =
-    modo === "mes"
-      ? Array.from({ length: 42 }, (_, i) => addDias(inicioDaGradeMensal(dataRef), i))
-      : [];
+  const tituloAgenda = formatTituloAgenda(modo, dataRef, inicioSemana, fimSemana);
+  const diasVisiveis = montarDiasVisiveis(modo, dataRef, inicioSemana);
+  const diasMes = montarDiasMes(modo, dataRef);
 
   const horariosAgendaModal = useMemo(() => {
-    const ocupados = new Map();
-    for (const ag of agendaDiaModal) {
-      if (ag.status === "cancelado") continue;
-      const hora = String(ag.data_hora || "").slice(11, 16);
-      if (!hora) continue;
-      const atual = ocupados.get(hora) || [];
-      atual.push(ag);
-      ocupados.set(hora, atual);
-    }
-
-    return HORARIOS_BASE.map((horario) => ({
-      horario,
-      ocupados: ocupados.get(horario) || [],
-      livre: !ocupados.has(horario),
-    }));
+    return montarHorariosAgendaModal(agendaDiaModal);
   }, [agendaDiaModal]);
 
   const petSelecionadoModal = useMemo(
@@ -456,37 +409,13 @@ export default function VetAgenda() {
   );
 
   const diagnosticoConflitoSelecionado = useMemo(() => {
-    if (!formNovo.hora) {
-      return {
-        conflitosVeterinario: [],
-        conflitosConsultorio: [],
-        outrosNoHorario: [],
-      };
-    }
-
-    const ocupadosMesmoHorario = agendaDiaModal.filter((ag) => {
-      if (ag.status === "cancelado") return false;
-      if (agendamentoEditandoId && Number(ag.id) === Number(agendamentoEditandoId)) return false;
-      return String(ag.data_hora || "").slice(11, 16) === formNovo.hora;
+    return diagnosticarConflitoAgendamento({
+      agendaDiaModal,
+      agendamentoEditandoId,
+      hora: formNovo.hora,
+      veterinarioId: formNovo.veterinario_id,
+      consultorioId: formNovo.consultorio_id,
     });
-
-    const conflitosVeterinario = formNovo.veterinario_id
-      ? ocupadosMesmoHorario.filter(
-          (ag) => String(ag.veterinario_id || "") === String(formNovo.veterinario_id)
-        )
-      : [];
-
-    const conflitosConsultorio = formNovo.consultorio_id
-      ? ocupadosMesmoHorario.filter(
-          (ag) => String(ag.consultorio_id || "") === String(formNovo.consultorio_id)
-        )
-      : [];
-
-    return {
-      conflitosVeterinario,
-      conflitosConsultorio,
-      outrosNoHorario: ocupadosMesmoHorario,
-    };
   }, [agendaDiaModal, agendamentoEditandoId, formNovo.hora, formNovo.veterinario_id, formNovo.consultorio_id]);
 
   const conflitoHorarioSelecionado =
@@ -494,16 +423,8 @@ export default function VetAgenda() {
     diagnosticoConflitoSelecionado.conflitosConsultorio.length > 0;
 
   const tipoSelecionado = normalizarTipoAgendamento(formNovo.tipo);
-  const dicaTipoSelecionado =
-    TIPO_OPTIONS.find((item) => item.value === tipoSelecionado)?.hint ||
-    "Escolha o fluxo para o proximo passo operacional.";
-
-  const motivoPlaceholderPorTipo = {
-    consulta: "Ex: Consulta dermatologica, retorno clinico...",
-    retorno: "Ex: Retorno pos-cirurgico, reavaliacao...",
-    vacina: "Ex: V10 anual, antirrabica...",
-    exame: "Ex: Hemograma, ultrassom, bioquimico...",
-  };
+  const dicaTipoSelecionado = obterDicaTipoAgendamento(tipoSelecionado);
+  const motivoPlaceholderPorTipo = MOTIVO_PLACEHOLDER_POR_TIPO;
 
   const tipoAgendamentoSelecionado = agendamentoSelecionado
     ? normalizarTipoAgendamento(agendamentoSelecionado.tipo)
@@ -526,11 +447,10 @@ export default function VetAgenda() {
     ? "Continuar atendimento"
     : TIPO_ACAO[tipoAgendamentoSelecionado] ?? "Abrir atendimento";
 
-  const mensagemAgendamentoSelecionado = agendamentoSelecionado
-    ? agendamentoSelecionado.status === "em_atendimento"
-      ? "Esse agendamento ja esta em atendimento. Voce pode continuar, editar ou desfazer o inicio se foi aberto por engano."
-      : `Deseja iniciar o fluxo de ${TIPO_LABEL[tipoAgendamentoSelecionado] ?? "Consulta"} agora?`
-    : "";
+  const mensagemAgendamentoSelecionado = montarMensagemGerenciamento(
+    agendamentoSelecionado,
+    tipoAgendamentoSelecionado
+  );
 
   const bloqueioCamposAgendamento = {
     veterinario: veterinarios.length > 0 && !formNovo.veterinario_id,
@@ -639,58 +559,18 @@ export default function VetAgenda() {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-blue-100 p-2">
-            <Calendar size={22} className="text-blue-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Agenda</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex overflow-hidden rounded-lg border border-gray-200 text-sm">
-            <button
-              onClick={() => setModo("dia")}
-              className={`px-3 py-1.5 ${modo === "dia" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}
-            >
-              Dia
-            </button>
-            <button
-              onClick={() => setModo("semana")}
-              className={`px-3 py-1.5 ${modo === "semana" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}
-            >
-              Semana
-            </button>
-            <button
-              onClick={() => setModo("mes")}
-              className={`px-3 py-1.5 ${modo === "mes" ? "bg-blue-600 text-white" : "hover:bg-gray-50"}`}
-            >
-              Mes
-            </button>
-          </div>
-          <button
-            onClick={() => abrirModalNovo(dataRef)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <Plus size={15} />
-            Agendar
-          </button>
-        </div>
-      </div>
+      <AgendaHeader
+        modo={modo}
+        onChangeModo={setModo}
+        onAbrirNovo={() => abrirModalNovo(dataRef)}
+      />
 
-      <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-        <button onClick={() => nav(-1)} className="rounded-full p-1 hover:bg-gray-100">
-          <ChevronLeft size={18} className="text-gray-600" />
-        </button>
-        <button
-          onClick={() => setDataRef(new Date())}
-          className="flex-1 text-center text-sm font-medium capitalize text-gray-700"
-        >
-          {formatTitulo()}
-        </button>
-        <button onClick={() => nav(1)} className="rounded-full p-1 hover:bg-gray-100">
-          <ChevronRight size={18} className="text-gray-600" />
-        </button>
-      </div>
+      <AgendaPeriodoNav
+        titulo={tituloAgenda}
+        onAnterior={() => nav(-1)}
+        onHoje={() => setDataRef(new Date())}
+        onProximo={() => nav(1)}
+      />
 
       {erro && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -699,65 +579,25 @@ export default function VetAgenda() {
         </div>
       )}
 
-      <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-cyan-900">Agenda no celular</h2>
-            <p className="mt-1 text-sm text-cyan-800">
-              Assine sua agenda veterinaria no calendario do celular com um link privado ou baixe um arquivo .ics.
-            </p>
-            {calendarioMeta?.mensagem_escopo && (
-              <p className="mt-2 text-xs text-cyan-700">{calendarioMeta.mensagem_escopo}</p>
-            )}
-            {mensagemCalendario && (
-              <p className="mt-2 text-xs font-medium text-cyan-700">{mensagemCalendario}</p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={baixarCalendarioAgenda}
-              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100"
-            >
-              <Download size={14} />
-              Baixar .ics
-            </button>
-            <button
-              type="button"
-              onClick={copiarLinkCalendario}
-              disabled={carregandoCalendario || !calendarioMeta?.feed_url}
-              className="inline-flex items-center gap-2 rounded-lg border border-cyan-300 bg-white px-3 py-2 text-sm font-medium text-cyan-800 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Link2 size={14} />
-              Copiar link privado
-            </button>
-          </div>
-        </div>
-      </div>
+      <AgendaCalendarioCard
+        calendarioMeta={calendarioMeta}
+        carregandoCalendario={carregandoCalendario}
+        mensagemCalendario={mensagemCalendario}
+        onBaixarCalendario={baixarCalendarioAgenda}
+        onCopiarLink={copiarLinkCalendario}
+      />
 
-      {carregando ? (
-        <div className="flex h-40 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-500" />
-        </div>
-      ) : modo === "mes" ? (
-        <AgendaMesView
-          diasMes={diasMes}
-          dataRef={dataRef}
-          agsDia={agsDia}
-          abrindoAgendamentoId={abrindoAgendamentoId}
-          onAbrirNovo={abrirModalNovo}
-          onGerenciarAgendamento={abrirGerenciarAgendamento}
-        />
-      ) : (
-        <AgendaDiasView
-          modo={modo}
-          diasVisiveis={diasVisiveis}
-          agsDia={agsDia}
-          abrindoAgendamentoId={abrindoAgendamentoId}
-          onAbrirNovo={abrirModalNovo}
-          onGerenciarAgendamento={abrirGerenciarAgendamento}
-        />
-      )}
+      <AgendaConteudo
+        carregando={carregando}
+        modo={modo}
+        diasMes={diasMes}
+        diasVisiveis={diasVisiveis}
+        dataRef={dataRef}
+        agsDia={agsDia}
+        abrindoAgendamentoId={abrindoAgendamentoId}
+        onAbrirNovo={abrirModalNovo}
+        onGerenciarAgendamento={abrirGerenciarAgendamento}
+      />
 
       <GerenciarAgendamentoModal
         agendamento={agendamentoSelecionado}
