@@ -2,6 +2,7 @@
  * Hook centralizado para chamadas à API veterinária.
  */
 import { api } from "../../services/api";
+import { historicoInternacoesPetApi, uploadArquivoExameApi } from "./vetApiHelpers";
 
 const BASE = "/vet";
 
@@ -61,13 +62,7 @@ export const vetApi = {
   atualizarExame: (id, data) => api.patch(`${BASE}/exames/${id}`, data),
   interpretarExameIA: (id) => api.post(`${BASE}/exames/${id}/interpretar-ia`),
   processarArquivoExameIA: (id) => api.post(`${BASE}/exames/${id}/processar-arquivo-ia`),
-  uploadArquivoExame: (id, file) => {
-    const formData = new FormData();
-    formData.append("arquivo", file);
-    return api.post(`${BASE}/exames/${id}/arquivo`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
+  uploadArquivoExame: (id, file) => uploadArquivoExameApi(api, BASE, id, file),
 
   // Peso
   curvaPeso: (petId) => api.get(`${BASE}/pets/${petId}/peso`),
@@ -99,57 +94,7 @@ export const vetApi = {
     api.patch(`${BASE}/internacoes/procedimentos-agenda/${agendaId}/concluir`, data),
   removerProcedimentoAgendaInternacao: (agendaId) =>
     api.delete(`${BASE}/internacoes/procedimentos-agenda/${agendaId}`),
-  historicoInternacoesPet: async (petId) => {
-    const base = await api.get(`${BASE}/internacoes`, {
-      params: {
-        status: "",
-        pet_id: petId,
-      },
-    });
-
-    const lista = Array.isArray(base.data)
-      ? base.data
-      : (base.data?.items ?? []);
-
-    const historicoDetalhado = await Promise.all(
-      lista.map(async (internacao) => {
-        try {
-          const detalhe = await api.get(`${BASE}/internacoes/${internacao.id}`);
-          return {
-            internacao_id: internacao.id,
-            status: detalhe.data?.status ?? internacao.status,
-            motivo: detalhe.data?.motivo ?? internacao.motivo,
-            box: detalhe.data?.box ?? internacao.box,
-            data_entrada: detalhe.data?.data_entrada ?? internacao.data_entrada,
-            data_saida: detalhe.data?.data_saida ?? internacao.data_saida,
-            observacoes_alta: detalhe.data?.observacoes_alta ?? internacao.observacoes_alta,
-            evolucoes: detalhe.data?.evolucoes ?? [],
-            procedimentos: detalhe.data?.procedimentos ?? [],
-          };
-        } catch {
-          return {
-            internacao_id: internacao.id,
-            status: internacao.status,
-            motivo: internacao.motivo,
-            box: internacao.box,
-            data_entrada: internacao.data_entrada,
-            data_saida: internacao.data_saida,
-            observacoes_alta: internacao.observacoes_alta,
-            evolucoes: [],
-            procedimentos: [],
-          };
-        }
-      })
-    );
-
-    return {
-      ...base,
-      data: {
-        pet_id: petId,
-        historico: historicoDetalhado,
-      },
-    };
-  },
+  historicoInternacoesPet: (petId) => historicoInternacoesPetApi(api, BASE, petId),
   darAlta: (internacaoId, obs) =>
     api.patch(`${BASE}/internacoes/${internacaoId}/alta`, null, { params: { observacoes: obs } }),
 

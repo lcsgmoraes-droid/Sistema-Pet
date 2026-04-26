@@ -1,15 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  criarConsultaFormInicial,
-  criarInsumoRapidoFormInicial,
-  criarNovoExameFormInicial,
-} from "./consultaFormState";
+
 import useCalculadoraDoseConsulta from "./useCalculadoraDoseConsulta";
 import useConsultaAssinatura from "./useConsultaAssinatura";
 import useConsultaCatalogos from "./useConsultaCatalogos";
 import useConsultaEdicaoLoader from "./useConsultaEdicaoLoader";
 import useConsultaFormActions from "./useConsultaFormActions";
+import useConsultaFormState from "./useConsultaFormState";
 import useConsultaPdfDownloads from "./useConsultaPdfDownloads";
 import useConsultaTimeline from "./useConsultaTimeline";
 import usePrescricaoProcedimentosConsulta from "./usePrescricaoProcedimentosConsulta";
@@ -26,40 +23,19 @@ export default function useVetConsultaFormController() {
   const tipoQuery = searchParams.get("tipo") || "consulta";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
-
-  const [etapa, setEtapa] = useState(0);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState(null);
-  const [sucesso, setSucesso] = useState(null);
-  const [consultaIdAtual, setConsultaIdAtual] = useState(consultaId ?? null);
-  const [modalCalculadoraAberto, setModalCalculadoraAberto] = useState(false);
-  const [modalNovoExameAberto, setModalNovoExameAberto] = useState(false);
-  const [salvandoNovoExame, setSalvandoNovoExame] = useState(false);
-  const [modalNovoPetAberto, setModalNovoPetAberto] = useState(false);
-  const [refreshExamesToken, setRefreshExamesToken] = useState(0);
-  const [novoExameForm, setNovoExameForm] = useState(criarNovoExameFormInicial);
-  const [novoExameArquivo, setNovoExameArquivo] = useState(null);
-  const [modalInsumoAberto, setModalInsumoAberto] = useState(false);
-  const [salvandoInsumoRapido, setSalvandoInsumoRapido] = useState(false);
-  const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
-  const [insumoRapidoForm, setInsumoRapidoForm] = useState(criarInsumoRapidoFormInicial);
-  const [form, setForm] = useState(criarConsultaFormInicial);
-
-  const setCampo = useCallback((campo, valor) => {
-    setForm((prev) => ({ ...prev, [campo]: valor }));
-  }, []);
+  const state = useConsultaFormState(consultaId);
 
   const { pets, setPets, veterinarios, medicamentosCatalogo, procedimentosCatalogo } = useConsultaCatalogos();
   const { carregando, finalizado, setFinalizado } = useConsultaEdicaoLoader({
     isEdicao,
     consultaId,
-    setForm,
-    setErro,
+    setForm: state.setForm,
+    setErro: state.setErro,
   });
 
   const modoSomenteLeitura = isEdicao && finalizado;
   const tituloConsulta = modoSomenteLeitura
-    ? "Consulta finalizada (somente visualização)"
+    ? "Consulta finalizada (somente visualizacao)"
     : isEdicao
       ? "Continuar consulta"
       : "Nova consulta";
@@ -67,8 +43,8 @@ export default function useVetConsultaFormController() {
   const selecaoTutorPet = useTutorPetSelection({
     pets,
     setPets,
-    formPetId: form.pet_id,
-    setCampo,
+    formPetId: state.form.pet_id,
+    setCampo: state.setCampo,
     isEdicao,
     petIdQuery,
     novoPetIdQuery,
@@ -77,33 +53,32 @@ export default function useVetConsultaFormController() {
   });
 
   const calculadora = useCalculadoraDoseConsulta({
-    formPesoKg: form.peso_kg,
+    formPesoKg: state.form.peso_kg,
     petSelecionado: selecaoTutorPet.petSelecionado,
     medicamentosCatalogo,
   });
-
-  const timeline = useConsultaTimeline(consultaIdAtual);
+  const timeline = useConsultaTimeline(state.consultaIdAtual);
   const assinatura = useConsultaAssinatura({
     modoSomenteLeitura,
-    consultaIdAtual,
+    consultaIdAtual: state.consultaIdAtual,
   });
   const pdfDownloads = useConsultaPdfDownloads({
-    consultaIdAtual,
-    setErro,
+    consultaIdAtual: state.consultaIdAtual,
+    setErro: state.setErro,
   });
   const prescricoesProcedimentos = usePrescricaoProcedimentosConsulta({
-    form,
-    setForm,
+    form: state.form,
+    setForm: state.setForm,
     medicamentosCatalogo,
     procedimentosCatalogo,
-    setErro,
+    setErro: state.setErro,
   });
 
   const contextoConsultaParams = useMemo(() => {
-    if (!form.pet_id) return "";
+    if (!state.form.pet_id) return "";
     const params = new URLSearchParams();
-    params.set("pet_id", String(form.pet_id));
-    if (consultaIdAtual) params.set("consulta_id", String(consultaIdAtual));
+    params.set("pet_id", String(state.form.pet_id));
+    if (state.consultaIdAtual) params.set("consulta_id", String(state.consultaIdAtual));
     if (agendamentoIdQuery) params.set("agendamento_id", String(agendamentoIdQuery));
     if (selecaoTutorPet.tutorSelecionado?.id) {
       params.set("tutor_id", String(selecaoTutorPet.tutorSelecionado.id));
@@ -112,38 +87,38 @@ export default function useVetConsultaFormController() {
       params.set("tutor_nome", selecaoTutorPet.tutorSelecionado.nome);
     }
     return params.toString();
-  }, [form.pet_id, consultaIdAtual, agendamentoIdQuery, selecaoTutorPet.tutorSelecionado]);
+  }, [state.form.pet_id, state.consultaIdAtual, agendamentoIdQuery, selecaoTutorPet.tutorSelecionado]);
 
   const acoes = useConsultaFormActions({
     agendamentoIdQuery,
     carregarTimelineConsulta: timeline.carregarTimelineConsulta,
-    consultaIdAtual,
+    consultaIdAtual: state.consultaIdAtual,
     contextoConsultaParams,
-    etapa,
-    form,
-    insumoRapidoForm,
-    insumoRapidoSelecionado,
+    etapa: state.etapa,
+    form: state.form,
+    insumoRapidoForm: state.insumoRapidoForm,
+    insumoRapidoSelecionado: state.insumoRapidoSelecionado,
     navigate,
-    novoExameArquivo,
-    novoExameForm,
+    novoExameArquivo: state.novoExameArquivo,
+    novoExameForm: state.novoExameForm,
     pets,
     selecionarPetCriado: selecaoTutorPet.selecionarPetCriado,
-    setConsultaIdAtual,
-    setErro,
-    setEtapa,
+    setConsultaIdAtual: state.setConsultaIdAtual,
+    setErro: state.setErro,
+    setEtapa: state.setEtapa,
     setFinalizado,
-    setInsumoRapidoForm,
-    setInsumoRapidoSelecionado,
-    setModalInsumoAberto,
-    setModalNovoExameAberto,
-    setModalNovoPetAberto,
-    setNovoExameArquivo,
-    setNovoExameForm,
-    setRefreshExamesToken,
-    setSalvando,
-    setSalvandoInsumoRapido,
-    setSalvandoNovoExame,
-    setSucesso,
+    setInsumoRapidoForm: state.setInsumoRapidoForm,
+    setInsumoRapidoSelecionado: state.setInsumoRapidoSelecionado,
+    setModalInsumoAberto: state.setModalInsumoAberto,
+    setModalNovoExameAberto: state.setModalNovoExameAberto,
+    setModalNovoPetAberto: state.setModalNovoPetAberto,
+    setNovoExameArquivo: state.setNovoExameArquivo,
+    setNovoExameForm: state.setNovoExameForm,
+    setRefreshExamesToken: state.setRefreshExamesToken,
+    setSalvando: state.setSalvando,
+    setSalvandoInsumoRapido: state.setSalvandoInsumoRapido,
+    setSalvandoNovoExame: state.setSalvandoNovoExame,
+    setSucesso: state.setSucesso,
     tipoQuery,
     tutorSelecionado: selecaoTutorPet.tutorSelecionado,
   });
@@ -155,44 +130,21 @@ export default function useVetConsultaFormController() {
     ...prescricoesProcedimentos,
     ...selecaoTutorPet,
     ...timeline,
-    abrirModalCalculadora: () => setModalCalculadoraAberto(true),
-    abrirModalNovoExame: () => setModalNovoExameAberto(true),
+    ...state,
+    abrirModalCalculadora: () => state.setModalCalculadoraAberto(true),
+    abrirModalNovoExame: () => state.setModalNovoExameAberto(true),
     abrirTimelineLink: (link) => navigate(link),
     assinatura,
     carregando,
-    consultaIdAtual,
-    etapa,
-    erro,
     finalizado,
-    form,
-    handleClearErro: () => setErro(null),
-    handleClearSucesso: () => setSucesso(null),
+    handleClearErro: () => state.setErro(null),
+    handleClearSucesso: () => state.setSucesso(null),
     isEdicao,
     medicamentosCatalogo,
-    modalCalculadoraAberto,
-    modalInsumoAberto,
-    modalNovoExameAberto,
-    modalNovoPetAberto,
     modoSomenteLeitura,
     navigate,
-    novoExameForm,
     procedimentosCatalogo,
-    refreshExamesToken,
-    salvando,
-    salvandoInsumoRapido,
-    salvandoNovoExame,
     setCalculadoraForm: calculadora.setCalculadoraForm,
-    setEtapa,
-    setInsumoRapidoForm,
-    setInsumoRapidoSelecionado,
-    setModalCalculadoraAberto,
-    setModalInsumoAberto,
-    setModalNovoExameAberto,
-    setModalNovoPetAberto,
-    setNovoExameArquivo,
-    setNovoExameForm,
-    setCampo,
-    sucesso,
     tituloConsulta,
     veterinarios,
   };
