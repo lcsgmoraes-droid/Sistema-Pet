@@ -358,6 +358,7 @@ function App() {
                   <Route path="veterinario/consultas/:consultaId" element={<VetConsultaForm />} />
                   <Route path="veterinario/exames" element={<VetExamesAnexados />} />
                   <Route path="veterinario/ia" element={<VetAssistenteIA />} />
+                  <Route path="veterinario/assistente-ia" element={<VetAssistenteIA />} />
                   <Route path="veterinario/calculadora-doses" element={<VetCalculadoraDoses />} />
                   <Route path="veterinario/vacinas" element={<VetVacinas />} />
                   <Route path="veterinario/internacoes" element={<VetInternacoes />} />

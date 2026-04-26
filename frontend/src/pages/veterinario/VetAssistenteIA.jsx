@@ -1,39 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Bot,
-  Send,
-  Stethoscope,
-  FlaskConical,
-  Calculator,
-  Pill,
-  MessageSquarePlus,
-  RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  Link2,
-} from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { vetApi } from "./vetApi";
 import { api } from "../../services/api";
-import TutorAutocomplete from "../../components/TutorAutocomplete";
-import NovoPetButton from "../../components/veterinario/NovoPetButton";
 import { buildReturnTo } from "../../utils/petReturnFlow";
-
-const css = {
-  input:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-300",
-  select:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-cyan-300",
-  textarea:
-    "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm min-h-[90px] focus:outline-none focus:ring-2 focus:ring-cyan-300",
-};
-
-function criarIdMensagemLocal() {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID();
-  }
-  return `msg-${Date.now()}-${Math.round(Math.random() * 100000)}`;
-}
+import AssistenteIAComposer from "./assistenteIA/AssistenteIAComposer";
+import AssistenteIAContextoPanel from "./assistenteIA/AssistenteIAContextoPanel";
+import AssistenteIAConversaSelector from "./assistenteIA/AssistenteIAConversaSelector";
+import AssistenteIAHeader from "./assistenteIA/AssistenteIAHeader";
+import AssistenteIAHistorico from "./assistenteIA/AssistenteIAHistorico";
+import { criarIdMensagemLocal } from "./assistenteIA/assistenteIAUtils";
 
 export default function VetAssistenteIA() {
   const navigate = useNavigate();
@@ -298,6 +273,23 @@ export default function VetAssistenteIA() {
     setMensagem(texto);
   }
 
+  function selecionarTutor(cliente) {
+    setTutorSelecionado(cliente);
+    setPetId("");
+    setConsultaId("");
+    setExameId("");
+  }
+
+  function selecionarPet(proximoPetId) {
+    setPetId(proximoPetId);
+    setConsultaId("");
+    setExameId("");
+  }
+
+  function abrirConsulta(consultaIdAlvo) {
+    navigate(`/veterinario/consultas/${consultaIdAlvo}`);
+  }
+
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search),
     [location.pathname, location.search]
@@ -311,315 +303,63 @@ export default function VetAssistenteIA() {
     [exames, exameId]
   );
 
-  function formatarLabelConsulta(consulta) {
-    if (!consulta) return "Consulta";
-    const pedacos = [`#${consulta.id}`];
-    if (consulta.status) {
-      pedacos.push(String(consulta.status).replaceAll("_", " "));
-    }
-    const dataRef = consulta.created_at || consulta.data_hora;
-    if (dataRef) {
-      pedacos.push(
-        new Date(dataRef).toLocaleString("pt-BR", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-    }
-    if (consulta.motivo_consulta) {
-      pedacos.push(consulta.motivo_consulta);
-    }
-    return pedacos.filter(Boolean).join(" • ");
-  }
-
-  let memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-500">Memória: verificando...</span>;
-  if (memoriaAtiva === true) {
-    memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700">Memória ativa</span>;
-  }
-  if (memoriaAtiva === false) {
-    memoriaBadge = <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">Memória indisponível</span>;
-  }
-
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-cyan-100 rounded-xl">
-          <Bot size={20} className="text-cyan-700" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Assistente IA Veterinário</h1>
-          <p className="text-xs text-gray-500">Aba dedicada para cálculo de dose, interação medicamentosa e discussão clínica.</p>
-        </div>
-        <div className="ml-auto">{memoriaBadge}</div>
-      </div>
+      <AssistenteIAHeader memoriaAtiva={memoriaAtiva} />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div className="md:col-span-2">
-            <label htmlFor="vet-ia-conversa" className="block text-xs font-medium text-gray-600 mb-1">Conversa salva</label>
-            <select id="vet-ia-conversa" value={conversaId} onChange={(e) => setConversaId(e.target.value)} className={css.select}>
-              <option value="">Nova conversa</option>
-              {conversas.map((c) => (
-                <option key={c.id} value={c.id}>{c.titulo || `Conversa #${c.id}`}</option>
-              ))}
-            </select>
-            <label className="mt-2 inline-flex items-center gap-2 text-xs text-gray-600">
-              <input
-                type="checkbox"
-                checked={filtrarConversasContexto}
-                onChange={(e) => setFiltrarConversasContexto(e.target.checked)}
-              />
-              <span>Filtrar conversas pelo contexto atual (pet/consulta/exame)</span>
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={novaConversa}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50"
-            >
-              <MessageSquarePlus size={14} /> Nova
-            </button>
-            <button
-              type="button"
-              onClick={carregarConversas}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-gray-200 hover:bg-gray-50"
-            >
-              <RefreshCw size={14} /> Atualizar
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setModo("atendimento")}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${
-              modo === "atendimento"
-                ? "bg-cyan-600 text-white border-cyan-600"
-                : "bg-white text-gray-600 border-gray-200"
-            }`}
-          >
-            <span className="inline-flex items-center gap-2"><Stethoscope size={14} /> Vincular atendimento</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setModo("livre")}
-            className={`px-3 py-1.5 text-sm rounded-lg border ${
-              modo === "livre"
-                ? "bg-cyan-600 text-white border-cyan-600"
-                : "bg-white text-gray-600 border-gray-200"
-            }`}
-          >
-            <span className="inline-flex items-center gap-2"><FlaskConical size={14} /> Conversa livre</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <div className="md:col-span-2">
-            <TutorAutocomplete
-              label="Tutor"
-              inputId="vet-ia-tutor"
-              selectedTutor={tutorSelecionado}
-              onSelect={(cliente) => {
-                setTutorSelecionado(cliente);
-                setPetId("");
-                setConsultaId("");
-                setExameId("");
-              }}
-            />
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <label htmlFor="vet-ia-pet" className="block text-xs font-medium text-gray-600">Pet (opcional)</label>
-              <NovoPetButton
-                tutorId={tutorSelecionado?.id}
-                tutorNome={tutorSelecionado?.nome}
-                returnTo={retornoNovoPet}
-              />
-            </div>
-            <select
-              id="vet-ia-pet"
-              value={petId}
-              onChange={(e) => {
-                setPetId(e.target.value);
-                setConsultaId("");
-                setExameId("");
-              }}
-              className={css.select}
-              disabled={!tutorSelecionado?.id}
-            >
-              <option value="">{tutorSelecionado?.id ? "Selecione o pet..." : "Selecione o tutor primeiro..."}</option>
-              {petsDoTutor.map((p) => (
-                <option key={p.id} value={p.id}>{p.nome}{p.especie ? ` (${p.especie})` : ""}</option>
-              ))}
-            </select>
-            {tutorSelecionado?.id && petsDoTutor.length === 0 && (
-              <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para este tutor.</p>
-            )}
-          </div>
-
-          {modo === "atendimento" && (
-            <>
-              <div>
-                <label htmlFor="vet-ia-consulta" className="block text-xs font-medium text-gray-600 mb-1">Consulta (opcional)</label>
-                <select id="vet-ia-consulta" value={consultaId} onChange={(e) => setConsultaId(e.target.value)} className={css.select}>
-                  <option value="">Sem consulta</option>
-                  {consultas.map((c) => (
-                    <option key={c.id} value={c.id}>{formatarLabelConsulta(c)}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="vet-ia-exame" className="block text-xs font-medium text-gray-600 mb-1">Exame (opcional)</label>
-                <select id="vet-ia-exame" value={exameId} onChange={(e) => setExameId(e.target.value)} className={css.select}>
-                  <option value="">Sem exame</option>
-                  {exames.map((ex) => (
-                    <option key={ex.id} value={ex.id}>{ex.nome || ex.tipo || `Exame #${ex.id}`}</option>
-                  ))}
-                </select>
-              </div>
-            </>
-          )}
-        </div>
-
-        {(consultaSelecionada || exameSelecionado) && (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {consultaSelecionada && (
-              <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-cyan-600">Consulta vinculada</p>
-                    <p className="font-semibold">#{consultaSelecionada.id}</p>
-                    <p className="text-xs text-cyan-700">
-                      {consultaSelecionada.motivo_consulta || "Sem motivo informado"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/veterinario/consultas/${consultaSelecionada.id}`)}
-                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-white px-3 py-2 text-xs font-medium text-cyan-700 hover:bg-cyan-100"
-                  >
-                    <Link2 size={13} />
-                    Abrir consulta
-                  </button>
-                </div>
-              </div>
-            )}
-            {exameSelecionado && (
-              <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
-                <p className="text-xs font-medium uppercase tracking-wide text-violet-600">Exame vinculado</p>
-                <p className="font-semibold">#{exameSelecionado.id} • {exameSelecionado.nome || exameSelecionado.tipo || "Exame"}</p>
-                <p className="text-xs text-violet-700">
-                  {exameSelecionado.arquivo_nome
-                    ? `Arquivo: ${exameSelecionado.arquivo_nome}`
-                    : "Sem arquivo anexado ainda"}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <label htmlFor="vet-ia-peso" className="block text-xs font-medium text-gray-600 mb-1">Peso (kg) para cálculo de dose</label>
-            <div className="relative">
-              <Calculator size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input id="vet-ia-peso" value={pesoKg} onChange={(e) => setPesoKg(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: 12,5" />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="vet-ia-med1" className="block text-xs font-medium text-gray-600 mb-1">Medicamento 1 (opcional)</label>
-            <div className="relative">
-              <Pill size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input id="vet-ia-med1" value={med1} onChange={(e) => setMed1(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: amoxicilina" />
-            </div>
-          </div>
-          <div>
-            <label htmlFor="vet-ia-med2" className="block text-xs font-medium text-gray-600 mb-1">Medicamento 2 (opcional)</label>
-            <div className="relative">
-              <Pill size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input id="vet-ia-med2" value={med2} onChange={(e) => setMed2(e.target.value)} className={`${css.input} pl-9`} placeholder="Ex: prednisolona" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => perguntaRapida("pode associar amoxicilina com prednisolona?")} className="text-xs px-2.5 py-1.5 rounded-md border border-cyan-200 text-cyan-700 hover:bg-cyan-50">Interação de medicamentos</button>
-          <button type="button" onClick={() => perguntaRapida("calcule a dose de amoxicilina por mg/kg") } className="text-xs px-2.5 py-1.5 rounded-md border border-cyan-200 text-cyan-700 hover:bg-cyan-50">Calcular dose</button>
-          <button type="button" onClick={() => perguntaRapida("pelos sintomas de vômito, apatia e febre, quais as principais possibilidades?") } className="text-xs px-2.5 py-1.5 rounded-md border border-cyan-200 text-cyan-700 hover:bg-cyan-50">Hipóteses por sintomas</button>
-          <button type="button" onClick={() => perguntaRapida("o que mais devo olhar para fechar diagnóstico?") } className="text-xs px-2.5 py-1.5 rounded-md border border-cyan-200 text-cyan-700 hover:bg-cyan-50">Checklist diagnóstico</button>
-        </div>
-
-        <textarea
-          value={mensagem}
-          onChange={(e) => setMensagem(e.target.value)}
-          className={css.textarea}
-          placeholder="Descreva o caso: sintomas, exames, medicações e sua pergunta..."
+        <AssistenteIAConversaSelector
+          conversaId={conversaId}
+          conversas={conversas}
+          filtrarConversasContexto={filtrarConversasContexto}
+          onAtualizarConversas={carregarConversas}
+          onNovaConversa={novaConversa}
+          setConversaId={setConversaId}
+          setFiltrarConversasContexto={setFiltrarConversasContexto}
         />
 
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={enviar}
-            disabled={!mensagem.trim() || carregando}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:opacity-60"
-          >
-            <Send size={14} /> {carregando ? "Enviando..." : "Perguntar à IA"}
-          </button>
-        </div>
+        <AssistenteIAContextoPanel
+          consultaId={consultaId}
+          consultaSelecionada={consultaSelecionada}
+          consultas={consultas}
+          exameId={exameId}
+          exameSelecionado={exameSelecionado}
+          exames={exames}
+          med1={med1}
+          med2={med2}
+          modo={modo}
+          onAbrirConsulta={abrirConsulta}
+          onSelecionarPet={selecionarPet}
+          onSelecionarTutor={selecionarTutor}
+          pesoKg={pesoKg}
+          petId={petId}
+          petsDoTutor={petsDoTutor}
+          retornoNovoPet={retornoNovoPet}
+          setConsultaId={setConsultaId}
+          setExameId={setExameId}
+          setMed1={setMed1}
+          setMed2={setMed2}
+          setModo={setModo}
+          setPesoKg={setPesoKg}
+          tutorSelecionado={tutorSelecionado}
+        />
 
-        {erro && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erro}</div>}
+        <AssistenteIAComposer
+          carregando={carregando}
+          erro={erro}
+          mensagem={mensagem}
+          onEnviar={enviar}
+          onPerguntaRapida={perguntaRapida}
+          setMensagem={setMensagem}
+        />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-gray-700">Conversa</h2>
-        {carregandoHistorico && (
-          <p className="text-xs text-gray-400">Carregando histórico...</p>
-        )}
-        {historico.length === 0 ? (
-          <p className="text-sm text-gray-400">Ainda sem mensagens. Envie a primeira pergunta.</p>
-        ) : (
-          <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-            {historico.map((msg) => (
-              <div key={msg.id || msg.localId || criarIdMensagemLocal()} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[88%] px-3 py-2 rounded-xl text-sm whitespace-pre-wrap ${msg.role === "user" ? "bg-cyan-600 text-white rounded-br-none" : "bg-gray-100 text-gray-800 rounded-bl-none"}`}>
-                  {msg.role === "ia" && <div className="text-[11px] font-semibold text-cyan-700 mb-1">IA Vet</div>}
-                  {msg.text}
-                  {msg.role === "ia" && msg.id ? (
-                    <div className="mt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => enviarFeedback(msg.id, true)}
-                        disabled={salvandoFeedbackId === String(msg.id)}
-                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border ${msg.feedback?.util === true ? "border-green-400 text-green-700 bg-green-50" : "border-gray-200 text-gray-600"}`}
-                      >
-                        <ThumbsUp size={11} /> Útil
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => enviarFeedback(msg.id, false)}
-                        disabled={salvandoFeedbackId === String(msg.id)}
-                        className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border ${msg.feedback?.util === false ? "border-amber-400 text-amber-700 bg-amber-50" : "border-gray-200 text-gray-600"}`}
-                      >
-                        <ThumbsDown size={11} /> Não útil
-                      </button>
-                    </div>
-                  ) : null}
-                  {msg.role === "ia" && msg.feedback?.comentario ? (
-                    <div className="mt-2 text-[11px] text-gray-500 border-t border-gray-200 pt-2">
-                      Comentário: {msg.feedback.comentario}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <AssistenteIAHistorico
+        carregandoHistorico={carregandoHistorico}
+        historico={historico}
+        onEnviarFeedback={enviarFeedback}
+        salvandoFeedbackId={salvandoFeedbackId}
+      />
     </div>
   );
 }

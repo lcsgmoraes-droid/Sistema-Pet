@@ -16,7 +16,7 @@ export default function FluxosVinculadosConsulta({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
+            onClick={() => abrirFluxoConsulta("/veterinario/ia")}
             disabled={!consultaIdAtual}
             className="inline-flex items-center gap-2 rounded-lg border border-purple-200 bg-white px-3 py-2 text-sm font-medium text-purple-700 hover:bg-purple-100 disabled:opacity-60"
           >

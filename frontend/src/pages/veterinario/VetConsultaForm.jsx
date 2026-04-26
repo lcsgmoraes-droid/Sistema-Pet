@@ -437,7 +437,7 @@ export default function VetConsultaForm() {
       <ConsultaHeader
         tituloConsulta={tituloConsulta}
         consultaIdAtual={consultaIdAtual}
-        onAbrirAssistente={() => abrirFluxoConsulta("/veterinario/assistente-ia")}
+        onAbrirAssistente={() => abrirFluxoConsulta("/veterinario/ia")}
         onAbrirCalculadora={() => setModalCalculadoraAberto(true)}
       />
 
