@@ -65,6 +65,7 @@ function ConsultaTableRow({ consulta, onAbrirConsulta }) {
       </td>
       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
         {formatDataConsulta(consulta.created_at)}
+        {" "}
         <span className="text-xs ml-1 text-gray-400">{formatHoraConsulta(consulta.created_at)}</span>
       </td>
       <td className="px-4 py-3 font-medium text-gray-800">{consulta.pet_nome ?? "-"}</td>
