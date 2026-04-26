@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
+import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
 const initialForm = {
   nome: "",
@@ -71,10 +72,11 @@ export default function BanhoTosaServicosView({ servicos, onChanged }) {
         </h2>
 
         <div className="mt-5 space-y-4">
-          <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} />
+          <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} help="Nome que aparece na agenda, na fila e no fechamento para o PDV." />
           <label className="block">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+            <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               Categoria
+              <BanhoTosaHelpTooltip text="Agrupa servicos para relatorios e filtros: banho, tosa, combo, higiene ou outro." />
             </span>
             <select
               value={form.categoria}
@@ -88,14 +90,14 @@ export default function BanhoTosaServicosView({ servicos, onChanged }) {
               <option value="outro">Outro</option>
             </select>
           </label>
-          <TextField label="Duracao padrao (min)" type="number" value={form.duracao_padrao_minutos} onChange={(value) => updateField("duracao_padrao_minutos", value)} />
-          <TextField label="Descricao" value={form.descricao} onChange={(value) => updateField("descricao", value)} />
+          <TextField label="Duracao padrao (min)" type="number" value={form.duracao_padrao_minutos} onChange={(value) => updateField("duracao_padrao_minutos", value)} help="Tempo usado para prever fim do agendamento e ocupacao da equipe." />
+          <TextField label="Descricao" value={form.descricao} onChange={(value) => updateField("descricao", value)} help="Explique o que esta incluso para padronizar a venda e o atendimento." />
 
           <div className="grid gap-2 sm:grid-cols-2">
-            <CheckField label="Requer banho" checked={form.requer_banho} onChange={(value) => updateField("requer_banho", value)} />
-            <CheckField label="Requer tosa" checked={form.requer_tosa} onChange={(value) => updateField("requer_tosa", value)} />
-            <CheckField label="Requer secagem" checked={form.requer_secagem} onChange={(value) => updateField("requer_secagem", value)} />
-            <CheckField label="Permite pacote" checked={form.permite_pacote} onChange={(value) => updateField("permite_pacote", value)} />
+            <CheckField label="Requer banho" checked={form.requer_banho} onChange={(value) => updateField("requer_banho", value)} help="Marca se o servico consome agua, shampoo e etapa de banho." />
+            <CheckField label="Requer tosa" checked={form.requer_tosa} onChange={(value) => updateField("requer_tosa", value)} help="Marca se precisa de tosador, mesa ou etapa de tosa." />
+            <CheckField label="Requer secagem" checked={form.requer_secagem} onChange={(value) => updateField("requer_secagem", value)} help="Marca se deve considerar secador/soprador no tempo e energia." />
+            <CheckField label="Permite pacote" checked={form.permite_pacote} onChange={(value) => updateField("permite_pacote", value)} help="Permite vender creditos recorrentes desse servico." />
           </div>
         </div>
 
@@ -169,14 +171,16 @@ export default function BanhoTosaServicosView({ servicos, onChanged }) {
   );
 }
 
-function TextField({ label, value, onChange, type = "text" }) {
+function TextField({ label, value, onChange, type = "text", help }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
         {label}
+        <BanhoTosaHelpTooltip text={help} />
       </span>
       <input
         type={type}
+        title={help || label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
@@ -185,9 +189,9 @@ function TextField({ label, value, onChange, type = "text" }) {
   );
 }
 
-function CheckField({ label, checked, onChange }) {
+function CheckField({ label, checked, onChange, help }) {
   return (
-    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
+    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" title={help || label}>
       <input
         type="checkbox"
         checked={checked}
@@ -195,6 +199,7 @@ function CheckField({ label, checked, onChange }) {
         className="h-4 w-4 rounded border-slate-300 text-orange-500"
       />
       {label}
+      <BanhoTosaHelpTooltip text={help} />
     </label>
   );
 }

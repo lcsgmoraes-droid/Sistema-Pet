@@ -2,6 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
 const initialForm = {
   nome: "",
@@ -72,10 +73,11 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
         </p>
 
         <div className="mt-5 space-y-4">
-          <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} />
+          <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} help="Identificacao do recurso na agenda e nos relatorios de ocupacao." />
           <label className="block">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+            <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
               Tipo
+              <BanhoTosaHelpTooltip text="Define como o recurso entra na capacidade: banheira, mesa, secador, box ou veiculo." />
             </span>
             <select
               value={form.tipo}
@@ -90,9 +92,9 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
               <option value="outro">Outro</option>
             </select>
           </label>
-          <TextField label="Capacidade simultanea" type="number" value={form.capacidade_simultanea} onChange={(value) => updateField("capacidade_simultanea", value)} />
-          <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => updateField("potencia_watts", value)} />
-          <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => updateField("custo_manutencao_hora", value)} />
+          <TextField label="Capacidade simultanea" type="number" value={form.capacidade_simultanea} onChange={(value) => updateField("capacidade_simultanea", value)} help="Quantidade de pets/atendimentos que o recurso comporta ao mesmo tempo." />
+          <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => updateField("potencia_watts", value)} help="Potencia do equipamento para calcular energia por tempo de uso." />
+          <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => updateField("custo_manutencao_hora", value)} help="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />
         </div>
 
         <button
@@ -157,15 +159,17 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
   );
 }
 
-function TextField({ label, value, onChange, type = "text" }) {
+function TextField({ label, value, onChange, type = "text", help }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
         {label}
+        <BanhoTosaHelpTooltip text={help} />
       </span>
       <input
         type={type}
         step={type === "number" ? "0.01" : undefined}
+        title={help || label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"

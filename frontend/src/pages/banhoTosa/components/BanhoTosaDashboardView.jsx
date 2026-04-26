@@ -1,3 +1,4 @@
+import BanhoTosaDefaultsPanel from "./BanhoTosaDefaultsPanel";
 import BanhoTosaMetricCard from "./BanhoTosaMetricCard";
 import BanhoTosaSimulador from "./BanhoTosaSimulador";
 
@@ -5,11 +6,14 @@ export default function BanhoTosaDashboardView({
   dashboard,
   config,
   parametros,
+  onChanged,
 }) {
   const parametrosAtivos = parametros.filter((item) => item.ativo).length;
 
   return (
     <div className="space-y-6">
+      <BanhoTosaDefaultsPanel onApplied={onChanged} />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <BanhoTosaMetricCard
           label="Agenda do dia"

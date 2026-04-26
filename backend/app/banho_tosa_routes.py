@@ -13,6 +13,7 @@ from app.banho_tosa_api.atendimentos_routes import router as atendimentos_router
 from app.banho_tosa_api.config_routes import router as config_router
 from app.banho_tosa_api.custos_routes import router as custos_router
 from app.banho_tosa_api.dashboard_routes import router as dashboard_router
+from app.banho_tosa_api.defaults_routes import router as defaults_router
 from app.banho_tosa_api.insumos_routes import router as insumos_router
 from app.banho_tosa_api.ocorrencias_routes import router as ocorrencias_router
 from app.banho_tosa_api.pacotes_recorrencias_routes import router as pacotes_recorrencias_router
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/banho-tosa", tags=["Banho & Tosa"])
 
 router.include_router(apoios_router)
 router.include_router(config_router)
+router.include_router(defaults_router)
 router.include_router(recursos_router)
 router.include_router(servicos_router)
 router.include_router(parametros_router)

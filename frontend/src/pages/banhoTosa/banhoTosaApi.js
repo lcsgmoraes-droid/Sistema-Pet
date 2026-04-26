@@ -10,6 +10,7 @@ export const banhoTosaApi = {
   dashboard: (params) => api.get(`${BASE}/dashboard`, { params }),
   obterConfiguracao: () => api.get(`${BASE}/configuracao`),
   atualizarConfiguracao: (data) => api.patch(`${BASE}/configuracao`, data),
+  aplicarDefaults: () => api.post(`${BASE}/defaults/aplicar`),
   listarRecursos: (params) => api.get(`${BASE}/recursos`, { params }),
   criarRecurso: (data) => api.post(`${BASE}/recursos`, data),
   atualizarRecurso: (id, data) => api.patch(`${BASE}/recursos/${id}`, data),

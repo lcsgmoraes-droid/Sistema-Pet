@@ -838,6 +838,8 @@ Implementado no primeiro bloco:
 - Templates configuraveis de campanha de retorno, com segmento por tipo, canal app/e-mail, variaveis de mensagem e disparo idempotente pela central de retornos.
 - App do tutor com tela de Banho & Tosa para acompanhar agenda/status do atendimento e registrar NPS apos entrega do pet.
 - Indicadores de NPS/avaliacoes no dashboard e no relatorio operacional para acompanhar qualidade percebida do servico.
+- Base padrao editavel para iniciar operacao com parametros medios de custos, portes, servicos, recursos e templates de retorno.
+- Tooltips explicativos nos principais campos de parametrizacao para facilitar implantacao assistida com cliente.
 
 Proximo bloco sugerido:
 

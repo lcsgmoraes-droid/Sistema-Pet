@@ -164,6 +164,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
         config={config}
         servicos={servicos}
         parametros={parametros}
+        onChanged={carregarDados}
       />
     );
   }

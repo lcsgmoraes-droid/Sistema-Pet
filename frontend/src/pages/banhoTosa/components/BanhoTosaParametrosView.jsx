@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 import BanhoTosaParametrosLista from "./BanhoTosaParametrosLista";
 
 const initialPorteForm = {
@@ -143,16 +144,16 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <TextField label="Inicio" type="time" value={configForm.horario_inicio} onChange={(value) => updateConfig("horario_inicio", value)} />
             <TextField label="Fim" type="time" value={configForm.horario_fim} onChange={(value) => updateConfig("horario_fim", value)} />
-            <TextField label="Slot agenda (min)" type="number" value={configForm.intervalo_slot_minutos} onChange={(value) => updateConfig("intervalo_slot_minutos", value)} />
-            <TextField label="Dias funcionamento" value={configForm.dias_funcionamento} onChange={(value) => updateConfig("dias_funcionamento", value)} />
-            <TextField label="Custo litro agua" type="number" value={configForm.custo_litro_agua} onChange={(value) => updateConfig("custo_litro_agua", value)} />
-            <TextField label="Vazao chuveiro L/min" type="number" value={configForm.vazao_chuveiro_litros_min} onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)} />
-            <TextField label="Custo kWh" type="number" value={configForm.custo_kwh} onChange={(value) => updateConfig("custo_kwh", value)} />
-            <TextField label="Toalha por banho" type="number" value={configForm.custo_toalha_padrao} onChange={(value) => updateConfig("custo_toalha_padrao", value)} />
-            <TextField label="Higienizacao por banho" type="number" value={configForm.custo_higienizacao_padrao} onChange={(value) => updateConfig("custo_higienizacao_padrao", value)} />
-            <TextField label="% taxas padrao" type="number" value={configForm.percentual_taxas_padrao} onChange={(value) => updateConfig("percentual_taxas_padrao", value)} />
-            <TextField label="Rateio operacional" type="number" value={configForm.custo_rateio_operacional_padrao} onChange={(value) => updateConfig("custo_rateio_operacional_padrao", value)} />
-            <TextField label="Horas produtivas mes" type="number" value={configForm.horas_produtivas_mes_padrao} onChange={(value) => updateConfig("horas_produtivas_mes_padrao", value)} />
+            <TextField label="Slot agenda (min)" type="number" value={configForm.intervalo_slot_minutos} onChange={(value) => updateConfig("intervalo_slot_minutos", value)} help="Intervalo usado para montar a grade de horarios e sugerir encaixes." />
+            <TextField label="Dias funcionamento" value={configForm.dias_funcionamento} onChange={(value) => updateConfig("dias_funcionamento", value)} help="Informe os dias separados por virgula: segunda,terca,quarta..." />
+            <TextField label="Custo litro agua" type="number" value={configForm.custo_litro_agua} onChange={(value) => updateConfig("custo_litro_agua", value)} help="Valor medio da agua e esgoto dividido por litro. Exemplo: R$ 0,02 por litro." />
+            <TextField label="Vazao chuveiro L/min" type="number" value={configForm.vazao_chuveiro_litros_min} onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)} help="Quantos litros o chuveiro consome por minuto durante o banho." />
+            <TextField label="Custo kWh" type="number" value={configForm.custo_kwh} onChange={(value) => updateConfig("custo_kwh", value)} help="Valor medio do kWh usado para calcular secador, soprador e equipamentos." />
+            <TextField label="Toalha por banho" type="number" value={configForm.custo_toalha_padrao} onChange={(value) => updateConfig("custo_toalha_padrao", value)} help="Custo medio de lavanderia, desgaste ou aluguel de toalha por atendimento." />
+            <TextField label="Higienizacao por banho" type="number" value={configForm.custo_higienizacao_padrao} onChange={(value) => updateConfig("custo_higienizacao_padrao", value)} help="Produtos de limpeza, desinfeccao de mesa/banheira e descartaveis." />
+            <TextField label="% taxas padrao" type="number" value={configForm.percentual_taxas_padrao} onChange={(value) => updateConfig("percentual_taxas_padrao", value)} help="Percentual medio de cartao, app ou taxa operacional sobre a venda." />
+            <TextField label="Rateio operacional" type="number" value={configForm.custo_rateio_operacional_padrao} onChange={(value) => updateConfig("custo_rateio_operacional_padrao", value)} help="Parcela media de aluguel, recepcao, limpeza e despesas fixas por atendimento." />
+            <TextField label="Horas produtivas mes" type="number" value={configForm.horas_produtivas_mes_padrao} onChange={(value) => updateConfig("horas_produtivas_mes_padrao", value)} help="Horas mensais usadas para ratear salario/custo do funcionario nos atendimentos." />
           </div>
 
           <button
@@ -177,14 +178,14 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <TextField label="Porte" value={porteForm.porte} onChange={(value) => updatePorte("porte", value)} />
-            <TextField label="Multiplicador preco" type="number" value={porteForm.multiplicador_preco} onChange={(value) => updatePorte("multiplicador_preco", value)} />
+            <TextField label="Multiplicador preco" type="number" value={porteForm.multiplicador_preco} onChange={(value) => updatePorte("multiplicador_preco", value)} help="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />
             <TextField label="Peso min kg" type="number" value={porteForm.peso_min_kg} onChange={(value) => updatePorte("peso_min_kg", value)} />
             <TextField label="Peso max kg" type="number" value={porteForm.peso_max_kg} onChange={(value) => updatePorte("peso_max_kg", value)} />
-            <TextField label="Agua padrao L" type="number" value={porteForm.agua_padrao_litros} onChange={(value) => updatePorte("agua_padrao_litros", value)} />
-            <TextField label="Energia padrao kWh" type="number" value={porteForm.energia_padrao_kwh} onChange={(value) => updatePorte("energia_padrao_kwh", value)} />
-            <TextField label="Tempo banho min" type="number" value={porteForm.tempo_banho_min} onChange={(value) => updatePorte("tempo_banho_min", value)} />
-            <TextField label="Tempo secagem min" type="number" value={porteForm.tempo_secagem_min} onChange={(value) => updatePorte("tempo_secagem_min", value)} />
-            <TextField label="Tempo tosa min" type="number" value={porteForm.tempo_tosa_min} onChange={(value) => updatePorte("tempo_tosa_min", value)} />
+            <TextField label="Agua padrao L" type="number" value={porteForm.agua_padrao_litros} onChange={(value) => updatePorte("agua_padrao_litros", value)} help="Estimativa usada quando nao houver medicao real do banho." />
+            <TextField label="Energia padrao kWh" type="number" value={porteForm.energia_padrao_kwh} onChange={(value) => updatePorte("energia_padrao_kwh", value)} help="Energia media esperada para secagem/equipamentos deste porte." />
+            <TextField label="Tempo banho min" type="number" value={porteForm.tempo_banho_min} onChange={(value) => updatePorte("tempo_banho_min", value)} help="Tempo medio de banho para calcular agenda, mao de obra e agua." />
+            <TextField label="Tempo secagem min" type="number" value={porteForm.tempo_secagem_min} onChange={(value) => updatePorte("tempo_secagem_min", value)} help="Tempo medio de secagem para energia e ocupacao de recurso." />
+            <TextField label="Tempo tosa min" type="number" value={porteForm.tempo_tosa_min} onChange={(value) => updatePorte("tempo_tosa_min", value)} help="Tempo medio de tosa para agenda e mao de obra." />
           </div>
 
           <button
@@ -202,15 +203,17 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
   );
 }
 
-function TextField({ label, value, onChange, type = "text" }) {
+function TextField({ label, value, onChange, type = "text", help }) {
   return (
     <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
         {label}
+        <BanhoTosaHelpTooltip text={help} />
       </span>
       <input
         type={type}
         step={type === "number" ? "0.01" : undefined}
+        title={help || label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
