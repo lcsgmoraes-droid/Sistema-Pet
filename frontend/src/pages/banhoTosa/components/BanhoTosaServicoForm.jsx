@@ -117,7 +117,6 @@ function TextField({ label, value, onChange, type = "text", help }) {
       </span>
       <input
         type={type}
-        title={help || label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
@@ -128,7 +127,7 @@ function TextField({ label, value, onChange, type = "text", help }) {
 
 function CheckField({ label, checked, onChange, help }) {
   return (
-    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" title={help || label}>
+    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
       <input
         type="checkbox"
         checked={checked}
