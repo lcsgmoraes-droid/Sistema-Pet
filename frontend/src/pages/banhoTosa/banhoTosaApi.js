@@ -17,6 +17,7 @@ export const banhoTosaApi = {
   listarServicos: (params) => api.get(`${BASE}/servicos`, { params }),
   criarServico: (data) => api.post(`${BASE}/servicos`, data),
   atualizarServico: (id, data) => api.patch(`${BASE}/servicos/${id}`, data),
+  removerServico: (id) => api.delete(`${BASE}/servicos/${id}`),
   listarParametrosPorte: (params) =>
     api.get(`${BASE}/parametros-porte`, { params }),
   criarParametroPorte: (data) => api.post(`${BASE}/parametros-porte`, data),

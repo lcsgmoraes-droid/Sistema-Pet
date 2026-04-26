@@ -5,7 +5,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.banho_tosa_models import BanhoTosaServico
+from app.banho_tosa_models import (
+    BanhoTosaAgendamentoServico,
+    BanhoTosaPacote,
+    BanhoTosaRecorrencia,
+    BanhoTosaServico,
+)
 from app.banho_tosa_schemas import (
     BanhoTosaServicoCreate,
     BanhoTosaServicoResponse,
@@ -56,6 +61,7 @@ def criar_servico(
     db.refresh(servico)
     return servico
 
+
 @router.patch("/servicos/{servico_id}", response_model=BanhoTosaServicoResponse)
 def atualizar_servico(
     servico_id: int,
@@ -89,3 +95,53 @@ def atualizar_servico(
     db.commit()
     db.refresh(servico)
     return servico
+
+
+@router.delete("/servicos/{servico_id}")
+def excluir_servico(
+    servico_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    servico = db.query(BanhoTosaServico).filter(
+        BanhoTosaServico.id == servico_id,
+        BanhoTosaServico.tenant_id == tenant_id,
+    ).first()
+    if not servico:
+        raise HTTPException(status_code=404, detail="Servico de Banho & Tosa nao encontrado")
+
+    if _servico_tem_vinculos(db, tenant_id, servico_id):
+        servico.ativo = False
+        db.commit()
+        return {
+            "deleted": False,
+            "deactivated": True,
+            "message": "Servico possui historico e foi desativado para preservar os registros.",
+        }
+
+    db.delete(servico)
+    db.commit()
+    return {
+        "deleted": True,
+        "deactivated": False,
+        "message": "Servico excluido.",
+    }
+
+
+def _servico_tem_vinculos(db: Session, tenant_id, servico_id: int) -> bool:
+    checks = [
+        db.query(BanhoTosaAgendamentoServico.id).filter(
+            BanhoTosaAgendamentoServico.tenant_id == tenant_id,
+            BanhoTosaAgendamentoServico.servico_id == servico_id,
+        ),
+        db.query(BanhoTosaPacote.id).filter(
+            BanhoTosaPacote.tenant_id == tenant_id,
+            BanhoTosaPacote.servico_id == servico_id,
+        ),
+        db.query(BanhoTosaRecorrencia.id).filter(
+            BanhoTosaRecorrencia.tenant_id == tenant_id,
+            BanhoTosaRecorrencia.servico_id == servico_id,
+        ),
+    ]
+    return any(query.first() is not None for query in checks)
