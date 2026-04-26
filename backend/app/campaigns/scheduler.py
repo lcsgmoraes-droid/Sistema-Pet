@@ -643,6 +643,7 @@ _DEFAULT_CAMPAIGNS = [
             "intermediate_stamp": None,
             "intermediate_reward_type": "coupon",
             "intermediate_reward_value": 0.0,
+            "benefit_channels": ["loja_fisica", "app", "ecommerce"],
             "notification_message": "Parabéns! Seu cartão está completo 🎉 Use o cupom: {code}",
         },
     },
@@ -656,6 +657,7 @@ _DEFAULT_CAMPAIGNS = [
             "gold_percent": 2.0,
             "diamond_percent": 3.0,
             "platinum_percent": 5.0,
+            "benefit_channels": ["loja_fisica", "app", "ecommerce"],
         },
     },
     {
@@ -718,6 +720,7 @@ _DEFAULT_CAMPAIGNS = [
             "coupon_value": 5.0,
             "coupon_valid_days": 15,
             "coupon_channel": "pdv",
+            "benefit_channels": ["loja_fisica", "app", "ecommerce"],
             "notification_message": "Obrigado pela compra! Use o cupom {code} na próxima visita.",
         },
     },

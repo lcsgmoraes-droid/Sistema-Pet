@@ -35,6 +35,11 @@ from app.campaigns.models import (
     CampaignStatusEnum,
     EventOriginEnum,
 )
+from app.campaigns.channel_scope import (
+    campaign_allows_sale_channel,
+    is_purchase_benefit_campaign,
+    normalize_benefit_channel,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +92,7 @@ class CampaignEngine:
             campaigns = self._get_active_campaigns(
                 tenant_id=event.tenant_id,
                 event_type=event.event_type,
+                sale_channel=(event.payload or {}).get("canal"),
             )
 
             for campaign in campaigns:
@@ -111,14 +117,19 @@ class CampaignEngine:
     # Métodos internos
     # ------------------------------------------------------------------
 
-    def _get_active_campaigns(self, tenant_id, event_type: str) -> list[Campaign]:
+    def _get_active_campaigns(
+        self,
+        tenant_id,
+        event_type: str,
+        sale_channel: Optional[str] = None,
+    ) -> list[Campaign]:
         """
         Retorna campanhas ativas ordenadas por prioridade.
         O mapeamento event_type → campaign_type fica nos handlers.
         """
         # TODO: implementar mapeamento event_type → campaign_type
         # Por ora retorna todas as campanhas ativas do tenant
-        return (
+        campaigns = (
             self.db.query(Campaign)
             .filter(
                 Campaign.tenant_id == tenant_id,
@@ -127,6 +138,26 @@ class CampaignEngine:
             .order_by(Campaign.priority.asc())
             .all()
         )
+
+        if event_type != "purchase_completed":
+            return campaigns
+
+        normalized_channel = normalize_benefit_channel(sale_channel)
+        filtered: list[Campaign] = []
+        for campaign in campaigns:
+            if is_purchase_benefit_campaign(campaign) and not campaign_allows_sale_channel(
+                campaign,
+                normalized_channel,
+            ):
+                logger.info(
+                    "[CampaignEngine] Campanha %s ignorada para canal=%s",
+                    campaign.id,
+                    normalized_channel,
+                )
+                continue
+            filtered.append(campaign)
+
+        return filtered
 
     def _run_campaign(self, campaign: Campaign, event: CampaignEventQueue) -> None:
         """

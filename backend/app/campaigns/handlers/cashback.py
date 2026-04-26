@@ -44,6 +44,7 @@ from app.campaigns.models import (
     RankLevelEnum,
 )
 from app.campaigns.notification_service import enqueue_email
+from app.campaigns.channel_scope import normalize_benefit_channel
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class CashbackHandler:
         customer_id = int(customer_id)
         venda_id = int(venda_id)
         venda_total = Decimal(str(venda_total))
-        canal = str(payload.get("canal") or "pdv").lower()
+        canal = normalize_benefit_channel(payload.get("canal") or "loja_fisica")
 
         try:
             rewarded = self._process(
@@ -146,6 +147,9 @@ class CashbackHandler:
         # Bônus adicional por canal de compra (PDV / App / Ecommerce)
         _CANAL_BONUS_KEY = {
             "pdv": "pdv_bonus_percent",
+            "loja_fisica": "pdv_bonus_percent",
+            "banho_tosa": "pdv_bonus_percent",
+            "veterinario": "pdv_bonus_percent",
             "app": "app_bonus_percent",
             "ecommerce": "ecommerce_bonus_percent",
             "aplicativo": "app_bonus_percent",

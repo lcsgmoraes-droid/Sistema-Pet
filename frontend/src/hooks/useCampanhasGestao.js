@@ -2,6 +2,7 @@ import { useState } from "react";
 import api from "../api";
 import { formatBRL } from "../utils/formatters";
 import { FRASES_ANIVERSARIO } from "../components/campanhas/campanhasConstants";
+import { formatBenefitChannelsSummary } from "../utils/campaignChannelScope";
 
 export default function useCampanhasGestao({
   setCampanhas,
@@ -130,10 +131,10 @@ export default function useCampanhasGestao({
   const formatarParams = (tipo, params) => {
     if (!params) return "-";
     if (tipo === "loyalty_stamp") {
-      return `${params.stamps_to_complete || "?"} carimbos -> R$ ${formatBRL(params.reward_value || 0)} de recompensa`;
+      return `${params.stamps_to_complete || "?"} carimbos -> R$ ${formatBRL(params.reward_value || 0)} de recompensa | Canais: ${formatBenefitChannelsSummary(params)}`;
     }
     if (tipo === "cashback") {
-      return `Bronze ${params.bronze_percent || 0}% / Prata ${params.silver_percent || 0}% / Ouro ${params.gold_percent || 0}%`;
+      return `Bronze ${params.bronze_percent || 0}% / Prata ${params.silver_percent || 0}% / Ouro ${params.gold_percent || 0}% | Canais: ${formatBenefitChannelsSummary(params)}`;
     }
     if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
       const tipoPresente = params.tipo_presente || "cupom";
@@ -160,7 +161,7 @@ export default function useCampanhasGestao({
         params.coupon_type === "fixed"
           ? `R$ ${formatBRL(params.coupon_value || 0)}`
           : `${params.coupon_value || "?"}%`;
-      return `Pos-compra: ${valor} desconto em ${params.coupon_valid_days || "?"} dias`;
+      return `Pos-compra: ${valor} desconto em ${params.coupon_valid_days || "?"} dias | Canais: ${formatBenefitChannelsSummary(params)}`;
     }
     return `${JSON.stringify(params).slice(0, 60)}...`;
   };

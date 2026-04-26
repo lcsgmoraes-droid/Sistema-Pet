@@ -2010,6 +2010,7 @@ class VendaService:
                             "customer_id": venda.cliente_id,
                             "venda_id": venda.id,
                             "venda_total": float(venda.total),
+                            "canal": venda.canal or "loja_fisica",
                         },
                     )
                     db.add(evento_campanha)

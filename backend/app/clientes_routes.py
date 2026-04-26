@@ -2092,7 +2092,8 @@ async def get_vendas_em_aberto(
                 "total": float(v.total or 0),
                 "total_pago": sum(float(pag.valor or 0) for pag in v.pagamentos) if hasattr(v, 'pagamentos') and v.pagamentos else 0,
                 "saldo_devedor": float(v.total or 0) - (sum(float(pag.valor or 0) for pag in v.pagamentos) if hasattr(v, 'pagamentos') and v.pagamentos else 0),
-                "status": v.status
+                "status": v.status,
+                "canal": v.canal or "loja_fisica",
             }
             for v in vendas_aberto
         ]
@@ -2194,6 +2195,7 @@ async def baixar_vendas_lote(
         valor_restante = valor_total
         vendas_quitadas = []
         vendas_parciais = []
+        eventos_campanha_enfileirados = 0
         
         for item in vendas_com_saldo:
             venda = item['venda']
@@ -2232,6 +2234,24 @@ async def baixar_vendas_lote(
                     'valor_baixado': valor_aplicar,
                     'saldo_anterior': saldo_devedor
                 })
+                if venda.cliente_id:
+                    try:
+                        from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+                        db.add(CampaignEventQueue(
+                            tenant_id=tenant_id,
+                            event_type="purchase_completed",
+                            event_origin=EventOriginEnum.user_action,
+                            event_depth=0,
+                            payload={
+                                "customer_id": venda.cliente_id,
+                                "venda_id": venda.id,
+                                "venda_total": float(venda.total or 0),
+                                "canal": venda.canal or "loja_fisica",
+                            },
+                        ))
+                        eventos_campanha_enfileirados += 1
+                    except Exception as e_camp:
+                        logger.warning("[Campanhas] Falha ao enfileirar baixa em lote: %s", e_camp)
             else:  # Baixa parcial
                 venda.status = 'baixa_parcial'
                 vendas_parciais.append({
@@ -2341,6 +2361,11 @@ async def baixar_vendas_lote(
         db.commit()
         
         logger.info(f"Commit realizado com sucesso!")
+        if eventos_campanha_enfileirados:
+            logger.info(
+                "[Campanhas] %d purchase_completed enfileirado(s) pela baixa em lote",
+                eventos_campanha_enfileirados,
+            )
         
         return {
             "success": True,

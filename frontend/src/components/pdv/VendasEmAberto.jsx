@@ -3,6 +3,10 @@ import { X, DollarSign, CheckCircle, AlertCircle, Loader } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
 import { formatBRL, formatMoneyBRL } from '../../utils/formatters';
+import {
+  campaignAllowsSaleChannel,
+  getCashbackBonusParamKey,
+} from '../../utils/campaignChannelScope';
 
 export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSucesso }) {
   const [vendas, setVendas] = useState([]);
@@ -143,6 +147,11 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
   const totalQuitadoPrevisto = vendasPrevistasQuitadas
     .reduce((acc, venda) => acc + parseFloat(venda.total || 0), 0);
 
+  const vendasElegiveisParaCampanha = (campanha) =>
+    vendasPrevistasQuitadas.filter((venda) =>
+      campaignAllowsSaleChannel(campanha, venda.canal || 'loja_fisica'),
+    );
+
   const campanhasCashback = campanhasCompra.filter((campanha) => campanha.campaign_type === 'cashback');
   const campanhasCarimbo = campanhasCompra.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
   const campanhasRecompra = campanhasCompra.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
@@ -150,17 +159,25 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
   const cashbackPrevisto = campanhasCashback
     .map((campanha) => {
       const params = campanha.params || {};
+      const vendasElegiveis = vendasElegiveisParaCampanha(campanha);
+      if (vendasElegiveis.length === 0) return null;
+
       const chaveRank = `${rankCliente}_percent`;
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const bonusPdv = Number(params.pdv_bonus_percent ?? 0);
-      const percentualTotal = percentualBase + bonusPdv;
-      const valorCashback = (totalQuitadoPrevisto * percentualTotal) / 100;
+      const percentuais = new Set();
+      const valorCashback = vendasElegiveis.reduce((acc, venda) => {
+        const bonusKey = getCashbackBonusParamKey(venda.canal || 'loja_fisica');
+        const percentualTotal = percentualBase + Number(params[bonusKey] ?? 0);
+        percentuais.add(percentualTotal);
+        const totalVenda = parseFloat(venda.total || 0);
+        return acc + (totalVenda * percentualTotal) / 100;
+      }, 0);
 
       if (valorCashback <= 0) return null;
 
       return {
         campanha: campanha.name,
-        percentual: percentualTotal,
+        percentual: percentuais.size === 1 ? [...percentuais][0] : null,
         valor: valorCashback,
       };
     })
@@ -170,10 +187,11 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
     .map((campanha) => {
       const params = campanha.params || {};
       const valorPorCarimbo = Number(params.min_purchase_value || 0);
+      const vendasElegiveis = vendasElegiveisParaCampanha(campanha);
 
-      if (valorPorCarimbo <= 0) return null;
+      if (valorPorCarimbo <= 0 || vendasElegiveis.length === 0) return null;
 
-      const totalCarimbosCampanha = vendasPrevistasQuitadas.reduce((acc, venda) => {
+      const totalCarimbosCampanha = vendasElegiveis.reduce((acc, venda) => {
         const totalVenda = parseFloat(venda.total || 0);
         return acc + Math.floor(totalVenda / valorPorCarimbo);
       }, 0);
@@ -193,8 +211,9 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
       const minPurchase = Number(params.min_purchase_value || 0);
       const couponType = String(params.coupon_type || 'percent');
       const couponValue = Number(params.coupon_value || 0);
+      const vendasElegiveis = vendasElegiveisParaCampanha(campanha);
 
-      const temVendaElegivel = vendasPrevistasQuitadas.some((venda) => {
+      const temVendaElegivel = vendasElegiveis.some((venda) => {
         const totalVenda = parseFloat(venda.total || 0);
         return minPurchase <= 0 || totalVenda >= minPurchase;
       });
@@ -549,7 +568,10 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
 
                         {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
                           <div key={`cashback-${item.campanha}`}>
-                            {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
+                            {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong>
+                            {item.percentual === null
+                              ? " (percentual varia por canal)."
+                              : ` (${formatBRL(item.percentual)}%).`}
                           </div>
                         ))}
 

@@ -1178,6 +1178,7 @@ async def finalizar_venda(
     if venda.cliente_id:
         try:
             from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+            canal_venda = venda.canal or "loja_fisica"
             evento_campanha = CampaignEventQueue(
                 tenant_id=tenant_id,
                 event_type="purchase_completed",
@@ -1187,7 +1188,7 @@ async def finalizar_venda(
                     "customer_id": venda.cliente_id,
                     "venda_id": venda.id,
                     "venda_total": float(venda.total or 0),
-                    "canal": "pdv",
+                    "canal": canal_venda,
                 },
             )
             db.add(evento_campanha)

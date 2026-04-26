@@ -38,6 +38,10 @@ import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
+import {
+  campaignAllowsSaleChannel,
+  getCashbackBonusParamKey,
+} from '../utils/campaignChannelScope';
 
 const BANDEIRAS = [
   'Visa',
@@ -221,16 +225,20 @@ export default function ModalPagamento({
   const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
 
   const valorBaseBeneficios = Number(venda.total || 0);
-  const campanhasCashback = campanhasCompra.filter((campanha) => campanha.campaign_type === 'cashback');
-  const campanhasCarimbo = campanhasCompra.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
-  const campanhasRecompra = campanhasCompra.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
+  const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
+  const campanhasElegiveisCanal = campanhasCompra.filter((campanha) =>
+    campaignAllowsSaleChannel(campanha, canalVendaBeneficios),
+  );
+  const campanhasCashback = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'cashback');
+  const campanhasCarimbo = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
+  const campanhasRecompra = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
 
   const cashbackPrevisto = campanhasCashback
     .map((campanha) => {
       const params = campanha.params || {};
       const chaveRank = `${rankCliente}_percent`;
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const bonusPdv = Number(params.pdv_bonus_percent ?? 0);
+      const bonusPdv = Number(params[getCashbackBonusParamKey(canalVendaBeneficios)] ?? 0);
       const percentualTotal = percentualBase + bonusPdv;
       const valor = (valorBaseBeneficios * percentualTotal) / 100;
 
