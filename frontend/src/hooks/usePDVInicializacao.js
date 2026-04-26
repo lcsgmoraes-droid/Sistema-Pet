@@ -1,4 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+
+function normalizarVendaId(valor) {
+  const vendaId = Number.parseInt(valor, 10);
+  return Number.isFinite(vendaId) && vendaId > 0 ? vendaId : null;
+}
 
 export function usePDVInicializacao({
   searchParams,
@@ -10,16 +15,26 @@ export function usePDVInicializacao({
   setMostrarModalAdicionarCredito,
   limparVenda,
 }) {
-  useEffect(() => {
-    const vendaId =
-      searchParams.get("venda") ||
-      searchParams.get("vendaId") ||
-      searchParams.get("venda_id");
+  const carregarVendaRef = useRef(carregarVendaEspecifica);
+  const ultimaVendaUrlCarregadaRef = useRef(null);
+  carregarVendaRef.current = carregarVendaEspecifica;
 
+  const vendaIdUrl =
+    searchParams.get("venda") ||
+    searchParams.get("vendaId") ||
+    searchParams.get("venda_id");
+
+  useEffect(() => {
+    const vendaId = normalizarVendaId(vendaIdUrl);
     if (vendaId) {
-      carregarVendaEspecifica(Number.parseInt(vendaId, 10));
+      if (ultimaVendaUrlCarregadaRef.current === vendaId) return;
+      ultimaVendaUrlCarregadaRef.current = vendaId;
+      void carregarVendaRef.current(vendaId);
+      return;
     }
-  }, [searchParams, carregarVendaEspecifica]);
+
+    ultimaVendaUrlCarregadaRef.current = null;
+  }, [vendaIdUrl]);
 
   useEffect(() => {
     const vendaId = sessionStorage.getItem("abrirVenda");
@@ -28,9 +43,12 @@ export function usePDVInicializacao({
     if (vendaId && abrirModal === "true") {
       sessionStorage.removeItem("abrirVenda");
       sessionStorage.removeItem("abrirModalPagamento");
-      carregarVendaEspecifica(Number.parseInt(vendaId, 10), true);
+      const vendaIdNormalizado = normalizarVendaId(vendaId);
+      if (vendaIdNormalizado) {
+        void carregarVendaRef.current(vendaIdNormalizado, true);
+      }
     }
-  }, [carregarVendaEspecifica]);
+  }, []);
 
   const handleNovaVenda = () => {
     if (window.confirm("Descartar venda atual sem salvar?")) {

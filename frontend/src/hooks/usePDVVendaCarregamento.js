@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import { buscarVenda, listarVendas } from "../api/vendas";
@@ -40,75 +41,111 @@ export function usePDVVendaCarregamento({
   sincronizarEntregadorDaVenda,
   recarregarContextoClientePorId,
 }) {
+  const carregamentosEmAndamentoRef = useRef(new Map());
+
   const carregarVendaEspecifica = async (
     vendaId,
     abrirModalPagamento = false,
   ) => {
-    try {
-      setLoading(true);
-      const venda = await buscarVenda(vendaId);
+    const vendaIdNormalizado = Number.parseInt(vendaId, 10);
+    if (!Number.isFinite(vendaIdNormalizado) || vendaIdNormalizado <= 0) {
+      alert("Venda invalida");
+      return;
+    }
 
-      if (!venda) {
-        alert("Venda nao encontrada");
-        return;
-      }
+    const chaveCarregamento = String(vendaIdNormalizado);
+    const carregamentoExistente =
+      carregamentosEmAndamentoRef.current.get(chaveCarregamento);
 
-      let clienteCompleto = null;
-      if (venda.cliente_id) {
-        try {
-          clienteCompleto = await buscarClientePorId(venda.cliente_id);
-        } catch (error) {
-          console.error("Erro ao buscar cliente:", error);
-        }
-      }
-
-      const { pagamentos, totalPago } = await carregarPagamentosVenda(vendaId);
-
-      await sincronizarComissaoDaVenda(venda.funcionario_id);
-
-      const vendaCarregada = {
-        id: venda.id,
-        numero_venda: venda.numero_venda,
-        status: venda.status,
-        data_venda: venda.data_venda,
-        cliente: clienteCompleto,
-        pet: null,
-        itens: venda.itens || [],
-        subtotal: venda.subtotal || 0,
-        desconto_valor: venda.desconto_valor || 0,
-        desconto_percentual: venda.desconto_percentual || 0,
-        total: venda.total || 0,
-        observacoes: venda.observacoes || "",
-        funcionario_id: venda.funcionario_id || null,
-        entregador_id: venda.entregador_id || null,
-        tem_entrega: venda.tem_entrega || false,
-        entrega: venda.entrega || criarEntregaVazia(),
-        pagamentos,
-        total_pago: totalPago,
-      };
-
-      setVendaAtual(vendaCarregada);
-      setModoVisualizacao(true);
-
-      await sincronizarEntregadorDaVenda(venda.entregador_id);
-      await recarregarContextoClientePorId?.(clienteCompleto?.id || venda.cliente_id);
-
+    if (carregamentoExistente) {
+      await carregamentoExistente;
       if (abrirModalPagamento) {
         setTimeout(() => {
           setMostrarModalPagamento(true);
         }, 500);
       }
-    } catch (error) {
-      console.error("Erro ao carregar venda:", error);
-      if (error.response?.status === 404) {
-        alert("Venda nao encontrada. Pode ter sido cancelada ou excluida.");
-      } else {
-        alert(
-          "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
+      return;
+    }
+
+    const carregamento = (async () => {
+      try {
+        setLoading(true);
+        const venda = await buscarVenda(vendaIdNormalizado);
+
+        if (!venda) {
+          alert("Venda nao encontrada");
+          return;
+        }
+
+        let clienteCompleto = null;
+        if (venda.cliente_id) {
+          try {
+            clienteCompleto = await buscarClientePorId(venda.cliente_id);
+          } catch (error) {
+            console.error("Erro ao buscar cliente:", error);
+          }
+        }
+
+        const { pagamentos, totalPago } = await carregarPagamentosVenda(
+          vendaIdNormalizado,
         );
+
+        await sincronizarComissaoDaVenda(venda.funcionario_id);
+
+        const vendaCarregada = {
+          id: venda.id,
+          numero_venda: venda.numero_venda,
+          status: venda.status,
+          data_venda: venda.data_venda,
+          cliente: clienteCompleto,
+          pet: null,
+          itens: venda.itens || [],
+          subtotal: venda.subtotal || 0,
+          desconto_valor: venda.desconto_valor || 0,
+          desconto_percentual: venda.desconto_percentual || 0,
+          total: venda.total || 0,
+          observacoes: venda.observacoes || "",
+          funcionario_id: venda.funcionario_id || null,
+          entregador_id: venda.entregador_id || null,
+          tem_entrega: venda.tem_entrega || false,
+          entrega: venda.entrega || criarEntregaVazia(),
+          pagamentos,
+          total_pago: totalPago,
+        };
+
+        setVendaAtual(vendaCarregada);
+        setModoVisualizacao(true);
+
+        await sincronizarEntregadorDaVenda(venda.entregador_id);
+        await recarregarContextoClientePorId?.(
+          clienteCompleto?.id || venda.cliente_id,
+        );
+
+        if (abrirModalPagamento) {
+          setTimeout(() => {
+            setMostrarModalPagamento(true);
+          }, 500);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar venda:", error);
+        if (error.response?.status === 404) {
+          alert("Venda nao encontrada. Pode ter sido cancelada ou excluida.");
+        } else {
+          alert(
+            "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
+          );
+        }
+      } finally {
+        setLoading(false);
       }
+    })();
+
+    carregamentosEmAndamentoRef.current.set(chaveCarregamento, carregamento);
+
+    try {
+      await carregamento;
     } finally {
-      setLoading(false);
+      carregamentosEmAndamentoRef.current.delete(chaveCarregamento);
     }
   };
 
