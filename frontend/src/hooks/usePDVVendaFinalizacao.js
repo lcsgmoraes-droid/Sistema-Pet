@@ -59,6 +59,7 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
     id: vendaAtualizada.id,
     numero_venda: vendaAtualizada.numero_venda,
     data_venda: vendaAtualizada.data_venda,
+    canal: vendaAtualizada.canal || "loja_fisica",
     cliente: clienteCompleto,
     pet: null,
     itens: vendaAtualizada.itens || [],

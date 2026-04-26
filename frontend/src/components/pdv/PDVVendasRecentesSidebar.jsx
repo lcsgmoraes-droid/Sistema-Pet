@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Clock,
   Scissors,
+  Stethoscope,
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
@@ -14,32 +15,53 @@ function getCanalInfo(canal) {
       ecommerce: {
         cor: "border-l-purple-500",
         bg: "bg-purple-50",
+        border: "border-purple-200 hover:border-purple-300",
         icon: "\uD83D\uDED2",
         label: "Ecommerce",
       },
       aplicativo: {
         cor: "border-l-green-500",
         bg: "bg-green-50",
+        border: "border-green-200 hover:border-green-300",
+        icon: "\uD83D\uDCF1",
+        label: "App",
+      },
+      app: {
+        cor: "border-l-green-500",
+        bg: "bg-green-50",
+        border: "border-green-200 hover:border-green-300",
         icon: "\uD83D\uDCF1",
         label: "App",
       },
       loja_fisica: {
         cor: "border-l-blue-500",
         bg: "bg-blue-50",
+        border: "border-blue-200 hover:border-blue-300",
         icon: "\uD83C\uDFEA",
         label: "PDV",
       },
       banho_tosa: {
-        cor: "border-l-cyan-500",
-        bg: "bg-cyan-50",
+        cor: "border-l-pink-500",
+        bg: "bg-pink-50",
+        border: "border-pink-200 hover:border-pink-300",
         Icon: Scissors,
-        iconColor: "text-cyan-700",
+        iconColor: "text-pink-700",
         label: "Banho & Tosa",
         title: "Venda gerada pelo modulo Banho & Tosa",
+      },
+      veterinario: {
+        cor: "border-l-amber-500",
+        bg: "bg-yellow-50",
+        border: "border-amber-200 hover:border-amber-300",
+        Icon: Stethoscope,
+        iconColor: "text-amber-700",
+        label: "Veterinario",
+        title: "Venda gerada pelo modulo Veterinario",
       },
     }[canal] || {
       cor: "border-l-gray-400",
       bg: "bg-gray-50",
+      border: "border-gray-200 hover:border-blue-300",
       icon: "\uD83C\uDFEA",
       label: "PDV",
     }
@@ -205,7 +227,7 @@ export default function PDVVendasRecentesSidebar({
                   <div
                     key={venda.id}
                     onClick={() => reabrirVenda(venda)}
-                    className={`rounded-lg p-2.5 border border-gray-200 border-l-4 ${canalInfo.cor} hover:border-blue-300 cursor-pointer transition-colors ${canalInfo.bg}`}
+                    className={`rounded-lg p-2.5 border border-l-4 ${canalInfo.cor} ${canalInfo.border} cursor-pointer transition-colors ${canalInfo.bg}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span

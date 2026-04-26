@@ -36,6 +36,7 @@ export function usePDVVendaAcoes({
     setVendaAtual({
       cliente: null,
       pet: null,
+      canal: "loja_fisica",
       itens: [],
       subtotal: 0,
       desconto_valor: 0,
