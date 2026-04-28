@@ -4921,6 +4921,7 @@ def vincular_fornecedor(
             logger.info(f"[FORNECEDOR] Desmarcando outros fornecedores principais")
             db.query(ProdutoFornecedor).filter(
                 ProdutoFornecedor.produto_id == produto_id,
+                ProdutoFornecedor.tenant_id == tenant_id,
                 ProdutoFornecedor.e_principal == True
             ).update({"e_principal": False})
 
@@ -4936,7 +4937,8 @@ def vincular_fornecedor(
             preco_custo=dados.preco_custo,
             prazo_entrega=dados.prazo_entrega,
             estoque_fornecedor=dados.estoque_fornecedor,
-            e_principal=dados.e_principal
+            e_principal=dados.e_principal,
+            tenant_id=tenant_id
         )
 
         db.add(novo_vinculo)
@@ -5078,6 +5080,7 @@ def atualizar_vinculo_fornecedor(
     if dados.e_principal and not vinculo.e_principal:
         db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == vinculo.produto_id,
+            ProdutoFornecedor.tenant_id == tenant_id,
             ProdutoFornecedor.e_principal == True
         ).update({"e_principal": False})
 
@@ -5165,6 +5168,7 @@ def desvincular_fornecedor(
     if era_principal:
         outro_vinculo = db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == produto_id,
+            ProdutoFornecedor.tenant_id == tenant_id,
             ProdutoFornecedor.id != vinculo_id,
             ProdutoFornecedor.ativo == True
         ).first()
