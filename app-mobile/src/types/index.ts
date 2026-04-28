@@ -258,6 +258,7 @@ export type MainTabParamList = {
   Favoritos: undefined;
   Pets: undefined;
   Pedidos: undefined;
+  Beneficios: undefined;
   Perfil: undefined;
 };
 
@@ -274,4 +275,6 @@ export type PetsStackParamList = {
   FormPet: { pet?: Pet };
   CalculadoraRacao: { pet?: Pet };
   DetalhePet: { pet: Pet; focusSection?: VetFocusSection };
+  Veterinario: undefined;
+  BanhoTosa: undefined;
 };

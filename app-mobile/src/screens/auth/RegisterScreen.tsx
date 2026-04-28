@@ -49,11 +49,6 @@ export default function RegisterScreen({ navigation }: any) {
       await register(email.trim().toLowerCase(), senha, nome.trim() || undefined, cpf.trim());
       // Login automático após registro — AppNavigator redireciona sozinho
     } catch (err: any) {
-      console.log('=== ERRO REGISTRO ===');
-      console.log('message:', err?.message);
-      console.log('code:', err?.code);
-      console.log('status:', err?.response?.status);
-      console.log('data:', JSON.stringify(err?.response?.data));
       const detalhe = err?.response?.data?.detail;
       const msg =
         typeof detalhe === 'string' && detalhe.includes('already registered')

@@ -46,6 +46,18 @@ export default function HomeScreen() {
   const primeiroNome = user?.nome?.split(' ')[0] || 'Cliente';
   const pontos = user?.pontos ?? 0;
 
+  function abrirListaPets() {
+    navigation.navigate('Pets', { screen: 'ListaPets' });
+  }
+
+  function abrirVeterinario() {
+    navigation.navigate('Pets', { screen: 'Veterinario' });
+  }
+
+  function abrirDetalhePet(pet: Pet) {
+    navigation.navigate('Pets', { screen: 'DetalhePet', params: { pet } });
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -94,10 +106,10 @@ export default function HomeScreen() {
           />
           <Atalho
             emoji="🐾"
-            titulo="Meus Pets"
-            cor="#FFF7ED"
-            corTexto={CORES.secundario}
-            onPress={() => navigation.navigate('Pets')}
+            titulo="Veterinario"
+            cor="#EEF2FF"
+            corTexto="#4338CA"
+            onPress={abrirVeterinario}
           />
           <Atalho
             emoji="🥣"
@@ -135,7 +147,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitulo}>Meus pets</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Pets')}>
+            <TouchableOpacity onPress={abrirListaPets}>
               <Text style={styles.verTodos}>Ver todos</Text>
             </TouchableOpacity>
           </View>
@@ -144,7 +156,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={pet.id}
                 style={styles.petCard}
-                onPress={() => navigation.navigate('Pets', { screen: 'FormPet', params: { pet } })}
+                onPress={() => abrirDetalhePet(pet)}
               >
                 {pet.foto_url ? (
                   <Image source={{ uri: pet.foto_url }} style={styles.petFoto} />
@@ -206,9 +218,11 @@ function Atalho({
   corTexto: string;
   onPress: () => void;
 }) {
+  const icone = titulo === 'Veterinario' ? 'VET' : emoji;
+
   return (
     <TouchableOpacity style={[styles.atalho, { backgroundColor: cor }]} onPress={onPress}>
-      <Text style={styles.atalhoEmoji}>{emoji}</Text>
+      <Text style={styles.atalhoEmoji}>{icone}</Text>
       <Text style={[styles.atalhoTexto, { color: corTexto }]}>{titulo}</Text>
     </TouchableOpacity>
   );

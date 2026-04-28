@@ -20,6 +20,7 @@ import PetFormScreen from "../screens/pets/PetFormScreen";
 import PetListScreen from "../screens/pets/PetListScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
 import BanhoTosaScreen from "../screens/services/BanhoTosaScreen";
+import VeterinarioScreen from "../screens/vet/VeterinarioScreen";
 import BarcodeScannerScreen from "../screens/shop/BarcodeScannerScreen";
 import CartScreen from "../screens/shop/CartScreen";
 import CatalogScreen from "../screens/shop/CatalogScreen";
@@ -78,6 +79,11 @@ function PetsNavigator() {
         name="DetalhePet"
         component={PetDetailScreen}
         options={{ title: "Carteirinha do Pet" }}
+      />
+      <PetsStack.Screen
+        name="Veterinario"
+        component={VeterinarioScreen}
+        options={{ title: "Veterinario" }}
       />
       <PetsStack.Screen
         name="CalculadoraRacao"
@@ -196,7 +202,8 @@ export default function MainNavigator() {
         name="Loja"
         component={LojaNavigator}
         listeners={({ navigation }) => ({
-          tabPress: () => {
+          tabPress: (event) => {
+            event.preventDefault();
             navigation.navigate("Loja", { screen: "Catalogo" });
           },
         })}
@@ -223,7 +230,8 @@ export default function MainNavigator() {
         name="Pets"
         component={PetsNavigator}
         listeners={({ navigation }) => ({
-          tabPress: () => {
+          tabPress: (event) => {
+            event.preventDefault();
             navigation.navigate("Pets", { screen: "ListaPets" });
           },
         })}
