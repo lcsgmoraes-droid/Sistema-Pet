@@ -393,6 +393,8 @@ class ClienteResponse(BaseModel):
     codigo: Optional[str] = None
     tipo_cadastro: str
     tipo_pessoa: str
+    fornecedor_grupo_id: Optional[int] = None
+    fornecedor_grupo_nome: Optional[str] = None
     nome: str
     data_nascimento: Optional[dt] = None
     cpf: Optional[str] = None

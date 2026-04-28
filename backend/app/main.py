@@ -47,6 +47,7 @@ from app.estoque_routes import router as estoque_router
 from app.estoque_alertas_routes import router as estoque_alertas_router
 from app.bling_sync_routes import router as bling_sync_router
 from app.pedidos_compra_routes import router as pedidos_compra_router
+from app.fornecedor_grupos_routes import router as fornecedor_grupos_router
 from app.notas_entrada_routes import router as notas_entrada_router
 from app.contas_pagar_routes import router as contas_pagar_router
 from app.tipo_despesa_routes import router as tipo_despesa_router
@@ -818,6 +819,7 @@ app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"])
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
 app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
 app.include_router(bling_sync_router, tags=["Sincronização Bling"])
+app.include_router(fornecedor_grupos_router, tags=["Grupos de Fornecedores"])
 app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"])
 app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"])
 app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"])

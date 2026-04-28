@@ -18,6 +18,14 @@ const ITEM_FORM_INICIAL = {
   preco_unitario: ''
 };
 
+const GRUPO_FORNECEDOR_FORM_INICIAL = {
+  id: null,
+  nome: '',
+  descricao: '',
+  fornecedor_principal_id: '',
+  fornecedor_ids: []
+};
+
 const COLUNAS_DOCUMENTO_PEDIDO = [
   { chave: 'codigo', label: 'Codigo / SKU' },
   { chave: 'produto', label: 'Descricao' },
@@ -207,6 +215,7 @@ const baixarArquivoResposta = (response, fallback) => {
 const PedidosCompra = () => {
   const [pedidos, setPedidos] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
+  const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -267,6 +276,10 @@ const PedidosCompra = () => {
   const [produtoTexto, setProdutoTexto] = useState('');
   const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
+  const [incluirGrupoFornecedor, setIncluirGrupoFornecedor] = useState(false);
+  const [mostrarModalGruposFornecedores, setMostrarModalGruposFornecedores] = useState(false);
+  const [grupoFornecedorForm, setGrupoFornecedorForm] = useState(GRUPO_FORNECEDOR_FORM_INICIAL);
+  const [salvandoGrupoFornecedor, setSalvandoGrupoFornecedor] = useState(false);
 
   const normalizarTexto = (texto = '') =>
     texto
@@ -295,6 +308,7 @@ const PedidosCompra = () => {
   const selecionarFornecedor = (fornecedor) => {
     setFornecedorTexto(fornecedor.nome || '');
     setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
+    setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedor.id)));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
     setMostrarSugestoesFornecedor(false);
@@ -310,6 +324,41 @@ const PedidosCompra = () => {
 
   const obterFornecedorPorId = (fornecedorId) =>
     fornecedores.find((f) => Number(f.id) === Number(fornecedorId));
+
+  const obterGrupoDoFornecedor = (fornecedorId) => {
+    const id = Number(fornecedorId);
+    if (!Number.isFinite(id) || id <= 0) {
+      return null;
+    }
+
+    const fornecedor = obterFornecedorPorId(id);
+    const grupoIdDireto = Number(fornecedor?.fornecedor_grupo_id);
+    if (Number.isFinite(grupoIdDireto) && grupoIdDireto > 0) {
+      return gruposFornecedores.find((grupo) => Number(grupo.id) === grupoIdDireto) || null;
+    }
+
+    return gruposFornecedores.find((grupo) => (
+      Array.isArray(grupo.fornecedor_ids)
+      && grupo.fornecedor_ids.some((grupoFornecedorId) => Number(grupoFornecedorId) === id)
+    )) || null;
+  };
+
+  const grupoFornecedorAtual = useMemo(
+    () => obterGrupoDoFornecedor(formData.fornecedor_id),
+    [formData.fornecedor_id, fornecedores, gruposFornecedores],
+  );
+
+  const obterParametrosGrupoFornecedor = (fornecedorId = formData.fornecedor_id) => {
+    const grupo = obterGrupoDoFornecedor(fornecedorId);
+    if (!grupo || !incluirGrupoFornecedor) {
+      return {};
+    }
+
+    return {
+      incluir_grupo_fornecedor: true,
+      fornecedor_grupo_id: grupo.id,
+    };
+  };
 
   const extrairEmailFornecedor = (fornecedor) => {
     if (!fornecedor) return '';
@@ -358,6 +407,7 @@ const PedidosCompra = () => {
     setFornecedorTexto('');
     setProdutoTexto('');
     setProdutos([]);
+    setIncluirGrupoFornecedor(false);
     setMostrarSugestoesFornecedor(false);
     setMostrarSugestoesProduto(false);
     limparEstadosSugestao();
@@ -405,6 +455,7 @@ const PedidosCompra = () => {
     setPedidoEditando(pedidoCompleto);
     setFormData(proximoFormData);
     setFornecedorTexto(fornecedorSelecionado?.nome || '');
+    setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedorId)));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
     setMostrarSugestoesProduto(false);
@@ -455,7 +506,10 @@ const PedidosCompra = () => {
 
     setLoadingPrepararSugestao(true);
     try {
-      const response = await api.get(`/pedidos-compra/rascunho/fornecedor/${fornecedorId}`);
+      const response = await api.get(
+        `/pedidos-compra/rascunho/fornecedor/${fornecedorId}`,
+        { params: obterParametrosGrupoFornecedor(fornecedorId) },
+      );
       const pedidoRascunho = response?.data?.pedido || null;
 
       if (pedidoRascunho) {
@@ -559,9 +613,10 @@ const PedidosCompra = () => {
 
   const carregarDados = async () => {
     try {
-      const [pedidosRes, fornecedoresRes, envioStatusRes] = await Promise.all([
+      const [pedidosRes, fornecedoresRes, gruposRes, envioStatusRes] = await Promise.all([
         api.get('/pedidos-compra/'),
         api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true'),
+        api.get('/fornecedor-grupos/'),
         api.get('/pedidos-compra/envio/status').catch(() => ({ data: { email_configurado: false } }))
       ]);
 
@@ -574,9 +629,13 @@ const PedidosCompra = () => {
       const fornecedoresData = Array.isArray(fornecedoresRes.data) 
         ? fornecedoresRes.data 
         : (fornecedoresRes.data.items || fornecedoresRes.data.clientes || []);
+      const gruposData = Array.isArray(gruposRes.data)
+        ? gruposRes.data
+        : (gruposRes.data.items || gruposRes.data.grupos || []);
 
       setPedidos(pedidosData);
       setFornecedores(fornecedoresData);
+      setGruposFornecedores(gruposData);
       setEmailEnvioDisponivel(Boolean(envioStatusRes?.data?.email_configurado));
       // NÃO carregar produtos aqui - apenas quando fornecedor for selecionado
     } catch (error) {
@@ -615,6 +674,114 @@ const PedidosCompra = () => {
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       toast.error('Erro ao carregar produtos do fornecedor');
+    }
+  };
+
+  const abrirNovoGrupoFornecedor = () => {
+    const fornecedorId = Number(formData.fornecedor_id);
+    setGrupoFornecedorForm({
+      ...GRUPO_FORNECEDOR_FORM_INICIAL,
+      fornecedor_principal_id: Number.isFinite(fornecedorId) && fornecedorId > 0 ? fornecedorId.toString() : '',
+      fornecedor_ids: Number.isFinite(fornecedorId) && fornecedorId > 0 ? [fornecedorId] : [],
+    });
+    setMostrarModalGruposFornecedores(true);
+  };
+
+  const editarGrupoFornecedor = (grupo) => {
+    setGrupoFornecedorForm({
+      id: grupo.id,
+      nome: grupo.nome || '',
+      descricao: grupo.descricao || '',
+      fornecedor_principal_id: grupo.fornecedor_principal_id?.toString() || '',
+      fornecedor_ids: (grupo.fornecedor_ids || []).map((id) => Number(id)),
+    });
+  };
+
+  const alternarFornecedorNoGrupoForm = (fornecedorId) => {
+    const id = Number(fornecedorId);
+    setGrupoFornecedorForm((prev) => {
+      const idsAtuais = new Set((prev.fornecedor_ids || []).map((item) => Number(item)));
+      if (idsAtuais.has(id)) {
+        idsAtuais.delete(id);
+      } else {
+        idsAtuais.add(id);
+      }
+
+      const fornecedorIds = Array.from(idsAtuais).sort((a, b) => a - b);
+      const principalAtual = Number(prev.fornecedor_principal_id);
+      const fornecedorPrincipalValido = fornecedorIds.includes(principalAtual)
+        ? prev.fornecedor_principal_id
+        : (fornecedorIds[0]?.toString() || '');
+
+      return {
+        ...prev,
+        fornecedor_ids: fornecedorIds,
+        fornecedor_principal_id: fornecedorPrincipalValido,
+      };
+    });
+  };
+
+  const salvarGrupoFornecedor = async (event) => {
+    event.preventDefault();
+
+    const fornecedorIds = (grupoFornecedorForm.fornecedor_ids || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!grupoFornecedorForm.nome.trim()) {
+      toast.error('Informe o nome do grupo');
+      return;
+    }
+
+    if (fornecedorIds.length < 2) {
+      toast.error('Selecione pelo menos 2 CNPJs para unificar em grupo');
+      return;
+    }
+
+    setSalvandoGrupoFornecedor(true);
+    try {
+      const payload = {
+        nome: grupoFornecedorForm.nome.trim(),
+        descricao: grupoFornecedorForm.descricao?.trim() || null,
+        fornecedor_principal_id: Number(grupoFornecedorForm.fornecedor_principal_id) || fornecedorIds[0],
+        fornecedor_ids: fornecedorIds,
+        ativo: true,
+      };
+
+      if (grupoFornecedorForm.id) {
+        await api.patch(`/fornecedor-grupos/${grupoFornecedorForm.id}`, payload);
+        toast.success('Grupo de fornecedor atualizado');
+      } else {
+        await api.post('/fornecedor-grupos/', payload);
+        toast.success('Grupo de fornecedor criado');
+      }
+
+      setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao salvar grupo de fornecedor:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao salvar grupo de fornecedor');
+    } finally {
+      setSalvandoGrupoFornecedor(false);
+    }
+  };
+
+  const excluirGrupoFornecedor = async (grupo) => {
+    const confirmar = window.confirm(`Excluir o grupo "${grupo.nome}" e liberar os fornecedores vinculados?`);
+    if (!confirmar) {
+      return;
+    }
+
+    try {
+      await api.delete(`/fornecedor-grupos/${grupo.id}`);
+      toast.success('Grupo de fornecedor excluido');
+      if (grupoFornecedorForm.id === grupo.id) {
+        setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
+      }
+      await carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir grupo de fornecedor:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao excluir grupo de fornecedor');
     }
   };
 
@@ -803,7 +970,8 @@ const PedidosCompra = () => {
             dias_cobertura: diasCobertura,
             apenas_criticos: apenasCriticos,
             incluir_alerta: incluirAlerta,
-            marca_ids: marcasSelecionadas
+            marca_ids: marcasSelecionadas,
+            ...obterParametrosGrupoFornecedor(fornecedorId)
           },
           timeout: 60000
         }
@@ -886,16 +1054,16 @@ const PedidosCompra = () => {
 
   const marcasFornecedor = useMemo(() => {
     const mapa = new Map();
-    produtos.forEach((produto) => {
-      const marcaId = Number(produto?.marca_id);
+    const registrarMarca = (origem) => {
+      const marcaId = Number(origem?.marca_id);
       if (!Number.isFinite(marcaId) || marcaId <= 0) {
         return;
       }
 
       const nomeMarca = String(
-        produto?.marca_nome
-          || produto?.marca?.nome
-          || produto?.marca
+        origem?.marca_nome
+          || origem?.marca?.nome
+          || origem?.marca
           || ''
       ).trim();
 
@@ -906,10 +1074,13 @@ const PedidosCompra = () => {
       if (!mapa.has(marcaId)) {
         mapa.set(marcaId, { id: marcaId, nome: nomeMarca });
       }
-    });
+    };
+
+    produtos.forEach(registrarMarca);
+    sugestoes.forEach(registrarMarca);
 
     return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [produtos]);
+  }, [produtos, sugestoes]);
 
   const selecionadosComQuantidade = useMemo(
     () => sugestoes
@@ -1566,6 +1737,7 @@ const PedidosCompra = () => {
                     } else {
                       setFormData((prev) => ({ ...prev, fornecedor_id: '', itens: [] }));
                       setProdutos([]);
+                      setIncluirGrupoFornecedor(false);
                       setProdutoTexto('');
                       setMostrarSugestoesProduto(false);
                       setItemForm(ITEM_FORM_INICIAL);
@@ -1592,15 +1764,55 @@ const PedidosCompra = () => {
                         className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
                       >
                         <div className="font-medium text-gray-800">{f.nome}</div>
-                        {f.cpf_cnpj && (
-                          <div className="text-xs text-gray-500">{f.cpf_cnpj}</div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                          {(f.cpf_cnpj || f.cnpj || f.cpf) && (
+                            <span>{f.cpf_cnpj || f.cnpj || f.cpf}</span>
+                          )}
+                          {obterGrupoDoFornecedor(f.id) && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
+                              Grupo: {obterGrupoDoFornecedor(f.id).nome}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     ))}
                   </div>
                 )}
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Digite ou selecione um fornecedor para carregar seus produtos</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-gray-500">Digite ou selecione um fornecedor para carregar seus produtos</p>
+                  <button
+                    type="button"
+                    onClick={abrirNovoGrupoFornecedor}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  >
+                    Grupos de fornecedor
+                  </button>
+                </div>
+                {formData.fornecedor_id && grupoFornecedorAtual && (
+                  <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    <input
+                      type="checkbox"
+                      checked={incluirGrupoFornecedor}
+                      onChange={(e) => {
+                        setIncluirGrupoFornecedor(e.target.checked);
+                        limparEstadosSugestao();
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded"
+                    />
+                    <span>
+                      <strong>Unificar CNPJs do grupo {grupoFornecedorAtual.nome}</strong>
+                      <span className="block text-emerald-700">
+                        A sugestao inteligente considera todos os fornecedores vinculados ao grupo.
+                      </span>
+                    </span>
+                  </label>
+                )}
+                {formData.fornecedor_id && !grupoFornecedorAtual && (
+                  <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Este fornecedor ainda nao esta em um grupo. Use "Grupos de fornecedor" para unificar CNPJs.
+                  </div>
+                )}
                 {formData.fornecedor_id && (
                   <button
                     type="button"
@@ -2002,6 +2214,25 @@ const PedidosCompra = () => {
       )}
 
       {/* 💡 MODAL DE SUGESTÃO INTELIGENTE */}
+      {mostrarModalGruposFornecedores && (
+        <ModalGruposFornecedores
+          grupos={gruposFornecedores}
+          fornecedores={fornecedores}
+          form={grupoFornecedorForm}
+          setForm={setGrupoFornecedorForm}
+          salvando={salvandoGrupoFornecedor}
+          onClose={() => {
+            setMostrarModalGruposFornecedores(false);
+            setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
+          }}
+          onSubmit={salvarGrupoFornecedor}
+          onNovo={() => setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL)}
+          onEditar={editarGrupoFornecedor}
+          onExcluir={excluirGrupoFornecedor}
+          onToggleFornecedor={alternarFornecedorNoGrupoForm}
+        />
+      )}
+
       {mostrarSugestao && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white w-full h-full flex flex-col">
@@ -2155,6 +2386,20 @@ const PedidosCompra = () => {
                           />
                           <span>Incluir Alertas</span>
                         </label>
+                        {grupoFornecedorAtual && (
+                          <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                            <input
+                              type="checkbox"
+                              checked={incluirGrupoFornecedor}
+                              onChange={(e) => {
+                                setIncluirGrupoFornecedor(e.target.checked);
+                                limparEstadosSugestao();
+                              }}
+                              className="h-4 w-4 rounded"
+                            />
+                            <span>Todos os CNPJs do grupo {grupoFornecedorAtual.nome}</span>
+                          </label>
+                        )}
                       </div>
 
                       {sugestoes.length > 0 && (
@@ -2365,6 +2610,11 @@ const PedidosCompra = () => {
                                   Barras: {sugestao.produto_codigo_barras || 'N/A'}
                                   {sugestao.marca_nome ? ` | Marca: ${sugestao.marca_nome}` : ''}
                                 </div>
+                                {sugestao.fornecedor_nome && incluirGrupoFornecedor && (
+                                  <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                    Origem: {sugestao.fornecedor_nome}
+                                  </div>
+                                )}
                                 {sugestao.observacao && (
                                   <div className="text-xs text-gray-600 mt-1 italic">{sugestao.observacao}</div>
                                 )}
@@ -2474,6 +2724,250 @@ const PedidosCompra = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const ModalGruposFornecedores = ({
+  grupos,
+  fornecedores,
+  form,
+  setForm,
+  salvando,
+  onClose,
+  onSubmit,
+  onNovo,
+  onEditar,
+  onExcluir,
+  onToggleFornecedor,
+}) => {
+  const [buscaFornecedor, setBuscaFornecedor] = useState('');
+  const fornecedoresSelecionadosSet = useMemo(
+    () => new Set((form.fornecedor_ids || []).map((id) => Number(id))),
+    [form.fornecedor_ids],
+  );
+  const fornecedoresSelecionados = useMemo(
+    () => fornecedores.filter((fornecedor) => fornecedoresSelecionadosSet.has(Number(fornecedor.id))),
+    [fornecedores, fornecedoresSelecionadosSet],
+  );
+  const normalizar = (texto = '') => texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '');
+  const fornecedoresFiltrados = useMemo(() => {
+    const termo = normalizar(buscaFornecedor.trim());
+    return fornecedores
+      .filter((fornecedor) => {
+        if (!termo) return true;
+        return normalizar([
+          fornecedor.nome,
+          fornecedor.cnpj,
+          fornecedor.cpf,
+          fornecedor.razao_social,
+          fornecedor.nome_fantasia,
+        ].filter(Boolean).join(' ')).includes(termo);
+      })
+      .slice(0, 120);
+  }, [fornecedores, buscaFornecedor]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">Grupos de fornecedor</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Una CNPJs do mesmo fornecedor comercial sem alterar o cadastro fiscal de cada empresa.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[0.95fr_1.2fr]">
+          <div className="border-r border-slate-200 bg-slate-50 p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cadastrados</div>
+                <div className="text-sm text-slate-600">{grupos.length} grupo(s)</div>
+              </div>
+              <button
+                type="button"
+                onClick={onNovo}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Novo
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {grupos.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
+                  Nenhum grupo criado ainda.
+                </div>
+              )}
+
+              {grupos.map((grupo) => (
+                <div
+                  key={grupo.id}
+                  className={`rounded-xl border p-4 ${
+                    Number(form.id) === Number(grupo.id)
+                      ? 'border-blue-300 bg-blue-50'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-900">{grupo.nome}</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {(grupo.fornecedores || []).length} CNPJ(s) vinculado(s)
+                      </div>
+                      {grupo.fornecedor_principal_nome && (
+                        <div className="mt-1 text-xs font-semibold text-emerald-700">
+                          Principal: {grupo.fornecedor_principal_nome}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEditar(grupo)}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onExcluir(grupo)}
+                        className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-5 p-6">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+                {form.id ? 'Editar grupo' : 'Novo grupo'}
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Unificacao comercial de CNPJs</h3>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Nome do grupo</label>
+                <input
+                  value={form.nome}
+                  onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
+                  placeholder="Ex: Distribuidora Pet Brasil"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Fornecedor principal</label>
+                <select
+                  value={form.fornecedor_principal_id}
+                  onChange={(event) => setForm((prev) => ({ ...prev, fornecedor_principal_id: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-blue-400"
+                >
+                  <option value="">Selecione</option>
+                  {fornecedoresSelecionados.map((fornecedor) => (
+                    <option key={fornecedor.id} value={fornecedor.id}>
+                      {fornecedor.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">Descricao interna</label>
+              <textarea
+                value={form.descricao}
+                onChange={(event) => setForm((prev) => ({ ...prev, descricao: event.target.value }))}
+                placeholder="Observacao opcional para compras, condicoes comerciais ou contatos."
+                className="h-20 w-full rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+
+            <div className="rounded-xl border border-slate-200">
+              <div className="border-b border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-semibold text-slate-900">CNPJs do grupo</div>
+                    <div className="text-sm text-slate-500">
+                      {fornecedoresSelecionados.length} fornecedor(es) selecionado(s)
+                    </div>
+                  </div>
+                  <input
+                    value={buscaFornecedor}
+                    onChange={(event) => setBuscaFornecedor(event.target.value)}
+                    placeholder="Buscar fornecedor, CNPJ ou razao social"
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm md:w-80"
+                  />
+                </div>
+              </div>
+
+              <div className="max-h-72 divide-y divide-slate-100 overflow-y-auto">
+                {fornecedoresFiltrados.map((fornecedor) => {
+                  const selecionado = fornecedoresSelecionadosSet.has(Number(fornecedor.id));
+                  return (
+                    <label
+                      key={fornecedor.id}
+                      className={`flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-blue-50 ${
+                        selecionado ? 'bg-blue-50/70' : 'bg-white'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selecionado}
+                        onChange={() => onToggleFornecedor(fornecedor.id)}
+                        className="mt-1 h-4 w-4 rounded"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-slate-900">{fornecedor.nome}</span>
+                        <span className="block text-xs text-slate-500">
+                          {fornecedor.cnpj || fornecedor.cpf || 'Sem CNPJ/CPF informado'}
+                          {fornecedor.razao_social ? ` | ${fornecedor.razao_social}` : ''}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 md:flex-row md:justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-slate-300 px-5 py-2.5 font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={salvando}
+                className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {salvando ? 'Salvando...' : 'Salvar grupo'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

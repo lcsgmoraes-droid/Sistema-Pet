@@ -41,7 +41,7 @@ from urllib.parse import quote
 from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User, Cliente
+from .models import User, Cliente, FornecedorGrupo
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
     PedidoCompra, PedidoCompraItem, ProdutoFornecedor, Marca
@@ -714,9 +714,50 @@ def status_envio_pedidos(
     }
 
 
+def _resolver_fornecedores_compra(
+    db: Session,
+    tenant_id,
+    fornecedor: Cliente,
+    incluir_grupo_fornecedor: bool = False,
+    fornecedor_grupo_id: Optional[int] = None,
+) -> tuple[List[int], Optional[FornecedorGrupo]]:
+    """Resolve quais CNPJs devem entrar na operacao de compra."""
+    grupo = None
+
+    if fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+        if not grupo:
+            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+    elif incluir_grupo_fornecedor and fornecedor.fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor.fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+
+    if not grupo:
+        return [fornecedor.id], None
+
+    fornecedores_grupo = db.query(Cliente.id).filter(
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == "fornecedor",
+        or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
+        Cliente.fornecedor_grupo_id == grupo.id,
+    ).all()
+    fornecedor_ids = sorted({linha[0] for linha in fornecedores_grupo} | {fornecedor.id})
+
+    return fornecedor_ids, grupo
+
+
 @router.get("/rascunho/fornecedor/{fornecedor_id}")
 def buscar_rascunho_fornecedor(
     fornecedor_id: int,
+    incluir_grupo_fornecedor: bool = Query(default=False),
+    fornecedor_grupo_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_session),
     current_user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -735,11 +776,19 @@ def buscar_rascunho_fornecedor(
     if not fornecedor:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
 
+    fornecedor_ids, grupo = _resolver_fornecedores_compra(
+        db,
+        tenant_id,
+        fornecedor,
+        incluir_grupo_fornecedor=incluir_grupo_fornecedor,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+    )
+
     rascunhos_query = db.query(PedidoCompra).options(
         joinedload(PedidoCompra.itens).joinedload(PedidoCompraItem.produto)
     ).filter(
         PedidoCompra.tenant_id == tenant_id,
-        PedidoCompra.fornecedor_id == fornecedor_id,
+        PedidoCompra.fornecedor_id.in_(fornecedor_ids),
         PedidoCompra.status == "rascunho"
     )
 
@@ -753,13 +802,23 @@ def buscar_rascunho_fornecedor(
         return {
             "existe": False,
             "total_rascunhos": 0,
-            "pedido": None
+            "pedido": None,
+            "fornecedor_ids_considerados": fornecedor_ids,
+            "fornecedor_grupo": {
+                "id": grupo.id,
+                "nome": grupo.nome,
+            } if grupo else None,
         }
 
     return {
         "existe": True,
         "total_rascunhos": total_rascunhos,
-        "pedido": _montar_resposta_pedido_detalhada(pedido)
+        "pedido": _montar_resposta_pedido_detalhada(pedido),
+        "fornecedor_ids_considerados": fornecedor_ids,
+        "fornecedor_grupo": {
+            "id": grupo.id,
+            "nome": grupo.nome,
+        } if grupo else None,
     }
 
 
@@ -1706,6 +1765,8 @@ def sugerir_pedido_inteligente(
     dias_cobertura: int = Query(default=30, ge=7, le=180, description="Dias de estoque que o pedido deve cobrir (7-180)"),
     apenas_criticos: bool = Query(default=False, description="Apenas produtos críticos (estoque < 7 dias)"),
     incluir_alerta: bool = Query(default=True, description="Incluir produtos em alerta"),
+    incluir_grupo_fornecedor: bool = Query(default=False, description="Incluir todos os CNPJs do grupo comercial do fornecedor"),
+    fornecedor_grupo_id: Optional[int] = Query(default=None, description="Grupo comercial de fornecedores para consolidar a sugestao"),
     marca_ids: Optional[List[int]] = Query(default=None, description="Filtrar por marcas específicas"),
     marca_ids_brackets: Optional[List[int]] = Query(default=None, alias="marca_ids[]"),
     db: Session = Depends(get_session),
@@ -1745,6 +1806,14 @@ def sugerir_pedido_inteligente(
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
     
     # Data inicial para análise
+    fornecedor_ids, fornecedor_grupo = _resolver_fornecedores_compra(
+        db,
+        tenant_id,
+        fornecedor,
+        incluir_grupo_fornecedor=incluir_grupo_fornecedor,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+    )
+
     data_inicio = datetime.now() - timedelta(days=periodo_dias)
     
     marcas_filtro = marca_ids or marca_ids_brackets or []
@@ -1763,7 +1832,7 @@ def sugerir_pedido_inteligente(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
-        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
         ProdutoFornecedor.ativo == True
     )
 
@@ -1772,13 +1841,44 @@ def sugerir_pedido_inteligente(
             Produto.marca_id.in_(marcas_filtro)
         )
 
-    produtos_fornecedor = produtos_fornecedor_query.all()
+    produtos_fornecedor_raw = produtos_fornecedor_query.all()
+    fornecedores_por_id = {
+        item.id: item.nome
+        for item in db.query(Cliente.id, Cliente.nome).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.id.in_(fornecedor_ids),
+        ).all()
+    }
+
+    # Se o mesmo produto estiver vinculado a mais de um CNPJ do grupo,
+    # manter uma unica linha e preferir o fornecedor selecionado/principal.
+    produtos_por_id = {}
+    for produto, produto_fornecedor, marca in produtos_fornecedor_raw:
+        score = (
+            0 if produto_fornecedor.fornecedor_id == fornecedor_id else 1,
+            0 if produto_fornecedor.e_principal else 1,
+            float(produto_fornecedor.preco_custo or 999999999),
+            produto_fornecedor.id,
+        )
+        atual = produtos_por_id.get(produto.id)
+        if not atual or score < atual["score"]:
+            produtos_por_id[produto.id] = {
+                "score": score,
+                "linha": (produto, produto_fornecedor, marca),
+            }
+
+    produtos_fornecedor = [item["linha"] for item in produtos_por_id.values()]
     
     if not produtos_fornecedor:
         return {
             "fornecedor": {
                 "id": fornecedor.id,
-                "nome": fornecedor.nome
+                "nome": fornecedor.nome,
+                "ids_considerados": fornecedor_ids,
+                "grupo": {
+                    "id": fornecedor_grupo.id,
+                    "nome": fornecedor_grupo.nome,
+                } if fornecedor_grupo else None,
             },
             "periodo_dias": periodo_dias,
             "sugestoes": [],
@@ -1904,6 +2004,10 @@ def sugerir_pedido_inteligente(
                 "produto_nome": produto.nome,
                 "produto_sku": produto.codigo,
                 "produto_codigo_barras": produto.codigo_barras,
+                "fornecedor_id": produto_fornecedor.fornecedor_id,
+                "fornecedor_nome": fornecedores_por_id.get(produto_fornecedor.fornecedor_id),
+                "fornecedor_grupo_id": fornecedor_grupo.id if fornecedor_grupo else None,
+                "fornecedor_grupo_nome": fornecedor_grupo.nome if fornecedor_grupo else None,
                 "marca_id": produto.marca_id,
                 "marca_nome": marca.nome if marca else None,
                 "estoque_atual": float(estoque_atual),
@@ -1933,7 +2037,12 @@ def sugerir_pedido_inteligente(
     return {
         "fornecedor": {
             "id": fornecedor.id,
-            "nome": fornecedor.nome
+            "nome": fornecedor.nome,
+            "ids_considerados": fornecedor_ids,
+            "grupo": {
+                "id": fornecedor_grupo.id,
+                "nome": fornecedor_grupo.nome,
+            } if fornecedor_grupo else None,
         },
         "periodo_dias": periodo_dias,
         "dias_cobertura": dias_cobertura,

@@ -135,6 +135,29 @@ class AuditLog(BaseTenantModel):
 # CADASTROS
 # ====================
 
+class FornecedorGrupo(BaseTenantModel):
+    """Grupo comercial de fornecedores com CNPJs separados."""
+    __tablename__ = "fornecedor_grupos"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "nome", name="uq_fornecedor_grupos_tenant_nome"),
+        {"extend_existing": True},
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String(255), nullable=False, index=True)
+    descricao = Column(Text, nullable=True)
+    fornecedor_principal_id = Column(Integer, nullable=True, index=True)
+    ativo = Column(Boolean, nullable=False, default=True, server_default="1")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    fornecedores = relationship(
+        "Cliente",
+        back_populates="fornecedor_grupo",
+        foreign_keys="Cliente.fornecedor_grupo_id",
+    )
+
+
 class Cliente(BaseTenantModel):
     """Cliente (tutor dos pets)"""
     __tablename__ = "clientes"
@@ -149,6 +172,7 @@ class Cliente(BaseTenantModel):
     # Tipo de cadastro e pessoa
     tipo_cadastro = Column(String(50), nullable=False, default="cliente", index=True)  # cliente, fornecedor, veterinario
     tipo_pessoa = Column(String(2), nullable=False, default="PF", index=True)  # PF ou PJ
+    fornecedor_grupo_id = Column(Integer, ForeignKey("fornecedor_grupos.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Dados pessoais (PF) / Nome Fantasia (PJ)
     nome = Column(String(255), nullable=False, index=True)
@@ -248,6 +272,15 @@ class Cliente(BaseTenantModel):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relacionamentos
+    fornecedor_grupo = relationship(
+        "FornecedorGrupo",
+        back_populates="fornecedores",
+        foreign_keys=[fornecedor_grupo_id],
+    )
+
+    @property
+    def fornecedor_grupo_nome(self):
+        return self.fornecedor_grupo.nome if self.fornecedor_grupo else None
     pets = relationship("Pet", back_populates="cliente", cascade="all, delete-orphan")
 
 
