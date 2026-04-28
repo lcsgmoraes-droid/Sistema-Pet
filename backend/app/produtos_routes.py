@@ -1102,7 +1102,7 @@ def criar_categoria(
 ):
     """Cria uma nova categoria"""
 
-    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Verificar se categoria pai existe (se fornecida)
     if categoria.categoria_pai_id:
@@ -1640,6 +1640,8 @@ def deletar_departamento(
 ):
     """Deleta (soft delete) um departamento"""
 
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     departamento = db.query(Departamento).filter(
         Departamento.id == departamento_id,
         Departamento.tenant_id == tenant_id,
@@ -1652,6 +1654,7 @@ def deletar_departamento(
     # Verificar se departamento tem produtos
     produtos_count = db.query(Produto).filter(
         Produto.departamento_id == departamento_id,
+        Produto.tenant_id == tenant_id,
         Produto.ativo == True
     ).count()
 
@@ -1783,6 +1786,8 @@ def validar_codigo_barras(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Valida um cÃ³digo de barras EAN-13"""
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Remover espaÃ§os e traÃ§os
     codigo_limpo = codigo.replace(" ", "").replace("-", "")
@@ -2366,6 +2371,8 @@ def listar_variacoes_excluidas(
     Lista variaÃ§Ãµes excluÃ­das (soft-deleted) de um produto PAI
     Permite visualizar, restaurar ou excluir definitivamente
     """
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Verificar se produto existe e Ã© PAI
     produto_pai = db.query(Produto).filter(
@@ -3134,6 +3141,8 @@ def criar_lote(
 ):
     """Cria um novo lote para o produto"""
 
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     # Verificar se produto existe
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
@@ -3232,6 +3241,8 @@ def atualizar_lote(
 ):
     """Atualiza informaÃ§Ãµes de um lote"""
 
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     # Buscar lote
     lote = db.query(ProdutoLote).filter(
         ProdutoLote.id == lote_id,
@@ -3285,6 +3296,8 @@ def excluir_lote(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Exclui um lote (soft delete)"""
+
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar lote
     lote = db.query(ProdutoLote).filter(
@@ -4853,6 +4866,8 @@ def vincular_fornecedor(
     - Apenas 1 pode ser principal
     - Fornecedor deve ser do tipo 'fornecedor' no cadastro de clientes
     """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     try:
         logger.info(f"[FORNECEDOR] Vinculando fornecedor {dados.fornecedor_id} ao produto {produto_id}")
 
@@ -5045,6 +5060,8 @@ def atualizar_vinculo_fornecedor(
     """
     Atualizar dados do vÃ­nculo fornecedor-produto
     """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     # Buscar vÃ­nculo e verificar permissÃ£o
     vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
         ProdutoFornecedor.id == vinculo_id,
@@ -5124,6 +5141,8 @@ def desvincular_fornecedor(
     Desvincular fornecedor de um produto
     Remove o vÃ­nculo do banco de dados
     """
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+
     # Buscar vÃ­nculo e verificar permissÃ£o
     vinculo = db.query(ProdutoFornecedor).join(Produto).filter(
         ProdutoFornecedor.id == vinculo_id,
@@ -5146,6 +5165,7 @@ def desvincular_fornecedor(
     if era_principal:
         outro_vinculo = db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == produto_id,
+            ProdutoFornecedor.id != vinculo_id,
             ProdutoFornecedor.ativo == True
         ).first()
 
