@@ -1,41 +1,39 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
   Image,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
-import { listarProdutos } from '../services/shop.service';
-import { listarPets } from '../services/pets.service';
-import { Produto, Pet } from '../types';
+import { Produto } from '../types';
 import { formatarMoeda } from '../utils/format';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const navigation = useNavigation<any>();
   const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   async function carregar() {
     try {
-      const [{ produtos: prods }, meusPets] = await Promise.all([
-        listarProdutos({ pagina: 1 }),
-        listarPets(),
-      ]);
-      setProdutos((prods ?? []).slice(0, 6)); // destaques
-      setPets(meusPets ?? []);
-    } catch {}
+      const { produtos: prods } = await listarProdutos({ pagina: 1 });
+      setProdutos((prods ?? []).slice(0, 6));
+    } catch {
+      setProdutos([]);
+    }
   }
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+  }, []);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -43,30 +41,27 @@ export default function HomeScreen() {
     setRefreshing(false);
   }
 
-  const primeiroNome = user?.nome?.split(' ')[0] || 'Cliente';
-  const pontos = user?.pontos ?? 0;
-
-  function abrirListaPets() {
-    navigation.navigate('Pets', { screen: 'ListaPets' });
-  }
-
   function abrirVeterinario() {
     navigation.navigate('Pets', { screen: 'Veterinario' });
   }
 
-  function abrirDetalhePet(pet: Pet) {
-    navigation.navigate('Pets', { screen: 'DetalhePet', params: { pet } });
-  }
+  const primeiroNome = user?.nome?.split(' ')[0] || 'Cliente';
+  const pontos = user?.pontos ?? 0;
 
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={CORES.primario} />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={CORES.primario}
+        />
+      }
     >
-      {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.saudacao}>Olá, {primeiroNome}! 👋</Text>
+          <Text style={styles.saudacao}>Ola, {primeiroNome}!</Text>
           <Text style={styles.subSaudacao}>Bem-vindo ao pet shop</Text>
         </View>
         <TouchableOpacity
@@ -78,63 +73,61 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Ação rápida: escanear produto */}
       <TouchableOpacity
         style={styles.scannerCard}
         onPress={() => navigation.navigate('Loja', { screen: 'BarcodeScanner' })}
         activeOpacity={0.85}
       >
         <View style={styles.scannerInfo}>
-          <Text style={styles.scannerTitulo}>📷 Comprar sem fila</Text>
+          <Text style={styles.scannerTitulo}>Comprar sem fila</Text>
           <Text style={styles.scannerTexto}>
-            Escaneie produtos na prateleira, monte seu carrinho e acompanhe os benefícios disponíveis.
+            Escaneie produtos na prateleira, monte seu carrinho e acompanhe os beneficios disponiveis.
           </Text>
         </View>
         <Ionicons name="barcode-outline" size={48} color="rgba(255,255,255,0.7)" />
       </TouchableOpacity>
 
-      {/* Atalhos */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitulo}>Acesso rápido</Text>
+        <Text style={styles.sectionTitulo}>Acesso rapido</Text>
         <View style={styles.atalhos}>
           <Atalho
-            emoji="🛍️"
+            iconText="Loja"
             titulo="Produtos"
             cor="#EFF6FF"
             corTexto={CORES.primario}
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <Atalho
-            emoji="🐾"
+            iconText="VET"
             titulo="Veterinario"
             cor="#EEF2FF"
             corTexto="#4338CA"
             onPress={abrirVeterinario}
           />
           <Atalho
-            emoji="🥣"
+            iconText="Calc"
             titulo="Calculadora"
             cor="#F0FDF4"
             corTexto={CORES.sucesso}
             onPress={() => navigation.navigate('Pets', { screen: 'CalculadoraRacao' })}
           />
           <Atalho
-            emoji="BT"
+            iconText="BT"
             titulo="Banho & Tosa"
             cor="#ECFEFF"
             corTexto="#0E7490"
             onPress={() => navigation.navigate('Pets', { screen: 'BanhoTosa' })}
           />
           <Atalho
-            emoji="📦"
+            iconText="Ped"
             titulo="Pedidos"
             cor="#FDF4FF"
             corTexto="#9333EA"
             onPress={() => navigation.navigate('Pedidos')}
           />
           <Atalho
-            emoji="🎁"
-            titulo="Benefícios"
+            iconText="Pts"
+            titulo="Beneficios"
             cor="#FEF3C7"
             corTexto="#92400E"
             onPress={() => navigation.navigate('Beneficios')}
@@ -142,40 +135,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Pets cadastrados */}
-      {pets.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitulo}>Meus pets</Text>
-            <TouchableOpacity onPress={abrirListaPets}>
-              <Text style={styles.verTodos}>Ver todos</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {pets.map((pet) => (
-              <TouchableOpacity
-                key={pet.id}
-                style={styles.petCard}
-                onPress={() => abrirDetalhePet(pet)}
-              >
-                {pet.foto_url ? (
-                  <Image source={{ uri: pet.foto_url }} style={styles.petFoto} />
-                ) : (
-                  <View style={[styles.petFoto, styles.petFotoPlaceholder]}>
-                    <Text style={{ fontSize: 28 }}>
-                      {pet.especie === 'gato' ? '🐱' : pet.especie === 'cão' ? '🐶' : '🐾'}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.petNome} numberOfLines={1}>{pet.nome}</Text>
-                <Text style={styles.petEspecie}>{pet.especie}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Destaques */}
       {produtos.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -185,15 +144,11 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           <View style={styles.produtosGrid}>
-            {produtos.map((p) => (
+            {produtos.map((produto) => (
               <ProdutoCard
-                key={p.id}
-                produto={p}
-                onPress={() =>
-                  navigation.navigate('Loja', {
-                    screen: 'Catalogo',
-                  })
-                }
+                key={produto.id}
+                produto={produto}
+                onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
               />
             ))}
           </View>
@@ -206,42 +161,44 @@ export default function HomeScreen() {
 }
 
 function Atalho({
-  emoji,
+  iconText,
   titulo,
   cor,
   corTexto,
   onPress,
 }: {
-  emoji: string;
+  iconText: string;
   titulo: string;
   cor: string;
   corTexto: string;
   onPress: () => void;
 }) {
-  const icone = titulo === 'Veterinario' ? 'VET' : emoji;
-
   return (
     <TouchableOpacity style={[styles.atalho, { backgroundColor: cor }]} onPress={onPress}>
-      <Text style={styles.atalhoEmoji}>{icone}</Text>
+      <Text style={[styles.atalhoIcon, { color: corTexto }]}>{iconText}</Text>
       <Text style={[styles.atalhoTexto, { color: corTexto }]}>{titulo}</Text>
     </TouchableOpacity>
   );
 }
 
 function ProdutoCard({ produto, onPress }: { produto: Produto; onPress: () => void }) {
-  const preco = produto.promocao_ativa && produto.preco_promocional
-    ? produto.preco_promocional
-    : produto.preco;
+  const preco =
+    produto.promocao_ativa && produto.preco_promocional
+      ? produto.preco_promocional
+      : produto.preco;
+
   return (
     <TouchableOpacity style={styles.produtoCard} onPress={onPress}>
       {produto.foto_url ? (
         <Image source={{ uri: produto.foto_url }} style={styles.produtoFoto} resizeMode="contain" />
       ) : (
         <View style={[styles.produtoFoto, styles.produtoFotoPlaceholder]}>
-          <Text style={{ fontSize: 24 }}>🛍️</Text>
+          <Ionicons name="bag-handle-outline" size={28} color={CORES.primario} />
         </View>
       )}
-      <Text style={styles.produtoNome} numberOfLines={2}>{produto.nome}</Text>
+      <Text style={styles.produtoNome} numberOfLines={2}>
+        {produto.nome}
+      </Text>
       <Text style={styles.produtoPreco}>{formatarMoeda(preco)}</Text>
     </TouchableOpacity>
   );
@@ -283,8 +240,18 @@ const styles = StyleSheet.create({
   scannerTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: '#fff', marginBottom: 6 },
   scannerTexto: { fontSize: FONTE.pequena, color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
   section: { paddingHorizontal: ESPACO.lg, marginBottom: ESPACO.lg },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ESPACO.sm },
-  sectionTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto, marginBottom: ESPACO.sm },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: ESPACO.sm,
+  },
+  sectionTitulo: {
+    fontSize: FONTE.grande,
+    fontWeight: 'bold',
+    color: CORES.texto,
+    marginBottom: ESPACO.sm,
+  },
   verTodos: { fontSize: FONTE.normal, color: CORES.primario, fontWeight: '500' },
   atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
   atalho: {
@@ -294,26 +261,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  atalhoEmoji: { fontSize: 22 },
+  atalhoIcon: { fontSize: 13, fontWeight: '900', letterSpacing: 0.3 },
   atalhoTexto: { fontSize: FONTE.pequena, fontWeight: '600' },
-  petCard: {
-    width: 90,
-    marginRight: ESPACO.sm,
-    alignItems: 'center',
-  },
-  petFoto: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    marginBottom: 6,
-  },
-  petFotoPlaceholder: {
-    backgroundColor: CORES.primarioClaro,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  petNome: { fontSize: FONTE.pequena, fontWeight: '600', color: CORES.texto, textAlign: 'center' },
-  petEspecie: { fontSize: FONTE.pequena - 1, color: CORES.textoSecundario },
   produtosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

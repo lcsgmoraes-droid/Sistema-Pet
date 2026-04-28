@@ -117,20 +117,8 @@ export default function VeterinarioScreen() {
         </View>
         <Text style={styles.heroTitle}>Central Veterinaria</Text>
         <Text style={styles.heroText}>
-          Vacinas, exames, consultas e servicos do pet em uma area separada do perfil da conta.
+          Vacinas, exames, consultas e agenda clinica em uma area separada do perfil da conta.
         </Text>
-        <View style={styles.heroFooter}>
-          <View style={styles.heroMetric}>
-            <Text style={styles.heroMetricValue}>{pets.length}</Text>
-            <Text style={styles.heroMetricLabel}>pet(s)</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.heroButton}
-            onPress={() => navigation.navigate("ListaPets")}
-          >
-            <Text style={styles.heroButtonText}>Ver pets</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       <View style={styles.section}>
@@ -153,22 +141,6 @@ export default function VeterinarioScreen() {
             onPress={() => abrirAreaVet(section)}
           />
         ))}
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Banho & Tosa</Text>
-          <Text style={styles.sectionBadgeAlt}>Novo</Text>
-        </View>
-        <ActionCard
-          icon="sparkles-outline"
-          title="Acompanhamento do atendimento"
-          subtitle="Veja agendamentos, andamento, entrega e avaliacao do banho e tosa."
-          action="Acompanhar"
-          tint="#0E7490"
-          background="#ECFEFF"
-          onPress={() => navigation.navigate("BanhoTosa")}
-        />
       </View>
 
       <View style={styles.section}>
@@ -264,26 +236,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 6,
   },
-  heroFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: ESPACO.lg,
-  },
-  heroMetric: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 6,
-  },
-  heroMetricValue: { color: "#fff", fontSize: FONTE.destaque, fontWeight: "800" },
-  heroMetricLabel: { color: "rgba(255,255,255,0.85)", fontSize: FONTE.normal },
-  heroButton: {
-    backgroundColor: "#fff",
-    borderRadius: RAIO.circulo,
-    paddingHorizontal: ESPACO.md,
-    paddingVertical: ESPACO.sm,
-  },
-  heroButtonText: { color: CORES.primario, fontWeight: "800" },
   section: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.lg,
@@ -311,16 +263,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: RAIO.circulo,
     backgroundColor: "#EFF6FF",
-    overflow: "hidden",
-  },
-  sectionBadgeAlt: {
-    color: "#0E7490",
-    fontSize: FONTE.pequena,
-    fontWeight: "800",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: RAIO.circulo,
-    backgroundColor: "#ECFEFF",
     overflow: "hidden",
   },
   actionCard: {
