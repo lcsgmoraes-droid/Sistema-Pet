@@ -279,6 +279,7 @@ async def importar_produtos(
                 localizacao = ws.cell(row_num, 14).value
                 status_texto = ws.cell(row_num, 15).value or 'ativo'
                 situacao = str(status_texto).lower().strip() == 'ativo'  # Converter para boolean
+                ativo = situacao
                 
                 # Dados fiscais/tributários
                 ncm = ws.cell(row_num, 16).value
@@ -413,6 +414,10 @@ async def importar_produtos(
                     produto.unidade = unidade
                     produto.localizacao = localizacao
                     produto.situacao = situacao
+                    produto.ativo = ativo
+                    if not ativo:
+                        produto.anunciar_ecommerce = False
+                        produto.anunciar_app = False
                     produto.informacoes_adicionais_nf = observacoes
                     
                     # Campos tributários
@@ -456,6 +461,9 @@ async def importar_produtos(
                         unidade=unidade,
                         localizacao=localizacao,
                         situacao=situacao,
+                        ativo=ativo,
+                        anunciar_ecommerce=ativo,
+                        anunciar_app=ativo,
                         informacoes_adicionais_nf=observacoes,
                         # Campos tributários
                         ncm=str(ncm).strip() if ncm else None,
