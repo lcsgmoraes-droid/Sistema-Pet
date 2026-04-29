@@ -4546,11 +4546,11 @@ async def upload_imagem_produto(
         current_user, tenant_id = user_and_tenant
         logger.info(f"[UPLOAD] Iniciando upload para produto {produto_id}")
 
-        # Verificar se produto existe e pertence ao usuÃ¡rio
+        # Imagens podem ser preparadas mesmo em produtos inativos/descontinuados.
+        # O bloqueio deve ser apenas por tenant/existencia, igual a tela de edicao.
         produto = db.query(Produto).filter(
             Produto.id == produto_id,
-            Produto.tenant_id == tenant_id,
-            Produto.situacao == True
+            Produto.tenant_id == tenant_id
         ).first()
 
         if not produto:
@@ -4600,6 +4600,7 @@ async def upload_imagem_produto(
 
         # Verificar se jÃ¡ existe imagem principal
         tem_principal = db.query(ProdutoImagem).filter(
+            ProdutoImagem.tenant_id == tenant_id,
             ProdutoImagem.produto_id == produto_id,
             ProdutoImagem.e_principal == True
         ).first()
@@ -4610,6 +4611,7 @@ async def upload_imagem_produto(
 
         # Obter prÃ³xima ordem
         max_ordem = db.query(func.max(ProdutoImagem.ordem)).filter(
+            ProdutoImagem.tenant_id == tenant_id,
             ProdutoImagem.produto_id == produto_id
         ).scalar() or 0
         logger.info(f"[UPLOAD] PrÃ³xima ordem: {max_ordem + 1}")
@@ -4676,6 +4678,7 @@ def listar_imagens_produto(
         )
 
     imagens = db.query(ProdutoImagem).filter(
+        ProdutoImagem.tenant_id == tenant_id,
         ProdutoImagem.produto_id == produto_id
     ).order_by(
         ProdutoImagem.e_principal.desc(),
@@ -4705,6 +4708,7 @@ def atualizar_imagem(
     # Buscar imagem e verificar permissão
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
+        ProdutoImagem.tenant_id == tenant_id,
         Produto.tenant_id == tenant_id
     ).first()
 
@@ -4717,6 +4721,7 @@ def atualizar_imagem(
     # Se for marcar como principal, desmarcar outras
     if dados.principal and not imagem.e_principal:
         db.query(ProdutoImagem).filter(
+            ProdutoImagem.tenant_id == tenant_id,
             ProdutoImagem.produto_id == imagem.produto_id,
             ProdutoImagem.e_principal == True
         ).update({"e_principal": False})
@@ -4729,6 +4734,7 @@ def atualizar_imagem(
         imagem.e_principal = dados.principal
         if dados.principal is False and imagem.produto.imagem_principal == imagem.url:
             proxima_principal = db.query(ProdutoImagem).filter(
+                ProdutoImagem.tenant_id == tenant_id,
                 ProdutoImagem.produto_id == imagem.produto_id,
                 ProdutoImagem.id != imagem.id,
             ).order_by(
@@ -4764,6 +4770,7 @@ def deletar_imagem(
     # Buscar imagem e verificar permissÃ£o
     imagem = db.query(ProdutoImagem).join(Produto).filter(
         ProdutoImagem.id == imagem_id,
+        ProdutoImagem.tenant_id == tenant_id,
         Produto.tenant_id == tenant_id
     ).first()
 
@@ -4786,6 +4793,7 @@ def deletar_imagem(
     db.delete(imagem)
 
     proxima_imagem = db.query(ProdutoImagem).filter(
+        ProdutoImagem.tenant_id == tenant_id,
         ProdutoImagem.produto_id == produto.id,
         ProdutoImagem.id != imagem_id,
     ).order_by(
@@ -4797,6 +4805,7 @@ def deletar_imagem(
     if proxima_imagem:
         if era_principal or produto.imagem_principal == url_removida:
             db.query(ProdutoImagem).filter(
+                ProdutoImagem.tenant_id == tenant_id,
                 ProdutoImagem.produto_id == produto.id,
             ).update({"e_principal": False})
             proxima_imagem.e_principal = True
