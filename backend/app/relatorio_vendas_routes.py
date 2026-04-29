@@ -6,7 +6,7 @@ Similar ao SimplesVet com abas: Resumo, Totais por produto, Lista de Vendas
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from datetime import datetime, date
 from typing import Optional
 from io import BytesIO
@@ -72,7 +72,8 @@ async def obter_relatorio_vendas(
         and_(
             Venda.tenant_id == tenant_id,
             Venda.data_venda >= data_inicio_dt,
-            Venda.data_venda <= data_fim_dt
+            Venda.data_venda <= data_fim_dt,
+            or_(Venda.status.is_(None), Venda.status != 'cancelada')
         )
     ).all()
 

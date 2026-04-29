@@ -249,6 +249,20 @@ function vendaEstaEmAberto(venda) {
   return venda?.status !== "finalizada" && venda?.status !== "cancelada";
 }
 
+function getStatusVendaMeta(status) {
+  const statusNormalizado = String(status || "").toLowerCase();
+  if (statusNormalizado === "finalizada") {
+    return { label: "Baixada", className: "bg-green-100 text-green-800" };
+  }
+  if (statusNormalizado === "baixa_parcial") {
+    return { label: "Parcial", className: "bg-blue-100 text-blue-800" };
+  }
+  if (statusNormalizado === "cancelada") {
+    return { label: "Cancelada", className: "bg-slate-200 text-slate-700" };
+  }
+  return { label: "Aberta", className: "bg-yellow-100 text-yellow-800" };
+}
+
 export default function VendasFinanceiro() {
   const { user } = useAuth();
   const userPermissions = user?.permissions || [];
@@ -654,10 +668,15 @@ export default function VendasFinanceiro() {
     };
   }, [vendasPorDataCalendario]);
 
+  const listaVendasVisiveis = useMemo(
+    () => listaVendas.filter((venda) => venda?.status !== "cancelada"),
+    [listaVendas],
+  );
+
   const listaVendasFiltrada = useMemo(() => {
-    if (filtroStatusLista !== "em_aberto") return listaVendas;
-    return listaVendas.filter(vendaEstaEmAberto);
-  }, [filtroStatusLista, listaVendas]);
+    if (filtroStatusLista !== "em_aberto") return listaVendasVisiveis;
+    return listaVendasVisiveis.filter(vendaEstaEmAberto);
+  }, [filtroStatusLista, listaVendasVisiveis]);
 
   const CardComVariacao = ({
     titulo,
@@ -2686,7 +2705,7 @@ export default function VendasFinanceiro() {
               </button>
             </div>
             <div className="text-sm text-slate-500">
-              Mostrando {listaVendasFiltrada.length} de {listaVendas.length} venda(s)
+              Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -2803,19 +2822,9 @@ export default function VendasFinanceiro() {
                       </td>
                       <td className="px-2 py-2 text-center">
                         <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            venda.status === "finalizada"
-                              ? "bg-green-100 text-green-800"
-                              : venda.status === "baixa_parcial"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-yellow-100 text-yellow-800"
-                          }`}
+                          className={`px-2 py-1 rounded text-xs ${getStatusVendaMeta(venda.status).className}`}
                         >
-                          {venda.status === "finalizada"
-                            ? "Baixada"
-                            : venda.status === "baixa_parcial"
-                              ? "Parcial"
-                              : "Aberta"}
+                          {getStatusVendaMeta(venda.status).label}
                         </span>
                       </td>
                     </tr>
