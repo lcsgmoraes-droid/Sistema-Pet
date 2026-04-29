@@ -5,7 +5,7 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
     useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
-  const recalcularTotais = (itens) => {
+  const recalcularTotais = (itens, extras = {}) => {
     const subtotal = itens.reduce((sum, item) => sum + item.subtotal, 0);
     const descontoItens = itens.reduce(
       (sum, item) => sum + (item.desconto_valor || 0),
@@ -26,6 +26,7 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
       desconto_valor: descontoItens,
       desconto_percentual: descontoPercentual,
       total,
+      ...extras,
     }));
   };
 

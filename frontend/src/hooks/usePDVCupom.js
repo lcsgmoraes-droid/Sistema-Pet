@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api";
 
 export function usePDVCupom({
@@ -10,6 +10,14 @@ export function usePDVCupom({
   const [cupomAplicado, setCupomAplicado] = useState(null);
   const [loadingCupom, setLoadingCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
+
+  useEffect(() => {
+    if (!vendaAtual.id && vendaAtual.itens.length === 0) {
+      setCupomAplicado(null);
+      setCodigoCupom("");
+      setErroCupom("");
+    }
+  }, [vendaAtual.id, vendaAtual.itens.length]);
 
   const aplicarCupom = async () => {
     const code = codigoCupom.trim().toUpperCase();
@@ -28,7 +36,10 @@ export function usePDVCupom({
       const dados = res.data;
       setCupomAplicado(dados);
       setCodigoCupom("");
-      aplicarDescontoTotal("valor", dados.discount_applied);
+      aplicarDescontoTotal("valor", dados.discount_applied, {
+        cupom_code: dados.code,
+        cupom_discount_applied: dados.discount_applied,
+      });
     } catch (err) {
       const msg = err?.response?.data?.detail || "Erro ao validar cupom";
       setErroCupom(msg);
@@ -41,7 +52,10 @@ export function usePDVCupom({
     setCupomAplicado(null);
     setCodigoCupom("");
     setErroCupom("");
-    removerDescontoTotal();
+    removerDescontoTotal({
+      cupom_code: null,
+      cupom_discount_applied: null,
+    });
   };
 
   const handleCodigoCupomChange = (valor) => {

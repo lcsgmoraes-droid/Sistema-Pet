@@ -17,7 +17,7 @@ export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
     setMostrarModalDescontoTotal(true);
   };
 
-  const aplicarDescontoTotal = (tipoDesconto, valor) => {
+  const aplicarDescontoTotal = (tipoDesconto, valor, extras = {}) => {
     const itens = vendaAtual.itens;
     if (itens.length === 0) return;
 
@@ -63,11 +63,11 @@ export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
       };
     });
 
-    recalcularTotais(itensAtualizados);
+    recalcularTotais(itensAtualizados, extras);
     setMostrarModalDescontoTotal(false);
   };
 
-  const removerDescontoTotal = () => {
+  const removerDescontoTotal = (extras = {}) => {
     const itensAtualizados = vendaAtual.itens.map((item) => {
       const subtotalBruto =
         (item.preco_unitario || item.preco_venda) * item.quantidade;
@@ -80,7 +80,7 @@ export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
         subtotal: subtotalBruto,
       };
     });
-    recalcularTotais(itensAtualizados);
+    recalcularTotais(itensAtualizados, extras);
   };
 
   return {

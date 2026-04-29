@@ -5,11 +5,12 @@ Gestão completa de despesas e pagamentos a fornecedores
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc, extract
+from sqlalchemy import and_, or_, func, desc, extract, select
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 from decimal import Decimal
+import re
 
 from .db import get_session
 from .auth import get_current_user
@@ -125,8 +126,45 @@ class ContaPagarResponse(BaseModel):
     tipo_despesa_id: Optional[int] = None
     tipo_despesa_nome: Optional[str] = None
     e_custo_fixo: Optional[bool] = None
+    origem_lancamento: Optional[str] = None
+    origem_lancamento_label: Optional[str] = None
+    caixa_referencia: Optional[str] = None
     
     model_config = {"from_attributes": True}
+
+
+CAIXA_PDV_OBSERVACAO_MARKER = "Gerada automaticamente pelo PDV"
+
+
+def _extrair_caixa_referencia(observacoes: Optional[str]) -> Optional[str]:
+    match = re.search(r"Caixa\s+#?([0-9]+)", observacoes or "", re.IGNORECASE)
+    if not match:
+        return None
+    return f"Caixa #{match.group(1)}"
+
+
+def _identificar_origem_conta_pagar(conta: ContaPagar) -> dict:
+    observacoes = conta.observacoes or ""
+    if CAIXA_PDV_OBSERVACAO_MARKER.lower() in observacoes.lower():
+        caixa_ref = _extrair_caixa_referencia(observacoes)
+        return {
+            "origem_lancamento": "caixa_pdv",
+            "origem_lancamento_label": "Caixa/PDV",
+            "caixa_referencia": caixa_ref,
+        }
+
+    if conta.nota_entrada_id:
+        return {
+            "origem_lancamento": "nota_entrada",
+            "origem_lancamento_label": "Nota de entrada",
+            "caixa_referencia": None,
+        }
+
+    return {
+        "origem_lancamento": "manual",
+        "origem_lancamento_label": "Manual/financeiro",
+        "caixa_referencia": None,
+    }
 
 
 # ============================================================================
@@ -480,7 +518,11 @@ def listar_contas_pagar(
     status: Optional[str] = Query(None),
     fornecedor_id: Optional[int] = Query(None),
     categoria_id: Optional[int] = Query(None),
+    tipo_despesa_id: Optional[int] = Query(None),
     tipo_custo: Optional[str] = Query(None),  # 'fixo', 'variavel'
+    origem: Optional[str] = Query(None),
+    busca: Optional[str] = Query(None),
+    data_campo: str = Query("vencimento"),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
@@ -514,12 +556,59 @@ def listar_contas_pagar(
         query = query.filter(ContaPagar.fornecedor_id == fornecedor_id)
     if categoria_id:
         query = query.filter(ContaPagar.categoria_id == categoria_id)
+    if tipo_despesa_id:
+        query = query.filter(ContaPagar.tipo_despesa_id == tipo_despesa_id)
+
+    origem_normalizada = (origem or "").strip().lower()
+    caixa_pdv_condition = ContaPagar.observacoes.ilike(f"%{CAIXA_PDV_OBSERVACAO_MARKER}%")
+    if origem_normalizada == "caixa_pdv":
+        query = query.filter(caixa_pdv_condition)
+    elif origem_normalizada == "nota_entrada":
+        query = query.filter(ContaPagar.nota_entrada_id.isnot(None))
+    elif origem_normalizada == "manual":
+        query = query.filter(
+            ContaPagar.nota_entrada_id.is_(None),
+            or_(ContaPagar.observacoes.is_(None), ~caixa_pdv_condition),
+        )
+
+    termo_busca = (busca or "").strip()
+    if termo_busca:
+        busca_pattern = f"%{termo_busca}%"
+        fornecedores_match = (
+            select(Cliente.id)
+            .where(
+                Cliente.tenant_id == tenant_id,
+                Cliente.nome.ilike(busca_pattern),
+            )
+        )
+        query = query.filter(
+            or_(
+                ContaPagar.descricao.ilike(busca_pattern),
+                ContaPagar.documento.ilike(busca_pattern),
+                ContaPagar.nfe_numero.ilike(busca_pattern),
+                ContaPagar.observacoes.ilike(busca_pattern),
+                ContaPagar.fornecedor_id.in_(fornecedores_match),
+            )
+        )
+
+    data_column = ContaPagar.data_vencimento
+    if data_campo == "pagamento":
+        data_column = ContaPagar.data_pagamento
+    elif data_campo == "emissao":
+        data_column = ContaPagar.data_emissao
+
     if data_inicio:
-        query = query.filter(ContaPagar.data_vencimento >= data_inicio)
+        query = query.filter(data_column >= data_inicio)
     if data_fim:
-        query = query.filter(ContaPagar.data_vencimento <= data_fim)
+        query = query.filter(data_column <= data_fim)
     if numero_nf:
-        query = query.filter(ContaPagar.nfe_numero.ilike(f'%{numero_nf}%'))
+        numero_nf_pattern = f'%{numero_nf}%'
+        query = query.filter(
+            or_(
+                ContaPagar.nfe_numero.ilike(numero_nf_pattern),
+                ContaPagar.documento.ilike(numero_nf_pattern),
+            )
+        )
     if tipo_custo in ('fixo', 'variavel'):
         from .financeiro_models import CategoriaFinanceira as CF
         query = query.join(CF, ContaPagar.categoria_id == CF.id, isouter=True).filter(
@@ -593,6 +682,7 @@ def listar_contas_pagar(
                 conta.categoria.tipo_custo == 'fixo' if conta.categoria and conta.categoria.tipo_custo in ('fixo', 'variavel')
                 else None
             ),
+            **_identificar_origem_conta_pagar(conta),
         }
 
         if conta.dre_subcategoria_id:

@@ -104,6 +104,8 @@ export function usePDVVendaCarregamento({
           subtotal: venda.subtotal || 0,
           desconto_valor: venda.desconto_valor || 0,
           desconto_percentual: venda.desconto_percentual || 0,
+          cupom_code: venda.cupom_code || null,
+          cupom_discount_applied: venda.cupom_discount_applied ?? null,
           total: venda.total || 0,
           observacoes: venda.observacoes || "",
           funcionario_id: venda.funcionario_id || null,

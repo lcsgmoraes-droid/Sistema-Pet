@@ -34,6 +34,8 @@ class Venda(BaseTenantModel):
     subtotal = Column(DECIMAL(10, 2), nullable=False)
     desconto_valor = Column(DECIMAL(10, 2), default=0)
     desconto_percentual = Column(DECIMAL(5, 2), default=0)
+    cupom_code = Column(String(100), nullable=True, index=True)
+    cupom_discount_applied = Column(DECIMAL(10, 2), nullable=True)
     total = Column(DECIMAL(10, 2), nullable=False)
     
     # Entrega
@@ -170,6 +172,8 @@ class Venda(BaseTenantModel):
             'subtotal': safe_decimal_to_float(self.subtotal),
             'desconto_valor': safe_decimal_to_float(self.desconto_valor) or 0,
             'desconto_percentual': safe_decimal_to_float(self.desconto_percentual) or 0,
+            'cupom_code': self.cupom_code,
+            'cupom_discount_applied': safe_decimal_to_float(self.cupom_discount_applied),
             'total': safe_decimal_to_float(self.total),
             'valor_total': safe_decimal_to_float(self.total),  # Alias para compatibilidade
             'valor_pago': valor_pago,

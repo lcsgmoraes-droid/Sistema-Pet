@@ -45,6 +45,11 @@ export function montarPayloadVenda(vendaAtual, entregadorSelecionado = null) {
     itens: montarItensVendaPayload(vendaAtual),
     desconto_valor: normalizarNumero(vendaAtual.desconto_valor),
     desconto_percentual: normalizarNumero(vendaAtual.desconto_percentual),
+    cupom_code: vendaAtual.cupom_code || null,
+    cupom_discount_applied:
+      vendaAtual.cupom_code && vendaAtual.cupom_discount_applied != null
+        ? normalizarNumero(vendaAtual.cupom_discount_applied)
+        : null,
     observacoes: vendaAtual.observacoes || "",
     tem_entrega: temEntrega,
     taxa_entrega: taxaEntregaTotal,

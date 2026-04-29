@@ -17,7 +17,11 @@ const ContasPagar = () => {
     apenas_vencidas: false,
     apenas_vencer: false,
     numero_nf: '',
-    tipo_custo: 'todos'
+    tipo_custo: 'todos',
+    origem: 'todos',
+    busca: '',
+    data_campo: 'vencimento',
+    tipo_despesa_id: ''
   });
   
   const [fornecedores, setFornecedores] = useState([]);
@@ -123,18 +127,37 @@ const ContasPagar = () => {
     }
   };
 
-  const aplicarFiltros = async () => {
+  const filtrosPadrao = {
+    status: 'todos',
+    fornecedor_id: null,
+    data_inicio: '',
+    data_fim: '',
+    apenas_vencidas: false,
+    apenas_vencer: false,
+    numero_nf: '',
+    tipo_custo: 'todos',
+    origem: 'todos',
+    busca: '',
+    data_campo: 'vencimento',
+    tipo_despesa_id: ''
+  };
+
+  const aplicarFiltros = async (filtrosParaAplicar = filtros) => {
     try {
       setLoading(true);
-            const params = new URLSearchParams();
-      if (filtros.status !== 'todos') params.append('status', filtros.status);
-      if (filtros.fornecedor_id) params.append('fornecedor_id', filtros.fornecedor_id);
-      if (filtros.data_inicio) params.append('data_inicio', filtros.data_inicio);
-      if (filtros.data_fim) params.append('data_fim', filtros.data_fim);
-      if (filtros.apenas_vencidas) params.append('apenas_vencidas', 'true');
-      if (filtros.apenas_vencer) params.append('apenas_vencer', 'true');
-      if (filtros.numero_nf) params.append('numero_nf', filtros.numero_nf);
-      if (filtros.tipo_custo !== 'todos') params.append('tipo_custo', filtros.tipo_custo);
+      const params = new URLSearchParams();
+      if (filtrosParaAplicar.status !== 'todos') params.append('status', filtrosParaAplicar.status);
+      if (filtrosParaAplicar.fornecedor_id) params.append('fornecedor_id', filtrosParaAplicar.fornecedor_id);
+      if (filtrosParaAplicar.data_inicio) params.append('data_inicio', filtrosParaAplicar.data_inicio);
+      if (filtrosParaAplicar.data_fim) params.append('data_fim', filtrosParaAplicar.data_fim);
+      if (filtrosParaAplicar.apenas_vencidas) params.append('apenas_vencidas', 'true');
+      if (filtrosParaAplicar.apenas_vencer) params.append('apenas_vencer', 'true');
+      if (filtrosParaAplicar.numero_nf) params.append('numero_nf', filtrosParaAplicar.numero_nf);
+      if (filtrosParaAplicar.tipo_custo !== 'todos') params.append('tipo_custo', filtrosParaAplicar.tipo_custo);
+      if (filtrosParaAplicar.origem !== 'todos') params.append('origem', filtrosParaAplicar.origem);
+      if (filtrosParaAplicar.busca) params.append('busca', filtrosParaAplicar.busca);
+      if (filtrosParaAplicar.data_campo) params.append('data_campo', filtrosParaAplicar.data_campo);
+      if (filtrosParaAplicar.tipo_despesa_id) params.append('tipo_despesa_id', filtrosParaAplicar.tipo_despesa_id);
       
       const response = await api.get(`/contas-pagar/?${params}`);
 
@@ -146,6 +169,25 @@ const ContasPagar = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filtrarDespesasCaixaHoje = () => {
+    const hoje = new Date().toISOString().split('T')[0];
+    const filtrosCaixa = {
+      ...filtrosPadrao,
+      status: 'pago',
+      origem: 'caixa_pdv',
+      data_campo: 'pagamento',
+      data_inicio: hoje,
+      data_fim: hoje
+    };
+    setFiltros(filtrosCaixa);
+    aplicarFiltros(filtrosCaixa);
+  };
+
+  const limparFiltros = () => {
+    setFiltros(filtrosPadrao);
+    aplicarFiltros(filtrosPadrao);
   };
 
   const abrirModalPagamento = (conta) => {
@@ -178,6 +220,7 @@ const ContasPagar = () => {
     setDadosClassificacao({
       categoria_id: conta.categoria_id || null,
       dre_subcategoria_id: conta.dre_subcategoria_id || null,
+      tipo_despesa_id: conta.tipo_despesa_id || null,
       canal: conta.canal || 'loja_fisica'
     });
     setMostrarModalClassificacao(true);
@@ -309,6 +352,37 @@ const ContasPagar = () => {
     return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">⏱ Pendente</span>;
   };
 
+  const getOrigemBadge = (conta) => {
+    const origem = conta.origem_lancamento || 'manual';
+
+    if (origem === 'caixa_pdv') {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-rose-100 text-rose-700 font-semibold">
+            Caixa/PDV
+          </span>
+          {conta.caixa_referencia && (
+            <span className="text-[11px] text-gray-500">{conta.caixa_referencia}</span>
+          )}
+        </div>
+      );
+    }
+
+    if (origem === 'nota_entrada') {
+      return (
+        <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">
+          Nota entrada
+        </span>
+      );
+    }
+
+    return (
+      <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-semibold">
+        Manual
+      </span>
+    );
+  };
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a pagar...</div>;
   }
@@ -328,8 +402,20 @@ const ContasPagar = () => {
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <h5 className="text-lg font-semibold mb-4">🔍 Filtros</h5>
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          <div className="md:col-span-3">
+            <label className="block text-sm font-medium mb-1">Buscar</label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 rounded px-3 py-2"
+              placeholder="Descrição, documento, NF, fornecedor..."
+              value={filtros.busca}
+              onChange={(e) => setFiltros({...filtros, busca: e.target.value})}
+              onKeyDown={(e) => e.key === 'Enter' && aplicarFiltros()}
+            />
+          </div>
+
+          <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1">Status</label>
             <select
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -345,6 +431,20 @@ const ContasPagar = () => {
           </div>
 
           <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Origem</label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2"
+              value={filtros.origem}
+              onChange={(e) => setFiltros({...filtros, origem: e.target.value})}
+            >
+              <option value="todos">Todas</option>
+              <option value="caixa_pdv">Caixa/PDV</option>
+              <option value="nota_entrada">Nota de entrada</option>
+              <option value="manual">Manual/financeiro</option>
+            </select>
+          </div>
+
+          <div className="md:col-span-3">
             <label className="block text-sm font-medium mb-1">Fornecedor</label>
             <select
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -358,8 +458,22 @@ const ContasPagar = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Número NF</label>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Tipo despesa</label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2"
+              value={filtros.tipo_despesa_id || ''}
+              onChange={(e) => setFiltros({...filtros, tipo_despesa_id: e.target.value})}
+            >
+              <option value="">Todos</option>
+              {safeArray(tiposDespesa).map(t => (
+                <option key={t.id} value={t.id}>{t.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">NF/documento</label>
             <input
               type="text"
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -369,21 +483,34 @@ const ContasPagar = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">💰 Tipo de Custo</label>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Tipo de custo</label>
             <select
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.tipo_custo}
               onChange={(e) => setFiltros({...filtros, tipo_custo: e.target.value})}
             >
               <option value="todos">Todos</option>
-              <option value="fixo">🔒 Só Fixos</option>
-              <option value="variavel">📈 Só Variáveis</option>
+              <option value="fixo">So fixos</option>
+              <option value="variavel">Só variáveis</option>
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Data Início</label>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Data usada</label>
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2"
+              value={filtros.data_campo}
+              onChange={(e) => setFiltros({...filtros, data_campo: e.target.value})}
+            >
+              <option value="vencimento">Vencimento</option>
+              <option value="pagamento">Pagamento</option>
+              <option value="emissao">Emissão</option>
+            </select>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Data início</label>
             <input
               type="date"
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -392,8 +519,8 @@ const ContasPagar = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Data Fim</label>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium mb-1">Data fim</label>
             <input
               type="date"
               className="w-full border border-gray-300 rounded px-3 py-2"
@@ -402,7 +529,7 @@ const ContasPagar = () => {
             />
           </div>
 
-          <div className="flex items-end gap-4">
+          <div className="md:col-span-3 flex items-end gap-4">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -410,7 +537,7 @@ const ContasPagar = () => {
                 checked={filtros.apenas_vencidas}
                 onChange={(e) => setFiltros({...filtros, apenas_vencidas: e.target.checked, apenas_vencer: false})}
               />
-              <span className="text-sm">Só Vencidas</span>
+              <span className="text-sm">Só vencidas</span>
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -419,11 +546,29 @@ const ContasPagar = () => {
                 checked={filtros.apenas_vencer}
                 onChange={(e) => setFiltros({...filtros, apenas_vencer: e.target.checked, apenas_vencidas: false})}
               />
-              <span className="text-sm">A Vencer</span>
+              <span className="text-sm">A vencer</span>
             </label>
+          </div>
+
+          <div className="md:col-span-5 flex flex-wrap items-end justify-end gap-2">
+            <button
+              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded text-sm font-semibold"
+              onClick={filtrarDespesasCaixaHoje}
+              type="button"
+            >
+              Despesas do caixa hoje
+            </button>
+            <button
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
+              onClick={limparFiltros}
+              type="button"
+            >
+              Limpar
+            </button>
             <button 
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
-              onClick={aplicarFiltros}
+              onClick={() => aplicarFiltros()}
+              type="button"
             >
               Filtrar
             </button>
@@ -440,6 +585,8 @@ const ContasPagar = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">ID</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descrição</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fornecedor</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Origem</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Original</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Pago</th>
@@ -451,7 +598,7 @@ const ContasPagar = () => {
             <tbody className="divide-y divide-gray-200">
               {contas.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
                     Nenhuma conta encontrada
                   </td>
                 </tr>
@@ -474,6 +621,16 @@ const ContasPagar = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">{conta.fornecedor_nome || '-'}</td>
+                    <td className="px-4 py-3 text-sm">{getOrigemBadge(conta)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {conta.tipo_despesa_nome ? (
+                        <span className="inline-flex px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700">
+                          {conta.tipo_despesa_nome}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm">{formatarData(conta.data_vencimento)}</td>
                     <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_original)}</td>
                     <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_pago)}</td>
@@ -714,6 +871,17 @@ const ContasPagar = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Origem</label>
+                  <div className="mt-1">{getOrigemBadge(contaSelecionada)}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Tipo de despesa</label>
+                  <p className="mt-1">{contaSelecionada.tipo_despesa_nome || 'Não classificado'}</p>
+                </div>
+              </div>
+
               {contaSelecionada.nfe_numero && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nota Fiscal</label>
@@ -921,6 +1089,20 @@ const ContasPagar = () => {
                   <option value="">Selecione...</option>
                   {safeArray(subcategoriasDre).filter(s => s.categoria_financeira_id === dadosClassificacao.categoria_id).map((s) => (
                     <option key={s.id} value={s.id}>{s.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Tipo de despesa</label>
+                <select
+                  className="w-full border border-gray-300 rounded px-3 py-2"
+                  value={dadosClassificacao.tipo_despesa_id || ''}
+                  onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, tipo_despesa_id: e.target.value ? parseInt(e.target.value, 10) : null })}
+                >
+                  <option value="">Selecione...</option>
+                  {safeArray(tiposDespesa).map((t) => (
+                    <option key={t.id} value={t.id}>{t.nome}</option>
                   ))}
                 </select>
               </div>

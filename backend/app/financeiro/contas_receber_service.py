@@ -614,7 +614,7 @@ class ContasReceberService:
         lancamentos_criados = []
 
         # Verificar se pagou tudo
-        if abs(total_recebido - total_venda) < 0.01:
+        if total_recebido >= total_venda - 0.01:
             # TOTALMENTE PAGO: Marcar lançamentos como realizados
             for lanc_prev in lancamentos_previstos:
                 lanc_prev.status = 'realizado'
@@ -650,9 +650,10 @@ class ContasReceberService:
                 lancamentos_criados.append(lanc_realizado.id)
 
                 # Ajustar lançamento previsto para saldo restante
-                saldo_restante = total_venda - total_recebido
+                saldo_restante = max(total_venda - total_recebido, 0)
                 lanc_prev.valor = Decimal(str(saldo_restante))
-                lanc_prev.descricao = f"{lanc_prev.descricao} - Saldo restante"
+                if "Saldo restante" not in (lanc_prev.descricao or ""):
+                    lanc_prev.descricao = f"{lanc_prev.descricao} - Saldo restante"
                 db.add(lanc_prev)
                 lancamentos_atualizados.append(lanc_prev.id)
 

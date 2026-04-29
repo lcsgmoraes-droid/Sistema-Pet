@@ -223,6 +223,15 @@ export default function ModalPagamento({
   const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
   const valorRestante = valorTotal - valorPago;
   const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
+  const cupomParaFinalizar =
+    cupomAplicado ||
+    (venda.cupom_code
+      ? {
+          code: venda.cupom_code,
+          discount_applied:
+            venda.cupom_discount_applied ?? venda.desconto_valor ?? null,
+        }
+      : null);
 
   const valorBaseBeneficios = Number(venda.total || 0);
   const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
@@ -797,8 +806,8 @@ export default function ModalPagamento({
 
       // Finalizar a venda com os pagamentos
       const resultado = await finalizarVenda(vendaId, pagamentos, {
-        cupom_code: cupomAplicado?.code || null,
-        cupom_discount_applied: cupomAplicado?.discount_applied ?? null,
+        cupom_code: cupomParaFinalizar?.code || null,
+        cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
       });
 
       // Mostrar pergunta sobre NF-e APENAS se pagamento completo

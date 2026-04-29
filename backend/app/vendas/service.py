@@ -214,6 +214,8 @@ class VendaService:
             # ============================================================
             
             subtotal_itens = sum(item['subtotal'] for item in itens)
+            desconto_itens = sum(float(item.get('desconto_item') or 0) for item in itens)
+            desconto_valor = desconto_itens if desconto_itens > 0 else float(payload.get('desconto_valor', 0) or 0)
             tem_entrega = bool(payload.get('tem_entrega', False))
             taxa_entrega = (payload.get('taxa_entrega', 0) or 0) if tem_entrega else 0
             total = subtotal_itens + taxa_entrega
@@ -256,8 +258,10 @@ class VendaService:
                 vendedor_id=payload.get('vendedor_id') or user_id,
                 funcionario_id=payload.get('funcionario_id'),
                 subtotal=float(subtotal_itens),
-                desconto_valor=float(payload.get('desconto_valor', 0) or 0),  # Desconto aplicado na venda
+                desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
                 desconto_percentual=payload.get('desconto_percentual', 0) or 0,
+                cupom_code=(str(payload.get('cupom_code')).strip().upper() if payload.get('cupom_code') else None),
+                cupom_discount_applied=payload.get('cupom_discount_applied'),
                 total=float(total),
                 observacoes=payload.get('observacoes'),
                 tem_entrega=tem_entrega,
@@ -1295,10 +1299,18 @@ class VendaService:
             total_venda = float(venda.total)
             valor_restante = total_venda - total_ja_pago
             
-            if abs(valor_restante) < 0.01:
+            if valor_restante <= 0.01:
                 raise HTTPException(status_code=400, detail='Venda já está totalmente paga')
             
-            total_novos_pagamentos = sum(p['valor'] for p in pagamentos)
+            total_novos_pagamentos = sum(float(p.get('valor') or 0) for p in pagamentos)
+            if total_novos_pagamentos > valor_restante + 0.01:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f'Valor dos pagamentos excede o saldo da venda. '
+                        f'Saldo: R$ {valor_restante:.2f}, informado: R$ {total_novos_pagamentos:.2f}.'
+                    )
+                )
             total_pagamentos = total_ja_pago + total_novos_pagamentos
             
             logger.info(
@@ -1307,20 +1319,29 @@ class VendaService:
                 f"Novos=R$ {total_novos_pagamentos:.2f}"
             )
 
+            cupom_code_resolvido = (str(cupom_code).strip().upper() if cupom_code else venda.cupom_code)
+            cupom_discount_resolvido = (
+                cupom_discount_applied
+                if cupom_discount_applied is not None
+                else float(venda.cupom_discount_applied or 0) if venda.cupom_discount_applied is not None else None
+            )
+
             cupom_consumido = None
-            if cupom_code:
+            if cupom_code_resolvido:
                 venda_total_para_cupom = float(venda.total or 0)
-                if cupom_discount_applied:
-                    venda_total_para_cupom += float(cupom_discount_applied or 0)
+                if cupom_discount_resolvido:
+                    venda_total_para_cupom += float(cupom_discount_resolvido or 0)
                 cupom_consumido = consume_coupon_redemption(
                     db,
                     tenant_id=tenant_id,
-                    code=cupom_code,
+                    code=cupom_code_resolvido,
                     venda_total=venda_total_para_cupom,
                     customer_id=venda.cliente_id,
                     venda_id=venda.id,
-                    expected_discount_applied=cupom_discount_applied,
+                    expected_discount_applied=cupom_discount_resolvido,
                 )
+                venda.cupom_code = cupom_code_resolvido
+                venda.cupom_discount_applied = cupom_consumido.get("discount_applied")
             
             # ============================================================
             # ETAPA 2: PROCESSAR PAGAMENTOS
@@ -1519,7 +1540,7 @@ class VendaService:
             status_anterior = venda.status
             logger.info(f"📋 Status anterior: {status_anterior}")
             
-            if abs(total_pagamentos - total_venda) < 0.01:
+            if total_pagamentos >= total_venda - 0.01:
                 # Pagamento completo
                 venda.status = 'finalizada'
                 venda.data_finalizacao = now_brasilia()

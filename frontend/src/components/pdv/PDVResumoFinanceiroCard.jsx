@@ -19,6 +19,15 @@ export default function PDVResumoFinanceiroCard({
 }) {
   const totalBruto = vendaAtual.subtotal + vendaAtual.desconto_valor;
   const saldoRestante = Math.max(0, vendaAtual.total - (vendaAtual.total_pago || 0));
+  const cupomExibicao =
+    cupomAplicado ||
+    (vendaAtual.cupom_code
+      ? {
+          code: vendaAtual.cupom_code,
+          discount_applied:
+            vendaAtual.cupom_discount_applied ?? vendaAtual.desconto_valor ?? 0,
+        }
+      : null);
   const descontoPercentualTexto =
     vendaAtual.desconto_valor > 0 && totalBruto > 0
       ? `${((vendaAtual.desconto_valor / totalBruto) * 100).toLocaleString(
@@ -74,14 +83,14 @@ export default function PDVResumoFinanceiroCard({
                   Cupom de desconto
                 </span>
               </div>
-              {cupomAplicado ? (
+              {cupomExibicao ? (
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="text-xs font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded font-mono">
-                      {cupomAplicado.code}
+                      {cupomExibicao.code}
                     </span>
                     <span className="ml-2 text-xs text-green-700 font-medium">
-                      - {formatMoneyBRL(cupomAplicado.discount_applied)}
+                      - {formatMoneyBRL(cupomExibicao.discount_applied)}
                     </span>
                   </div>
                   <button
@@ -134,7 +143,7 @@ export default function PDVResumoFinanceiroCard({
                   - {formatMoneyBRL(vendaAtual.desconto_valor)}
                 </span>
               )}
-              {!cupomAplicado && (
+              {!cupomExibicao && (
                 <button
                   onClick={onAbrirModalDescontoTotal}
                   disabled={modoVisualizacao}
@@ -145,7 +154,7 @@ export default function PDVResumoFinanceiroCard({
                   <span>{vendaAtual.desconto_valor > 0 ? "Editar" : "Adicionar"}</span>
                 </button>
               )}
-              {vendaAtual.desconto_valor > 0 && !cupomAplicado && (
+              {vendaAtual.desconto_valor > 0 && !cupomExibicao && (
                 <button
                   onClick={onRemoverDescontoTotal}
                   disabled={modoVisualizacao}

@@ -122,6 +122,8 @@ class CriarVendaRequest(BaseModel):
     itens: List[VendaItemSchema]
     desconto_valor: Optional[float] = 0
     desconto_percentual: Optional[float] = 0
+    cupom_code: Optional[str] = None
+    cupom_discount_applied: Optional[float] = None
     observacoes: Optional[str] = None
     tem_entrega: bool = False
     taxa_entrega: Optional[float] = 0
@@ -168,19 +170,24 @@ def calcular_totais_venda(itens: List, desconto_valor: float, desconto_percentua
     Returns:
         Dict com subtotal, desconto_valor, total
     """
-    # Calcular subtotal dos itens
-    subtotal = sum(item.subtotal for item in itens)
+    # O PDV grava desconto rateado no item e envia item.subtotal ja liquido.
+    # Se subtrair desconto_valor novamente aqui, a venda fica menor que o valor recebido.
+    subtotal_liquido = sum(float(item.subtotal or 0) for item in itens)
+    desconto_itens = sum(float(item.desconto_item or 0) for item in itens)
+    taxa_entrega = float(taxa_entrega or 0)
 
-    # Aplicar desconto (se houver)
-    if desconto_percentual > 0:
-        desconto_valor = subtotal * (desconto_percentual / 100)
-
-    # Calcular total
-    total = subtotal - desconto_valor + taxa_entrega
+    if desconto_itens > 0:
+        desconto_calculado = desconto_itens
+        total = subtotal_liquido + taxa_entrega
+    else:
+        desconto_calculado = float(desconto_valor or 0)
+        if desconto_percentual and desconto_percentual > 0:
+            desconto_calculado = subtotal_liquido * (float(desconto_percentual) / 100)
+        total = subtotal_liquido - desconto_calculado + taxa_entrega
 
     return {
-        'subtotal': subtotal,
-        'desconto_valor': desconto_valor,
+        'subtotal': subtotal_liquido,
+        'desconto_valor': round(desconto_calculado, 2),
         'total': total
     }
 
@@ -389,6 +396,8 @@ async def criar_venda(
         'itens': [item.dict() for item in dados.itens],
         'desconto_valor': dados.desconto_valor,
         'desconto_percentual': dados.desconto_percentual,
+        'cupom_code': dados.cupom_code.strip().upper() if dados.cupom_code else None,
+        'cupom_discount_applied': dados.cupom_discount_applied,
         'observacoes': dados.observacoes,
         'tem_entrega': dados.tem_entrega,
         'taxa_entrega': dados.taxa_entrega,
@@ -541,6 +550,8 @@ def atualizar_venda(
     venda.subtotal = totais['subtotal']
     venda.desconto_valor = totais['desconto_valor']
     venda.desconto_percentual = dados.desconto_percentual or 0
+    venda.cupom_code = dados.cupom_code.strip().upper() if dados.cupom_code else None
+    venda.cupom_discount_applied = dados.cupom_discount_applied
     venda.total = totais['total']
     venda.observacoes = dados.observacoes
     venda.tem_entrega = tem_entrega

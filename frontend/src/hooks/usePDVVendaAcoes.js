@@ -41,6 +41,8 @@ export function usePDVVendaAcoes({
       subtotal: 0,
       desconto_valor: 0,
       desconto_percentual: 0,
+      cupom_code: null,
+      cupom_discount_applied: null,
       total: 0,
       observacoes: "",
       funcionario_id: null,
