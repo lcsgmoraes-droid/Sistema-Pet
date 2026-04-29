@@ -1,25 +1,16 @@
-/**
- * tenant.store.ts
- *
- * Armazena qual loja o usuário vinculou ao app.
- * Persiste em SecureStore para sobreviver a reinicializações.
- *
- * Fluxo:
- *  1. App abre → carrega tenant do storage
- *  2. Se não tiver tenant → mostra SelecionarLojaScreen
- *  3. Usuário digita slug ou lê QR Code → API valida → salva tenant
- *  4. Todas as chamadas de API usam o tenant_id salvo aqui
- */
-
-import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import { create } from 'zustand';
 import { API_BASE_URL } from '../config';
 
 export interface TenantInfo {
-  id: string;           // UUID do tenant
-  slug: string;         // ex: "atacadao"
-  nome: string;         // ex: "Atacadão das Rações Pet"
+  id: string;
+  slug: string;
+  nome: string;
   logo_url: string | null;
+  endereco?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  cep?: string | null;
   cidade: string | null;
   uf: string | null;
 }
@@ -27,18 +18,65 @@ export interface TenantInfo {
 interface TenantState {
   tenant: TenantInfo | null;
   isLoading: boolean;
-
-  // Carrega do storage persistido
   loadTenant: () => Promise<void>;
-  // Consulta a API pelo slug SEM salvar (só para preview)
   buscarPorSlug: (slug: string) => Promise<TenantInfo>;
-  // Salva o tenant no storage e atualiza o store (confirmar seleção)
+  buscarPorLocalidade: (cidade: string, uf?: string | null) => Promise<TenantInfo[]>;
   confirmarTenant: (tenant: TenantInfo) => Promise<void>;
-  // Remove a loja vinculada (forçar re-seleção)
   limparTenant: () => Promise<void>;
 }
 
 const STORAGE_KEY = 'tenant_info';
+
+export function extractStoreSlug(input: string): string {
+  const raw = input.trim().toLowerCase();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw);
+    const querySlug =
+      url.searchParams.get('loja') ||
+      url.searchParams.get('slug') ||
+      url.searchParams.get('tenant') ||
+      url.searchParams.get('store');
+
+    if (querySlug) return sanitizeSlug(querySlug);
+
+    const segments = url.pathname
+      .split('/')
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    return sanitizeSlug(firstUsefulSegment(segments));
+  } catch {
+    const [, queryString = ''] = raw.split('?');
+    const queryParams = new URLSearchParams(queryString);
+    const querySlug =
+      queryParams.get('loja') ||
+      queryParams.get('slug') ||
+      queryParams.get('tenant') ||
+      queryParams.get('store');
+
+    if (querySlug) return sanitizeSlug(querySlug);
+
+    const withoutProtocol = raw
+      .replace(/^(?:[a-z]+:\/\/)?[^/\s]+\.[^/\s]+\/?/i, '')
+      .replace(/^\//, '');
+    const [withoutQuery] = withoutProtocol.split('?');
+    return sanitizeSlug(firstUsefulSegment(withoutQuery.split('/').filter(Boolean)) || withoutQuery);
+  }
+}
+
+function firstUsefulSegment(segments: string[]): string {
+  const reserved = new Set(['loja', 'store', 'ecommerce', 'app', 'tenant']);
+  return (
+    segments.find((segment) => !reserved.has(segment.toLowerCase())) ||
+    segments[segments.length - 1] ||
+    ''
+  );
+}
+
+function sanitizeSlug(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+}
 
 export const useTenantStore = create<TenantState>()((set) => ({
   tenant: null,
@@ -52,39 +90,47 @@ export const useTenantStore = create<TenantState>()((set) => ({
         const tenant: TenantInfo = JSON.parse(raw);
         set({ tenant });
       }
-    } catch (_) {
-      // storage corrompido — ignora
+    } catch {
+      // Ignore corrupted local tenant data and force a fresh selection later.
     } finally {
       set({ isLoading: false });
     }
   },
 
   buscarPorSlug: async (slug: string) => {
-    // Normaliza: remove URL se o usuário colou a URL completa
-    // Ex: "https://mlprohub.com.br/atacadao" → "atacadao"
-    const slugLimpo = slug
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\/[^/]+\/?/, '') // remove domínio
-      .replace(/^\//, '')                   // remove barra inicial
-      .split('/')[0]                        // pega só o primeiro segmento
-      .split('?')[0];                       // remove query string
+    const slugLimpo = extractStoreSlug(slug);
+    if (!slugLimpo) {
+      throw new Error('Informe o codigo ou QR Code da loja.');
+    }
 
-    // Chama o endpoint de descoberta de loja
     const base = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
     const response = await fetch(`${base}/api/ecommerce/tenant-slug/${slugLimpo}`);
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || 'Loja não encontrada. Verifique o código.');
+      throw new Error(body.detail || 'Loja nao encontrada. Verifique o codigo.');
     }
 
     const tenant: TenantInfo = await response.json();
-    return tenant; // SÓ retorna — não salva ainda
+    return tenant;
+  },
+
+  buscarPorLocalidade: async (cidade: string, uf?: string | null) => {
+    const cidadeLimpa = cidade.trim();
+    if (!cidadeLimpa) return [];
+
+    const base = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    const params = new URLSearchParams({ cidade: cidadeLimpa });
+    if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
+
+    const response = await fetch(`${base}/api/ecommerce/tenants/sugerir?${params.toString()}`);
+    if (!response.ok) return [];
+
+    const data = await response.json().catch(() => ({ lojas: [] }));
+    return Array.isArray(data.lojas) ? data.lojas : [];
   },
 
   confirmarTenant: async (tenant: TenantInfo) => {
-    // Persiste e atualiza o store — AppNavigator vai navegar automaticamente
     await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(tenant));
     set({ tenant });
   },

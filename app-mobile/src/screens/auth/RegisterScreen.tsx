@@ -6,12 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
+import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 
@@ -61,11 +60,7 @@ export default function RegisterScreen({ navigation }: any) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.logoCircle}>
             <Text style={styles.logoEmoji}>🐾</Text>
@@ -75,6 +70,8 @@ export default function RegisterScreen({ navigation }: any) {
         </View>
 
         {/* Bônus de boas-vindas */}
+        <SelectedStoreBanner />
+
         <View style={styles.bonusCard}>
           <Text style={styles.bonusEmoji}>🎁</Text>
           <View style={{ flex: 1 }}>
@@ -175,14 +172,13 @@ export default function RegisterScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
-  scroll: { flexGrow: 1, padding: ESPACO.lg },
+  scroll: { flexGrow: 1, padding: ESPACO.lg, paddingBottom: 140 },
   header: { alignItems: 'center', marginBottom: ESPACO.lg, marginTop: ESPACO.xl },
   logoCircle: {
     width: 70,

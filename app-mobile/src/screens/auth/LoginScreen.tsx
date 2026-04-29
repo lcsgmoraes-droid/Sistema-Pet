@@ -6,12 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
+import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 
@@ -42,11 +41,7 @@ export default function LoginScreen({ navigation }: any) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.scroll}>
         {/* Logo / cabeçalho */}
         <View style={styles.header}>
           <View style={styles.logoCircle}>
@@ -57,6 +52,8 @@ export default function LoginScreen({ navigation }: any) {
         </View>
 
         {/* Formulário */}
+        <SelectedStoreBanner />
+
         <View style={styles.form}>
           <Text style={styles.label}>E-mail</Text>
           <TextInput
@@ -120,8 +117,7 @@ export default function LoginScreen({ navigation }: any) {
           <BeneficioItem emoji="🏆" texto="Ganhe pontos em cada compra" />
           <BeneficioItem emoji="🐶" texto="Calculadora de ração personalizada" />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -143,6 +139,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: ESPACO.lg,
     justifyContent: 'center',
+    paddingBottom: 140,
   },
   header: {
     alignItems: 'center',

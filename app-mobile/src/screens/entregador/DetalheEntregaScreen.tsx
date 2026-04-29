@@ -16,6 +16,7 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
+import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import api from "../../services/api";
 import { EntregadorStackParamList } from "../../types/entregadorNavigation";
 
@@ -691,7 +692,7 @@ export default function DetalheEntregaScreen() {
     pendentes === 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Resumo */}
       <View style={styles.resumo}>
         <View style={styles.resumoItem}>
@@ -1025,7 +1026,7 @@ export default function DetalheEntregaScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -1033,7 +1034,7 @@ export default function DetalheEntregaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { padding: 16, paddingBottom: 140 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: { color: "#ef4444", fontSize: 16 },
 

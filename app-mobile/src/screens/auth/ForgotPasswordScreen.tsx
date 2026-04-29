@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +9,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
+import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import * as AuthService from '../../services/auth.service';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 
@@ -90,11 +89,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.logoCircle}>
             <Text style={styles.logoEmoji}>🔐</Text>
@@ -106,6 +101,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
               : 'Digite o token recebido e escolha sua nova senha.'}
           </Text>
         </View>
+
+        <SelectedStoreBanner />
 
         <View style={styles.form}>
           <Text style={styles.label}>E-mail</Text>
@@ -213,8 +210,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -227,6 +223,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: ESPACO.lg,
     justifyContent: 'center',
+    paddingBottom: 140,
   },
   header: {
     alignItems: 'center',

@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Alert,
   ActivityIndicator,
   Switch,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
 import { criarPet, atualizarPet, uploadFotoPet } from '../../services/pets.service';
 import { Pet, PetFormData } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
@@ -132,7 +132,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Foto do pet */}
       <TouchableOpacity style={styles.fotoBox} onPress={pickFoto}>
         {fotoPendente ? (
@@ -316,7 +316,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
       </TouchableOpacity>
 
       <View style={{ height: ESPACO.xxl }} />
-    </ScrollView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -354,7 +354,7 @@ function emojiEspecie(e: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
-  content: { padding: ESPACO.lg },
+  content: { padding: ESPACO.lg, paddingBottom: 140 },
   campo: { marginBottom: ESPACO.md },
   label: { fontSize: FONTE.normal, fontWeight: '600', color: CORES.texto, marginBottom: ESPACO.xs },
   input: {

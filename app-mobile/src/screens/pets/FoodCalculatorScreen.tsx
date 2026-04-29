@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
   Modal,
@@ -13,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
 import { calcularRacaoComProduto, compararRacoesCategoria, listarRacoesCadastradas, RacaoCadastrada, adicionarAoCarrinho } from '../../services/shop.service';
 import { listarPets } from '../../services/pets.service';
 import { Pet } from '../../types';
@@ -185,7 +185,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Cabeçalho */}
       <View style={styles.header}>
         <Text style={styles.emoji}>🥣</Text>
@@ -628,7 +628,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
           )}
         </View>
       </Modal>
-    </ScrollView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -723,7 +723,7 @@ function ItemResultado({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
-  content: { padding: ESPACO.lg },
+  content: { padding: ESPACO.lg, paddingBottom: 140 },
   header: { alignItems: 'center', marginBottom: ESPACO.lg },
   emoji: { fontSize: 48, marginBottom: ESPACO.sm },
   titulo: { fontSize: FONTE.titulo, fontWeight: 'bold', color: CORES.texto },

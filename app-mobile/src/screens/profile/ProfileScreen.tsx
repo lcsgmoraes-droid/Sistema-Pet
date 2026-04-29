@@ -3,15 +3,13 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import { updateProfile } from "../../services/auth.service";
 import { useAuthStore } from "../../store/auth.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
@@ -130,14 +128,9 @@ export default function ProfileScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
+    <KeyboardSafeScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.avatarSection}>
           <View style={styles.avatar}>
@@ -344,8 +337,7 @@ export default function ProfileScreen() {
 
         <Text style={styles.versao}>PetShop App v1.0.0</Text>
         <View style={{ height: ESPACO.xxl }} />
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -393,7 +385,7 @@ function SaveButton({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
-  content: { padding: ESPACO.lg },
+  content: { padding: ESPACO.lg, paddingBottom: 140 },
   avatarSection: { alignItems: "center", marginBottom: ESPACO.lg },
   avatar: {
     width: 80,

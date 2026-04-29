@@ -12,10 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  ScrollView as RNScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
 import { useCartStore } from '../../store/cart.store';
 import { useAuthStore } from '../../store/auth.store';
 import { finalizarCheckoutAppLoja } from '../../services/shop.service';
@@ -493,7 +493,7 @@ export default function CartScreen() {
             </TouchableOpacity>
           </View>
 
-          <RNScrollView contentContainerStyle={styles.modalConteudo} keyboardShouldPersistTaps="handled">
+          <KeyboardSafeScrollView contentContainerStyle={styles.modalConteudo}>
             {/* CEP com busca automática */}
             <Text style={styles.modalLabel}>CEP</Text>
             <View style={styles.cepRow}>
@@ -552,7 +552,7 @@ export default function CartScreen() {
             >
               <Text style={styles.modalBotaoTexto}>Usar este endereço</Text>
             </TouchableOpacity>
-          </RNScrollView>
+          </KeyboardSafeScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>

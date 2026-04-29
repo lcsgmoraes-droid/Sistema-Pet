@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -17,6 +18,13 @@ from app.services.validade_campanha_service import (
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _CATALOG_ORDER_OPTIONS = {"prontos", "nome", "menor_preco", "maior_preco"}
+
+
+def _normalize_location_text(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFD", str(value).strip().lower())
+    return "".join(char for char in normalized if unicodedata.category(char) != "Mn")
 
 
 def _serializar_promocao_validade(oferta, origem_preco: str | None) -> dict | None:
@@ -118,6 +126,60 @@ def _get_active_tenant(db: Session, tenant_ref: tuple[str, str]) -> Tenant:
     return tenant
 
 
+def _tenant_public_payload(tenant: Tenant) -> dict:
+    return {
+        "id": str(tenant.id),
+        "slug": tenant.ecommerce_slug,
+        "nome": tenant.name,
+        "logo_url": tenant.logo_url,
+        "endereco": tenant.endereco,
+        "numero": tenant.numero,
+        "bairro": tenant.bairro,
+        "cep": tenant.cep,
+        "cidade": tenant.cidade,
+        "uf": tenant.uf,
+    }
+
+
+@router.get("/tenants/sugerir")
+def sugerir_tenants_por_localidade(
+    cidade: str = Query(..., min_length=2),
+    uf: str | None = Query(default=None, min_length=2, max_length=2),
+    limit: int = Query(default=8, ge=1, le=20),
+    db: Session = Depends(get_session),
+):
+    """
+    Sugere lojas para o app mobile usando a cidade obtida pelo GPS do cliente.
+    A selecao fina por distancia fica para quando cada loja tiver coordenadas.
+    """
+    cidade_norm = _normalize_location_text(cidade)
+    uf_norm = uf.strip().upper() if uf else None
+
+    filtros = [
+        Tenant.ecommerce_slug.isnot(None),
+        Tenant.ecommerce_slug != "",
+        func.lower(Tenant.status) == "active",
+        Tenant.ecommerce_ativo.is_(True),
+        Tenant.cidade.isnot(None),
+    ]
+    if uf_norm:
+        filtros.append(func.upper(Tenant.uf) == uf_norm)
+
+    candidates = (
+        db.query(Tenant)
+        .filter(*filtros)
+        .order_by(Tenant.name.asc())
+        .all()
+    )
+    tenants = [
+        tenant
+        for tenant in candidates
+        if _normalize_location_text(tenant.cidade) == cidade_norm
+    ][:limit]
+
+    return {"lojas": [_tenant_public_payload(tenant) for tenant in tenants]}
+
+
 @router.get("/tenant-slug/{slug}")
 def buscar_tenant_por_slug(
     slug: str,
@@ -150,14 +212,7 @@ def buscar_tenant_por_slug(
             detail="Esta loja não está ativa no momento.",
         )
 
-    return {
-        "id": str(tenant.id),
-        "slug": tenant.ecommerce_slug,
-        "nome": tenant.name,
-        "logo_url": tenant.logo_url,
-        "cidade": tenant.cidade,
-        "uf": tenant.uf,
-    }
+    return _tenant_public_payload(tenant)
 
 
 @router.get("/tenant-context")
@@ -175,6 +230,10 @@ def tenant_context(
         "status": tenant.status,
         "cidade": tenant.cidade,
         "uf": tenant.uf,
+        "endereco": tenant.endereco,
+        "numero": tenant.numero,
+        "bairro": tenant.bairro,
+        "cep": tenant.cep,
         "logo_url": tenant.logo_url,
         "banner_1_url": tenant.banner_1_url,
         "banner_2_url": tenant.banner_2_url,

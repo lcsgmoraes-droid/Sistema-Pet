@@ -1,29 +1,30 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Location from "expo-location";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import { TenantInfo, useTenantStore } from "../store/tenant.store";
+import KeyboardSafeScrollView from "../components/KeyboardSafeScrollView";
+import { extractStoreSlug, TenantInfo, useTenantStore } from "../store/tenant.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../theme";
 
 export default function SelecionarLojaScreen() {
-  const { buscarPorSlug, confirmarTenant } = useTenantStore();
+  const { buscarPorSlug, buscarPorLocalidade, confirmarTenant } = useTenantStore();
 
   const [slug, setSlug] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false);
   const [lojaPrevia, setLojaPrevia] = useState<TenantInfo | null>(null);
+  const [lojasSugeridas, setLojasSugeridas] = useState<TenantInfo[]>([]);
   const [qrAberto, setQrAberto] = useState(false);
   const [qrLido, setQrLido] = useState(false);
 
@@ -38,6 +39,7 @@ export default function SelecionarLojaScreen() {
     }
     setCarregando(true);
     setLojaPrevia(null);
+    setLojasSugeridas([]);
     try {
       // Só consulta, não salva ainda — aguarda confirmação do usuário
       const loja = await buscarPorSlug(slugDigitado);
@@ -54,6 +56,50 @@ export default function SelecionarLojaScreen() {
   }
 
   // ─── Confirmar loja já encontrada ───────────────────────────────────────
+
+  async function buscarPorLocalizacao() {
+    setBuscandoLocalizacao(true);
+    setLojaPrevia(null);
+    setLojasSugeridas([]);
+
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "PermissÃ£o necessÃ¡ria",
+          "Permita o acesso Ã  localizaÃ§Ã£o para sugerirmos lojas perto de voce.",
+        );
+        return;
+      }
+
+      const posicao = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const geocode = await Location.reverseGeocodeAsync(posicao.coords);
+      const endereco = geocode[0];
+      const cidadeAtual = endereco?.city || endereco?.subregion || endereco?.district;
+
+      if (!cidadeAtual) {
+        Alert.alert("LocalizaÃ§Ã£o", "Nao conseguimos identificar sua cidade agora.");
+        return;
+      }
+
+      const lojas = await buscarPorLocalidade(cidadeAtual, null);
+      if (lojas.length === 0) {
+        Alert.alert(
+          "Nenhuma loja sugerida",
+          `Nao encontramos lojas ativas em ${cidadeAtual}. Use o QR Code ou codigo da loja.`,
+        );
+        return;
+      }
+
+      setLojasSugeridas(lojas);
+    } catch {
+      Alert.alert("Erro", "Nao foi possivel buscar lojas pela sua localizacao agora.");
+    } finally {
+      setBuscandoLocalizacao(false);
+    }
+  }
 
   async function confirmarLoja() {
     if (!lojaPrevia) return;
@@ -90,13 +136,7 @@ export default function SelecionarLojaScreen() {
     if (qrLido) return;
     setQrLido(true);
     setQrAberto(false);
-    const slugExtraido = data
-      .trim()
-      .toLowerCase()
-      .replace(/^https?:\/\/[^/]+\/?/, "")
-      .replace(/^\//, "")
-      .split("/")[0]
-      .split("?")[0];
+    const slugExtraido = extractStoreSlug(data);
     setSlug(slugExtraido);
     buscarLoja(slugExtraido);
   }
@@ -104,14 +144,8 @@ export default function SelecionarLojaScreen() {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
+    <View style={styles.container}>
+      <KeyboardSafeScrollView contentContainerStyle={styles.scroll}>
         {/* Logo / Ícone */}
         <View style={styles.heroArea}>
           <View style={styles.iconeCirculo}>
@@ -135,6 +169,7 @@ export default function SelecionarLojaScreen() {
               onChangeText={(t) => {
                 setSlug(t);
                 setLojaPrevia(null);
+                setLojasSugeridas([]);
               }}
               autoCapitalize="none"
               autoCorrect={false}
@@ -159,6 +194,22 @@ export default function SelecionarLojaScreen() {
           </Text>
 
           <TouchableOpacity
+            style={[styles.botaoLocalizacao, buscandoLocalizacao && styles.botaoDesabilitado]}
+            onPress={buscarPorLocalizacao}
+            disabled={buscandoLocalizacao}
+            activeOpacity={0.8}
+          >
+            {buscandoLocalizacao ? (
+              <ActivityIndicator color={CORES.primario} />
+            ) : (
+              <>
+                <Ionicons name="location-outline" size={18} color={CORES.primario} />
+                <Text style={styles.botaoLocalizacaoTexto}>Sugerir loja pela minha localizacao</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.botaoBuscar, carregando && styles.botaoDesabilitado]}
             onPress={() => buscarLoja(slug)}
             disabled={carregando}
@@ -171,6 +222,33 @@ export default function SelecionarLojaScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {lojasSugeridas.length > 0 && (
+          <View style={styles.cardSugestoes}>
+            <Text style={styles.sugestoesTitulo}>Lojas encontradas perto de voce</Text>
+            {lojasSugeridas.map((loja) => (
+              <TouchableOpacity
+                key={loja.id}
+                style={styles.sugestaoItem}
+                onPress={() => {
+                  setLojaPrevia(loja);
+                  setSlug(loja.slug);
+                  setLojasSugeridas([]);
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sugestaoNome}>{loja.nome}</Text>
+                  <Text style={styles.sugestaoEndereco} numberOfLines={2}>
+                    {[loja.endereco, loja.numero].filter(Boolean).join(", ")}
+                    {loja.bairro ? ` - ${loja.bairro}` : ""}
+                    {loja.cidade ? ` - ${loja.cidade}${loja.uf ? `/${loja.uf}` : ""}` : ""}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Preview da loja encontrada */}
         {lojaPrevia && (
@@ -191,6 +269,12 @@ export default function SelecionarLojaScreen() {
               <Text style={styles.lojaCidade}>
                 {lojaPrevia.cidade}
                 {lojaPrevia.uf ? ` — ${lojaPrevia.uf}` : ""}
+              </Text>
+            ) : null}
+            {lojaPrevia.endereco ? (
+              <Text style={styles.lojaEndereco}>
+                {[lojaPrevia.endereco, lojaPrevia.numero].filter(Boolean).join(", ")}
+                {lojaPrevia.bairro ? ` - ${lojaPrevia.bairro}` : ""}
               </Text>
             ) : null}
 
@@ -214,7 +298,7 @@ export default function SelecionarLojaScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </ScrollView>
+      </KeyboardSafeScrollView>
 
       {/* Modal de Scanner QR */}
       <Modal
@@ -244,7 +328,7 @@ export default function SelecionarLojaScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -358,6 +442,57 @@ const styles = StyleSheet.create({
   },
 
   // Card de prévia da loja
+  botaoLocalizacao: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: CORES.primario,
+    height: 48,
+    borderRadius: RAIO.md ?? 10,
+    marginBottom: 10,
+    backgroundColor: "#EEF2FF",
+  },
+  botaoLocalizacaoTexto: {
+    color: CORES.primario,
+    fontSize: FONTE.normal ?? 14,
+    fontWeight: "700",
+  },
+  cardSugestoes: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: RAIO.lg ?? 16,
+    padding: ESPACO.md,
+    marginBottom: ESPACO.md,
+    ...(SOMBRA ?? {}),
+  },
+  sugestoesTitulo: {
+    fontSize: FONTE.normal ?? 14,
+    fontWeight: "700",
+    color: CORES.texto ?? "#1a1a1a",
+    marginBottom: ESPACO.sm,
+  },
+  sugestaoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: CORES.borda ?? "#ddd",
+    borderRadius: RAIO.md ?? 10,
+    padding: ESPACO.md,
+    marginBottom: ESPACO.xs,
+    gap: 8,
+  },
+  sugestaoNome: {
+    fontSize: FONTE.normal ?? 14,
+    fontWeight: "700",
+    color: CORES.texto ?? "#1a1a1a",
+  },
+  sugestaoEndereco: {
+    fontSize: FONTE.pequena ?? 12,
+    color: CORES.textoSecundario ?? "#555",
+    marginTop: 2,
+  },
   cardLoja: {
     width: "100%",
     backgroundColor: "#fff",
@@ -393,6 +528,12 @@ const styles = StyleSheet.create({
   lojaCidade: {
     fontSize: FONTE.pequena ?? 13,
     color: CORES.textoSecundario ?? "#555",
+    marginBottom: 6,
+  },
+  lojaEndereco: {
+    fontSize: FONTE.pequena ?? 13,
+    color: CORES.textoSecundario ?? "#555",
+    textAlign: "center",
     marginBottom: 20,
   },
   botaoConfirmar: {
