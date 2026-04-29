@@ -811,6 +811,9 @@ class VendaService:
         from app.caixa_models import MovimentacaoCaixa
         from app.financeiro_models import ContaReceber, LancamentoManual, MovimentacaoFinanceira, ContaBancaria
         from app.audit_log import log_action
+        from app.tenancy.context import set_tenant_context
+
+        set_tenant_context(tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id)))
         
         logger.info(f"🔴 Iniciando cancelamento ATÔMICO da venda #{venda_id}")
         
@@ -1076,7 +1079,9 @@ class VendaService:
                     f'Motivo: {motivo} - '
                     f'Itens estornados: {itens_estornados} - '
                     f'Contas canceladas: {contas_canceladas}'
-                )
+                ),
+                tenant_id=tenant_id,
+                commit=False,
             )
             
             # Commit automático pelo context manager

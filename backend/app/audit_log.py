@@ -6,8 +6,19 @@ from sqlalchemy.orm import Session as DBSession
 from app.models import AuditLog
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
+from uuid import UUID
 import json
 from app.utils.logger import logger
+from app.tenancy.context import get_current_tenant
+
+
+def _resolver_tenant_id(tenant_id: Optional[Any]):
+    valor = tenant_id or get_current_tenant()
+    if not valor:
+        return None
+    if isinstance(valor, UUID):
+        return valor
+    return UUID(str(valor))
 
 
 def log_action(
@@ -20,7 +31,9 @@ def log_action(
     new_value: Optional[Dict[str, Any]] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
-    details: Optional[str] = None
+    details: Optional[str] = None,
+    tenant_id: Optional[Any] = None,
+    commit: bool = True,
 ):
     """
     Registra uma ação no log de auditoria.
@@ -38,6 +51,17 @@ def log_action(
         details: Detalhes adicionais
     """
     try:
+        tenant_id_resolvido = _resolver_tenant_id(tenant_id)
+        if tenant_id_resolvido is None:
+            logger.warning(
+                "audit_log_skipped",
+                "Log de auditoria ignorado por falta de tenant_id",
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+            return None
+
         log = AuditLog(
             user_id=user_id,
             action=action,
@@ -48,14 +72,22 @@ def log_action(
             ip_address=ip_address,
             user_agent=user_agent,
             details=details,
-            timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc),
+            tenant_id=tenant_id_resolvido,
         )
         
         db.add(log)
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
+        return log
     except Exception as e:
         logger.warning("audit_log_error", f"Erro ao registrar log de auditoria: {e}", exception=str(e))
-        db.rollback()
+        if commit:
+            db.rollback()
+        else:
+            raise
 
 
 # Atalhos para ações comuns
