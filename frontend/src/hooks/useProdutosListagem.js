@@ -92,7 +92,7 @@ export default function useProdutosListagem({
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
     const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
-    const buscaDigitos = buscaNormalizada.replace(/\D/g, "");
+    const termosBusca = buscaNormalizada.split(/\s+/).filter(Boolean);
     const buscaAtiva = Boolean(buscaNormalizada);
     const produtoCorrespondeBusca = (produto) => {
       const campos = [
@@ -101,16 +101,20 @@ export default function useProdutosListagem({
         produto.codigo_barras,
         produto.nome,
       ].map((value) => normalizeSearchText(value || ""));
-      const correspondeTexto = campos.some((campo) => campo.includes(buscaNormalizada));
-
-      if (correspondeTexto || !buscaDigitos) {
-        return correspondeTexto;
-      }
-
       const camposDigitos = [produto.codigo, produto.sku, produto.codigo_barras].map(
         (value) => normalizeSearchText(value || "").replace(/\D/g, ""),
       );
-      return camposDigitos.some((campo) => campo.includes(buscaDigitos));
+
+      return termosBusca.every((termo) => {
+        const termoDigitos = termo.replace(/\D/g, "");
+        const correspondeTexto = campos.some((campo) => campo.includes(termo));
+
+        if (correspondeTexto || !termoDigitos) {
+          return correspondeTexto;
+        }
+
+        return camposDigitos.some((campo) => campo.includes(termoDigitos));
+      });
     };
 
     if (!filtros.mostrarPaisVariacoes) {
