@@ -5,9 +5,11 @@ import {
   Calendar,
   ChevronDown,
   ChevronRight,
+  Copy,
   CreditCard,
   DollarSign,
   Download,
+  ExternalLink,
   FileText,
   Filter,
   Minus,
@@ -356,6 +358,24 @@ export default function VendasFinanceiro() {
       novoSet.add(vendaId);
     }
     setVendasExpandidas(novoSet);
+  };
+
+  const criarUrlPdvVenda = (venda) => `/pdv?venda_id=${encodeURIComponent(venda.id)}`;
+
+  const copiarNumeroVenda = async (event, numeroVenda) => {
+    event.stopPropagation();
+
+    if (!numeroVenda) {
+      toast.error("Numero da venda nao disponivel.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(String(numeroVenda));
+      toast.success(`Venda ${numeroVenda} copiada.`);
+    } catch (_error) {
+      toast.error("Nao foi possivel copiar o numero da venda.");
+    }
   };
 
   const formatarMoeda = (valor) => {
@@ -2756,7 +2776,28 @@ export default function VendasFinanceiro() {
                         {formatarData(venda.data_venda)}
                       </td>
                       <td className="px-1 py-2 whitespace-nowrap">
-                        {venda.numero_venda}
+                        <div className="inline-flex items-center gap-1.5">
+                          <a
+                            href={criarUrlPdvVenda(venda)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline"
+                            title="Abrir venda no PDV em nova aba"
+                          >
+                            {venda.numero_venda}
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={(event) => copiarNumeroVenda(event, venda.numero_venda)}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                            title="Copiar numero da venda"
+                            aria-label={`Copiar numero da venda ${venda.numero_venda}`}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-1 py-2">{venda.cliente_nome}</td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">

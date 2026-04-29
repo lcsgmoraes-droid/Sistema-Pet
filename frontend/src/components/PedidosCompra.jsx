@@ -944,6 +944,22 @@ const PedidosCompra = () => {
     }
   };
 
+  const copiarSkuSugestao = async (sugestao) => {
+    const sku = sugestao?.produto_sku || sugestao?.sku || sugestao?.codigo || '';
+
+    if (!sku) {
+      toast.error('SKU nÃ£o disponÃ­vel para este produto');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(String(sku));
+      toast.success(`SKU ${sku} copiado`);
+    } catch (_error) {
+      toast.error('NÃ£o foi possÃ­vel copiar o SKU');
+    }
+  };
+
   const calcularTotal = () => {
     const subtotal = formData.itens.reduce((sum, item) => sum + item.total, 0);
     const frete = parseFloat(formData.valor_frete || 0);
@@ -2605,10 +2621,22 @@ const PedidosCompra = () => {
                             <td className="px-4 py-3">
                               <div>
                                 <div className="font-medium text-gray-900">{sugestao.produto_nome}</div>
-                                <div className="text-xs text-gray-500">
-                                  SKU: {sugestao.produto_sku || 'N/A'} | 
-                                  Barras: {sugestao.produto_codigo_barras || 'N/A'}
-                                  {sugestao.marca_nome ? ` | Marca: ${sugestao.marca_nome}` : ''}
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                                  <span>SKU: {sugestao.produto_sku || 'N/A'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => copiarSkuSugestao(sugestao)}
+                                    className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+                                    title="Copiar SKU"
+                                    aria-label={`Copiar SKU de ${sugestao.produto_nome}`}
+                                  >
+                                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                                      <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+                                    </svg>
+                                  </button>
+                                  <span>| Barras: {sugestao.produto_codigo_barras || 'N/A'}</span>
+                                  {sugestao.marca_nome ? <span>| Marca: {sugestao.marca_nome}</span> : null}
                                 </div>
                                 {sugestao.fornecedor_nome && incluirGrupoFornecedor && (
                                   <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
