@@ -58,6 +58,12 @@ function formatarQuantidade(valor) {
   });
 }
 
+function getSaldoAposLancamento(movimentacao) {
+  const saldo = movimentacao?.saldo_apos_lancamento ?? movimentacao?.quantidade_nova;
+  const saldoNumerico = Number(saldo);
+  return Number.isFinite(saldoNumerico) ? saldoNumerico : null;
+}
+
 export default function MovimentacoesProduto() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -886,6 +892,9 @@ export default function MovimentacoesProduto() {
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Saída
                 </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Saldo após
+                </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Preço Venda
                 </th>
@@ -909,7 +918,7 @@ export default function MovimentacoesProduto() {
             <tbody className="bg-white divide-y divide-gray-200">
               {movimentacoes.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
                     Nenhuma movimentação registrada
                   </td>
                 </tr>
@@ -917,6 +926,8 @@ export default function MovimentacoesProduto() {
                 movimentacoes.map((mov, index) => {
                   const origem = getOrigem(mov);
                   const movCancelado = mov.status === 'cancelado';
+                  const saldoAposLancamento = getSaldoAposLancamento(mov);
+                  const unidadeProduto = produto?.unidade || produto?.unidade_medida || 'UN';
                   
                   // Verificar se é o mesmo pedido/venda que o anterior
                   const movAnterior = index > 0 ? movimentacoes[index - 1] : null;
@@ -955,6 +966,15 @@ export default function MovimentacoesProduto() {
                         {mov.tipo === 'saida' ? (
                           <span className="text-red-600 font-semibold">{parseFloat(mov.quantidade).toFixed(2)}</span>
                         ) : '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
+                        {saldoAposLancamento !== null ? (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                            {formatarQuantidade(saldoAposLancamento)} {unidadeProduto}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
                         {mov.preco_venda_unitario !== null && mov.preco_venda_unitario !== undefined

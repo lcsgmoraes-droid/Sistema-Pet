@@ -14,7 +14,7 @@ import {
   Package,
   TrendingUp,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import {
   Bar,
@@ -107,6 +107,127 @@ async function exportarPlanilhasExcel(planilhas, nomeArquivo) {
   ).toFile(nomeArquivo);
 }
 
+function parseDataLocal(valor) {
+  if (!valor) return null;
+
+  if (valor instanceof Date) {
+    return new Date(valor.getFullYear(), valor.getMonth(), valor.getDate());
+  }
+
+  if (typeof valor === "string") {
+    const dataBase = valor.includes("T") ? valor.split("T")[0] : valor;
+    const match = dataBase.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const [, ano, mes, dia] = match;
+      return new Date(Number(ano), Number(mes) - 1, Number(dia));
+    }
+  }
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return null;
+  return data;
+}
+
+function dataKeyLocal(valor) {
+  const data = parseDataLocal(valor);
+  if (!data) return "";
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function formatarDataLocal(valor, opcoes = {}) {
+  const data = parseDataLocal(valor);
+  if (!data) return "N/A";
+  return data.toLocaleDateString("pt-BR", opcoes);
+}
+
+function adicionarDias(data, dias) {
+  const proxima = new Date(data);
+  proxima.setDate(proxima.getDate() + dias);
+  return proxima;
+}
+
+function listarDiasPeriodo(dataInicio, dataFim) {
+  const inicio = parseDataLocal(dataInicio);
+  const fim = parseDataLocal(dataFim);
+  if (!inicio || !fim || inicio > fim) return [];
+
+  const dias = [];
+  for (let atual = new Date(inicio); atual <= fim; atual = adicionarDias(atual, 1)) {
+    dias.push(new Date(atual));
+  }
+  return dias;
+}
+
+function calcularPascoa(ano) {
+  const a = ano % 19;
+  const b = Math.floor(ano / 100);
+  const c = ano % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(ano, mes - 1, dia);
+}
+
+function feriadoMovel(ano, deslocamentoDias) {
+  return dataKeyLocal(adicionarDias(calcularPascoa(ano), deslocamentoDias));
+}
+
+function montarFeriadosPadrao(anos) {
+  const feriados = {};
+  anos.forEach((ano) => {
+    Object.assign(feriados, {
+      [`${ano}-01-01`]: "Confraternização Universal",
+      [`${ano}-04-21`]: "Tiradentes",
+      [`${ano}-05-01`]: "Dia do Trabalho",
+      [`${ano}-09-07`]: "Independência do Brasil",
+      [`${ano}-10-12`]: "Nossa Senhora Aparecida",
+      [`${ano}-11-02`]: "Finados",
+      [`${ano}-11-15`]: "Proclamação da República",
+      [`${ano}-11-20`]: "Consciência Negra",
+      [`${ano}-12-25`]: "Natal",
+      [feriadoMovel(ano, -48)]: "Carnaval",
+      [feriadoMovel(ano, -47)]: "Carnaval",
+      [feriadoMovel(ano, -2)]: "Sexta-feira Santa",
+      [feriadoMovel(ano, 60)]: "Corpus Christi",
+    });
+  });
+  return feriados;
+}
+
+function getFeriadosStorageKey() {
+  try {
+    const tenant = JSON.parse(window.localStorage.getItem("selectedTenant") || "{}");
+    return `financeiro:vendas:feriados-customizados:${tenant?.id || "global"}`;
+  } catch {
+    return "financeiro:vendas:feriados-customizados:global";
+  }
+}
+
+function carregarFeriadosCustomizados() {
+  try {
+    const salvo = window.localStorage.getItem(getFeriadosStorageKey());
+    const parsed = salvo ? JSON.parse(salvo) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function vendaEstaEmAberto(venda) {
+  return venda?.status !== "finalizada" && venda?.status !== "cancelada";
+}
+
 export default function VendasFinanceiro() {
   const { user } = useAuth();
   const userPermissions = user?.permissions || [];
@@ -170,8 +291,16 @@ export default function VendasFinanceiro() {
     [],
   );
   const [previsaoProximos7Dias, setPrevisaoProximos7Dias] = useState(0);
+  const menuRelatoriosRef = useRef(null);
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
+  const [filtroStatusLista, setFiltroStatusLista] = useState("");
+  const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
+  const [feriadosCustomizados, setFeriadosCustomizados] = useState(
+    carregarFeriadosCustomizados,
+  );
+  const [novoFeriadoData, setNovoFeriadoData] = useState("");
+  const [novoFeriadoNome, setNovoFeriadoNome] = useState("");
   const [ordenacaoRelatorio, setOrdenacaoRelatorio] = useState("data_desc");
   const [colunasRelatorio, setColunasRelatorio] = useState([
     "data_venda",
@@ -215,6 +344,8 @@ export default function VendasFinanceiro() {
 
   const formatarData = (dataStr) => {
     if (!dataStr) return "N/A";
+    const dataLocal = parseDataLocal(dataStr);
+    if (dataLocal) return dataLocal.toLocaleDateString("pt-BR");
     try {
       // Se já é um objeto Date
       if (dataStr instanceof Date) {
@@ -254,8 +385,9 @@ export default function VendasFinanceiro() {
       const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
       const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
       const okCategoria = !filtroCategoria || categoria === filtroCategoria;
+      const okStatus = filtroStatusLista !== "em_aberto" || vendaEstaEmAberto(venda);
 
-      return okFuncionario && okForma && okCategoria;
+      return okFuncionario && okForma && okCategoria && okStatus;
     });
   };
 
@@ -263,7 +395,7 @@ export default function VendasFinanceiro() {
     const copia = [...lista];
     switch (ordenacao) {
       case "data_asc":
-        return copia.sort((a, b) => new Date(a.data_venda) - new Date(b.data_venda));
+        return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
       case "bruta_desc":
         return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
       case "bruta_asc":
@@ -274,7 +406,7 @@ export default function VendasFinanceiro() {
         return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
       case "data_desc":
       default:
-        return copia.sort((a, b) => new Date(b.data_venda) - new Date(a.data_venda));
+        return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));
     }
   };
 
@@ -325,6 +457,40 @@ export default function VendasFinanceiro() {
     setColunasRelatorio((prev) =>
       prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
     );
+  };
+
+  const abrirVendasEmAberto = () => {
+    setFiltroStatusLista("em_aberto");
+    setAbaAtiva("lista");
+  };
+
+  const limparFiltroStatusLista = () => {
+    setFiltroStatusLista("");
+  };
+
+  const adicionarFeriadoCustomizado = () => {
+    if (!novoFeriadoData) {
+      toast.error("Informe a data do feriado.");
+      return;
+    }
+
+    setFeriadosCustomizados((prev) => {
+      const semDuplicado = prev.filter((feriado) => feriado.data !== novoFeriadoData);
+      return [
+        ...semDuplicado,
+        {
+          data: novoFeriadoData,
+          nome: novoFeriadoNome.trim() || "Feriado local",
+        },
+      ].sort((a, b) => a.data.localeCompare(b.data));
+    });
+    setNovoFeriadoData("");
+    setNovoFeriadoNome("");
+    toast.success("Feriado salvo para a contagem de dias úteis.");
+  };
+
+  const removerFeriadoCustomizado = (data) => {
+    setFeriadosCustomizados((prev) => prev.filter((feriado) => feriado.data !== data));
   };
 
   const CORES_GRAFICOS = [
@@ -381,24 +547,115 @@ export default function VendasFinanceiro() {
     "categoria",
   );
 
+  const feriadosPorData = useMemo(() => {
+    const anos = new Set(
+      listarDiasPeriodo(dataInicio, dataFim).map((dia) => dia.getFullYear()),
+    );
+    const feriados = montarFeriadosPadrao(Array.from(anos));
+
+    feriadosCustomizados.forEach((feriado) => {
+      if (feriado?.data) {
+        feriados[feriado.data] = feriado.nome?.trim() || "Feriado cadastrado";
+      }
+    });
+
+    return feriados;
+  }, [dataInicio, dataFim, feriadosCustomizados]);
+
+  const vendasPorDataCalendario = useMemo(() => {
+    const vendasMap = new Map(
+      (vendasPorData || []).map((item) => [dataKeyLocal(item.data), item]),
+    );
+
+    return listarDiasPeriodo(dataInicio, dataFim).map((dia) => {
+      const key = dataKeyLocal(dia);
+      const item = vendasMap.get(key) || {};
+      const diaSemana = dia.getDay();
+      const fimDeSemana = diaSemana === 0 || diaSemana === 6;
+      const feriadoNome = feriadosPorData[key] || "";
+
+      const quantidade = Number(item.quantidade || 0);
+      const valorBruto = Number(item.valor_bruto || 0);
+      const valorLiquido = Number(item.valor_liquido || 0);
+
+      return {
+        data: key,
+        quantidade,
+        valor_bruto: valorBruto,
+        taxa_entrega: Number(item.taxa_entrega || 0),
+        desconto: Number(item.desconto || 0),
+        percentual_desconto: Number(item.percentual_desconto || 0),
+        valor_liquido: valorLiquido,
+        valor_recebido: Number(item.valor_recebido || 0),
+        saldo_aberto: Number(item.saldo_aberto || 0),
+        ticket_medio: quantidade > 0 ? Number(item.ticket_medio || valorBruto / quantidade) : 0,
+        dia_semana: formatarDataLocal(key, { weekday: "long" }),
+        fim_de_semana: fimDeSemana,
+        feriado_nome: feriadoNome,
+        dia_util: !fimDeSemana && !feriadoNome,
+        sem_movimento: quantidade === 0 && valorLiquido === 0,
+      };
+    });
+  }, [dataInicio, dataFim, feriadosPorData, vendasPorData]);
+
+  const resumoDiasPeriodo = useMemo(() => {
+    const diasUteis = vendasPorDataCalendario.filter((item) => item.dia_util);
+    const diasTrabalhados = diasUteis.filter((item) => !item.sem_movimento);
+    const diasUteisSemVenda = diasUteis.filter((item) => item.sem_movimento);
+    const totalLiquido = vendasPorDataCalendario.reduce(
+      (sum, item) => sum + Number(item.valor_liquido || 0),
+      0,
+    );
+
+    return {
+      totalDias: vendasPorDataCalendario.length,
+      diasUteis: diasUteis.length,
+      diasTrabalhados: diasTrabalhados.length,
+      diasUteisSemVenda: diasUteisSemVenda.length,
+      finsDeSemana: vendasPorDataCalendario.filter((item) => item.fim_de_semana).length,
+      feriados: vendasPorDataCalendario.filter((item) => item.feriado_nome).length,
+      mediaDiaUtil: diasUteis.length > 0 ? totalLiquido / diasUteis.length : 0,
+      mediaDiaTrabalhado: diasTrabalhados.length > 0 ? totalLiquido / diasTrabalhados.length : 0,
+    };
+  }, [vendasPorDataCalendario]);
+
+  const listaVendasFiltrada = useMemo(() => {
+    if (filtroStatusLista !== "em_aberto") return listaVendas;
+    return listaVendas.filter(vendaEstaEmAberto);
+  }, [filtroStatusLista, listaVendas]);
+
   const CardComVariacao = ({
     titulo,
     valor,
     icone: Icone,
     cor,
     valorAnterior,
+    onClick,
+    ativo = false,
   }) => {
     const variacao = calcularVariacao(valor, valorAnterior);
     const cresceu = variacao.percentual > 0;
     const manteve = variacao.percentual === 0;
+    const Container = onClick ? "button" : "div";
 
     return (
-      <div className={`${cor} text-white p-4 rounded-lg shadow`}>
+      <Container
+        type={onClick ? "button" : undefined}
+        onClick={onClick}
+        className={`${cor} w-full text-left text-white p-4 rounded-lg shadow transition ${
+          onClick ? "cursor-pointer hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-red-200" : ""
+        } ${ativo ? "ring-4 ring-red-200" : ""}`}
+      >
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm opacity-90">{titulo}</span>
           <Icone className="w-5 h-5 opacity-80" />
         </div>
         <div className="text-3xl font-bold mb-1">{formatarMoeda(valor)}</div>
+        {onClick && (
+          <div className="text-xs font-medium opacity-90">
+            Clique para ver as vendas em aberto
+          </div>
+        )}
         {modoComparacao && valorAnterior !== undefined && (
           <div
             className={`flex items-center gap-1 text-sm ${manteve ? "opacity-70" : ""}`}
@@ -409,7 +666,7 @@ export default function VendasFinanceiro() {
             <span>{Math.abs(variacao.percentual)}%</span>
           </div>
         )}
-      </div>
+      </Container>
     );
   };
 
@@ -492,10 +749,11 @@ export default function VendasFinanceiro() {
     ];
 
     // Aba Vendas por Data
-    if (vendasPorData.length > 0) {
+    if (vendasPorDataCalendario.length > 0) {
       const vendasData = [
         [
           "Data",
+          "Dia",
           "Qtd",
           "Tkt. Médio",
           "Vl. bruto",
@@ -506,8 +764,9 @@ export default function VendasFinanceiro() {
           "Vl. recebido",
           "Saldo aberto",
         ],
-        ...vendasPorData.map((v) => [
+        ...vendasPorDataCalendario.map((v) => [
           formatarData(v.data),
+          v.feriado_nome || v.dia_semana,
           v.quantidade,
           v.ticket_medio,
           v.valor_bruto,
@@ -919,6 +1178,27 @@ export default function VendasFinanceiro() {
     }
   }, [podeVerFinanceiroCompleto]);
 
+  useEffect(() => {
+    window.localStorage.setItem(
+      getFeriadosStorageKey(),
+      JSON.stringify(feriadosCustomizados),
+    );
+  }, [feriadosCustomizados]);
+
+  useEffect(() => {
+    const fecharMenuAoClicarFora = (event) => {
+      if (
+        menuRelatoriosRef.current &&
+        !menuRelatoriosRef.current.contains(event.target)
+      ) {
+        setMenuRelatoriosAberto(false);
+      }
+    };
+
+    document.addEventListener("mousedown", fecharMenuAoClicarFora);
+    return () => document.removeEventListener("mousedown", fecharMenuAoClicarFora);
+  }, []);
+
   // Aplicar filtro "Este mês" ao carregar componente pela primeira vez
   useEffect(() => {
     aplicarFiltroRapido("este_mes");
@@ -943,7 +1223,7 @@ export default function VendasFinanceiro() {
 
           {podeVerFinanceiroCompleto ? (
             <div className="flex items-center gap-4">
-            <div className="relative">
+            <div className="relative" ref={menuRelatoriosRef}>
               <button
                 onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
@@ -1330,6 +1610,8 @@ export default function VendasFinanceiro() {
               icone={CreditCard}
               cor="bg-red-500"
               valorAnterior={resumoComparacao.em_aberto}
+              onClick={abrirVendasEmAberto}
+              ativo={abaAtiva === "lista" && filtroStatusLista === "em_aberto"}
             />
           </div>
 
@@ -1361,6 +1643,121 @@ export default function VendasFinanceiro() {
             </div>
           </div>
 
+          <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Dias úteis e média operacional
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Fins de semana e feriados não entram na média por dia útil.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMostrarConfigFeriados((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+              >
+                <Calendar className="h-4 w-4" />
+                Configurar feriados
+              </button>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-4">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Dias úteis
+                </div>
+                <div className="mt-1 text-2xl font-bold text-slate-900">
+                  {resumoDiasPeriodo.diasUteis}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {resumoDiasPeriodo.totalDias} dia(s) no período
+                </div>
+              </div>
+              <div className="rounded-xl bg-emerald-50 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                  Dias trabalhados
+                </div>
+                <div className="mt-1 text-2xl font-bold text-emerald-700">
+                  {resumoDiasPeriodo.diasTrabalhados}
+                </div>
+                <div className="text-xs text-emerald-600">
+                  Dia útil com venda registrada
+                </div>
+              </div>
+              <div className="rounded-xl bg-amber-50 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Dias úteis sem venda
+                </div>
+                <div className="mt-1 text-2xl font-bold text-amber-700">
+                  {resumoDiasPeriodo.diasUteisSemVenda}
+                </div>
+                <div className="text-xs text-amber-700">
+                  Fora fins de semana/feriados
+                </div>
+              </div>
+              <div className="rounded-xl bg-blue-50 p-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                  Média por dia útil
+                </div>
+                <div className="mt-1 text-2xl font-bold text-blue-700">
+                  {formatarMoeda(resumoDiasPeriodo.mediaDiaUtil)}
+                </div>
+                <div className="text-xs text-blue-700">
+                  {resumoDiasPeriodo.feriados} feriado(s), {resumoDiasPeriodo.finsDeSemana} fim(ns) de semana
+                </div>
+              </div>
+            </div>
+
+            {mostrarConfigFeriados && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
+                  <input
+                    type="date"
+                    value={novoFeriadoData}
+                    onChange={(event) => setNovoFeriadoData(event.target.value)}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  <input
+                    type="text"
+                    value={novoFeriadoNome}
+                    onChange={(event) => setNovoFeriadoNome(event.target.value)}
+                    placeholder="Nome do feriado local, municipal ou data sem expediente"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  <button
+                    type="button"
+                    onClick={adicionarFeriadoCustomizado}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    Salvar feriado
+                  </button>
+                </div>
+
+                {feriadosCustomizados.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {feriadosCustomizados.map((feriado) => (
+                      <span
+                        key={feriado.data}
+                        className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                      >
+                        {formatarData(feriado.data)} - {feriado.nome}
+                        <button
+                          type="button"
+                          onClick={() => removerFeriadoCustomizado(feriado.data)}
+                          className="text-rose-600 hover:text-rose-700"
+                        >
+                          remover
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Gráficos */}
           {mostrarGraficos && (
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -1370,15 +1767,12 @@ export default function VendasFinanceiro() {
                   Vendas no Período
                 </h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={vendasPorData}>
+                  <LineChart data={vendasPorDataCalendario}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="data"
                       tickFormatter={(value) =>
-                        new Date(value).toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                        })
+                        formatarDataLocal(value, { day: "2-digit", month: "2-digit" })
                       }
                     />
                     <YAxis
@@ -1515,6 +1909,7 @@ export default function VendasFinanceiro() {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="px-4 py-2 text-left">Data</th>
+                    <th className="px-4 py-2 text-left">Dia</th>
                     <th className="px-4 py-2 text-right">Qtd</th>
                     <th className="px-4 py-2 text-right">Tkt. Médio</th>
                     <th className="px-4 py-2 text-right">Vl. bruto</th>
@@ -1527,9 +1922,36 @@ export default function VendasFinanceiro() {
                   </tr>
                 </thead>
                 <tbody>
-                  {vendasPorData.map((item, idx) => (
-                    <tr key={`dia-${item.data || idx}`} className="border-b hover:bg-gray-50">
+                  {vendasPorDataCalendario.map((item, idx) => (
+                    <tr
+                      key={`dia-${item.data || idx}`}
+                      className={`border-b hover:bg-gray-50 ${
+                        item.sem_movimento ? "bg-slate-50/60 text-slate-500" : ""
+                      }`}
+                    >
                       <td className="px-4 py-2">{formatarData(item.data)}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex flex-wrap gap-1">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              item.fim_de_semana
+                                ? "bg-purple-100 text-purple-700"
+                                : item.feriado_nome
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {item.fim_de_semana
+                              ? item.dia_semana
+                              : item.feriado_nome || item.dia_semana}
+                          </span>
+                          {item.sem_movimento && item.dia_util && (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                              Sem venda
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-2 text-right">
                         {item.quantidade}
                       </td>
@@ -1560,17 +1982,17 @@ export default function VendasFinanceiro() {
                     </tr>
                   ))}
                   {/* TOTAL */}
-                  {vendasPorData.length > 0 &&
+                  {vendasPorDataCalendario.length > 0 &&
                     (() => {
-                      const totalQtd = vendasPorData.reduce(
+                      const totalQtd = vendasPorDataCalendario.reduce(
                         (sum, item) => sum + item.quantidade,
                         0,
                       );
-                      const totalBruto = vendasPorData.reduce(
+                      const totalBruto = vendasPorDataCalendario.reduce(
                         (sum, item) => sum + item.valor_bruto,
                         0,
                       );
-                      const totalDesconto = vendasPorData.reduce(
+                      const totalDesconto = vendasPorDataCalendario.reduce(
                         (sum, item) => sum + item.desconto,
                         0,
                       );
@@ -1589,7 +2011,7 @@ export default function VendasFinanceiro() {
                             fontWeight: "bold",
                           }}
                         >
-                          <td className="px-4 py-3">TOTAL</td>
+                          <td className="px-4 py-3" colSpan="2">TOTAL</td>
                           <td className="px-4 py-3 text-right">{totalQtd}</td>
                           <td className="px-4 py-3 text-right">
                             {formatarMoeda(ticketMedio)}
@@ -1599,7 +2021,7 @@ export default function VendasFinanceiro() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             {formatarMoeda(
-                              vendasPorData.reduce(
+                              vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.taxa_entrega,
                                 0,
                               ),
@@ -1613,7 +2035,7 @@ export default function VendasFinanceiro() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             {formatarMoeda(
-                              vendasPorData.reduce(
+                              vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.valor_liquido,
                                 0,
                               ),
@@ -1621,7 +2043,7 @@ export default function VendasFinanceiro() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             {formatarMoeda(
-                              vendasPorData.reduce(
+                              vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.valor_recebido,
                                 0,
                               ),
@@ -1629,7 +2051,7 @@ export default function VendasFinanceiro() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             {formatarMoeda(
-                              vendasPorData.reduce(
+                              vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.saldo_aberto,
                                 0,
                               ),
@@ -2175,6 +2597,35 @@ export default function VendasFinanceiro() {
           <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
             Lista de Vendas com Análise de Rentabilidade
           </div>
+          <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={limparFiltroStatusLista}
+                className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
+                  filtroStatusLista === ""
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                Todas
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroStatusLista("em_aberto")}
+                className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
+                  filtroStatusLista === "em_aberto"
+                    ? "bg-red-600 text-white"
+                    : "bg-red-50 text-red-700 hover:bg-red-100"
+                }`}
+              >
+                Em aberto
+              </button>
+            </div>
+            <div className="text-sm text-slate-500">
+              Mostrando {listaVendasFiltrada.length} de {listaVendas.length} venda(s)
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100">
@@ -2206,7 +2657,7 @@ export default function VendasFinanceiro() {
                 </tr>
               </thead>
               <tbody>
-                {listaVendas.map((venda) => (
+                {listaVendasFiltrada.map((venda) => (
                   <React.Fragment key={venda.id}>
                     <tr
                       className="border-b hover:bg-gray-50 cursor-pointer"

@@ -101,6 +101,7 @@ function ResumoTransferenciaCard({ titulo, valor, descricao, destaque = "slate" 
 export default function EstoqueTransferenciaParceiro() {
   const parceiroRef = useRef(null);
   const produtoRef = useRef(null);
+  const itensRef = useRef(null);
 
   const [form, setForm] = useState({
     parceiro_id: "",
@@ -556,11 +557,23 @@ export default function EstoqueTransferenciaParceiro() {
     setBuscaProduto("");
     setSugestoesProdutos([]);
     setDropdownProdutoAberto(false);
+    window.setTimeout(() => {
+      itensRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
   };
 
   const atualizarQuantidade = (uid, valor) => {
+    if (valor === "") {
+      setItens((prev) =>
+        prev.map((item) =>
+          item.uid === uid ? { ...item, quantidade: "", total_item: 0 } : item,
+        ),
+      );
+      return;
+    }
+
     const quantidade = normalizarNumero(valor);
-    if (!Number.isFinite(quantidade) || quantidade <= 0) {
+    if (!Number.isFinite(quantidade) || quantidade < 0) {
       return;
     }
 
@@ -578,6 +591,15 @@ export default function EstoqueTransferenciaParceiro() {
   };
 
   const atualizarCustoUnitario = (uid, valor) => {
+    if (valor === "") {
+      setItens((prev) =>
+        prev.map((item) =>
+          item.uid === uid ? { ...item, custo_unitario: "", total_item: 0 } : item,
+        ),
+      );
+      return;
+    }
+
     const custoUnitario = normalizarNumero(valor);
     if (!Number.isFinite(custoUnitario) || custoUnitario < 0) {
       return;
@@ -597,6 +619,15 @@ export default function EstoqueTransferenciaParceiro() {
   };
 
   const atualizarTotalItem = (uid, valor) => {
+    if (valor === "") {
+      setItens((prev) =>
+        prev.map((item) =>
+          item.uid === uid ? { ...item, total_item: "" } : item,
+        ),
+      );
+      return;
+    }
+
     const totalItem = normalizarNumero(valor);
     if (!Number.isFinite(totalItem) || totalItem < 0) {
       return;
@@ -634,6 +665,11 @@ export default function EstoqueTransferenciaParceiro() {
 
     if (itens.length === 0) {
       toast.error("Adicione ao menos um produto na transferencia.");
+      return;
+    }
+
+    if (itens.some((item) => Number(item.quantidade || 0) <= 0)) {
+      toast.error("Informe uma quantidade maior que zero para todos os itens.");
       return;
     }
 
@@ -1152,23 +1188,14 @@ export default function EstoqueTransferenciaParceiro() {
             )}
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            Se o mesmo produto for selecionado novamente, o sistema soma mais
-            uma unidade na transferencia para acelerar o lancamento.
+          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+            Depois de selecionar o produto, confira quantidade e valores na
+            lista abaixo. O botao de registrar fica junto da conferencia final.
           </div>
-
-          <button
-            type="button"
-            onClick={registrarTransferencia}
-            disabled={salvando}
-            className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-          >
-            {salvando ? "Registrando transferencia..." : "Registrar transferencia"}
-          </button>
         </section>
       </div>
 
-      <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
+      <section ref={itensRef} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
@@ -1179,8 +1206,18 @@ export default function EstoqueTransferenciaParceiro() {
             </p>
           </div>
 
-          <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-            {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un | {formatarMoeda(totalRessarcimento)}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+              {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un | {formatarMoeda(totalRessarcimento)}
+            </div>
+            <button
+              type="button"
+              onClick={registrarTransferencia}
+              disabled={salvando || itens.length === 0}
+              className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+            >
+              {salvando ? "Registrando..." : "Registrar transferencia"}
+            </button>
           </div>
         </div>
 
@@ -1228,7 +1265,7 @@ export default function EstoqueTransferenciaParceiro() {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={Number(item.custo_unitario || 0).toFixed(2)}
+                          value={item.custo_unitario ?? ""}
                           onChange={(event) =>
                             atualizarCustoUnitario(item.uid, event.target.value)
                           }
@@ -1242,7 +1279,7 @@ export default function EstoqueTransferenciaParceiro() {
                           type="number"
                           min="0.001"
                           step="0.001"
-                          value={item.quantidade}
+                          value={item.quantidade ?? ""}
                           onChange={(event) => atualizarQuantidade(item.uid, event.target.value)}
                           className="w-28 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                         />
@@ -1252,7 +1289,7 @@ export default function EstoqueTransferenciaParceiro() {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={Number(item.total_item || 0).toFixed(2)}
+                          value={item.total_item ?? ""}
                           onChange={(event) =>
                             atualizarTotalItem(item.uid, event.target.value)
                           }

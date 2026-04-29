@@ -4128,8 +4128,21 @@ def listar_movimentacoes_produto(
     
     # Dicionário para rastrear consumo acumulado por lote
     consumo_por_lote = {}
+    saldo_estimado = 0.0
     
     for mov in movimentacoes:
+        if mov.quantidade_nova is not None:
+            saldo_apos_lancamento = float(mov.quantidade_nova)
+            saldo_estimado = saldo_apos_lancamento
+        else:
+            quantidade_movimento = float(mov.quantidade or 0)
+            if mov.status != "cancelado":
+                if mov.tipo == "entrada":
+                    saldo_estimado += quantidade_movimento
+                elif mov.tipo == "saida":
+                    saldo_estimado -= quantidade_movimento
+            saldo_apos_lancamento = saldo_estimado
+
         # Buscar informações do lote
         lote_nome = None
         lote_info = None
@@ -4243,6 +4256,7 @@ def listar_movimentacoes_produto(
             "quantidade": mov.quantidade,
             "quantidade_anterior": mov.quantidade_anterior,
             "quantidade_nova": mov.quantidade_nova,
+            "saldo_apos_lancamento": saldo_apos_lancamento,
             "custo_unitario": mov.custo_unitario,
             "valor_total": mov.valor_total,
             "documento": documento_exibicao,
