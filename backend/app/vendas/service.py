@@ -943,8 +943,10 @@ class VendaService:
             # ETAPA 6: ESTORNAR MOVIMENTAÇÕES BANCÁRIAS
             # ============================================================
             
-            movimentacoes_bancarias = db.query(MovimentacaoFinanceira).filter_by(
-                venda_id=venda_id
+            movimentacoes_bancarias = db.query(MovimentacaoFinanceira).filter(
+                MovimentacaoFinanceira.tenant_id == tenant_id,
+                MovimentacaoFinanceira.origem_tipo == 'venda',
+                MovimentacaoFinanceira.origem_id == venda_id
             ).all()
             
             movimentacoes_estornadas = 0
@@ -955,13 +957,13 @@ class VendaService:
                 ).first()
                 
                 if conta_bancaria:
-                    if mov_banc.tipo == 'receita':
+                    if mov_banc.tipo in ('receita', 'entrada'):
                         conta_bancaria.saldo_atual -= mov_banc.valor
                         logger.info(
                             f"  🏦 Estornando saldo bancário: {conta_bancaria.nome} "
                             f"-R$ {mov_banc.valor}"
                         )
-                    elif mov_banc.tipo == 'despesa':
+                    elif mov_banc.tipo in ('despesa', 'saida'):
                         conta_bancaria.saldo_atual += mov_banc.valor
                         logger.info(
                             f"  🏦 Estornando saldo bancário: {conta_bancaria.nome} "
