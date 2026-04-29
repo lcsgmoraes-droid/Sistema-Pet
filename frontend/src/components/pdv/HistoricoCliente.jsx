@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard, Copy, Check } from 'lucide-react';
+import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
 
@@ -17,6 +17,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
   const [detalhesVenda, setDetalhesVenda] = useState({});
   const [loadingDetalhes, setLoadingDetalhes] = useState({});
   const [copiadoCampo, setCopiadoCampo] = useState('');
+  const [mostrarResumoGerencial, setMostrarResumoGerencial] = useState(false);
 
   useEffect(() => {
     carregarHistorico();
@@ -171,6 +172,8 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
     return venda.status === filtroStatus;
   }) || [];
 
+  const valorResumo = (valor) => (mostrarResumoGerencial ? valor : '••••');
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -196,9 +199,24 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
               <h2 className="text-2xl font-bold text-gray-900">Histórico de Compras</h2>
               <p className="text-gray-600 mt-1">{clienteNome}</p>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
-              <X className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMostrarResumoGerencial((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:bg-blue-50"
+                title={mostrarResumoGerencial ? 'Ocultar resumo gerencial' : 'Mostrar resumo gerencial'}
+              >
+                {mostrarResumoGerencial ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                {mostrarResumoGerencial ? 'Ocultar valores' : 'Ver valores'}
+              </button>
+              <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Estatisticas */}
@@ -210,7 +228,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                 </div>
                 <div>
                   <div className="text-sm text-gray-600">Total de Compras</div>
-                  <div className="text-2xl font-bold text-gray-900">{historico.total_compras}</div>
+                  <div className="text-2xl font-bold text-gray-900">{valorResumo(historico.total_compras)}</div>
                 </div>
               </div>
             </div>
@@ -223,7 +241,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                 <div>
                   <div className="text-sm text-gray-600">Total Gasto</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {formatBRL(historico.valor_total_gasto)}
+                    {valorResumo(formatBRL(historico.valor_total_gasto))}
                   </div>
                 </div>
               </div>
@@ -237,7 +255,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                 <div>
                   <div className="text-sm text-gray-600">Ticket Médio</div>
                   <div className="text-2xl font-bold text-gray-900">
-                    {formatBRL(historico.ticket_medio)}
+                    {valorResumo(formatBRL(historico.ticket_medio))}
                   </div>
                 </div>
               </div>

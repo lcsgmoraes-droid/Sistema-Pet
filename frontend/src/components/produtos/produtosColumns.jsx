@@ -24,7 +24,7 @@ const normalizeExpandId = (value) => String(value ?? "");
 // DEFINICAO DE COLUNAS DA LISTAGEM
 // ====================================================
 export function createProdutosColunas() {
-  return [
+  const colunas = [
   {
     key: "checkbox",
     label: "",
@@ -761,6 +761,15 @@ export function createProdutosColunas() {
     },
   },
   ];
+
+  const indiceMargem = colunas.findIndex((coluna) => coluna.key === "margem");
+  const indicePrecoVenda = colunas.findIndex((coluna) => coluna.key === "preco_venda");
+  if (indiceMargem > indicePrecoVenda && indicePrecoVenda >= 0) {
+    const [colunaMargem] = colunas.splice(indiceMargem, 1);
+    colunas.splice(indicePrecoVenda, 0, colunaMargem);
+  }
+
+  return colunas;
 }
 
 export default createProdutosColunas;

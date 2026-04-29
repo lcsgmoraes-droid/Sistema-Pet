@@ -224,6 +224,27 @@ function carregarFeriadosCustomizados() {
   }
 }
 
+function getDiasUteisStorageKey() {
+  try {
+    const tenant = JSON.parse(window.localStorage.getItem("selectedTenant") || "{}");
+    return `financeiro:vendas:dias-uteis:${tenant?.id || "global"}`;
+  } catch {
+    return "financeiro:vendas:dias-uteis:global";
+  }
+}
+
+function carregarConfigDiasUteis() {
+  try {
+    const salvo = window.localStorage.getItem(getDiasUteisStorageKey());
+    const parsed = salvo ? JSON.parse(salvo) : {};
+    return {
+      considerarSabadoDiaUtil: Boolean(parsed?.considerarSabadoDiaUtil),
+    };
+  } catch {
+    return { considerarSabadoDiaUtil: false };
+  }
+}
+
 function vendaEstaEmAberto(venda) {
   return venda?.status !== "finalizada" && venda?.status !== "cancelada";
 }
@@ -299,6 +320,7 @@ export default function VendasFinanceiro() {
   const [feriadosCustomizados, setFeriadosCustomizados] = useState(
     carregarFeriadosCustomizados,
   );
+  const [configDiasUteis, setConfigDiasUteis] = useState(carregarConfigDiasUteis);
   const [novoFeriadoData, setNovoFeriadoData] = useState("");
   const [novoFeriadoNome, setNovoFeriadoNome] = useState("");
   const [ordenacaoRelatorio, setOrdenacaoRelatorio] = useState("data_desc");
@@ -571,12 +593,19 @@ export default function VendasFinanceiro() {
       const key = dataKeyLocal(dia);
       const item = vendasMap.get(key) || {};
       const diaSemana = dia.getDay();
-      const fimDeSemana = diaSemana === 0 || diaSemana === 6;
       const feriadoNome = feriadosPorData[key] || "";
 
       const quantidade = Number(item.quantidade || 0);
       const valorBruto = Number(item.valor_bruto || 0);
       const valorLiquido = Number(item.valor_liquido || 0);
+      const temMovimento = quantidade > 0 || valorBruto > 0 || valorLiquido > 0;
+      const sabado = diaSemana === 6;
+      const domingo = diaSemana === 0;
+      const sabadoUtil = sabado && configDiasUteis.considerarSabadoDiaUtil;
+      const feriadoAberto = Boolean(feriadoNome && temMovimento);
+      const fimDeSemana = domingo || (sabado && !sabadoUtil);
+      const diaUtilBase = !domingo && (!sabado || sabadoUtil);
+      const diaUtil = feriadoAberto || (diaUtilBase && !feriadoNome);
 
       return {
         data: key,
@@ -590,19 +619,25 @@ export default function VendasFinanceiro() {
         saldo_aberto: Number(item.saldo_aberto || 0),
         ticket_medio: quantidade > 0 ? Number(item.ticket_medio || valorBruto / quantidade) : 0,
         dia_semana: formatarDataLocal(key, { weekday: "long" }),
+        sabado,
         fim_de_semana: fimDeSemana,
         feriado_nome: feriadoNome,
-        dia_util: !fimDeSemana && !feriadoNome,
+        feriado_aberto: feriadoAberto,
+        dia_util: diaUtil,
         sem_movimento: quantidade === 0 && valorLiquido === 0,
       };
     });
-  }, [dataInicio, dataFim, feriadosPorData, vendasPorData]);
+  }, [configDiasUteis.considerarSabadoDiaUtil, dataInicio, dataFim, feriadosPorData, vendasPorData]);
 
   const resumoDiasPeriodo = useMemo(() => {
     const diasUteis = vendasPorDataCalendario.filter((item) => item.dia_util);
     const diasTrabalhados = diasUteis.filter((item) => !item.sem_movimento);
     const diasUteisSemVenda = diasUteis.filter((item) => item.sem_movimento);
-    const totalLiquido = vendasPorDataCalendario.reduce(
+    const totalLiquidoDiasUteis = diasUteis.reduce(
+      (sum, item) => sum + Number(item.valor_liquido || 0),
+      0,
+    );
+    const totalLiquidoDiasTrabalhados = diasTrabalhados.reduce(
       (sum, item) => sum + Number(item.valor_liquido || 0),
       0,
     );
@@ -614,8 +649,8 @@ export default function VendasFinanceiro() {
       diasUteisSemVenda: diasUteisSemVenda.length,
       finsDeSemana: vendasPorDataCalendario.filter((item) => item.fim_de_semana).length,
       feriados: vendasPorDataCalendario.filter((item) => item.feriado_nome).length,
-      mediaDiaUtil: diasUteis.length > 0 ? totalLiquido / diasUteis.length : 0,
-      mediaDiaTrabalhado: diasTrabalhados.length > 0 ? totalLiquido / diasTrabalhados.length : 0,
+      mediaDiaUtil: diasUteis.length > 0 ? totalLiquidoDiasUteis / diasUteis.length : 0,
+      mediaDiaTrabalhado: diasTrabalhados.length > 0 ? totalLiquidoDiasTrabalhados / diasTrabalhados.length : 0,
     };
   }, [vendasPorDataCalendario]);
 
@@ -1186,6 +1221,13 @@ export default function VendasFinanceiro() {
   }, [feriadosCustomizados]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      getDiasUteisStorageKey(),
+      JSON.stringify(configDiasUteis),
+    );
+  }, [configDiasUteis]);
+
+  useEffect(() => {
     const fecharMenuAoClicarFora = (event) => {
       if (
         menuRelatoriosRef.current &&
@@ -1650,17 +1692,33 @@ export default function VendasFinanceiro() {
                   Dias úteis e média operacional
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Fins de semana e feriados não entram na média por dia útil.
+                  Configure se sábado entra na média. Feriado com faturamento vira dia útil automaticamente.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setMostrarConfigFeriados((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-              >
-                <Calendar className="h-4 w-4" />
-                Configurar feriados
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                  <input
+                    type="checkbox"
+                    checked={configDiasUteis.considerarSabadoDiaUtil}
+                    onChange={(event) =>
+                      setConfigDiasUteis((prev) => ({
+                        ...prev,
+                        considerarSabadoDiaUtil: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  Sábado conta como dia útil
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setMostrarConfigFeriados((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Configurar feriados
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 grid gap-3 md:grid-cols-4">
@@ -1934,20 +1992,25 @@ export default function VendasFinanceiro() {
                         <div className="flex flex-wrap gap-1">
                           <span
                             className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              item.fim_de_semana
+                              item.feriado_aberto
+                                ? "bg-emerald-100 text-emerald-700"
+                                : item.fim_de_semana
                                 ? "bg-purple-100 text-purple-700"
                                 : item.feriado_nome
                                   ? "bg-amber-100 text-amber-700"
                                   : "bg-emerald-100 text-emerald-700"
                             }`}
                           >
-                            {item.fim_de_semana
-                              ? item.dia_semana
-                              : item.feriado_nome || item.dia_semana}
+                            {item.feriado_nome || item.dia_semana}
                           </span>
                           {item.sem_movimento && item.dia_util && (
                             <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">
                               Sem venda
+                            </span>
+                          )}
+                          {item.feriado_aberto && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                              Aberto
                             </span>
                           )}
                         </div>
