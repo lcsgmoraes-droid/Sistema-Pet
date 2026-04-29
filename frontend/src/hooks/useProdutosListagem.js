@@ -92,44 +92,52 @@ export default function useProdutosListagem({
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
     const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
+    const buscaDigitos = buscaNormalizada.replace(/\D/g, "");
     const buscaAtiva = Boolean(buscaNormalizada);
     const produtoCorrespondeBusca = (produto) => {
-      const codigo = normalizeSearchText(produto.codigo || produto.sku || "");
-      const nome = normalizeSearchText(produto.nome || "");
-      return codigo.includes(buscaNormalizada) || nome.includes(buscaNormalizada);
+      const campos = [
+        produto.codigo,
+        produto.sku,
+        produto.codigo_barras,
+        produto.nome,
+      ].map((value) => normalizeSearchText(value || ""));
+      const correspondeTexto = campos.some((campo) => campo.includes(buscaNormalizada));
+
+      if (correspondeTexto || !buscaDigitos) {
+        return correspondeTexto;
+      }
+
+      const camposDigitos = [produto.codigo, produto.sku, produto.codigo_barras].map(
+        (value) => normalizeSearchText(value || "").replace(/\D/g, ""),
+      );
+      return camposDigitos.some((campo) => campo.includes(buscaDigitos));
     };
 
     if (!filtros.mostrarPaisVariacoes) {
       return produtosTemp.filter((p) => (p.tipo_produto || "SIMPLES") === "SIMPLES");
     }
 
+    if (!buscaAtiva) {
+      return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);
+    }
+
     const paisVisiveisPorBusca = new Set();
     const paisExpandidosSet = new Set((paisExpandidos || []).map(normalizeExpandId));
 
-    if (buscaAtiva) {
-      produtosTemp.forEach((produto) => {
-        if (!produtoCorrespondeBusca(produto)) return;
+    produtosTemp.forEach((produto) => {
+      if (!produtoCorrespondeBusca(produto)) return;
 
-        if (produto.tipo_produto === "PAI") {
-          paisVisiveisPorBusca.add(normalizeExpandId(produto.id));
-          return;
-        }
-
-        if (produto.tipo_produto === "VARIACAO" && produto.produto_pai_id) {
-          paisVisiveisPorBusca.add(normalizeExpandId(produto.produto_pai_id));
-        }
-      });
-    }
-
-    produtosTemp = produtosTemp.filter((p) => {
-      if (!buscaAtiva) {
-        if (p.tipo_produto !== "VARIACAO") {
-          return true;
-        }
-
-        return paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id));
+      if (produto.tipo_produto === "PAI") {
+        paisVisiveisPorBusca.add(normalizeExpandId(produto.id));
+        return;
       }
 
+      if (produto.tipo_produto === "VARIACAO" && produto.produto_pai_id) {
+        paisVisiveisPorBusca.add(normalizeExpandId(produto.produto_pai_id));
+      }
+    });
+
+    produtosTemp = produtosTemp.filter((p) => {
       if (p.tipo_produto === "PAI") {
         return paisVisiveisPorBusca.has(normalizeExpandId(p.id)) || produtoCorrespondeBusca(p);
       }
@@ -156,7 +164,6 @@ export default function useProdutosListagem({
     paisExpandidos,
     produtosBrutos,
   ]);
-
   const produtos = produtosFiltrados;
   const totalPaginas = Math.max(totalPaginasServidor, 1);
   const totalItens = totalItensServidor;
@@ -279,13 +286,10 @@ export default function useProdutosListagem({
   const handleFiltroChange = (campo, valor) => {
     const proximoFiltro = { ...filtros, [campo]: valor };
     setFiltros(proximoFiltro);
+    setPaginaAtual(1);
 
     if (campo === "mostrarPaisVariacoes" && !valor) {
       onOcultarPaisVariacoes?.();
-    }
-
-    if (campo !== "mostrarPaisVariacoes") {
-      setPaginaAtual(1);
     }
   };
 

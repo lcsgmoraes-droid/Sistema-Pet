@@ -110,7 +110,7 @@ export default function ProdutosFiltrosPanel({
               }
               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-700">Mostrar Pais, Variacoes e Kits</span>
+            <span className="text-sm text-gray-700">Incluir pais, variacoes e kits</span>
           </label>
 
           <label

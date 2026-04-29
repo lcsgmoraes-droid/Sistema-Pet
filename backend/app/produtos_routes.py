@@ -247,6 +247,43 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
     ]
 
 
+def _only_digits(value: Optional[str]) -> str:
+    return "".join(ch for ch in str(value or "") if ch.isdigit())
+
+
+def _digits_expr(column):
+    return func.regexp_replace(func.coalesce(column, ""), "[^0-9]", "", "g")
+
+
+def _produto_search_conditions(palavra: str):
+    """Busca por texto e tambem por codigos numericos normalizados."""
+    termo = (palavra or "").strip()
+    busca_pattern = f"%{termo}%"
+    conditions = [
+        Produto.nome.ilike(busca_pattern),
+        Produto.codigo.ilike(busca_pattern),
+        Produto.codigo_barras.ilike(busca_pattern),
+    ]
+
+    if PRODUTO_SKU_COLUMN is not None:
+        conditions.append(PRODUTO_SKU_COLUMN.ilike(busca_pattern))
+
+    digitos = _only_digits(termo)
+    if len(digitos) >= 4:
+        digitos_pattern = f"%{digitos}%"
+        conditions.extend(
+            [
+                _digits_expr(Produto.codigo).ilike(digitos_pattern),
+                _digits_expr(Produto.codigo_barras).ilike(digitos_pattern),
+            ]
+        )
+
+        if PRODUTO_SKU_COLUMN is not None:
+            conditions.append(_digits_expr(PRODUTO_SKU_COLUMN).ilike(digitos_pattern))
+
+    return or_(*conditions)
+
+
 def _enriquecer_produto_listagem(
     db: Session,
     produto: Produto,
@@ -2042,12 +2079,7 @@ def listar_produtos_vendaveis(
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
-            p = f"%{palavra}%"
-            query = query.filter(
-                (Produto.nome.ilike(p)) |
-                (Produto.codigo.ilike(p)) |
-                (Produto.codigo_barras.ilike(p))
-            )
+            query = query.filter(_produto_search_conditions(palavra))
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -2196,20 +2228,7 @@ def listar_produtos(
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
-            busca_pattern = f"%{palavra}%"
-            if PRODUTO_SKU_COLUMN is None:
-                query = query.filter(
-                    (Produto.nome.ilike(busca_pattern)) |
-                    (Produto.codigo.ilike(busca_pattern)) |
-                    (Produto.codigo_barras.ilike(busca_pattern))
-                )
-            else:
-                query = query.filter(
-                    (Produto.nome.ilike(busca_pattern)) |
-                    (Produto.codigo.ilike(busca_pattern)) |
-                    (PRODUTO_SKU_COLUMN.ilike(busca_pattern)) |
-                    (Produto.codigo_barras.ilike(busca_pattern))
-                )
+            query = query.filter(_produto_search_conditions(palavra))
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
