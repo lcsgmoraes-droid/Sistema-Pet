@@ -314,15 +314,24 @@ def atualizar_consulta(
         setattr(c, field, value)
 
     # Se registrou peso, cria registro na curva de peso
-    if body.peso_consulta and body.peso_consulta > 0:
-        peso_reg = PesoRegistro(
-            pet_id=c.pet_id,
-            consulta_id=c.id,
-            user_id=user.id,
-            data=date.today(),
-            peso_kg=body.peso_consulta,
-        )
-        db.add(peso_reg)
+    if body.peso_consulta is not None and body.peso_consulta > 0:
+        peso_reg = db.query(PesoRegistro).filter(
+            PesoRegistro.consulta_id == c.id,
+            PesoRegistro.tenant_id == tenant_id,
+        ).first()
+        if peso_reg:
+            peso_reg.data = date.today()
+            peso_reg.peso_kg = body.peso_consulta
+        else:
+            peso_reg = PesoRegistro(
+                tenant_id=tenant_id,
+                pet_id=c.pet_id,
+                consulta_id=c.id,
+                user_id=user.id,
+                data=date.today(),
+                peso_kg=body.peso_consulta,
+            )
+            db.add(peso_reg)
 
         # Atualiza peso no cadastro do pet
         pet = db.query(Pet).filter(Pet.id == c.pet_id).first()

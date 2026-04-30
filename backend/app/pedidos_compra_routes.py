@@ -37,6 +37,7 @@ import re
 import unicodedata
 from io import BytesIO
 from urllib.parse import quote
+from xml.sax.saxutils import escape
 
 from .db import get_session
 from .auth import get_current_user
@@ -2540,7 +2541,13 @@ def exportar_confronto_pdf(
         return Paragraph(escape(str(valor if valor is not None else "-")), small_style)
 
     elements.append(Paragraph("CONFRONTO PEDIDO x NOTA FISCAL", title_style))
-    elements.append(Paragraph(f"Pedido: <b>{pedido.numero_pedido}</b> &nbsp;|&nbsp; NF: <b>{numero_nota}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_nome}</b> &nbsp;|&nbsp; Data confronto: <b>{pedido.data_confronto.strftime('%d/%m/%Y %H:%M') if pedido.data_confronto else '-'}</b>", sub_style))
+    pedido_pdf = escape(str(pedido.numero_pedido or "-"))
+    numero_nota_pdf = escape(str(numero_nota or "-"))
+    fornecedor_pdf = escape(str(fornecedor_nome or "-"))
+    data_confronto_pdf = escape(
+        pedido.data_confronto.strftime("%d/%m/%Y %H:%M") if pedido.data_confronto else "-"
+    )
+    elements.append(Paragraph(f"Pedido: <b>{pedido_pdf}</b> &nbsp;|&nbsp; NF: <b>{numero_nota_pdf}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_pdf}</b> &nbsp;|&nbsp; Data confronto: <b>{data_confronto_pdf}</b>", sub_style))
     elements.append(Spacer(1, 4*mm))
 
     STATUS_LABELS = {
