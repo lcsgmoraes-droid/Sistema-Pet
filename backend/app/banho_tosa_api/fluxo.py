@@ -1,6 +1,6 @@
 """Utilitarios do fluxo operacional do Banho & Tosa."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from math import ceil
 from typing import Optional
 
@@ -119,10 +119,11 @@ def fechar_etapa_aberta(
     fim: Optional[datetime] = None,
     observacoes: Optional[str] = None,
 ) -> None:
-    fim = fim or datetime.now()
+    fim = _datetime_compativel(fim or datetime.now(), etapa.inicio_em)
     etapa.fim_em = fim
     if etapa.inicio_em:
-        segundos = max(0, int((fim - etapa.inicio_em).total_seconds()))
+        inicio = _datetime_compativel(etapa.inicio_em, fim)
+        segundos = max(0, int((fim - inicio).total_seconds()))
         etapa.duracao_segundos = segundos
         etapa.duracao_minutos = int(ceil(segundos / 60)) if segundos else 0
     if observacoes is not None:
@@ -141,7 +142,8 @@ def calcular_tempos_etapa(etapa: BanhoTosaEtapa, agora: Optional[datetime] = Non
             "atrasado": False,
         }
 
-    referencia = fim or agora or datetime.now()
+    referencia = _datetime_compativel(fim or agora or datetime.now(), inicio)
+    inicio = _datetime_compativel(inicio, referencia)
     decorrido = max(0, int((referencia - inicio).total_seconds()))
     restante = (previsto_min * 60) - decorrido if previsto_min else None
     atraso = abs(restante) if restante is not None and restante < 0 else 0
@@ -151,6 +153,21 @@ def calcular_tempos_etapa(etapa: BanhoTosaEtapa, agora: Optional[datetime] = Non
         "atraso_segundos": atraso,
         "atrasado": atraso > 0,
     }
+
+
+def _datetime_compativel(valor: datetime, referencia: Optional[datetime]) -> datetime:
+    """Evita erro entre datetimes com timezone e sem timezone vindos do banco."""
+    if not valor or not referencia:
+        return valor
+
+    valor_tem_tz = valor.tzinfo is not None and valor.utcoffset() is not None
+    referencia_tem_tz = referencia.tzinfo is not None and referencia.utcoffset() is not None
+
+    if valor_tem_tz == referencia_tem_tz:
+        return valor
+    if referencia_tem_tz:
+        return valor.replace(tzinfo=referencia.tzinfo or timezone.utc)
+    return valor.replace(tzinfo=None)
 
 
 def estado_operacional_atendimento(
