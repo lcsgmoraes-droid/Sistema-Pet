@@ -468,6 +468,7 @@ def _gerar_pdf_pedido_bytes(
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
+        from xml.sax.saxutils import escape
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -2533,7 +2534,10 @@ def exportar_confronto_pdf(
     title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16,
                                  textColor=colors.HexColor("#1a56db"), alignment=TA_CENTER, spaceAfter=8)
     sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9, spaceAfter=4)
-    small_style = ParagraphStyle("Sm", parent=styles["Normal"], fontSize=7, leading=9)
+    small_style = ParagraphStyle("Sm", parent=styles["Normal"], fontSize=6.5, leading=8, wordWrap="CJK")
+
+    def cell(valor):
+        return Paragraph(escape(str(valor if valor is not None else "-")), small_style)
 
     elements.append(Paragraph("CONFRONTO PEDIDO x NOTA FISCAL", title_style))
     elements.append(Paragraph(f"Pedido: <b>{pedido.numero_pedido}</b> &nbsp;|&nbsp; NF: <b>{numero_nota}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_nome}</b> &nbsp;|&nbsp; Data confronto: <b>{pedido.data_confronto.strftime('%d/%m/%Y %H:%M') if pedido.data_confronto else '-'}</b>", sub_style))
@@ -2563,22 +2567,22 @@ def exportar_confronto_pdf(
         st = it.get("status", "ok")
         row_colors.append((idx + 1, STATUS_COLORS.get(st, colors.white)))
         table_data.append([
-            Paragraph(it.get("produto_nome", "")[:40], small_style),
-            it.get("produto_codigo") or "",
-            f"{it.get('qtd_pedida', 0):.2f}".rstrip("0").rstrip("."),
-            f"{it.get('qtd_nf', 0):.2f}".rstrip("0").rstrip("."),
-            f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip("."),
-            f"R$ {it.get('preco_pedido', 0):.2f}",
-            f"R$ {it.get('preco_nf', 0):.2f}",
-            f"R$ {it.get('dif_preco_unit', 0):+.2f}" if it.get('dif_preco_unit') is not None else "-",
-            f"{it.get('dif_preco_pct', 0):+.1f}%",
-            f"R$ {it.get('valor_pedido', 0):.2f}",
-            f"R$ {it.get('valor_nf', 0):.2f}",
-            f"R$ {it.get('dif_valor', 0):+.2f}",
-            STATUS_LABELS.get(st, st),
+            cell(it.get("produto_nome", "")),
+            cell(it.get("produto_codigo") or ""),
+            cell(f"{it.get('qtd_pedida', 0):.2f}".rstrip("0").rstrip(".")),
+            cell(f"{it.get('qtd_nf', 0):.2f}".rstrip("0").rstrip(".")),
+            cell(f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip(".")),
+            cell(f"R$ {it.get('preco_pedido', 0):.2f}"),
+            cell(f"R$ {it.get('preco_nf', 0):.2f}"),
+            cell(f"R$ {it.get('dif_preco_unit', 0):+.2f}" if it.get('dif_preco_unit') is not None else "-"),
+            cell(f"{it.get('dif_preco_pct', 0):+.1f}%"),
+            cell(f"R$ {it.get('valor_pedido', 0):.2f}"),
+            cell(f"R$ {it.get('valor_nf', 0):.2f}"),
+            cell(f"R$ {it.get('dif_valor', 0):+.2f}"),
+            cell(STATUS_LABELS.get(st, st)),
         ])
 
-    col_widths = [48*mm, 14*mm, 14*mm, 14*mm, 14*mm, 16*mm, 16*mm, 16*mm, 12*mm, 18*mm, 18*mm, 16*mm, 16*mm]
+    col_widths = [54*mm, 16*mm, 14*mm, 14*mm, 14*mm, 16*mm, 16*mm, 16*mm, 12*mm, 18*mm, 18*mm, 16*mm, 16*mm]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a56db")),
@@ -2586,6 +2590,7 @@ def exportar_confronto_pdf(
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 7),
         ("ALIGN", (2, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ("TOPPADDING", (0, 0), (-1, -1), 4),

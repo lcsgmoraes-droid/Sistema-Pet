@@ -58,8 +58,10 @@ export default function useConsultaRascunhoActions({
 
       if (!consultaIdAtual) {
         const res = await vetApi.criarConsulta(payload);
-        setConsultaIdAtual(res.data.id);
-        navigate(`/veterinario/consultas/${res.data.id}`, { replace: true });
+        const novoId = res.data.id;
+        await vetApi.atualizarConsulta(novoId, payload);
+        setConsultaIdAtual(novoId);
+        navigate(`/veterinario/consultas/${novoId}`, { replace: true });
       } else {
         await vetApi.atualizarConsulta(consultaIdAtual, payload);
       }

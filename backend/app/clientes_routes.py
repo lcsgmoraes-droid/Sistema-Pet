@@ -58,6 +58,32 @@ def _somente_digitos_coluna(coluna):
     )
 
 
+def _somente_digitos(valor) -> str:
+    return "".join(ch for ch in str(valor or "") if ch.isdigit())
+
+
+def _validar_telefone_cliente_obrigatorio(cliente_data, cliente_atual=None) -> None:
+    tipo = getattr(cliente_data, "tipo_cadastro", None)
+    if tipo is None and cliente_atual is not None:
+        tipo = getattr(cliente_atual, "tipo_cadastro", None)
+
+    if tipo and tipo != "cliente":
+        return
+
+    telefone = getattr(cliente_data, "telefone", None)
+    celular = getattr(cliente_data, "celular", None)
+    if telefone is None and cliente_atual is not None:
+        telefone = getattr(cliente_atual, "telefone", None)
+    if celular is None and cliente_atual is not None:
+        celular = getattr(cliente_atual, "celular", None)
+
+    if max(len(_somente_digitos(telefone)), len(_somente_digitos(celular))) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Telefone/celular obrigatorio para cadastro de cliente",
+        )
+
+
 # ========== HELPERS INTERNOS ==========
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
@@ -521,6 +547,7 @@ def create_cliente(
 ):
     """Criar novo cliente/fornecedor"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    _validar_telefone_cliente_obrigatorio(cliente_data)
     
     # Validar documento conforme tipo de pessoa (CPF nÃ£o Ã© obrigatÃ³rio)
     if cliente_data.tipo_pessoa == "PF":
@@ -1014,6 +1041,7 @@ def update_cliente(
     logger.info(f"[DEBUG] entregador_padrao={cliente_data.entregador_padrao}, gera_conta_pagar_custo_entrega={cliente_data.gera_conta_pagar_custo_entrega}")
     
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
     
     # Verificar CPF duplicado (se alterado)
     if cliente_data.cpf and cliente_data.cpf != cliente.cpf:

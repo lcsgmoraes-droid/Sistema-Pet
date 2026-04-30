@@ -1,6 +1,7 @@
 """Geracao de PDF do modulo veterinario (prontuario e receituario)."""
 from datetime import datetime
 from io import BytesIO
+from xml.sax.saxutils import escape
 
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
@@ -40,7 +41,8 @@ def _texto(valor):
 
 
 def _bloco_info(titulo, linhas):
-    data = [["Campo", "Valor"], *linhas]
+    data = [["Campo", "Valor"]]
+    data.extend([[_par(campo, bold=True), _par(valor)] for campo, valor in linhas])
     tabela = Table(data, colWidths=[5.5 * cm, 10.5 * cm])
     tabela.setStyle(
         TableStyle(
@@ -95,6 +97,21 @@ def _style_normal():
         fontSize=9,
         leading=12,
     )
+
+
+def _style_cell(bold=False):
+    return ParagraphStyle(
+        "VetCellBold" if bold else "VetCell",
+        parent=_style_normal(),
+        fontName="Helvetica-Bold" if bold else "Helvetica",
+        fontSize=8,
+        leading=10,
+        wordWrap="CJK",
+    )
+
+
+def _par(valor, bold=False):
+    return Paragraph(escape(_texto(valor)), _style_cell(bold=bold))
 
 
 def _qr_drawing(conteudo, size=2.8 * cm):
@@ -169,10 +186,10 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
         for p in prescricoes:
             itens.append(
                 [
-                    _texto(getattr(p, "numero", None)),
-                    _fmt_data(getattr(p, "data_emissao", None)),
-                    _texto(getattr(p, "tipo_receituario", None)),
-                    str(len(getattr(p, "itens", []) or [])),
+                    _par(getattr(p, "numero", None)),
+                    _par(_fmt_data(getattr(p, "data_emissao", None))),
+                    _par(getattr(p, "tipo_receituario", None)),
+                    _par(str(len(getattr(p, "itens", []) or []))),
                 ]
             )
         tabela_prescricoes = Table(itens, colWidths=[3.2 * cm, 3 * cm, 5 * cm, 4.8 * cm])
@@ -249,10 +266,10 @@ def gerar_pdf_receita(prescricao, url_validacao):
     for item in prescricao.itens:
         dados_itens.append(
             [
-                _texto(item.nome_medicamento),
-                _texto(item.posologia),
-                _texto(item.via_administracao),
-                f"{item.duracao_dias} dia(s)" if item.duracao_dias else "-",
+                _par(item.nome_medicamento),
+                _par(item.posologia),
+                _par(item.via_administracao),
+                _par(f"{item.duracao_dias} dia(s)" if item.duracao_dias else "-"),
             ]
         )
 

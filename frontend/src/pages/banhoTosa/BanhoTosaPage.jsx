@@ -126,6 +126,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
     if (view === "fila") {
       return (
         <BanhoTosaFilaView
+          config={config}
           funcionarios={funcionarios}
           recursos={recursos}
           onChanged={carregarDados}

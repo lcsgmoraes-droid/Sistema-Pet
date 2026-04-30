@@ -7,6 +7,7 @@ import {
   Alert,
   Vibration,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from '@react-navigation/native';
@@ -163,8 +164,26 @@ export default function BarcodeScannerScreen({ navigation }: any) {
       {/* Card do produto encontrado */}
       {produtoEncontrado && (
         <View style={styles.produtoCard}>
+          <TouchableOpacity
+            style={styles.produtoImagemWrap}
+            onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}
+            activeOpacity={0.85}
+          >
+            {produtoEncontrado.foto_url ? (
+              <Image source={{ uri: produtoEncontrado.foto_url }} style={styles.produtoImagem} resizeMode="contain" />
+            ) : (
+              <View style={[styles.produtoImagem, styles.produtoImagemPlaceholder]}>
+                <Ionicons name="image-outline" size={24} color={CORES.textoClaro} />
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.produtoInfo}>
-            <Text style={styles.produtoNome} numberOfLines={2}>{produtoEncontrado.nome}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}>
+              <Text style={styles.produtoNome} numberOfLines={2}>{produtoEncontrado.nome}</Text>
+            </TouchableOpacity>
+            {produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional ? (
+              <Text style={styles.produtoPrecoOriginal}>{formatarMoeda(produtoEncontrado.preco)}</Text>
+            ) : null}
             <Text style={styles.produtoPreco}>
               {formatarMoeda(
                 produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional
@@ -256,8 +275,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RAIO.lg,
     gap: ESPACO.md,
   },
+  produtoImagemWrap: { width: 72, height: 72, borderRadius: RAIO.md, overflow: 'hidden', backgroundColor: CORES.fundo },
+  produtoImagem: { width: '100%', height: '100%' },
+  produtoImagemPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   produtoInfo: { flex: 1 },
   produtoNome: { fontSize: FONTE.normal, fontWeight: '600', color: CORES.texto },
+  produtoPrecoOriginal: { fontSize: FONTE.pequena, color: CORES.textoClaro, textDecorationLine: 'line-through', marginTop: 4 },
   produtoPreco: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.primario, marginTop: 4 },
   produtoAcoes: { flexDirection: 'row', gap: ESPACO.sm, alignItems: 'center' },
   botaoEscanear: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
   const petInicial = route.params?.pet;
 
   const [racoes, setRacoes] = useState<RacaoCadastrada[]>([]);
+  const [buscaRacao, setBuscaRacao] = useState('');
   const [carregandoRacoes, setCarregandoRacoes] = useState(true);
   const [seletorAberto, setSeletorAberto] = useState<'principal' | 'comparar' | 'pet' | null>(null);
 
@@ -64,6 +65,15 @@ export default function FoodCalculatorScreen({ route }: Props) {
   const [calculando, setCalculando] = useState(false);
   const [resultadoPrincipal, setResultadoPrincipal] = useState<any>(null);
   const [resultadoComparar, setResultadoComparar] = useState<any>(null);
+  const racoesFiltradas = useMemo(() => {
+    const termo = buscaRacao.trim().toLowerCase();
+    if (!termo) return racoes;
+    return racoes.filter((racao) =>
+      `${racao.nome} ${racao.classificacao_racao || ''} ${racao.categoria_racao || ''}`
+        .toLowerCase()
+        .includes(termo)
+    );
+  }, [buscaRacao, racoes]);
 
   useEffect(() => {
     carregarRacoes();
@@ -180,6 +190,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
       setRacaoComparar(racao);
     }
     setSeletorAberto(null);
+    setBuscaRacao('');
     setResultadoPrincipal(null);
     setResultadoComparar(null);
   }
@@ -596,10 +607,33 @@ export default function FoodCalculatorScreen({ route }: Props) {
               </Text>
             </View>
           ) : (
+            <>
+            <View style={styles.buscaRacaoBox}>
+              <Ionicons name="search-outline" size={18} color={CORES.textoClaro} />
+              <TextInput
+                style={styles.buscaRacaoInput}
+                value={buscaRacao}
+                onChangeText={setBuscaRacao}
+                placeholder="Digite o nome da racao..."
+                placeholderTextColor={CORES.textoClaro}
+                autoCapitalize="none"
+              />
+              {buscaRacao ? (
+                <TouchableOpacity onPress={() => setBuscaRacao('')}>
+                  <Ionicons name="close-circle" size={18} color={CORES.textoClaro} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <FlatList
-              data={racoes}
+              data={racoesFiltradas}
               keyExtractor={(r) => String(r.id)}
               contentContainerStyle={{ padding: ESPACO.md }}
+              ListEmptyComponent={
+                <View style={styles.modalVazio}>
+                  <Text style={styles.modalVazioTexto}>Nenhuma racao encontrada.</Text>
+                  <Text style={styles.modalVazioSub}>Tente buscar por outro trecho do nome.</Text>
+                </View>
+              }
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.racaoItem}
@@ -624,6 +658,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
                 </TouchableOpacity>
               )}
             />
+            </>
           )
           )}
         </View>
@@ -908,6 +943,24 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.superficie,
   },
   modalTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto },
+  buscaRacaoBox: {
+    margin: ESPACO.md,
+    marginBottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.superficie,
+    paddingHorizontal: ESPACO.md,
+  },
+  buscaRacaoInput: {
+    flex: 1,
+    paddingVertical: ESPACO.sm + 2,
+    fontSize: FONTE.normal,
+    color: CORES.texto,
+  },
   modalVazio: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: ESPACO.xl, gap: ESPACO.md },
   modalVazioTexto: { fontSize: FONTE.grande, fontWeight: '600', color: CORES.texto, textAlign: 'center' },
   modalVazioSub: { fontSize: FONTE.normal, color: CORES.textoSecundario, textAlign: 'center' },

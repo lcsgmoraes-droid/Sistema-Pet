@@ -426,6 +426,13 @@ export function useClientesNovoCadastro({
         }
       }
 
+      if (formData.tipo_cadastro === "cliente") {
+        const telefoneDigits = `${formData.telefone || ""}${formData.celular || ""}`.replace(/\D/g, "");
+        if (telefoneDigits.length < 10) {
+          errosValidacao.push("Telefone ou celular");
+        }
+      }
+
       if (errosValidacao.length > 0) {
         const mensagem =
           "Faltam os seguintes campos obrigatorios:\n\n" +

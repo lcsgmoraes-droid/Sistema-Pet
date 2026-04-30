@@ -1,3 +1,5 @@
+import { formatCurrency } from "../banhoTosaUtils";
+
 export default function BanhoTosaServicosTable({
   servicos,
   onEdit,
@@ -27,6 +29,7 @@ export default function BanhoTosaServicosTable({
               <th className="px-4 py-3">Servico</th>
               <th className="px-4 py-3">Categoria</th>
               <th className="px-4 py-3">Duracao</th>
+              <th className="px-4 py-3">Preco base</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 text-right">Acoes</th>
             </tr>
@@ -37,6 +40,7 @@ export default function BanhoTosaServicosTable({
                 <td className="px-4 py-3 font-bold text-slate-900">{servico.nome}</td>
                 <td className="px-4 py-3 text-slate-600">{servico.categoria}</td>
                 <td className="px-4 py-3 text-slate-600">{servico.duracao_padrao_minutos} min</td>
+                <td className="px-4 py-3 font-bold text-emerald-700">{formatCurrency(servico.preco_base)}</td>
                 <td className="px-4 py-3">
                   <button
                     type="button"
@@ -60,7 +64,7 @@ export default function BanhoTosaServicosTable({
             ))}
             {servicos.length === 0 && (
               <tr>
-                <td className="px-4 py-8 text-center text-slate-500" colSpan={5}>
+                <td className="px-4 py-8 text-center text-slate-500" colSpan={6}>
                   Nenhum servico cadastrado ainda.
                 </td>
               </tr>

@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useState } from "react";
 import {
+  Alert,
   ActivityIndicator,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -10,12 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import {
   avaliarBanhoTosaAtendimento,
+  listarCalendarioBanhoTosa,
   listarStatusBanhoTosa,
 } from "../../services/banhoTosa.service";
+import { listarPets } from "../../services/pets.service";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
-import { BanhoTosaStatusItem } from "../../types";
+import { BanhoTosaCalendarioResponse, BanhoTosaStatusItem, Pet } from "../../types";
 import { formatarDataHora, formatarMoeda } from "../../utils/format";
 
 const statusCores: Record<string, { bg: string; fg: string }> = {
@@ -34,11 +39,23 @@ export default function BanhoTosaScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [avaliandoId, setAvaliandoId] = useState<number | null>(null);
+  const [calendario, setCalendario] = useState<BanhoTosaCalendarioResponse | null>(null);
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [servicoId, setServicoId] = useState<number | null>(null);
+  const [petId, setPetId] = useState<number | null>(null);
 
   async function carregar() {
     try {
-      const response = await listarStatusBanhoTosa();
+      const [response, calendarioResponse, petsResponse] = await Promise.all([
+        listarStatusBanhoTosa(),
+        listarCalendarioBanhoTosa(),
+        listarPets().catch(() => []),
+      ]);
       setItens(response.itens || []);
+      setCalendario(calendarioResponse);
+      setPets(petsResponse);
+      if (!servicoId && calendarioResponse.servicos?.[0]?.id) setServicoId(calendarioResponse.servicos[0].id);
+      if (!petId && petsResponse?.[0]?.id) setPetId(petsResponse[0].id);
     } catch {
       setItens([]);
     } finally {
@@ -65,6 +82,34 @@ export default function BanhoTosaScreen() {
     }
   }
 
+  async function pedirAgendamento(data: string, horario: string) {
+    const servico = calendario?.servicos.find((item) => item.id === servicoId);
+    const pet = pets.find((item) => item.id === petId);
+    const whatsapp = String(calendario?.whatsapp || "").replace(/\D/g, "");
+    if (!servico) {
+      Alert.alert("Escolha o servico", "Selecione o servico antes de pedir o horario.");
+      return;
+    }
+    if (!pet) {
+      Alert.alert("Escolha o pet", "Selecione o pet antes de pedir o horario.");
+      return;
+    }
+    if (!whatsapp) {
+      Alert.alert("WhatsApp nao configurado", "A loja ainda nao cadastrou o WhatsApp de agendamento.");
+      return;
+    }
+    const mensagem = `Ola! Gostaria de marcar ${servico.nome} para o pet ${pet.nome} no dia ${formatarDataCurta(data)} as ${horario}.`;
+    await Clipboard.setStringAsync(mensagem);
+    const numero = whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`;
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    const podeAbrir = await Linking.canOpenURL(url);
+    if (podeAbrir) {
+      Linking.openURL(url);
+    } else {
+      Alert.alert("Mensagem copiada", "Cole a mensagem no WhatsApp da loja para solicitar o agendamento.");
+    }
+  }
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -87,6 +132,69 @@ export default function BanhoTosaScreen() {
           Acompanhe agendamentos, andamento do atendimento e avalie quando seu pet for entregue.
         </Text>
       </View>
+
+      {calendario?.visivel ? (
+        <View style={styles.calendarCard}>
+          <Text style={styles.sectionTitle}>Agenda disponivel</Text>
+          <Text style={styles.sectionText}>
+            Escolha servico, pet e horario. O app monta a mensagem e abre o WhatsApp da loja.
+          </Text>
+
+          <Text style={styles.selectorLabel}>Servico</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            {calendario.servicos.map((servico) => (
+              <TouchableOpacity
+                key={servico.id}
+                style={[styles.chip, servicoId === servico.id && styles.chipActive]}
+                onPress={() => setServicoId(servico.id)}
+              >
+                <Text style={[styles.chipText, servicoId === servico.id && styles.chipTextActive]}>{servico.nome}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.selectorLabel}>Pet</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            {pets.map((pet) => (
+              <TouchableOpacity
+                key={pet.id}
+                style={[styles.chip, petId === pet.id && styles.chipActive]}
+                onPress={() => setPetId(pet.id)}
+              >
+                <Text style={[styles.chipText, petId === pet.id && styles.chipTextActive]}>{pet.nome}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {calendario.dias.map((dia) => (
+            <View key={dia.data} style={styles.dayBox}>
+              <Text style={styles.dayTitle}>{formatarDataCurta(dia.data)}</Text>
+              {!dia.funciona ? (
+                <Text style={styles.dayClosed}>Loja fechada</Text>
+              ) : (
+                <View style={styles.slotsGrid}>
+                  {dia.slots.map((slot) => {
+                    const disponivel = slot.status === "disponivel";
+                    return (
+                      <TouchableOpacity
+                        key={`${dia.data}-${slot.horario_inicio}`}
+                        disabled={!disponivel}
+                        style={[styles.slot, !disponivel && styles.slotBusy]}
+                        onPress={() => pedirAgendamento(dia.data, slot.horario_inicio)}
+                      >
+                        <Text style={[styles.slotText, !disponivel && styles.slotTextBusy]}>{slot.horario_inicio}</Text>
+                        <Text style={[styles.slotSub, !disponivel && styles.slotTextBusy]}>
+                          {disponivel ? "Livre" : "Ocupado"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       {itens.length === 0 ? (
         <View style={styles.empty}>
@@ -176,6 +284,12 @@ function StatusCard({
   );
 }
 
+function formatarDataCurta(dataIso: string): string {
+  const [ano, mes, dia] = String(dataIso || "").split("-");
+  if (!ano || !mes || !dia) return dataIso;
+  return `${dia}/${mes}/${ano}`;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -197,6 +311,24 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: "#fff", fontSize: FONTE.titulo, fontWeight: "bold" },
   heroText: { color: "rgba(255,255,255,0.85)", marginTop: 6, fontSize: FONTE.normal },
+  calendarCard: { marginHorizontal: ESPACO.lg, marginBottom: ESPACO.md, padding: ESPACO.lg, borderRadius: RAIO.lg, backgroundColor: CORES.superficie, ...SOMBRA },
+  sectionTitle: { fontSize: FONTE.grande, color: CORES.texto, fontWeight: "bold" },
+  sectionText: { color: CORES.textoSecundario, marginTop: 4, marginBottom: ESPACO.md },
+  selectorLabel: { color: CORES.texto, fontWeight: "700", marginTop: ESPACO.sm, marginBottom: ESPACO.xs },
+  chipsRow: { gap: 8, paddingRight: ESPACO.lg },
+  chip: { borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.circulo, paddingHorizontal: ESPACO.md, paddingVertical: 8, backgroundColor: CORES.fundo },
+  chipActive: { backgroundColor: CORES.primario, borderColor: CORES.primario },
+  chipText: { color: CORES.textoSecundario, fontWeight: "700" },
+  chipTextActive: { color: "#fff" },
+  dayBox: { marginTop: ESPACO.md, borderTopWidth: 1, borderTopColor: CORES.borda, paddingTop: ESPACO.md },
+  dayTitle: { color: CORES.texto, fontWeight: "800", marginBottom: ESPACO.sm },
+  dayClosed: { color: CORES.textoClaro },
+  slotsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  slot: { minWidth: 74, borderRadius: RAIO.md, backgroundColor: "#ECFDF5", borderWidth: 1, borderColor: "#A7F3D0", paddingVertical: 8, alignItems: "center" },
+  slotBusy: { backgroundColor: "#F3F4F6", borderColor: CORES.borda },
+  slotText: { color: "#047857", fontWeight: "900" },
+  slotSub: { color: "#047857", fontSize: FONTE.pequena, marginTop: 2 },
+  slotTextBusy: { color: CORES.textoClaro },
   empty: { margin: ESPACO.lg, padding: ESPACO.xl, alignItems: "center", backgroundColor: CORES.superficie, borderRadius: RAIO.lg },
   emptyTitle: { marginTop: ESPACO.sm, fontSize: FONTE.grande, fontWeight: "bold", color: CORES.texto },
   emptyText: { marginTop: 4, color: CORES.textoSecundario, textAlign: "center" },

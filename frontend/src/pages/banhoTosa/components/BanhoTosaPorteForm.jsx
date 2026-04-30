@@ -11,6 +11,9 @@ export const initialPorteForm = {
   tempo_secagem_min: "0",
   tempo_tosa_min: "0",
   multiplicador_preco: "1",
+  multiplicador_pelo_curto: "1",
+  multiplicador_pelo_longo: "1.2",
+  tempo_extra_pelo_longo_min: "0",
   ativo: true,
 };
 
@@ -25,6 +28,9 @@ export function formFromParametroPorte(item) {
     tempo_secagem_min: String(item.tempo_secagem_min || 0),
     tempo_tosa_min: String(item.tempo_tosa_min || 0),
     multiplicador_preco: String(item.multiplicador_preco ?? "1"),
+    multiplicador_pelo_curto: String(item.multiplicador_pelo_curto ?? "1"),
+    multiplicador_pelo_longo: String(item.multiplicador_pelo_longo ?? "1.2"),
+    tempo_extra_pelo_longo_min: String(item.tempo_extra_pelo_longo_min || 0),
     ativo: Boolean(item.ativo),
   };
 }
@@ -40,6 +46,9 @@ export function payloadFromPorteForm(form) {
     tempo_secagem_min: Number(form.tempo_secagem_min || 0),
     tempo_tosa_min: Number(form.tempo_tosa_min || 0),
     multiplicador_preco: toApiDecimal(form.multiplicador_preco, "1"),
+    multiplicador_pelo_curto: toApiDecimal(form.multiplicador_pelo_curto, "1"),
+    multiplicador_pelo_longo: toApiDecimal(form.multiplicador_pelo_longo, "1.2"),
+    tempo_extra_pelo_longo_min: Number(form.tempo_extra_pelo_longo_min || 0),
     ativo: Boolean(form.ativo),
   };
 }
@@ -74,6 +83,20 @@ export default function BanhoTosaPorteForm({
         <TextField label="Tempo banho min" type="number" value={form.tempo_banho_min} onChange={(value) => onChangeField("tempo_banho_min", value)} help="Tempo medio de banho para calcular agenda, mao de obra e agua." />
         <TextField label="Tempo secagem min" type="number" value={form.tempo_secagem_min} onChange={(value) => onChangeField("tempo_secagem_min", value)} help="Tempo medio de secagem para energia e ocupacao de recurso." />
         <TextField label="Tempo tosa min" type="number" value={form.tempo_tosa_min} onChange={(value) => onChangeField("tempo_tosa_min", value)} help="Tempo medio de tosa para agenda e mao de obra." />
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-600">
+          Pelagem dentro deste porte
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Use pelo curto como base e ajuste pelo longo com multiplicador e tempo extra.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <TextField label="Mult. pelo curto" type="number" value={form.multiplicador_pelo_curto} onChange={(value) => onChangeField("multiplicador_pelo_curto", value)} help="Multiplicador de preco quando o pet for classificado como pelo curto." />
+          <TextField label="Mult. pelo longo" type="number" value={form.multiplicador_pelo_longo} onChange={(value) => onChangeField("multiplicador_pelo_longo", value)} help="Multiplicador de preco quando o pet for classificado como pelo longo." />
+          <TextField label="Extra longo min" type="number" value={form.tempo_extra_pelo_longo_min} onChange={(value) => onChangeField("tempo_extra_pelo_longo_min", value)} help="Minutos somados ao banho, secagem e tosa quando a pelagem for longa." />
+        </div>
       </div>
 
       {editing && (

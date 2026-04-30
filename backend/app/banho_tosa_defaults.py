@@ -28,25 +28,26 @@ CONFIG_PADRAO = {
     "percentual_taxas_padrao": Decimal("3.5000"),
     "custo_rateio_operacional_padrao": Decimal("5.00"),
     "horas_produtivas_mes_padrao": Decimal("176.00"),
+    "fluxo_etapas": ["chegou", "banho", "secagem", "tosa", "pronto"],
 }
 
 PARAMETROS_PORTE_PADRAO = [
-    ("mini", None, "5.000", "18.000", "0.6000", 20, 20, 0, "0.8500"),
-    ("pequeno", "5.001", "10.000", "25.000", "0.9000", 25, 25, 20, "1.0000"),
-    ("medio", "10.001", "20.000", "35.000", "1.2000", 35, 35, 30, "1.2500"),
-    ("grande", "20.001", "35.000", "50.000", "1.8000", 45, 45, 40, "1.5500"),
-    ("gigante", "35.001", None, "70.000", "2.4000", 60, 60, 50, "2.0000"),
+    ("mini", None, "5.000", "18.000", "0.6000", 20, 20, 0, "0.8500", "1.0000", "1.1500", 5),
+    ("pequeno", "5.001", "10.000", "25.000", "0.9000", 25, 25, 20, "1.0000", "1.0000", "1.2000", 8),
+    ("medio", "10.001", "20.000", "35.000", "1.2000", 35, 35, 30, "1.2500", "1.0000", "1.2500", 10),
+    ("grande", "20.001", "35.000", "50.000", "1.8000", 45, 45, 40, "1.5500", "1.0000", "1.3000", 15),
+    ("gigante", "35.001", None, "70.000", "2.4000", 60, 60, 50, "2.0000", "1.0000", "1.3500", 20),
 ]
 
 SERVICOS_PADRAO = [
-    ("Banho Higienico", "banho", "Banho simples com shampoo, secagem e finalizacao basica.", 60, True, False, True, True),
-    ("Banho Completo", "banho", "Banho completo com limpeza de ouvidos e acabamento.", 75, True, False, True, True),
-    ("Banho + Tosa Higienica", "combo", "Banho completo com tosa higienica de patas, barriga e partes intimas.", 90, True, True, True, True),
-    ("Tosa na Maquina", "tosa", "Tosa padronizada na maquina, sem banho obrigatorio.", 75, False, True, False, True),
-    ("Tosa Completa", "combo", "Banho, secagem e tosa completa com acabamento.", 120, True, True, True, True),
-    ("Desembaraco", "higiene", "Servico adicional para nos e pelagem embaraçada.", 45, False, False, False, False),
-    ("Corte de Unhas", "higiene", "Corte e conferência rapida das unhas.", 15, False, False, False, False),
-    ("Hidratacao de Pelagem", "higiene", "Tratamento adicional aplicado junto ao banho.", 30, True, False, True, True),
+    ("Banho Higienico", "banho", "Banho simples com shampoo, secagem e finalizacao basica.", 60, "85.00", True, False, True, True),
+    ("Banho Completo", "banho", "Banho completo com limpeza de ouvidos e acabamento.", 75, "120.00", True, False, True, True),
+    ("Banho + Tosa Higienica", "combo", "Banho completo com tosa higienica de patas, barriga e partes intimas.", 90, "145.00", True, True, True, True),
+    ("Tosa na Maquina", "tosa", "Tosa padronizada na maquina, sem banho obrigatorio.", 75, "110.00", False, True, False, True),
+    ("Tosa Completa", "combo", "Banho, secagem e tosa completa com acabamento.", 120, "180.00", True, True, True, True),
+    ("Desembaraco", "higiene", "Servico adicional para nos e pelagem embaracada.", 45, "45.00", False, False, False, False),
+    ("Corte de Unhas", "higiene", "Corte e conferencia rapida das unhas.", 15, "25.00", False, False, False, False),
+    ("Hidratacao de Pelagem", "higiene", "Tratamento adicional aplicado junto ao banho.", 30, "40.00", True, False, True, True),
 ]
 
 RECURSOS_PADRAO = [
@@ -131,13 +132,16 @@ def _criar_parametros(db: Session, tenant_id, resumo: dict) -> None:
             tempo_secagem_min=item[6],
             tempo_tosa_min=item[7],
             multiplicador_preco=_dec(item[8]),
+            multiplicador_pelo_curto=_dec(item[9]),
+            multiplicador_pelo_longo=_dec(item[10]),
+            tempo_extra_pelo_longo_min=item[11],
             ativo=True,
         ))
         resumo["criados"]["parametros"] += 1
 
 
 def _criar_servicos(db: Session, tenant_id, resumo: dict) -> None:
-    for nome, categoria, descricao, duracao, banho, tosa, secagem, pacote in SERVICOS_PADRAO:
+    for nome, categoria, descricao, duracao, preco_base, banho, tosa, secagem, pacote in SERVICOS_PADRAO:
         existe = db.query(BanhoTosaServico.id).filter(
             BanhoTosaServico.tenant_id == tenant_id,
             func.lower(BanhoTosaServico.nome) == nome.lower(),
@@ -152,6 +156,7 @@ def _criar_servicos(db: Session, tenant_id, resumo: dict) -> None:
             categoria=categoria,
             descricao=descricao,
             duracao_padrao_minutos=duracao,
+            preco_base=_dec(preco_base),
             requer_banho=banho,
             requer_tosa=tosa,
             requer_secagem=secagem,

@@ -17,13 +17,15 @@ export async function register(
   email: string,
   password: string,
   nome?: string,
-  cpf?: string
+  cpf?: string,
+  telefone?: string
 ): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/registrar', {
     email,
     password,
     nome,
     cpf: cpf || undefined,
+    telefone: telefone || undefined,
   });
   await SecureStore.setItemAsync('auth_token', data.access_token);
   return data;

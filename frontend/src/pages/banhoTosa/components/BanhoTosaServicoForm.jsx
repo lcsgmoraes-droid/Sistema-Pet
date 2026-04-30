@@ -1,10 +1,12 @@
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
+import { toApiDecimal } from "../banhoTosaUtils";
 
 export const initialServicoForm = {
   nome: "",
   categoria: "banho",
   descricao: "",
   duracao_padrao_minutos: "60",
+  preco_base: "0",
   requer_banho: true,
   requer_tosa: false,
   requer_secagem: true,
@@ -18,6 +20,7 @@ export function formFromServico(servico) {
     categoria: servico.categoria || "banho",
     descricao: servico.descricao || "",
     duracao_padrao_minutos: String(servico.duracao_padrao_minutos || 60),
+    preco_base: String(servico.preco_base ?? "0"),
     requer_banho: Boolean(servico.requer_banho),
     requer_tosa: Boolean(servico.requer_tosa),
     requer_secagem: Boolean(servico.requer_secagem),
@@ -32,6 +35,7 @@ export function payloadFromServicoForm(form) {
     nome: form.nome.trim(),
     descricao: form.descricao.trim() || null,
     duracao_padrao_minutos: Number(form.duracao_padrao_minutos || 60),
+    preco_base: toApiDecimal(form.preco_base),
   };
 }
 
@@ -75,6 +79,7 @@ export default function BanhoTosaServicoForm({
           </select>
         </label>
         <TextField label="Duracao padrao (min)" type="number" value={form.duracao_padrao_minutos} onChange={(value) => onChangeField("duracao_padrao_minutos", value)} help="Tempo usado para prever fim do agendamento e ocupacao da equipe." />
+        <TextField label="Preco base" type="number" value={form.preco_base} onChange={(value) => onChangeField("preco_base", value)} help="Valor sugerido no agendamento e no fechamento. Pode ser alterado na venda final." />
         <TextField label="Descricao" value={form.descricao} onChange={(value) => onChangeField("descricao", value)} help="Explique o que esta incluso para padronizar a venda e o atendimento." />
 
         <div className="grid gap-2 sm:grid-cols-2">
@@ -117,6 +122,7 @@ function TextField({ label, value, onChange, type = "text", help }) {
       </span>
       <input
         type={type}
+        step={type === "number" ? "0.01" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"

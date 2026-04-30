@@ -11,21 +11,21 @@ export function buildConsultaPayload({
     tipo: tipoQuery || "consulta",
     agendamento_id: agendamentoIdQuery ? Number(agendamentoIdQuery) : undefined,
     queixa_principal: form.motivo_consulta || undefined,
-    peso_kg: form.peso_kg ? Number.parseFloat(form.peso_kg) : undefined,
+    peso_consulta: form.peso_kg ? Number.parseFloat(form.peso_kg) : undefined,
     temperatura: form.temperatura ? Number.parseFloat(form.temperatura) : undefined,
-    freq_cardiaca: form.freq_cardiaca ? parseInt(form.freq_cardiaca) : undefined,
-    freq_respiratoria: form.freq_respiratoria ? parseInt(form.freq_respiratoria) : undefined,
+    frequencia_cardiaca: form.freq_cardiaca ? parseInt(form.freq_cardiaca) : undefined,
+    frequencia_respiratoria: form.freq_respiratoria ? parseInt(form.freq_respiratoria) : undefined,
     tpc: form.tpc || undefined,
-    mucosa: form.mucosa || undefined,
-    estado_hidratacao: form.estado_hidratacao || undefined,
+    mucosas: form.mucosa || undefined,
+    hidratacao: form.estado_hidratacao || undefined,
     nivel_consciencia: form.nivel_consciencia || undefined,
     nivel_dor: form.nivel_dor ? parseInt(form.nivel_dor) : undefined,
     exame_fisico: form.exame_fisico || undefined,
-    historico_clinico: form.historico_clinico || undefined,
+    historia_clinica: form.historico_clinico || undefined,
     diagnostico: form.diagnostico || undefined,
-    prognostico: form.prognostico || undefined,
-    tratamento: form.tratamento || undefined,
-    observacoes: form.observacoes || undefined,
+    hipotese_diagnostica: form.prognostico || undefined,
+    conduta: form.tratamento || undefined,
+    observacoes_tutor: form.observacoes || undefined,
     retorno_em_dias: form.retorno_em_dias ? parseInt(form.retorno_em_dias) : undefined,
   };
 }
@@ -33,9 +33,9 @@ export function buildConsultaPayload({
 export function buildFinalizacaoPayload(form) {
   return {
     diagnostico: form.diagnostico || undefined,
-    prognostico: form.prognostico || undefined,
-    tratamento: form.tratamento || undefined,
-    observacoes: form.observacoes || undefined,
+    hipotese_diagnostica: form.prognostico || undefined,
+    conduta: form.tratamento || undefined,
+    observacoes_tutor: form.observacoes || undefined,
     retorno_em_dias: form.retorno_em_dias ? parseInt(form.retorno_em_dias) : undefined,
   };
 }

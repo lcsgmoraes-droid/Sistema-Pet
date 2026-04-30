@@ -74,6 +74,7 @@ export default function VetConsultaForm() {
         onVoltarConsultas={() => consulta.navigate("/veterinario/consultas")}
         onVoltarEtapa={() => consulta.setEtapa((e) => e - 1)}
         onSalvarRascunho={consulta.salvarRascunho}
+        onSalvarAssinar={consulta.finalizar}
         onFinalizar={consulta.finalizar}
       />
 

@@ -17,6 +17,7 @@ import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 export default function RegisterScreen({ navigation }: any) {
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
+  const [telefone, setTelefone] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -35,6 +36,11 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert('CPF obrigatório', 'Informe um CPF válido com 11 dígitos.');
       return;
     }
+    const telefoneDigits = telefone.replace(/\D/g, '');
+    if (telefoneDigits.length < 10) {
+      Alert.alert('Telefone obrigatorio', 'Informe um telefone ou WhatsApp valido.');
+      return;
+    }
     if (senha !== confirmarSenha) {
       Alert.alert('Senhas diferentes', 'A confirmação de senha não confere.');
       return;
@@ -45,7 +51,7 @@ export default function RegisterScreen({ navigation }: any) {
     }
     setCarregando(true);
     try {
-      await register(email.trim().toLowerCase(), senha, nome.trim() || undefined, cpf.trim());
+      await register(email.trim().toLowerCase(), senha, nome.trim() || undefined, cpf.trim(), telefone.trim());
       // Login automático após registro — AppNavigator redireciona sozinho
     } catch (err: any) {
       const detalhe = err?.response?.data?.detail;
@@ -101,6 +107,16 @@ export default function RegisterScreen({ navigation }: any) {
             keyboardType="numeric"
             value={cpf}
             onChangeText={setCpf}
+          />
+
+          <Text style={styles.label}>Telefone/WhatsApp *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="(00) 00000-0000"
+            placeholderTextColor={CORES.textoClaro}
+            keyboardType="phone-pad"
+            value={telefone}
+            onChangeText={setTelefone}
           />
 
           <Text style={styles.label}>E-mail *</Text>

@@ -4,6 +4,13 @@ export default function BanhoTosaParametrosLista({
   onDelete,
   onToggleAtivo,
 }) {
+  const parametrosOrdenados = [...parametros].sort((a, b) => {
+    const pesoA = Number(a.peso_min_kg ?? 999999);
+    const pesoB = Number(b.peso_min_kg ?? 999999);
+    if (pesoA !== pesoB) return pesoA - pesoB;
+    return String(a.porte || "").localeCompare(String(b.porte || ""));
+  });
+
   return (
     <div className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
@@ -14,7 +21,7 @@ export default function BanhoTosaParametrosLista({
       </h2>
 
       <div className="mt-5 space-y-3">
-        {parametros.map((item) => (
+        {parametrosOrdenados.map((item) => (
           <ParametroPorteCard
             key={item.id}
             item={item}
@@ -24,7 +31,7 @@ export default function BanhoTosaParametrosLista({
           />
         ))}
 
-        {parametros.length === 0 && (
+        {parametrosOrdenados.length === 0 && (
           <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
             Nenhum porte parametrizado ainda.
           </div>
@@ -64,6 +71,11 @@ function ParametroPorteCard({ item, onEdit, onDelete, onToggleAtivo }) {
         <MiniMetric label="Agua" value={`${item.agua_padrao_litros} L`} />
         <MiniMetric label="Energia" value={`${item.energia_padrao_kwh} kWh`} />
         <MiniMetric label="Tempo" value={`${tempoTotal} min`} />
+      </div>
+      <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3">
+        <MiniMetric label="Pelo curto" value={`${item.multiplicador_pelo_curto ?? 1}x`} />
+        <MiniMetric label="Pelo longo" value={`${item.multiplicador_pelo_longo ?? 1.2}x`} />
+        <MiniMetric label="Extra longo" value={`${item.tempo_extra_pelo_longo_min || 0} min`} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <ActionButton onClick={() => onEdit?.(item)}>Editar</ActionButton>

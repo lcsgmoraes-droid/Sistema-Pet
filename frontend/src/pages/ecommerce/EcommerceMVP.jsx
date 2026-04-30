@@ -394,7 +394,7 @@ export default function EcommerceMVP() {
     entrega_estado: '',
   });
 
-  const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '', cpf: '' });
+  const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '', cpf: '', telefone: '' });
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [recoveryStep, setRecoveryStep] = useState('request');
@@ -807,6 +807,12 @@ export default function EcommerceMVP() {
       return;
     }
 
+    const phoneDigits = String(profileForm.telefone || '').replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setError('Informe um telefone/celular valido.');
+      return;
+    }
+
     if (profileForm.usar_endereco_entrega_diferente) {
       const requiredDelivery = [
         profileForm.entrega_nome,
@@ -1060,6 +1066,11 @@ export default function EcommerceMVP() {
       setError('Informe um CPF válido com 11 dígitos.');
       return;
     }
+    const phoneDigits = (registerForm.telefone || '').replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setError('Informe um telefone/celular valido.');
+      return;
+    }
     setAuthLoading(true);
     setError('');
     setSuccess('');
@@ -1073,7 +1084,7 @@ export default function EcommerceMVP() {
       localStorage.setItem(STORAGE_TOKEN_KEY, token);
       setCustomerToken(token);
       await syncGuestCartToServer(token);
-      setRegisterForm({ email: '', password: '', nome: '', cpf: '' });
+      setRegisterForm({ email: '', password: '', nome: '', cpf: '', telefone: '' });
       setPasswordRecoveryMode(false);
       setRecoveryStep('request');
       clearRecoveryParamsFromUrl();
@@ -2455,7 +2466,7 @@ export default function EcommerceMVP() {
                     <input value={customer?.email || ''} disabled placeholder="Email" style={{ ...S.formInput, background: '#f8fafc', color: '#9ca3af' }} />
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    <input value={profileForm.telefone} onChange={(e) => setProfileForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone" style={S.formInput} />
+                    <input value={profileForm.telefone} onChange={(e) => setProfileForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone *" style={S.formInput} required />
                     <input value={profileForm.cpf} onChange={(e) => setProfileForm((prev) => ({ ...prev, cpf: e.target.value }))} placeholder="CPF" style={S.formInput} />
                   </div>
 
@@ -2513,6 +2524,7 @@ export default function EcommerceMVP() {
                 <form onSubmit={handleRegister} autoComplete="off" style={{ display: 'grid', gap: 10 }}>
                   <input name="ecommerce_register_nome" autoComplete="off" value={registerForm.nome} onChange={(e) => setRegisterForm((prev) => ({ ...prev, nome: e.target.value }))} placeholder="Nome completo" style={S.formInput} />
                   <input name="ecommerce_register_cpf" autoComplete="off" value={registerForm.cpf} onChange={(e) => setRegisterForm((prev) => ({ ...prev, cpf: e.target.value }))} placeholder="CPF *  (000.000.000-00)" inputMode="numeric" style={S.formInput} required />
+                  <input name="ecommerce_register_telefone" autoComplete="off" value={registerForm.telefone} onChange={(e) => setRegisterForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone/WhatsApp *" inputMode="tel" style={S.formInput} required />
                   <input name="ecommerce_register_email" autoComplete="off" value={registerForm.email} onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
                   <div style={{ position: 'relative' }}>
                     <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showRegisterPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />

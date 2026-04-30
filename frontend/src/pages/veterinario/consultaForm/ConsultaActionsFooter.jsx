@@ -10,6 +10,7 @@ export default function ConsultaActionsFooter({
   onVoltarConsultas,
   onVoltarEtapa,
   onSalvarRascunho,
+  onSalvarAssinar,
   onFinalizar,
 }) {
   const ultimaEtapa = etapa >= totalEtapas - 1;
@@ -62,9 +63,18 @@ export default function ConsultaActionsFooter({
                   {salvando ? "Salvando…" : "Salvar rascunho"}
                 </button>
                 <button
+                  onClick={onSalvarAssinar || onFinalizar}
+                  disabled={salvando || !diagnosticoPreenchido}
+                  className="flex items-center gap-2 px-5 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60"
+                  title={!diagnosticoPreenchido ? "Preencha o diagnostico para assinar" : ""}
+                >
+                  <Lock size={14} />
+                  {salvando ? "Assinando..." : "Salvar e assinar consulta"}
+                </button>
+                <button
                   onClick={onFinalizar}
                   disabled={salvando || !diagnosticoPreenchido}
-                  className="flex items-center gap-2 px-5 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-60"
+                  className="flex items-center gap-2 px-5 py-2 text-sm bg-slate-900 text-white rounded-lg hover:bg-slate-700 disabled:opacity-60"
                   title={!diagnosticoPreenchido ? "Preencha o diagnóstico para finalizar" : ""}
                 >
                   <Lock size={14} />

@@ -12,6 +12,7 @@ from app.banho_tosa_api.agenda_helpers import (
 from app.banho_tosa_api.utils import (
     STATUS_AGENDAMENTO_FINAIS,
     calcular_total_servicos,
+    obter_ou_criar_configuracao,
     serializar_agendamento,
     serializar_atendimento,
     validar_cliente_pet,
@@ -240,4 +241,5 @@ def realizar_checkin_agendamento(
     db.commit()
     db.refresh(atendimento)
     atendimento = buscar_atendimento_completo(db, tenant_id, atendimento.id)
-    return serializar_atendimento(atendimento)
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    return serializar_atendimento(atendimento, config)

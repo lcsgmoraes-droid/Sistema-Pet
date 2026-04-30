@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -67,6 +67,7 @@ class ProdutoBarcodeResponse(BaseModel):
     nome: str
     preco: float
     preco_original: float
+    preco_promocional: Optional[float] = None
     foto_url: Optional[str]
     codigo_barras: Optional[str]
     unidade: str
@@ -439,26 +440,37 @@ def buscar_produto_barcode(
     Tenta `codigo_barras` e depois `gtin_ean`.
     Retorna apenas produtos ativos do tenant.
     """
+    barcode = (barcode or "").strip()
+    barcode_digits = "".join(ch for ch in barcode if ch.isdigit())
+    codigo_barras_digits = func.regexp_replace(func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g")
+    gtin_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g")
+    gtin_tributario_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g")
+    filtros_codigo = [
+        Produto.codigo_barras == barcode,
+        Produto.gtin_ean == barcode,
+        Produto.gtin_ean_tributario == barcode,
+        Produto.codigo == barcode,
+        Produto.codigos_barras_alternativos.ilike(f"%{barcode}%"),
+    ]
+    if barcode_digits:
+        filtros_codigo.extend([
+            codigo_barras_digits == barcode_digits,
+            gtin_digits == barcode_digits,
+            gtin_tributario_digits == barcode_digits,
+            Produto.codigo == barcode_digits,
+            Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
+        ])
+
     produto = (
         db.query(Produto)
         .filter(
             Produto.tenant_id == str(current_user.tenant_id),
             Produto.situacao == True,
-            Produto.codigo_barras == barcode,
+            or_(*filtros_codigo),
         )
+        .order_by(Produto.is_parent.asc(), Produto.id.asc())
         .first()
     )
-
-    if not produto:
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.tenant_id == str(current_user.tenant_id),
-                Produto.situacao == True,
-                Produto.gtin_ean == barcode,
-            )
-            .first()
-        )
 
     if not produto:
         raise HTTPException(
@@ -480,6 +492,7 @@ def buscar_produto_barcode(
         "nome": produto.nome,
         "preco": preco,
         "preco_original": preco_original,
+        "preco_promocional": preco if pricing.promotion_active else None,
         "foto_url": produto.imagem_principal,
         "codigo_barras": produto.codigo_barras,
         "unidade": produto.unidade or "UN",

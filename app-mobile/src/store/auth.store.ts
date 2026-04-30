@@ -63,6 +63,7 @@ interface AuthState {
     password: string,
     nome?: string,
     cpf?: string,
+    telefone?: string,
   ) => Promise<void>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
@@ -80,8 +81,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ isAuthenticated: true, user });
   },
 
-  register: async (email, password, nome, cpf) => {
-    const { user } = await AuthService.register(email, password, nome, cpf);
+  register: async (email, password, nome, cpf, telefone) => {
+    const { user } = await AuthService.register(email, password, nome, cpf, telefone);
     await cacheEntregadorRole(user);
     set({ isAuthenticated: true, user });
   },

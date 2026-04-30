@@ -25,6 +25,7 @@ import BarcodeScannerScreen from "../screens/shop/BarcodeScannerScreen";
 import CartScreen from "../screens/shop/CartScreen";
 import CatalogScreen from "../screens/shop/CatalogScreen";
 import CheckoutSucessoScreen from "../screens/shop/CheckoutSucessoScreen";
+import ProductDetailScreen from "../screens/shop/ProductDetailScreen";
 import WishlistScreen from "../screens/shop/WishlistScreen";
 
 const Tab = createBottomTabNavigator();
@@ -45,6 +46,11 @@ function LojaNavigator() {
         name="Carrinho"
         component={CartScreen}
         options={{ title: "Meu Carrinho" }}
+      />
+      <LojaStack.Screen
+        name="DetalhesProduto"
+        component={ProductDetailScreen}
+        options={{ title: "Produto" }}
       />
       <LojaStack.Screen
         name="BarcodeScanner"

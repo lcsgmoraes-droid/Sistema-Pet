@@ -26,6 +26,9 @@ class BanhoTosaConfiguracao(BaseTenantModel):
     horas_produtivas_mes_padrao = Column(Numeric(8, 2), nullable=False, default=176)
     dre_subcategoria_receita_id = Column(Integer, nullable=True, index=True)
     dre_subcategoria_custo_id = Column(Integer, nullable=True, index=True)
+    fluxo_etapas = Column(JSON, nullable=True)
+    mostrar_calendario_cliente = Column(Boolean, nullable=False, default=False)
+    whatsapp_agendamento = Column(String(30), nullable=True)
     ativo = Column(Boolean, nullable=False, default=True)
 
 
@@ -52,6 +55,7 @@ class BanhoTosaServico(BaseTenantModel):
     categoria = Column(String(30), nullable=False, default="banho", index=True)
     descricao = Column(Text, nullable=True)
     duracao_padrao_minutos = Column(Integer, nullable=False, default=60)
+    preco_base = Column(Numeric(12, 2), nullable=False, default=0)
     requer_banho = Column(Boolean, nullable=False, default=True)
     requer_tosa = Column(Boolean, nullable=False, default=False)
     requer_secagem = Column(Boolean, nullable=False, default=True)
@@ -77,6 +81,9 @@ class BanhoTosaParametroPorte(BaseTenantModel):
     tempo_secagem_min = Column(Integer, nullable=False, default=0)
     tempo_tosa_min = Column(Integer, nullable=False, default=0)
     multiplicador_preco = Column(Numeric(8, 4), nullable=False, default=1)
+    multiplicador_pelo_curto = Column(Numeric(8, 4), nullable=False, default=1)
+    multiplicador_pelo_longo = Column(Numeric(8, 4), nullable=False, default=1.2)
+    tempo_extra_pelo_longo_min = Column(Integer, nullable=False, default=0)
     ativo = Column(Boolean, nullable=False, default=True)
 
     precos = relationship("BanhoTosaPrecoServico", back_populates="porte")

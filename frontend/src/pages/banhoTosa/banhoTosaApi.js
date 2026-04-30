@@ -44,6 +44,8 @@ export const banhoTosaApi = {
     api.post(`${BASE}/fechamentos/pendencias/sincronizar`, null, { params }),
   atualizarStatusAtendimento: (id, data) =>
     api.patch(`${BASE}/atendimentos/${id}/status`, data),
+  moverEtapaAtendimento: (id, data) =>
+    api.post(`${BASE}/atendimentos/${id}/mover-etapa`, data),
   cancelarProcessoAtendimento: (id, data) =>
     api.post(`${BASE}/atendimentos/${id}/cancelar-processo`, data),
   gerarVendaAtendimento: (id) =>

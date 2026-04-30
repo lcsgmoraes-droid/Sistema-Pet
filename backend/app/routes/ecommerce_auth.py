@@ -30,6 +30,7 @@ class EcommerceRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     nome: str | None = None
+    telefone: str = Field(min_length=8, max_length=20, description="Telefone obrigatorio")
     cpf: str = Field(min_length=11, max_length=14, description='CPF obrigatório (11 dígitos, com ou sem formatação)')
 
 
@@ -548,11 +549,15 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
 
     # Normaliza CPF para apenas dígitos antes de salvar e de buscar o Cliente
     cpf_normalizado = re.sub(r"\D+", "", str(payload.cpf or "")).strip() or None
+    telefone = (payload.telefone or "").strip()
+    if len(_digits_only(telefone)) < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
 
     user = User(
         email=payload.email,
         hashed_password=hash_password(payload.password),
         nome=payload.nome,
+        telefone=telefone,
         is_active=True,
         is_admin=False,
         consent_date=datetime.now(timezone.utc),
@@ -568,6 +573,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         cliente.nome = payload.nome
     if cpf_normalizado and not cliente.cpf:
         cliente.cpf = cpf_normalizado
+    cliente.telefone = telefone
     _ensure_active_store_access(db, user, str(tenant_id))
     db.commit()
     db.refresh(cliente)
@@ -761,8 +767,12 @@ def atualizar_perfil(
 
     if payload.telefone is not None:
         telefone = payload.telefone.strip()
+        if len(_digits_only(telefone)) < 10:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
         current_user.telefone = telefone or None
         cliente.telefone = telefone or None
+    elif len(_digits_only(current_user.telefone or cliente.telefone)) < 10:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
 
     if payload.cpf is not None:
         cpf = payload.cpf.strip()

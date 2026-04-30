@@ -24,7 +24,13 @@ const ClientesNovoContatosStep = ({
           }}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
           placeholder="(00) 00000-0000"
+          required={formData.tipo_cadastro === "cliente"}
         />
+        {formData.tipo_cadastro === "cliente" && (
+          <p className="mt-1 text-xs text-gray-500">
+            Obrigatorio para clientes do app, e-commerce e loja fisica.
+          </p>
+        )}
       </div>
 
       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">

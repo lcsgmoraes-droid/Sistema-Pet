@@ -35,6 +35,8 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
         config.custo_rateio_operacional_padrao ?? "0",
       ),
       horas_produtivas_mes_padrao: String(config.horas_produtivas_mes_padrao ?? "176"),
+      mostrar_calendario_cliente: Boolean(config.mostrar_calendario_cliente),
+      whatsapp_agendamento: config.whatsapp_agendamento || "",
     });
   }, [config?.id]);
 
@@ -72,6 +74,8 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
           configForm.horas_produtivas_mes_padrao,
           "176",
         ),
+        mostrar_calendario_cliente: Boolean(configForm.mostrar_calendario_cliente),
+        whatsapp_agendamento: configForm.whatsapp_agendamento || null,
       });
       toast.success("Parametros salvos.");
       await onChanged(true);
@@ -173,6 +177,17 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
             <TextField label="Fim" type="time" value={configForm.horario_fim} onChange={(value) => updateConfig("horario_fim", value)} />
             <TextField label="Slot agenda (min)" type="number" value={configForm.intervalo_slot_minutos} onChange={(value) => updateConfig("intervalo_slot_minutos", value)} help="Intervalo usado para montar a grade de horarios e sugerir encaixes." />
             <TextField label="Dias funcionamento" value={configForm.dias_funcionamento} onChange={(value) => updateConfig("dias_funcionamento", value)} help="Informe os dias separados por virgula: segunda,terca,quarta..." />
+            <TextField label="WhatsApp agendamento" value={configForm.whatsapp_agendamento} onChange={(value) => updateConfig("whatsapp_agendamento", value)} help="Numero usado no app para o cliente pedir horario pelo WhatsApp. Exemplo: 5511999999999." />
+            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(configForm.mostrar_calendario_cliente)}
+                onChange={(event) => updateConfig("mostrar_calendario_cliente", event.target.checked)}
+                className="h-4 w-4 accent-orange-500"
+              />
+              Mostrar calendario disponivel no app do cliente
+              <BanhoTosaHelpTooltip text="Quando ativo, o app mostra horarios livres/ocupados sem revelar nomes dos pets. O cliente toca no horario e fala com a loja pelo WhatsApp." />
+            </label>
             <TextField label="Custo litro agua" type="number" value={configForm.custo_litro_agua} onChange={(value) => updateConfig("custo_litro_agua", value)} help="Valor medio da agua e esgoto dividido por litro. Exemplo: R$ 0,02 por litro." />
             <TextField label="Vazao chuveiro L/min" type="number" value={configForm.vazao_chuveiro_litros_min} onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)} help="Quantos litros o chuveiro consome por minuto durante o banho." />
             <TextField label="Custo kWh" type="number" value={configForm.custo_kwh} onChange={(value) => updateConfig("custo_kwh", value)} help="Valor medio do kWh usado para calcular secador, soprador e equipamentos." />

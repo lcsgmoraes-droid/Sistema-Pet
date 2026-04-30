@@ -45,6 +45,27 @@ function normalizarNumero(valor) {
   return Number(String(valor || "").replace(",", "."));
 }
 
+function normalizarCodigo(valor) {
+  return String(valor || "").replace(/\D/g, "");
+}
+
+function produtoConfereCodigo(produto, termo) {
+  const termoLimpo = String(termo || "").trim().toLowerCase();
+  const termoDigitos = normalizarCodigo(termo);
+  if (!termoLimpo) return false;
+  const campos = [
+    produto?.codigo,
+    produto?.codigo_barras,
+    produto?.gtin_ean,
+    produto?.gtin_ean_tributario,
+  ];
+  return campos.some((campo) => {
+    const texto = String(campo || "").trim().toLowerCase();
+    if (!texto) return false;
+    return texto === termoLimpo || (termoDigitos && normalizarCodigo(texto) === termoDigitos);
+  });
+}
+
 function formatarData(valor) {
   if (!valor) return "-";
   const data = new Date(`${valor}T00:00:00`);
@@ -101,6 +122,7 @@ function ResumoTransferenciaCard({ titulo, valor, descricao, destaque = "slate" 
 export default function EstoqueTransferenciaParceiro() {
   const parceiroRef = useRef(null);
   const produtoRef = useRef(null);
+  const produtoInputRef = useRef(null);
   const itensRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -521,7 +543,7 @@ export default function EstoqueTransferenciaParceiro() {
     }));
   };
 
-  const adicionarProduto = (produto) => {
+  const adicionarProduto = (produto, options = {}) => {
     const custoUnitario = Number(produto?.preco_custo || 0);
     setItens((prev) => {
       const indiceExistente = prev.findIndex((item) => item.produto_id === produto.id);
@@ -558,8 +580,47 @@ export default function EstoqueTransferenciaParceiro() {
     setSugestoesProdutos([]);
     setDropdownProdutoAberto(false);
     window.setTimeout(() => {
-      itensRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (options.scroll !== false) {
+        itensRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      produtoInputRef.current?.focus();
     }, 80);
+  };
+
+  const adicionarProdutoPorBuscaAtual = async () => {
+    const termo = buscaProduto.trim();
+    if (termo.length < 2) return;
+
+    const local = sugestoesProdutos.find((produto) => produtoConfereCodigo(produto, termo));
+    if (local) {
+      adicionarProduto(local, { scroll: false });
+      return;
+    }
+
+    try {
+      setLoadingProdutos(true);
+      const response = await getProdutos({
+        busca: termo,
+        page: 1,
+        page_size: 12,
+        include_variations: true,
+      });
+      const produtos = extrairListaProdutos(response?.data).filter(
+        (produto) => !produto?.is_parent && produto?.tipo_produto !== "PAI",
+      );
+      const encontrado = produtos.find((produto) => produtoConfereCodigo(produto, termo)) || (produtos.length === 1 ? produtos[0] : null);
+      if (encontrado) {
+        adicionarProduto(encontrado, { scroll: false });
+      } else {
+        setSugestoesProdutos(produtos);
+        setDropdownProdutoAberto(true);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar produto pelo leitor:", error);
+      toast.error("Nao foi possivel localizar o produto.");
+    } finally {
+      setLoadingProdutos(false);
+    }
   };
 
   const atualizarQuantidade = (uid, valor) => {
@@ -1145,10 +1206,17 @@ export default function EstoqueTransferenciaParceiro() {
               Buscar produto
             </label>
             <input
+              ref={produtoInputRef}
               type="text"
               value={buscaProduto}
               onChange={(event) => setBuscaProduto(event.target.value)}
               onFocus={() => setDropdownProdutoAberto(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void adicionarProdutoPorBuscaAtual();
+                }
+              }}
               placeholder="Digite nome, SKU ou codigo de barras"
               className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />

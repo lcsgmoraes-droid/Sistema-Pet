@@ -163,8 +163,16 @@ export default function BanhoTosaAtendimentoPanel({ atendimentoId, funcionarios,
               <div>
                 <p className="font-black capitalize text-slate-900">{etapa.tipo}</p>
                 <p className="text-sm text-slate-500">
-                  Resp.: {etapa.responsavel_nome || "nao informado"} | Recurso: {etapa.recurso_nome || "nao informado"} | Duracao: {etapa.duracao_minutos ?? "-"} min
+                  Resp.: {etapa.responsavel_nome || "nao informado"} | Recurso: {etapa.recurso_nome || "nao informado"} | Tempo: {formatTempoEtapa(etapa)}
                 </p>
+                {etapa.tempo_previsto_minutos ? (
+                  <p className={`mt-1 text-xs font-bold ${etapa.atrasado ? "text-red-600" : "text-emerald-600"}`}>
+                    Previsto: {etapa.tempo_previsto_minutos} min
+                    {etapa.fim_em
+                      ? ` | Realizado: ${formatSegundos(etapa.duracao_segundos)}`
+                      : ` | Restante: ${formatSegundos(etapa.tempo_restante_segundos)}`}
+                  </p>
+                ) : null}
                 {etapa.observacoes && (
                   <p className="mt-1 text-sm text-slate-600">{etapa.observacoes}</p>
                 )}
@@ -243,4 +251,24 @@ function TextField({ label, value, onChange }) {
       />
     </label>
   );
+}
+
+function formatTempoEtapa(etapa) {
+  if (etapa.duracao_segundos !== null && etapa.duracao_segundos !== undefined) {
+    return formatSegundos(etapa.duracao_segundos);
+  }
+  if (etapa.duracao_minutos !== null && etapa.duracao_minutos !== undefined) {
+    return `${etapa.duracao_minutos} min`;
+  }
+  return "em andamento";
+}
+
+function formatSegundos(value) {
+  if (value === null || value === undefined) return "-";
+  const numeric = Number(value || 0);
+  const abs = Math.abs(numeric);
+  const minutes = Math.floor(abs / 60);
+  const seconds = abs % 60;
+  const prefix = numeric < 0 ? "-" : "";
+  return `${prefix}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

@@ -16,7 +16,16 @@ class BanhoTosaEtapaCreate(BaseModel):
     tipo: str = Field(..., min_length=1, max_length=40)
     responsavel_id: Optional[int] = None
     recurso_id: Optional[int] = None
+    tempo_previsto_minutos: Optional[int] = Field(default=None, ge=0, le=1440)
     observacoes: Optional[str] = None
+
+
+class BanhoTosaMoverEtapaInput(BaseModel):
+    tipo: str = Field(..., min_length=1, max_length=40)
+    responsavel_id: Optional[int] = None
+    recurso_id: Optional[int] = None
+    observacoes: Optional[str] = None
+    finalizar_etapa_atual: bool = True
 
 
 class BanhoTosaEtapaUpdate(BaseModel):
@@ -37,9 +46,16 @@ class BanhoTosaEtapaResponse(BaseModel):
     responsavel_nome: Optional[str] = None
     recurso_id: Optional[int] = None
     recurso_nome: Optional[str] = None
+    ordem_fluxo: Optional[int] = None
+    tempo_previsto_minutos: Optional[int] = None
     inicio_em: Optional[datetime] = None
     fim_em: Optional[datetime] = None
     duracao_minutos: Optional[int] = None
+    duracao_segundos: Optional[int] = None
+    tempo_decorrido_segundos: Optional[int] = None
+    tempo_restante_segundos: Optional[int] = None
+    atraso_segundos: Optional[int] = None
+    atrasado: bool = False
     observacoes: Optional[str] = None
 
 
@@ -79,6 +95,15 @@ class BanhoTosaAtendimentoResponse(BaseModel):
     fechamento_alertas: List[str] = Field(default_factory=list)
     pdv_url: Optional[str] = None
     etapas: List[BanhoTosaEtapaResponse] = Field(default_factory=list)
+    etapa_atual_codigo: Optional[str] = None
+    etapa_atual_label: Optional[str] = None
+    proxima_etapa_codigo: Optional[str] = None
+    proxima_etapa_label: Optional[str] = None
+    tempo_previsto_minutos: Optional[int] = None
+    tempo_decorrido_segundos: Optional[int] = None
+    tempo_restante_segundos: Optional[int] = None
+    atraso_segundos: Optional[int] = None
+    atrasado: bool = False
 
 
 class BanhoTosaOcorrenciaCreate(BaseModel):

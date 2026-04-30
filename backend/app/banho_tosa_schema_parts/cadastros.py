@@ -23,6 +23,9 @@ class BanhoTosaConfiguracaoUpdate(BaseModel):
     horas_produtivas_mes_padrao: Optional[Decimal] = Field(default=None, ge=1)
     dre_subcategoria_receita_id: Optional[int] = None
     dre_subcategoria_custo_id: Optional[int] = None
+    fluxo_etapas: Optional[list[str]] = None
+    mostrar_calendario_cliente: Optional[bool] = None
+    whatsapp_agendamento: Optional[str] = Field(default=None, max_length=30)
     ativo: Optional[bool] = None
 
 
@@ -44,6 +47,9 @@ class BanhoTosaConfiguracaoResponse(BaseModel):
     horas_produtivas_mes_padrao: Decimal
     dre_subcategoria_receita_id: Optional[int] = None
     dre_subcategoria_custo_id: Optional[int] = None
+    fluxo_etapas: Optional[list[str]] = None
+    mostrar_calendario_cliente: bool = False
+    whatsapp_agendamento: Optional[str] = None
     ativo: bool
 
     class Config:
@@ -101,6 +107,7 @@ class BanhoTosaServicoCreate(BaseModel):
     categoria: str = Field(default="banho", max_length=30)
     descricao: Optional[str] = None
     duracao_padrao_minutos: int = Field(default=60, ge=1, le=1440)
+    preco_base: Decimal = Field(default=Decimal("0"), ge=0)
     requer_banho: bool = True
     requer_tosa: bool = False
     requer_secagem: bool = True
@@ -113,6 +120,7 @@ class BanhoTosaServicoUpdate(BaseModel):
     categoria: Optional[str] = Field(default=None, max_length=30)
     descricao: Optional[str] = None
     duracao_padrao_minutos: Optional[int] = Field(default=None, ge=1, le=1440)
+    preco_base: Optional[Decimal] = Field(default=None, ge=0)
     requer_banho: Optional[bool] = None
     requer_tosa: Optional[bool] = None
     requer_secagem: Optional[bool] = None
@@ -126,6 +134,7 @@ class BanhoTosaServicoResponse(BaseModel):
     categoria: str
     descricao: Optional[str] = None
     duracao_padrao_minutos: int
+    preco_base: Decimal
     requer_banho: bool
     requer_tosa: bool
     requer_secagem: bool
@@ -146,6 +155,9 @@ class BanhoTosaParametroPorteCreate(BaseModel):
     tempo_secagem_min: int = Field(default=0, ge=0)
     tempo_tosa_min: int = Field(default=0, ge=0)
     multiplicador_preco: Decimal = Field(default=Decimal("1"), ge=0)
+    multiplicador_pelo_curto: Decimal = Field(default=Decimal("1"), ge=0)
+    multiplicador_pelo_longo: Decimal = Field(default=Decimal("1.2"), ge=0)
+    tempo_extra_pelo_longo_min: int = Field(default=0, ge=0)
     ativo: bool = True
 
 
@@ -159,6 +171,9 @@ class BanhoTosaParametroPorteUpdate(BaseModel):
     tempo_secagem_min: Optional[int] = Field(default=None, ge=0)
     tempo_tosa_min: Optional[int] = Field(default=None, ge=0)
     multiplicador_preco: Optional[Decimal] = Field(default=None, ge=0)
+    multiplicador_pelo_curto: Optional[Decimal] = Field(default=None, ge=0)
+    multiplicador_pelo_longo: Optional[Decimal] = Field(default=None, ge=0)
+    tempo_extra_pelo_longo_min: Optional[int] = Field(default=None, ge=0)
     ativo: Optional[bool] = None
 
 
@@ -173,6 +188,9 @@ class BanhoTosaParametroPorteResponse(BaseModel):
     tempo_secagem_min: int
     tempo_tosa_min: int
     multiplicador_preco: Decimal
+    multiplicador_pelo_curto: Decimal
+    multiplicador_pelo_longo: Decimal
+    tempo_extra_pelo_longo_min: int
     ativo: bool
 
     class Config:

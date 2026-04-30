@@ -13,8 +13,17 @@ from app.banho_tosa_api.atendimentos_helpers import (
     query_atendimento_completo,
     validar_responsavel_recurso,
 )
+from app.banho_tosa_api.fluxo import (
+    ETAPAS_OPERACIONAIS,
+    calcular_tempo_previsto_etapa,
+    fechar_etapa_aberta,
+    fluxo_da_config,
+    ordem_fluxo_para,
+    status_por_etapa,
+)
 from app.banho_tosa_api.utils import (
     STATUS_ATENDIMENTO_FINAIS,
+    obter_ou_criar_configuracao,
     serializar_atendimento,
     serializar_etapa,
 )
@@ -33,6 +42,7 @@ from app.banho_tosa_schemas import (
     BanhoTosaEtapaFinalizarInput,
     BanhoTosaEtapaResponse,
     BanhoTosaEtapaUpdate,
+    BanhoTosaMoverEtapaInput,
 )
 from app.db import get_session
 from app.veterinario_core import _get_tenant
@@ -54,7 +64,8 @@ def listar_atendimentos(
         query = query.filter(BanhoTosaAtendimento.status == status)
 
     atendimentos = query.order_by(BanhoTosaAtendimento.checkin_em.desc()).limit(limit).all()
-    return [serializar_atendimento(item) for item in atendimentos]
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    return [serializar_atendimento(item, config) for item in atendimentos]
 
 
 @router.get("/atendimentos/{atendimento_id}", response_model=BanhoTosaAtendimentoResponse)
@@ -65,7 +76,8 @@ def obter_atendimento(
 ):
     _, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
-    return serializar_atendimento(atendimento)
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    return serializar_atendimento(atendimento, config)
 
 
 @router.patch("/atendimentos/{atendimento_id}/status", response_model=BanhoTosaAtendimentoResponse)
@@ -90,7 +102,8 @@ def atualizar_status_atendimento(
     db.commit()
     db.refresh(atendimento)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
-    return serializar_atendimento(atendimento)
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    return serializar_atendimento(atendimento, config)
 
 
 @router.post(
@@ -111,6 +124,58 @@ def cancelar_processo(
         atendimento_id=atendimento_id,
         motivo=body.motivo,
     )
+
+
+@router.post("/atendimentos/{atendimento_id}/mover-etapa", response_model=BanhoTosaAtendimentoResponse)
+def mover_etapa_atendimento(
+    atendimento_id: int,
+    body: BanhoTosaMoverEtapaInput,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
+    if atendimento.status in STATUS_ATENDIMENTO_FINAIS:
+        raise HTTPException(status_code=422, detail="Atendimento finalizado nao aceita mudanca de etapa")
+
+    tipo = body.tipo.strip().lower()
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    fluxo = fluxo_da_config(config)
+    etapas_validas = set(fluxo) | {"entregue"}
+    if tipo not in etapas_validas:
+        raise HTTPException(status_code=422, detail="Etapa nao faz parte do fluxo configurado")
+    if tipo in ETAPAS_OPERACIONAIS:
+        validar_responsavel_recurso(db, tenant_id, body.responsavel_id, body.recurso_id)
+
+    agora = datetime.now()
+    etapas_abertas = db.query(BanhoTosaEtapa).filter(
+        BanhoTosaEtapa.tenant_id == tenant_id,
+        BanhoTosaEtapa.atendimento_id == atendimento.id,
+        BanhoTosaEtapa.fim_em.is_(None),
+    ).all()
+    if etapas_abertas and not body.finalizar_etapa_atual:
+        raise HTTPException(status_code=409, detail="Finalize a etapa aberta antes de iniciar outra")
+    for etapa in etapas_abertas:
+        fechar_etapa_aberta(etapa, fim=agora)
+
+    if tipo in ETAPAS_OPERACIONAIS:
+        etapa = BanhoTosaEtapa(
+            tenant_id=tenant_id,
+            atendimento_id=atendimento.id,
+            tipo=tipo,
+            responsavel_id=body.responsavel_id,
+            recurso_id=body.recurso_id,
+            ordem_fluxo=ordem_fluxo_para(tipo, fluxo),
+            tempo_previsto_minutos=calcular_tempo_previsto_etapa(db, tenant_id, atendimento, tipo),
+            inicio_em=agora,
+            observacoes=body.observacoes,
+        )
+        db.add(etapa)
+
+    aplicar_status_atendimento(db, tenant_id, atendimento, status_por_etapa(tipo))
+    db.commit()
+    atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
+    return serializar_atendimento(atendimento, config)
 
 
 @router.post("/atendimentos/{atendimento_id}/etapas", response_model=BanhoTosaEtapaResponse, status_code=201)
@@ -136,12 +201,18 @@ def iniciar_etapa(
         raise HTTPException(status_code=409, detail="Ja existe etapa aberta desse tipo")
 
     validar_responsavel_recurso(db, tenant_id, body.responsavel_id, body.recurso_id)
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    fluxo = fluxo_da_config(config)
     etapa = BanhoTosaEtapa(
         tenant_id=tenant_id,
         atendimento_id=atendimento.id,
         tipo=tipo,
         responsavel_id=body.responsavel_id,
         recurso_id=body.recurso_id,
+        ordem_fluxo=ordem_fluxo_para(tipo, fluxo),
+        tempo_previsto_minutos=body.tempo_previsto_minutos
+        if body.tempo_previsto_minutos is not None
+        else calcular_tempo_previsto_etapa(db, tenant_id, atendimento, tipo),
         inicio_em=datetime.now(),
         observacoes=body.observacoes,
     )
@@ -200,12 +271,7 @@ def finalizar_etapa(
     if etapa.fim_em:
         return serializar_etapa(etapa)
 
-    fim = datetime.now()
-    etapa.fim_em = fim
-    if etapa.inicio_em:
-        etapa.duracao_minutos = max(0, int((fim - etapa.inicio_em).total_seconds() // 60))
-    if body.observacoes is not None:
-        etapa.observacoes = body.observacoes
+    fechar_etapa_aberta(etapa, observacoes=body.observacoes)
 
     db.commit()
     db.refresh(etapa)

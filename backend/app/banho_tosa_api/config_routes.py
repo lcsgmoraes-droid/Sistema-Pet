@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.banho_tosa_api.fluxo import normalizar_fluxo_etapas
 from app.banho_tosa_api.utils import obter_ou_criar_configuracao
 from app.banho_tosa_schemas import BanhoTosaConfiguracaoResponse, BanhoTosaConfiguracaoUpdate
 from app.db import get_session
@@ -29,7 +30,11 @@ def atualizar_configuracao(
     _, tenant_id = _get_tenant(current)
     config = obter_ou_criar_configuracao(db, tenant_id)
 
-    for campo, valor in body.model_dump(exclude_unset=True).items():
+    payload = body.model_dump(exclude_unset=True)
+    if "fluxo_etapas" in payload:
+        payload["fluxo_etapas"] = normalizar_fluxo_etapas(payload["fluxo_etapas"])
+
+    for campo, valor in payload.items():
         setattr(config, campo, valor)
 
     db.commit()

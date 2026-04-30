@@ -148,7 +148,7 @@ export default function HomeScreen() {
               <ProdutoCard
                 key={produto.id}
                 produto={produto}
-                onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+                onPress={() => navigation.navigate('Loja', { screen: 'DetalhesProduto', params: { produto } })}
               />
             ))}
           </View>
@@ -186,6 +186,7 @@ function ProdutoCard({ produto, onPress }: { produto: Produto; onPress: () => vo
     produto.promocao_ativa && produto.preco_promocional
       ? produto.preco_promocional
       : produto.preco;
+  const temOferta = !!produto.promocao_ativa && !!produto.preco_promocional;
 
   return (
     <TouchableOpacity style={styles.produtoCard} onPress={onPress}>
@@ -196,10 +197,18 @@ function ProdutoCard({ produto, onPress }: { produto: Produto; onPress: () => vo
           <Ionicons name="bag-handle-outline" size={28} color={CORES.primario} />
         </View>
       )}
+      {temOferta ? (
+        <View style={styles.produtoOfertaBadge}>
+          <Text style={styles.produtoOfertaTexto}>Oferta</Text>
+        </View>
+      ) : null}
       <Text style={styles.produtoNome} numberOfLines={2}>
         {produto.nome}
       </Text>
-      <Text style={styles.produtoPreco}>{formatarMoeda(preco)}</Text>
+      <View style={styles.produtoPrecoRow}>
+        {temOferta ? <Text style={styles.produtoPrecoOriginal}>{formatarMoeda(produto.preco)}</Text> : null}
+        <Text style={styles.produtoPreco}>{formatarMoeda(preco)}</Text>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -276,6 +285,16 @@ const styles = StyleSheet.create({
     ...SOMBRA,
   },
   produtoFoto: { width: '100%', height: 120 },
+  produtoOfertaBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#DC2626',
+    borderRadius: RAIO.circulo,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  produtoOfertaTexto: { color: '#fff', fontSize: 10, fontWeight: '900' },
   produtoFotoPlaceholder: {
     backgroundColor: CORES.primarioClaro,
     justifyContent: 'center',
@@ -288,11 +307,15 @@ const styles = StyleSheet.create({
     padding: ESPACO.sm,
     paddingBottom: 2,
   },
+  produtoPrecoRow: { padding: ESPACO.sm, paddingTop: 2 },
+  produtoPrecoOriginal: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoClaro,
+    textDecorationLine: 'line-through',
+  },
   produtoPreco: {
     fontSize: FONTE.normal,
     fontWeight: 'bold',
     color: CORES.primario,
-    padding: ESPACO.sm,
-    paddingTop: 2,
   },
 });

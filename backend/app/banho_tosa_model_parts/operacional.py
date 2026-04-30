@@ -52,9 +52,12 @@ class BanhoTosaEtapa(BaseTenantModel):
     tipo = Column(String(40), nullable=False, index=True)
     responsavel_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)
     recurso_id = Column(Integer, ForeignKey("banho_tosa_recursos.id"), nullable=True, index=True)
+    ordem_fluxo = Column(Integer, nullable=True)
+    tempo_previsto_minutos = Column(Integer, nullable=True)
     inicio_em = Column(DateTime(timezone=True), nullable=True)
     fim_em = Column(DateTime(timezone=True), nullable=True)
     duracao_minutos = Column(Integer, nullable=True)
+    duracao_segundos = Column(Integer, nullable=True)
     observacoes = Column(Text, nullable=True)
 
     atendimento = relationship("BanhoTosaAtendimento", back_populates="etapas")

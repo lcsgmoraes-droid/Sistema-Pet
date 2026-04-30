@@ -13,6 +13,11 @@ from app.banho_tosa_models import (
     BanhoTosaConfiguracao,
     BanhoTosaEtapa,
 )
+from app.banho_tosa_api.fluxo import (
+    DEFAULT_FLUXO_ETAPAS,
+    calcular_tempos_etapa,
+    estado_operacional_atendimento,
+)
 from app.banho_tosa_pacotes import calcular_saldo_creditos
 from app.models import Cliente, Pet
 from app.utils.serialization import safe_decimal_to_float
@@ -30,11 +35,14 @@ def obter_ou_criar_configuracao(db: Session, tenant_id) -> BanhoTosaConfiguracao
         .first()
     )
     if config:
+        if not config.fluxo_etapas:
+            config.fluxo_etapas = DEFAULT_FLUXO_ETAPAS
         return config
 
     config = BanhoTosaConfiguracao(
         tenant_id=tenant_id,
         dias_funcionamento=["segunda", "terca", "quarta", "quinta", "sexta", "sabado"],
+        fluxo_etapas=DEFAULT_FLUXO_ETAPAS,
     )
     db.add(config)
     db.commit()
@@ -66,6 +74,7 @@ def validar_cliente_pet(db: Session, tenant_id, cliente_id: int, pet_id: int) ->
 def serializar_etapa(etapa: BanhoTosaEtapa) -> dict:
     responsavel = etapa.responsavel
     recurso = etapa.recurso
+    tempos = calcular_tempos_etapa(etapa)
     return {
         "id": etapa.id,
         "atendimento_id": etapa.atendimento_id,
@@ -74,9 +83,16 @@ def serializar_etapa(etapa: BanhoTosaEtapa) -> dict:
         "responsavel_nome": responsavel.nome if responsavel else None,
         "recurso_id": etapa.recurso_id,
         "recurso_nome": recurso.nome if recurso else None,
+        "ordem_fluxo": etapa.ordem_fluxo,
+        "tempo_previsto_minutos": etapa.tempo_previsto_minutos,
         "inicio_em": etapa.inicio_em,
         "fim_em": etapa.fim_em,
         "duracao_minutos": etapa.duracao_minutos,
+        "duracao_segundos": etapa.duracao_segundos,
+        "tempo_decorrido_segundos": tempos["tempo_decorrido_segundos"],
+        "tempo_restante_segundos": tempos["tempo_restante_segundos"],
+        "atraso_segundos": tempos["atraso_segundos"],
+        "atrasado": tempos["atrasado"],
         "observacoes": etapa.observacoes,
     }
 
@@ -112,11 +128,20 @@ def serializar_agendamento(agendamento: BanhoTosaAgendamento) -> dict:
     }
 
 
-def serializar_atendimento(atendimento: BanhoTosaAtendimento) -> dict:
+def serializar_atendimento(
+    atendimento: BanhoTosaAtendimento,
+    config: Optional[BanhoTosaConfiguracao] = None,
+) -> dict:
     pet = atendimento.pet
     cliente = atendimento.cliente
     agendamento = getattr(atendimento, "agendamento", None)
-    etapas = getattr(atendimento, "etapas", []) or []
+    etapas = sorted(
+        getattr(atendimento, "etapas", []) or [],
+        key=lambda etapa: (
+            etapa.inicio_em or datetime.min,
+            etapa.id or 0,
+        ),
+    )
     venda = getattr(atendimento, "venda", None)
     pacote_credito = getattr(atendimento, "pacote_credito", None)
     valor_pago = sum(float(pag.valor or 0) for pag in venda.pagamentos) if venda else 0
@@ -124,8 +149,9 @@ def serializar_atendimento(atendimento: BanhoTosaAtendimento) -> dict:
     status_pagamento = None
     if venda:
         status_pagamento = "pago" if valor_pago >= (venda_total or 0) else "parcial" if valor_pago > 0 else "pendente"
+    estado = estado_operacional_atendimento(atendimento, config)
 
-    return {
+    payload = {
         "id": atendimento.id,
         "agendamento_id": atendimento.agendamento_id,
         "cliente_id": atendimento.cliente_id,
@@ -174,6 +200,8 @@ def serializar_atendimento(atendimento: BanhoTosaAtendimento) -> dict:
         "pdv_url": f"/pdv?venda_id={atendimento.venda_id}" if atendimento.venda_id else None,
         "etapas": [serializar_etapa(etapa) for etapa in etapas],
     }
+    payload.update(estado)
+    return payload
 
 
 def _alertas_fechamento_atendimento(atendimento, venda, status_pagamento: Optional[str]) -> list[str]:

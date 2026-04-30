@@ -148,6 +148,33 @@ export interface BanhoTosaStatusResponse {
   itens: BanhoTosaStatusItem[];
 }
 
+export interface BanhoTosaServicoOpcao {
+  id: number;
+  nome: string;
+  duracao_padrao_minutos?: number | null;
+  preco_base?: number | null;
+}
+
+export interface BanhoTosaCalendarioSlot {
+  horario_inicio: string;
+  horario_fim: string;
+  status: "disponivel" | "ocupado";
+  vagas: number;
+}
+
+export interface BanhoTosaCalendarioDia {
+  data: string;
+  funciona: boolean;
+  slots: BanhoTosaCalendarioSlot[];
+}
+
+export interface BanhoTosaCalendarioResponse {
+  visivel: boolean;
+  whatsapp?: string | null;
+  servicos: BanhoTosaServicoOpcao[];
+  dias: BanhoTosaCalendarioDia[];
+}
+
 export interface PetFormData {
   nome: string;
   especie: string;
@@ -172,6 +199,7 @@ export interface Produto {
   id: number;
   nome: string;
   preco: number;
+  preco_original?: number | null;
   preco_promocional?: number | null;
   promocao_ativa?: boolean;
   descricao?: string | null;

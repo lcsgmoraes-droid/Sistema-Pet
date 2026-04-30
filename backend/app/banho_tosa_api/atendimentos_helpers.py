@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from app.banho_tosa_api.fluxo import STATUS_POR_ETAPA
 from app.banho_tosa_api.utils import STATUS_ATENDIMENTO_FINAIS
 from app.banho_tosa_models import (
     BanhoTosaAgendamento,
@@ -16,13 +17,7 @@ from app.models import Cliente
 from app.vendas_models import Venda
 
 
-STATUS_POR_TIPO_ETAPA = {
-    "banho": "em_banho",
-    "secagem": "em_secagem",
-    "tosa": "em_tosa",
-    "higiene": "em_banho",
-    "preparo": "em_banho",
-}
+STATUS_POR_TIPO_ETAPA = STATUS_POR_ETAPA
 
 
 def query_atendimento_completo(db: Session, tenant_id):

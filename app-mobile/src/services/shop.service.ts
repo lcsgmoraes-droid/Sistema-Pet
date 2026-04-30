@@ -92,6 +92,7 @@ export async function listarProdutos(params?: {
       id: p.id,
       nome: p.nome,
       preco: p.preco_venda ?? p.preco ?? 0,
+      preco_original: p.preco_original ?? p.preco_venda ?? p.preco ?? null,
       preco_promocional: p.preco_promocional ?? null,
       promocao_ativa: p.promocao_ativa ?? false,
       foto_url: resolveMediaUrl(p.imagem_principal ?? p.foto_url),
@@ -110,8 +111,20 @@ export async function listarProdutos(params?: {
 
 export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto | null> {
   try {
-    const { data } = await api.get<Produto>(`/app/produto-barcode/${barcode}`);
-    return data;
+    const { data } = await api.get<any>(`/app/produto-barcode/${encodeURIComponent(barcode)}`);
+    return {
+      id: data.id,
+      nome: data.nome,
+      preco: Number(data.preco_original ?? data.preco ?? 0),
+      preco_original: data.preco_original ?? data.preco ?? null,
+      preco_promocional: data.preco_promocional ?? (data.promocao_ativa ? data.preco : null),
+      promocao_ativa: !!data.promocao_ativa,
+      foto_url: resolveMediaUrl(data.foto_url),
+      estoque: Number(data.estoque ?? 0),
+      codigo: data.codigo ?? data.codigo_barras ?? null,
+      codigo_barras: data.codigo_barras ?? null,
+      unidade: data.unidade ?? 'UN',
+    };
   } catch (err: any) {
     if (err?.response?.status === 404) return null;
     throw err;

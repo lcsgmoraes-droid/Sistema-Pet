@@ -96,7 +96,12 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   }
 
   function onServicoChange(servicoId) {
-    setForm((prev) => ({ ...prev, servico_id: servicoId }));
+    const servico = servicos.find((item) => String(item.id) === String(servicoId));
+    setForm((prev) => ({
+      ...prev,
+      servico_id: servicoId,
+      valor_unitario: servico ? String(servico.preco_base ?? "0") : prev.valor_unitario,
+    }));
   }
 
   function resetarFormularioAgendamento() {
@@ -160,7 +165,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       servico_id: servico ? Number(servico.id) : null,
       nome_servico: servico ? null : "Banho & Tosa",
       quantidade: "1",
-      valor_unitario: toApiDecimal(form.valor_unitario),
+      valor_unitario: toApiDecimal(form.valor_unitario || servico?.preco_base || "0"),
       desconto: "0",
       tempo_previsto_minutos: servico?.duracao_padrao_minutos || 60,
     };
