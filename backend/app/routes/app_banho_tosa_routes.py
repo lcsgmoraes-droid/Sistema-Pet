@@ -232,8 +232,23 @@ def _dia_funciona(config, dia: date) -> bool:
 
 def _intervalos_sobrepoem(inicio: datetime, fim: datetime, agendamento: BanhoTosaAgendamento) -> bool:
     ag_inicio = agendamento.data_hora_inicio
+    if not ag_inicio:
+        return False
     ag_fim = agendamento.data_hora_fim_prevista or (ag_inicio + timedelta(minutes=60))
+    ag_inicio = _datetime_compativel(ag_inicio, inicio)
+    ag_fim = _datetime_compativel(ag_fim, inicio)
     return bool(ag_inicio and ag_inicio < fim and ag_fim > inicio)
+
+
+def _datetime_compativel(valor: datetime, referencia: datetime) -> datetime:
+    """Evita erro ao comparar datas timezone-aware do banco com slots locais do calendario."""
+    valor_tem_tz = valor.tzinfo is not None and valor.utcoffset() is not None
+    referencia_tem_tz = referencia.tzinfo is not None and referencia.utcoffset() is not None
+    if valor_tem_tz == referencia_tem_tz:
+        return valor
+    if referencia_tem_tz:
+        return valor.replace(tzinfo=referencia.tzinfo)
+    return valor.replace(tzinfo=None)
 
 
 def _listar_atendimentos_visiveis(db: Session, tenant_id, cliente_id: int):

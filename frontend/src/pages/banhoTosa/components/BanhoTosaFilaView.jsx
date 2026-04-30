@@ -307,16 +307,6 @@ function AtendimentoCard({
           </button>
         )}
 
-        {atual !== "chegou" && (
-          <button
-            type="button"
-            disabled={processing}
-            onClick={() => onMover(atendimento, "chegou", { resetarFluxo: true })}
-            className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-          >
-            Resetar para chegou
-          </button>
-        )}
       </div>
 
       <div className="relative">
@@ -336,11 +326,7 @@ function AtendimentoCard({
                 disabled={processing || etapa === atual}
                 onClick={() => {
                   setOpenSelector(false);
-                  onMover(
-                    atendimento,
-                    etapa,
-                    etapa === "chegou" ? { resetarFluxo: true } : {},
-                  );
+                  onMover(atendimento, etapa);
                 }}
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-slate-300"
               >

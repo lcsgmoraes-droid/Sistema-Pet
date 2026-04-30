@@ -28,6 +28,7 @@ const statusCores: Record<string, { bg: string; fg: string }> = {
   confirmado: { bg: "#DCFCE7", fg: "#166534" },
   chegou: { bg: "#FEF3C7", fg: "#92400E" },
   em_banho: { bg: "#DBEAFE", fg: "#1D4ED8" },
+  em_secagem: { bg: "#FCE7F3", fg: "#BE185D" },
   secagem: { bg: "#FCE7F3", fg: "#BE185D" },
   em_tosa: { bg: "#EDE9FE", fg: "#6D28D9" },
   pronto: { bg: "#D1FAE5", fg: "#047857" },
@@ -46,18 +47,23 @@ export default function BanhoTosaScreen() {
 
   async function carregar() {
     try {
-      const [response, calendarioResponse, petsResponse] = await Promise.all([
-        listarStatusBanhoTosa(),
+      const response = await listarStatusBanhoTosa();
+      setItens(response.itens || []);
+    } catch {
+      setItens([]);
+    }
+
+    try {
+      const [calendarioResponse, petsResponse] = await Promise.all([
         listarCalendarioBanhoTosa(),
         listarPets().catch(() => []),
       ]);
-      setItens(response.itens || []);
       setCalendario(calendarioResponse);
       setPets(petsResponse);
       if (!servicoId && calendarioResponse.servicos?.[0]?.id) setServicoId(calendarioResponse.servicos[0].id);
       if (!petId && petsResponse?.[0]?.id) setPetId(petsResponse[0].id);
     } catch {
-      setItens([]);
+      setCalendario(null);
     } finally {
       setLoading(false);
     }
