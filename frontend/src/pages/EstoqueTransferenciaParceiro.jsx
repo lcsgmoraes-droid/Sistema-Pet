@@ -84,6 +84,121 @@ function baixarArquivoBlob(blob, nomeArquivo) {
   window.URL.revokeObjectURL(url);
 }
 
+const CUPOM_TRANSFERENCIA_WIDTH = 42;
+
+function textoCupom(valor) {
+  return String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cortarCupom(valor, max = CUPOM_TRANSFERENCIA_WIDTH) {
+  const limpo = textoCupom(valor);
+  return limpo.length > max ? `${limpo.slice(0, max - 3)}...` : limpo;
+}
+
+function centralizarCupom(valor, width = CUPOM_TRANSFERENCIA_WIDTH) {
+  const texto = cortarCupom(valor, width);
+  const total = Math.max(0, width - texto.length);
+  const esquerda = Math.floor(total / 2);
+  return `${" ".repeat(esquerda)}${texto}${" ".repeat(total - esquerda)}`;
+}
+
+function parCupom(label, valor, width = CUPOM_TRANSFERENCIA_WIDTH) {
+  const direita = cortarCupom(valor, Math.max(8, Math.floor(width / 2)));
+  const maxEsquerda = Math.max(0, width - direita.length - 1);
+  const esquerda = cortarCupom(label, maxEsquerda);
+  return `${esquerda}${" ".repeat(Math.max(1, width - esquerda.length - direita.length))}${direita}`;
+}
+
+function quebrarCupom(valor, width = CUPOM_TRANSFERENCIA_WIDTH) {
+  const palavras = textoCupom(valor).split(" ");
+  const linhas = [];
+  let atual = "";
+
+  for (const palavra of palavras) {
+    if (!palavra) continue;
+    const proposta = atual ? `${atual} ${palavra}` : palavra;
+    if (proposta.length <= width) {
+      atual = proposta;
+      continue;
+    }
+
+    if (atual) linhas.push(atual);
+    if (palavra.length <= width) {
+      atual = palavra;
+      continue;
+    }
+
+    for (let i = 0; i < palavra.length; i += width) {
+      linhas.push(palavra.slice(i, i + width));
+    }
+    atual = "";
+  }
+
+  if (atual) linhas.push(atual);
+  return linhas.length ? linhas : [""];
+}
+
+function montarCupomTransferencia(registro) {
+  const documento = registro.documento || `TRP-${registro.conta_receber_id}`;
+  const itens = Array.isArray(registro.itens) ? registro.itens : [];
+  const linhas = [
+    centralizarCupom("PET SHOP PRO"),
+    centralizarCupom("TRANSFERENCIA PARCEIRO"),
+    centralizarCupom("COMPROVANTE DE RETIRADA"),
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+    cortarCupom(`Documento: ${documento}`),
+    cortarCupom(`Pessoa: ${registro.parceiro_nome || "-"}`),
+    cortarCupom(`Emissao: ${formatarData(registro.data_emissao)}`),
+    cortarCupom(`Vencimento: ${formatarData(registro.data_vencimento)}`),
+    cortarCupom(`Status: ${registro.status_label || registro.status || "-"}`),
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+    "ITENS",
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+  ];
+
+  for (const item of itens) {
+    linhas.push(...quebrarCupom(item.produto_nome || "Item"));
+    linhas.push(parCupom(`Cod ${item.codigo || item.produto_id || "-"}`, `Qtd ${formatarQuantidade(item.quantidade)}`));
+    linhas.push(parCupom("Custo un.", formatarMoeda(item.custo_unitario)));
+    linhas.push(parCupom("Total", formatarMoeda(item.valor_total)));
+    linhas.push("");
+  }
+
+  linhas.push(
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+    parCupom("Valor", formatarMoeda(registro.valor_original)),
+    parCupom("Recebido", formatarMoeda(registro.valor_recebido)),
+    parCupom("Saldo", formatarMoeda(registro.saldo_aberto)),
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+  );
+
+  if (registro.observacoes) {
+    linhas.push("OBS:", ...quebrarCupom(registro.observacoes), "-".repeat(CUPOM_TRANSFERENCIA_WIDTH));
+  }
+
+  linhas.push(
+    "RETIRADO POR:",
+    "",
+    "Nome: ________________________________",
+    "Doc.: ________________________________",
+    "",
+    "Assinatura:",
+    "",
+    "______________________________________",
+    "",
+    "Data: ____/____/________",
+    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+    centralizarCupom("Documento para controle interno"),
+  );
+
+  return linhas.join("\n");
+}
+
 function StatusTransferenciaBadge({ status, label }) {
   const estilos = {
     pendente: "bg-amber-100 text-amber-800",
@@ -146,6 +261,7 @@ export default function EstoqueTransferenciaParceiro() {
   const [salvando, setSalvando] = useState(false);
   const [contaGerandoPdf, setContaGerandoPdf] = useState(null);
   const [gerandoPdfConsolidado, setGerandoPdfConsolidado] = useState(false);
+  const [cupomTransferencia, setCupomTransferencia] = useState("");
   const [contaEnviandoEmail, setContaEnviandoEmail] = useState(null);
   const [contaRecebendo, setContaRecebendo] = useState(null);
   const [contaExcluindo, setContaExcluindo] = useState(null);
@@ -278,6 +394,12 @@ export default function EstoqueTransferenciaParceiro() {
   useEffect(() => {
     void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
   }, [filtrosHistoricoAplicados, paginaHistorico]);
+
+  useEffect(() => {
+    const limparCupom = () => setCupomTransferencia("");
+    window.addEventListener("afterprint", limparCupom);
+    return () => window.removeEventListener("afterprint", limparCupom);
+  }, []);
 
   const totalQuantidade = useMemo(
     () => itens.reduce((acumulado, item) => acumulado + Number(item.quantidade || 0), 0),
@@ -801,6 +923,11 @@ export default function EstoqueTransferenciaParceiro() {
     }
   };
 
+  const imprimirCupomTransferencia = (registro) => {
+    setCupomTransferencia(montarCupomTransferencia(registro));
+    window.setTimeout(() => globalThis.print(), 0);
+  };
+
   const alternarSelecaoHistorico = (contaReceberId) => {
     setSelecionadosHistorico((prev) =>
       prev.includes(contaReceberId)
@@ -1007,6 +1134,51 @@ export default function EstoqueTransferenciaParceiro() {
 
   return (
     <div className="space-y-6 p-6">
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+
+          .transferencia-cupom-impressao,
+          .transferencia-cupom-impressao * {
+            visibility: visible;
+          }
+
+          .transferencia-cupom-impressao {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 76mm;
+            margin: 0;
+            padding: 0 1mm;
+            color: #000 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          @page {
+            size: 80mm auto;
+            margin: 2mm;
+          }
+        }
+      `}</style>
+      <pre
+        className="transferencia-cupom-impressao hidden print:block"
+        style={{
+          width: "76mm",
+          fontFamily: 'Consolas, "Courier New", monospace',
+          fontSize: "13px",
+          fontWeight: 800,
+          letterSpacing: "0.1px",
+          lineHeight: 1.28,
+          margin: 0,
+          padding: 0,
+          whiteSpace: "pre",
+        }}
+      >
+        {cupomTransferencia}
+      </pre>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -1686,6 +1858,13 @@ export default function EstoqueTransferenciaParceiro() {
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {contaGerandoPdf === registro.conta_receber_id ? "Gerando PDF..." : "Gerar PDF"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => imprimirCupomTransferencia(registro)}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    Imprimir cupom
                   </button>
                   <button
                     type="button"

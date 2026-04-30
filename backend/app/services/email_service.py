@@ -15,9 +15,7 @@ import logging
 import os
 import smtplib
 from pathlib import Path
-from email.mime.application import MIMEApplication
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from email.message import EmailMessage
 from typing import Iterable, Mapping, Any
 from dotenv import load_dotenv
 
@@ -69,6 +67,52 @@ def is_email_configured() -> bool:
     return _smtp_configured()
 
 
+def _normalizar_conteudo_anexo(content: Any) -> bytes:
+    if content is None:
+        return b""
+    if isinstance(content, bytes):
+        return content
+    if isinstance(content, bytearray):
+        return bytes(content)
+    if isinstance(content, str):
+        return content.encode("utf-8")
+    if hasattr(content, "read"):
+        return content.read()
+    return bytes(content)
+
+
+def _build_email_message(
+    *,
+    from_addr: str,
+    to: str,
+    subject: str,
+    html_body: str,
+    text_body: str | None = None,
+    attachments: Iterable[Mapping[str, Any]] | None = None,
+) -> EmailMessage:
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to
+
+    texto_fallback = text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
+    msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
+    msg.add_alternative(html_body, subtype="html", charset="utf-8")
+
+    for attachment in attachments or []:
+        filename = str(attachment.get("filename") or "anexo.bin")
+        content = _normalizar_conteudo_anexo(attachment.get("content"))
+        mime_subtype = str(attachment.get("mime_subtype") or "octet-stream")
+        msg.add_attachment(
+            content,
+            maintype="application",
+            subtype=mime_subtype,
+            filename=filename,
+        )
+
+    return msg
+
+
 def send_email(
     to: str,
     subject: str,
@@ -93,22 +137,14 @@ def send_email(
     from_addr = str(config["from_addr"])
     use_tls = bool(config["use_tls"])
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = from_addr
-    msg["To"] = to
-
-    if text_body:
-        msg.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-    for attachment in attachments or []:
-        filename = str(attachment.get("filename") or "anexo.bin")
-        content = attachment.get("content") or b""
-        mime_subtype = str(attachment.get("mime_subtype") or "octet-stream")
-        part = MIMEApplication(content, _subtype=mime_subtype)
-        part.add_header("Content-Disposition", "attachment", filename=filename)
-        msg.attach(part)
+    msg = _build_email_message(
+        from_addr=from_addr,
+        to=to,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        attachments=attachments,
+    )
 
     try:
         with smtplib.SMTP(host, port, timeout=10) as server:

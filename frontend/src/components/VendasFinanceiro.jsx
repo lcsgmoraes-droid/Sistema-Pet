@@ -248,13 +248,17 @@ function carregarConfigDiasUteis() {
 }
 
 function vendaEstaEmAberto(venda) {
-  return venda?.status !== "finalizada" && venda?.status !== "cancelada";
+  const status = String(venda?.status || "").toLowerCase();
+  return !["finalizada", "pago_nf", "cancelada"].includes(status);
 }
 
 function getStatusVendaMeta(status) {
   const statusNormalizado = String(status || "").toLowerCase();
   if (statusNormalizado === "finalizada") {
     return { label: "Baixada", className: "bg-green-100 text-green-800" };
+  }
+  if (statusNormalizado === "pago_nf") {
+    return { label: "Pago NF", className: "bg-emerald-100 text-emerald-800" };
   }
   if (statusNormalizado === "baixa_parcial") {
     return { label: "Parcial", className: "bg-blue-100 text-blue-800" };
@@ -263,6 +267,80 @@ function getStatusVendaMeta(status) {
     return { label: "Cancelada", className: "bg-slate-200 text-slate-700" };
   }
   return { label: "Aberta", className: "bg-yellow-100 text-yellow-800" };
+}
+
+function arredondarMoeda(valor) {
+  return Math.round((Number(valor) || 0) * 100) / 100;
+}
+
+function arredondarPercentual(valor) {
+  return Math.round((Number(valor) || 0) * 10) / 10;
+}
+
+function vendaTemNotaFiscal(venda) {
+  const nfeStatus = String(venda?.nfe_status || "").toLowerCase();
+  if (["cancelada", "cancelado", "denegada", "rejeitada"].includes(nfeStatus)) {
+    return false;
+  }
+
+  return Boolean(
+    venda?.nf_emitida ||
+      venda?.nfe_bling_id ||
+      venda?.nfe_chave ||
+      venda?.nfe_numero ||
+      String(venda?.status || "").toLowerCase() === "pago_nf",
+  );
+}
+
+function ajustarItemImposto(item, aplicarImposto) {
+  if (aplicarImposto) return item;
+
+  const impostoOriginal = Number(item?.imposto || 0);
+  const vendaBruta = Number(item?.venda_bruta || 0);
+  const custoTotal = Number(item?.custo_total || 0);
+  const valorLiquido = arredondarMoeda(Number(item?.valor_liquido || 0) + impostoOriginal);
+  const lucro = arredondarMoeda(Number(item?.lucro || 0) + impostoOriginal);
+
+  return {
+    ...item,
+    imposto_original: impostoOriginal,
+    imposto: 0,
+    valor_liquido: valorLiquido,
+    lucro,
+    margem_sobre_venda: vendaBruta > 0 ? arredondarPercentual((lucro / vendaBruta) * 100) : 0,
+    margem_sobre_custo: custoTotal > 0 ? arredondarPercentual((lucro / custoTotal) * 100) : 0,
+  };
+}
+
+function ajustarVendaImposto(venda, mostrarImpostoTodasVendas) {
+  const aplicarImposto = mostrarImpostoTodasVendas || vendaTemNotaFiscal(venda);
+  if (aplicarImposto) {
+    return {
+      ...venda,
+      imposto_aplicado: true,
+      imposto_original: Number(venda?.imposto || 0),
+    };
+  }
+
+  const impostoOriginal = Number(venda?.imposto || 0);
+  const vendaBruta = Number(venda?.venda_bruta || 0);
+  const custoProdutos = Number(venda?.custo_produtos || 0);
+  const vendaLiquida = arredondarMoeda(Number(venda?.venda_liquida || 0) + impostoOriginal);
+  const lucro = arredondarMoeda(Number(venda?.lucro || 0) + impostoOriginal);
+
+  return {
+    ...venda,
+    imposto_aplicado: false,
+    imposto_original: impostoOriginal,
+    imposto: 0,
+    venda_liquida: vendaLiquida,
+    lucro,
+    margem_sobre_venda: vendaBruta > 0 ? arredondarPercentual((lucro / vendaBruta) * 100) : 0,
+    margem_sobre_custo: custoProdutos > 0 ? arredondarPercentual((lucro / custoProdutos) * 100) : 0,
+    itens: Array.isArray(venda?.itens)
+      ? venda.itens.map((item) => ajustarItemImposto(item, false))
+      : [],
+  };
 }
 
 export default function VendasFinanceiro() {
@@ -332,6 +410,7 @@ export default function VendasFinanceiro() {
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
   const [filtroStatusLista, setFiltroStatusLista] = useState("");
+  const [mostrarImpostoTodasVendas, setMostrarImpostoTodasVendas] = useState(true);
   const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
   const [feriadosCustomizados, setFeriadosCustomizados] = useState(
     carregarFeriadosCustomizados,
@@ -430,10 +509,15 @@ export default function VendasFinanceiro() {
     }
   };
 
-  const filtrarVendasParaRelatorio = (escopo) => {
-    if (escopo === "geral") return [...listaVendas];
+  const listaVendasComImpostoAjustado = useMemo(
+    () => listaVendas.map((venda) => ajustarVendaImposto(venda, mostrarImpostoTodasVendas)),
+    [listaVendas, mostrarImpostoTodasVendas],
+  );
 
-    return listaVendas.filter((venda) => {
+  const filtrarVendasParaRelatorio = (escopo) => {
+    if (escopo === "geral") return [...listaVendasComImpostoAjustado];
+
+    return listaVendasComImpostoAjustado.filter((venda) => {
       const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
       const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
       const categoria = String(venda.categoria || "");
@@ -689,14 +773,85 @@ export default function VendasFinanceiro() {
   }, [vendasPorDataCalendario]);
 
   const listaVendasVisiveis = useMemo(
-    () => listaVendas.filter((venda) => venda?.status !== "cancelada"),
-    [listaVendas],
+    () =>
+      listaVendasComImpostoAjustado.filter(
+        (venda) => String(venda?.status || "").toLowerCase() !== "cancelada",
+      ),
+    [listaVendasComImpostoAjustado],
   );
 
   const listaVendasFiltrada = useMemo(() => {
     if (filtroStatusLista !== "em_aberto") return listaVendasVisiveis;
     return listaVendasVisiveis.filter(vendaEstaEmAberto);
   }, [filtroStatusLista, listaVendasVisiveis]);
+
+  const totalizadoresListaVendas = useMemo(() => {
+    const totais = listaVendasFiltrada.reduce(
+      (acc, venda) => {
+        acc.quantidade += 1;
+        acc.venda_bruta += Number(venda.venda_bruta || 0);
+        acc.taxa_loja += Number(venda.taxa_loja || 0);
+        acc.desconto += Number(venda.desconto || 0);
+        acc.taxa_entrega += Number(venda.taxa_entrega || 0);
+        acc.taxa_operacional += Number(venda.taxa_operacional || 0);
+        acc.taxa_cartao += Number(venda.taxa_cartao || 0);
+        acc.comissao += Number(venda.comissao || 0);
+        acc.imposto += Number(venda.imposto || 0);
+        acc.custo_campanha += Number(venda.custo_campanha || 0);
+        acc.venda_liquida += Number(venda.venda_liquida || 0);
+        acc.custo_produtos += Number(venda.custo_produtos || 0);
+        acc.lucro += Number(venda.lucro || 0);
+        if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
+        return acc;
+      },
+      {
+        quantidade: 0,
+        venda_bruta: 0,
+        taxa_loja: 0,
+        desconto: 0,
+        taxa_entrega: 0,
+        taxa_operacional: 0,
+        taxa_cartao: 0,
+        comissao: 0,
+        imposto: 0,
+        custo_campanha: 0,
+        venda_liquida: 0,
+        custo_produtos: 0,
+        lucro: 0,
+        com_nf: 0,
+      },
+    );
+
+    return {
+      ...totais,
+      margem_sobre_venda:
+        totais.venda_bruta > 0 ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100) : 0,
+      margem_sobre_custo:
+        totais.custo_produtos > 0 ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100) : 0,
+    };
+  }, [listaVendasFiltrada]);
+
+  const formatarDeducaoTotalizador = (valor) =>
+    Number(valor || 0) > 0 ? `-${formatarMoeda(valor)}` : formatarMoeda(0);
+
+  const cardsTotalizadoresLista = [
+    { label: "Vendas", value: totalizadoresListaVendas.quantidade.toLocaleString("pt-BR") },
+    { label: "Com NF", value: totalizadoresListaVendas.com_nf.toLocaleString("pt-BR") },
+    { label: "Venda Bruta", value: formatarMoeda(totalizadoresListaVendas.venda_bruta) },
+    { label: "Tx Loja", value: `+${formatarMoeda(totalizadoresListaVendas.taxa_loja)}` },
+    { label: "Desconto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto) },
+    { label: "Tx. Entrega", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega) },
+    { label: "Tx. Operac.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional) },
+    { label: "Tx. Cartao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_cartao) },
+    { label: "Comissao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao) },
+    { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto) },
+    { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha) },
+    { label: "Liquida", value: formatarMoeda(totalizadoresListaVendas.venda_liquida) },
+    { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos) },
+    { label: "Lucro", value: formatarMoeda(totalizadoresListaVendas.lucro) },
+    { label: "MG Venda", value: `${totalizadoresListaVendas.margem_sobre_venda}%` },
+    { label: "MG Custo", value: `${totalizadoresListaVendas.margem_sobre_custo}%` },
+  ];
 
   const CardComVariacao = ({
     titulo,
@@ -2723,10 +2878,37 @@ export default function VendasFinanceiro() {
               >
                 Em aberto
               </button>
+              <label
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm"
+                title="Marcado: mostra imposto estimado em todas as vendas. Desmarcado: mostra imposto somente em vendas com NF/NFC-e vinculada."
+              >
+                <input
+                  type="checkbox"
+                  checked={mostrarImpostoTodasVendas}
+                  onChange={(event) => setMostrarImpostoTodasVendas(event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                Mostrar TUDO com imposto
+              </label>
             </div>
             <div className="text-sm text-slate-500">
               Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
             </div>
+          </div>
+          <div className="grid gap-2 border-b border-gray-100 bg-slate-50 px-4 py-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+            {cardsTotalizadoresLista.map((card) => (
+              <div
+                key={card.label}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  {card.label}
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-900">
+                  {card.value}
+                </p>
+              </div>
+            ))}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -2832,7 +3014,11 @@ export default function VendasFinanceiro() {
                       </td>
                       <td
                         className="px-1 py-2 text-right text-pink-600 whitespace-nowrap"
-                        title="Impostos sobre faturamento"
+                        title={
+                          venda.imposto_aplicado
+                            ? "Impostos sobre faturamento"
+                            : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
+                        }
                       >
                         -{formatarMoeda(venda.imposto || 0)}
                       </td>
@@ -2981,7 +3167,14 @@ export default function VendasFinanceiro() {
                                       <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
                                         -{formatarMoeda(item.comissao)}
                                       </td>
-                                      <td className="px-1 py-1 text-right text-pink-600 whitespace-nowrap">
+                                      <td
+                                        className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
+                                        title={
+                                          venda.imposto_aplicado
+                                            ? "Impostos rateados neste item"
+                                            : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
+                                        }
+                                      >
                                         -{formatarMoeda(item.imposto || 0)}
                                       </td>
                                       <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">

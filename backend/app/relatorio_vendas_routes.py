@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/relatorios")
 
 
+def _texto_normalizado(valor) -> str:
+    return str(valor or "").strip().lower()
+
+
+def _venda_tem_documento_fiscal(venda: Venda) -> bool:
+    nfe_status = _texto_normalizado(getattr(venda, "nfe_status", None))
+    if nfe_status in {"cancelada", "cancelado", "denegada", "rejeitada"}:
+        return False
+
+    return bool(
+        getattr(venda, "nfe_bling_id", None)
+        or getattr(venda, "nfe_chave", None)
+        or getattr(venda, "nfe_numero", None)
+        or _texto_normalizado(getattr(venda, "status", None)) == "pago_nf"
+    )
+
+
 @router.get("/vendas/relatorio")
 async def obter_relatorio_vendas(
     data_inicio: Optional[str] = Query(None),
@@ -560,6 +577,12 @@ async def obter_relatorio_vendas(
             "numero_venda": venda.numero_venda,
             "data_venda": venda.data_venda.isoformat(),
             "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
+            "nf_emitida": _venda_tem_documento_fiscal(venda),
+            "nfe_tipo": venda.nfe_tipo,
+            "nfe_status": venda.nfe_status,
+            "nfe_numero": venda.nfe_numero,
+            "nfe_chave": venda.nfe_chave,
+            "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
             "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
             "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
             "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),
