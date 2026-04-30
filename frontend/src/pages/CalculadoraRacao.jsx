@@ -288,6 +288,52 @@ const pontuarBuscaRacao = (produto, valor) => {
   return score;
 };
 
+const produtoCasaComTextoSelecionado = (produto, valor) => {
+  const consulta = normalizarTexto(valor);
+  if (!consulta) return false;
+
+  const nome = normalizarTexto(produto?.nome);
+  const labelCompleta = normalizarTexto(formatarRacaoLabel(produto));
+  const labelSemPreco = normalizarTexto(
+    `${produto?.nome || ""} - ${formatarPeso(produto?.peso_embalagem)}`,
+  );
+
+  return (
+    consulta === nome ||
+    consulta === labelCompleta ||
+    consulta === labelSemPreco ||
+    consulta.includes(nome) ||
+    labelCompleta.includes(consulta)
+  );
+};
+
+const escolherRacaoAptaPorTexto = (valor, ...listas) => {
+  const consulta = normalizarTexto(valor);
+  if (!consulta) return null;
+
+  const candidatos = combinarProdutosComAptidao(...listas).filter(
+    (produto) => produto?.aptidao?.apta,
+  );
+
+  const matchDireto = candidatos.find((produto) =>
+    produtoCasaComTextoSelecionado(produto, valor),
+  );
+  if (matchDireto) return matchDireto;
+
+  const pontuados = candidatos
+    .map((produto) => ({
+      produto,
+      score: pontuarBuscaRacao(produto, valor),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (a.score !== b.score) return b.score - a.score;
+      return a.produto.nome.localeCompare(b.produto.nome, "pt-BR");
+    });
+
+  return pontuados.length === 1 ? pontuados[0].produto : null;
+};
+
 function RacaoSearchInput({
   disabled = false,
   hint,
@@ -573,6 +619,40 @@ export default function CalculadoraRacao() {
       produtosBuscaComparativoComAptidao,
     ).find((produto) => String(produto.id) === String(produtoId));
 
+  const resolverRacaoPrincipalDigitada = async () => {
+    const texto = String(form.produto_nome || "").trim();
+
+    let produto = escolherRacaoAptaPorTexto(
+      texto,
+      opcoesRacaoPrincipal,
+      produtosComAptidao,
+    );
+
+    if (produto) return produto;
+    if (texto.length < 2) return null;
+
+    try {
+      setLoadingBuscaPrincipal(true);
+      const racoes = await buscarRacoesNoCadastro(texto);
+      setProdutosBuscaPrincipal(racoes);
+      const racoesComAptidao = prepararProdutosComAptidao(racoes);
+
+      produto = escolherRacaoAptaPorTexto(
+        texto,
+        racoesComAptidao,
+        opcoesRacaoPrincipal,
+        produtosComAptidao,
+      );
+
+      return produto || null;
+    } catch (error) {
+      console.error("Erro ao resolver racao digitada:", error);
+      return null;
+    } finally {
+      setLoadingBuscaPrincipal(false);
+    }
+  };
+
   const validarProdutoApto = (produtoId, contexto = "ração") => {
     const produto = buscarProdutoComAptidao(produtoId);
     if (!produto) {
@@ -617,9 +697,7 @@ export default function CalculadoraRacao() {
   };
 
   const alterarBuscaRacaoPrincipal = (valor) => {
-    const produtoExato = opcoesRacaoPrincipal.find(
-      (produto) => formatarRacaoLabel(produto) === valor,
-    );
+    const produtoExato = escolherRacaoAptaPorTexto(valor, opcoesRacaoPrincipal);
 
     setForm((prev) => ({
       ...prev,
@@ -632,9 +710,7 @@ export default function CalculadoraRacao() {
   };
 
   const alterarBuscaRacaoComparativo = (valor) => {
-    const produtoExato = opcoesRacaoComparativo.find(
-      (produto) => formatarRacaoLabel(produto) === valor,
-    );
+    const produtoExato = escolherRacaoAptaPorTexto(valor, opcoesRacaoComparativo);
 
     setForm((prev) => ({
       ...prev,
@@ -801,17 +877,41 @@ export default function CalculadoraRacao() {
       return;
     }
 
-    if (!form.produto_id) {
+    let produtoSelecionado = form.produto_id
+      ? buscarProdutoComAptidao(form.produto_id)
+      : null;
+
+    if (!produtoSelecionado && form.produto_nome) {
+      produtoSelecionado = await resolverRacaoPrincipalDigitada();
+    }
+
+    const produtoIdCalculo = produtoSelecionado?.id
+      ? parseInt(produtoSelecionado.id)
+      : null;
+    const categoriaRacaoCalculo =
+      produtoSelecionado?.categoria_racao || form.categoria_racao;
+
+    if (!produtoIdCalculo) {
       toast.error("Selecione uma ração apta para análise.");
       return;
     }
 
-    if (!validarProdutoApto(form.produto_id)) {
+    if (!produtoSelecionado.aptidao.apta) {
+      toast.error(camposIncompletosTexto(produtoSelecionado.aptidao.faltantes));
       return;
     }
 
+    if (String(form.produto_id) !== String(produtoIdCalculo)) {
+      setForm((prev) => ({
+        ...prev,
+        produto_id: produtoIdCalculo,
+        produto_nome: formatarRacaoLabel(produtoSelecionado),
+        categoria_racao: categoriaRacaoCalculo || "",
+      }));
+    }
+
     // Validar idade obrigatória para ração de filhote
-    if (form.categoria_racao === "filhote" && !form.idade_meses) {
+    if (categoriaRacaoCalculo === "filhote" && !form.idade_meses) {
       toast.error("⚠️ Idade é obrigatória para rações de filhote!");
       return;
     }
@@ -819,7 +919,7 @@ export default function CalculadoraRacao() {
     try {
       setLoading(true);
       const response = await api.post("/api/produtos/calculadora-racao", {
-        produto_id: form.produto_id ? parseInt(form.produto_id) : null,
+        produto_id: produtoIdCalculo,
         peso_pet_kg: parseFloat(form.peso_pet_kg),
         idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
         nivel_atividade: form.nivel_atividade,
