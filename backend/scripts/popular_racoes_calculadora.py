@@ -28,6 +28,33 @@ from app.opcoes_racao_models import (
 from app.produtos_models import Produto
 
 
+TERMOS_NAO_RACAO = (
+    "areia",
+    "arranhador",
+    "bandeja",
+    "banheira",
+    "bebedouro",
+    "biscoito",
+    "brinquedo",
+    "canister",
+    "comedouro",
+    "display",
+    "granulado",
+    "lata",
+    "molho",
+    "ossinho",
+    "osso",
+    "petisco",
+    "porta racao",
+    "sache",
+    "snack",
+    "suplemento",
+    "tapete",
+    "trade mkt",
+    "vitaminico",
+)
+
+
 def normalizar(valor: object) -> str:
     texto = unicodedata.normalize("NFD", str(valor or "").strip().lower())
     return "".join(char for char in texto if unicodedata.category(char) != "Mn")
@@ -79,6 +106,8 @@ def parece_racao(texto: str, produto: Produto) -> bool:
         return True
     if normalizar(getattr(produto, "classificacao_racao", "")) not in {"", "nao"}:
         return True
+    if any(termo in texto for termo in TERMOS_NAO_RACAO):
+        return False
     return bool(
         re.search(
             r"\b(racao|racoes|alimento\s+completo|alimento\s+seco|alimento\s+umido)\b",
