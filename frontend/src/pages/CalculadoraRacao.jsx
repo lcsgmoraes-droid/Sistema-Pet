@@ -13,6 +13,12 @@ const normalizarTexto = (valor) =>
     .toLowerCase()
     .trim();
 
+const termosBusca = (valor) =>
+  normalizarTexto(valor)
+    .split(/\s+/)
+    .map((termo) => termo.trim())
+    .filter(Boolean);
+
 const temValorPreenchido = (valor) => {
   if (valor === null || valor === undefined) return false;
   if (Array.isArray(valor)) return valor.length > 0;
@@ -131,6 +137,64 @@ const formatarPeso = (valor) => {
 const formatarRacaoLabel = (produto) =>
   `${produto.nome} - ${formatarPeso(produto.peso_embalagem)} - ${formatarMoeda(produto.preco_venda)}`;
 
+const textoBuscaRacao = (produto) =>
+  normalizarTexto(
+    [
+      produto?.nome,
+      produto?.codigo,
+      produto?.sku,
+      produto?.codigo_barras,
+      produto?.categoria_nome,
+      produto?.categoria?.nome,
+      produto?.marca?.nome,
+      produto?.marca_nome,
+      produto?.descricao_curta,
+      produto?.descricao_completa,
+      produto?.classificacao_racao,
+      produto?.categoria_racao,
+      produto?.especies_indicadas,
+      formatarPeso(produto?.peso_embalagem),
+      formatarMoeda(produto?.preco_venda),
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+const termoCasaComPalavra = (termo, palavras) =>
+  palavras.some((palavra) => {
+    if (palavra.includes(termo)) return true;
+    return termo.length >= 4 && palavra.length >= 4 && termo.includes(palavra);
+  });
+
+const pontuarBuscaRacao = (produto, valor) => {
+  const consulta = normalizarTexto(valor);
+  if (!consulta) return 1;
+
+  const termos = termosBusca(valor);
+  const texto = textoBuscaRacao(produto);
+  const nome = normalizarTexto(produto?.nome);
+  const palavras = texto.split(/\s+/).filter(Boolean);
+
+  const todosTermosEncontrados = termos.every(
+    (termo) => texto.includes(termo) || termoCasaComPalavra(termo, palavras),
+  );
+
+  if (!todosTermosEncontrados) return 0;
+
+  let score = 10;
+  if (nome === consulta) score += 120;
+  if (nome.startsWith(consulta)) score += 90;
+  if (texto.includes(consulta)) score += 70;
+
+  termos.forEach((termo) => {
+    if (nome.split(/\s+/).includes(termo)) score += 12;
+    else if (nome.includes(termo)) score += 8;
+    else score += 4;
+  });
+
+  return score;
+};
+
 function RacaoSearchInput({
   disabled = false,
   hint,
@@ -147,20 +211,26 @@ function RacaoSearchInput({
   const termo = normalizarTexto(value);
 
   const opcoes = useMemo(() => {
-    const filtradas = produtos.filter((produto) => {
-      if (!termo) return true;
-      return normalizarTexto(formatarRacaoLabel(produto)).includes(termo);
-    });
+    const filtradas = produtos
+      .map((produto) => ({
+        produto,
+        score: termo ? pontuarBuscaRacao(produto, value) : 1,
+      }))
+      .filter((item) => item.score > 0);
 
     return filtradas
       .sort((a, b) => {
-        if (a.aptidao.apta !== b.aptidao.apta) {
-          return a.aptidao.apta ? -1 : 1;
+        if (a.produto.aptidao.apta !== b.produto.aptidao.apta) {
+          return a.produto.aptidao.apta ? -1 : 1;
         }
-        return a.nome.localeCompare(b.nome, "pt-BR");
+        if (a.score !== b.score) {
+          return b.score - a.score;
+        }
+        return a.produto.nome.localeCompare(b.produto.nome, "pt-BR");
       })
+      .map((item) => item.produto)
       .slice(0, 12);
-  }, [produtos, termo]);
+  }, [produtos, termo, value]);
 
   const selecionar = (produto) => {
     if (!produto.aptidao.apta) {
