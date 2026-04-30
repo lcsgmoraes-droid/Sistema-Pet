@@ -81,7 +81,7 @@ def parece_racao(texto: str, produto: Produto) -> bool:
         return True
     return bool(
         re.search(
-            r"\b(racao|racoes|dog|dogs|cat|cats|gato|gatos|cao|caes|canino|felino|puppy|kitten)\b",
+            r"\b(racao|racoes|alimento\s+completo|alimento\s+seco|alimento\s+umido)\b",
             texto,
         )
     )
