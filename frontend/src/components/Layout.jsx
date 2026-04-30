@@ -960,11 +960,11 @@ const Layout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="erp-shell flex h-screen bg-gray-50">
       {/* Backdrop para mobile */}
       {isMobile && sidebarOpen && effectiveSidebarVisible && (
         <div
-          className="fixed inset-0 bg-transparent z-40 md:hidden"
+          className="erp-mobile-sidebar-backdrop fixed inset-0 bg-transparent z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -974,11 +974,11 @@ const Layout = () => {
         <aside
           className={`${
             isMobile
-              ? `fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ${
+              ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ${
                   sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`
               : `${sidebarOpen ? "w-64" : "w-20"} transition-all duration-300`
-          } bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 flex flex-col shadow-lg`}
+          } erp-sidebar bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 flex flex-col shadow-lg`}
         >
           {/* Logo/Header com Toggle */}
           <div
@@ -1293,9 +1293,9 @@ const Layout = () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="erp-main-column flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <header className="erp-topbar bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
           {/* Menu Hamburguer (Mobile) */}
           {isMobile && effectiveSidebarVisible && (
             <button
@@ -1334,7 +1334,7 @@ const Layout = () => {
         </header>
 
         {/* Page Content */}
-        <main className={`flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}>
+        <main className={`erp-page-content flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}>
           <Outlet />
         </main>
       </div>

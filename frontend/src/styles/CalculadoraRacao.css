@@ -622,3 +622,101 @@ select:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
+
+@media (max-width: 768px) {
+  .calculadora-racao-container {
+    padding: 0.75rem;
+    max-width: 100%;
+  }
+
+  .header {
+    margin-bottom: 1rem;
+  }
+
+  .header h1 {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+
+  .calculadora-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .form-card,
+  .result-card,
+  .comparativo-card {
+    padding: 1rem;
+    border-radius: 10px;
+  }
+
+  .form-card {
+    position: static;
+    top: auto;
+  }
+
+  .racao-search-control {
+    align-items: stretch;
+  }
+
+  .racao-options {
+    max-height: 58dvh;
+    z-index: 60;
+  }
+
+  .racao-option {
+    padding: 0.75rem;
+  }
+
+  .racao-option-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+  }
+
+  .racao-status {
+    align-self: flex-start;
+  }
+
+  .result-header,
+  .item-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .result-stats,
+  .result-details {
+    grid-template-columns: 1fr;
+  }
+
+  .item-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .comparativo-item {
+    padding: 1rem;
+  }
+
+  .item-price {
+    font-size: 1.25rem;
+  }
+
+  .info-box {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .item-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .racao-search-control {
+    gap: 0.4rem;
+  }
+
+  .btn-clear-compact {
+    min-width: 44px;
+  }
+}

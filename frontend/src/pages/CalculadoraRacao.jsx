@@ -19,6 +19,22 @@ const termosBusca = (valor) =>
     .map((termo) => termo.trim())
     .filter(Boolean);
 
+const aliasesBusca = {
+  cao: ["cao", "caes", "canino", "dog", "cachorro"],
+  caes: ["caes", "cao", "canino", "dog", "cachorro"],
+  cachorro: ["cachorro", "cao", "caes", "canino", "dog"],
+  dog: ["dog", "cao", "caes", "canino", "cachorro"],
+  especial: ["especial", "special"],
+  felino: ["felino", "gato", "cat"],
+  gato: ["gato", "felino", "cat"],
+  cat: ["cat", "gato", "felino"],
+  racao: ["racao", "racoes"],
+  racoes: ["racoes", "racao"],
+  special: ["special", "especial"],
+};
+
+const variacoesTermoBusca = (termo) => aliasesBusca[termo] || [termo];
+
 const temValorPreenchido = (valor) => {
   if (valor === null || valor === undefined) return false;
   if (Array.isArray(valor)) return valor.length > 0;
@@ -82,10 +98,9 @@ const produtoPareceRacao = (produto) => {
     produtoTemConfigRacao(produto) ||
     temValorPreenchido(produto?.tabela_consumo) ||
     temValorPreenchido(produto?.tabela_nutricional) ||
-    (numeroPositivo(produto?.peso_embalagem) &&
-      /(racao|racoes|dog|cat|gato|cao|caes|canino|felino|royal|premier|special)/.test(
-        textoBusca,
-      ))
+    /(racao|racoes|dog|cat|gato|cao|caes|canino|felino|royal|premier|special|especial)/.test(
+      textoBusca,
+    )
   );
 };
 
@@ -137,6 +152,81 @@ const formatarPeso = (valor) => {
 const formatarRacaoLabel = (produto) =>
   `${produto.nome} - ${formatarPeso(produto.peso_embalagem)} - ${formatarMoeda(produto.preco_venda)}`;
 
+const extrairListaProdutos = (data) => {
+  if (typeof data === "string") {
+    try {
+      return extrairListaProdutos(JSON.parse(data));
+    } catch {
+      return [];
+    }
+  }
+
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
+
+  return data.items || data.produtos || data.itens || data.data || [];
+};
+
+const prepararProdutosComAptidao = (lista = []) =>
+  lista
+    .filter((produto) => produto && produtoPareceRacao(produto))
+    .map((produto) => ({
+      ...produto,
+      aptidao: avaliarAptidaoRacao(produto),
+    }));
+
+const combinarProdutosComAptidao = (...listas) => {
+  const mapa = new Map();
+
+  listas.flat().forEach((produto) => {
+    if (!produto?.id) return;
+    const chave = String(produto.id);
+    const anterior = mapa.get(chave) || {};
+    mapa.set(chave, {
+      ...anterior,
+      ...produto,
+      aptidao: produto.aptidao || avaliarAptidaoRacao(produto),
+    });
+  });
+
+  return Array.from(mapa.values());
+};
+
+const variantesBuscaRemota = (valor) => {
+  const termo = String(valor || "").trim();
+  const normalizado = normalizarTexto(termo);
+  const variantes = [termo, normalizado];
+
+  if (/\bspecial\b/.test(normalizado)) {
+    variantes.push(normalizado.replace(/\bspecial\b/g, "especial"));
+  }
+
+  if (/\bespecial\b/.test(normalizado)) {
+    variantes.push(normalizado.replace(/\bespecial\b/g, "special"));
+  }
+
+  return [...new Set(variantes.filter(Boolean))].slice(0, 3);
+};
+
+const buscarRacoesNoCadastro = async (termo) => {
+  const respostas = await Promise.all(
+    variantesBuscaRemota(termo).map((busca) =>
+      api.get("/produtos/", {
+        params: {
+          busca,
+          page: 1,
+          page_size: 30,
+          include_variations: true,
+          ativo: true,
+          _ts: Date.now(),
+        },
+      }),
+    ),
+  );
+
+  return respostas.flatMap((response) => extrairListaProdutos(response.data));
+};
+
 const textoBuscaRacao = (produto) =>
   normalizarTexto(
     [
@@ -166,6 +256,11 @@ const termoCasaComPalavra = (termo, palavras) =>
     return termo.length >= 4 && palavra.length >= 4 && termo.includes(palavra);
   });
 
+const termoEncontradoNoProduto = (termo, texto, palavras) =>
+  variacoesTermoBusca(termo).some(
+    (alias) => texto.includes(alias) || termoCasaComPalavra(alias, palavras),
+  );
+
 const pontuarBuscaRacao = (produto, valor) => {
   const consulta = normalizarTexto(valor);
   if (!consulta) return 1;
@@ -175,8 +270,8 @@ const pontuarBuscaRacao = (produto, valor) => {
   const nome = normalizarTexto(produto?.nome);
   const palavras = texto.split(/\s+/).filter(Boolean);
 
-  const todosTermosEncontrados = termos.every(
-    (termo) => texto.includes(termo) || termoCasaComPalavra(termo, palavras),
+  const todosTermosEncontrados = termos.every((termo) =>
+    termoEncontradoNoProduto(termo, texto, palavras),
   );
 
   if (!todosTermosEncontrados) return 0;
@@ -199,6 +294,7 @@ function RacaoSearchInput({
   disabled = false,
   hint,
   label,
+  loading = false,
   onChange,
   onClear,
   onSelect,
@@ -273,7 +369,10 @@ function RacaoSearchInput({
 
       {aberto && !disabled && (
         <div className="racao-options" role="listbox">
-          {opcoes.length === 0 ? (
+          {loading && (
+            <div className="racao-empty">Buscando no cadastro...</div>
+          )}
+          {!loading && opcoes.length === 0 ? (
             <div className="racao-empty">Nenhuma ração encontrada.</div>
           ) : (
             opcoes.map((produto) => (
@@ -323,8 +422,12 @@ function RacaoSearchInput({
 
 export default function CalculadoraRacao() {
   const [produtos, setProdutos] = useState([]);
+  const [produtosBuscaPrincipal, setProdutosBuscaPrincipal] = useState([]);
+  const [produtosBuscaComparativo, setProdutosBuscaComparativo] = useState([]);
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingBuscaPrincipal, setLoadingBuscaPrincipal] = useState(false);
+  const [loadingBuscaComparativo, setLoadingBuscaComparativo] = useState(false);
 
   // Formulário
   const [form, setForm] = useState({
@@ -353,12 +456,36 @@ export default function CalculadoraRacao() {
   }, []);
 
   const produtosComAptidao = useMemo(
-    () =>
-      produtos.map((produto) => ({
-        ...produto,
-        aptidao: avaliarAptidaoRacao(produto),
-      })),
+    () => prepararProdutosComAptidao(produtos),
     [produtos],
+  );
+
+  const produtosBuscaPrincipalComAptidao = useMemo(
+    () => prepararProdutosComAptidao(produtosBuscaPrincipal),
+    [produtosBuscaPrincipal],
+  );
+
+  const produtosBuscaComparativoComAptidao = useMemo(
+    () => prepararProdutosComAptidao(produtosBuscaComparativo),
+    [produtosBuscaComparativo],
+  );
+
+  const opcoesRacaoPrincipal = useMemo(
+    () =>
+      combinarProdutosComAptidao(
+        produtosBuscaPrincipalComAptidao,
+        produtosComAptidao,
+      ),
+    [produtosBuscaPrincipalComAptidao, produtosComAptidao],
+  );
+
+  const opcoesRacaoComparativo = useMemo(
+    () =>
+      combinarProdutosComAptidao(
+        produtosBuscaComparativoComAptidao,
+        produtosComAptidao,
+      ),
+    [produtosBuscaComparativoComAptidao, produtosComAptidao],
   );
 
   const resumoAptidao = useMemo(() => {
@@ -369,8 +496,84 @@ export default function CalculadoraRacao() {
     };
   }, [produtosComAptidao]);
 
+  useEffect(() => {
+    const termo = String(form.produto_nome || "").trim();
+
+    if (form.produto_id || termo.length < 2) {
+      setProdutosBuscaPrincipal([]);
+      setLoadingBuscaPrincipal(false);
+      return undefined;
+    }
+
+    let ativo = true;
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingBuscaPrincipal(true);
+        const racoes = await buscarRacoesNoCadastro(termo);
+
+        if (ativo) {
+          setProdutosBuscaPrincipal(racoes);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar rações no cadastro:", error);
+        if (ativo) {
+          setProdutosBuscaPrincipal([]);
+        }
+      } finally {
+        if (ativo) {
+          setLoadingBuscaPrincipal(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
+  }, [form.produto_nome, form.produto_id]);
+
+  useEffect(() => {
+    const termo = String(form.produto_comparar_nome || "").trim();
+
+    if (form.produto_comparar_id || termo.length < 2) {
+      setProdutosBuscaComparativo([]);
+      setLoadingBuscaComparativo(false);
+      return undefined;
+    }
+
+    let ativo = true;
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingBuscaComparativo(true);
+        const racoes = await buscarRacoesNoCadastro(termo);
+
+        if (ativo) {
+          setProdutosBuscaComparativo(racoes);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar rações para comparação:", error);
+        if (ativo) {
+          setProdutosBuscaComparativo([]);
+        }
+      } finally {
+        if (ativo) {
+          setLoadingBuscaComparativo(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      ativo = false;
+      clearTimeout(timer);
+    };
+  }, [form.produto_comparar_nome, form.produto_comparar_id]);
+
   const buscarProdutoComAptidao = (produtoId) =>
-    produtosComAptidao.find((produto) => String(produto.id) === String(produtoId));
+    combinarProdutosComAptidao(
+      produtosComAptidao,
+      produtosBuscaPrincipalComAptidao,
+      produtosBuscaComparativoComAptidao,
+    ).find((produto) => String(produto.id) === String(produtoId));
 
   const validarProdutoApto = (produtoId, contexto = "ração") => {
     const produto = buscarProdutoComAptidao(produtoId);
@@ -416,7 +619,7 @@ export default function CalculadoraRacao() {
   };
 
   const alterarBuscaRacaoPrincipal = (valor) => {
-    const produtoExato = produtosComAptidao.find(
+    const produtoExato = opcoesRacaoPrincipal.find(
       (produto) => formatarRacaoLabel(produto) === valor,
     );
 
@@ -431,7 +634,7 @@ export default function CalculadoraRacao() {
   };
 
   const alterarBuscaRacaoComparativo = (valor) => {
-    const produtoExato = produtosComAptidao.find(
+    const produtoExato = opcoesRacaoComparativo.find(
       (produto) => formatarRacaoLabel(produto) === valor,
     );
 
@@ -447,7 +650,14 @@ export default function CalculadoraRacao() {
     try {
       console.log("🔍 Iniciando carregamento de produtos...");
 
-      const response = await api.get("/produtos/");
+      const response = await api.get("/produtos/", {
+        params: {
+          page: 1,
+          page_size: 1000,
+          include_variations: true,
+          ativo: true,
+        },
+      });
 
       console.log("📡 Resposta da API:", {
         status: response.status,
@@ -474,9 +684,7 @@ export default function CalculadoraRacao() {
       }
 
       // A API retorna objeto paginado: {items: [], total: X}
-      const listaProdutos = Array.isArray(data)
-        ? data
-        : data.items || data.produtos || [];
+      const listaProdutos = extrairListaProdutos(data);
       console.log("📦 Total de produtos recebidos:", listaProdutos.length);
       console.log(
         "📦 Estrutura da resposta:",
@@ -881,7 +1089,8 @@ export default function CalculadoraRacao() {
                   categoria_racao: "",
                 }))
               }
-              produtos={produtosComAptidao}
+              produtos={opcoesRacaoPrincipal}
+              loading={loadingBuscaPrincipal}
               placeholder="Digite ou selecione uma ração"
               hint={`${resumoAptidao.aptas} aptas para análise · ${resumoAptidao.incompletas} com cadastro incompleto`}
             />
@@ -930,7 +1139,8 @@ export default function CalculadoraRacao() {
                     produto_comparar_nome: "",
                   }))
                 }
-                produtos={produtosComAptidao}
+                produtos={opcoesRacaoComparativo}
+                loading={loadingBuscaComparativo}
                 placeholder="Digite ou selecione uma ração"
                 disabled={form.classificacao !== ""}
                 warning={

@@ -256,18 +256,29 @@ def _digits_expr(column):
     return func.regexp_replace(func.coalesce(column, ""), "[^0-9]", "", "g")
 
 
+def _unaccent_text(column):
+    return func.unaccent(func.coalesce(column, ""))
+
+
+def _unaccent_ilike(column, pattern: str):
+    return _unaccent_text(column).ilike(func.unaccent(pattern))
+
+
 def _produto_search_conditions(palavra: str):
     """Busca por texto e tambem por codigos numericos normalizados."""
     termo = (palavra or "").strip()
     busca_pattern = f"%{termo}%"
     conditions = [
-        Produto.nome.ilike(busca_pattern),
-        Produto.codigo.ilike(busca_pattern),
-        Produto.codigo_barras.ilike(busca_pattern),
+        _unaccent_ilike(Produto.nome, busca_pattern),
+        _unaccent_ilike(Produto.codigo, busca_pattern),
+        _unaccent_ilike(Produto.codigo_barras, busca_pattern),
+        Produto.marca.has(_unaccent_ilike(Marca.nome, busca_pattern)),
+        Produto.categoria.has(_unaccent_ilike(Categoria.nome, busca_pattern)),
+        Produto.departamento.has(_unaccent_ilike(Departamento.nome, busca_pattern)),
     ]
 
     if PRODUTO_SKU_COLUMN is not None:
-        conditions.append(PRODUTO_SKU_COLUMN.ilike(busca_pattern))
+        conditions.append(_unaccent_ilike(PRODUTO_SKU_COLUMN, busca_pattern))
 
     digitos = _only_digits(termo)
     if len(digitos) >= 4:
