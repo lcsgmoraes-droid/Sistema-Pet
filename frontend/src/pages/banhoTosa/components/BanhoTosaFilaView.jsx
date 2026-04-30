@@ -33,14 +33,11 @@ const ETAPA_POR_STATUS = {
   em_tosa: "tosa",
   pronto: "pronto",
 };
-const ETAPAS_OPERACIONAIS = new Set(["banho", "secagem", "tosa", "higiene", "preparo"]);
-
 export default function BanhoTosaFilaView({ config, funcionarios, recursos, onChanged }) {
   const [atendimentos, setAtendimentos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [savingFluxo, setSavingFluxo] = useState(false);
-  const [tick, setTick] = useState(0);
   const [fluxoLocal, setFluxoLocal] = useState(() => normalizarFluxo(config?.fluxo_etapas));
   const [atendimentoSelecionadoId, setAtendimentoSelecionadoId] = useState(null);
 
@@ -50,11 +47,6 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
 
   useEffect(() => {
     carregarFila();
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
-    return () => window.clearInterval(timer);
   }, []);
 
   const fluxo = useMemo(() => normalizarFluxo(fluxoLocal), [fluxoLocal]);
@@ -104,43 +96,13 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
     try {
       await banhoTosaApi.moverEtapaAtendimento(atendimento.id, {
         tipo: etapa,
-        iniciar_timer: Boolean(options.iniciarTimer),
+        iniciar_timer: false,
         resetar_fluxo: Boolean(options.resetarFluxo),
       });
       await carregarFila();
       await onChanged(true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Nao foi possivel mover a etapa."));
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  async function iniciarContador(atendimento, etapa) {
-    if (!etapa || !ETAPAS_OPERACIONAIS.has(etapa)) return;
-
-    setProcessingId(atendimento.id);
-    try {
-      await banhoTosaApi.iniciarEtapa(atendimento.id, { tipo: etapa });
-      await carregarFila();
-      await onChanged(true);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel iniciar o contador da etapa."));
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  async function resetarEtapa(atendimento, etapa) {
-    if (!etapa?.id) return;
-
-    setProcessingId(atendimento.id);
-    try {
-      await banhoTosaApi.resetarEtapa(atendimento.id, etapa.id);
-      await carregarFila();
-      await onChanged(true);
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel resetar o contador da etapa."));
     } finally {
       setProcessingId(null);
     }
@@ -252,10 +214,7 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
                         atendimento={atendimento}
                         fluxo={fluxo}
                         processing={processingId === atendimento.id}
-                        tick={tick}
                         onMover={moverEtapa}
-                        onIniciar={iniciarContador}
-                        onResetarEtapa={resetarEtapa}
                         onSelect={setAtendimentoSelecionadoId}
                       />
                     ))}
@@ -289,19 +248,12 @@ function AtendimentoCard({
   atendimento,
   fluxo,
   processing,
-  tick,
   onMover,
-  onIniciar,
-  onResetarEtapa,
   onSelect,
 }) {
   const [openSelector, setOpenSelector] = useState(false);
   const atual = etapaAtual(atendimento);
   const proxima = proximaEtapa(atendimento, fluxo);
-  const aberta = etapaAberta(atendimento);
-  const timer = timerEtapa(atendimento, tick);
-  const etapaOperacional = ETAPAS_OPERACIONAIS.has(atual);
-  const etapaRodando = Boolean(aberta);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -326,30 +278,6 @@ function AtendimentoCard({
         </p>
       )}
 
-      {timer && (
-        <div
-          className={`mt-3 rounded-2xl px-3 py-2 text-sm font-black ${
-            timer.remaining < 0
-              ? "bg-red-50 text-red-700"
-              : timer.remaining <= 300
-                ? "bg-amber-50 text-amber-700"
-                : "bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {timer.remaining < 0 ? "Atraso " : "Tempo restante "}
-          {formatTempo(timer.remaining)}
-          <span className="ml-2 text-xs font-semibold opacity-75">
-            previsto {timer.previstoMin} min
-          </span>
-        </div>
-      )}
-
-      {etapaOperacional && !etapaRodando && (
-        <div className="mt-3 rounded-2xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700">
-          Contador parado para {labelEtapa(atual).toLowerCase()}. Inicie quando o pet entrar nessa etapa.
-        </div>
-      )}
-
       <BanhoTosaVetAlertas
         compact
         perfil={atendimento.perfil_comportamental_snapshot}
@@ -357,58 +285,25 @@ function AtendimentoCard({
       />
 
       <div className="mt-4 space-y-2">
-        {atual === "chegou" && proxima && ETAPAS_OPERACIONAIS.has(proxima) && (
+        {proxima && atual !== "pronto" && (
           <button
             type="button"
             disabled={processing}
-            onClick={() => onMover(atendimento, proxima, { iniciarTimer: true })}
+            onClick={() => onMover(atendimento, proxima)}
             className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
           >
-            {processing ? "Atualizando..." : `Iniciar ${labelEtapa(proxima).toLowerCase()}`}
+            {processing ? "Atualizando..." : acaoProximaLabel(proxima, atual !== "chegou")}
           </button>
         )}
 
-        {etapaOperacional && !etapaRodando && (
+        {atual === "pronto" && proxima === "entregue" && (
           <button
             type="button"
             disabled={processing}
-            onClick={() => onIniciar(atendimento, atual)}
-            className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-          >
-            {processing ? "Atualizando..." : `Iniciar contador de ${labelEtapa(atual).toLowerCase()}`}
-          </button>
-        )}
-
-        {etapaRodando && proxima && (
-          <button
-            type="button"
-            disabled={processing}
-            onClick={() => onMover(atendimento, proxima, { iniciarTimer: false })}
-            className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-          >
-            {processing ? "Atualizando..." : acaoProximaLabel(proxima, true)}
-          </button>
-        )}
-
-        {!etapaRodando && atual === "pronto" && proxima === "entregue" && (
-          <button
-            type="button"
-            disabled={processing}
-            onClick={() => onMover(atendimento, proxima, { iniciarTimer: false })}
+            onClick={() => onMover(atendimento, proxima)}
             className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
           >
             {processing ? "Atualizando..." : "Entregar"}
-          </button>
-        )}
-
-        {etapaRodando && (
-          <button
-            type="button"
-            disabled={processing}
-            onClick={() => onResetarEtapa(atendimento, aberta)}
-            className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
-          >
-            Resetar contador desta etapa
           </button>
         )}
 
@@ -444,7 +339,7 @@ function AtendimentoCard({
                   onMover(
                     atendimento,
                     etapa,
-                    etapa === "chegou" ? { resetarFluxo: true } : { iniciarTimer: false },
+                    etapa === "chegou" ? { resetarFluxo: true } : {},
                   );
                 }}
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-slate-300"
@@ -516,27 +411,4 @@ function proximaEtapa(atendimento, fluxo) {
     return fluxo[index + 1];
   }
   return STATUS_POR_ETAPA[atual] === "pronto" ? "entregue" : null;
-}
-
-function timerEtapa(atendimento, tick) {
-  void tick;
-  const aberta = etapaAberta(atendimento);
-  const previstoMin = Number(aberta?.tempo_previsto_minutos || atendimento.tempo_previsto_minutos || 0);
-  if (!aberta?.inicio_em || !previstoMin) return null;
-  const inicioMs = new Date(aberta.inicio_em).getTime();
-  if (!Number.isFinite(inicioMs)) return null;
-  const decorrido = Math.max(0, Math.floor((Date.now() - inicioMs) / 1000));
-  return {
-    previstoMin,
-    decorrido,
-    remaining: previstoMin * 60 - decorrido,
-  };
-}
-
-function formatTempo(seconds) {
-  const abs = Math.abs(Number(seconds || 0));
-  const minutes = Math.floor(abs / 60);
-  const rest = abs % 60;
-  const prefix = Number(seconds || 0) < 0 ? "-" : "";
-  return `${prefix}${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`;
 }

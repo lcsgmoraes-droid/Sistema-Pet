@@ -133,7 +133,8 @@ export default function BanhoTosaScreen() {
         </Text>
       </View>
 
-      {calendario?.visivel ? (
+      {calendario ? (
+        calendario.visivel ? (
         <View style={styles.calendarCard}>
           <Text style={styles.sectionTitle}>Agenda disponivel</Text>
           <Text style={styles.sectionText}>
@@ -194,6 +195,14 @@ export default function BanhoTosaScreen() {
             </View>
           ))}
         </View>
+        ) : (
+          <View style={styles.calendarCard}>
+            <Text style={styles.sectionTitle}>Agenda do banho e tosa</Text>
+            <Text style={styles.sectionText}>
+              A loja ainda nao liberou a visualizacao dos horarios no app. Quando ativar o calendario no ERP, os horarios livres e ocupados aparecem aqui.
+            </Text>
+          </View>
+        )
       ) : null}
 
       {itens.length === 0 ? (

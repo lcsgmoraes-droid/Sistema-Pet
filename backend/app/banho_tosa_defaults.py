@@ -28,6 +28,7 @@ CONFIG_PADRAO = {
     "percentual_taxas_padrao": Decimal("3.5000"),
     "custo_rateio_operacional_padrao": Decimal("5.00"),
     "horas_produtivas_mes_padrao": Decimal("176.00"),
+    "mostrar_calendario_cliente": True,
     "fluxo_etapas": ["chegou", "banho", "secagem", "tosa", "pronto"],
 }
 

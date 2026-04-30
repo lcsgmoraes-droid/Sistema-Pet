@@ -20,6 +20,8 @@ import ChatIAModal from "./ChatIAModal";
 import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
 
+const DRE_REQUEST_TIMEOUT_MS = 120000;
+
 const DRE = () => {
   // Controle de tabs
   const [tabAtiva, setTabAtiva] = useState("demonstrativo"); // demonstrativo, extrato, analise
@@ -68,6 +70,7 @@ const DRE = () => {
 
       const response = await api.get(`/financeiro/dre/canais`, {
         params: { ano, mes, canais: canaisParam },
+        timeout: DRE_REQUEST_TIMEOUT_MS,
       });
 
       setDados(response.data);
@@ -151,6 +154,7 @@ const DRE = () => {
       const response = await api.get(`/financeiro/dre/export/pdf`, {
         params: { ano, mes },
         responseType: "blob",
+        timeout: DRE_REQUEST_TIMEOUT_MS,
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -176,6 +180,7 @@ const DRE = () => {
       const response = await api.get(`/financeiro/dre/export/excel`, {
         params: { ano, mes },
         responseType: "blob",
+        timeout: DRE_REQUEST_TIMEOUT_MS,
       });
 
       const url = window.URL.createObjectURL(new Blob([response.data]));

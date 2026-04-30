@@ -31,7 +31,7 @@ from .produtos_models import (
     NotaEntrada, NotaEntradaItem, ProdutoHistoricoPreco,
     ProdutoFornecedor
 )
-from .financeiro_models import ContaPagar
+from .financeiro_models import ContaPagar, TipoDespesa
 from .fiscal_patterns import aplicar_inteligencia_fiscal, identificar_padrao_fiscal
 
 import logging
@@ -84,6 +84,28 @@ ACOES_CONFERENCIA_VALIDAS = {
     "nf_devolucao",
     "ajuste_interno",
 }
+
+
+def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
+    nomes_prioritarios = [
+        "Produto para Revenda",
+        "Fornecedor de Produto para Revenda",
+    ]
+    for nome in nomes_prioritarios:
+        tipo = db.query(TipoDespesa).filter(
+            TipoDespesa.tenant_id == tenant_id,
+            func.lower(TipoDespesa.nome) == nome.lower(),
+            TipoDespesa.ativo.is_(True),
+        ).first()
+        if tipo:
+            return tipo.id
+
+    tipo = db.query(TipoDespesa).filter(
+        TipoDespesa.tenant_id == tenant_id,
+        TipoDespesa.nome.ilike("%produto%revenda%"),
+        TipoDespesa.ativo.is_(True),
+    ).order_by(TipoDespesa.nome.asc()).first()
+    return tipo.id if tipo else None
 
 
 class ConferenciaItemPayload(BaseModel):
@@ -1069,6 +1091,7 @@ def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, 
     
     total_duplicatas = len(duplicatas)
     eh_parcelado = total_duplicatas > 1
+    tipo_produto_revenda_id = _obter_tipo_produto_revenda_id(db, tenant_id)
     
     for idx, dup in enumerate(duplicatas, 1):
         try:
@@ -1079,6 +1102,7 @@ def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, 
             # Criar conta a pagar
             conta = ContaPagar(
                 fornecedor_id=nota.fornecedor_id,
+                tipo_despesa_id=tipo_produto_revenda_id,
                 descricao=f"NF-e {nota.numero_nota} - Parcela {dup['numero']}",
                 valor_original=valor_reais,
                 valor_final=valor_reais,

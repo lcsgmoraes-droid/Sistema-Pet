@@ -13,6 +13,7 @@ Exemplos pré-cadastrados:
   Comissões         → Variável
 """
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -60,7 +61,7 @@ TIPOS_PADRAO = [
     {"nome": "Seguro",                            "e_custo_fixo": True, "dre_subcategoria_id": 2},
     {"nome": "Marketing / Publicidade Fixo",      "e_custo_fixo": True, "dre_subcategoria_id": 2},
     # Variáveis
-    {"nome": "Fornecedor de Produto para Revenda","e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Produto para Revenda",            "e_custo_fixo": False, "dre_subcategoria_id": 2},
     {"nome": "Frete de Compra",                   "e_custo_fixo": False, "dre_subcategoria_id": 2},
     {"nome": "Comissões de Vendas",               "e_custo_fixo": False, "dre_subcategoria_id": 2},
     {"nome": "Embalagens",                        "e_custo_fixo": False, "dre_subcategoria_id": 2},
@@ -84,7 +85,7 @@ def listar_tipos_despesa(
 
     tipos = db.query(TipoDespesa).filter(
         TipoDespesa.tenant_id == tenant_id
-    ).order_by(TipoDespesa.e_custo_fixo.desc(), TipoDespesa.nome).all()
+    ).order_by(func.lower(TipoDespesa.nome)).all()
 
     # Seed automático na primeira vez
     if not tipos:
@@ -94,7 +95,7 @@ def listar_tipos_despesa(
         db.commit()
         tipos = db.query(TipoDespesa).filter(
             TipoDespesa.tenant_id == tenant_id
-        ).order_by(TipoDespesa.e_custo_fixo.desc(), TipoDespesa.nome).all()
+        ).order_by(func.lower(TipoDespesa.nome)).all()
 
     return tipos
 

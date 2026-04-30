@@ -167,6 +167,28 @@ def _identificar_origem_conta_pagar(conta: ContaPagar) -> dict:
     }
 
 
+def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
+    nomes_prioritarios = [
+        "Produto para Revenda",
+        "Fornecedor de Produto para Revenda",
+    ]
+    for nome in nomes_prioritarios:
+        tipo = db.query(TipoDespesa).filter(
+            TipoDespesa.tenant_id == tenant_id,
+            func.lower(TipoDespesa.nome) == nome.lower(),
+            TipoDespesa.ativo.is_(True),
+        ).first()
+        if tipo:
+            return tipo.id
+
+    tipo = db.query(TipoDespesa).filter(
+        TipoDespesa.tenant_id == tenant_id,
+        TipoDespesa.nome.ilike("%produto%revenda%"),
+        TipoDespesa.ativo.is_(True),
+    ).order_by(TipoDespesa.nome.asc()).first()
+    return tipo.id if tipo else None
+
+
 # ============================================================================
 # FUNÇÃO HELPER: CALCULAR PRÓXIMA DATA DE RECORRÊNCIA
 # ============================================================================
@@ -225,6 +247,10 @@ async def criar_conta_pagar(
         if conta.dre_subcategoria_id is None:
             # Padrão: subcategoria 2 (Despesas Operacionais ou equivalente)
             conta.dre_subcategoria_id = 2
+
+        tipo_despesa_id = conta.tipo_despesa_id
+        if conta.nota_entrada_id and not tipo_despesa_id:
+            tipo_despesa_id = _obter_tipo_produto_revenda_id(db, tenant_id)
         
         # ============================
         # VALIDAÇÃO DRE - CRÍTICA
@@ -252,6 +278,7 @@ async def criar_conta_pagar(
                 categoria_id=conta.categoria_id,
                 dre_subcategoria_id=conta.dre_subcategoria_id,
                 canal=conta.canal,
+                tipo_despesa_id=tipo_despesa_id,
                 valor_original=conta.valor_original,
                 valor_final=conta.valor_original,
                 data_emissao=conta.data_emissao,
@@ -289,6 +316,7 @@ async def criar_conta_pagar(
                     categoria_id=conta.categoria_id,
                     dre_subcategoria_id=conta.dre_subcategoria_id,
                     canal=conta.canal,
+                    tipo_despesa_id=tipo_despesa_id,
                     valor_original=valor_parcela,
                     valor_final=valor_parcela,
                     data_emissao=conta.data_emissao,
@@ -315,7 +343,7 @@ async def criar_conta_pagar(
                 categoria_id=conta.categoria_id,
                 dre_subcategoria_id=conta.dre_subcategoria_id,
                 canal=conta.canal,
-                tipo_despesa_id=conta.tipo_despesa_id,
+                tipo_despesa_id=tipo_despesa_id,
                 valor_original=conta.valor_original,
                 valor_final=conta.valor_original,
                 data_emissao=conta.data_emissao,
@@ -522,6 +550,7 @@ def listar_contas_pagar(
     tipo_custo: Optional[str] = Query(None),  # 'fixo', 'variavel'
     origem: Optional[str] = Query(None),
     busca: Optional[str] = Query(None),
+    fornecedor_nome: Optional[str] = Query(None),
     data_campo: str = Query("vencimento"),
     data_inicio: Optional[date] = Query(None),
     data_fim: Optional[date] = Query(None),
@@ -554,6 +583,23 @@ def listar_contas_pagar(
             query = query.filter(ContaPagar.status == status_normalizado)
     if fornecedor_id:
         query = query.filter(ContaPagar.fornecedor_id == fornecedor_id)
+    termo_fornecedor = (fornecedor_nome or "").strip()
+    if termo_fornecedor:
+        fornecedor_pattern = f"%{termo_fornecedor}%"
+        fornecedores_match = (
+            select(Cliente.id)
+            .where(
+                Cliente.tenant_id == tenant_id,
+                or_(
+                    Cliente.nome.ilike(fornecedor_pattern),
+                    Cliente.nome_fantasia.ilike(fornecedor_pattern),
+                    Cliente.razao_social.ilike(fornecedor_pattern),
+                    Cliente.cnpj.ilike(fornecedor_pattern),
+                    Cliente.cpf.ilike(fornecedor_pattern),
+                ),
+            )
+        )
+        query = query.filter(ContaPagar.fornecedor_id.in_(fornecedores_match))
     if categoria_id:
         query = query.filter(ContaPagar.categoria_id == categoria_id)
     if tipo_despesa_id:

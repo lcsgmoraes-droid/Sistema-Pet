@@ -84,7 +84,7 @@ class DREPorCanalResponse(BaseModel):
 
 # ==================== FUNÇÕES AUXILIARES ====================
 
-def obter_vendas_por_canal(db: Session, mes: int, ano: int, user_id: int) -> Dict:
+def _obter_vendas_por_canal_legacy(db: Session, mes: int, ano: int, user_id: int) -> Dict:
     """Retorna vendas agrupadas por canal"""
     vendas = db.query(Venda).filter(
         and_(
@@ -128,6 +128,81 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, user_id: int) -> Dic
                 custo = Decimal(str(produto.preco_custo)) * item.quantidade
                 dados_por_canal[canal]['cmv'] += custo
     
+    return dados_por_canal
+
+
+def _periodo_mes(mes: int, ano: int) -> tuple[datetime, datetime]:
+    inicio = datetime(ano, mes, 1)
+    fim = datetime(ano + 1, 1, 1) if mes == 12 else datetime(ano, mes + 1, 1)
+    return inicio, fim
+
+
+def _decimal(valor) -> Decimal:
+    return Decimal(str(valor or 0))
+
+
+def _canal_expr():
+    return func.coalesce(Venda.canal, 'loja_fisica')
+
+
+def _novo_canal() -> Dict:
+    return {
+        'receita_produtos': Decimal('0'),
+        'taxa_entrega': Decimal('0'),
+        'descontos': Decimal('0'),
+        'cmv': Decimal('0'),
+    }
+
+
+def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> Dict:
+    """Retorna vendas agrupadas por canal sem consulta N+1."""
+    inicio, fim = _periodo_mes(mes, ano)
+    filtros_venda = [
+        Venda.tenant_id == tenant_id,
+        Venda.data_venda >= inicio,
+        Venda.data_venda < fim,
+        Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial']),
+    ]
+
+    dados_por_canal: Dict[str, Dict] = {}
+
+    totais_venda = (
+        db.query(
+            _canal_expr().label("canal"),
+            func.coalesce(func.sum(Venda.subtotal), 0).label("receita_produtos"),
+            func.coalesce(func.sum(Venda.taxa_entrega), 0).label("taxa_entrega"),
+            func.coalesce(func.sum(Venda.desconto_valor), 0).label("descontos"),
+        )
+        .filter(and_(*filtros_venda))
+        .group_by(_canal_expr())
+        .all()
+    )
+
+    for row in totais_venda:
+        canal = row.canal or 'loja_fisica'
+        dados = dados_por_canal.setdefault(canal, _novo_canal())
+        dados['receita_produtos'] = _decimal(row.receita_produtos)
+        dados['taxa_entrega'] = _decimal(row.taxa_entrega)
+        dados['descontos'] = _decimal(row.descontos)
+
+    custos = (
+        db.query(
+            _canal_expr().label("canal"),
+            func.coalesce(func.sum(VendaItem.quantidade * func.coalesce(Produto.preco_custo, 0)), 0).label("cmv"),
+        )
+        .select_from(Venda)
+        .join(VendaItem, VendaItem.venda_id == Venda.id)
+        .outerjoin(Produto, Produto.id == VendaItem.produto_id)
+        .filter(and_(*filtros_venda))
+        .group_by(_canal_expr())
+        .all()
+    )
+
+    for row in custos:
+        canal = row.canal or 'loja_fisica'
+        dados = dados_por_canal.setdefault(canal, _novo_canal())
+        dados['cmv'] = _decimal(row.cmv)
+
     return dados_por_canal
 
 
@@ -202,10 +277,10 @@ def gerar_dre_por_canais(
     periodo = f"{meses[mes]}/{ano}"
     
     # Extrair user e tenant
-    user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
     
     # Obter dados por canal
-    dados_canais = obter_vendas_por_canal(db, mes, ano, user.id)
+    dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
     
     # Filtrar apenas os canais selecionados e garantir que existam
     dados_canais_filtrados = {}

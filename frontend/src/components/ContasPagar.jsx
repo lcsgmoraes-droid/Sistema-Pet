@@ -21,6 +21,7 @@ const ContasPagar = () => {
     origem: 'todos',
     busca: '',
     data_campo: 'vencimento',
+    fornecedor_busca: '',
     tipo_despesa_id: ''
   });
   
@@ -139,6 +140,7 @@ const ContasPagar = () => {
     origem: 'todos',
     busca: '',
     data_campo: 'vencimento',
+    fornecedor_busca: '',
     tipo_despesa_id: ''
   };
 
@@ -156,6 +158,7 @@ const ContasPagar = () => {
       if (filtrosParaAplicar.tipo_custo !== 'todos') params.append('tipo_custo', filtrosParaAplicar.tipo_custo);
       if (filtrosParaAplicar.origem !== 'todos') params.append('origem', filtrosParaAplicar.origem);
       if (filtrosParaAplicar.busca) params.append('busca', filtrosParaAplicar.busca);
+      if (filtrosParaAplicar.fornecedor_busca) params.append('fornecedor_nome', filtrosParaAplicar.fornecedor_busca);
       if (filtrosParaAplicar.data_campo) params.append('data_campo', filtrosParaAplicar.data_campo);
       if (filtrosParaAplicar.tipo_despesa_id) params.append('tipo_despesa_id', filtrosParaAplicar.tipo_despesa_id);
       
@@ -171,15 +174,14 @@ const ContasPagar = () => {
     }
   };
 
-  const filtrarDespesasCaixaHoje = () => {
-    const hoje = new Date().toISOString().split('T')[0];
+  const filtrarDespesasCaixa = () => {
     const filtrosCaixa = {
       ...filtrosPadrao,
       status: 'pago',
       origem: 'caixa_pdv',
-      data_campo: 'pagamento',
-      data_inicio: hoje,
-      data_fim: hoje
+      data_campo: filtros.data_campo || 'pagamento',
+      data_inicio: filtros.data_inicio,
+      data_fim: filtros.data_fim
     };
     setFiltros(filtrosCaixa);
     aplicarFiltros(filtrosCaixa);
@@ -383,6 +385,10 @@ const ContasPagar = () => {
     );
   };
 
+  const tiposDespesaOrdenados = [...safeArray(tiposDespesa)].sort((a, b) =>
+    String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
+  );
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a pagar...</div>;
   }
@@ -446,16 +452,14 @@ const ContasPagar = () => {
 
           <div className="md:col-span-3">
             <label className="block text-sm font-medium mb-1">Fornecedor</label>
-            <select
+            <input
+              type="text"
               className="w-full border border-gray-300 rounded px-3 py-2"
-              value={filtros.fornecedor_id || ''}
-              onChange={(e) => setFiltros({...filtros, fornecedor_id: e.target.value || null})}
-            >
-              <option value="">Todos</option>
-              {safeArray(fornecedores).map(f => (
-                <option key={f.id} value={f.id}>{f.nome}</option>
-              ))}
-            </select>
+              placeholder="Digite nome, fantasia, CPF ou CNPJ..."
+              value={filtros.fornecedor_busca || ''}
+              onChange={(e) => setFiltros({...filtros, fornecedor_busca: e.target.value, fornecedor_id: null})}
+              onKeyDown={(e) => e.key === 'Enter' && aplicarFiltros()}
+            />
           </div>
 
           <div className="md:col-span-2">
@@ -466,7 +470,7 @@ const ContasPagar = () => {
               onChange={(e) => setFiltros({...filtros, tipo_despesa_id: e.target.value})}
             >
               <option value="">Todos</option>
-              {safeArray(tiposDespesa).map(t => (
+              {tiposDespesaOrdenados.map(t => (
                 <option key={t.id} value={t.id}>{t.nome}</option>
               ))}
             </select>
@@ -553,10 +557,10 @@ const ContasPagar = () => {
           <div className="md:col-span-5 flex flex-wrap items-end justify-end gap-2">
             <button
               className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded text-sm font-semibold"
-              onClick={filtrarDespesasCaixaHoje}
+              onClick={filtrarDespesasCaixa}
               type="button"
             >
-              Despesas do caixa hoje
+              Despesas do caixa
             </button>
             <button
               className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
@@ -1101,7 +1105,7 @@ const ContasPagar = () => {
                   onChange={(e) => setDadosClassificacao({ ...dadosClassificacao, tipo_despesa_id: e.target.value ? parseInt(e.target.value, 10) : null })}
                 >
                   <option value="">Selecione...</option>
-                  {safeArray(tiposDespesa).map((t) => (
+                  {tiposDespesaOrdenados.map((t) => (
                     <option key={t.id} value={t.id}>{t.nome}</option>
                   ))}
                 </select>
