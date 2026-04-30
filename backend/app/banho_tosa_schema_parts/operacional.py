@@ -26,6 +26,9 @@ class BanhoTosaMoverEtapaInput(BaseModel):
     recurso_id: Optional[int] = None
     observacoes: Optional[str] = None
     finalizar_etapa_atual: bool = True
+    iniciar_timer: bool = True
+    resetar_fluxo: bool = False
+    tempo_previsto_minutos: Optional[int] = Field(default=None, ge=0, le=1440)
 
 
 class BanhoTosaEtapaUpdate(BaseModel):

@@ -33,6 +33,7 @@ const ETAPA_POR_STATUS = {
   em_tosa: "tosa",
   pronto: "pronto",
 };
+const ETAPAS_OPERACIONAIS = new Set(["banho", "secagem", "tosa", "higiene", "preparo"]);
 
 export default function BanhoTosaFilaView({ config, funcionarios, recursos, onChanged }) {
   const [atendimentos, setAtendimentos] = useState([]);
@@ -96,16 +97,50 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
     salvarFluxo(novoFluxo);
   }
 
-  async function moverEtapa(atendimento, etapa) {
+  async function moverEtapa(atendimento, etapa, options = {}) {
     if (!etapa) return;
 
     setProcessingId(atendimento.id);
     try {
-      await banhoTosaApi.moverEtapaAtendimento(atendimento.id, { tipo: etapa });
+      await banhoTosaApi.moverEtapaAtendimento(atendimento.id, {
+        tipo: etapa,
+        iniciar_timer: Boolean(options.iniciarTimer),
+        resetar_fluxo: Boolean(options.resetarFluxo),
+      });
       await carregarFila();
       await onChanged(true);
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Nao foi possivel mover a etapa."));
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function iniciarContador(atendimento, etapa) {
+    if (!etapa || !ETAPAS_OPERACIONAIS.has(etapa)) return;
+
+    setProcessingId(atendimento.id);
+    try {
+      await banhoTosaApi.iniciarEtapa(atendimento.id, { tipo: etapa });
+      await carregarFila();
+      await onChanged(true);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel iniciar o contador da etapa."));
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function resetarEtapa(atendimento, etapa) {
+    if (!etapa?.id) return;
+
+    setProcessingId(atendimento.id);
+    try {
+      await banhoTosaApi.resetarEtapa(atendimento.id, etapa.id);
+      await carregarFila();
+      await onChanged(true);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Nao foi possivel resetar o contador da etapa."));
     } finally {
       setProcessingId(null);
     }
@@ -219,6 +254,8 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
                         processing={processingId === atendimento.id}
                         tick={tick}
                         onMover={moverEtapa}
+                        onIniciar={iniciarContador}
+                        onResetarEtapa={resetarEtapa}
                         onSelect={setAtendimentoSelecionadoId}
                       />
                     ))}
@@ -248,11 +285,23 @@ export default function BanhoTosaFilaView({ config, funcionarios, recursos, onCh
   );
 }
 
-function AtendimentoCard({ atendimento, fluxo, processing, tick, onMover, onSelect }) {
+function AtendimentoCard({
+  atendimento,
+  fluxo,
+  processing,
+  tick,
+  onMover,
+  onIniciar,
+  onResetarEtapa,
+  onSelect,
+}) {
   const [openSelector, setOpenSelector] = useState(false);
   const atual = etapaAtual(atendimento);
   const proxima = proximaEtapa(atendimento, fluxo);
+  const aberta = etapaAberta(atendimento);
   const timer = timerEtapa(atendimento, tick);
+  const etapaOperacional = ETAPAS_OPERACIONAIS.has(atual);
+  const etapaRodando = Boolean(aberta);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -295,22 +344,85 @@ function AtendimentoCard({ atendimento, fluxo, processing, tick, onMover, onSele
         </div>
       )}
 
+      {etapaOperacional && !etapaRodando && (
+        <div className="mt-3 rounded-2xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700">
+          Contador parado para {labelEtapa(atual).toLowerCase()}. Inicie quando o pet entrar nessa etapa.
+        </div>
+      )}
+
       <BanhoTosaVetAlertas
         compact
         perfil={atendimento.perfil_comportamental_snapshot}
         restricoes={atendimento.restricoes_veterinarias_snapshot}
       />
 
-      {proxima && (
-        <button
-          type="button"
-          disabled={processing}
-          onClick={() => onMover(atendimento, proxima)}
-          className="mt-4 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-        >
-          {processing ? "Atualizando..." : acaoProximaLabel(proxima)}
-        </button>
-      )}
+      <div className="mt-4 space-y-2">
+        {atual === "chegou" && proxima && ETAPAS_OPERACIONAIS.has(proxima) && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onMover(atendimento, proxima, { iniciarTimer: true })}
+            className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
+          >
+            {processing ? "Atualizando..." : `Iniciar ${labelEtapa(proxima).toLowerCase()}`}
+          </button>
+        )}
+
+        {etapaOperacional && !etapaRodando && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onIniciar(atendimento, atual)}
+            className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
+          >
+            {processing ? "Atualizando..." : `Iniciar contador de ${labelEtapa(atual).toLowerCase()}`}
+          </button>
+        )}
+
+        {etapaRodando && proxima && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onMover(atendimento, proxima, { iniciarTimer: false })}
+            className="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
+          >
+            {processing ? "Atualizando..." : acaoProximaLabel(proxima, true)}
+          </button>
+        )}
+
+        {!etapaRodando && atual === "pronto" && proxima === "entregue" && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onMover(atendimento, proxima, { iniciarTimer: false })}
+            className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {processing ? "Atualizando..." : "Entregar"}
+          </button>
+        )}
+
+        {etapaRodando && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onResetarEtapa(atendimento, aberta)}
+            className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
+          >
+            Resetar contador desta etapa
+          </button>
+        )}
+
+        {atual !== "chegou" && (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => onMover(atendimento, "chegou", { resetarFluxo: true })}
+            className="w-full rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+          >
+            Resetar para chegou
+          </button>
+        )}
+      </div>
 
       <div className="relative">
         <button
@@ -329,7 +441,11 @@ function AtendimentoCard({ atendimento, fluxo, processing, tick, onMover, onSele
                 disabled={processing || etapa === atual}
                 onClick={() => {
                   setOpenSelector(false);
-                  onMover(atendimento, etapa);
+                  onMover(
+                    atendimento,
+                    etapa,
+                    etapa === "chegou" ? { resetarFluxo: true } : { iniciarTimer: false },
+                  );
                 }}
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-orange-50 disabled:cursor-not-allowed disabled:text-slate-300"
               >
@@ -367,10 +483,11 @@ function labelEtapa(etapa) {
   return ETAPA_LABELS[etapa] || String(etapa || "").replace("_", " ");
 }
 
-function acaoProximaLabel(etapa) {
+function acaoProximaLabel(etapa, finalizando = false) {
   if (etapa === "entregue") return "Entregar";
-  if (etapa === "pronto") return "Marcar pronto";
-  return `Ir para ${labelEtapa(etapa).toLowerCase()}`;
+  if (etapa === "pronto") return finalizando ? "Finalizar e marcar pronto" : "Marcar pronto";
+  const destino = labelEtapa(etapa).toLowerCase();
+  return finalizando ? `Finalizar e enviar para ${destino}` : `Ir para ${destino}`;
 }
 
 function etapaAtual(atendimento) {

@@ -82,6 +82,8 @@ export const banhoTosaApi = {
     api.patch(`${BASE}/atendimentos/${atendimentoId}/etapas/${etapaId}`, data),
   finalizarEtapa: (atendimentoId, etapaId, data) =>
     api.post(`${BASE}/atendimentos/${atendimentoId}/etapas/${etapaId}/finalizar`, data),
+  resetarEtapa: (atendimentoId, etapaId) =>
+    api.post(`${BASE}/atendimentos/${atendimentoId}/etapas/${etapaId}/resetar`),
   obterCustoAtendimento: (id) => api.get(`${BASE}/custos/atendimentos/${id}`),
   recalcularCustoAtendimento: (id) =>
     api.post(`${BASE}/custos/atendimentos/${id}/recalcular`),
