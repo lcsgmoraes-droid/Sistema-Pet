@@ -206,23 +206,17 @@ const variantesBuscaRemota = (valor) => {
   return [...new Set(variantes.filter(Boolean))].slice(0, 3);
 };
 
-const buscarRacoesNoCadastro = async (termo) => {
-  const respostas = await Promise.all(
-    variantesBuscaRemota(termo).map((busca) =>
-      api.get("/produtos/", {
-        params: {
-          busca,
-          page: 1,
-          page_size: 30,
-          include_variations: true,
-          ativo: true,
-          _ts: Date.now(),
-        },
-      }),
-    ),
-  );
+const buscarRacoesNoCadastro = async (termo, pageSize = 80) => {
+  const response = await api.get("/produtos/calculadora-racao/opcoes", {
+    params: {
+      busca: String(termo || "").trim() || undefined,
+      page: 1,
+      page_size: pageSize,
+      _ts: Date.now(),
+    },
+  });
 
-  return respostas.flatMap((response) => extrairListaProdutos(response.data));
+  return extrairListaProdutos(response.data);
 };
 
 const textoBuscaRacao = (produto) =>
@@ -724,12 +718,11 @@ export default function CalculadoraRacao() {
     try {
       console.log("🔍 Iniciando carregamento de produtos...");
 
-      const response = await api.get("/produtos/", {
+      const response = await api.get("/produtos/calculadora-racao/opcoes", {
         params: {
           page: 1,
-          page_size: 1000,
-          include_variations: true,
-          ativo: true,
+          page_size: 1200,
+          _ts: Date.now(),
         },
       });
 
@@ -918,7 +911,7 @@ export default function CalculadoraRacao() {
 
     try {
       setLoading(true);
-      const response = await api.post("/api/produtos/calculadora-racao", {
+      const response = await api.post("/produtos/calculadora-racao", {
         produto_id: produtoIdCalculo,
         peso_pet_kg: parseFloat(form.peso_pet_kg),
         idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
@@ -963,7 +956,7 @@ export default function CalculadoraRacao() {
       // MODO 1x1: Se selecionou uma ração específica para comparar
       if (form.produto_comparar_id) {
         // Calcular SOMENTE para a ração selecionada no comparativo
-        const calcResponse = await api.post("/api/produtos/calculadora-racao", {
+        const calcResponse = await api.post("/produtos/calculadora-racao", {
           produto_id: parseInt(form.produto_comparar_id),
           peso_pet_kg: parseFloat(form.peso_pet_kg),
           idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
@@ -975,7 +968,7 @@ export default function CalculadoraRacao() {
         // Se também selecionou uma ração principal, calcular ela também
         if (form.produto_id) {
           const calcPrincipal = await api.post(
-            "/api/produtos/calculadora-racao",
+            "/produtos/calculadora-racao",
             {
               produto_id: parseInt(form.produto_id),
               peso_pet_kg: parseFloat(form.peso_pet_kg),
@@ -1011,7 +1004,7 @@ export default function CalculadoraRacao() {
         if (form.classificacao) params.classificacao = form.classificacao;
         if (form.especies) params.especies = form.especies;
 
-        const response = await api.post("/api/produtos/comparar-racoes", null, {
+        const response = await api.post("/produtos/comparar-racoes", null, {
           params,
         });
 
@@ -1026,7 +1019,7 @@ export default function CalculadoraRacao() {
 
           // Calcular a ração principal
           const calcPrincipal = await api.post(
-            "/api/produtos/calculadora-racao",
+            "/produtos/calculadora-racao",
             {
               produto_id: parseInt(form.produto_id),
               peso_pet_kg: parseFloat(form.peso_pet_kg),

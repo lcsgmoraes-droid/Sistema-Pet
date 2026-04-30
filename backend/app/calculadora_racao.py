@@ -5,15 +5,16 @@ Calcula duração, custo/dia, custo/kg e compara produtos
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Any, List, Optional
+from pydantic import BaseModel, Field
 import json
 import logging
 
 from .db import get_session
 from .auth import get_current_user, get_current_user_and_tenant
 from .models import User
-from .produtos_models import Produto
+from .partner_utils import get_all_accessible_tenant_ids
+from .produtos_models import Categoria, Marca, Produto
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/produtos", tags=["calculadora-racao"])
@@ -65,6 +66,46 @@ class ComparativoRacoesResponse(BaseModel):
     melhor_custo_beneficio: Optional[int] = None  # produto_id
     maior_duracao: Optional[int] = None  # produto_id
     menor_custo_diario: Optional[int] = None  # produto_id
+
+
+class RacaoCalculadoraOption(BaseModel):
+    id: int
+    nome: str
+    codigo: Optional[str] = None
+    sku: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    categoria_nome: Optional[str] = None
+    marca_nome: Optional[str] = None
+    tipo: Optional[str] = None
+    eh_racao: bool = True
+    classificacao_racao: Optional[str] = None
+    categoria_racao: Optional[str] = None
+    especies_indicadas: Optional[str] = None
+    peso_embalagem: Optional[float] = None
+    preco_venda: Optional[float] = None
+    linha_racao_id: Optional[int] = None
+    porte_animal_id: Optional[int] = None
+    fase_publico_id: Optional[int] = None
+    tipo_tratamento_id: Optional[int] = None
+    sabor_proteina_id: Optional[int] = None
+    apresentacao_peso_id: Optional[int] = None
+    porte_animal: Optional[Any] = None
+    fase_publico: Optional[Any] = None
+    tipo_tratamento: Optional[Any] = None
+    sabor_proteina: Optional[str] = None
+    tabela_consumo: Optional[str] = None
+    tabela_nutricional: Optional[str] = None
+    apta: bool = False
+    faltantes: List[str] = Field(default_factory=list)
+
+
+class RacoesCalculadoraOptionsResponse(BaseModel):
+    items: List[RacaoCalculadoraOption]
+    total: int
+    page: int
+    page_size: int
+    aptas: int
+    incompletas: int
 
 
 # ==================== FUNÇÕES AUXILIARES ====================
@@ -154,6 +195,84 @@ def _produto_eh_racao_expr():
             classificacao_normalizada != "",
             classificacao_normalizada.notin_(["nao", "não"]),
         ),
+    )
+
+
+def _usar_unaccent(db: Session) -> bool:
+    try:
+        return db.get_bind().dialect.name == "postgresql"
+    except Exception:
+        return False
+
+
+def _busca_ilike(column, pattern: str, db: Session):
+    if _usar_unaccent(db):
+        texto_coluna = func.lower(func.unaccent(func.coalesce(column, "")))
+        return texto_coluna.ilike(func.lower(func.unaccent(pattern)))
+
+    return func.lower(func.coalesce(column, "")).ilike(pattern.lower())
+
+
+def _busca_racao_conditions(palavra: str, db: Session):
+    termo = (palavra or "").strip()
+    busca_pattern = f"%{termo}%"
+    return or_(
+        _busca_ilike(Produto.nome, busca_pattern, db),
+        _busca_ilike(Produto.codigo, busca_pattern, db),
+        _busca_ilike(Produto.codigo_barras, busca_pattern, db),
+        _busca_ilike(Produto.classificacao_racao, busca_pattern, db),
+        _busca_ilike(Produto.categoria_racao, busca_pattern, db),
+        _busca_ilike(Produto.especies_indicadas, busca_pattern, db),
+        _busca_ilike(Produto.sabor_proteina, busca_pattern, db),
+        _busca_ilike(Categoria.nome, busca_pattern, db),
+        _busca_ilike(Marca.nome, busca_pattern, db),
+    )
+
+
+def _float_ou_none(valor) -> Optional[float]:
+    try:
+        if valor is None:
+            return None
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _serializar_opcao_racao(
+    produto: Produto,
+    categoria_nome: Optional[str],
+    marca_nome: Optional[str],
+) -> RacaoCalculadoraOption:
+    faltantes = _avaliar_aptidao_calculadora(produto)
+    return RacaoCalculadoraOption(
+        id=produto.id,
+        nome=produto.nome,
+        codigo=produto.codigo,
+        sku=getattr(produto, "sku", None),
+        codigo_barras=produto.codigo_barras,
+        categoria_nome=categoria_nome,
+        marca_nome=marca_nome,
+        tipo=produto.tipo,
+        eh_racao=_produto_tem_config_racao(produto),
+        classificacao_racao=produto.classificacao_racao,
+        categoria_racao=produto.categoria_racao,
+        especies_indicadas=produto.especies_indicadas,
+        peso_embalagem=_float_ou_none(produto.peso_embalagem),
+        preco_venda=_float_ou_none(produto.preco_venda),
+        linha_racao_id=produto.linha_racao_id,
+        porte_animal_id=produto.porte_animal_id,
+        fase_publico_id=produto.fase_publico_id,
+        tipo_tratamento_id=produto.tipo_tratamento_id,
+        sabor_proteina_id=produto.sabor_proteina_id,
+        apresentacao_peso_id=produto.apresentacao_peso_id,
+        porte_animal=produto.porte_animal,
+        fase_publico=produto.fase_publico,
+        tipo_tratamento=produto.tipo_tratamento,
+        sabor_proteina=produto.sabor_proteina,
+        tabela_consumo=produto.tabela_consumo,
+        tabela_nutricional=produto.tabela_nutricional,
+        apta=not faltantes,
+        faltantes=faltantes,
     )
 
 
@@ -358,6 +477,74 @@ def calcular_resultado(
 
 # ==================== ENDPOINTS ====================
 
+@router.get("/calculadora-racao/opcoes", response_model=RacoesCalculadoraOptionsResponse)
+async def listar_opcoes_calculadora_racao(
+    busca: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(120, ge=1, le=1500),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """
+    Lista leve de racoes para a calculadora.
+
+    Evita usar /produtos/, que carrega hierarquia, imagens, lotes e outros dados
+    desnecessarios para a busca da calculadora.
+    """
+    _current_user, tenant_id = user_and_tenant
+    access_ids = get_all_accessible_tenant_ids(db, tenant_id)
+    termo_busca = (busca or "").strip()
+
+    query = (
+        db.query(
+            Produto,
+            Categoria.nome.label("categoria_nome"),
+            Marca.nome.label("marca_nome"),
+        )
+        .outerjoin(Categoria, Produto.categoria_id == Categoria.id)
+        .outerjoin(Marca, Produto.marca_id == Marca.id)
+        .filter(
+            Produto.tenant_id.in_(access_ids),
+            or_(
+                Produto.tipo_produto.is_(None),
+                Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            ),
+            or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
+            Produto.deleted_at.is_(None),
+            _produto_eh_racao_expr(),
+        )
+    )
+
+    if termo_busca:
+        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
+        for palavra in palavras:
+            query = query.filter(_busca_racao_conditions(palavra, db))
+
+    total = query.count()
+    offset = (page - 1) * page_size
+    linhas = (
+        query.order_by(Produto.nome.asc(), Produto.id.asc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    items = [
+        _serializar_opcao_racao(produto, categoria_nome, marca_nome)
+        for produto, categoria_nome, marca_nome in linhas
+    ]
+    aptas = sum(1 for item in items if item.apta)
+
+    return RacoesCalculadoraOptionsResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        aptas=aptas,
+        incompletas=len(items) - aptas,
+    )
+
+
 @router.post("/calculadora-racao", response_model=ResultadoCalculoRacao)
 async def calcular_racao(
     req: CalculadoraRacaoRequest,
@@ -385,9 +572,10 @@ async def calcular_racao(
         categoria_racao = None
         
         if req.produto_id:
+            access_ids = get_all_accessible_tenant_ids(db, tenant_id)
             produto = db.query(Produto).filter(
                 Produto.id == req.produto_id,
-                Produto.tenant_id == tenant_id
+                Produto.tenant_id.in_(access_ids)
             ).first()
             
             if not produto:
@@ -473,8 +661,9 @@ async def comparar_racoes(
     
     try:
         # Buscar produtos que são rações
+        access_ids = get_all_accessible_tenant_ids(db, tenant_id)
         query = db.query(Produto).filter(
-            Produto.tenant_id == tenant_id,
+            Produto.tenant_id.in_(access_ids),
             _produto_eh_racao_expr(),
             Produto.peso_embalagem.isnot(None),
             Produto.peso_embalagem > 0,

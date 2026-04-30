@@ -268,12 +268,6 @@ const Layout = () => {
   }, [location.pathname, isMobile]);
 
   useEffect(() => {
-    if (isMobile && sidebarOpen) {
-      setSidebarOpen(false);
-    }
-  }, [isMobile, sidebarOpen]);
-
-  useEffect(() => {
     setCalculadoraAberta(false);
   }, [location.pathname]);
 
