@@ -1713,41 +1713,62 @@ const EntradaXML = () => {
       const pageWidth = doc.internal.pageSize.getWidth();
       const usableWidth = pageWidth - (marginX * 2);
       const tableStartY = 30;
-      const rowHeight = 6;
+      const minRowHeight = 7;
+      const lineHeight = 3.4;
 
       const colunas = [
-        { key: 'produto_nome', label: 'Produto', width: 30 },
-        { key: 'sku', label: 'SKU', width: 10 },
-        { key: 'nf_atual_numero', label: 'NF', width: 10 },
-        { key: 'custo_bruto_unitario', label: 'Bruto', width: 10 },
-        { key: 'frete_unitario', label: 'Frete', width: 10 },
-        { key: 'seguro_unitario', label: 'Seguro', width: 10 },
-        { key: 'outras_despesas_unitario', label: 'Desp.', width: 10 },
-        { key: 'desconto_unitario', label: 'Desc.', width: 10 },
-        { key: 'icms_st_unitario', label: 'ICMS ST', width: 10 },
-        { key: 'ipi_unitario', label: 'IPI', width: 10 },
-        { key: 'icms_unitario', label: 'ICMS', width: 10 },
-        { key: 'custo_aquisicao', label: 'Custo Total', width: 12 },
-        { key: 'nf_anterior_numero', label: 'NF Ant.', width: 10 },
-        { key: 'nf_anterior_custo', label: 'Custo Ant.', width: 12 },
-        { key: 'variacao_percentual', label: 'Var %', width: 10 },
-        { key: 'variacao_absoluta', label: 'Delta R$', width: 12 }
+        { key: 'produto_nome', label: 'Produto', width: 58 },
+        { key: 'sku', label: 'SKU', width: 17 },
+        { key: 'nf_atual_numero', label: 'NF', width: 14 },
+        { key: 'custo_bruto_unitario', label: 'Bruto', width: 15 },
+        { key: 'frete_unitario', label: 'Frete', width: 14 },
+        { key: 'seguro_unitario', label: 'Seguro', width: 14 },
+        { key: 'outras_despesas_unitario', label: 'Desp.', width: 14 },
+        { key: 'desconto_unitario', label: 'Desc.', width: 14 },
+        { key: 'icms_st_unitario', label: 'ICMS ST', width: 15 },
+        { key: 'ipi_unitario', label: 'IPI', width: 13 },
+        { key: 'icms_unitario', label: 'ICMS', width: 13 },
+        { key: 'custo_aquisicao', label: 'Custo Total', width: 18 },
+        { key: 'nf_anterior_numero', label: 'NF Ant.', width: 15 },
+        { key: 'nf_anterior_custo', label: 'Custo Ant.', width: 18 },
+        { key: 'variacao_percentual', label: 'Var %', width: 14 },
+        { key: 'variacao_absoluta', label: 'Delta R$', width: 17 }
       ];
 
       const larguraColunas = colunas.reduce((acc, col) => acc + col.width, 0);
       const escala = larguraColunas > usableWidth ? usableWidth / larguraColunas : 1;
       colunas.forEach((col) => { col.width = Number((col.width * escala).toFixed(2)); });
 
-      const truncarTexto = (texto, larguraMax) => {
+      const quebrarTexto = (texto, larguraMax, maxLinhas = 2) => {
         const valor = String(texto ?? '');
-        if (!valor) return '';
-        const larguraTexto = doc.getTextWidth(valor);
-        if (larguraTexto <= larguraMax) return valor;
-        let corte = valor;
+        if (!valor) return [''];
+        const linhas = doc.splitTextToSize(valor, Math.max(4, larguraMax));
+
+        if (linhas.length <= maxLinhas) {
+          return linhas;
+        }
+
+        const visiveis = linhas.slice(0, maxLinhas);
+        const ultima = visiveis[maxLinhas - 1] || '';
+        let corte = ultima;
+
         while (corte.length > 1 && doc.getTextWidth(`${corte}...`) > larguraMax) {
           corte = corte.slice(0, -1);
         }
-        return `${corte}...`;
+
+        visiveis[maxLinhas - 1] = `${corte}...`;
+        return visiveis;
+      };
+
+      const desenharTextoCelula = (texto, x, y, largura, alinhamento = 'left', maxLinhas = 2) => {
+        const linhas = quebrarTexto(texto, largura - 2, maxLinhas);
+        linhas.forEach((linha, index) => {
+          const textX = alinhamento === 'right' ? x + largura - 1 : x + 1;
+          doc.text(linha, textX, y + 4 + (index * lineHeight), {
+            align: alinhamento,
+            maxWidth: largura - 2,
+          });
+        });
       };
 
       const renderCabecalhoPagina = () => {
@@ -1759,37 +1780,26 @@ const EntradaXML = () => {
         doc.text(`Data de emissao NF atual: ${formatarDataRelatorio(previewProcessamento?.data_emissao)}`, marginX, 21);
 
         doc.setFillColor(226, 232, 240);
-        doc.rect(marginX, tableStartY, usableWidth, rowHeight, 'F');
+        doc.rect(marginX, tableStartY, usableWidth, minRowHeight, 'F');
         doc.setDrawColor(203, 213, 225);
         doc.setTextColor(15, 23, 42);
         doc.setFontSize(7);
 
         let xAtual = marginX;
         colunas.forEach((coluna) => {
-          doc.rect(xAtual, tableStartY, coluna.width, rowHeight);
-          doc.text(coluna.label, xAtual + 1, tableStartY + 4);
+          doc.rect(xAtual, tableStartY, coluna.width, minRowHeight);
+          desenharTextoCelula(coluna.label, xAtual, tableStartY, coluna.width, 'left', 1);
           xAtual += coluna.width;
         });
       };
 
       renderCabecalhoPagina();
 
-      let y = tableStartY + rowHeight;
+      let y = tableStartY + minRowHeight;
       linhas.forEach((linha) => {
-        if (y > 190) {
-          doc.addPage();
-          renderCabecalhoPagina();
-          y = tableStartY + rowHeight;
-        }
-
-        let xAtual = marginX;
-        doc.setDrawColor(226, 232, 240);
-        doc.setTextColor(15, 23, 42);
-        doc.setFontSize(6.5);
-
         const comp = linha.composicao_custo?.componentes_unitario || {};
         const rowData = {
-          produto_nome: truncarTexto(linha.produto_nome, 28),
+          produto_nome: linha.produto_nome || '-',
           sku: linha.sku || '-',
           nf_atual_numero: linha.nf_atual_numero,
           custo_bruto_unitario: formatarMoedaRelatorio(linha.composicao_custo?.custo_bruto_unitario || 0),
@@ -1807,11 +1817,29 @@ const EntradaXML = () => {
           variacao_absoluta: formatarMoedaRelatorio(linha.variacao_absoluta)
         };
 
+        const maxLinhasProduto = quebrarTexto(rowData.produto_nome, colunas[0].width - 2, 3).length;
+        const maxLinhasSku = quebrarTexto(rowData.sku, colunas[1].width - 2, 2).length;
+        const rowHeight = Math.max(minRowHeight, 4 + (Math.max(maxLinhasProduto, maxLinhasSku, 1) * lineHeight));
+
+        if (y + rowHeight > 195) {
+          doc.addPage();
+          renderCabecalhoPagina();
+          y = tableStartY + minRowHeight;
+        }
+
+        let xAtual = marginX;
+        doc.setDrawColor(226, 232, 240);
+        doc.setTextColor(15, 23, 42);
+        doc.setFontSize(6.5);
+
         colunas.forEach((coluna) => {
           doc.rect(xAtual, y, coluna.width, rowHeight);
           const valor = rowData[coluna.key] || '';
-          const texto = truncarTexto(valor, coluna.width - 2);
-          doc.text(texto, xAtual + 1, y + 4);
+          const alinhamento = coluna.key === 'produto_nome' || coluna.key === 'sku' || coluna.key.includes('numero')
+            ? 'left'
+            : 'right';
+          const maxLinhas = coluna.key === 'produto_nome' ? 3 : coluna.key === 'sku' ? 2 : 1;
+          desenharTextoCelula(valor, xAtual, y, coluna.width, alinhamento, maxLinhas);
           xAtual += coluna.width;
         });
 
