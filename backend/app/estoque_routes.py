@@ -89,6 +89,44 @@ _MODO_BAIXA_TRANSFERENCIA_LABELS = {
     "acerto": "Acerto / Compensacao",
 }
 
+_OPCOES_DOCUMENTO_TRANSFERENCIA_PADRAO = {
+    "mostrar_codigo": True,
+    "mostrar_descricao": True,
+    "mostrar_quantidade": True,
+    "mostrar_custo_unitario": True,
+    "mostrar_total_item": True,
+    "mostrar_totais": True,
+}
+
+
+def _bool_opcao_documento_transferencia(valor, padrao: bool = True) -> bool:
+    if valor is None:
+        return padrao
+    if isinstance(valor, str):
+        return valor.strip().lower() in {"1", "true", "t", "sim", "s", "yes", "y", "on"}
+    return bool(valor)
+
+
+def _normalizar_opcoes_documento_transferencia(opcoes: dict | None = None) -> dict:
+    normalizadas = dict(_OPCOES_DOCUMENTO_TRANSFERENCIA_PADRAO)
+    for chave, padrao in _OPCOES_DOCUMENTO_TRANSFERENCIA_PADRAO.items():
+        if opcoes and chave in opcoes:
+            normalizadas[chave] = _bool_opcao_documento_transferencia(opcoes.get(chave), padrao)
+
+    if not any(
+        normalizadas[chave]
+        for chave in (
+            "mostrar_codigo",
+            "mostrar_descricao",
+            "mostrar_quantidade",
+            "mostrar_custo_unitario",
+            "mostrar_total_item",
+        )
+    ):
+        normalizadas["mostrar_descricao"] = True
+
+    return normalizadas
+
 
 def _texto_limpo(valor) -> str | None:
     if valor is None:
@@ -815,6 +853,12 @@ class TransferenciaParceiroEnviarEmailRequest(BaseModel):
     email: Optional[str] = None
     assunto: Optional[str] = None
     mensagem: Optional[str] = None
+    mostrar_codigo: bool = True
+    mostrar_descricao: bool = True
+    mostrar_quantidade: bool = True
+    mostrar_custo_unitario: bool = True
+    mostrar_total_item: bool = True
+    mostrar_totais: bool = True
 
 
 class TransferenciaParceiroCompensacaoContaRequest(BaseModel):
@@ -868,6 +912,12 @@ class TransferenciaParceiroPdfConsolidadoRequest(BaseModel):
     busca: Optional[str] = None
     data_inicio: Optional[date] = None
     data_fim: Optional[date] = None
+    mostrar_codigo: bool = True
+    mostrar_descricao: bool = True
+    mostrar_quantidade: bool = True
+    mostrar_custo_unitario: bool = True
+    mostrar_total_item: bool = True
+    mostrar_totais: bool = True
 
 
 class TransferenciaParceiroHistoricoItem(BaseModel):
@@ -1439,6 +1489,7 @@ def _gerar_pdf_transferencia_parceiro_bytes(
     conta: ContaReceber,
     parceiro: Cliente | None,
     itens: list[TransferenciaParceiroHistoricoMovItem],
+    opcoes_documento: dict | None = None,
 ) -> bytes:
     try:
         from reportlab.lib.pagesizes import A4
@@ -1481,10 +1532,18 @@ def _gerar_pdf_transferencia_parceiro_bytes(
         spaceAfter=14,
     )
 
+    opcoes = _normalizar_opcoes_documento_transferencia(opcoes_documento)
+    mostra_valores = any(
+        opcoes[chave]
+        for chave in ("mostrar_custo_unitario", "mostrar_total_item", "mostrar_totais")
+    )
+
     elements = [
         Paragraph("TRANSFERENCIA COM RESSARCIMENTO", titulo_style),
         Paragraph(
-            "Documento operacional de saida de estoque pelo custo",
+            "Documento operacional de saida de estoque pelo custo"
+            if mostra_valores
+            else "Documento operacional de retirada de estoque",
             subtitulo_style,
         ),
     ]
@@ -1524,66 +1583,93 @@ def _gerar_pdf_transferencia_parceiro_bytes(
     elements.append(bloco_info)
     elements.append(Spacer(1, 8 * mm))
 
-    tabela_itens = [["Codigo", "Produto", "Qtd", "Custo un.", "Total"]]
+    colunas_itens = []
+    largura_total = 180 * mm
+    largura_fixa = 0
+    if opcoes["mostrar_codigo"]:
+        colunas_itens.append(("codigo", "Codigo", 22 * mm))
+        largura_fixa += 22 * mm
+    if opcoes["mostrar_descricao"]:
+        colunas_itens.append(("produto", "Produto", None))
+    if opcoes["mostrar_quantidade"]:
+        colunas_itens.append(("quantidade", "Qtd", 18 * mm))
+        largura_fixa += 18 * mm
+    if opcoes["mostrar_custo_unitario"]:
+        colunas_itens.append(("custo_unitario", "Custo un.", 28 * mm))
+        largura_fixa += 28 * mm
+    if opcoes["mostrar_total_item"]:
+        colunas_itens.append(("total", "Total", 28 * mm))
+        largura_fixa += 28 * mm
+
+    largura_produto = max(54 * mm, largura_total - largura_fixa)
+    col_widths = [
+        largura_produto if chave == "produto" else largura
+        for chave, _label, largura in colunas_itens
+    ]
+    tabela_itens = [[label for _chave, label, _largura in colunas_itens]]
     for item in itens:
-        tabela_itens.append(
-            [
-                item.codigo or "-",
-                Paragraph(item.produto_nome, styles["BodyText"]),
-                f"{float(item.quantidade or 0):.3f}".rstrip("0").rstrip("."),
-                f"R$ {float(item.custo_unitario or 0):.2f}",
-                f"R$ {float(item.valor_total or 0):.2f}",
-            ]
-        )
+        linha = []
+        for chave, _label, _largura in colunas_itens:
+            if chave == "codigo":
+                linha.append(item.codigo or "-")
+            elif chave == "produto":
+                linha.append(Paragraph(item.produto_nome, styles["BodyText"]))
+            elif chave == "quantidade":
+                linha.append(f"{float(item.quantidade or 0):.3f}".rstrip("0").rstrip("."))
+            elif chave == "custo_unitario":
+                linha.append(f"R$ {float(item.custo_unitario or 0):.2f}")
+            elif chave == "total":
+                linha.append(f"R$ {float(item.valor_total or 0):.2f}")
+        tabela_itens.append(linha)
 
     tabela = Table(
         tabela_itens,
-        colWidths=[22 * mm, 84 * mm, 18 * mm, 28 * mm, 28 * mm],
+        colWidths=col_widths,
         repeatRows=1,
     )
-    tabela.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 9),
-                ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
-                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ]
-        )
-    )
+    estilos_tabela = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]
+    for indice, (chave, _label, _largura) in enumerate(colunas_itens):
+        if chave in {"quantidade", "custo_unitario", "total"}:
+            estilos_tabela.append(("ALIGN", (indice, 1), (indice, -1), "RIGHT"))
+    tabela.setStyle(TableStyle(estilos_tabela))
     elements.append(tabela)
     elements.append(Spacer(1, 6 * mm))
 
-    totais = Table(
-        [
-            ["Valor transferido", f"R$ {valor_original:.2f}"],
-            ["Valor recebido", f"R$ {valor_recebido:.2f}"],
-            ["Saldo em aberto", f"R$ {saldo_aberto:.2f}"],
-        ],
-        colWidths=[48 * mm, 38 * mm],
-        hAlign="RIGHT",
-    )
-    totais.setStyle(
-        TableStyle(
+    if opcoes["mostrar_totais"]:
+        totais = Table(
             [
-                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-                ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
-                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                ("TEXTCOLOR", (1, 2), (1, 2), colors.HexColor("#b45309") if status_resolvido != "recebido" else colors.HexColor("#047857")),
-                ("LINEABOVE", (0, 2), (-1, 2), 1, colors.HexColor("#94a3b8")),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
+                ["Valor transferido", f"R$ {valor_original:.2f}"],
+                ["Valor recebido", f"R$ {valor_recebido:.2f}"],
+                ["Saldo em aberto", f"R$ {saldo_aberto:.2f}"],
+            ],
+            colWidths=[48 * mm, 38 * mm],
+            hAlign="RIGHT",
         )
-    )
-    elements.append(totais)
+        totais.setStyle(
+            TableStyle(
+                [
+                    ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                    ("FONTNAME", (1, 0), (1, -1), "Helvetica-Bold"),
+                    ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                    ("TEXTCOLOR", (1, 2), (1, 2), colors.HexColor("#b45309") if status_resolvido != "recebido" else colors.HexColor("#047857")),
+                    ("LINEABOVE", (0, 2), (-1, 2), 1, colors.HexColor("#94a3b8")),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]
+            )
+        )
+        elements.append(totais)
 
     if conta.observacoes:
         elements.append(Spacer(1, 6 * mm))
@@ -1598,6 +1684,7 @@ def _gerar_pdf_transferencia_parceiro_bytes(
 def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
     contas: list[ContaReceber],
     itens_por_conta: dict[int, list[TransferenciaParceiroHistoricoMovItem]],
+    opcoes_documento: dict | None = None,
 ) -> bytes:
     try:
         from reportlab.lib.pagesizes import A4
@@ -1614,6 +1701,8 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
 
     if not contas:
         raise HTTPException(status_code=404, detail="Nenhuma transferencia encontrada para consolidar")
+
+    opcoes = _normalizar_opcoes_documento_transferencia(opcoes_documento)
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -1676,15 +1765,22 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
         ),
     ]
 
+    resumo_linhas = [
+        ["Pessoas", ", ".join(pessoas[:4]) + ("..." if len(pessoas) > 4 else "")],
+        ["Periodo", periodo_texto],
+        ["Lancamentos", str(len(contas))],
+    ]
+    if opcoes["mostrar_totais"]:
+        resumo_linhas.extend(
+            [
+                ["Valor transferido", f"R$ {total_transferido:.2f}"],
+                ["Valor recebido", f"R$ {total_recebido:.2f}"],
+                ["Saldo em aberto", f"R$ {total_saldo:.2f}"],
+            ]
+        )
+
     resumo = Table(
-        [
-            ["Pessoas", ", ".join(pessoas[:4]) + ("..." if len(pessoas) > 4 else "")],
-            ["Periodo", periodo_texto],
-            ["Lancamentos", str(len(contas))],
-            ["Valor transferido", f"R$ {total_transferido:.2f}"],
-            ["Valor recebido", f"R$ {total_recebido:.2f}"],
-            ["Saldo em aberto", f"R$ {total_saldo:.2f}"],
-        ],
+        resumo_linhas,
         colWidths=[34 * mm, 144 * mm],
     )
     resumo.setStyle(
@@ -1706,24 +1802,33 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
     elements.append(resumo)
     elements.append(Spacer(1, 5 * mm))
 
-    tabela_documentos = [["Documento", "Pessoa", "Emissao", "Status", "Valor", "Saldo"]]
+    tabela_documentos = [["Documento", "Pessoa", "Emissao", "Status"]]
+    col_widths_resumo = [30 * mm, 82 * mm, 24 * mm, 26 * mm]
+    if opcoes["mostrar_totais"]:
+        tabela_documentos[0].extend(["Valor", "Saldo"])
+        col_widths_resumo = [28 * mm, 62 * mm, 22 * mm, 24 * mm, 28 * mm, 24 * mm]
+
     for conta in contas:
         pessoa = conta.cliente.nome if conta.cliente else "Pessoa nao encontrada"
         status_label = _status_transferencia_parceiro(conta)[1]
-        tabela_documentos.append(
-            [
-                conta.documento or f"TRP-{conta.id:06d}",
-                Paragraph(pessoa, styles["BodyText"]),
-                conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-",
-                status_label,
-                f"R$ {float(conta.valor_original or 0):.2f}",
-                f"R$ {_saldo_conta_receber(conta):.2f}",
-            ]
-        )
+        linha_documento = [
+            conta.documento or f"TRP-{conta.id:06d}",
+            Paragraph(pessoa, styles["BodyText"]),
+            conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-",
+            status_label,
+        ]
+        if opcoes["mostrar_totais"]:
+            linha_documento.extend(
+                [
+                    f"R$ {float(conta.valor_original or 0):.2f}",
+                    f"R$ {_saldo_conta_receber(conta):.2f}",
+                ]
+            )
+        tabela_documentos.append(linha_documento)
 
     tabela_resumo = Table(
         tabela_documentos,
-        colWidths=[28 * mm, 62 * mm, 22 * mm, 24 * mm, 28 * mm, 24 * mm],
+        colWidths=col_widths_resumo,
         repeatRows=1,
     )
     tabela_resumo.setStyle(
@@ -1756,42 +1861,73 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
         elementos_info = [
             f"Emissao: {conta.data_emissao.strftime('%d/%m/%Y') if conta.data_emissao else '-'}",
             f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y') if conta.data_vencimento else '-'}",
-            f"Valor: R$ {float(conta.valor_original or 0):.2f}",
-            f"Recebido: R$ {float(conta.valor_recebido or 0):.2f}",
-            f"Saldo: R$ {_saldo_conta_receber(conta):.2f}",
         ]
+        if opcoes["mostrar_totais"]:
+            elementos_info.extend(
+                [
+                    f"Valor: R$ {float(conta.valor_original or 0):.2f}",
+                    f"Recebido: R$ {float(conta.valor_recebido or 0):.2f}",
+                    f"Saldo: R$ {_saldo_conta_receber(conta):.2f}",
+                ]
+            )
         elements.append(Paragraph(" | ".join(elementos_info), styles["BodyText"]))
 
         itens = itens_por_conta.get(conta.id, [])
         if itens:
-            tabela_itens = [["Codigo", "Produto", "Qtd", "Custo", "Total"]]
+            colunas_itens = []
+            largura_total = 172 * mm
+            largura_fixa = 0
+            if opcoes["mostrar_codigo"]:
+                colunas_itens.append(("codigo", "Codigo", 20 * mm))
+                largura_fixa += 20 * mm
+            if opcoes["mostrar_descricao"]:
+                colunas_itens.append(("produto", "Produto", None))
+            if opcoes["mostrar_quantidade"]:
+                colunas_itens.append(("quantidade", "Qtd", 16 * mm))
+                largura_fixa += 16 * mm
+            if opcoes["mostrar_custo_unitario"]:
+                colunas_itens.append(("custo_unitario", "Custo", 24 * mm))
+                largura_fixa += 24 * mm
+            if opcoes["mostrar_total_item"]:
+                colunas_itens.append(("total", "Total", 24 * mm))
+                largura_fixa += 24 * mm
+
+            largura_produto = max(54 * mm, largura_total - largura_fixa)
+            col_widths_itens = [
+                largura_produto if chave == "produto" else largura
+                for chave, _label, largura in colunas_itens
+            ]
+            tabela_itens = [[label for _chave, label, _largura in colunas_itens]]
             for item in itens:
-                tabela_itens.append(
-                    [
-                        item.codigo or "-",
-                        Paragraph(item.produto_nome, styles["BodyText"]),
-                        f"{float(item.quantidade or 0):.3f}".rstrip("0").rstrip("."),
-                        f"R$ {float(item.custo_unitario or 0):.2f}",
-                        f"R$ {float(item.valor_total or 0):.2f}",
-                    ]
-                )
+                linha_item = []
+                for chave, _label, _largura in colunas_itens:
+                    if chave == "codigo":
+                        linha_item.append(item.codigo or "-")
+                    elif chave == "produto":
+                        linha_item.append(Paragraph(item.produto_nome, styles["BodyText"]))
+                    elif chave == "quantidade":
+                        linha_item.append(f"{float(item.quantidade or 0):.3f}".rstrip("0").rstrip("."))
+                    elif chave == "custo_unitario":
+                        linha_item.append(f"R$ {float(item.custo_unitario or 0):.2f}")
+                    elif chave == "total":
+                        linha_item.append(f"R$ {float(item.valor_total or 0):.2f}")
+                tabela_itens.append(linha_item)
             tabela_itens_pdf = Table(
                 tabela_itens,
-                colWidths=[20 * mm, 88 * mm, 16 * mm, 24 * mm, 24 * mm],
+                colWidths=col_widths_itens,
                 repeatRows=1,
             )
-            tabela_itens_pdf.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, -1), 8),
-                        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
-                        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ]
-                )
-            )
+            estilos_itens = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e2e8f0")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ]
+            for indice, (chave, _label, _largura) in enumerate(colunas_itens):
+                if chave in {"quantidade", "custo_unitario", "total"}:
+                    estilos_itens.append(("ALIGN", (indice, 1), (indice, -1), "RIGHT"))
+            tabela_itens_pdf.setStyle(TableStyle(estilos_itens))
             elements.append(Spacer(1, 2 * mm))
             elements.append(tabela_itens_pdf)
 
@@ -1815,6 +1951,7 @@ def _montar_email_transferencia_parceiro(
     parceiro: Cliente | None,
     itens: list[TransferenciaParceiroHistoricoMovItem],
     mensagem_extra: str | None = None,
+    opcoes_documento: dict | None = None,
 ) -> tuple[str, str, str]:
     def _formatar_quantidade_email(valor: float | int | None) -> str:
         texto = f"{float(valor or 0):.3f}"
@@ -1826,15 +1963,55 @@ def _montar_email_transferencia_parceiro(
     valor_original = float(conta.valor_original or 0)
     observacoes = (conta.observacoes or "").strip()
     mensagem_extra = (mensagem_extra or "").strip()
+    opcoes = _normalizar_opcoes_documento_transferencia(opcoes_documento)
+    mostra_valores = any(
+        opcoes[chave]
+        for chave in ("mostrar_custo_unitario", "mostrar_total_item", "mostrar_totais")
+    )
 
+    colunas_email = []
+    if opcoes["mostrar_codigo"]:
+        colunas_email.append(("codigo", "Codigo", "left"))
+    if opcoes["mostrar_descricao"]:
+        colunas_email.append(("produto", "Produto", "left"))
+    if opcoes["mostrar_quantidade"]:
+        colunas_email.append(("quantidade", "Qtd", "right"))
+    if opcoes["mostrar_custo_unitario"]:
+        colunas_email.append(("custo_unitario", "Custo un.", "right"))
+    if opcoes["mostrar_total_item"]:
+        colunas_email.append(("total", "Total", "right"))
+
+    def _valor_coluna_email(item: TransferenciaParceiroHistoricoMovItem, chave: str) -> str:
+        if chave == "codigo":
+            return item.codigo or "-"
+        if chave == "produto":
+            return item.produto_nome
+        if chave == "quantidade":
+            return _formatar_quantidade_email(item.quantidade)
+        if chave == "custo_unitario":
+            return f"R$ {float(item.custo_unitario or 0):.2f}"
+        if chave == "total":
+            return f"R$ {float(item.valor_total or 0):.2f}"
+        return "-"
+
+    cabecalho_itens_html = "".join(
+        f"<th style='padding:8px 10px;text-align:{alinhamento};'>{label}</th>"
+        for _chave, label, alinhamento in colunas_email
+    )
     itens_html = "".join(
-        f"<tr>"
-        f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;'>{item.produto_nome}</td>"
-        f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;'>{_formatar_quantidade_email(item.quantidade)}"
-        f"</td><td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;'>R$ {float(item.custo_unitario or 0):.2f}</td>"
-        f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;'>R$ {float(item.valor_total or 0):.2f}</td>"
-        f"</tr>"
+        "<tr>"
+        + "".join(
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:{alinhamento};'>"
+            f"{_valor_coluna_email(item, chave)}</td>"
+            for chave, _label, alinhamento in colunas_email
+        )
+        + "</tr>"
         for item in itens
+    )
+    total_html = (
+        f"<li><strong>Total:</strong> R$ {valor_original:.2f}</li>"
+        if opcoes["mostrar_totais"]
+        else ""
     )
 
     assunto = f"Transferencia {documento} - ressarcimento de estoque"
@@ -1847,20 +2024,17 @@ def _montar_email_transferencia_parceiro(
         </div>
         <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:24px;">
           <p>Ola,</p>
-          <p>Segue em anexo o PDF da transferencia de estoque com ressarcimento pelo custo.</p>
+          <p>Segue em anexo o PDF da transferencia de estoque{(" com ressarcimento pelo custo" if mostra_valores else " para conferencia da retirada")}.</p>
           <ul>
             <li><strong>Status:</strong> {status_label}</li>
             <li><strong>Emissao:</strong> {conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-"}</li>
             <li><strong>Vencimento:</strong> {conta.data_vencimento.strftime("%d/%m/%Y") if conta.data_vencimento else "-"}</li>
-            <li><strong>Total:</strong> R$ {valor_original:.2f}</li>
+            {total_html}
           </ul>
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
             <thead>
               <tr style="background:#f8fafc;color:#334155;">
-                <th style="padding:8px 10px;text-align:left;">Produto</th>
-                <th style="padding:8px 10px;text-align:right;">Qtd</th>
-                <th style="padding:8px 10px;text-align:right;">Custo un.</th>
-                <th style="padding:8px 10px;text-align:right;">Total</th>
+                {cabecalho_itens_html}
               </tr>
             </thead>
             <tbody>{itens_html}</tbody>
@@ -1873,19 +2047,22 @@ def _montar_email_transferencia_parceiro(
     </html>
     """
 
-    linhas_itens = [
-        f"- {item.produto_nome}: {_formatar_quantidade_email(item.quantidade)}"
-        + f" x R$ {float(item.custo_unitario or 0):.2f} = R$ {float(item.valor_total or 0):.2f}"
-        for item in itens
-    ]
+    linhas_itens = []
+    for item in itens:
+        partes = []
+        for chave, label, _alinhamento in colunas_email:
+            partes.append(f"{label}: {_valor_coluna_email(item, chave)}")
+        linhas_itens.append("- " + " | ".join(partes))
+
     text_body = (
-        f"Transferencia com ressarcimento\n"
+        f"Transferencia {'com ressarcimento' if mostra_valores else 'para conferencia de retirada'}\n"
         f"Documento: {documento}\n"
         f"Pessoa: {parceiro_nome}\n"
         f"Status: {status_label}\n"
         f"Emissao: {conta.data_emissao.strftime('%d/%m/%Y') if conta.data_emissao else '-'}\n"
         f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y') if conta.data_vencimento else '-'}\n"
-        f"Total: R$ {valor_original:.2f}\n\n"
+        + (f"Total: R$ {valor_original:.2f}\n" if opcoes["mostrar_totais"] else "")
+        + "\n"
         f"Itens:\n" + "\n".join(linhas_itens)
     )
     if observacoes:
@@ -3016,6 +3193,12 @@ def listar_transferencias_para_parceiro(
 @require_permission("produtos.visualizar")
 def gerar_pdf_transferencia_parceiro(
     conta_receber_id: int,
+    mostrar_codigo: bool = True,
+    mostrar_descricao: bool = True,
+    mostrar_quantidade: bool = True,
+    mostrar_custo_unitario: bool = True,
+    mostrar_total_item: bool = True,
+    mostrar_totais: bool = True,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -3024,7 +3207,19 @@ def gerar_pdf_transferencia_parceiro(
     conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
     parceiro = conta.cliente
     itens = _listar_itens_transferencia_parceiro(db, tenant_id, conta_receber_id)
-    pdf_bytes = _gerar_pdf_transferencia_parceiro_bytes(conta, parceiro, itens)
+    pdf_bytes = _gerar_pdf_transferencia_parceiro_bytes(
+        conta,
+        parceiro,
+        itens,
+        {
+            "mostrar_codigo": mostrar_codigo,
+            "mostrar_descricao": mostrar_descricao,
+            "mostrar_quantidade": mostrar_quantidade,
+            "mostrar_custo_unitario": mostrar_custo_unitario,
+            "mostrar_total_item": mostrar_total_item,
+            "mostrar_totais": mostrar_totais,
+        },
+    )
     nome_documento = (conta.documento or f"TRP-{conta.id:06d}").replace("/", "-")
 
     return StreamingResponse(
@@ -3092,7 +3287,18 @@ def gerar_pdf_transferencias_parceiro_consolidado(
             )
         )
 
-    pdf_bytes = _gerar_pdf_transferencias_parceiro_consolidado_bytes(contas, itens_por_conta)
+    pdf_bytes = _gerar_pdf_transferencias_parceiro_consolidado_bytes(
+        contas,
+        itens_por_conta,
+        {
+            "mostrar_codigo": payload.mostrar_codigo,
+            "mostrar_descricao": payload.mostrar_descricao,
+            "mostrar_quantidade": payload.mostrar_quantidade,
+            "mostrar_custo_unitario": payload.mostrar_custo_unitario,
+            "mostrar_total_item": payload.mostrar_total_item,
+            "mostrar_totais": payload.mostrar_totais,
+        },
+    )
     data_ref = datetime.now().strftime("%Y%m%d_%H%M%S")
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
@@ -3130,12 +3336,26 @@ def enviar_email_transferencia_parceiro(
         )
 
     itens = _listar_itens_transferencia_parceiro(db, tenant_id, conta_receber_id)
-    pdf_bytes = _gerar_pdf_transferencia_parceiro_bytes(conta, parceiro, itens)
+    opcoes_documento = {
+        "mostrar_codigo": payload.mostrar_codigo,
+        "mostrar_descricao": payload.mostrar_descricao,
+        "mostrar_quantidade": payload.mostrar_quantidade,
+        "mostrar_custo_unitario": payload.mostrar_custo_unitario,
+        "mostrar_total_item": payload.mostrar_total_item,
+        "mostrar_totais": payload.mostrar_totais,
+    }
+    pdf_bytes = _gerar_pdf_transferencia_parceiro_bytes(
+        conta,
+        parceiro,
+        itens,
+        opcoes_documento,
+    )
     assunto_padrao, html_body, text_body = _montar_email_transferencia_parceiro(
         conta,
         parceiro,
         itens,
         mensagem_extra=payload.mensagem,
+        opcoes_documento=opcoes_documento,
     )
 
     enviado = send_email(

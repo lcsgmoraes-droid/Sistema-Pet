@@ -86,6 +86,57 @@ function baixarArquivoBlob(blob, nomeArquivo) {
 
 const CUPOM_TRANSFERENCIA_WIDTH = 42;
 
+const COLUNAS_DOCUMENTO_TRANSFERENCIA = [
+  { chave: "codigo", label: "Codigo / SKU" },
+  { chave: "produto", label: "Descricao" },
+  { chave: "quantidade", label: "Quantidade" },
+  { chave: "custo_unitario", label: "Custo unitario" },
+  { chave: "total", label: "Total do item" },
+  { chave: "totais", label: "Totais do acerto" },
+];
+
+const COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO = COLUNAS_DOCUMENTO_TRANSFERENCIA.map(
+  (coluna) => coluna.chave,
+);
+const COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA = ["codigo", "produto", "quantidade"];
+const COLUNAS_DOCUMENTO_TRANSFERENCIA_FINANCEIRAS = ["custo_unitario", "total", "totais"];
+
+const normalizarColunasDocumentoTransferencia = (
+  colunas = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+) => {
+  const candidatas = Array.isArray(colunas)
+    ? colunas
+    : String(colunas || "").split(",");
+
+  const selecionadas = new Set(
+    candidatas
+      .map((coluna) => String(coluna || "").trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  return COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO.filter((coluna) =>
+    selecionadas.has(coluna),
+  );
+};
+
+const documentoTransferenciaTemValores = (colunas = []) =>
+  normalizarColunasDocumentoTransferencia(colunas).some((coluna) =>
+    COLUNAS_DOCUMENTO_TRANSFERENCIA_FINANCEIRAS.includes(coluna),
+  );
+
+const montarParametrosDocumentoTransferencia = (colunas = []) => {
+  const normalizadas = normalizarColunasDocumentoTransferencia(colunas);
+
+  return {
+    mostrar_codigo: normalizadas.includes("codigo"),
+    mostrar_descricao: normalizadas.includes("produto"),
+    mostrar_quantidade: normalizadas.includes("quantidade"),
+    mostrar_custo_unitario: normalizadas.includes("custo_unitario"),
+    mostrar_total_item: normalizadas.includes("total"),
+    mostrar_totais: normalizadas.includes("totais"),
+  };
+};
+
 function textoCupom(valor) {
   return String(valor || "")
     .normalize("NFD")
@@ -143,7 +194,14 @@ function quebrarCupom(valor, width = CUPOM_TRANSFERENCIA_WIDTH) {
   return linhas.length ? linhas : [""];
 }
 
-function montarCupomTransferencia(registro) {
+function montarCupomTransferencia(registro, colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO) {
+  const colunas = normalizarColunasDocumentoTransferencia(colunasDocumento);
+  const mostrarCodigo = colunas.includes("codigo");
+  const mostrarProduto = colunas.includes("produto");
+  const mostrarQuantidade = colunas.includes("quantidade");
+  const mostrarCustoUnitario = colunas.includes("custo_unitario");
+  const mostrarTotalItem = colunas.includes("total");
+  const mostrarTotais = colunas.includes("totais");
   const documento = registro.documento || `TRP-${registro.conta_receber_id}`;
   const itens = Array.isArray(registro.itens) ? registro.itens : [];
   const linhas = [
@@ -162,20 +220,36 @@ function montarCupomTransferencia(registro) {
   ];
 
   for (const item of itens) {
-    linhas.push(...quebrarCupom(item.produto_nome || "Item"));
-    linhas.push(parCupom(`Cod ${item.codigo || item.produto_id || "-"}`, `Qtd ${formatarQuantidade(item.quantidade)}`));
-    linhas.push(parCupom("Custo un.", formatarMoeda(item.custo_unitario)));
-    linhas.push(parCupom("Total", formatarMoeda(item.valor_total)));
+    if (mostrarProduto) {
+      linhas.push(...quebrarCupom(item.produto_nome || "Item"));
+    }
+    if (mostrarCodigo && mostrarQuantidade) {
+      linhas.push(parCupom(`Cod ${item.codigo || item.produto_id || "-"}`, `Qtd ${formatarQuantidade(item.quantidade)}`));
+    } else if (mostrarCodigo) {
+      linhas.push(cortarCupom(`Cod ${item.codigo || item.produto_id || "-"}`));
+    } else if (mostrarQuantidade) {
+      linhas.push(cortarCupom(`Qtd ${formatarQuantidade(item.quantidade)}`));
+    }
+    if (mostrarCustoUnitario) {
+      linhas.push(parCupom("Custo un.", formatarMoeda(item.custo_unitario)));
+    }
+    if (mostrarTotalItem) {
+      linhas.push(parCupom("Total", formatarMoeda(item.valor_total)));
+    }
     linhas.push("");
   }
 
-  linhas.push(
-    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
-    parCupom("Valor", formatarMoeda(registro.valor_original)),
-    parCupom("Recebido", formatarMoeda(registro.valor_recebido)),
-    parCupom("Saldo", formatarMoeda(registro.saldo_aberto)),
-    "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
-  );
+  if (mostrarTotais) {
+    linhas.push(
+      "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+      parCupom("Valor", formatarMoeda(registro.valor_original)),
+      parCupom("Recebido", formatarMoeda(registro.valor_recebido)),
+      parCupom("Saldo", formatarMoeda(registro.saldo_aberto)),
+      "-".repeat(CUPOM_TRANSFERENCIA_WIDTH),
+    );
+  } else {
+    linhas.push("-".repeat(CUPOM_TRANSFERENCIA_WIDTH));
+  }
 
   if (registro.observacoes) {
     linhas.push("OBS:", ...quebrarCupom(registro.observacoes), "-".repeat(CUPOM_TRANSFERENCIA_WIDTH));
@@ -197,6 +271,78 @@ function montarCupomTransferencia(registro) {
   );
 
   return linhas.join("\n");
+}
+
+function SeletorColunasDocumentoTransferencia({ colunasSelecionadas, onChange }) {
+  const colunasNormalizadas = normalizarColunasDocumentoTransferencia(colunasSelecionadas);
+  const semValores = !documentoTransferenciaTemValores(colunasNormalizadas);
+
+  const alternarColuna = (chave) => {
+    if (colunasNormalizadas.includes(chave)) {
+      onChange(colunasNormalizadas.filter((coluna) => coluna !== chave));
+      return;
+    }
+
+    onChange([...colunasNormalizadas, chave]);
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-800">Conteudo do documento</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Escolha o que deve sair antes de baixar ou imprimir.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onChange(COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            Somente retirada
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            Documento completo
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {COLUNAS_DOCUMENTO_TRANSFERENCIA.map((coluna) => (
+          <label
+            key={coluna.chave}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+          >
+            <input
+              type="checkbox"
+              checked={colunasNormalizadas.includes(coluna.chave)}
+              onChange={() => alternarColuna(coluna.chave)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>{coluna.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <div
+        className={`mt-3 rounded-lg border px-3 py-2 text-xs ${
+          semValores
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-emerald-200 bg-emerald-50 text-emerald-800"
+        }`}
+      >
+        {semValores
+          ? "Sem custos: o parceiro ve apenas identificacao, descricao e quantidade."
+          : "Com valores: o documento mostra custo unitario, total do item e totalizadores marcados."}
+      </div>
+    </div>
+  );
 }
 
 function StatusTransferenciaBadge({ status, label }) {
@@ -234,6 +380,82 @@ function ResumoTransferenciaCard({ titulo, valor, descricao, destaque = "slate" 
   );
 }
 
+function ModalDocumentoTransferenciaParceiro({
+  modal,
+  colunasSelecionadas,
+  onChangeColunas,
+  onClose,
+  onConfirmar,
+  loading,
+}) {
+  if (!modal?.aberto) return null;
+
+  const registro = modal.registro;
+  const ehCupom = modal.tipo === "cupom";
+  const ehEmail = modal.tipo === "email";
+  const ehConsolidado = modal.tipo === "pdf_consolidado";
+  const titulo = ehCupom
+    ? "Imprimir cupom"
+    : ehEmail
+      ? "Enviar por e-mail"
+      : ehConsolidado
+        ? "Gerar PDF consolidado"
+        : "Gerar PDF";
+  const subtitulo = ehConsolidado
+    ? "Transferencias do filtro atual ou selecao manual"
+    : ehEmail && registro?.parceiro_email
+      ? `${registro.documento || `Transferencia #${registro.conta_receber_id}`} | ${registro.parceiro_email}`
+    : registro?.documento || `Transferencia #${registro?.conta_receber_id || ""}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">{titulo}</h2>
+            <p className="mt-1 text-sm text-slate-500">{subtitulo}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Fechar"
+          >
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <SeletorColunasDocumentoTransferencia
+          colunasSelecionadas={colunasSelecionadas}
+          onChange={onChangeColunas}
+        />
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onConfirmar}
+            disabled={loading}
+            className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
+            {loading ? "Processando..." : titulo}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EstoqueTransferenciaParceiro() {
   const parceiroRef = useRef(null);
   const produtoRef = useRef(null);
@@ -262,6 +484,14 @@ export default function EstoqueTransferenciaParceiro() {
   const [contaGerandoPdf, setContaGerandoPdf] = useState(null);
   const [gerandoPdfConsolidado, setGerandoPdfConsolidado] = useState(false);
   const [cupomTransferencia, setCupomTransferencia] = useState("");
+  const [modalDocumentoTransferencia, setModalDocumentoTransferencia] = useState({
+    aberto: false,
+    tipo: null,
+    registro: null,
+  });
+  const [colunasDocumentoTransferencia, setColunasDocumentoTransferencia] = useState(
+    COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+  );
   const [contaEnviandoEmail, setContaEnviandoEmail] = useState(null);
   const [contaRecebendo, setContaRecebendo] = useState(null);
   const [contaExcluindo, setContaExcluindo] = useState(null);
@@ -902,29 +1132,56 @@ export default function EstoqueTransferenciaParceiro() {
     }
   };
 
-  const gerarPdfTransferencia = async (registro) => {
+  const abrirModalDocumentoTransferencia = (registro, tipo) => {
+    setModalDocumentoTransferencia({
+      aberto: true,
+      tipo,
+      registro: registro || null,
+    });
+  };
+
+  const fecharModalDocumentoTransferencia = () => {
+    setModalDocumentoTransferencia({
+      aberto: false,
+      tipo: null,
+      registro: null,
+    });
+  };
+
+  const gerarPdfTransferencia = async (
+    registro,
+    colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+  ) => {
     try {
       setContaGerandoPdf(registro.conta_receber_id);
       const response = await api.get(
         `/estoque/transferencia-parceiro/${registro.conta_receber_id}/pdf`,
-        { responseType: "blob" },
+        {
+          params: montarParametrosDocumentoTransferencia(colunasDocumento),
+          responseType: "blob",
+        },
       );
       baixarArquivoBlob(
         response.data,
         `transferencia_${registro.documento || registro.conta_receber_id}.pdf`,
       );
+      return true;
     } catch (error) {
       console.error("Erro ao gerar PDF da transferencia:", error);
       toast.error(
         error?.response?.data?.detail || "Nao foi possivel gerar o PDF da transferencia.",
       );
+      return false;
     } finally {
       setContaGerandoPdf(null);
     }
   };
 
-  const imprimirCupomTransferencia = (registro) => {
-    setCupomTransferencia(montarCupomTransferencia(registro));
+  const imprimirCupomTransferencia = (
+    registro,
+    colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+  ) => {
+    setCupomTransferencia(montarCupomTransferencia(registro, colunasDocumento));
     window.setTimeout(() => globalThis.print(), 0);
   };
 
@@ -952,10 +1209,12 @@ export default function EstoqueTransferenciaParceiro() {
     setSelecionadosHistorico([]);
   };
 
-  const gerarPdfConsolidadoHistorico = async () => {
+  const gerarPdfConsolidadoHistorico = async (
+    colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+  ) => {
     if ((historico.totais.total_registros || 0) <= 0) {
       toast.error("Nao ha transferencias no filtro atual para consolidar.");
-      return;
+      return false;
     }
 
     const payload = {
@@ -967,6 +1226,7 @@ export default function EstoqueTransferenciaParceiro() {
       busca: filtrosHistoricoAplicados.busca?.trim() || undefined,
       data_inicio: filtrosHistoricoAplicados.data_inicio || undefined,
       data_fim: filtrosHistoricoAplicados.data_fim || undefined,
+      ...montarParametrosDocumentoTransferencia(colunasDocumento),
     };
 
     try {
@@ -977,35 +1237,77 @@ export default function EstoqueTransferenciaParceiro() {
         { responseType: "blob" },
       );
       baixarArquivoBlob(response.data, "transferencias_consolidadas.pdf");
+      return true;
     } catch (error) {
       console.error("Erro ao gerar PDF consolidado das transferencias:", error);
       toast.error(
         error?.response?.data?.detail ||
           "Nao foi possivel gerar o PDF consolidado das transferencias.",
       );
+      return false;
     } finally {
       setGerandoPdfConsolidado(false);
     }
   };
 
-  const enviarEmailTransferencia = async (registro) => {
+  const confirmarDocumentoTransferencia = async () => {
+    const colunas = normalizarColunasDocumentoTransferencia(colunasDocumentoTransferencia);
+    if (colunas.length === 0) {
+      toast.error("Selecione ao menos uma informacao para o documento.");
+      return;
+    }
+
+    const { tipo, registro } = modalDocumentoTransferencia;
+    if (tipo === "cupom" && registro) {
+      fecharModalDocumentoTransferencia();
+      imprimirCupomTransferencia(registro, colunas);
+      return;
+    }
+
+    if (tipo === "pdf" && registro) {
+      const gerado = await gerarPdfTransferencia(registro, colunas);
+      if (gerado) fecharModalDocumentoTransferencia();
+      return;
+    }
+
+    if (tipo === "email" && registro) {
+      const enviado = await enviarEmailTransferencia(registro, colunas);
+      if (enviado) fecharModalDocumentoTransferencia();
+      return;
+    }
+
+    if (tipo === "pdf_consolidado") {
+      const gerado = await gerarPdfConsolidadoHistorico(colunas);
+      if (gerado) fecharModalDocumentoTransferencia();
+    }
+  };
+
+  const enviarEmailTransferencia = async (
+    registro,
+    colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
+  ) => {
     if (!registro?.parceiro_email) {
       toast.error("Essa pessoa nao possui e-mail cadastrado.");
-      return;
+      return false;
     }
 
     try {
       setContaEnviandoEmail(registro.conta_receber_id);
       await api.post(
         `/estoque/transferencia-parceiro/${registro.conta_receber_id}/enviar-email`,
-        { email: registro.parceiro_email },
+        {
+          email: registro.parceiro_email,
+          ...montarParametrosDocumentoTransferencia(colunasDocumento),
+        },
       );
       toast.success(`E-mail enviado para ${registro.parceiro_email}.`);
+      return true;
     } catch (error) {
       console.error("Erro ao enviar e-mail da transferencia:", error);
       toast.error(
         error?.response?.data?.detail || "Nao foi possivel enviar o e-mail da transferencia.",
       );
+      return false;
     } finally {
       setContaEnviandoEmail(null);
     }
@@ -1131,6 +1433,14 @@ export default function EstoqueTransferenciaParceiro() {
   };
 
   const totalPaginasHistorico = historico.pages || 0;
+  const loadingDocumentoTransferencia =
+    modalDocumentoTransferencia.tipo === "pdf_consolidado"
+      ? gerandoPdfConsolidado
+      : modalDocumentoTransferencia.tipo === "email" && modalDocumentoTransferencia.registro
+        ? contaEnviandoEmail === modalDocumentoTransferencia.registro.conta_receber_id
+      : modalDocumentoTransferencia.tipo === "pdf" && modalDocumentoTransferencia.registro
+        ? contaGerandoPdf === modalDocumentoTransferencia.registro.conta_receber_id
+        : false;
 
   return (
     <div className="space-y-6 p-6">
@@ -1179,6 +1489,16 @@ export default function EstoqueTransferenciaParceiro() {
       >
         {cupomTransferencia}
       </pre>
+      <ModalDocumentoTransferenciaParceiro
+        modal={modalDocumentoTransferencia}
+        colunasSelecionadas={colunasDocumentoTransferencia}
+        onChangeColunas={(colunas) =>
+          setColunasDocumentoTransferencia(normalizarColunasDocumentoTransferencia(colunas))
+        }
+        onClose={fecharModalDocumentoTransferencia}
+        onConfirmar={() => void confirmarDocumentoTransferencia()}
+        loading={loadingDocumentoTransferencia}
+      />
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -1746,7 +2066,7 @@ export default function EstoqueTransferenciaParceiro() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void gerarPdfConsolidadoHistorico()}
+                  onClick={() => abrirModalDocumentoTransferencia(null, "pdf_consolidado")}
                   disabled={gerandoPdfConsolidado}
                   className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                 >
@@ -1853,7 +2173,7 @@ export default function EstoqueTransferenciaParceiro() {
                   ) : null}
                   <button
                     type="button"
-                    onClick={() => void gerarPdfTransferencia(registro)}
+                    onClick={() => abrirModalDocumentoTransferencia(registro, "pdf")}
                     disabled={contaGerandoPdf === registro.conta_receber_id}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -1861,14 +2181,14 @@ export default function EstoqueTransferenciaParceiro() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => imprimirCupomTransferencia(registro)}
+                    onClick={() => abrirModalDocumentoTransferencia(registro, "cupom")}
                     className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     Imprimir cupom
                   </button>
                   <button
                     type="button"
-                    onClick={() => void enviarEmailTransferencia(registro)}
+                    onClick={() => abrirModalDocumentoTransferencia(registro, "email")}
                     disabled={
                       contaEnviandoEmail === registro.conta_receber_id ||
                       !registro.parceiro_email

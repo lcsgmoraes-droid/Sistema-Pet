@@ -3588,9 +3588,134 @@ def _parse_relatorio_datetime(valor: Optional[str], *, end_of_day: bool = False)
     return data.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def _serializar_movimentacao_relatorio(mov: EstoqueMovimentacao) -> dict:
+def _datetime_sem_timezone_relatorio(valor):
+    if not valor:
+        return None
+    if getattr(valor, "tzinfo", None) is not None:
+        return valor.replace(tzinfo=None)
+    return valor
+
+
+def _produto_promocao_ativa_na_data(produto: Optional[Produto], data_ref: Optional[datetime]) -> bool:
+    if not produto or not produto.preco_promocional or produto.promocao_ativa is not True:
+        return False
+
+    data_base = _datetime_sem_timezone_relatorio(data_ref) or datetime.utcnow()
+    inicio = _datetime_sem_timezone_relatorio(produto.promocao_inicio)
+    fim = _datetime_sem_timezone_relatorio(produto.promocao_fim)
+    if inicio and data_base < inicio:
+        return False
+    if fim and data_base > fim:
+        return False
+    return True
+
+
+def _detectar_promocao_venda_item(item: VendaItem) -> dict:
+    venda = item.venda
+    produto = item.produto
+    motivos = []
+    preco_unitario = float(item.preco_unitario or 0)
+    preco_cadastro = float(produto.preco_venda or 0) if produto else 0.0
+    preco_promocional = float(produto.preco_promocional or 0) if produto and produto.preco_promocional else 0.0
+    desconto_item = float(item.desconto_item or 0)
+    desconto_venda = float(getattr(venda, "desconto_valor", 0) or 0) if venda else 0.0
+    cupom_valor = float(getattr(venda, "cupom_discount_applied", 0) or 0) if venda else 0.0
+
+    if produto and _produto_promocao_ativa_na_data(produto, getattr(venda, "data_venda", None)):
+        if preco_promocional <= 0 or preco_unitario <= (preco_promocional + 0.01):
+            motivos.append("Produto em promocao")
+
+    if desconto_item > 0 or desconto_venda > 0:
+        motivos.append("Desconto aplicado")
+
+    if getattr(venda, "cupom_code", None) or cupom_valor > 0:
+        motivos.append("Campanha/cupom")
+
+    if preco_cadastro > 0 and preco_unitario > 0 and preco_unitario < (preco_cadastro - 0.01):
+        motivos.append("Preco abaixo do cadastro")
+
+    motivos_unicos = list(dict.fromkeys(motivos))
+    subtotal = float(item.subtotal or 0)
+    return {
+        "em_promocao": bool(motivos_unicos),
+        "promocao_origem": ", ".join(motivos_unicos) if motivos_unicos else None,
+        "preco_cadastro": round(preco_cadastro, 2),
+        "preco_promocional_cadastro": round(preco_promocional, 2) if preco_promocional else None,
+        "desconto_promocional": round(desconto_item + cupom_valor, 2),
+        "valor_promocional": round(subtotal, 2) if motivos_unicos else 0.0,
+    }
+
+
+def _mapear_promocoes_movimentacoes(
+    db: Session,
+    tenant_id: str,
+    movimentacoes: list[EstoqueMovimentacao],
+) -> dict[tuple[int, int], dict]:
+    venda_ids = {
+        int(mov.referencia_id)
+        for mov in movimentacoes
+        if mov.referencia_id
+        and (
+            str(mov.referencia_tipo or "").lower() == "venda"
+            or str(mov.motivo or "").lower() == "venda"
+        )
+    }
+    produto_ids = {int(mov.produto_id) for mov in movimentacoes if mov.produto_id}
+    if not venda_ids or not produto_ids:
+        return {}
+
+    itens = db.query(VendaItem).options(
+        joinedload(VendaItem.produto),
+        joinedload(VendaItem.venda),
+    ).join(Venda, Venda.id == VendaItem.venda_id).filter(
+        Venda.tenant_id == tenant_id,
+        VendaItem.tenant_id == tenant_id,
+        VendaItem.venda_id.in_(venda_ids),
+        VendaItem.produto_id.in_(produto_ids),
+    ).all()
+
+    mapa = {}
+    for item in itens:
+        chave = (int(item.venda_id), int(item.produto_id))
+        info = _detectar_promocao_venda_item(item)
+        atual = mapa.get(chave)
+        if not atual:
+            mapa[chave] = info
+            continue
+
+        if info.get("em_promocao"):
+            motivos = [
+                parte.strip()
+                for parte in f"{atual.get('promocao_origem') or ''}, {info.get('promocao_origem') or ''}".split(",")
+                if parte.strip()
+            ]
+            atual.update(
+                {
+                    "em_promocao": True,
+                    "promocao_origem": ", ".join(list(dict.fromkeys(motivos))),
+                    "valor_promocional": round(
+                        float(atual.get("valor_promocional", 0) or 0)
+                        + float(info.get("valor_promocional", 0) or 0),
+                        2,
+                    ),
+                    "desconto_promocional": round(
+                        float(atual.get("desconto_promocional", 0) or 0)
+                        + float(info.get("desconto_promocional", 0) or 0),
+                        2,
+                    ),
+                }
+            )
+
+    return mapa
+
+
+def _serializar_movimentacao_relatorio(
+    mov: EstoqueMovimentacao,
+    promocao_info: Optional[dict] = None,
+) -> dict:
     produto = mov.produto
     motivo = (mov.motivo or "").strip()
+    promocao_info = promocao_info or {}
 
     return {
         "id": mov.id,
@@ -3614,6 +3739,12 @@ def _serializar_movimentacao_relatorio(mov: EstoqueMovimentacao) -> dict:
         "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S") if mov.created_at else None,
         "observacoes": mov.observacao,
         "lotes_consumidos": mov.lotes_consumidos,
+        "em_promocao": bool(promocao_info.get("em_promocao")),
+        "promocao_origem": promocao_info.get("promocao_origem"),
+        "preco_cadastro": promocao_info.get("preco_cadastro"),
+        "preco_promocional_cadastro": promocao_info.get("preco_promocional_cadastro"),
+        "desconto_promocional": promocao_info.get("desconto_promocional", 0),
+        "valor_promocional": promocao_info.get("valor_promocional", 0),
     }
 
 
@@ -3692,7 +3823,21 @@ def relatorio_movimentacoes(
     if not export_all:
         query = query.offset((page - 1) * page_size).limit(page_size)
 
-    resultado = [_serializar_movimentacao_relatorio(mov) for mov in query.all()]
+    movimentacoes_resultado = query.all()
+    promocoes_por_chave = _mapear_promocoes_movimentacoes(
+        db,
+        tenant_id,
+        movimentacoes_resultado,
+    )
+    resultado = [
+        _serializar_movimentacao_relatorio(
+            mov,
+            promocoes_por_chave.get((int(mov.referencia_id), int(mov.produto_id)))
+            if mov.referencia_id and mov.produto_id
+            else None,
+        )
+        for mov in movimentacoes_resultado
+    ]
 
     if agrupar_por_mes:
         agrupado = {}
@@ -3815,6 +3960,7 @@ def relatorio_vendas_produto(
 
     historico_rows = base_historico.options(
         joinedload(VendaItem.venda).joinedload(Venda.cliente),
+        joinedload(VendaItem.produto),
     ).order_by(
         Venda.data_venda.desc(),
         Venda.numero_venda.desc(),
@@ -3824,6 +3970,7 @@ def relatorio_vendas_produto(
     historico = []
     for item in historico_rows:
         venda = item.venda
+        info_promocao = _detectar_promocao_venda_item(item)
         historico.append({
             "id": item.id,
             "venda_id": venda.id if venda else None,
@@ -3835,6 +3982,9 @@ def relatorio_vendas_produto(
             "quantidade": float(item.quantidade or 0),
             "preco_unitario": float(item.preco_unitario or 0),
             "subtotal": float(item.subtotal or 0),
+            "em_promocao": bool(info_promocao.get("em_promocao")),
+            "promocao_origem": info_promocao.get("promocao_origem"),
+            "desconto_promocional": info_promocao.get("desconto_promocional", 0),
         })
 
     analise_rows = db.query(

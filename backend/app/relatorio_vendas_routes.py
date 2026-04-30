@@ -45,6 +45,143 @@ def _venda_tem_documento_fiscal(venda: Venda) -> bool:
     )
 
 
+def _normalizar_forma_pagamento_label(valor) -> str:
+    texto = str(valor or "").strip()
+    chave = texto.lower()
+    mapa = {
+        "1": "Dinheiro",
+        "2": "Pix",
+        "3": "Cartao Debito",
+        "4": "Cartao Credito",
+        "5": "Cartao Credito",
+        "dinheiro": "Dinheiro",
+        "pix": "Pix",
+        "debito": "Cartao Debito",
+        "cartao_debito": "Cartao Debito",
+        "cartao debito": "Cartao Debito",
+        "credito": "Cartao Credito",
+        "cartao_credito": "Cartao Credito",
+        "cartao credito": "Cartao Credito",
+        "credito_parcelado": "Cartao Credito",
+        "credito cliente": "Credito do Cliente",
+        "credito_cliente": "Credito do Cliente",
+    }
+    return mapa.get(chave, texto or "Nao informado")
+
+
+def _datetime_sem_timezone(valor):
+    if not valor:
+        return None
+    if getattr(valor, "tzinfo", None) is not None:
+        return valor.replace(tzinfo=None)
+    return valor
+
+
+def _janela_promocao_ativa(produto: Produto, data_venda: Optional[datetime]) -> bool:
+    if not produto or not getattr(produto, "preco_promocional", None):
+        return False
+    if getattr(produto, "promocao_ativa", False) is not True:
+        return False
+
+    data_ref = _datetime_sem_timezone(data_venda) or datetime.utcnow()
+    inicio = _datetime_sem_timezone(getattr(produto, "promocao_inicio", None))
+    fim = _datetime_sem_timezone(getattr(produto, "promocao_fim", None))
+    if inicio and data_ref < inicio:
+        return False
+    if fim and data_ref > fim:
+        return False
+    return True
+
+
+def _detectar_promocao_item(
+    produto: Optional[Produto],
+    item: Optional[VendaItem],
+    venda: Optional[Venda],
+    item_snapshot: Optional[dict] = None,
+) -> dict:
+    motivos = []
+    item_snapshot = item_snapshot or {}
+    data_venda = getattr(venda, "data_venda", None)
+    preco_unitario = float(
+        getattr(item, "preco_unitario", None)
+        or item_snapshot.get("preco_unitario", 0)
+        or 0
+    )
+    preco_cadastro = float(getattr(produto, "preco_venda", 0) or 0) if produto else 0.0
+    preco_promocional = (
+        float(getattr(produto, "preco_promocional", 0) or 0)
+        if produto
+        else 0.0
+    )
+    desconto_item = float(getattr(item, "desconto_item", 0) or 0) if item else 0.0
+    desconto_rateado = float(item_snapshot.get("desconto", 0) or 0)
+    campanha_rateada = float(item_snapshot.get("campanha", 0) or 0)
+    subtotal_item = float(
+        getattr(item, "subtotal", None)
+        or item_snapshot.get("venda_bruta", 0)
+        or 0
+    )
+
+    if produto and _janela_promocao_ativa(produto, data_venda):
+        if preco_promocional <= 0 or preco_unitario <= (preco_promocional + 0.01):
+            motivos.append("Produto em promocao")
+
+    if desconto_item > 0 or desconto_rateado > 0:
+        motivos.append("Desconto aplicado")
+
+    if (
+        getattr(venda, "cupom_code", None)
+        or float(getattr(venda, "cupom_discount_applied", 0) or 0) > 0
+        or campanha_rateada > 0
+    ):
+        motivos.append("Campanha/cupom")
+
+    if preco_cadastro > 0 and preco_unitario > 0 and preco_unitario < (preco_cadastro - 0.01):
+        motivos.append("Preco abaixo do cadastro")
+
+    motivos_unicos = list(dict.fromkeys(motivos))
+    em_promocao = bool(motivos_unicos)
+    return {
+        "em_promocao": em_promocao,
+        "promocao_origem": ", ".join(motivos_unicos) if em_promocao else None,
+        "preco_cadastro": round(preco_cadastro, 2),
+        "preco_promocional_cadastro": round(preco_promocional, 2) if preco_promocional else None,
+        "desconto_promocional": round(desconto_item + desconto_rateado + campanha_rateada, 2),
+        "valor_promocional": round(subtotal_item, 2) if em_promocao else 0.0,
+    }
+
+
+def _enriquecer_itens_promocionais(venda: Venda, itens_snapshot: list[dict]) -> list[dict]:
+    itens_venda = list(getattr(venda, "itens", []) or [])
+    usados = set()
+    resultado = []
+
+    for indice, item_snapshot in enumerate(itens_snapshot):
+        item_modelo = None
+        produto_id_snapshot = item_snapshot.get("produto_id")
+
+        if indice < len(itens_venda):
+            candidato = itens_venda[indice]
+            if not produto_id_snapshot or getattr(candidato, "produto_id", None) == produto_id_snapshot:
+                item_modelo = candidato
+                usados.add(indice)
+
+        if item_modelo is None:
+            for idx, candidato in enumerate(itens_venda):
+                if idx in usados:
+                    continue
+                if getattr(candidato, "produto_id", None) == produto_id_snapshot:
+                    item_modelo = candidato
+                    usados.add(idx)
+                    break
+
+        produto = getattr(item_modelo, "produto", None) if item_modelo else None
+        info_promocao = _detectar_promocao_item(produto, item_modelo, venda, item_snapshot)
+        resultado.append({**item_snapshot, **info_promocao})
+
+    return resultado
+
+
 @router.get("/vendas/relatorio")
 async def obter_relatorio_vendas(
     data_inicio: Optional[str] = Query(None),
@@ -281,8 +418,7 @@ async def obter_relatorio_vendas(
     for venda in vendas:
         # OTIMIZAÇÃO: usar pagamentos já carregados
         for pag in venda.pagamentos:
-            forma_codigo = str(pag.forma_pagamento) if pag.forma_pagamento else "Não informado"
-            forma_base = FORMAS_PAGAMENTO_MAP.get(forma_codigo, forma_codigo)
+            forma_base = _normalizar_forma_pagamento_label(pag.forma_pagamento)
 
             # Criar chave única com forma + parcelas
             if pag.numero_parcelas and pag.numero_parcelas > 1:
@@ -544,7 +680,12 @@ async def obter_relatorio_vendas(
     lista_vendas = []
     custo_total_geral = 0
     taxa_total_geral = 0
+    taxa_loja_total_geral = 0
+    taxa_entrega_repasse_total_geral = 0
+    taxa_operacional_total_geral = 0
     comissao_total_geral = 0
+    imposto_total_geral = 0
+    custo_campanha_total_geral = 0
     lucro_total_geral = 0
     venda_liquida_geral = 0
 
@@ -568,9 +709,27 @@ async def obter_relatorio_vendas(
 
         custo_total_geral += float(snapshot.get("custo_produtos", 0) or 0)
         taxa_total_geral += float(snapshot.get("taxa_cartao", 0) or 0)
+        taxa_loja_total_geral += float(snapshot.get("taxa_loja", 0) or 0)
+        taxa_entrega_repasse_total_geral += float(snapshot.get("taxa_entrega", 0) or 0)
+        taxa_operacional_total_geral += float(snapshot.get("taxa_operacional", 0) or 0)
         comissao_total_geral += float(snapshot.get("comissao", 0) or 0)
+        imposto_total_geral += float(snapshot.get("imposto", 0) or 0)
+        custo_campanha_total_geral += float(snapshot.get("custo_campanha", 0) or 0)
         lucro_total_geral += float(snapshot.get("lucro", 0) or 0)
         venda_liquida_geral += float(snapshot.get("venda_liquida", 0) or 0)
+        itens_enriquecidos = _enriquecer_itens_promocionais(
+            venda,
+            list(snapshot.get("itens", []) or []),
+        )
+        itens_promocionais = [item for item in itens_enriquecidos if item.get("em_promocao")]
+        origens_promocao = sorted(
+            {
+                origem.strip()
+                for item in itens_promocionais
+                for origem in str(item.get("promocao_origem") or "").split(",")
+                if origem.strip()
+            }
+        )
 
         lista_vendas.append({
             "id": venda.id,
@@ -598,15 +757,27 @@ async def obter_relatorio_vendas(
             "margem_sobre_venda": round(float(snapshot.get("margem_sobre_venda", 0) or 0), 1),
             "margem_sobre_custo": round(float(snapshot.get("margem_sobre_custo", 0) or 0), 1),
             "status": venda.status,
-            "itens": list(snapshot.get("itens", []) or []),
+            "tem_promocao": bool(itens_promocionais),
+            "itens_promocionais": len(itens_promocionais),
+            "valor_promocional": round(
+                sum(float(item.get("valor_promocional", 0) or 0) for item in itens_promocionais),
+                2,
+            ),
+            "origens_promocao": origens_promocao,
+            "itens": itens_enriquecidos,
         })
 
     lista_vendas = sorted(lista_vendas, key=lambda x: x["data_venda"], reverse=True)
 
     # Adicionar análise de rentabilidade ao resumo
     resumo["custo_total"] = round(custo_total_geral, 2)
+    resumo["taxa_loja_total"] = round(taxa_loja_total_geral, 2)
+    resumo["taxa_entrega_repasse_total"] = round(taxa_entrega_repasse_total_geral, 2)
+    resumo["taxa_operacional_total"] = round(taxa_operacional_total_geral, 2)
     resumo["taxa_cartao_total"] = round(taxa_total_geral, 2)
     resumo["comissao_total"] = round(comissao_total_geral, 2)
+    resumo["imposto_total"] = round(imposto_total_geral, 2)
+    resumo["custo_campanha_total"] = round(custo_campanha_total_geral, 2)
     resumo["lucro_total"] = round(lucro_total_geral, 2)
     resumo["venda_liquida"] = round(venda_liquida_geral, 2)
     resumo["margem_media"] = round((lucro_total_geral / venda_liquida_geral * 100) if venda_liquida_geral > 0 else 0, 1)

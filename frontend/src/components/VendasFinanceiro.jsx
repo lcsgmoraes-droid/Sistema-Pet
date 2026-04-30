@@ -130,6 +130,34 @@ function parseDataLocal(valor) {
   return data;
 }
 
+function parseDataHoraLocal(valor) {
+  if (!valor) return null;
+  if (valor instanceof Date) {
+    return Number.isNaN(valor.getTime()) ? null : valor;
+  }
+
+  if (typeof valor === "string") {
+    const match = valor.match(
+      /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/,
+    );
+    if (match) {
+      const [, ano, mes, dia, hora, minuto, segundo] = match;
+      return new Date(
+        Number(ano),
+        Number(mes) - 1,
+        Number(dia),
+        Number(hora),
+        Number(minuto),
+        Number(segundo || 0),
+      );
+    }
+  }
+
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return null;
+  return data;
+}
+
 function dataKeyLocal(valor) {
   const data = parseDataLocal(valor);
   if (!data) return "";
@@ -137,6 +165,31 @@ function dataKeyLocal(valor) {
   const mes = String(data.getMonth() + 1).padStart(2, "0");
   const dia = String(data.getDate()).padStart(2, "0");
   return `${ano}-${mes}-${dia}`;
+}
+
+function normalizarFormaPagamentoLabel(valor) {
+  const texto = String(valor || "").trim();
+  const lower = texto.toLowerCase();
+  const mapa = {
+    "1": "Dinheiro",
+    "2": "Pix",
+    "3": "Cartao Debito",
+    "4": "Cartao Credito",
+    "5": "Cartao Credito",
+    pix: "Pix",
+    dinheiro: "Dinheiro",
+    debito: "Cartao Debito",
+    cartao_debito: "Cartao Debito",
+    "cartao debito": "Cartao Debito",
+    credito: "Cartao Credito",
+    cartao_credito: "Cartao Credito",
+    "cartao credito": "Cartao Credito",
+    credito_parcelado: "Cartao Credito",
+    credito_cliente: "Credito do Cliente",
+    "credito cliente": "Credito do Cliente",
+  };
+
+  return mapa[lower] || texto || "Nao informado";
 }
 
 function formatarDataLocal(valor, opcoes = {}) {
@@ -674,8 +727,42 @@ export default function VendasFinanceiro() {
     return dadosFiltrados;
   };
 
+  const formasRecebimentoConsolidadas = useMemo(() => {
+    const mapa = new Map();
+    (formasRecebimento || []).forEach((item) => {
+      const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
+      const atual = mapa.get(forma) || {
+        ...item,
+        forma_pagamento: forma,
+        valor_total: 0,
+      };
+      atual.valor_total += Number(item.valor_total || 0);
+      mapa.set(forma, atual);
+    });
+    return Array.from(mapa.values()).sort(
+      (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
+    );
+  }, [formasRecebimento]);
+
+  const formasRecebimentoComparacaoConsolidadas = useMemo(() => {
+    const mapa = new Map();
+    (formasRecebimentoComparacao || []).forEach((item) => {
+      const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
+      const atual = mapa.get(forma) || {
+        ...item,
+        forma_pagamento: forma,
+        valor_total: 0,
+      };
+      atual.valor_total += Number(item.valor_total || 0);
+      mapa.set(forma, atual);
+    });
+    return Array.from(mapa.values()).sort(
+      (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
+    );
+  }, [formasRecebimentoComparacao]);
+
   const formasRecebimentoFiltradas = aplicarFiltros(
-    formasRecebimento,
+    formasRecebimentoConsolidadas,
     "formaPagamento",
   );
   const vendasPorFuncionarioFiltradas = aplicarFiltros(
@@ -784,6 +871,280 @@ export default function VendasFinanceiro() {
     if (filtroStatusLista !== "em_aberto") return listaVendasVisiveis;
     return listaVendasVisiveis.filter(vendaEstaEmAberto);
   }, [filtroStatusLista, listaVendasVisiveis]);
+
+  const vendasResumoPeriodo = useMemo(() => listaVendasVisiveis, [listaVendasVisiveis]);
+
+  const fluxoResultadoCards = useMemo(() => {
+    const taxaLoja = Number(resumo.taxa_loja_total || 0);
+    const repasseEntrega = Number(
+      resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0,
+    );
+    const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
+    const custoOperacional = repasseEntrega + taxaOperacional;
+    const taxasCartao = Number(resumo.taxa_cartao_total || 0);
+    const comissao = Number(resumo.comissao_total || 0);
+    const imposto = Number(resumo.imposto_total || 0);
+    const campanhas = Number(resumo.custo_campanha_total || 0);
+    const custoProdutos = Number(resumo.custo_total || 0);
+
+    return [
+      {
+        sinal: "",
+        titulo: "Venda Bruta",
+        valor: Number(resumo.venda_bruta || 0),
+        detalhe: "Produtos e servicos antes das deducoes.",
+        cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      },
+      {
+        sinal: "+",
+        titulo: "Tx Loja",
+        valor: taxaLoja,
+        detalhe: "Parte da entrega que fica como receita da loja.",
+        cor: "border-blue-200 bg-blue-50 text-blue-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Descontos",
+        valor: Number(resumo.desconto || 0),
+        detalhe: "Descontos de venda e itens.",
+        cor: "border-amber-200 bg-amber-50 text-amber-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Operacional",
+        valor: custoOperacional,
+        detalhe: "Repasse de entrega e custos operacionais.",
+        cor: "border-orange-200 bg-orange-50 text-orange-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Cartao",
+        valor: taxasCartao,
+        detalhe: "Taxas das operadoras de cartao.",
+        cor: "border-purple-200 bg-purple-50 text-purple-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Comissao",
+        valor: comissao,
+        detalhe: "Comissoes rateadas nas vendas.",
+        cor: "border-indigo-200 bg-indigo-50 text-indigo-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Impostos",
+        valor: imposto,
+        detalhe: "Imposto usado na rentabilidade.",
+        cor: "border-rose-200 bg-rose-50 text-rose-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Campanhas",
+        valor: campanhas,
+        detalhe: "Cashback, cupons e beneficios resgatados.",
+        cor: "border-cyan-200 bg-cyan-50 text-cyan-800",
+      },
+      {
+        sinal: "=",
+        titulo: "Venda Liquida",
+        valor: Number(resumo.venda_liquida || 0),
+        detalhe: "Resultado antes do custo dos produtos.",
+        cor: "border-sky-200 bg-sky-50 text-sky-800",
+      },
+      {
+        sinal: "-",
+        titulo: "Custo Produtos",
+        valor: custoProdutos,
+        detalhe: "CMV dos produtos vendidos.",
+        cor: "border-slate-200 bg-slate-50 text-slate-800",
+      },
+      {
+        sinal: "=",
+        titulo: "Lucro",
+        valor: Number(resumo.lucro_total || 0),
+        detalhe: "Venda liquida menos custo dos produtos.",
+        cor:
+          Number(resumo.lucro_total || 0) >= 0
+            ? "border-green-200 bg-green-50 text-green-800"
+            : "border-red-200 bg-red-50 text-red-800",
+      },
+      {
+        sinal: "%",
+        titulo: "Margem",
+        valor: Number(resumo.margem_media || 0),
+        detalhe: "Lucro sobre a venda liquida.",
+        percentual: true,
+        cor: "border-teal-200 bg-teal-50 text-teal-800",
+      },
+    ];
+  }, [resumo]);
+
+  const vendasPorDiaSemanaResumo = useMemo(() => {
+    const dias = [
+      { chave: 1, nome: "Segunda", curto: "Seg" },
+      { chave: 2, nome: "Terca", curto: "Ter" },
+      { chave: 3, nome: "Quarta", curto: "Qua" },
+      { chave: 4, nome: "Quinta", curto: "Qui" },
+      { chave: 5, nome: "Sexta", curto: "Sex" },
+      { chave: 6, nome: "Sabado", curto: "Sab" },
+      { chave: 0, nome: "Domingo", curto: "Dom" },
+    ];
+    const mapa = new Map(
+      dias.map((dia, ordem) => [
+        dia.chave,
+        {
+          ...dia,
+          ordem,
+          quantidade: 0,
+          valor_bruto: 0,
+          valor_liquido: 0,
+          ticket_medio: 0,
+        },
+      ]),
+    );
+
+    vendasResumoPeriodo.forEach((venda) => {
+      const data = parseDataHoraLocal(venda.data_venda);
+      if (!data) return;
+      const item = mapa.get(data.getDay());
+      if (!item) return;
+      item.quantidade += 1;
+      item.valor_bruto += Number(venda.venda_bruta || 0);
+      item.valor_liquido += Number(venda.venda_liquida || 0);
+    });
+
+    return Array.from(mapa.values()).map((item) => ({
+      ...item,
+      ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+    }));
+  }, [vendasResumoPeriodo]);
+
+  const vendasPorHorarioResumo = useMemo(() => {
+    const horas = Array.from({ length: 24 }, (_, hora) => ({
+      hora,
+      faixa: `${String(hora).padStart(2, "0")}h`,
+      quantidade: 0,
+      valor_bruto: 0,
+      valor_liquido: 0,
+      ticket_medio: 0,
+    }));
+
+    vendasResumoPeriodo.forEach((venda) => {
+      const data = parseDataHoraLocal(venda.data_venda);
+      if (!data) return;
+      const item = horas[data.getHours()];
+      item.quantidade += 1;
+      item.valor_bruto += Number(venda.venda_bruta || 0);
+      item.valor_liquido += Number(venda.venda_liquida || 0);
+    });
+
+    return horas.map((item) => ({
+      ...item,
+      ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+    }));
+  }, [vendasResumoPeriodo]);
+
+  const vendasPorHorarioComMovimento = useMemo(
+    () => vendasPorHorarioResumo.filter((item) => item.quantidade > 0),
+    [vendasPorHorarioResumo],
+  );
+
+  const melhorDiaSemana = useMemo(
+    () =>
+      [...vendasPorDiaSemanaResumo].sort(
+        (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+      )[0],
+    [vendasPorDiaSemanaResumo],
+  );
+
+  const melhorHorario = useMemo(
+    () =>
+      [...vendasPorHorarioComMovimento].sort(
+        (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+      )[0],
+    [vendasPorHorarioComMovimento],
+  );
+
+  const analisePromocoes = useMemo(() => {
+    const topProdutos = new Map();
+    let vendasPromocao = 0;
+    let vendasNormais = 0;
+    let valorVendasPromocao = 0;
+    let valorVendasNormais = 0;
+    let valorItensPromocionais = 0;
+    let descontoPromocional = 0;
+
+    vendasResumoPeriodo.forEach((venda) => {
+      const itens = Array.isArray(venda.itens) ? venda.itens : [];
+      const itensPromo = itens.filter((item) => item?.em_promocao);
+      const vendaTemPromocao = Boolean(venda.tem_promocao || itensPromo.length > 0);
+      const valorVenda = Number(venda.venda_liquida || venda.venda_bruta || 0);
+
+      if (vendaTemPromocao) {
+        vendasPromocao += 1;
+        valorVendasPromocao += valorVenda;
+      } else {
+        vendasNormais += 1;
+        valorVendasNormais += valorVenda;
+      }
+
+      itensPromo.forEach((item) => {
+        const chave = item.produto_id || item.produto_nome;
+        const atual = topProdutos.get(chave) || {
+          produto_nome: item.produto_nome || "Produto removido",
+          quantidade: 0,
+          valor: 0,
+          desconto: 0,
+          origens: new Set(),
+        };
+        const valorItem = Number(
+          item.valor_liquido || item.valor_promocional || item.venda_bruta || 0,
+        );
+        const descontoItem = Number(
+          item.desconto_promocional || item.desconto || 0,
+        ) + Number(item.campanha || 0);
+
+        atual.quantidade += Number(item.quantidade || 0);
+        atual.valor += valorItem;
+        atual.desconto += descontoItem;
+        String(item.promocao_origem || "")
+          .split(",")
+          .map((origem) => origem.trim())
+          .filter(Boolean)
+          .forEach((origem) => atual.origens.add(origem));
+
+        valorItensPromocionais += valorItem;
+        descontoPromocional += descontoItem;
+        topProdutos.set(chave, atual);
+      });
+    });
+
+    const totalVendas = vendasPromocao + vendasNormais;
+    return {
+      totalVendas,
+      vendasPromocao,
+      vendasNormais,
+      valorVendasPromocao,
+      valorVendasNormais,
+      valorItensPromocionais,
+      descontoPromocional,
+      percentualPromocao:
+        totalVendas > 0 ? arredondarPercentual((vendasPromocao / totalVendas) * 100) : 0,
+      comparativo: [
+        { tipo: "Normais", quantidade: vendasNormais, valor: valorVendasNormais },
+        { tipo: "Promocao/campanha", quantidade: vendasPromocao, valor: valorVendasPromocao },
+      ],
+      topProdutos: Array.from(topProdutos.values())
+        .map((item) => ({
+          ...item,
+          origens: Array.from(item.origens),
+          valor: arredondarMoeda(item.valor),
+          desconto: arredondarMoeda(item.desconto),
+        }))
+        .sort((a, b) => b.valor - a.valor)
+        .slice(0, 8),
+    };
+  }, [vendasResumoPeriodo]);
 
   const totalizadoresListaVendas = useMemo(() => {
     const totais = listaVendasFiltrada.reduce(
@@ -1663,7 +2024,7 @@ export default function VendasFinanceiro() {
             className="border rounded px-3 py-2 text-sm"
           >
             <option value="">Todas as formas</option>
-            {formasRecebimento.map((f) => (
+            {formasRecebimentoConsolidadas.map((f) => (
               <option key={`forma-${f.forma_pagamento || "sem-forma"}`} value={f.forma_pagamento}>
                 {f.forma_pagamento}
               </option>
@@ -1876,6 +2237,43 @@ export default function VendasFinanceiro() {
                 {resumo.margem_media || 0}%
               </div>
               <div className="text-sm">Margem Média</div>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Composicao do resultado
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Sequencia da venda bruta ate o lucro do periodo filtrado.
+                </p>
+              </div>
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {fluxoResultadoCards.map((card) => (
+                <div
+                  key={card.titulo}
+                  className={`min-h-[116px] rounded-lg border p-3 shadow-sm ${card.cor}`}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide">
+                      {card.titulo}
+                    </span>
+                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold">
+                      {card.sinal || "R$"}
+                    </span>
+                  </div>
+                  <div className="text-xl font-bold">
+                    {card.percentual ? `${card.valor}%` : formatarMoeda(card.valor)}
+                  </div>
+                  <p className="mt-2 text-xs opacity-75">{card.detalhe}</p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -2148,8 +2546,210 @@ export default function VendasFinanceiro() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Vendas por dia da semana
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Melhor dia: {melhorDiaSemana?.nome || "-"} com {formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {melhorDiaSemana?.quantidade || 0} venda(s)
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={vendasPorDiaSemanaResumo}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="curto" />
+                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(value, name, props) => {
+                        const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
+                        return [
+                          isQuantidade ? value : formatarMoeda(value),
+                          isQuantidade ? "Vendas" : "Valor liquido",
+                        ];
+                      }}
+                      labelFormatter={(label) => {
+                        const dia = vendasPorDiaSemanaResumo.find((item) => item.curto === label);
+                        return dia?.nome || label;
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="valor_liquido" fill="#14B8A6" name="Valor liquido" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="quantidade" fill="#94A3B8" name="Vendas" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-4">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Vendas por horario
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Pico: {melhorHorario?.faixa || "-"} com {formatarMoeda(melhorHorario?.valor_liquido || 0)}.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    {melhorHorario?.quantidade || 0} venda(s)
+                  </span>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={vendasPorHorarioComMovimento}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="faixa" />
+                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip
+                      formatter={(value, name, props) => {
+                        const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
+                        return [
+                          isQuantidade ? value : formatarMoeda(value),
+                          isQuantidade ? "Vendas" : "Valor liquido",
+                        ];
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="valor_liquido" fill="#3B82F6" name="Valor liquido" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="quantidade" fill="#F59E0B" name="Vendas" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           )}
+
+          <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Vendas normais x promocao/campanha
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Itens marcados por preco promocional, desconto, cupom ou campanha.
+                </p>
+              </div>
+              <div className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">
+                {analisePromocoes.percentualPromocao}% das vendas com promocao
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-slate-500">
+                  Vendas normais
+                </p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {analisePromocoes.vendasNormais}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {formatarMoeda(analisePromocoes.valorVendasNormais)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3">
+                <p className="text-xs font-semibold uppercase text-cyan-700">
+                  Com promocao/campanha
+                </p>
+                <p className="mt-1 text-2xl font-bold text-cyan-800">
+                  {analisePromocoes.vendasPromocao}
+                </p>
+                <p className="text-xs text-cyan-700">
+                  {formatarMoeda(analisePromocoes.valorVendasPromocao)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs font-semibold uppercase text-blue-700">
+                  Itens promocionais
+                </p>
+                <p className="mt-1 text-2xl font-bold text-blue-800">
+                  {formatarMoeda(analisePromocoes.valorItensPromocionais)}
+                </p>
+                <p className="text-xs text-blue-700">
+                  Valor dos itens identificados
+                </p>
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold uppercase text-amber-700">
+                  Desconto/campanha
+                </p>
+                <p className="mt-1 text-2xl font-bold text-amber-800">
+                  {formatarMoeda(analisePromocoes.descontoPromocional)}
+                </p>
+                <p className="text-xs text-amber-700">
+                  Soma estimada nos itens marcados
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <div className="h-[260px] rounded-lg border border-slate-100 p-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analisePromocoes.comparativo}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="tipo" />
+                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(value, name, props) => {
+                      const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
+                      return [
+                        isQuantidade ? value : formatarMoeda(value),
+                        isQuantidade ? "Vendas" : "Valor",
+                      ];
+                    }} />
+                    <Legend />
+                    <Bar dataKey="valor" name="Valor" fill="#06B6D4" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="quantidade" name="Vendas" fill="#64748B" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-slate-100">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Produto</th>
+                      <th className="px-3 py-2 text-right">Qtd</th>
+                      <th className="px-3 py-2 text-right">Valor</th>
+                      <th className="px-3 py-2 text-right">Desconto</th>
+                      <th className="px-3 py-2 text-left">Origem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analisePromocoes.topProdutos.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="px-3 py-6 text-center text-sm text-slate-500">
+                          Nenhum item promocional identificado no periodo.
+                        </td>
+                      </tr>
+                    ) : (
+                      analisePromocoes.topProdutos.map((produto) => (
+                        <tr key={produto.produto_nome} className="border-t border-slate-100">
+                          <td className="px-3 py-2 font-medium text-slate-800">
+                            {produto.produto_nome}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {produto.quantidade}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {formatarMoeda(produto.valor)}
+                          </td>
+                          <td className="px-3 py-2 text-right text-amber-700">
+                            {formatarMoeda(produto.desconto)}
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">
+                            {produto.origens.join(", ") || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
 
           {/* Vendas por Data */}
           <div className="bg-white rounded-lg shadow mb-6">
@@ -2337,7 +2937,7 @@ export default function VendasFinanceiro() {
                   </tr>
                 </thead>
                 <tbody>
-                  {formasRecebimento.map((item, idx) => (
+                  {formasRecebimentoConsolidadas.map((item, idx) => (
                     <tr key={`forma-row-${item.forma_pagamento || idx}`} className="border-b">
                       <td className="px-4 py-2">{item.forma_pagamento}</td>
                       <td className="px-4 py-2 text-right">
@@ -2345,7 +2945,7 @@ export default function VendasFinanceiro() {
                       </td>
                     </tr>
                   ))}
-                  {formasRecebimento.length > 0 && (
+                  {formasRecebimentoConsolidadas.length > 0 && (
                     <tr
                       style={{
                         backgroundColor: "#E5E7EB",
@@ -2356,7 +2956,7 @@ export default function VendasFinanceiro() {
                       <td className="px-4 py-3">TOTAL</td>
                       <td className="px-4 py-3 text-right">
                         {formatarMoeda(
-                          formasRecebimento.reduce(
+                          formasRecebimentoConsolidadas.reduce(
                             (sum, item) => sum + item.valor_total,
                             0,
                           ),
@@ -3135,7 +3735,17 @@ export default function VendasFinanceiro() {
                                       className="border-b border-blue-200 hover:bg-blue-100"
                                     >
                                       <td className="px-1 py-1">
-                                        {item.produto_nome}
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          <span>{item.produto_nome}</span>
+                                          {item.em_promocao && (
+                                            <span
+                                              className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"
+                                              title={item.promocao_origem || "Item vendido em promocao/campanha"}
+                                            >
+                                              Promo
+                                            </span>
+                                          )}
+                                        </div>
                                       </td>
                                       <td className="px-1 py-1 text-center">
                                         {item.quantidade}
@@ -3539,8 +4149,8 @@ export default function VendasFinanceiro() {
                       </tr>
                     </thead>
                     <tbody>
-                      {formasRecebimento.map((formaAtual, idx) => {
-                        const formaAnt = formasRecebimentoComparacao.find(
+                      {formasRecebimentoConsolidadas.map((formaAtual, idx) => {
+                        const formaAnt = formasRecebimentoComparacaoConsolidadas.find(
                           (f) =>
                             f.forma_pagamento === formaAtual.forma_pagamento,
                         ) || { valor_total: 0 };
@@ -3589,10 +4199,10 @@ export default function VendasFinanceiro() {
                 </h3>
                 <ResponsiveContainer width="100%" height={350}>
                   <BarChart
-                    data={formasRecebimento.map((f) => ({
+                    data={formasRecebimentoConsolidadas.map((f) => ({
                       nome: f.forma_pagamento,
                       Anterior:
-                        (formasRecebimentoComparacao.find(
+                        (formasRecebimentoComparacaoConsolidadas.find(
                           (fa) => fa.forma_pagamento === f.forma_pagamento,
                         )?.valor_total || 0) / 1000,
                       Atual: f.valor_total / 1000,

@@ -474,6 +474,8 @@ export default function ProdutosRelatorio() {
         "Saida",
         "Estoque",
         "Valor total",
+        "Promocao/campanha",
+        "Origem promocao",
         "Usuario",
         "Documento",
       ];
@@ -492,6 +494,8 @@ export default function ProdutosRelatorio() {
           mov.saida ?? "",
           mov.estoque ?? "",
           mov.valor_total ?? "",
+          mov.em_promocao ? "Sim" : "Nao",
+          mov.promocao_origem || "",
           mov.usuario || "",
           mov.numero_pedido || "",
         ].join(";")),
@@ -911,7 +915,22 @@ export default function ProdutosRelatorio() {
                                 {formatarData(item.data_venda)}
                               </td>
                               <td className="px-5 py-3 text-sm font-medium text-gray-900">
-                                {item.numero_venda || "-"}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span>{item.numero_venda || "-"}</span>
+                                  {item.em_promocao && (
+                                    <span
+                                      className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
+                                      title={item.promocao_origem || "Venda em promocao/campanha"}
+                                    >
+                                      Promo
+                                    </span>
+                                  )}
+                                </div>
+                                {item.em_promocao && (
+                                  <p className="mt-1 text-xs font-medium text-cyan-700">
+                                    {item.promocao_origem || "Promocao/campanha"}
+                                  </p>
+                                )}
                               </td>
                               <td className="px-5 py-3 text-sm text-gray-700">
                                 {item.cliente_nome || "Sem cliente"}
@@ -1091,12 +1110,27 @@ export default function ProdutosRelatorio() {
                           </p>
                         </td>
                         <td className="px-5 py-3 text-sm text-gray-700">
-                          <p className="font-semibold text-gray-900">
-                            {mov.produto_nome || "-"}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-gray-900">
+                              {mov.produto_nome || "-"}
+                            </p>
+                            {mov.em_promocao && (
+                              <span
+                                className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
+                                title={mov.promocao_origem || "Venda em promocao/campanha"}
+                              >
+                                Promo
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500">
                             {[mov.codigo, mov.sku, mov.codigo_barras].filter(Boolean).join(" | ") || "Sem codigo"}
                           </p>
+                          {mov.em_promocao && (
+                            <p className="mt-1 text-xs font-medium text-cyan-700">
+                              {mov.promocao_origem || "Promocao/campanha"}
+                            </p>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-sm text-gray-700">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClasse}`}>
