@@ -172,22 +172,40 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
             Operacao e custos base
           </h2>
 
+          <div className="mt-5 rounded-3xl border border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50 p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-500">
+                  Agenda no app do cliente
+                </p>
+                <h3 className="mt-1 text-base font-black text-slate-900">
+                  WhatsApp e horarios visiveis
+                </h3>
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  O cliente ve horarios livres/ocupados sem nomes de pets e toca para falar com a loja pelo WhatsApp.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 rounded-2xl border border-orange-200 bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(configForm.mostrar_calendario_cliente)}
+                  onChange={(event) => updateConfig("mostrar_calendario_cliente", event.target.checked)}
+                  className="h-4 w-4 accent-orange-500"
+                />
+                Mostrar no app
+                <BanhoTosaHelpTooltip text="Quando ativo, o app mostra horarios livres/ocupados sem revelar nomes dos pets. O cliente toca no horario e fala com a loja pelo WhatsApp." />
+              </label>
+            </div>
+            <div className="mt-4">
+              <TextField label="WhatsApp de agendamento" value={configForm.whatsapp_agendamento} onChange={(value) => updateConfig("whatsapp_agendamento", value)} help="Numero usado no app para abrir a conversa de agendamento. Pode informar com DDD; o sistema monta o link do WhatsApp." />
+            </div>
+          </div>
+
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <TextField label="Inicio" type="time" value={configForm.horario_inicio} onChange={(value) => updateConfig("horario_inicio", value)} />
             <TextField label="Fim" type="time" value={configForm.horario_fim} onChange={(value) => updateConfig("horario_fim", value)} />
             <TextField label="Slot agenda (min)" type="number" value={configForm.intervalo_slot_minutos} onChange={(value) => updateConfig("intervalo_slot_minutos", value)} help="Intervalo usado para montar a grade de horarios e sugerir encaixes." />
             <TextField label="Dias funcionamento" value={configForm.dias_funcionamento} onChange={(value) => updateConfig("dias_funcionamento", value)} help="Informe os dias separados por virgula: segunda,terca,quarta..." />
-            <TextField label="WhatsApp agendamento" value={configForm.whatsapp_agendamento} onChange={(value) => updateConfig("whatsapp_agendamento", value)} help="Numero usado no app para o cliente pedir horario pelo WhatsApp. Exemplo: 5511999999999." />
-            <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-700">
-              <input
-                type="checkbox"
-                checked={Boolean(configForm.mostrar_calendario_cliente)}
-                onChange={(event) => updateConfig("mostrar_calendario_cliente", event.target.checked)}
-                className="h-4 w-4 accent-orange-500"
-              />
-              Mostrar calendario disponivel no app do cliente
-              <BanhoTosaHelpTooltip text="Quando ativo, o app mostra horarios livres/ocupados sem revelar nomes dos pets. O cliente toca no horario e fala com a loja pelo WhatsApp." />
-            </label>
             <TextField label="Custo litro agua" type="number" value={configForm.custo_litro_agua} onChange={(value) => updateConfig("custo_litro_agua", value)} help="Valor medio da agua e esgoto dividido por litro. Exemplo: R$ 0,02 por litro." />
             <TextField label="Vazao chuveiro L/min" type="number" value={configForm.vazao_chuveiro_litros_min} onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)} help="Quantos litros o chuveiro consome por minuto durante o banho." />
             <TextField label="Custo kWh" type="number" value={configForm.custo_kwh} onChange={(value) => updateConfig("custo_kwh", value)} help="Valor medio do kWh usado para calcular secador, soprador e equipamentos." />

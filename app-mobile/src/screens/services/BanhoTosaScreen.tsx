@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ActivityIndicator,
@@ -20,7 +20,7 @@ import {
 } from "../../services/banhoTosa.service";
 import { listarPets } from "../../services/pets.service";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
-import { BanhoTosaCalendarioResponse, BanhoTosaStatusItem, Pet } from "../../types";
+import { BanhoTosaCalendarioDia, BanhoTosaCalendarioResponse, BanhoTosaStatusItem, Pet } from "../../types";
 import { formatarDataHora, formatarMoeda } from "../../utils/format";
 
 const statusCores: Record<string, { bg: string; fg: string }> = {
@@ -44,6 +44,9 @@ export default function BanhoTosaScreen() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [servicoId, setServicoId] = useState<number | null>(null);
   const [petId, setPetId] = useState<number | null>(null);
+  const [dataSelecionada, setDataSelecionada] = useState<string | null>(null);
+  const [agendaAberta, setAgendaAberta] = useState(true);
+  const [servicoListaAberta, setServicoListaAberta] = useState(false);
 
   async function carregar() {
     try {
@@ -62,6 +65,10 @@ export default function BanhoTosaScreen() {
       setPets(petsResponse);
       if (!servicoId && calendarioResponse.servicos?.[0]?.id) setServicoId(calendarioResponse.servicos[0].id);
       if (!petId && petsResponse?.[0]?.id) setPetId(petsResponse[0].id);
+      const primeiroDia = calendarioResponse.dias?.find((dia) => dia.funciona)?.data || calendarioResponse.dias?.[0]?.data || null;
+      setDataSelecionada((atual) => (
+        atual && calendarioResponse.dias?.some((dia) => dia.data === atual) ? atual : primeiroDia
+      ));
     } catch {
       setCalendario(null);
     } finally {
@@ -70,6 +77,12 @@ export default function BanhoTosaScreen() {
   }
 
   useFocusEffect(useCallback(() => { carregar(); }, []));
+
+  useEffect(() => {
+    if (!calendario?.dias?.length) return;
+    if (dataSelecionada && calendario.dias.some((dia) => dia.data === dataSelecionada)) return;
+    setDataSelecionada(calendario.dias.find((dia) => dia.funciona)?.data || calendario.dias[0].data);
+  }, [calendario?.dias, dataSelecionada]);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -91,7 +104,6 @@ export default function BanhoTosaScreen() {
   async function pedirAgendamento(data: string, horario: string) {
     const servico = calendario?.servicos.find((item) => item.id === servicoId);
     const pet = pets.find((item) => item.id === petId);
-    const whatsapp = String(calendario?.whatsapp || "").replace(/\D/g, "");
     if (!servico) {
       Alert.alert("Escolha o servico", "Selecione o servico antes de pedir o horario.");
       return;
@@ -100,14 +112,20 @@ export default function BanhoTosaScreen() {
       Alert.alert("Escolha o pet", "Selecione o pet antes de pedir o horario.");
       return;
     }
+    const mensagem = `Ola! Gostaria de marcar ${servico.nome} para o pet ${pet.nome} no dia ${formatarDataCurta(data)} as ${horario}.`;
+    await abrirWhatsappLoja(mensagem);
+  }
+
+  async function abrirWhatsappLoja(mensagem?: string) {
+    const whatsapp = limparWhatsapp(calendario?.whatsapp);
     if (!whatsapp) {
       Alert.alert("WhatsApp nao configurado", "A loja ainda nao cadastrou o WhatsApp de agendamento.");
       return;
     }
-    const mensagem = `Ola! Gostaria de marcar ${servico.nome} para o pet ${pet.nome} no dia ${formatarDataCurta(data)} as ${horario}.`;
-    await Clipboard.setStringAsync(mensagem);
+    const texto = mensagem || "Ola! Gostaria de falar sobre banho e tosa.";
+    await Clipboard.setStringAsync(texto);
     const numero = whatsapp.startsWith("55") ? whatsapp : `55${whatsapp}`;
-    const url = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+    const url = `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
     const podeAbrir = await Linking.canOpenURL(url);
     if (podeAbrir) {
       Linking.openURL(url);
@@ -123,6 +141,13 @@ export default function BanhoTosaScreen() {
       </View>
     );
   }
+
+  const servicoSelecionado = calendario?.servicos.find((item) => item.id === servicoId);
+  const diaSelecionado =
+    calendario?.dias.find((dia) => dia.data === dataSelecionada) ||
+    calendario?.dias.find((dia) => dia.funciona) ||
+    calendario?.dias[0];
+  const whatsappFormatado = formatarWhatsapp(calendario?.whatsapp);
 
   return (
     <ScrollView
@@ -141,66 +166,138 @@ export default function BanhoTosaScreen() {
 
       {calendario ? (
         calendario.visivel ? (
-        <View style={styles.calendarCard}>
-          <Text style={styles.sectionTitle}>Agenda disponivel</Text>
-          <Text style={styles.sectionText}>
-            Escolha servico, pet e horario. O app monta a mensagem e abre o WhatsApp da loja.
-          </Text>
+          <View style={styles.calendarCard}>
+            <TouchableOpacity
+              style={styles.calendarHeader}
+              activeOpacity={0.82}
+              onPress={() => setAgendaAberta((atual) => !atual)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitle}>Agenda disponivel</Text>
+                <Text style={styles.sectionTextCompact}>
+                  {agendaAberta
+                    ? "Escolha dia, horario, servico e pet para falar com a loja."
+                    : "Toque para abrir os horarios e pedir agendamento pelo WhatsApp."}
+                </Text>
+              </View>
+              <View style={styles.calendarToggle}>
+                <Text style={styles.calendarToggleText}>{agendaAberta ? "Minimizar" : "Ver horarios"}</Text>
+                <Ionicons name={agendaAberta ? "chevron-up" : "chevron-down"} size={18} color={CORES.primario} />
+              </View>
+            </TouchableOpacity>
 
-          <Text style={styles.selectorLabel}>Servico</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-            {calendario.servicos.map((servico) => (
-              <TouchableOpacity
-                key={servico.id}
-                style={[styles.chip, servicoId === servico.id && styles.chipActive]}
-                onPress={() => setServicoId(servico.id)}
-              >
-                <Text style={[styles.chipText, servicoId === servico.id && styles.chipTextActive]}>{servico.nome}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            {agendaAberta && (
+              <>
+                <TouchableOpacity style={styles.whatsappBox} onPress={() => abrirWhatsappLoja()} activeOpacity={0.86}>
+                  <Ionicons name="logo-whatsapp" size={20} color="#16A34A" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.whatsappLabel}>WhatsApp da loja</Text>
+                    <Text style={styles.whatsappNumero}>{whatsappFormatado || "Nao configurado"}</Text>
+                  </View>
+                  <Text style={styles.whatsappAction}>Abrir</Text>
+                </TouchableOpacity>
 
-          <Text style={styles.selectorLabel}>Pet</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
-            {pets.map((pet) => (
-              <TouchableOpacity
-                key={pet.id}
-                style={[styles.chip, petId === pet.id && styles.chipActive]}
-                onPress={() => setPetId(pet.id)}
-              >
-                <Text style={[styles.chipText, petId === pet.id && styles.chipTextActive]}>{pet.nome}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                <Text style={styles.selectorLabel}>Servico</Text>
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setServicoListaAberta((atual) => !atual)}
+                  activeOpacity={0.86}
+                >
+                  <Text style={styles.dropdownText}>{servicoSelecionado?.nome || "Selecione o servico"}</Text>
+                  <Ionicons name={servicoListaAberta ? "chevron-up" : "chevron-down"} size={18} color={CORES.textoSecundario} />
+                </TouchableOpacity>
+                {servicoListaAberta && (
+                  <View style={styles.dropdownList}>
+                    {calendario.servicos.map((servico) => (
+                      <TouchableOpacity
+                        key={servico.id}
+                        style={styles.dropdownItem}
+                        onPress={() => {
+                          setServicoId(servico.id);
+                          setServicoListaAberta(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, servicoId === servico.id && styles.dropdownItemTextActive]}>
+                          {servico.nome}
+                        </Text>
+                        {servicoId === servico.id && <Ionicons name="checkmark-circle" size={18} color={CORES.primario} />}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
 
-          {calendario.dias.map((dia) => (
-            <View key={dia.data} style={styles.dayBox}>
-              <Text style={styles.dayTitle}>{formatarDataCurta(dia.data)}</Text>
-              {!dia.funciona ? (
-                <Text style={styles.dayClosed}>Loja fechada</Text>
-              ) : (
-                <View style={styles.slotsGrid}>
-                  {dia.slots.map((slot) => {
-                    const disponivel = slot.status === "disponivel";
+                <Text style={styles.selectorLabel}>Pet</Text>
+                <View style={styles.petGrid}>
+                  {pets.map((pet) => (
+                    <TouchableOpacity
+                      key={pet.id}
+                      style={[styles.chip, petId === pet.id && styles.chipActive]}
+                      onPress={() => setPetId(pet.id)}
+                    >
+                      <Text style={[styles.chipText, petId === pet.id && styles.chipTextActive]}>{pet.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={styles.selectorLabel}>Calendario</Text>
+                <View style={styles.daysGrid}>
+                  {calendario.dias.map((dia) => {
+                    const selecionado = dia.data === diaSelecionado?.data;
+                    const livres = contarSlotsLivres(dia);
                     return (
                       <TouchableOpacity
-                        key={`${dia.data}-${slot.horario_inicio}`}
-                        disabled={!disponivel}
-                        style={[styles.slot, !disponivel && styles.slotBusy]}
-                        onPress={() => pedirAgendamento(dia.data, slot.horario_inicio)}
+                        key={dia.data}
+                        style={[
+                          styles.dayMini,
+                          selecionado && styles.dayMiniActive,
+                          !dia.funciona && styles.dayMiniClosed,
+                        ]}
+                        onPress={() => setDataSelecionada(dia.data)}
                       >
-                        <Text style={[styles.slotText, !disponivel && styles.slotTextBusy]}>{slot.horario_inicio}</Text>
-                        <Text style={[styles.slotSub, !disponivel && styles.slotTextBusy]}>
-                          {disponivel ? "Livre" : "Ocupado"}
+                        <Text style={[styles.dayWeek, selecionado && styles.dayMiniTextActive]}>
+                          {formatarDiaSemana(dia.data)}
+                        </Text>
+                        <Text style={[styles.dayNumber, selecionado && styles.dayMiniTextActive]}>
+                          {formatarDiaMes(dia.data)}
+                        </Text>
+                        <Text style={[styles.dayAvailability, selecionado && styles.dayMiniTextActive]}>
+                          {!dia.funciona ? "Fechado" : `${livres} livre${livres === 1 ? "" : "s"}`}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-              )}
-            </View>
-          ))}
-        </View>
+
+                {diaSelecionado ? (
+                  <View style={styles.dayBox}>
+                    <Text style={styles.dayTitle}>{formatarDataCurta(diaSelecionado.data)}</Text>
+                    {!diaSelecionado.funciona ? (
+                      <Text style={styles.dayClosed}>Loja fechada neste dia</Text>
+                    ) : (
+                      <View style={styles.slotsGrid}>
+                        {diaSelecionado.slots.map((slot) => {
+                          const disponivel = slot.status === "disponivel";
+                          return (
+                            <TouchableOpacity
+                              key={`${diaSelecionado.data}-${slot.horario_inicio}`}
+                              disabled={!disponivel}
+                              style={[styles.slot, !disponivel && styles.slotBusy]}
+                              onPress={() => pedirAgendamento(diaSelecionado.data, slot.horario_inicio)}
+                            >
+                              <Text style={[styles.slotText, !disponivel && styles.slotTextBusy]}>{slot.horario_inicio}</Text>
+                              <Text style={[styles.slotSub, !disponivel && styles.slotTextBusy]}>
+                                {disponivel ? "Livre" : "Ocupado"}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                ) : null}
+              </>
+            )}
+          </View>
         ) : (
           <View style={styles.calendarCard}>
             <Text style={styles.sectionTitle}>Agenda do banho e tosa</Text>
@@ -305,6 +402,47 @@ function formatarDataCurta(dataIso: string): string {
   return `${dia}/${mes}/${ano}`;
 }
 
+function parseDataLocal(dataIso: string): Date | null {
+  const [ano, mes, dia] = String(dataIso || "").split("-").map(Number);
+  if (!ano || !mes || !dia) return null;
+  return new Date(ano, mes - 1, dia);
+}
+
+function formatarDiaSemana(dataIso: string): string {
+  const data = parseDataLocal(dataIso);
+  if (!data) return "--";
+  return data.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+}
+
+function formatarDiaMes(dataIso: string): string {
+  const data = parseDataLocal(dataIso);
+  if (!data) return "--";
+  return String(data.getDate()).padStart(2, "0");
+}
+
+function contarSlotsLivres(dia: BanhoTosaCalendarioDia): number {
+  if (!dia.funciona) return 0;
+  return dia.slots.filter((slot) => slot.status === "disponivel").length;
+}
+
+function limparWhatsapp(valor?: string | null): string {
+  return String(valor || "").replace(/\D/g, "");
+}
+
+function formatarWhatsapp(valor?: string | null): string {
+  let numero = limparWhatsapp(valor);
+  if (numero.startsWith("55") && numero.length > 11) {
+    numero = numero.slice(2);
+  }
+  if (numero.length === 11) {
+    return `(${numero.slice(0, 2)}) ${numero.slice(2, 7)}-${numero.slice(7)}`;
+  }
+  if (numero.length === 10) {
+    return `(${numero.slice(0, 2)}) ${numero.slice(2, 6)}-${numero.slice(6)}`;
+  }
+  return numero;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: CORES.fundo },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
@@ -327,14 +465,37 @@ const styles = StyleSheet.create({
   heroTitle: { color: "#fff", fontSize: FONTE.titulo, fontWeight: "bold" },
   heroText: { color: "rgba(255,255,255,0.85)", marginTop: 6, fontSize: FONTE.normal },
   calendarCard: { marginHorizontal: ESPACO.lg, marginBottom: ESPACO.md, padding: ESPACO.lg, borderRadius: RAIO.lg, backgroundColor: CORES.superficie, ...SOMBRA },
+  calendarHeader: { flexDirection: "row", alignItems: "center", gap: ESPACO.sm },
+  calendarToggle: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: RAIO.circulo, backgroundColor: "#EFF6FF", paddingHorizontal: ESPACO.sm, paddingVertical: 8 },
+  calendarToggleText: { color: CORES.primario, fontSize: FONTE.pequena, fontWeight: "800" },
   sectionTitle: { fontSize: FONTE.grande, color: CORES.texto, fontWeight: "bold" },
   sectionText: { color: CORES.textoSecundario, marginTop: 4, marginBottom: ESPACO.md },
+  sectionTextCompact: { color: CORES.textoSecundario, marginTop: 4 },
+  whatsappBox: { flexDirection: "row", alignItems: "center", gap: ESPACO.sm, marginTop: ESPACO.md, padding: ESPACO.sm, borderRadius: RAIO.md, backgroundColor: "#F0FDF4", borderWidth: 1, borderColor: "#BBF7D0" },
+  whatsappLabel: { color: "#166534", fontSize: FONTE.pequena, fontWeight: "800" },
+  whatsappNumero: { marginTop: 2, color: "#14532D", fontWeight: "900" },
+  whatsappAction: { color: "#16A34A", fontWeight: "900" },
   selectorLabel: { color: CORES.texto, fontWeight: "700", marginTop: ESPACO.sm, marginBottom: ESPACO.xs },
+  dropdownButton: { minHeight: 48, borderRadius: RAIO.md, borderWidth: 1, borderColor: CORES.borda, backgroundColor: CORES.fundo, paddingHorizontal: ESPACO.md, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  dropdownText: { color: CORES.texto, fontWeight: "800", flex: 1 },
+  dropdownList: { marginTop: 6, borderRadius: RAIO.md, borderWidth: 1, borderColor: CORES.borda, backgroundColor: "#FFFFFF", overflow: "hidden" },
+  dropdownItem: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: ESPACO.md, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  dropdownItemText: { color: CORES.textoSecundario, fontWeight: "700" },
+  dropdownItemTextActive: { color: CORES.primario },
+  petGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chipsRow: { gap: 8, paddingRight: ESPACO.lg },
   chip: { borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.circulo, paddingHorizontal: ESPACO.md, paddingVertical: 8, backgroundColor: CORES.fundo },
   chipActive: { backgroundColor: CORES.primario, borderColor: CORES.primario },
   chipText: { color: CORES.textoSecundario, fontWeight: "700" },
   chipTextActive: { color: "#fff" },
+  daysGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  dayMini: { width: "22.8%", minHeight: 76, borderRadius: RAIO.md, borderWidth: 1, borderColor: CORES.borda, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", padding: 6 },
+  dayMiniActive: { backgroundColor: CORES.primario, borderColor: CORES.primario },
+  dayMiniClosed: { backgroundColor: "#F8FAFC" },
+  dayWeek: { color: CORES.textoSecundario, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
+  dayNumber: { marginTop: 3, color: CORES.texto, fontSize: 20, fontWeight: "900" },
+  dayAvailability: { marginTop: 2, color: CORES.textoClaro, fontSize: 9, fontWeight: "800", textAlign: "center" },
+  dayMiniTextActive: { color: "#FFFFFF" },
   dayBox: { marginTop: ESPACO.md, borderTopWidth: 1, borderTopColor: CORES.borda, paddingTop: ESPACO.md },
   dayTitle: { color: CORES.texto, fontWeight: "800", marginBottom: ESPACO.sm },
   dayClosed: { color: CORES.textoClaro },

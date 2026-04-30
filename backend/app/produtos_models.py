@@ -628,7 +628,7 @@ class EstoqueMovimentacao(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     produto_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
     tipo = Column(String(20), nullable=False)  # entrada, saida, transferencia
-    motivo = Column(String(50), nullable=True)  # compra, venda, ajuste, devolucao, perda, transferencia, balanco
+    motivo = Column(String(80), nullable=True)  # compra, venda, ajuste, devolucao, perda, transferencia, balanco
     
     quantidade = Column(Float, nullable=False)
     quantidade_anterior = Column(Float, nullable=True)
@@ -648,7 +648,7 @@ class EstoqueMovimentacao(BaseTenantModel):
     # Referências
     documento = Column(String(50), nullable=True)  # Número NFe, número venda, etc
     referencia_id = Column(Integer, nullable=True)  # ID da venda, compra, etc
-    referencia_tipo = Column(String(20), nullable=True)  # venda, compra, ajuste
+    referencia_tipo = Column(String(50), nullable=True)  # venda, compra, ajuste, procedimento_veterinario
     
     # Status da movimentação
     # reservado: estoque baixado mas pendente de confirmação (venda em aberto)

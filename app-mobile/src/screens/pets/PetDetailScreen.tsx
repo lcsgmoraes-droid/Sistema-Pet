@@ -172,13 +172,11 @@ export default function PetDetailScreen({ route, navigation }: any) {
               {(dados?.status_vacinal?.carteira || []).length === 0 ? (
                 <Text style={styles.vazioTexto}>Nenhuma vacina registrada ainda.</Text>
               ) : (
-                dados?.status_vacinal?.carteira.map((vacina) => (
-                  <VacinaCarteiraCard
-                    key={vacina.id}
-                    vacina={vacina}
-                    onPress={() => setVacinaSelecionada(vacina)}
-                  />
-                ))
+                <CarteirinhaVacinasFolheto
+                  pet={petAtual}
+                  vacinas={dados?.status_vacinal?.carteira || []}
+                  onPressVacina={setVacinaSelecionada}
+                />
               )}
             </Section>
           </View>
@@ -320,43 +318,154 @@ function QuickNavButton({
   );
 }
 
-function VacinaCarteiraCard({
+const VACINAS_POR_PAGINA = 4;
+
+function CarteirinhaVacinasFolheto({
+  pet,
+  vacinas,
+  onPressVacina,
+}: {
+  pet: Pet;
+  vacinas: VacinaCarteirinha[];
+  onPressVacina: (vacina: VacinaCarteirinha) => void;
+}) {
+  const [pagina, setPagina] = useState(0);
+  const totalPaginas = Math.max(1, Math.ceil(vacinas.length / VACINAS_POR_PAGINA));
+  const inicio = pagina * VACINAS_POR_PAGINA;
+  const vacinasDaPagina = vacinas.slice(inicio, inicio + VACINAS_POR_PAGINA);
+  const slots = Array.from({ length: VACINAS_POR_PAGINA }, (_, index) => vacinasDaPagina[index] || null);
+
+  return (
+    <View>
+      <View style={styles.folhetoCarteira}>
+        <View style={styles.folhetoPaws}>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Ionicons key={`paw_top_${index}`} name="paw-outline" size={13} color="rgba(255,255,255,0.9)" />
+          ))}
+        </View>
+
+        <View style={styles.folhetoIdentidade}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.folhetoLabel}>Carteira digital de vacinas</Text>
+            <Text style={styles.folhetoPetNome}>{pet.nome}</Text>
+            <Text style={styles.folhetoPetInfo}>
+              {pet.especie || 'Pet'}{pet.raca ? ` - ${pet.raca}` : ''} - {formatarIdadePet(pet)}
+            </Text>
+            <Text style={styles.folhetoPetInfo}>
+              Tutor: dados vinculados ao cadastro do app
+            </Text>
+          </View>
+          {pet.foto_url ? (
+            <Image source={{ uri: pet.foto_url }} style={styles.folhetoFoto} />
+          ) : (
+            <View style={[styles.folhetoFoto, styles.folhetoFotoPlaceholder]}>
+              <Ionicons name="paw" size={32} color="#16A34A" />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.folhetoSlots}>
+          {slots.map((vacina, index) => (
+            <VacinaFolhetoSlot
+              key={vacina?.id || `slot_${pagina}_${index}`}
+              vacina={vacina}
+              onPress={() => vacina && onPressVacina(vacina)}
+            />
+          ))}
+        </View>
+
+        <View style={styles.folhetoPaws}>
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Ionicons key={`paw_bottom_${index}`} name="paw-outline" size={13} color="rgba(255,255,255,0.9)" />
+          ))}
+        </View>
+      </View>
+
+      {totalPaginas > 1 && (
+        <View style={styles.folhetoPaginacao}>
+          <TouchableOpacity
+            style={[styles.folhetoPaginaBotao, pagina === 0 && styles.folhetoPaginaBotaoDisabled]}
+            disabled={pagina === 0}
+            onPress={() => setPagina((atual) => Math.max(0, atual - 1))}
+          >
+            <Ionicons name="chevron-back" size={16} color={pagina === 0 ? CORES.textoClaro : CORES.primario} />
+            <Text style={[styles.folhetoPaginaTexto, pagina === 0 && styles.folhetoPaginaTextoDisabled]}>Anterior</Text>
+          </TouchableOpacity>
+          <Text style={styles.folhetoPaginaInfo}>Pagina {pagina + 1} de {totalPaginas}</Text>
+          <TouchableOpacity
+            style={[styles.folhetoPaginaBotao, pagina >= totalPaginas - 1 && styles.folhetoPaginaBotaoDisabled]}
+            disabled={pagina >= totalPaginas - 1}
+            onPress={() => setPagina((atual) => Math.min(totalPaginas - 1, atual + 1))}
+          >
+            <Text style={[styles.folhetoPaginaTexto, pagina >= totalPaginas - 1 && styles.folhetoPaginaTextoDisabled]}>Proxima</Text>
+            <Ionicons name="chevron-forward" size={16} color={pagina >= totalPaginas - 1 ? CORES.textoClaro : CORES.primario} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function VacinaFolhetoSlot({
   vacina,
   onPress,
 }: {
-  vacina: VacinaCarteirinha;
+  vacina: VacinaCarteirinha | null;
   onPress: () => void;
 }) {
-  const corStatus = corStatusVacina(vacina.status);
+  if (!vacina) {
+    return (
+      <View style={[styles.folhetoVacinaSlot, styles.folhetoVacinaSlotVazio]}>
+        <Text style={styles.folhetoSlotTitulo}>Espaco livre</Text>
+        <Text style={styles.folhetoSlotTexto}>Proxima vacina registrada aparece aqui.</Text>
+      </View>
+    );
+  }
 
+  const corStatus = corStatusVacina(vacina.status);
   return (
-    <TouchableOpacity style={styles.vacinaCard} onPress={onPress} activeOpacity={0.86}>
-      <View style={styles.vacinaCardHeader}>
-        <View style={styles.vacinaIconBox}>
-          <Ionicons name="shield-checkmark-outline" size={22} color={CORES.primario} />
-        </View>
+    <TouchableOpacity style={styles.folhetoVacinaSlot} onPress={onPress} activeOpacity={0.86}>
+      <View style={styles.folhetoSlotHeader}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.vacinaNome}>{vacina.nome}</Text>
-          <Text style={styles.itemMeta}>Toque para abrir a carteirinha digital</Text>
+          <Text style={styles.folhetoSlotLabel}>Vacina</Text>
+          <Text style={styles.folhetoSlotTitulo}>{vacina.nome}</Text>
         </View>
-        <View style={[styles.vacinaStatusPill, { backgroundColor: `${corStatus}18` }]}>
-          <Text style={[styles.vacinaStatusTexto, { color: corStatus }]}>
+        <View style={[styles.folhetoStatusPill, { borderColor: corStatus }]}>
+          <Text style={[styles.folhetoStatusTexto, { color: corStatus }]}>
             {labelStatusVacina(vacina.status)}
           </Text>
         </View>
       </View>
 
-      <View style={styles.vacinaGrid}>
-        <View style={styles.vacinaCampo}>
-          <Text style={styles.vacinaCampoLabel}>Aplicacao</Text>
-          <Text style={styles.vacinaCampoValor}>{formatarData(vacina.data_aplicacao)}</Text>
+      <View style={styles.folhetoSlotGrid}>
+        <FolhetoInfo label="Data" valor={formatarData(vacina.data_aplicacao)} />
+        <FolhetoInfo label="Repetir em" valor={formatarData(vacina.data_proxima_dose)} />
+        <FolhetoInfo label="Dose" valor={vacina.numero_dose ? `${vacina.numero_dose}` : '-'} />
+        <FolhetoInfo label="Lote" valor={vacina.lote || '-'} />
+      </View>
+
+      <View style={styles.folhetoAssinatura}>
+        <View style={styles.folhetoQr}>
+          <Ionicons name="qr-code-outline" size={24} color="#15803D" />
         </View>
-        <View style={styles.vacinaCampo}>
-          <Text style={styles.vacinaCampoLabel}>Proxima dose</Text>
-          <Text style={styles.vacinaCampoValor}>{formatarData(vacina.data_proxima_dose)}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.folhetoAssinaturaTitulo}>Assinatura digital</Text>
+          <Text style={styles.folhetoAssinaturaTexto}>
+            {vacina.veterinario_nome || 'Veterinario nao informado'}
+          </Text>
+          <Text style={styles.folhetoAssinaturaHash}>{resumirHash(vacina.hash_validacao)}</Text>
         </View>
       </View>
     </TouchableOpacity>
+  );
+}
+
+function FolhetoInfo({ label, valor }: { label: string; valor: string }) {
+  return (
+    <View style={styles.folhetoInfoBox}>
+      <Text style={styles.folhetoInfoLabel}>{label}</Text>
+      <Text style={styles.folhetoInfoValor}>{valor}</Text>
+    </View>
   );
 }
 
@@ -541,6 +650,200 @@ const styles = StyleSheet.create({
   itemResumo: { marginTop: 8, fontSize: FONTE.pequena, color: CORES.texto },
   linkTexto: { marginTop: 8, color: CORES.primario, fontWeight: '600' },
   vazioTexto: { color: CORES.textoSecundario },
+  folhetoCarteira: {
+    borderRadius: RAIO.lg,
+    backgroundColor: '#74D391',
+    padding: ESPACO.md,
+    gap: ESPACO.sm,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  folhetoPaws: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    opacity: 0.9,
+  },
+  folhetoIdentidade: {
+    flexDirection: 'row',
+    gap: ESPACO.md,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    borderRadius: RAIO.lg,
+    padding: ESPACO.sm,
+  },
+  folhetoLabel: {
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: '#064E3B',
+    fontWeight: '900',
+  },
+  folhetoPetNome: {
+    marginTop: 4,
+    fontSize: 22,
+    color: '#064E3B',
+    fontWeight: '900',
+  },
+  folhetoPetInfo: {
+    marginTop: 2,
+    fontSize: FONTE.pequena,
+    color: '#065F46',
+    fontWeight: '700',
+  },
+  folhetoFoto: {
+    width: 88,
+    height: 88,
+    borderRadius: RAIO.md,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    transform: [{ rotate: '5deg' }],
+  },
+  folhetoFotoPlaceholder: {
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  folhetoSlots: { gap: ESPACO.sm },
+  folhetoVacinaSlot: {
+    borderRadius: RAIO.lg,
+    backgroundColor: '#FFFFFF',
+    padding: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 78, 59, 0.12)',
+  },
+  folhetoVacinaSlotVazio: {
+    minHeight: 92,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderStyle: 'dashed',
+  },
+  folhetoSlotHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACO.sm,
+  },
+  folhetoSlotLabel: {
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#15803D',
+    fontWeight: '900',
+  },
+  folhetoSlotTitulo: {
+    marginTop: 2,
+    fontSize: FONTE.normal,
+    color: CORES.texto,
+    fontWeight: '900',
+  },
+  folhetoSlotTexto: {
+    marginTop: 4,
+    color: '#166534',
+    fontSize: FONTE.pequena,
+  },
+  folhetoStatusPill: {
+    borderRadius: RAIO.circulo,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#F8FAFC',
+  },
+  folhetoStatusTexto: {
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  folhetoSlotGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: ESPACO.sm,
+  },
+  folhetoInfoBox: {
+    width: '48%',
+    borderRadius: RAIO.md,
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+  },
+  folhetoInfoLabel: {
+    fontSize: 9,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: CORES.textoClaro,
+    fontWeight: '900',
+  },
+  folhetoInfoValor: {
+    marginTop: 3,
+    fontSize: FONTE.pequena,
+    color: CORES.texto,
+    fontWeight: '800',
+  },
+  folhetoAssinatura: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+    marginTop: ESPACO.sm,
+    borderRadius: RAIO.md,
+    backgroundColor: '#ECFDF5',
+    padding: 8,
+  },
+  folhetoQr: {
+    width: 42,
+    height: 42,
+    borderRadius: RAIO.md,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  folhetoAssinaturaTitulo: {
+    fontSize: 10,
+    color: '#166534',
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  folhetoAssinaturaTexto: {
+    marginTop: 2,
+    color: '#064E3B',
+    fontWeight: '800',
+  },
+  folhetoAssinaturaHash: {
+    marginTop: 2,
+    fontSize: 10,
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  folhetoPaginacao: {
+    marginTop: ESPACO.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: ESPACO.sm,
+  },
+  folhetoPaginaBotao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: RAIO.circulo,
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: 8,
+    backgroundColor: '#EFF6FF',
+  },
+  folhetoPaginaBotaoDisabled: {
+    borderColor: CORES.borda,
+    backgroundColor: CORES.fundo,
+  },
+  folhetoPaginaTexto: {
+    color: CORES.primario,
+    fontWeight: '800',
+    fontSize: FONTE.pequena,
+  },
+  folhetoPaginaTextoDisabled: { color: CORES.textoClaro },
+  folhetoPaginaInfo: {
+    color: CORES.textoSecundario,
+    fontSize: FONTE.pequena,
+    fontWeight: '800',
+  },
   vacinaCard: {
     borderWidth: 1,
     borderColor: '#BFDBFE',
