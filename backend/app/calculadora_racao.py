@@ -3,6 +3,7 @@ API para Calculadora de Ração - FASE 2
 Calcula duração, custo/dia, custo/kg e compara produtos
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
@@ -67,6 +68,96 @@ class ComparativoRacoesResponse(BaseModel):
 
 
 # ==================== FUNÇÕES AUXILIARES ====================
+
+def _texto_preenchido(valor) -> bool:
+    if valor is None:
+        return False
+    if isinstance(valor, (list, tuple, set, dict)):
+        return len(valor) > 0
+
+    texto = str(valor).strip()
+    return texto.lower() not in {"", "{}", "[]", "null", "none", "undefined"}
+
+
+def _json_preenchido(valor) -> bool:
+    if not _texto_preenchido(valor):
+        return False
+    if isinstance(valor, (list, tuple, set, dict)):
+        return len(valor) > 0
+
+    try:
+        parsed = json.loads(str(valor))
+    except Exception:
+        return _texto_preenchido(valor)
+
+    if isinstance(parsed, dict):
+        return any(_texto_preenchido(item) for item in parsed.values())
+    if isinstance(parsed, list):
+        return len(parsed) > 0
+    return _texto_preenchido(parsed)
+
+
+def _numero_positivo(valor) -> bool:
+    try:
+        return float(valor or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _produto_tem_config_racao(produto: Produto) -> bool:
+    tipo = (getattr(produto, "tipo", None) or "").strip().lower()
+    classificacao = (getattr(produto, "classificacao_racao", None) or "").strip().lower()
+
+    return (
+        tipo.startswith("ra")
+        or bool(getattr(produto, "linha_racao_id", None))
+        or (bool(classificacao) and classificacao not in {"nao", "não"})
+    )
+
+
+def _avaliar_aptidao_calculadora(produto: Produto) -> List[str]:
+    faltantes: List[str] = []
+
+    if not _produto_tem_config_racao(produto):
+        faltantes.append("aba Ração")
+    if not _numero_positivo(getattr(produto, "peso_embalagem", None)):
+        faltantes.append("peso da embalagem")
+    if not _numero_positivo(getattr(produto, "preco_venda", None)):
+        faltantes.append("preço de venda")
+    if not _texto_preenchido(getattr(produto, "linha_racao_id", None) or getattr(produto, "classificacao_racao", None)):
+        faltantes.append("linha/classificação")
+    if not _texto_preenchido(getattr(produto, "porte_animal_id", None) or getattr(produto, "porte_animal", None)):
+        faltantes.append("porte")
+    if not _texto_preenchido(
+        getattr(produto, "fase_publico_id", None)
+        or getattr(produto, "fase_publico", None)
+        or getattr(produto, "categoria_racao", None)
+    ):
+        faltantes.append("fase/público")
+    if not _texto_preenchido(getattr(produto, "sabor_proteina_id", None) or getattr(produto, "sabor_proteina", None)):
+        faltantes.append("sabor/proteína")
+    if not _texto_preenchido(getattr(produto, "especies_indicadas", None)):
+        faltantes.append("espécie indicada")
+    if not _json_preenchido(getattr(produto, "tabela_nutricional", None)):
+        faltantes.append("tabela nutricional")
+    if not _json_preenchido(getattr(produto, "tabela_consumo", None)):
+        faltantes.append("tabela de consumo")
+
+    return faltantes
+
+
+def _produto_eh_racao_expr():
+    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
+    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    return or_(
+        tipo_normalizado.like("ra%"),
+        Produto.linha_racao_id.isnot(None),
+        and_(
+            classificacao_normalizada != "",
+            classificacao_normalizada.notin_(["nao", "não"]),
+        ),
+    )
+
 
 def calcular_quantidade_diaria(
     peso_pet_kg: float, 
@@ -303,6 +394,16 @@ async def calcular_racao(
             
             if not produto:
                 raise HTTPException(status_code=404, detail="Produto não encontrado")
+
+            campos_faltantes = _avaliar_aptidao_calculadora(produto)
+            if campos_faltantes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Ração com cadastro incompleto para a calculadora. "
+                        f"Falta preencher: {', '.join(campos_faltantes)}"
+                    ),
+                )
             
             peso_embalagem_kg = produto.peso_embalagem
             preco = produto.preco_venda
@@ -376,8 +477,15 @@ async def comparar_racoes(
         # Buscar produtos que são rações
         query = db.query(Produto).filter(
             Produto.tenant_id == tenant_id,
+            _produto_eh_racao_expr(),
             Produto.peso_embalagem.isnot(None),
-            Produto.peso_embalagem > 0
+            Produto.peso_embalagem > 0,
+            Produto.preco_venda.isnot(None),
+            Produto.preco_venda > 0,
+            Produto.tabela_nutricional.isnot(None),
+            func.length(func.trim(Produto.tabela_nutricional)) > 0,
+            Produto.tabela_consumo.isnot(None),
+            func.length(func.trim(Produto.tabela_consumo)) > 0,
         )
         
         # Filtros opcionais
@@ -388,13 +496,23 @@ async def comparar_racoes(
         
         produtos = query.all()
         
-        if not produtos:
-            raise HTTPException(status_code=404, detail="Nenhuma ração encontrada com os filtros")
+        produtos_aptos = [
+            produto for produto in produtos if not _avaliar_aptidao_calculadora(produto)
+        ]
+
+        if not produtos_aptos:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "Nenhuma ração apta para análise com os filtros. "
+                    "Complete a aba Ração e a tabela nutricional dos produtos."
+                ),
+            )
         
         # Calcular para cada produto usando SUA PRÓPRIA tabela de consumo
         resultados = []
         
-        for produto in produtos:
+        for produto in produtos_aptos:
             # IMPORTANTE: Calcular quantidade diária ESPECÍFICA deste produto
             quantidade_diaria_g = calcular_quantidade_diaria(
                 peso_pet_kg=peso_pet_kg,

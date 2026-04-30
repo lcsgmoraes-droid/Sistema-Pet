@@ -49,6 +49,7 @@ from .services.validade_campanha_service import (
     obter_configs_campanha_validade,
     obter_mapas_exclusao_validade,
 )
+from .promocoes_venda_utils import detectar_promocao_por_preco_vendido
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -3588,62 +3589,19 @@ def _parse_relatorio_datetime(valor: Optional[str], *, end_of_day: bool = False)
     return data.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def _datetime_sem_timezone_relatorio(valor):
-    if not valor:
-        return None
-    if getattr(valor, "tzinfo", None) is not None:
-        return valor.replace(tzinfo=None)
-    return valor
-
-
-def _produto_promocao_ativa_na_data(produto: Optional[Produto], data_ref: Optional[datetime]) -> bool:
-    if not produto or not produto.preco_promocional or produto.promocao_ativa is not True:
-        return False
-
-    data_base = _datetime_sem_timezone_relatorio(data_ref) or datetime.utcnow()
-    inicio = _datetime_sem_timezone_relatorio(produto.promocao_inicio)
-    fim = _datetime_sem_timezone_relatorio(produto.promocao_fim)
-    if inicio and data_base < inicio:
-        return False
-    if fim and data_base > fim:
-        return False
-    return True
-
-
 def _detectar_promocao_venda_item(item: VendaItem) -> dict:
     venda = item.venda
     produto = item.produto
-    motivos = []
     preco_unitario = float(item.preco_unitario or 0)
-    preco_cadastro = float(produto.preco_venda or 0) if produto else 0.0
-    preco_promocional = float(produto.preco_promocional or 0) if produto and produto.preco_promocional else 0.0
-    desconto_item = float(item.desconto_item or 0)
-    desconto_venda = float(getattr(venda, "desconto_valor", 0) or 0) if venda else 0.0
-    cupom_valor = float(getattr(venda, "cupom_discount_applied", 0) or 0) if venda else 0.0
-
-    if produto and _produto_promocao_ativa_na_data(produto, getattr(venda, "data_venda", None)):
-        if preco_promocional <= 0 or preco_unitario <= (preco_promocional + 0.01):
-            motivos.append("Produto em promocao")
-
-    if desconto_item > 0 or desconto_venda > 0:
-        motivos.append("Desconto aplicado")
-
-    if getattr(venda, "cupom_code", None) or cupom_valor > 0:
-        motivos.append("Campanha/cupom")
-
-    if preco_cadastro > 0 and preco_unitario > 0 and preco_unitario < (preco_cadastro - 0.01):
-        motivos.append("Preco abaixo do cadastro")
-
-    motivos_unicos = list(dict.fromkeys(motivos))
+    quantidade = float(item.quantidade or 0)
     subtotal = float(item.subtotal or 0)
-    return {
-        "em_promocao": bool(motivos_unicos),
-        "promocao_origem": ", ".join(motivos_unicos) if motivos_unicos else None,
-        "preco_cadastro": round(preco_cadastro, 2),
-        "preco_promocional_cadastro": round(preco_promocional, 2) if preco_promocional else None,
-        "desconto_promocional": round(desconto_item + cupom_valor, 2),
-        "valor_promocional": round(subtotal, 2) if motivos_unicos else 0.0,
-    }
+    return detectar_promocao_por_preco_vendido(
+        produto,
+        venda,
+        preco_unitario=preco_unitario,
+        quantidade=quantidade,
+        subtotal_item=subtotal,
+    )
 
 
 def _mapear_promocoes_movimentacoes(

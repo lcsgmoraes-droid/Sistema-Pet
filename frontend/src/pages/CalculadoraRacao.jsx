@@ -1,7 +1,255 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import "../styles/CalculadoraRacao.css";
+
+const camposIncompletosTexto = (campos = []) =>
+  campos.length ? `Falta preencher: ${campos.join(", ")}` : "";
+
+const normalizarTexto = (valor) =>
+  String(valor || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const temValorPreenchido = (valor) => {
+  if (valor === null || valor === undefined) return false;
+  if (Array.isArray(valor)) return valor.length > 0;
+  if (typeof valor === "object") return Object.keys(valor).length > 0;
+
+  const texto = String(valor).trim();
+  return !["", "{}", "[]", "null", "undefined", "none"].includes(
+    texto.toLowerCase(),
+  );
+};
+
+const temJsonPreenchido = (valor) => {
+  if (!temValorPreenchido(valor)) return false;
+  if (typeof valor === "object") return temValorPreenchido(valor);
+
+  try {
+    const parsed = JSON.parse(valor);
+    if (Array.isArray(parsed)) return parsed.length > 0;
+    if (parsed && typeof parsed === "object") {
+      return Object.values(parsed).some((item) => temValorPreenchido(item));
+    }
+    return temValorPreenchido(parsed);
+  } catch {
+    return temValorPreenchido(valor);
+  }
+};
+
+const numeroPositivo = (valor) => {
+  const numero = Number(valor);
+  return Number.isFinite(numero) && numero > 0;
+};
+
+const produtoTemConfigRacao = (produto) => {
+  const tipo = normalizarTexto(produto?.tipo);
+  const classificacao = normalizarTexto(produto?.classificacao_racao);
+
+  return (
+    produto?.eh_racao === true ||
+    tipo.startsWith("racao") ||
+    tipo.startsWith("ra") ||
+    Boolean(produto?.linha_racao_id) ||
+    (Boolean(classificacao) && !["nao", "não"].includes(classificacao))
+  );
+};
+
+const produtoPareceRacao = (produto) => {
+  const textoBusca = normalizarTexto(
+    [
+      produto?.nome,
+      produto?.categoria_nome,
+      produto?.categoria?.nome,
+      produto?.marca?.nome,
+      produto?.classificacao_racao,
+      produto?.especies_indicadas,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  return (
+    produtoTemConfigRacao(produto) ||
+    temValorPreenchido(produto?.tabela_consumo) ||
+    temValorPreenchido(produto?.tabela_nutricional) ||
+    (numeroPositivo(produto?.peso_embalagem) &&
+      /(racao|racoes|dog|cat|gato|cao|caes|canino|felino|royal|premier|special)/.test(
+        textoBusca,
+      ))
+  );
+};
+
+const avaliarAptidaoRacao = (produto) => {
+  const faltantes = [];
+
+  if (!produtoTemConfigRacao(produto)) faltantes.push("aba Ração");
+  if (!numeroPositivo(produto?.peso_embalagem))
+    faltantes.push("peso da embalagem");
+  if (!numeroPositivo(produto?.preco_venda)) faltantes.push("preço de venda");
+  if (!temValorPreenchido(produto?.linha_racao_id || produto?.classificacao_racao))
+    faltantes.push("linha/classificação");
+  if (!temValorPreenchido(produto?.porte_animal_id || produto?.porte_animal))
+    faltantes.push("porte");
+  if (
+    !temValorPreenchido(
+      produto?.fase_publico_id || produto?.fase_publico || produto?.categoria_racao,
+    )
+  )
+    faltantes.push("fase/público");
+  if (!temValorPreenchido(produto?.sabor_proteina_id || produto?.sabor_proteina))
+    faltantes.push("sabor/proteína");
+  if (!temValorPreenchido(produto?.especies_indicadas))
+    faltantes.push("espécie indicada");
+  if (!temJsonPreenchido(produto?.tabela_nutricional))
+    faltantes.push("tabela nutricional");
+  if (!temJsonPreenchido(produto?.tabela_consumo))
+    faltantes.push("tabela de consumo");
+
+  return {
+    apta: faltantes.length === 0,
+    faltantes,
+  };
+};
+
+const formatarMoeda = (valor) =>
+  Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+
+const formatarPeso = (valor) => {
+  if (!numeroPositivo(valor)) return "sem peso";
+  return `${Number(valor).toLocaleString("pt-BR", {
+    maximumFractionDigits: 3,
+  })}kg`;
+};
+
+const formatarRacaoLabel = (produto) =>
+  `${produto.nome} - ${formatarPeso(produto.peso_embalagem)} - ${formatarMoeda(produto.preco_venda)}`;
+
+function RacaoSearchInput({
+  disabled = false,
+  hint,
+  label,
+  onChange,
+  onClear,
+  onSelect,
+  placeholder,
+  produtos,
+  value,
+  warning,
+}) {
+  const [aberto, setAberto] = useState(false);
+  const termo = normalizarTexto(value);
+
+  const opcoes = useMemo(() => {
+    const filtradas = produtos.filter((produto) => {
+      if (!termo) return true;
+      return normalizarTexto(formatarRacaoLabel(produto)).includes(termo);
+    });
+
+    return filtradas
+      .sort((a, b) => {
+        if (a.aptidao.apta !== b.aptidao.apta) {
+          return a.aptidao.apta ? -1 : 1;
+        }
+        return a.nome.localeCompare(b.nome, "pt-BR");
+      })
+      .slice(0, 12);
+  }, [produtos, termo]);
+
+  const selecionar = (produto) => {
+    if (!produto.aptidao.apta) {
+      toast.error(camposIncompletosTexto(produto.aptidao.faltantes));
+      return;
+    }
+    onSelect(produto);
+    setAberto(false);
+  };
+
+  return (
+    <div className="racao-search-field">
+      <label>{label}</label>
+      <div className="racao-search-control">
+        <input
+          type="text"
+          value={value || ""}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setAberto(true);
+          }}
+          onFocus={() => !disabled && setAberto(true)}
+          onBlur={() => setTimeout(() => setAberto(false), 160)}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoComplete="off"
+        />
+        {value && onClear && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onClear}
+            className="btn-clear btn-clear-compact"
+            title="Limpar seleção"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {aberto && !disabled && (
+        <div className="racao-options" role="listbox">
+          {opcoes.length === 0 ? (
+            <div className="racao-empty">Nenhuma ração encontrada.</div>
+          ) : (
+            opcoes.map((produto) => (
+              <button
+                key={produto.id}
+                type="button"
+                className={`racao-option ${
+                  produto.aptidao.apta ? "is-ready" : "is-incomplete"
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selecionar(produto)}
+                aria-disabled={!produto.aptidao.apta}
+              >
+                <div className="racao-option-main">
+                  <span className="racao-option-name">{produto.nome}</span>
+                  <span
+                    className={`racao-status ${
+                      produto.aptidao.apta ? "ready" : "incomplete"
+                    }`}
+                  >
+                    {produto.aptidao.apta ? "Apta" : "Cadastro incompleto"}
+                  </span>
+                </div>
+                <div className="racao-option-meta">
+                  <span>{formatarPeso(produto.peso_embalagem)}</span>
+                  <span>{formatarMoeda(produto.preco_venda)}</span>
+                  {produto.classificacao_racao && (
+                    <span>{produto.classificacao_racao}</span>
+                  )}
+                </div>
+                {!produto.aptidao.apta && (
+                  <div className="racao-option-missing">
+                    {camposIncompletosTexto(produto.aptidao.faltantes)}
+                  </div>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {warning && <small className="form-warning">{warning}</small>}
+      {hint && <small className="form-hint">{hint}</small>}
+    </div>
+  );
+}
 
 export default function CalculadoraRacao() {
   const [produtos, setProdutos] = useState([]);
@@ -33,6 +281,97 @@ export default function CalculadoraRacao() {
     carregarProdutos();
     carregarPets();
   }, []);
+
+  const produtosComAptidao = useMemo(
+    () =>
+      produtos.map((produto) => ({
+        ...produto,
+        aptidao: avaliarAptidaoRacao(produto),
+      })),
+    [produtos],
+  );
+
+  const resumoAptidao = useMemo(() => {
+    const aptas = produtosComAptidao.filter((produto) => produto.aptidao.apta);
+    return {
+      aptas: aptas.length,
+      incompletas: produtosComAptidao.length - aptas.length,
+    };
+  }, [produtosComAptidao]);
+
+  const buscarProdutoComAptidao = (produtoId) =>
+    produtosComAptidao.find((produto) => String(produto.id) === String(produtoId));
+
+  const validarProdutoApto = (produtoId, contexto = "ração") => {
+    const produto = buscarProdutoComAptidao(produtoId);
+    if (!produto) {
+      toast.error(`Selecione uma ${contexto} apta para análise.`);
+      return false;
+    }
+
+    if (!produto.aptidao.apta) {
+      toast.error(camposIncompletosTexto(produto.aptidao.faltantes));
+      return false;
+    }
+
+    return true;
+  };
+
+  const selecionarRacaoPrincipal = (produto) => {
+    if (!produto.aptidao.apta) {
+      toast.error(camposIncompletosTexto(produto.aptidao.faltantes));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      produto_id: produto.id,
+      produto_nome: formatarRacaoLabel(produto),
+      categoria_racao: produto.categoria_racao || "",
+    }));
+  };
+
+  const selecionarRacaoComparativo = (produto) => {
+    if (!produto.aptidao.apta) {
+      toast.error(camposIncompletosTexto(produto.aptidao.faltantes));
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      produto_comparar_id: produto.id,
+      produto_comparar_nome: formatarRacaoLabel(produto),
+      classificacao: "",
+    }));
+  };
+
+  const alterarBuscaRacaoPrincipal = (valor) => {
+    const produtoExato = produtosComAptidao.find(
+      (produto) => formatarRacaoLabel(produto) === valor,
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      produto_id: produtoExato?.aptidao.apta ? produtoExato.id : "",
+      produto_nome: valor,
+      categoria_racao: produtoExato?.aptidao.apta
+        ? produtoExato.categoria_racao || ""
+        : "",
+    }));
+  };
+
+  const alterarBuscaRacaoComparativo = (valor) => {
+    const produtoExato = produtosComAptidao.find(
+      (produto) => formatarRacaoLabel(produto) === valor,
+    );
+
+    setForm((prev) => ({
+      ...prev,
+      produto_comparar_id: produtoExato?.aptidao.apta ? produtoExato.id : "",
+      produto_comparar_nome: valor,
+      classificacao: "",
+    }));
+  };
 
   const carregarProdutos = async () => {
     try {
@@ -80,11 +419,11 @@ export default function CalculadoraRacao() {
         console.log("📦 Estrutura do primeiro produto:", listaProdutos[0]);
       }
 
-      // Filtrar apenas produtos com peso_embalagem
-      const racoes = listaProdutos.filter(
-        (p) => p.peso_embalagem && p.peso_embalagem > 0,
-      );
+      // Mostrar rações aptas e incompletas para orientar o cadastro.
+      const racoes = listaProdutos.filter((p) => produtoPareceRacao(p));
+      const aptas = racoes.filter((p) => avaliarAptidaoRacao(p).apta);
       console.log("🥫 Rações encontradas:", racoes.length);
+      console.log("✅ Rações aptas para análise:", aptas.length);
       console.log("📊 Total de produtos:", listaProdutos.length);
 
       if (racoes.length > 0) {
@@ -108,12 +447,10 @@ export default function CalculadoraRacao() {
       setProdutos(racoes);
 
       if (racoes.length === 0 && listaProdutos.length > 0) {
-        console.warn(
-          "⚠️ Produtos encontrados, mas nenhum tem peso de embalagem configurado",
-        );
+        console.warn("⚠️ Produtos encontrados, mas nenhum parece ser ração");
         toast.error(
-          `${listaProdutos.length} produtos encontrados, mas nenhum tem PESO DE EMBALAGEM configurado. ` +
-            'Edite os produtos de ração e preencha o campo "Peso da Embalagem (kg)".',
+          `${listaProdutos.length} produtos encontrados, mas nenhum parece estar marcado como ração. ` +
+            'Edite os produtos de ração e preencha a aba "Ração".',
           { duration: 6000 },
         );
       } else if (racoes.length === 0) {
@@ -188,6 +525,15 @@ export default function CalculadoraRacao() {
       return;
     }
 
+    if (!form.produto_id) {
+      toast.error("Selecione uma ração apta para análise.");
+      return;
+    }
+
+    if (!validarProdutoApto(form.produto_id)) {
+      return;
+    }
+
     // Validar idade obrigatória para ração de filhote
     if (form.categoria_racao === "filhote" && !form.idade_meses) {
       toast.error("⚠️ Idade é obrigatória para rações de filhote!");
@@ -216,6 +562,22 @@ export default function CalculadoraRacao() {
   const compararRacoes = async () => {
     if (!form.peso_pet_kg) {
       toast.error("Informe o peso do pet");
+      return;
+    }
+
+    if (form.produto_id && !validarProdutoApto(form.produto_id)) {
+      return;
+    }
+
+    if (form.produto_comparar_nome && !form.produto_comparar_id) {
+      toast.error("Selecione uma ração de comparação apta ou limpe o campo.");
+      return;
+    }
+
+    if (
+      form.produto_comparar_id &&
+      !validarProdutoApto(form.produto_comparar_id, "ração de comparação")
+    ) {
       return;
     }
 
@@ -436,40 +798,23 @@ export default function CalculadoraRacao() {
           <h3>🥫 Ração</h3>
 
           <div className="form-group">
-            <label>Selecionar Ração</label>
-            <input
-              type="text"
-              list="racoes-list"
+            <RacaoSearchInput
+              label="Selecionar Ração"
               value={form.produto_nome || ""}
-              onChange={(e) => {
-                const nomeRacao = e.target.value;
-                setForm({ ...form, produto_nome: nomeRacao });
-
-                // Se digitou exatamente o nome de uma ração, seleciona ela
-                const racaoEncontrada = produtos.find(
-                  (p) =>
-                    `${p.nome} - ${p.peso_embalagem}kg - R$ ${p.preco_venda}` ===
-                    nomeRacao,
-                );
-                if (racaoEncontrada) {
-                  setForm({
-                    ...form,
-                    produto_id: racaoEncontrada.id,
-                    produto_nome: nomeRacao,
-                    categoria_racao: racaoEncontrada.categoria_racao || "",
-                  });
-                }
-              }}
+              onChange={alterarBuscaRacaoPrincipal}
+              onSelect={selecionarRacaoPrincipal}
+              onClear={() =>
+                setForm((prev) => ({
+                  ...prev,
+                  produto_id: "",
+                  produto_nome: "",
+                  categoria_racao: "",
+                }))
+              }
+              produtos={produtosComAptidao}
               placeholder="Digite ou selecione uma ração"
+              hint={`${resumoAptidao.aptas} aptas para análise · ${resumoAptidao.incompletas} com cadastro incompleto`}
             />
-            <datalist id="racoes-list">
-              {produtos.map((p) => (
-                <option
-                  key={p.id}
-                  value={`${p.nome} - ${p.peso_embalagem}kg - R$ ${p.preco_venda}`}
-                />
-              ))}
-            </datalist>
             {form.categoria_racao === "filhote" && (
               <small
                 className="form-hint"
@@ -502,85 +847,34 @@ export default function CalculadoraRacao() {
 
           {/* NOVO: Selecionar uma ração específica para comparar */}
           <div className="form-group">
-            <label>⭐ Comparar Ração Específica</label>
             <div style={{ display: "flex", gap: "8px" }}>
-              <input
-                type="text"
-                list="racoes-comparar-list"
+              <RacaoSearchInput
+                label="⭐ Comparar Ração Específica"
                 value={form.produto_comparar_nome || ""}
-                onChange={(e) => {
-                  const nomeRacao = e.target.value;
-
-                  // Se limpar o campo
-                  if (nomeRacao === "") {
-                    setForm({
-                      ...form,
-                      produto_comparar_id: "",
-                      produto_comparar_nome: "",
-                    });
-                    return;
-                  }
-
-                  setForm({
-                    ...form,
-                    produto_comparar_nome: nomeRacao,
-                    classificacao: "",
-                  });
-
-                  // Se digitou exatamente o nome de uma ração, seleciona ela
-                  const racaoEncontrada = produtos.find(
-                    (p) =>
-                      `${p.nome} - ${p.classificacao_racao} - R$ ${p.preco_venda}` ===
-                      nomeRacao,
-                  );
-                  if (racaoEncontrada) {
-                    setForm({
-                      ...form,
-                      produto_comparar_id: racaoEncontrada.id,
-                      produto_comparar_nome: nomeRacao,
-                      classificacao: "",
-                    });
-                  }
-                }}
+                onChange={alterarBuscaRacaoComparativo}
+                onSelect={selecionarRacaoComparativo}
+                onClear={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    produto_comparar_id: "",
+                    produto_comparar_nome: "",
+                  }))
+                }
+                produtos={produtosComAptidao}
                 placeholder="Digite ou selecione uma ração"
                 disabled={form.classificacao !== ""}
-                style={{ flex: 1 }}
+                warning={
+                  form.classificacao
+                    ? "⚠️ Limpe o filtro de classificação para usar esta opção"
+                    : ""
+                }
+                hint={
+                  !form.produto_comparar_id && !form.classificacao
+                    ? "💡 Deixe vazio para comparar por classificação abaixo"
+                    : ""
+                }
               />
-              {form.produto_comparar_nome && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      produto_comparar_id: "",
-                      produto_comparar_nome: "",
-                    })
-                  }
-                  className="btn-clear"
-                  title="Limpar seleção"
-                >
-                  ✕
-                </button>
-              )}
             </div>
-            <datalist id="racoes-comparar-list">
-              {produtos.map((p) => (
-                <option
-                  key={p.id}
-                  value={`${p.nome} - ${p.classificacao_racao} - R$ ${p.preco_venda}`}
-                />
-              ))}
-            </datalist>
-            {form.classificacao && (
-              <small className="form-warning">
-                ⚠️ Limpe o filtro de classificação para usar esta opção
-              </small>
-            )}
-            {!form.produto_comparar_id && !form.classificacao && (
-              <small className="form-hint">
-                💡 Deixe vazio para comparar por classificação abaixo
-              </small>
-            )}
           </div>
 
           <div className="divider-text">OU</div>

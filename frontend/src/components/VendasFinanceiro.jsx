@@ -6,15 +6,10 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
-  CreditCard,
-  DollarSign,
   Download,
   ExternalLink,
   FileText,
   Filter,
-  Minus,
-  Package,
-  TrendingUp,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -952,6 +947,14 @@ export default function VendasFinanceiro() {
         cor: "border-sky-200 bg-sky-50 text-sky-800",
       },
       {
+        sinal: "!",
+        titulo: "Em Aberto",
+        valor: Number(resumo.em_aberto || 0),
+        detalhe: "Vendas pendentes de baixa no periodo.",
+        cor: "border-red-200 bg-red-50 text-red-800",
+        acao: "vendas_em_aberto",
+      },
+      {
         sinal: "-",
         titulo: "Custo Produtos",
         valor: custoProdutos,
@@ -1100,9 +1103,7 @@ export default function VendasFinanceiro() {
         const valorItem = Number(
           item.valor_liquido || item.valor_promocional || item.venda_bruta || 0,
         );
-        const descontoItem = Number(
-          item.desconto_promocional || item.desconto || 0,
-        ) + Number(item.campanha || 0);
+        const descontoItem = Number(item.desconto_promocional || 0);
 
         atual.quantidade += Number(item.quantidade || 0);
         atual.valor += valorItem;
@@ -1132,7 +1133,7 @@ export default function VendasFinanceiro() {
         totalVendas > 0 ? arredondarPercentual((vendasPromocao / totalVendas) * 100) : 0,
       comparativo: [
         { tipo: "Normais", quantidade: vendasNormais, valor: valorVendasNormais },
-        { tipo: "Promocao/campanha", quantidade: vendasPromocao, valor: valorVendasPromocao },
+        { tipo: "Preco promocional", quantidade: vendasPromocao, valor: valorVendasPromocao },
       ],
       topProdutos: Array.from(topProdutos.values())
         .map((item) => ({
@@ -1213,52 +1214,6 @@ export default function VendasFinanceiro() {
     { label: "MG Venda", value: `${totalizadoresListaVendas.margem_sobre_venda}%` },
     { label: "MG Custo", value: `${totalizadoresListaVendas.margem_sobre_custo}%` },
   ];
-
-  const CardComVariacao = ({
-    titulo,
-    valor,
-    icone: Icone,
-    cor,
-    valorAnterior,
-    onClick,
-    ativo = false,
-  }) => {
-    const variacao = calcularVariacao(valor, valorAnterior);
-    const cresceu = variacao.percentual > 0;
-    const manteve = variacao.percentual === 0;
-    const Container = onClick ? "button" : "div";
-
-    return (
-      <Container
-        type={onClick ? "button" : undefined}
-        onClick={onClick}
-        className={`${cor} w-full text-left text-white p-4 rounded-lg shadow transition ${
-          onClick ? "cursor-pointer hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-red-200" : ""
-        } ${ativo ? "ring-4 ring-red-200" : ""}`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm opacity-90">{titulo}</span>
-          <Icone className="w-5 h-5 opacity-80" />
-        </div>
-        <div className="text-3xl font-bold mb-1">{formatarMoeda(valor)}</div>
-        {onClick && (
-          <div className="text-xs font-medium opacity-90">
-            Clique para ver as vendas em aberto
-          </div>
-        )}
-        {modoComparacao && valorAnterior !== undefined && (
-          <div
-            className={`flex items-center gap-1 text-sm ${manteve ? "opacity-70" : ""}`}
-          >
-            {cresceu && <ArrowUp className="w-4 h-4" />}
-            {!cresceu && !manteve && <ArrowDown className="w-4 h-4" />}
-            {manteve && <Minus className="w-4 h-4" />}
-            <span>{Math.abs(variacao.percentual)}%</span>
-          </div>
-        )}
-      </Container>
-    );
-  };
 
   const getTextoComparacao = () => {
     switch (periodoComparacao) {
@@ -2171,75 +2126,6 @@ export default function VendasFinanceiro() {
             </div>
           )}
 
-          {/* Cards de Resumo */}
-          <div className="grid grid-cols-5 gap-4 mb-6">
-            <CardComVariacao
-              titulo="Venda Bruta"
-              valor={resumo.venda_bruta}
-              icone={DollarSign}
-              cor="bg-green-500"
-              valorAnterior={resumoComparacao.venda_bruta}
-            />
-            <CardComVariacao
-              titulo="Taxa de Entrega"
-              valor={resumo.taxa_entrega}
-              icone={Package}
-              cor="bg-gray-400"
-              valorAnterior={resumoComparacao.taxa_entrega}
-            />
-            <CardComVariacao
-              titulo="Desconto"
-              valor={resumo.desconto}
-              icone={TrendingUp}
-              cor="bg-yellow-500"
-              valorAnterior={resumoComparacao.desconto}
-            />
-            <CardComVariacao
-              titulo="Venda Líquida"
-              valor={resumo.venda_liquida}
-              icone={DollarSign}
-              cor="bg-blue-500"
-              valorAnterior={resumoComparacao.venda_liquida}
-            />
-            <CardComVariacao
-              titulo="Em Aberto"
-              valor={resumo.em_aberto}
-              icone={CreditCard}
-              cor="bg-red-500"
-              valorAnterior={resumoComparacao.em_aberto}
-              onClick={abrirVendasEmAberto}
-              ativo={abaAtiva === "lista" && filtroStatusLista === "em_aberto"}
-            />
-          </div>
-
-          {/* Cards de Análise de Rentabilidade */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="bg-orange-500 text-white p-4 rounded-lg shadow">
-              <div className="text-3xl font-bold">
-                {formatarMoeda(resumo.custo_total || 0)}
-              </div>
-              <div className="text-sm">Custo Total</div>
-            </div>
-            <div className="bg-purple-500 text-white p-4 rounded-lg shadow">
-              <div className="text-3xl font-bold">
-                {formatarMoeda(resumo.taxa_cartao_total || 0)}
-              </div>
-              <div className="text-sm">Taxas de Cartão</div>
-            </div>
-            <div className="bg-green-600 text-white p-4 rounded-lg shadow">
-              <div className="text-3xl font-bold">
-                {formatarMoeda(resumo.lucro_total || 0)}
-              </div>
-              <div className="text-sm">Lucro Total</div>
-            </div>
-            <div className="bg-teal-500 text-white p-4 rounded-lg shadow">
-              <div className="text-3xl font-bold">
-                {resumo.margem_media || 0}%
-              </div>
-              <div className="text-sm">Margem Média</div>
-            </div>
-          </div>
-
           <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -2254,26 +2140,46 @@ export default function VendasFinanceiro() {
                 {formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-              {fluxoResultadoCards.map((card) => (
-                <div
-                  key={card.titulo}
-                  className={`min-h-[116px] rounded-lg border p-3 shadow-sm ${card.cor}`}
-                >
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide">
-                      {card.titulo}
-                    </span>
-                    <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold">
-                      {card.sinal || "R$"}
-                    </span>
-                  </div>
-                  <div className="text-xl font-bold">
-                    {card.percentual ? `${card.valor}%` : formatarMoeda(card.valor)}
-                  </div>
-                  <p className="mt-2 text-xs opacity-75">{card.detalhe}</p>
-                </div>
-              ))}
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+              {fluxoResultadoCards.map((card) => {
+                const clicavel = card.acao === "vendas_em_aberto";
+                const Container = clicavel ? "button" : "div";
+                const ativo =
+                  clicavel &&
+                  abaAtiva === "lista" &&
+                  filtroStatusLista === "em_aberto";
+
+                return (
+                  <Container
+                    key={card.titulo}
+                    type={clicavel ? "button" : undefined}
+                    onClick={clicavel ? abrirVendasEmAberto : undefined}
+                    className={`min-h-[116px] rounded-lg border p-3 text-left shadow-sm transition ${card.cor} ${
+                      clicavel
+                        ? "hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-red-100"
+                        : ""
+                    } ${ativo ? "ring-4 ring-red-100" : ""}`}
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide">
+                        {card.titulo}
+                      </span>
+                      <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold">
+                        {card.sinal || "R$"}
+                      </span>
+                    </div>
+                    <div className="text-xl font-bold">
+                      {card.percentual ? `${card.valor}%` : formatarMoeda(card.valor)}
+                    </div>
+                    <p className="mt-2 text-xs opacity-75">{card.detalhe}</p>
+                    {clicavel ? (
+                      <p className="mt-1 text-xs font-semibold opacity-80">
+                        Clique para ver as vendas em aberto.
+                      </p>
+                    ) : null}
+                  </Container>
+                );
+              })}
             </div>
           </div>
 
@@ -2627,10 +2533,10 @@ export default function VendasFinanceiro() {
             <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">
-                  Vendas normais x promocao/campanha
+                  Vendas normais x preco promocional
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Itens marcados por preco promocional, desconto, cupom ou campanha.
+                  Itens vendidos pelo preco promocional ativo no ERP, ecommerce ou app.
                 </p>
               </div>
               <div className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">
@@ -2652,7 +2558,7 @@ export default function VendasFinanceiro() {
               </div>
               <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3">
                 <p className="text-xs font-semibold uppercase text-cyan-700">
-                  Com promocao/campanha
+                  Com preco promocional
                 </p>
                 <p className="mt-1 text-2xl font-bold text-cyan-800">
                   {analisePromocoes.vendasPromocao}
@@ -2674,7 +2580,7 @@ export default function VendasFinanceiro() {
               </div>
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <p className="text-xs font-semibold uppercase text-amber-700">
-                  Desconto/campanha
+                  Economia promocional
                 </p>
                 <p className="mt-1 text-2xl font-bold text-amber-800">
                   {formatarMoeda(analisePromocoes.descontoPromocional)}
@@ -3740,7 +3646,7 @@ export default function VendasFinanceiro() {
                                           {item.em_promocao && (
                                             <span
                                               className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"
-                                              title={item.promocao_origem || "Item vendido em promocao/campanha"}
+                                              title={item.promocao_origem || "Item vendido por preco promocional ativo"}
                                             >
                                               Promo
                                             </span>

@@ -474,7 +474,7 @@ export default function ProdutosRelatorio() {
         "Saida",
         "Estoque",
         "Valor total",
-        "Promocao/campanha",
+        "Preco promocional",
         "Origem promocao",
         "Usuario",
         "Documento",
@@ -920,7 +920,7 @@ export default function ProdutosRelatorio() {
                                   {item.em_promocao && (
                                     <span
                                       className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
-                                      title={item.promocao_origem || "Venda em promocao/campanha"}
+                                      title={item.promocao_origem || "Venda por preco promocional ativo"}
                                     >
                                       Promo
                                     </span>
@@ -928,7 +928,7 @@ export default function ProdutosRelatorio() {
                                 </div>
                                 {item.em_promocao && (
                                   <p className="mt-1 text-xs font-medium text-cyan-700">
-                                    {item.promocao_origem || "Promocao/campanha"}
+                                    {item.promocao_origem || "Preco promocional ativo"}
                                   </p>
                                 )}
                               </td>
@@ -1117,7 +1117,7 @@ export default function ProdutosRelatorio() {
                             {mov.em_promocao && (
                               <span
                                 className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
-                                title={mov.promocao_origem || "Venda em promocao/campanha"}
+                                title={mov.promocao_origem || "Venda por preco promocional ativo"}
                               >
                                 Promo
                               </span>
@@ -1128,7 +1128,7 @@ export default function ProdutosRelatorio() {
                           </p>
                           {mov.em_promocao && (
                             <p className="mt-1 text-xs font-medium text-cyan-700">
-                              {mov.promocao_origem || "Promocao/campanha"}
+                              {mov.promocao_origem || "Preco promocional ativo"}
                             </p>
                           )}
                         </td>

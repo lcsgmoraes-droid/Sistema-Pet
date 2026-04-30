@@ -21,6 +21,7 @@ from .models import User, Cliente
 from .comissoes_models import ComissaoItem
 from .empresa_config_fiscal_models import EmpresaConfigFiscal
 from .financeiro_models import FormaPagamento
+from .promocoes_venda_utils import detectar_promocao_por_preco_vendido
 from .services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
 
 logger = logging.getLogger(__name__)
@@ -69,86 +70,35 @@ def _normalizar_forma_pagamento_label(valor) -> str:
     return mapa.get(chave, texto or "Nao informado")
 
 
-def _datetime_sem_timezone(valor):
-    if not valor:
-        return None
-    if getattr(valor, "tzinfo", None) is not None:
-        return valor.replace(tzinfo=None)
-    return valor
-
-
-def _janela_promocao_ativa(produto: Produto, data_venda: Optional[datetime]) -> bool:
-    if not produto or not getattr(produto, "preco_promocional", None):
-        return False
-    if getattr(produto, "promocao_ativa", False) is not True:
-        return False
-
-    data_ref = _datetime_sem_timezone(data_venda) or datetime.utcnow()
-    inicio = _datetime_sem_timezone(getattr(produto, "promocao_inicio", None))
-    fim = _datetime_sem_timezone(getattr(produto, "promocao_fim", None))
-    if inicio and data_ref < inicio:
-        return False
-    if fim and data_ref > fim:
-        return False
-    return True
-
-
 def _detectar_promocao_item(
     produto: Optional[Produto],
     item: Optional[VendaItem],
     venda: Optional[Venda],
     item_snapshot: Optional[dict] = None,
 ) -> dict:
-    motivos = []
     item_snapshot = item_snapshot or {}
-    data_venda = getattr(venda, "data_venda", None)
     preco_unitario = float(
         getattr(item, "preco_unitario", None)
         or item_snapshot.get("preco_unitario", 0)
         or 0
     )
-    preco_cadastro = float(getattr(produto, "preco_venda", 0) or 0) if produto else 0.0
-    preco_promocional = (
-        float(getattr(produto, "preco_promocional", 0) or 0)
-        if produto
-        else 0.0
+    quantidade = float(
+        getattr(item, "quantidade", None)
+        or item_snapshot.get("quantidade", 0)
+        or 0
     )
-    desconto_item = float(getattr(item, "desconto_item", 0) or 0) if item else 0.0
-    desconto_rateado = float(item_snapshot.get("desconto", 0) or 0)
-    campanha_rateada = float(item_snapshot.get("campanha", 0) or 0)
     subtotal_item = float(
         getattr(item, "subtotal", None)
         or item_snapshot.get("venda_bruta", 0)
         or 0
     )
-
-    if produto and _janela_promocao_ativa(produto, data_venda):
-        if preco_promocional <= 0 or preco_unitario <= (preco_promocional + 0.01):
-            motivos.append("Produto em promocao")
-
-    if desconto_item > 0 or desconto_rateado > 0:
-        motivos.append("Desconto aplicado")
-
-    if (
-        getattr(venda, "cupom_code", None)
-        or float(getattr(venda, "cupom_discount_applied", 0) or 0) > 0
-        or campanha_rateada > 0
-    ):
-        motivos.append("Campanha/cupom")
-
-    if preco_cadastro > 0 and preco_unitario > 0 and preco_unitario < (preco_cadastro - 0.01):
-        motivos.append("Preco abaixo do cadastro")
-
-    motivos_unicos = list(dict.fromkeys(motivos))
-    em_promocao = bool(motivos_unicos)
-    return {
-        "em_promocao": em_promocao,
-        "promocao_origem": ", ".join(motivos_unicos) if em_promocao else None,
-        "preco_cadastro": round(preco_cadastro, 2),
-        "preco_promocional_cadastro": round(preco_promocional, 2) if preco_promocional else None,
-        "desconto_promocional": round(desconto_item + desconto_rateado + campanha_rateada, 2),
-        "valor_promocional": round(subtotal_item, 2) if em_promocao else 0.0,
-    }
+    return detectar_promocao_por_preco_vendido(
+        produto,
+        venda,
+        preco_unitario=preco_unitario,
+        quantidade=quantidade,
+        subtotal_item=subtotal_item,
+    )
 
 
 def _enriquecer_itens_promocionais(venda: Venda, itens_snapshot: list[dict]) -> list[dict]:
