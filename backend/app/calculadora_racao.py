@@ -138,8 +138,6 @@ def _avaliar_aptidao_calculadora(produto: Produto) -> List[str]:
         faltantes.append("sabor/proteína")
     if not _texto_preenchido(getattr(produto, "especies_indicadas", None)):
         faltantes.append("espécie indicada")
-    if not _json_preenchido(getattr(produto, "tabela_nutricional", None)):
-        faltantes.append("tabela nutricional")
     if not _json_preenchido(getattr(produto, "tabela_consumo", None)):
         faltantes.append("tabela de consumo")
 
@@ -482,8 +480,6 @@ async def comparar_racoes(
             Produto.peso_embalagem > 0,
             Produto.preco_venda.isnot(None),
             Produto.preco_venda > 0,
-            Produto.tabela_nutricional.isnot(None),
-            func.length(func.trim(Produto.tabela_nutricional)) > 0,
             Produto.tabela_consumo.isnot(None),
             func.length(func.trim(Produto.tabela_consumo)) > 0,
         )
@@ -505,7 +501,7 @@ async def comparar_racoes(
                 status_code=404,
                 detail=(
                     "Nenhuma ração apta para análise com os filtros. "
-                    "Complete a aba Ração e a tabela nutricional dos produtos."
+                    "Complete a aba Ração e a tabela de consumo dos produtos."
                 ),
             )
         

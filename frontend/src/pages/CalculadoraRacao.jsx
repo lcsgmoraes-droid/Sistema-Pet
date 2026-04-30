@@ -125,8 +125,6 @@ const avaliarAptidaoRacao = (produto) => {
     faltantes.push("sabor/proteína");
   if (!temValorPreenchido(produto?.especies_indicadas))
     faltantes.push("espécie indicada");
-  if (!temJsonPreenchido(produto?.tabela_nutricional))
-    faltantes.push("tabela nutricional");
   if (!temJsonPreenchido(produto?.tabela_consumo))
     faltantes.push("tabela de consumo");
 
