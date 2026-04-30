@@ -52,6 +52,7 @@ export default function VetConsultaForm() {
         etapas={ETAPAS}
         etapaAtual={consulta.etapa}
         modoSomenteLeitura={consulta.modoSomenteLeitura}
+        podeNavegarLivremente={Boolean(consulta.consultaIdAtual)}
         onChangeEtapa={consulta.setEtapa}
       />
 

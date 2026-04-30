@@ -1,6 +1,7 @@
 """Helpers clinicos compartilhados do modulo veterinario."""
 
 import json
+import hashlib
 from datetime import date, datetime, timedelta
 from typing import Optional
 
@@ -36,6 +37,33 @@ def _idade_inicio_meses_protocolo(dose_inicial_semanas: Optional[int]) -> Option
     return round(float(dose_inicial_semanas) / 4, 2)
 
 
+def _idade_meses_pet(pet: Pet) -> Optional[int]:
+    idade_meses = _meses_desde(pet.data_nascimento)
+    if idade_meses is not None:
+        return idade_meses
+    idade_aproximada = getattr(pet, "idade_aproximada", None)
+    if idade_aproximada is None:
+        return None
+    try:
+        return int(idade_aproximada)
+    except (TypeError, ValueError):
+        return None
+
+
+def _assinatura_publica_vacina(registro: VacinaRegistro, pet: Pet, tenant_id) -> str:
+    payload = "|".join([
+        str(tenant_id or ""),
+        str(registro.id or ""),
+        str(pet.id or ""),
+        str(registro.nome_vacina or ""),
+        str(registro.data_aplicacao or ""),
+        str(registro.lote or ""),
+        str(registro.fabricante or ""),
+        str(getattr(registro, "veterinario_id", None) or ""),
+    ])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
     especies_pet = _aliases_especie_vet(pet.especie or "")
     protocolos = db.query(ProtocoloVacina).filter(
@@ -56,6 +84,19 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
         VacinaRegistro.tenant_id == tenant_id,
     ).order_by(VacinaRegistro.data_aplicacao.desc()).all()
 
+    veterinarios_por_id = {}
+    veterinario_ids = {
+        getattr(registro, "veterinario_id", None)
+        for registro in registros
+        if getattr(registro, "veterinario_id", None)
+    }
+    if veterinario_ids:
+        veterinarios = db.query(Cliente).filter(
+            Cliente.id.in_(veterinario_ids),
+            Cliente.tenant_id == str(tenant_id),
+        ).all()
+        veterinarios_por_id = {veterinario.id: veterinario for veterinario in veterinarios}
+
     pendentes = []
     vencidas = []
     carteira = []
@@ -74,6 +115,9 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
             })
         elif registro.data_proxima_dose and registro.data_proxima_dose <= hoje + timedelta(days=30):
             status = "vence_breve"
+        assinatura_hash = _assinatura_publica_vacina(registro, pet, tenant_id)
+        veterinario_id = getattr(registro, "veterinario_id", None)
+        veterinario = veterinarios_por_id.get(veterinario_id)
         carteira.append({
             "id": registro.id,
             "nome": registro.nome_vacina,
@@ -82,10 +126,15 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
             "numero_dose": registro.numero_dose,
             "lote": registro.lote,
             "fabricante": registro.fabricante,
+            "veterinario_id": veterinario_id,
+            "veterinario_nome": getattr(veterinario, "nome", None) if veterinario else None,
+            "assinatura_digital": f"VAC-{assinatura_hash[:12].upper()}" if veterinario_id else None,
+            "assinatura_valida": bool(veterinario_id),
+            "hash_validacao": assinatura_hash,
             "status": status,
         })
 
-    idade_meses = _meses_desde(pet.data_nascimento)
+    idade_meses = _idade_meses_pet(pet)
     for protocolo in protocolos_ativos:
         chave = (protocolo.nome or "").strip().lower()
         registros_vacina = registros_por_nome.get(chave, [])

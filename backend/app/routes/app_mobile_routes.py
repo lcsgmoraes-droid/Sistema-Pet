@@ -46,6 +46,7 @@ class PetResponse(BaseModel):
     sexo: Optional[str]
     castrado: bool
     data_nascimento: Optional[str]   # ISO 8601 string
+    idade_aproximada: Optional[int] = None
     peso: Optional[float]
     porte: Optional[str]
     cor: Optional[str]
@@ -119,6 +120,7 @@ class PetCreate(BaseModel):
     sexo: Optional[str] = None
     castrado: bool = False
     data_nascimento: Optional[datetime] = None
+    idade_aproximada: Optional[int] = None
     peso: Optional[float] = None
     porte: Optional[str] = None
     cor: Optional[str] = None
@@ -134,6 +136,7 @@ class PetUpdate(BaseModel):
     sexo: Optional[str] = None
     castrado: Optional[bool] = None
     data_nascimento: Optional[datetime] = None
+    idade_aproximada: Optional[int] = None
     peso: Optional[float] = None
     porte: Optional[str] = None
     cor: Optional[str] = None
@@ -169,6 +172,7 @@ def _serialize_pet(pet: Pet) -> dict:
         "sexo": pet.sexo,
         "castrado": pet.castrado,
         "data_nascimento": pet.data_nascimento.isoformat() if pet.data_nascimento else None,
+        "idade_aproximada": pet.idade_aproximada,
         "peso": pet.peso,
         "porte": pet.porte,
         "cor": pet.cor,
@@ -245,6 +249,7 @@ def criar_pet(
         sexo=payload.sexo,
         castrado=payload.castrado,
         data_nascimento=payload.data_nascimento,
+        idade_aproximada=payload.idade_aproximada,
         peso=payload.peso,
         porte=payload.porte,
         cor=payload.cor,

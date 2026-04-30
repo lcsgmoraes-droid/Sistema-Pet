@@ -10,10 +10,11 @@ import {
   Linking,
   Image,
   LayoutChangeEvent,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { obterCarteirinhaPet } from '../../services/pets.service';
-import { Pet, PetCarteirinha, VetFocusSection } from '../../types';
+import { Pet, PetCarteirinha, VacinaCarteirinha, VetFocusSection } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { calcularIdade, formatarData } from '../../utils/format';
 
@@ -24,6 +25,7 @@ export default function PetDetailScreen({ route, navigation }: any) {
   const focusSection = route.params?.focusSection;
   const [dados, setDados] = useState<PetCarteirinha | null>(null);
   const [loading, setLoading] = useState(true);
+  const [vacinaSelecionada, setVacinaSelecionada] = useState<VacinaCarteirinha | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const sectionPositionsRef = useRef<Record<VetFocusSection, number>>({
     vacinas: 0,
@@ -97,11 +99,7 @@ export default function PetDetailScreen({ route, navigation }: any) {
             {petAtual.especie}
             {petAtual.raca ? ` · ${petAtual.raca}` : ''}
           </Text>
-          <Text style={styles.subtitulo}>
-            {petAtual.data_nascimento
-              ? calcularIdade(petAtual.data_nascimento)
-              : 'Idade nao informada'}
-          </Text>
+          <Text style={styles.subtitulo}>{formatarIdadePet(petAtual)}</Text>
           {!!petAtual.tipo_sanguineo && (
             <Text style={styles.subtitulo}>Tipo sanguineo: {petAtual.tipo_sanguineo}</Text>
           )}
@@ -175,18 +173,11 @@ export default function PetDetailScreen({ route, navigation }: any) {
                 <Text style={styles.vazioTexto}>Nenhuma vacina registrada ainda.</Text>
               ) : (
                 dados?.status_vacinal?.carteira.map((vacina) => (
-                  <View key={vacina.id} style={styles.itemCard}>
-                    <Text style={styles.itemTitulo}>{vacina.nome}</Text>
-                    <Text style={styles.itemMeta}>
-                      Aplicacao: {formatarData(vacina.data_aplicacao)}
-                    </Text>
-                    <Text style={styles.itemMeta}>
-                      Proxima dose: {formatarData(vacina.data_proxima_dose)}
-                    </Text>
-                    {!!vacina.status && (
-                      <Text style={styles.itemMeta}>Status: {vacina.status}</Text>
-                    )}
-                  </View>
+                  <VacinaCarteiraCard
+                    key={vacina.id}
+                    vacina={vacina}
+                    onPress={() => setVacinaSelecionada(vacina)}
+                  />
                 ))
               )}
             </Section>
@@ -248,8 +239,50 @@ export default function PetDetailScreen({ route, navigation }: any) {
           </View>
         </>
       )}
+
+      <CarteiraVacinaModal
+        vacina={vacinaSelecionada}
+        pet={petAtual}
+        onClose={() => setVacinaSelecionada(null)}
+      />
     </ScrollView>
   );
+}
+
+function formatarIdadePet(pet: Pet): string {
+  if (pet.data_nascimento) return calcularIdade(pet.data_nascimento);
+  if (typeof pet.idade_aproximada === 'number' && pet.idade_aproximada >= 0) {
+    return formatarIdadeMeses(pet.idade_aproximada);
+  }
+  return 'Idade nao informada';
+}
+
+function formatarIdadeMeses(meses: number): string {
+  if (meses < 12) return `${meses} ${meses === 1 ? 'mes' : 'meses'}`;
+  const anos = Math.floor(meses / 12);
+  const mesesRestantes = meses % 12;
+  if (!mesesRestantes) return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+  return `${anos}a ${mesesRestantes}m`;
+}
+
+function labelStatusVacina(status?: string | null): string {
+  const mapa: Record<string, string> = {
+    em_dia: 'Em dia',
+    vence_breve: 'Vence breve',
+    atrasada: 'Atrasada',
+  };
+  return status ? mapa[status] ?? status : 'Registrada';
+}
+
+function corStatusVacina(status?: string | null): string {
+  if (status === 'atrasada') return CORES.erro;
+  if (status === 'vence_breve') return '#B7791F';
+  return '#047857';
+}
+
+function resumirHash(hash?: string | null): string {
+  if (!hash) return 'Sem codigo';
+  return `${hash.slice(0, 8).toUpperCase()}...${hash.slice(-6).toUpperCase()}`;
 }
 
 function Section({ titulo, children }: { titulo: string; children: React.ReactNode }) {
@@ -284,6 +317,132 @@ function QuickNavButton({
       <Ionicons name={icon} size={16} color={CORES.primario} />
       <Text style={styles.quickNavLabel}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+function VacinaCarteiraCard({
+  vacina,
+  onPress,
+}: {
+  vacina: VacinaCarteirinha;
+  onPress: () => void;
+}) {
+  const corStatus = corStatusVacina(vacina.status);
+
+  return (
+    <TouchableOpacity style={styles.vacinaCard} onPress={onPress} activeOpacity={0.86}>
+      <View style={styles.vacinaCardHeader}>
+        <View style={styles.vacinaIconBox}>
+          <Ionicons name="shield-checkmark-outline" size={22} color={CORES.primario} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.vacinaNome}>{vacina.nome}</Text>
+          <Text style={styles.itemMeta}>Toque para abrir a carteirinha digital</Text>
+        </View>
+        <View style={[styles.vacinaStatusPill, { backgroundColor: `${corStatus}18` }]}>
+          <Text style={[styles.vacinaStatusTexto, { color: corStatus }]}>
+            {labelStatusVacina(vacina.status)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.vacinaGrid}>
+        <View style={styles.vacinaCampo}>
+          <Text style={styles.vacinaCampoLabel}>Aplicacao</Text>
+          <Text style={styles.vacinaCampoValor}>{formatarData(vacina.data_aplicacao)}</Text>
+        </View>
+        <View style={styles.vacinaCampo}>
+          <Text style={styles.vacinaCampoLabel}>Proxima dose</Text>
+          <Text style={styles.vacinaCampoValor}>{formatarData(vacina.data_proxima_dose)}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function CarteiraVacinaModal({
+  vacina,
+  pet,
+  onClose,
+}: {
+  vacina: VacinaCarteirinha | null;
+  pet: Pet;
+  onClose: () => void;
+}) {
+  if (!vacina) return null;
+  const corStatus = corStatusVacina(vacina.status);
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalHeader}>
+            <View>
+              <Text style={styles.modalTitulo}>Carteira de vacina</Text>
+              <Text style={styles.modalSubtitulo}>{pet.nome} - {formatarIdadePet(pet)}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.modalCloseButton}>
+              <Ionicons name="close" size={22} color={CORES.texto} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.carteiraVirtual}>
+            <View style={styles.carteiraTopLine}>
+              <View>
+                <Text style={styles.carteiraPetNome}>{pet.nome}</Text>
+                <Text style={styles.itemMeta}>{pet.especie}{pet.raca ? ` - ${pet.raca}` : ''}</Text>
+              </View>
+              <View style={[styles.carteiraStamp, { borderColor: corStatus }]}>
+                <Text style={[styles.carteiraStampTexto, { color: corStatus }]}>
+                  {labelStatusVacina(vacina.status)}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.carteiraVacinaNome}>{vacina.nome}</Text>
+
+            <View style={styles.carteiraInfoGrid}>
+              <InfoLinha label="Data" valor={formatarData(vacina.data_aplicacao)} />
+              <InfoLinha label="Proxima dose" valor={formatarData(vacina.data_proxima_dose)} />
+              <InfoLinha label="Dose" valor={vacina.numero_dose ? `${vacina.numero_dose}` : '-'} />
+              <InfoLinha label="Lote" valor={vacina.lote || '-'} />
+              <InfoLinha label="Fabricante" valor={vacina.fabricante || '-'} />
+              <InfoLinha label="Validacao" valor={vacina.assinatura_digital || resumirHash(vacina.hash_validacao)} />
+            </View>
+
+            <View style={styles.assinaturaBox}>
+              <Ionicons name="pencil-outline" size={18} color={CORES.primario} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.assinaturaTitulo}>Assinatura digital</Text>
+                <Text style={styles.assinaturaNome}>
+                  {vacina.veterinario_nome || 'Veterinario nao informado'}
+                </Text>
+                <Text style={styles.assinaturaCodigo}>
+                  {vacina.assinatura_valida ? 'Registro validado' : 'Assinatura pendente'}
+                </Text>
+              </View>
+            </View>
+
+            {!!vacina.hash_validacao && (
+              <Text style={styles.hashTexto}>Hash: {resumirHash(vacina.hash_validacao)}</Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.fecharModal} onPress={onClose}>
+            <Text style={styles.fecharModalTexto}>Fechar carteira</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function InfoLinha({ label, valor }: { label: string; valor: string }) {
+  return (
+    <View style={styles.carteiraInfoBox}>
+      <Text style={styles.carteiraInfoLabel}>{label}</Text>
+      <Text style={styles.carteiraInfoValor}>{valor}</Text>
+    </View>
   );
 }
 
@@ -382,6 +541,172 @@ const styles = StyleSheet.create({
   itemResumo: { marginTop: 8, fontSize: FONTE.pequena, color: CORES.texto },
   linkTexto: { marginTop: 8, color: CORES.primario, fontWeight: '600' },
   vazioTexto: { color: CORES.textoSecundario },
+  vacinaCard: {
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: RAIO.lg,
+    padding: ESPACO.md,
+    marginBottom: ESPACO.sm,
+    backgroundColor: '#F8FBFF',
+  },
+  vacinaCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+  },
+  vacinaIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: CORES.primarioClaro,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vacinaNome: { fontSize: FONTE.normal, fontWeight: '800', color: CORES.texto },
+  vacinaStatusPill: {
+    borderRadius: RAIO.circulo,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  vacinaStatusTexto: { fontSize: FONTE.pequena, fontWeight: '800' },
+  vacinaGrid: {
+    flexDirection: 'row',
+    gap: ESPACO.sm,
+    marginTop: ESPACO.md,
+  },
+  vacinaCampo: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: RAIO.md,
+    padding: ESPACO.sm,
+  },
+  vacinaCampoLabel: {
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: CORES.textoClaro,
+    fontWeight: '800',
+  },
+  vacinaCampoValor: {
+    marginTop: 3,
+    fontSize: FONTE.pequena,
+    color: CORES.texto,
+    fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
+    justifyContent: 'center',
+    padding: ESPACO.lg,
+  },
+  modalCard: {
+    backgroundColor: CORES.superficie,
+    borderRadius: RAIO.lg,
+    padding: ESPACO.md,
+    ...SOMBRA,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: ESPACO.md,
+  },
+  modalTitulo: { fontSize: FONTE.grande, fontWeight: '800', color: CORES.texto },
+  modalSubtitulo: { marginTop: 2, fontSize: FONTE.pequena, color: CORES.textoSecundario },
+  modalCloseButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CORES.fundo,
+  },
+  carteiraVirtual: {
+    borderRadius: RAIO.lg,
+    borderWidth: 1,
+    borderColor: '#F6AD55',
+    backgroundColor: '#FFFBEB',
+    padding: ESPACO.md,
+  },
+  carteiraTopLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: ESPACO.sm,
+  },
+  carteiraPetNome: { fontSize: FONTE.grande, fontWeight: '900', color: CORES.texto },
+  carteiraStamp: {
+    minWidth: 82,
+    minHeight: 82,
+    borderRadius: 41,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-8deg' }],
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  carteiraStampTexto: {
+    fontSize: 11,
+    fontWeight: '900',
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  carteiraVacinaNome: {
+    marginTop: ESPACO.md,
+    fontSize: 22,
+    fontWeight: '900',
+    color: CORES.texto,
+  },
+  carteiraInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.sm,
+    marginTop: ESPACO.md,
+  },
+  carteiraInfoBox: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RAIO.md,
+    padding: ESPACO.sm,
+  },
+  carteiraInfoLabel: {
+    fontSize: 10,
+    letterSpacing: 0.8,
+    color: CORES.textoClaro,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+  },
+  carteiraInfoValor: {
+    marginTop: 4,
+    fontSize: FONTE.pequena,
+    color: CORES.texto,
+    fontWeight: '800',
+  },
+  assinaturaBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+    marginTop: ESPACO.md,
+    padding: ESPACO.sm,
+    borderRadius: RAIO.md,
+    backgroundColor: '#EEF2FF',
+  },
+  assinaturaTitulo: { fontSize: FONTE.pequena, color: CORES.textoSecundario },
+  assinaturaNome: { marginTop: 2, fontSize: FONTE.normal, fontWeight: '800', color: CORES.texto },
+  assinaturaCodigo: { marginTop: 2, fontSize: FONTE.pequena, color: CORES.primario },
+  hashTexto: {
+    marginTop: ESPACO.sm,
+    fontSize: 10,
+    color: CORES.textoClaro,
+    textAlign: 'center',
+  },
+  fecharModal: {
+    marginTop: ESPACO.md,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.primario,
+    paddingVertical: ESPACO.sm + 2,
+    alignItems: 'center',
+  },
+  fecharModalTexto: { color: '#FFFFFF', fontWeight: '800' },
   pendenteChip: {
     alignSelf: 'flex-start',
     borderWidth: 1,

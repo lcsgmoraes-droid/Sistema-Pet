@@ -71,6 +71,11 @@ export interface VacinaCarteirinha {
   numero_dose?: number | null;
   lote?: string | null;
   fabricante?: string | null;
+  veterinario_id?: number | null;
+  veterinario_nome?: string | null;
+  assinatura_digital?: string | null;
+  assinatura_valida?: boolean | null;
+  hash_validacao?: string | null;
   status?: string | null;
 }
 
