@@ -122,18 +122,53 @@ def atualizar_dre_por_lancamento(
     
     # 4. Atualizar valores conforme natureza da subcategoria
     valor_decimal = float(valor)
+    nome_lower = (subcategoria.nome or "").lower()
+    categoria_lower = (getattr(subcategoria.categoria, "nome", "") or "").lower()
+    texto_classificacao = f"{nome_lower} {categoria_lower}"
+    eh_deducao_receita = any(
+        termo in texto_classificacao
+        for termo in (
+            "dedu",
+            "desconto",
+            "abatimento",
+            "devolu",
+            "cancelamento",
+            "imposto",
+            "tribut",
+            "simples",
+            "icms",
+            "pis",
+            "cofins",
+            "iss",
+        )
+    )
+    eh_cmv = any(
+        termo in texto_classificacao
+        for termo in (
+            "cmv",
+            "mercadorias vendidas",
+            "produto vendido",
+            "produtos vendidos",
+            "fretes sobre compras",
+        )
+    )
     
     if subcategoria.categoria.natureza == NaturezaDRE.RECEITA:
         dre_detalhe.receita_bruta += valor_decimal
         dre_detalhe.receita_liquida = dre_detalhe.receita_bruta - dre_detalhe.deducoes_receita
+
+    elif eh_deducao_receita:
+        dre_detalhe.deducoes_receita += valor_decimal
+        dre_detalhe.receita_liquida = dre_detalhe.receita_bruta - dre_detalhe.deducoes_receita
     
     elif subcategoria.categoria.natureza == NaturezaDRE.CUSTO:
-        dre_detalhe.custo_produtos_vendidos += valor_decimal
+        if eh_cmv:
+            dre_detalhe.custo_produtos_vendidos += valor_decimal
+        else:
+            dre_detalhe.despesas_vendas += valor_decimal
     
     elif subcategoria.categoria.natureza == NaturezaDRE.DESPESA:
         # Determinar tipo de despesa pelo nome da subcategoria (pode ser refinado)
-        nome_lower = subcategoria.nome.lower()
-        
         if 'venda' in nome_lower or 'comiss' in nome_lower or 'taxa' in nome_lower:
             dre_detalhe.despesas_vendas += valor_decimal
         elif 'pessoal' in nome_lower or 'salario' in nome_lower or 'folha' in nome_lower:

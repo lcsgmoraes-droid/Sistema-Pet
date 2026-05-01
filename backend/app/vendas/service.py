@@ -2786,6 +2786,18 @@ def gerar_dre_competencia_venda(
                 'message': 'DRE já foi gerada anteriormente (idempotência)'
             }
         
+        canal = venda.canal or 'loja_fisica'
+        canal_labels = {
+            'loja_fisica': 'Loja Fisica',
+            'pdv': 'Loja Fisica',
+            'mercado_livre': 'Mercado Livre',
+            'shopee': 'Shopee',
+            'amazon': 'Amazon',
+            'ecommerce': 'E-commerce',
+            'app': 'App',
+        }
+        canal_label = canal_labels.get(canal, 'Loja Fisica')
+
         # ============================================================
         # ETAPA 2: BUSCAR SUBCATEGORIAS DRE
         # ============================================================
@@ -2855,6 +2867,45 @@ def gerar_dre_competencia_venda(
             f"Desconto (ID={subcat_desconto.id if subcat_desconto else 'N/A'})"
         )
         
+        def buscar_subcategoria(padroes, natureza=None):
+            for padrao in padroes:
+                query = db.query(DRESubcategoria).filter(
+                    DRESubcategoria.tenant_id == tenant_uuid,
+                    DRESubcategoria.nome.ilike(padrao),
+                    DRESubcategoria.ativo == True,
+                )
+                if natureza is not None:
+                    query = query.filter(DRESubcategoria.categoria.has(natureza=natureza))
+                subcategoria = query.first()
+                if subcategoria:
+                    return subcategoria
+            return None
+
+        subcat_receita_frete = buscar_subcategoria(
+            [f"%Taxa de Frete%{canal_label}%", "%Taxa de Frete%", "%Receita%Frete%"],
+            NaturezaDRE.RECEITA,
+        )
+        subcat_imposto = buscar_subcategoria(
+            ["%Simples Nacional%", "%ICMS%", "%PIS%", "%COFINS%", "%ISS%", "%impost%", "%tribut%"],
+            NaturezaDRE.DESPESA,
+        )
+        subcat_taxa_cartao = buscar_subcategoria(
+            [f"%Cart%{canal_label}%", "%Cart%", "%PIX%", "%Boleto%"],
+            None,
+        )
+        subcat_entrega = buscar_subcategoria(
+            [f"%Frete Operacional%{canal_label}%", "%Frete Operacional%", "%Fretes sobre Vendas%"],
+            None,
+        )
+        subcat_comissao = buscar_subcategoria(
+            ["%Comiss%Vendas%", "%Comiss%Entregador%", "%Comiss%"],
+            None,
+        )
+        subcat_campanha = buscar_subcategoria(
+            ["%Programas de Fidelidade%", "%Campanha%", "%Marketing%", "%Brinde%"],
+            None,
+        )
+
         # ============================================================
         # ETAPA 3: CALCULAR VALORES
         # ============================================================
@@ -2869,8 +2920,15 @@ def gerar_dre_competencia_venda(
 
         # Receita, CMV e desconto passam a seguir a fotografia financeira da venda.
         receita_bruta = Decimal(str(snapshot.get('venda_bruta', 0) or 0))
+        receita_frete = Decimal(str(snapshot.get('taxa_loja', 0) or 0))
         cmv_total = Decimal(str(snapshot.get('custo_produtos', 0) or 0))
         desconto_total = Decimal(str(snapshot.get('desconto', 0) or 0))
+        imposto_total = Decimal(str(snapshot.get('imposto', 0) or 0))
+        taxa_cartao_total = Decimal(str(snapshot.get('taxa_cartao', 0) or 0))
+        repasse_entrega_total = Decimal(str(snapshot.get('taxa_entrega', 0) or 0))
+        taxa_operacional_total = Decimal(str(snapshot.get('taxa_operacional', 0) or 0))
+        comissao_total = Decimal(str(snapshot.get('comissao', 0) or 0))
+        campanha_total = Decimal(str(snapshot.get('custo_campanha', 0) or 0))
         
         # Canal da venda (para DRE por canal)
         canal = venda.canal or 'loja_fisica'
@@ -2890,6 +2948,54 @@ def gerar_dre_competencia_venda(
         # ============================================================
         
         lancamentos_criados = 0
+        receita_bruta_retorno = receita_bruta
+        cmv_total_retorno = cmv_total
+        desconto_total_retorno = desconto_total
+
+        componentes_dre = [
+            ("Receita de produtos/servicos", subcat_receita, receita_bruta, 'RECEITA'),
+            ("Receita de frete", subcat_receita_frete, receita_frete, 'RECEITA'),
+            ("Descontos concedidos", subcat_desconto, desconto_total, 'DESPESA'),
+            ("Impostos sobre vendas", subcat_imposto, imposto_total, 'DESPESA'),
+            ("CMV", subcat_cmv, cmv_total, 'DESPESA'),
+            ("Taxas de cartao/meios de pagamento", subcat_taxa_cartao, taxa_cartao_total, 'DESPESA'),
+            ("Repasse/custo de entrega", subcat_entrega, repasse_entrega_total, 'DESPESA'),
+            ("Custo operacional de entrega", subcat_entrega, taxa_operacional_total, 'DESPESA'),
+            ("Comissoes de venda", subcat_comissao, comissao_total, 'DESPESA'),
+            ("Campanhas, cupons e cashback", subcat_campanha, campanha_total, 'DESPESA'),
+        ]
+
+        for descricao_componente, subcategoria_dre, valor_componente, tipo_movimentacao in componentes_dre:
+            if valor_componente <= 0:
+                continue
+            if not subcategoria_dre:
+                logger.warning(
+                    "  DRE: %s de R$ %.2f nao lancado (subcategoria nao encontrada)",
+                    descricao_componente,
+                    float(valor_componente),
+                )
+                continue
+
+            try:
+                atualizar_dre_por_lancamento(
+                    db=db,
+                    tenant_id=tenant_uuid,
+                    dre_subcategoria_id=subcategoria_dre.id,
+                    canal=canal,
+                    valor=valor_componente,
+                    data_lancamento=data_venda,
+                    tipo_movimentacao=tipo_movimentacao,
+                )
+                lancamentos_criados += 1
+                logger.info("  DRE: %s lancado: R$ %.2f", descricao_componente, float(valor_componente))
+            except Exception as e:
+                logger.error("  Erro ao lancar %s na DRE: %s", descricao_componente, str(e), exc_info=True)
+                raise
+
+        # Os blocos legados abaixo ficam desativados para evitar duplicidade.
+        receita_bruta = Decimal("0")
+        cmv_total = Decimal("0")
+        desconto_total = Decimal("0")
         
         # 4.1 - Lançamento de RECEITA (100%)
         if receita_bruta > 0:
@@ -2947,6 +3053,10 @@ def gerar_dre_competencia_venda(
         elif desconto_total > 0:
             logger.warning(f"  ⚠️  Desconto de R$ {float(desconto_total):.2f} não lançado (subcategoria não encontrada)")
         
+        receita_bruta = receita_bruta_retorno
+        cmv_total = cmv_total_retorno
+        desconto_total = desconto_total_retorno
+
         # ============================================================
         # ETAPA 5: MARCAR VENDA COMO DRE GERADA
         # ============================================================
