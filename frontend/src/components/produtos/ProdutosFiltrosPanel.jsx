@@ -10,8 +10,8 @@ export default function ProdutosFiltrosPanel({
   setPersistirBusca,
 }) {
   return (
-    <div id="tour-produtos-filtros" className="bg-white rounded-lg shadow-sm p-4 mb-6">
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+    <div id="tour-produtos-filtros" className="mb-4 rounded-lg bg-white p-3 shadow-sm md:mb-6 md:p-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-7 md:gap-4">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <input
             type="text"

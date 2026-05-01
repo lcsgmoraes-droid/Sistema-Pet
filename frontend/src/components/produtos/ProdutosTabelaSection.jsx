@@ -1,5 +1,70 @@
 import React from "react";
+import { formatarData, formatarMoeda } from "../../api/produtos";
+import { obterEstoqueVisualProduto } from "./produtosUtils";
 import ProdutosPaginationControls from "./ProdutosPaginationControls";
+
+function obterValidadeResumoProduto(produto) {
+  const lotes = (produto?.lotes || [])
+    .filter((lote) => lote?.data_validade)
+    .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+
+  if (lotes.length === 0) {
+    return {
+      data: "-",
+      apoio: "Sem lote com validade",
+      className: "text-gray-500",
+      surfaceClassName: "bg-gray-50 border-gray-200",
+    };
+  }
+
+  const lote = lotes[0];
+  const dataValidade = new Date(lote.data_validade);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  dataValidade.setHours(0, 0, 0, 0);
+  const dias = Math.floor((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+
+  if (dias < 0) {
+    return {
+      data: formatarData(lote.data_validade),
+      apoio: `${Math.abs(dias)} dia(s) vencido`,
+      className: "text-red-700",
+      surfaceClassName: "bg-red-50 border-red-200",
+    };
+  }
+
+  if (dias <= 30) {
+    return {
+      data: formatarData(lote.data_validade),
+      apoio: `Vence em ${dias} dia(s)`,
+      className: "text-orange-700",
+      surfaceClassName: "bg-orange-50 border-orange-200",
+    };
+  }
+
+  if (dias <= 90) {
+    return {
+      data: formatarData(lote.data_validade),
+      apoio: `Vence em ${dias} dia(s)`,
+      className: "text-yellow-700",
+      surfaceClassName: "bg-yellow-50 border-yellow-200",
+    };
+  }
+
+  return {
+    data: formatarData(lote.data_validade),
+    apoio: `Vence em ${dias} dia(s)`,
+    className: "text-gray-700",
+    surfaceClassName: "bg-gray-50 border-gray-200",
+  };
+}
+
+function obterImagemProduto(produto) {
+  if (!produto?.imagem_principal) return null;
+  return produto.imagem_principal.startsWith("http")
+    ? produto.imagem_principal
+    : `${window.location.origin}${produto.imagem_principal}`;
+}
 
 export default function ProdutosTabelaSection({
   colunasVisiveis,
@@ -63,7 +128,168 @@ export default function ProdutosTabelaSection({
       )}
 
       <div id="tour-produtos-lista" className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="md:hidden">
+          {loading ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              Carregando produtos...
+            </div>
+          ) : produtos.length === 0 ? (
+            <div className="px-4 py-8 text-center text-gray-500">
+              Nenhum produto encontrado
+            </div>
+          ) : (
+            <div className="space-y-3 bg-gray-50 p-3">
+              {produtos.map((produto, idx) => {
+                if (!produto || !produto.id) {
+                  console.error(`Produto invalido no indice ${idx}:`, produto);
+                  return null;
+                }
+
+                const validade = obterValidadeResumoProduto(produto);
+                const estoqueAtual = obterEstoqueVisualProduto(produto);
+                const reservado = Number(produto.estoque_reservado || 0);
+                const estoqueDisponivel = Number((estoqueAtual - reservado).toFixed(2));
+                const imagem = obterImagemProduto(produto);
+                const codigo = produto.codigo || produto.sku || produto.codigo_barras;
+
+                return (
+                  <article
+                    key={produto.id}
+                    ref={(element) => {
+                      linhaProdutoRefs.current[produto.id] = element;
+                    }}
+                    onClick={() => navigate(`/produtos/${produto.id}/editar`)}
+                    className={`rounded-lg border bg-white p-3 shadow-sm ${
+                      produto.ativo === false ? "border-slate-200 bg-slate-50 opacity-80" : "border-gray-200"
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100">
+                        {imagem ? (
+                          <img
+                            src={imagem}
+                            alt={produto.nome}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                            Sem foto
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selecionados.includes(produto.id)}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => handleSelecionar(produto.id, event.nativeEvent)}
+                            className="mt-1 h-4 w-4 rounded text-blue-600"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="line-clamp-2 text-sm font-semibold text-gray-900">
+                              {produto.nome}
+                            </h3>
+                            <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-gray-500">
+                              {codigo && (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5">
+                                  Cod: {codigo}
+                                </span>
+                              )}
+                              {produto.marca?.nome || produto.marca_nome ? (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5">
+                                  {produto.marca?.nome || produto.marca_nome}
+                                </span>
+                              ) : null}
+                              {produto.ativo === false && (
+                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-700">
+                                  Inativo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <div className={`min-w-0 flex-1 rounded-lg border p-2 ${validade.surfaceClassName}`}>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Validade
+                        </p>
+                        <p className={`mt-1 text-sm font-bold ${validade.className}`}>
+                          {validade.data}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">
+                          {validade.apoio}
+                        </p>
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Estoque
+                        </p>
+                        <p className={`mt-1 text-sm font-bold ${getCorEstoque(produto)}`}>
+                          {produto.controlar_estoque ? estoqueDisponivel : "-"}
+                        </p>
+                        {reservado > 0 && (
+                          <p className="mt-0.5 text-[11px] text-yellow-700">
+                            {reservado} reservado
+                          </p>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">
+                          Venda
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-gray-900">
+                          {formatarMoeda(produto.preco_venda)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/produtos/${produto.id}/editar`);
+                        }}
+                        className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+                      >
+                        Editar
+                      </button>
+                      {codigo && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            copiarTexto(codigo, "Codigo");
+                          }}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+                        >
+                          Copiar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleToggleAtivo(produto);
+                        }}
+                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+                      >
+                        {produto.ativo === false ? "Ativar" : "Inativar"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

@@ -29,8 +29,8 @@ export default function ProdutosPaginationControls({
   );
 
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
         <span className="text-sm text-gray-600">
           Mostrando {(paginaAtual - 1) * itensPorPagina + 1} a{" "}
           {Math.min(paginaAtual * itensPorPagina, totalItens)} de {totalItens} produtos
@@ -48,11 +48,11 @@ export default function ProdutosPaginationControls({
         </select>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2 md:justify-end">
         <button
           onClick={onIrParaPrimeiraPagina}
           disabled={paginaAtual === 1}
-          className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:inline-flex"
         >
           Primeira
         </button>
@@ -64,7 +64,11 @@ export default function ProdutosPaginationControls({
           Anterior
         </button>
 
-        <div className="flex items-center gap-1">
+        <span className="text-sm font-medium text-gray-600 sm:hidden">
+          {paginaAtual}/{Math.max(totalPaginas, 1)}
+        </span>
+
+        <div className="hidden items-center gap-1 sm:flex">
           {paginasVisiveis.map((pageNum) => (
             <button
               key={pageNum}
@@ -90,7 +94,7 @@ export default function ProdutosPaginationControls({
         <button
           onClick={onIrParaUltimaPagina}
           disabled={paginaAtual === totalPaginas}
-          className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="hidden px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed sm:inline-flex"
         >
           Ultima
         </button>

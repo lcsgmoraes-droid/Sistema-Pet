@@ -47,16 +47,19 @@ export default function AlertasEstoque() {
   }, [location.search, abaAtiva]);
 
   useEffect(() => {
-    getProdutos({ limit: 5000, ativo: true })
+    if (abaAtiva === 'validade' || produtosBrutos.length > 0) return;
+
+    getProdutos({ page_size: 500, ativo: true })
       .then(res => {
         const lista = Array.isArray(res.data) ? res.data
+          : Array.isArray(res.data?.items) ? res.data.items
           : Array.isArray(res.data?.itens) ? res.data.itens
           : Array.isArray(res.data?.produtos) ? res.data.produtos
           : [];
         setProdutosBrutos(lista);
       })
       .catch(() => {});
-  }, []);
+  }, [abaAtiva, produtosBrutos.length]);
 
   const insights = useMemo(() => {
     const ativos = (produtosBrutos || []).filter(
@@ -170,10 +173,10 @@ export default function AlertasEstoque() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-0 md:p-6">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900 md:text-3xl">
           <AlertTriangle className="text-red-500" />
           Alertas de Estoque
         </h1>
@@ -183,8 +186,8 @@ export default function AlertasEstoque() {
       </div>
 
       {/* Análises Inteligentes */}
-      {produtosBrutos.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm p-5 mb-6 border border-indigo-100">
+      {abaAtiva !== 'validade' && produtosBrutos.length > 0 && (
+        <div className="mb-4 rounded-lg border border-indigo-100 bg-white p-4 shadow-sm md:mb-6 md:p-5">
           <h2 className="text-base font-semibold text-gray-800 mb-4">Análises Inteligentes</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
             <div className="p-3 rounded-lg bg-red-50 border border-red-200">
@@ -254,9 +257,9 @@ export default function AlertasEstoque() {
       )}
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm mb-6">
+      <div className="mb-4 rounded-lg bg-white shadow-sm md:mb-6">
         <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
+          <nav className="-mb-px flex overflow-x-auto">
             <button
               onClick={() => handleMudarAba('pendentes')}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${

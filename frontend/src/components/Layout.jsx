@@ -247,6 +247,11 @@ const Layout = () => {
     }
   };
 
+  const toggleSidebarMobile = () => {
+    setSidebarVisible(true);
+    setSidebarOpen((open) => !open);
+  };
+
   // Persistir estado da sidebar no localStorage (apenas desktop)
   useEffect(() => {
     if (!isMobile) {
@@ -1293,9 +1298,11 @@ const Layout = () => {
           {/* Menu Hamburguer (Mobile) */}
           {isMobile && effectiveSidebarVisible && (
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors md:hidden"
+              type="button"
+              onClick={toggleSidebarMobile}
+              className="touch-manipulation rounded-lg p-2 hover:bg-gray-100 transition-colors md:hidden"
               aria-label="Toggle menu"
+              aria-expanded={sidebarOpen}
             >
               <FiMenu className="w-6 h-6 text-gray-700" />
             </button>

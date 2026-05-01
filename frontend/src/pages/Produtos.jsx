@@ -278,7 +278,7 @@ export default function Produtos() {
   });
 
   return (
-    <div className="p-6">
+    <div className="p-0 md:p-6">
       <ProdutosMainContent {...mainContentProps} />
       <ProdutosModalsLayer {...modalsLayerProps} />
     </div>

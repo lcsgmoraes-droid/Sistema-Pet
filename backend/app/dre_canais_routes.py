@@ -79,6 +79,8 @@ class LinhaCanal(BaseModel):
     nivel: int  # 0=seção, 1=linha normal, 2=total
     tipo: str  # 'receita', 'deducao', 'custo', 'despesa', 'lucro'
     origem: Optional[str] = None
+    campo: Optional[str] = None
+    detalhavel: bool = False
 
 
 class DREPorCanalResponse(BaseModel):
@@ -89,6 +91,35 @@ class DREPorCanalResponse(BaseModel):
     linhas: List[LinhaCanal]
     totais: Dict
     canais_encontrados: List[str]
+
+
+class DREDetalheItem(BaseModel):
+    id: str
+    origem_tipo: str
+    origem_label: str
+    data: Optional[str] = None
+    descricao: str
+    contraparte: Optional[str] = None
+    documento: Optional[str] = None
+    status: Optional[str] = None
+    valor: float
+    valor_auxiliar: Optional[float] = None
+    link: Optional[str] = None
+    meta: Dict[str, Any] = {}
+
+
+class DREDetalheResponse(BaseModel):
+    campo: str
+    canal: str
+    canal_nome: str
+    periodo: str
+    origem: Optional[str] = None
+    total: float
+    total_itens: int
+    page: int
+    page_size: int
+    pages: int
+    items: List[DREDetalheItem]
 
 
 # ==================== FUNÇÕES AUXILIARES ====================
@@ -642,6 +673,7 @@ def _linha_total(
     cor: str,
     cor_bg: str,
     origem: Optional[str] = None,
+    campo: Optional[str] = None,
 ) -> LinhaCanal:
     percentual = Decimal("100") if descricao.startswith("(+)") and receita_bruta_total > 0 else Decimal(str(_percentual(valor, receita_bruta_total)))
     return LinhaCanal(
@@ -655,6 +687,8 @@ def _linha_total(
         nivel=0,
         tipo=tipo,
         origem=origem,
+        campo=campo,
+        detalhavel=False,
     )
 
 
@@ -665,6 +699,7 @@ def _linha_canal(
     receita_bruta_total: Decimal,
     tipo: str,
     origem: Optional[str] = None,
+    campo: Optional[str] = None,
 ) -> LinhaCanal:
     config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
     return LinhaCanal(
@@ -678,6 +713,8 @@ def _linha_canal(
         nivel=1,
         tipo=tipo,
         origem=origem,
+        campo=campo,
+        detalhavel=bool(campo),
     )
 
 
@@ -692,7 +729,7 @@ def _adicionar_linhas_campo(
 ) -> None:
     origem_linha = origem or ORIGENS_DRE.get(campo)
     for canal in sorted(dados_canais.keys()):
-        linhas.append(_linha_canal(canal, descricao, _decimal(dados_canais[canal].get(campo, 0)), receita_bruta_total, tipo, origem_linha))
+        linhas.append(_linha_canal(canal, descricao, _decimal(dados_canais[canal].get(campo, 0)), receita_bruta_total, tipo, origem_linha, campo))
 
 
 def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[LinhaCanal], Dict[str, Any]]:
@@ -827,7 +864,351 @@ def obter_despesas_operacionais(db: Session, mes: int, ano: int, tenant_id: str)
     return total_despesas
 
 
+def _periodo_label(mes: int, ano: int) -> str:
+    meses = ['', 'Janeiro', 'Fevereiro', 'MarÃ§o', 'Abril', 'Maio', 'Junho',
+             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+    return f"{meses[mes]}/{ano}" if 1 <= mes <= 12 else f"{mes}/{ano}"
+
+
+def _data_iso(valor: Any) -> Optional[str]:
+    if not valor:
+        return None
+    if isinstance(valor, datetime):
+        return valor.date().isoformat()
+    if isinstance(valor, date):
+        return valor.isoformat()
+    return str(valor)
+
+
+def _paginar_detalhes(
+    items: List[DREDetalheItem],
+    page: int,
+    page_size: int,
+) -> tuple[List[DREDetalheItem], int, int]:
+    page = max(int(page or 1), 1)
+    page_size = min(max(int(page_size or 30), 1), 100)
+    total_itens = len(items)
+    pages = (total_itens + page_size - 1) // page_size if total_itens else 0
+    inicio = (page - 1) * page_size
+    return items[inicio:inicio + page_size], page_size, pages
+
+
+def _preparar_snapshots_vendas(
+    db: Session,
+    tenant_id: str,
+    vendas: List[Venda],
+) -> Dict[int, Dict[str, Any]]:
+    venda_ids = [venda.id for venda in vendas if getattr(venda, "id", None)]
+    formas_pagamento = _formas_pagamento_map(db, tenant_id)
+    impostos_percentual = _impostos_percentual(db, tenant_id)
+    comissoes_por_venda = _bulk_comissoes_por_venda(db, tenant_id, venda_ids)
+    cupons_por_venda = _bulk_cupons_por_venda(db, tenant_id, vendas)
+    cashback_por_venda = _bulk_cashback_por_venda(db, tenant_id, venda_ids)
+    taxa_operacional_por_venda = _bulk_taxa_operacional_por_venda(db, tenant_id, vendas)
+    estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
+
+    snapshots: Dict[int, Dict[str, Any]] = {}
+    for venda in vendas:
+        cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
+        custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
+        snapshot = _snapshot_pronto(venda)
+        if snapshot and custo_campanha > 0 and _decimal(snapshot.get("custo_campanha", 0)) <= 0:
+            snapshot = None
+        if snapshot is None:
+            snapshot = build_venda_rentabilidade_snapshot(
+                venda,
+                db,
+                tenant_id,
+                impostos_percentual=impostos_percentual,
+                formas_pagamento_map=formas_pagamento,
+                custo_campanha=custo_campanha,
+                cupom_desconto=cupom_desconto,
+                comissao_total=comissoes_por_venda.get(venda.id, 0.0),
+                taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
+                estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
+            )
+        snapshots[int(venda.id)] = snapshot
+    return snapshots
+
+
+def _valor_snapshot_campo(campo: str, venda: Venda, snapshot: Dict[str, Any]) -> Decimal:
+    if campo in {"receita_produtos", "receita_servicos"}:
+        receita_produtos, receita_servicos = _separar_receita_produto_servico(
+            venda,
+            _decimal(snapshot.get("venda_bruta", 0)),
+        )
+        return receita_produtos if campo == "receita_produtos" else receita_servicos
+
+    mapa_snapshot = {
+        "receita_frete": "taxa_loja",
+        "descontos": "desconto",
+        "impostos": "imposto",
+        "cmv": "custo_produtos",
+        "taxas_cartao": "taxa_cartao",
+        "repasse_entrega": "taxa_entrega",
+        "taxa_operacional_entrega": "taxa_operacional",
+        "comissoes": "comissao",
+        "campanhas": "custo_campanha",
+    }
+    chave = mapa_snapshot.get(campo)
+    return _decimal(snapshot.get(chave, 0)) if chave else Decimal("0")
+
+
+CAMPOS_DETALHE_VENDAS = {
+    "receita_produtos",
+    "receita_servicos",
+    "receita_frete",
+    "descontos",
+    "impostos",
+    "cmv",
+    "taxas_cartao",
+    "repasse_entrega",
+    "taxa_operacional_entrega",
+    "comissoes",
+    "campanhas",
+}
+
+CAMPOS_DETALHE_CONTAS = {
+    "fretes_compras",
+    "taxas_marketplace",
+    "despesas_pessoal",
+    "despesas_administrativas",
+    "despesas_comerciais",
+    "despesas_financeiras",
+    "outras_despesas",
+}
+
+
+def _detalhes_vendas_campo(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    campo: str,
+) -> List[DREDetalheItem]:
+    inicio, fim = _periodo_mes(mes, ano)
+    vendas = (
+        db.query(Venda)
+        .options(
+            selectinload(Venda.cliente),
+            selectinload(Venda.itens).selectinload(VendaItem.produto),
+            selectinload(Venda.pagamentos),
+        )
+        .filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio,
+                Venda.data_venda < fim,
+                Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial']),
+            )
+        )
+        .all()
+    )
+    vendas = [venda for venda in vendas if _normalizar_canal(getattr(venda, "canal", None)) == canal]
+    snapshots = _preparar_snapshots_vendas(db, tenant_id, vendas)
+
+    detalhes: List[DREDetalheItem] = []
+    for venda in vendas:
+        snapshot = snapshots.get(int(venda.id), {})
+        valor = _valor_snapshot_campo(campo, venda, snapshot)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+
+        pagamentos = []
+        for pagamento in list(getattr(venda, "pagamentos", []) or []):
+            forma = getattr(pagamento, "forma_pagamento", None) or getattr(pagamento, "tipo", None)
+            if forma:
+                pagamentos.append(str(forma))
+
+        cliente_nome = getattr(getattr(venda, "cliente", None), "nome", None) or "Sem cliente"
+        numero = getattr(venda, "numero_venda", None) or f"#{venda.id}"
+        detalhes.append(
+            DREDetalheItem(
+                id=f"venda-{venda.id}",
+                origem_tipo="venda",
+                origem_label="Venda",
+                data=_data_iso(getattr(venda, "data_venda", None)),
+                descricao=f"{numero} - {cliente_nome}",
+                contraparte=cliente_nome,
+                documento=str(numero),
+                status=getattr(venda, "status", None),
+                valor=float(valor),
+                valor_auxiliar=float(_decimal(getattr(venda, "total", 0))),
+                link="/financeiro/vendas",
+                meta={
+                    "canal": canal,
+                    "cupom": getattr(venda, "cupom_code", None),
+                    "pagamentos": ", ".join(pagamentos),
+                },
+            )
+        )
+
+    detalhes.sort(key=lambda item: item.data or "", reverse=True)
+    return detalhes
+
+
+def _subcategorias_contas_map(
+    db: Session,
+    tenant_id: str,
+    contas: List[ContaPagar],
+) -> Dict[int, DRESubcategoria]:
+    ids = {
+        conta.dre_subcategoria_id
+        for conta in contas
+        if getattr(conta, "dre_subcategoria_id", None)
+    }
+    if not ids:
+        return {}
+    return {
+        subcategoria.id: subcategoria
+        for subcategoria in db.query(DRESubcategoria)
+        .options(selectinload(DRESubcategoria.categoria))
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.id.in_(ids),
+        )
+        .all()
+    }
+
+
+def _detalhes_contas_campo(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+    campo: str,
+) -> List[DREDetalheItem]:
+    if campo == "fretes_compras":
+        if canal != "loja_fisica":
+            return []
+        subcategoria_frete_compras = db.query(DRESubcategoria).filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.nome == "Fretes sobre Compras",
+        ).first()
+        if not subcategoria_frete_compras:
+            return []
+        contas = (
+            db.query(ContaPagar)
+            .options(selectinload(ContaPagar.fornecedor))
+            .filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    extract('month', ContaPagar.data_emissao) == mes,
+                    extract('year', ContaPagar.data_emissao) == ano,
+                    ContaPagar.status != 'cancelado',
+                    ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
+                )
+            )
+            .all()
+        )
+        subcategorias = {subcategoria_frete_compras.id: subcategoria_frete_compras}
+    else:
+        contas_base = (
+            db.query(ContaPagar)
+            .options(selectinload(ContaPagar.fornecedor))
+            .filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    extract('month', ContaPagar.data_emissao) == mes,
+                    extract('year', ContaPagar.data_emissao) == ano,
+                    ContaPagar.status != 'cancelado',
+                    ContaPagar.nota_entrada_id.is_(None),
+                )
+            )
+            .all()
+        )
+        subcategorias = _subcategorias_contas_map(db, tenant_id, contas_base)
+        contas = []
+        for conta in contas_base:
+            if _normalizar_canal(getattr(conta, "canal", None)) != canal:
+                continue
+            subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
+            texto = _texto_conta(conta, subcategoria)
+            campo_conta = _classificar_conta_dre(texto)
+            if campo_conta != "taxas_marketplace" and _eh_custo_de_venda_ja_vindo_da_venda(texto):
+                continue
+            if campo_conta == campo:
+                contas.append(conta)
+
+    detalhes: List[DREDetalheItem] = []
+    for conta in contas:
+        fornecedor_nome = getattr(getattr(conta, "fornecedor", None), "nome", None)
+        documento = getattr(conta, "documento", None) or getattr(conta, "nfe_numero", None)
+        subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
+        valor = _decimal(getattr(conta, "valor_original", 0)) if campo == "fretes_compras" else _conta_valor(conta)
+        if abs(valor) <= Decimal("0.004"):
+            continue
+        detalhes.append(
+            DREDetalheItem(
+                id=f"conta-pagar-{conta.id}",
+                origem_tipo="conta_pagar",
+                origem_label="Conta a pagar",
+                data=_data_iso(getattr(conta, "data_emissao", None)),
+                descricao=getattr(conta, "descricao", "") or f"Conta #{conta.id}",
+                contraparte=fornecedor_nome,
+                documento=str(documento) if documento else None,
+                status=getattr(conta, "status", None),
+                valor=float(valor),
+                valor_auxiliar=float(_decimal(getattr(conta, "valor_pago", 0))),
+                link="/financeiro/contas-pagar",
+                meta={
+                    "vencimento": _data_iso(getattr(conta, "data_vencimento", None)),
+                    "subcategoria": getattr(subcategoria, "nome", None),
+                    "canal": canal,
+                },
+            )
+        )
+
+    detalhes.sort(key=lambda item: item.data or "", reverse=True)
+    return detalhes
+
+
 # ==================== ENDPOINT PRINCIPAL ====================
+
+@router.get("/detalhes", response_model=DREDetalheResponse)
+def detalhar_linha_dre_por_canal(
+    ano: int = Query(..., description="Ano do DRE"),
+    mes: int = Query(..., description="MÃªs do DRE (1-12)"),
+    canal: str = Query(..., description="Canal da linha"),
+    campo: str = Query(..., description="Campo da DRE"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    if mes < 1 or mes > 12:
+        raise HTTPException(status_code=400, detail="MÃªs deve estar entre 1 e 12")
+
+    campo = (campo or "").strip()
+    canal = _normalizar_canal(canal)
+    if campo not in CAMPOS_DETALHE_VENDAS and campo not in CAMPOS_DETALHE_CONTAS:
+        raise HTTPException(status_code=400, detail="Linha da DRE sem detalhamento disponivel")
+
+    _, tenant_id = user_and_tenant
+    if campo in CAMPOS_DETALHE_VENDAS:
+        detalhes = _detalhes_vendas_campo(db, mes, ano, tenant_id, canal, campo)
+    else:
+        detalhes = _detalhes_contas_campo(db, mes, ano, tenant_id, canal, campo)
+
+    total = sum((_decimal(item.valor) for item in detalhes), Decimal("0"))
+    pagina_items, page_size_final, pages = _paginar_detalhes(detalhes, page, page_size)
+    config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+
+    return DREDetalheResponse(
+        campo=campo,
+        canal=canal,
+        canal_nome=config["nome"],
+        periodo=_periodo_label(mes, ano),
+        origem=ORIGENS_DRE.get(campo),
+        total=float(total),
+        total_itens=len(detalhes),
+        page=max(int(page or 1), 1),
+        page_size=page_size_final,
+        pages=pages,
+        items=pagina_items,
+    )
 
 @router.get("", response_model=DREPorCanalResponse)
 def gerar_dre_por_canais(

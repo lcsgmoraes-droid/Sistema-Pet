@@ -12,6 +12,7 @@
   TrendingDown,
   TrendingUp,
   Upload,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -35,6 +36,9 @@ const DRE = () => {
 
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
+  const [linhaDetalhe, setLinhaDetalhe] = useState(null);
+  const [detalhesLinha, setDetalhesLinha] = useState(null);
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
   const dreAbortRef = useRef(null);
   const dreRequestIdRef = useRef(0);
 
@@ -118,9 +122,52 @@ const DRE = () => {
     return `${(valor || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
   };
 
+  const formatarData = (valor) => {
+    if (!valor) return "-";
+    const data = new Date(`${valor}T00:00:00`);
+    if (Number.isNaN(data.getTime())) return valor;
+    return data.toLocaleDateString("pt-BR");
+  };
+
   const calcularPercentual = (valor, total) => {
     if (!total || total === 0) return 0;
     return (valor / total) * 100;
+  };
+
+  const fecharDetalhesLinha = () => {
+    setLinhaDetalhe(null);
+    setDetalhesLinha(null);
+    setLoadingDetalhes(false);
+  };
+
+  const abrirDetalhesLinha = async (linha, page = 1) => {
+    if (!linha?.detalhavel || !linha?.campo || !linha?.canal) return;
+
+    setLinhaDetalhe(linha);
+    setLoadingDetalhes(true);
+    try {
+      const [ano, mes] = periodo.split("-");
+      const response = await api.get(`/financeiro/dre/canais/detalhes`, {
+        params: {
+          ano,
+          mes,
+          canal: linha.canal,
+          campo: linha.campo,
+          page,
+          page_size: 30,
+        },
+        timeout: DRE_REQUEST_TIMEOUT_MS,
+      });
+      setDetalhesLinha(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes da DRE:", error);
+      toast.error(
+        "Erro ao carregar detalhes: " +
+          (error.response?.data?.detail || error.message),
+      );
+    } finally {
+      setLoadingDetalhes(false);
+    }
   };
 
   // Funções para gerenciar canais
@@ -233,11 +280,11 @@ const DRE = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-4 p-3 md:space-y-6 md:p-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
             📊 DRE - Demonstração do Resultado
           </h1>
           <p className="text-gray-600 mt-1">
@@ -245,7 +292,7 @@ const DRE = () => {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setModalClassificarOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
@@ -283,7 +330,7 @@ const DRE = () => {
       </div>
 
       {/* Tabs de Navegação */}
-      <div className="border-b border-gray-200">
+      <div className="overflow-x-auto border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setTabAtiva("demonstrativo")}
@@ -385,24 +432,24 @@ const DRE = () => {
           {dados && (
             <div className="space-y-6">
               {/* Cards de Resumo */}
-              <div className="grid grid-cols-4 gap-4">
-                <div className="bg-green-500 text-white p-6 rounded-lg shadow">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="bg-green-500 text-white p-4 rounded-lg shadow md:p-6">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm opacity-90">Receita Bruta</span>
                     <TrendingUp className="w-5 h-5" />
                   </div>
-                  <div className="text-3xl font-bold">
+                  <div className="text-2xl font-bold md:text-3xl">
                     {formatarMoeda(dados.totais?.receita_bruta || 0)}
                   </div>
                   <div className="text-xs mt-1 opacity-80">Base de cálculo</div>
                 </div>
 
-                <div className="bg-red-500 text-white p-6 rounded-lg shadow">
+                <div className="bg-red-500 text-white p-4 rounded-lg shadow md:p-6">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm opacity-90">CMV</span>
                     <TrendingDown className="w-5 h-5" />
                   </div>
-                  <div className="text-3xl font-bold">
+                  <div className="text-2xl font-bold md:text-3xl">
                     {formatarMoeda(dados.totais?.cmv || 0)}
                   </div>
                   <div className="text-xs mt-1 opacity-80">
@@ -416,23 +463,23 @@ const DRE = () => {
                   </div>
                 </div>
 
-                <div className="bg-blue-500 text-white p-6 rounded-lg shadow">
+                <div className="bg-blue-500 text-white p-4 rounded-lg shadow md:p-6">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm opacity-90">Lucro Bruto</span>
                     <DollarSign className="w-5 h-5" />
                   </div>
-                  <div className="text-3xl font-bold">
+                  <div className="text-2xl font-bold md:text-3xl">
                     {formatarMoeda(dados.totais?.lucro_bruto || 0)}
                   </div>
                   <div className="text-xs mt-1 opacity-80">Após custos</div>
                 </div>
 
-                <div className="bg-purple-500 text-white p-6 rounded-lg shadow">
+                <div className="bg-purple-500 text-white p-4 rounded-lg shadow md:p-6">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm opacity-90">Margem Bruta</span>
                     <Percent className="w-5 h-5" />
                   </div>
-                  <div className="text-3xl font-bold">
+                  <div className="text-2xl font-bold md:text-3xl">
                     {formatarPercentual(dados.totais?.margem_bruta || 0)}
                   </div>
                   <div className="text-xs mt-1 opacity-80">Rentabilidade</div>
@@ -440,8 +487,8 @@ const DRE = () => {
               </div>
 
               {/* Seletor de Canais - ABA 7 */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
+              <div className="bg-white rounded-lg shadow p-4 md:p-6">
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                       <CheckCircle size={20} className="text-blue-600" />
@@ -490,7 +537,7 @@ const DRE = () => {
                       <button
                         key={canal.id}
                         onClick={() => toggleCanal(canal.id)}
-                        className={`${corClasses[canal.cor]} border-2 rounded-lg p-4 transition-all duration-200 transform ${
+                        className={`${corClasses[canal.cor]} border-2 rounded-lg p-3 transition-all duration-200 transform md:p-4 ${
                           selecionado
                             ? "scale-105 shadow-lg"
                             : "hover:scale-102"
@@ -533,8 +580,9 @@ const DRE = () => {
               </div>
 
               {/* Tabela DRE Detalhada */}
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <table className="w-full">
+              <div className="overflow-hidden rounded-lg bg-white shadow">
+                <div className="overflow-x-auto">
+                <table className="min-w-[760px] w-full">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -554,6 +602,7 @@ const DRE = () => {
                       // Classes de estilo baseadas no nÃ­vel e tipo
                       const ehTotal = linha.nivel === 0;
                       const ehSubitem = linha.nivel === 1;
+                      const podeDetalhar = Boolean(linha.detalhavel);
 
                       // Background baseado na cor do canal
                       const bgStyle =
@@ -568,8 +617,19 @@ const DRE = () => {
                         <tr
                           key={idx}
                           style={bgStyle}
-                          title={linha.origem || undefined}
-                          className={`${ehTotal ? "font-bold" : ""} ${linha.origem ? "cursor-help hover:brightness-[0.98]" : ""}`}
+                          title={
+                            podeDetalhar
+                              ? "Clique para ver os lancamentos desta linha"
+                              : linha.origem || undefined
+                          }
+                          onClick={() => abrirDetalhesLinha(linha)}
+                          className={`${ehTotal ? "font-bold" : ""} ${
+                            podeDetalhar
+                              ? "cursor-pointer hover:brightness-[0.98]"
+                              : linha.origem
+                                ? "cursor-help hover:brightness-[0.98]"
+                                : ""
+                          }`}
                         >
                           <td
                             className={`px-6 py-3 ${ehSubitem ? "pl-12" : ""} ${ehTotal ? "font-bold" : ""}`}
@@ -583,6 +643,11 @@ const DRE = () => {
                                   className="text-gray-400"
                                   title={linha.origem}
                                 />
+                              )}
+                              {podeDetalhar && (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+                                  detalhes
+                                </span>
                               )}
                             </span>
                           </td>
@@ -603,6 +668,7 @@ const DRE = () => {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               {/* Seletor de Canais (removido - nÃ£o necessÃ¡rio com novo endpoint) */}
@@ -656,6 +722,188 @@ const DRE = () => {
         isOpen={modalClassificarOpen}
         onClose={() => setModalClassificarOpen(false)}
       />
+
+      {linhaDetalhe && (
+        <div
+          className="fixed inset-0 z-[70] bg-slate-900/30"
+          onClick={fecharDetalhesLinha}
+        >
+          <aside
+            className="fixed inset-x-0 bottom-0 max-h-[86dvh] overflow-hidden rounded-t-2xl bg-white shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[760px] md:rounded-none"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex h-full flex-col">
+              <div className="border-b border-gray-200 p-4 md:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Lancamentos da DRE
+                    </p>
+                    <h2 className="mt-1 text-lg font-bold text-gray-900 md:text-xl">
+                      {linhaDetalhe.descricao}
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-600">
+                      {detalhesLinha?.periodo || periodo} • {linhaDetalhe.canal_nome}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fecharDetalhesLinha}
+                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    aria-label="Fechar detalhes"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase text-gray-500">
+                      Total da linha
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-gray-900">
+                      {formatarMoeda(detalhesLinha?.total ?? linhaDetalhe.valor)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase text-gray-500">
+                      Lancamentos
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-gray-900">
+                      {detalhesLinha?.total_itens ?? "-"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-xs font-medium uppercase text-gray-500">
+                      Fonte
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-gray-800">
+                      {detalhesLinha?.items?.[0]?.origem_label || "Aguardando dados"}
+                    </p>
+                  </div>
+                </div>
+
+                {detalhesLinha?.origem && (
+                  <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                    {detalhesLinha.origem}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 md:p-5">
+                {loadingDetalhes ? (
+                  <div className="flex h-48 items-center justify-center text-gray-500">
+                    <RefreshCw className="mr-2 animate-spin" size={18} />
+                    Carregando lancamentos...
+                  </div>
+                ) : (detalhesLinha?.items || []).length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+                    Nenhum lancamento encontrado para esta linha no periodo.
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+                              Data
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+                              Descricao
+                            </th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
+                              Origem
+                            </th>
+                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">
+                              Valor
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {detalhesLinha.items.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm text-gray-700">
+                                {formatarData(item.data)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-medium text-gray-900">
+                                  {item.descricao}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {item.contraparte || item.documento || "-"}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {item.origem_label}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
+                                {formatarMoeda(item.valor)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="space-y-3 md:hidden">
+                      {detalhesLinha.items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-medium text-gray-500">
+                                {formatarData(item.data)} • {item.origem_label}
+                              </p>
+                              <h3 className="mt-1 text-sm font-semibold text-gray-900">
+                                {item.descricao}
+                              </h3>
+                              {item.contraparte && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                  {item.contraparte}
+                                </p>
+                              )}
+                            </div>
+                            <p className="shrink-0 text-sm font-bold text-gray-900">
+                              {formatarMoeda(item.valor)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {detalhesLinha && detalhesLinha.pages > 1 && (
+                <div className="flex items-center justify-between border-t border-gray-200 p-4 text-sm">
+                  <button
+                    type="button"
+                    disabled={loadingDetalhes || detalhesLinha.page <= 1}
+                    onClick={() => abrirDetalhesLinha(linhaDetalhe, detalhesLinha.page - 1)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-gray-600">
+                    Pagina {detalhesLinha.page} de {detalhesLinha.pages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={loadingDetalhes || detalhesLinha.page >= detalhesLinha.pages}
+                    onClick={() => abrirDetalhesLinha(linhaDetalhe, detalhesLinha.page + 1)}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Proxima
+                  </button>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 };

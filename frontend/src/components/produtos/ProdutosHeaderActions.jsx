@@ -17,11 +17,13 @@ export default function ProdutosHeaderActions({
   selecionadosCount,
 }) {
   return (
-    <div className="mb-6 flex justify-between items-start">
+    <div className="mb-4 flex flex-col gap-3 md:mb-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="flex items-center gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Produtos</h1>
-          <p className="text-gray-600 mt-1">Gerencie seu estoque de produtos</p>
+          <p className="mt-1 text-sm text-gray-600 md:text-base">
+            Gerencie seu estoque de produtos
+          </p>
         </div>
         <button
           onClick={iniciarTour}
@@ -32,18 +34,18 @@ export default function ProdutosHeaderActions({
           <span className="hidden sm:inline text-xs">Tour</span>
         </button>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {selecionadosCount > 0 && (
           <>
             <button
               onClick={onOpenEdicaoLote}
-              className="px-4 py-2 text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all duration-200 border border-emerald-500"
+              className="px-3 py-2 text-sm text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all duration-200 border border-emerald-500 md:px-4"
             >
               Editar em Lote ({selecionadosCount})
             </button>
             <button
               onClick={onExcluirSelecionados}
-              className="px-4 py-2 text-white rounded-xl bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all duration-200 border border-red-500"
+              className="px-3 py-2 text-sm text-white rounded-xl bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all duration-200 border border-red-500 md:px-4"
             >
               Excluir Selecionados ({selecionadosCount})
             </button>
@@ -52,7 +54,7 @@ export default function ProdutosHeaderActions({
         <button
           id="tour-produtos-importar"
           onClick={onOpenImportacao}
-          className="px-4 py-2 text-white rounded-xl bg-sky-600 hover:bg-sky-700 shadow-sm hover:shadow-md transition-all duration-200 border border-sky-500 font-medium flex items-center gap-2"
+          className="px-3 py-2 text-sm text-white rounded-xl bg-sky-600 hover:bg-sky-700 shadow-sm hover:shadow-md transition-all duration-200 border border-sky-500 font-medium flex items-center gap-2 md:px-4"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -66,7 +68,7 @@ export default function ProdutosHeaderActions({
         </button>
         <button
           onClick={abrirModalColunas}
-          className="px-4 py-2 text-slate-700 rounded-xl bg-white hover:bg-slate-50 shadow-sm hover:shadow-md transition-all duration-200 border border-slate-300 font-medium flex items-center gap-2"
+          className="px-3 py-2 text-sm text-slate-700 rounded-xl bg-white hover:bg-slate-50 shadow-sm hover:shadow-md transition-all duration-200 border border-slate-300 font-medium flex items-center gap-2 md:px-4"
           title="Configurar colunas visiveis"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -88,13 +90,13 @@ export default function ProdutosHeaderActions({
         <div className="relative" ref={menuRelatoriosRef}>
           <button
             onClick={onToggleMenuRelatorios}
-            className="px-4 py-2 text-indigo-700 rounded-xl bg-indigo-50 hover:bg-indigo-100 shadow-sm hover:shadow-md transition-all duration-200 border border-indigo-200 font-medium"
+            className="px-3 py-2 text-sm text-indigo-700 rounded-xl bg-indigo-50 hover:bg-indigo-100 shadow-sm hover:shadow-md transition-all duration-200 border border-indigo-200 font-medium md:px-4"
           >
             Relatorios
           </button>
 
           {menuRelatoriosAberto && (
-            <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+            <div className="absolute right-0 z-40 mt-2 w-[calc(100vw-2rem)] max-w-72 rounded-lg border border-gray-200 bg-white shadow-lg">
               <button
                 onClick={onGerarRelatorioGeral}
                 className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
@@ -119,7 +121,7 @@ export default function ProdutosHeaderActions({
         <button
           id="tour-produtos-novo"
           onClick={() => navigate("/produtos/novo")}
-          className="px-4 py-2 text-white rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all duration-200 border border-blue-500 font-medium"
+          className="px-3 py-2 text-sm text-white rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all duration-200 border border-blue-500 font-medium md:px-4"
         >
           + Novo Produto
         </button>
