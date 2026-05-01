@@ -315,14 +315,33 @@ export default function PDVClienteCard({
                   {saldoCampanhas.cupons_ativos?.length > 0 && (
                     <div className="flex items-center flex-wrap gap-1 text-sm">
                       <span className="text-blue-800">🎟️ Cupons:</span>
-                      {saldoCampanhas.cupons_ativos.map((c) => (
-                        <span
-                          key={c.code}
-                          className="px-1.5 py-0.5 bg-yellow-100 border border-yellow-300 rounded text-xs font-mono text-yellow-800"
-                        >
-                          {c.code}
-                        </span>
-                      ))}
+                      {saldoCampanhas.cupons_ativos.map((c) => {
+                        const codigoCupom = String(c.code || "");
+                        const chaveCopia = `cupom-${codigoCupom}`;
+
+                        return (
+                          <span
+                            key={codigoCupom}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-yellow-100 border border-yellow-300 rounded text-xs font-mono text-yellow-800"
+                          >
+                            <span>{codigoCupom}</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onCopiarCampoCliente(codigoCupom, chaveCopia)
+                              }
+                              className="inline-flex h-4 w-4 items-center justify-center rounded text-yellow-700 hover:bg-yellow-200 hover:text-yellow-900"
+                              title="Copiar cupom"
+                            >
+                              {copiadoClienteCampo === chaveCopia ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

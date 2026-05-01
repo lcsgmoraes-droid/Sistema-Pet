@@ -14,7 +14,7 @@ from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 3
 FROZEN_STATUSES = {"finalizada", "baixa_parcial"}
 
 
@@ -125,15 +125,38 @@ def _resolve_comissao_total(
         return 0.0
 
 
-def _resolve_custo_campanha(
+def _resolve_cupom_desconto(
+    db: Session,
+    tenant_id: Any,
+    venda: Any,
+) -> float:
+    desconto_salvo = _round_money(getattr(venda, "cupom_discount_applied", 0))
+    if desconto_salvo > 0:
+        return desconto_salvo
+
+    venda_id = getattr(venda, "id", None)
+    if not venda_id:
+        return 0.0
+
+    try:
+        from app.campaigns.models import CouponRedemption
+
+        total = db.query(func.sum(CouponRedemption.discount_applied)).filter(
+            CouponRedemption.tenant_id == tenant_id,
+            CouponRedemption.venda_id == venda_id,
+            CouponRedemption.voided_at.is_(None),
+        ).scalar()
+        return _round_money(total)
+    except Exception as exc:
+        logger.warning("Falha ao buscar uso de cupom da venda %s: %s", venda_id, exc)
+        return 0.0
+
+
+def _resolve_cashback_resgatado(
     db: Session,
     tenant_id: Any,
     venda_id: int,
-    custo_campanha: Optional[float],
 ) -> float:
-    if custo_campanha is not None:
-        return _round_money(custo_campanha)
-
     try:
         from app.campaigns.models import CashbackTransaction
 
@@ -144,8 +167,27 @@ def _resolve_custo_campanha(
         ).scalar()
         return _round_money(abs(total or 0))
     except Exception as exc:
-        logger.warning("Falha ao buscar custo de campanha da venda %s: %s", venda_id, exc)
+        logger.warning("Falha ao buscar cashback da venda %s: %s", venda_id, exc)
         return 0.0
+
+
+def _resolve_custo_campanha(
+    db: Session,
+    tenant_id: Any,
+    venda: Any,
+    custo_campanha: Optional[float],
+) -> float:
+    if custo_campanha is not None:
+        return _round_money(custo_campanha)
+
+    venda_id = getattr(venda, "id", None)
+    if not venda_id:
+        return 0.0
+
+    return _round_money(
+        _resolve_cashback_resgatado(db, tenant_id, venda_id)
+        + _resolve_cupom_desconto(db, tenant_id, venda)
+    )
 
 
 def _resolve_taxa_operacional_entrega(
@@ -235,7 +277,8 @@ def build_venda_rentabilidade_snapshot(
     taxa_operacional_entrega = _resolve_taxa_operacional_entrega(
         db, tenant_id, venda, taxa_operacional_entrega
     )
-    custo_campanha = _resolve_custo_campanha(db, tenant_id, venda.id, custo_campanha)
+    cupom_desconto = _resolve_cupom_desconto(db, tenant_id, venda)
+    custo_campanha = _resolve_custo_campanha(db, tenant_id, venda, custo_campanha)
 
     taxa_entrega_receita = _round_money(getattr(venda, "taxa_entrega", 0))
     taxa_entrega_repasse = _round_money(getattr(venda, "valor_taxa_entregador", 0))
@@ -244,8 +287,10 @@ def build_venda_rentabilidade_snapshot(
     if taxa_entrega_repasse > taxa_entrega_receita:
         taxa_entrega_repasse = taxa_entrega_receita
 
-    venda_bruta = _round_money(_as_float(getattr(venda, "subtotal", 0)) + _as_float(getattr(venda, "desconto_valor", 0)))
-    desconto_total = _round_money(getattr(venda, "desconto_valor", 0))
+    desconto_bruto = _round_money(getattr(venda, "desconto_valor", 0))
+    desconto_cupom_reclassificado = min(cupom_desconto, desconto_bruto)
+    venda_bruta = _round_money(_as_float(getattr(venda, "subtotal", 0)) + desconto_bruto)
+    desconto_total = _round_money(max(desconto_bruto - desconto_cupom_reclassificado, 0))
 
     itens_base = []
     subtotal_itens = 0.0

@@ -70,6 +70,22 @@ def _normalizar_forma_pagamento_label(valor) -> str:
     return mapa.get(chave, texto or "Nao informado")
 
 
+def _as_float(valor) -> float:
+    try:
+        if valor is None:
+            return 0.0
+        return float(valor)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _valor_cupom_venda(venda: Venda, cupons_por_venda: dict[int, float]) -> float:
+    valor_salvo = _as_float(getattr(venda, "cupom_discount_applied", 0))
+    if valor_salvo > 0:
+        return round(valor_salvo, 2)
+    return round(_as_float(cupons_por_venda.get(venda.id, 0.0)), 2)
+
+
 def _detectar_promocao_item(
     produto: Optional[Produto],
     item: Optional[VendaItem],
@@ -234,6 +250,22 @@ async def obter_relatorio_vendas(
             cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
         except Exception as e:
             logger.warning(f"Erro ao buscar cashback por venda (tabela pode não existir): {e}")
+
+    cupons_por_venda = {}
+    if venda_ids:
+        try:
+            from app.campaigns.models import CouponRedemption
+            resgates_cupons = db.query(
+                CouponRedemption.venda_id,
+                func.sum(CouponRedemption.discount_applied),
+            ).filter(
+                CouponRedemption.tenant_id == tenant_id,
+                CouponRedemption.venda_id.in_(venda_ids),
+                CouponRedemption.voided_at.is_(None),
+            ).group_by(CouponRedemption.venda_id).all()
+            cupons_por_venda = {r[0]: float(r[1] or 0) for r in resgates_cupons}
+        except Exception as e:
+            logger.warning(f"Erro ao buscar cupons por venda (tabela pode nÃ£o existir): {e}")
 
     comissao_total_por_venda = {
         venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
@@ -638,8 +670,15 @@ async def obter_relatorio_vendas(
     custo_campanha_total_geral = 0
     lucro_total_geral = 0
     venda_liquida_geral = 0
+    venda_bruta_snapshot_geral = 0
+    desconto_snapshot_geral = 0
 
     for venda in vendas:
+        cupom_desconto = _valor_cupom_venda(venda, cupons_por_venda)
+        custo_campanha_venda = round(
+            float(cashback_por_venda.get(venda.id, 0.0) or 0.0) + cupom_desconto,
+            2,
+        )
         snapshot = get_or_build_venda_rentabilidade_snapshot(
             venda,
             db,
@@ -647,7 +686,7 @@ async def obter_relatorio_vendas(
             persist_if_missing=True,
             impostos_percentual=impostos_percentual_global,
             formas_pagamento_map=formas_pagamento_map,
-            custo_campanha=cashback_por_venda.get(venda.id, 0.0),
+            custo_campanha=custo_campanha_venda,
             comissao_total=comissao_total_por_venda.get(venda.id, 0.0),
             taxa_operacional_entrega=(
                 entregadores_map.get(venda.entregador_id, 0.0)
@@ -657,6 +696,8 @@ async def obter_relatorio_vendas(
             estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
         )
 
+        venda_bruta_snapshot_geral += float(snapshot.get("venda_bruta", 0) or 0)
+        desconto_snapshot_geral += float(snapshot.get("desconto", 0) or 0)
         custo_total_geral += float(snapshot.get("custo_produtos", 0) or 0)
         taxa_total_geral += float(snapshot.get("taxa_cartao", 0) or 0)
         taxa_loja_total_geral += float(snapshot.get("taxa_loja", 0) or 0)
@@ -692,6 +733,8 @@ async def obter_relatorio_vendas(
             "nfe_numero": venda.nfe_numero,
             "nfe_chave": venda.nfe_chave,
             "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
+            "cupom_code": venda.cupom_code,
+            "cupom_discount_applied": round(cupom_desconto, 2),
             "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
             "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
             "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),
@@ -720,6 +763,14 @@ async def obter_relatorio_vendas(
     lista_vendas = sorted(lista_vendas, key=lambda x: x["data_venda"], reverse=True)
 
     # Adicionar análise de rentabilidade ao resumo
+    resumo["venda_bruta"] = round(venda_bruta_snapshot_geral, 2)
+    resumo["desconto"] = round(desconto_snapshot_geral, 2)
+    resumo["percentual_desconto"] = round(
+        (desconto_snapshot_geral / venda_bruta_snapshot_geral * 100)
+        if venda_bruta_snapshot_geral > 0
+        else 0,
+        1,
+    )
     resumo["custo_total"] = round(custo_total_geral, 2)
     resumo["taxa_loja_total"] = round(taxa_loja_total_geral, 2)
     resumo["taxa_entrega_repasse_total"] = round(taxa_entrega_repasse_total_geral, 2)
