@@ -262,6 +262,7 @@ def build_venda_rentabilidade_snapshot(
     impostos_percentual: Optional[float] = None,
     formas_pagamento_map: Optional[Dict[str, FormaPagamento]] = None,
     custo_campanha: Optional[float] = None,
+    cupom_desconto: Optional[float] = None,
     comissao_total: Optional[float] = None,
     taxa_operacional_entrega: Optional[float] = None,
     estoque_custos_por_produto: Optional[Dict[int, Dict[str, float]]] = None,
@@ -277,7 +278,11 @@ def build_venda_rentabilidade_snapshot(
     taxa_operacional_entrega = _resolve_taxa_operacional_entrega(
         db, tenant_id, venda, taxa_operacional_entrega
     )
-    cupom_desconto = _resolve_cupom_desconto(db, tenant_id, venda)
+    cupom_desconto = (
+        _round_money(cupom_desconto)
+        if cupom_desconto is not None
+        else _resolve_cupom_desconto(db, tenant_id, venda)
+    )
     custo_campanha = _resolve_custo_campanha(db, tenant_id, venda, custo_campanha)
 
     taxa_entrega_receita = _round_money(getattr(venda, "taxa_entrega", 0))
@@ -430,6 +435,7 @@ def get_or_build_venda_rentabilidade_snapshot(
     impostos_percentual: Optional[float] = None,
     formas_pagamento_map: Optional[Dict[str, FormaPagamento]] = None,
     custo_campanha: Optional[float] = None,
+    cupom_desconto: Optional[float] = None,
     comissao_total: Optional[float] = None,
     taxa_operacional_entrega: Optional[float] = None,
     estoque_custos_por_produto: Optional[Dict[int, Dict[str, float]]] = None,
@@ -448,6 +454,7 @@ def get_or_build_venda_rentabilidade_snapshot(
         impostos_percentual=impostos_percentual,
         formas_pagamento_map=formas_pagamento_map,
         custo_campanha=custo_campanha,
+        cupom_desconto=cupom_desconto,
         comissao_total=comissao_total,
         taxa_operacional_entrega=taxa_operacional_entrega,
         estoque_custos_por_produto=estoque_custos_por_produto,

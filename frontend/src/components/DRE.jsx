@@ -4,6 +4,7 @@
   DollarSign,
   Download,
   FileText,
+  Info,
   MessageCircle,
   Percent,
   RefreshCw,
@@ -12,7 +13,7 @@
   TrendingUp,
   Upload,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import AnaliseInteligente from "./AnaliseInteligente";
@@ -34,6 +35,8 @@ const DRE = () => {
 
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
+  const dreAbortRef = useRef(null);
+  const dreRequestIdRef = useRef(0);
 
   // Canais de venda (ABA 7)
   const [canaisDisponiveis] = useState([
@@ -58,12 +61,21 @@ const DRE = () => {
 
   useEffect(() => {
     carregarDRE();
+
+    return () => {
+      dreAbortRef.current?.abort?.();
+    };
   }, []);
 
-  const carregarDRE = async () => {
+  const carregarDRE = async (periodoAlvo = periodo) => {
+    const requestId = dreRequestIdRef.current + 1;
+    dreRequestIdRef.current = requestId;
+    dreAbortRef.current?.abort?.();
+    const controller = new AbortController();
+    dreAbortRef.current = controller;
     setLoading(true);
     try {
-      const [ano, mes] = periodo.split("-");
+      const [ano, mes] = periodoAlvo.split("-");
 
       // Enviar os canais selecionados para o backend
       const canaisParam = canaisSelecionados.join(",");
@@ -71,17 +83,27 @@ const DRE = () => {
       const response = await api.get(`/financeiro/dre/canais`, {
         params: { ano, mes, canais: canaisParam },
         timeout: DRE_REQUEST_TIMEOUT_MS,
+        signal: controller.signal,
       });
 
-      setDados(response.data);
+      if (requestId === dreRequestIdRef.current) {
+        setDados(response.data);
+      }
     } catch (error) {
+      if (error.code === "ERR_CANCELED" || error.name === "CanceledError") {
+        return;
+      }
       console.error("Erro ao carregar DRE:", error);
-      toast.error(
-        "Erro ao carregar DRE: " +
-          (error.response?.data?.detail || error.message),
-      );
+      if (requestId === dreRequestIdRef.current) {
+        toast.error(
+          "Erro ao carregar DRE: " +
+            (error.response?.data?.detail || error.message),
+        );
+      }
     } finally {
-      setLoading(false);
+      if (requestId === dreRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -118,9 +140,10 @@ const DRE = () => {
 
   // Recarregar DRE quando os canais selecionados mudarem
   useEffect(() => {
-    if (dados) {
-      carregarDRE();
-    }
+    if (!dados) return undefined;
+
+    const timer = setTimeout(() => carregarDRE(), 350);
+    return () => clearTimeout(timer);
   }, [canaisSelecionados]);
 
   const handlePeriodoPreset = (preset) => {
@@ -143,7 +166,7 @@ const DRE = () => {
     }
 
     setPeriodo(novaData);
-    setTimeout(() => carregarDRE(), 100);
+    setTimeout(() => carregarDRE(novaData), 100);
   };
 
   const exportarPDF = async () => {
@@ -545,13 +568,23 @@ const DRE = () => {
                         <tr
                           key={idx}
                           style={bgStyle}
-                          className={ehTotal ? "font-bold" : ""}
+                          title={linha.origem || undefined}
+                          className={`${ehTotal ? "font-bold" : ""} ${linha.origem ? "cursor-help hover:brightness-[0.98]" : ""}`}
                         >
                           <td
                             className={`px-6 py-3 ${ehSubitem ? "pl-12" : ""} ${ehTotal ? "font-bold" : ""}`}
                             style={textStyle}
                           >
-                            {linha.descricao}
+                            <span className="inline-flex items-center gap-2">
+                              <span>{linha.descricao}</span>
+                              {linha.origem && (
+                                <Info
+                                  size={14}
+                                  className="text-gray-400"
+                                  title={linha.origem}
+                                />
+                              )}
+                            </span>
                           </td>
                           <td
                             className={`px-6 py-3 text-right ${ehTotal ? "font-bold" : ""}`}

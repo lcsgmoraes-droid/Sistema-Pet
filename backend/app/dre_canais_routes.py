@@ -1,6 +1,8 @@
 """
 Endpoint DRE por Canal - Retorna dados estruturados com nome e cor por canal
 """
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, and_, or_, extract
@@ -12,12 +14,17 @@ from pydantic import BaseModel
 from app.db import get_session
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
+from app.models import User, Cliente
 from app.vendas_models import Venda, VendaItem
-from app.produtos_models import Produto
-from app.financeiro_models import ContaPagar
+from app.produtos_models import Produto, EstoqueMovimentacao
+from app.financeiro_models import ContaPagar, FormaPagamento
 from app.dre_plano_contas_models import DRESubcategoria
-from app.services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
+from app.comissoes_models import ComissaoItem
+from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.services.venda_rentabilidade_snapshot_service import (
+    SNAPSHOT_VERSION,
+    build_venda_rentabilidade_snapshot,
+)
 
 router = APIRouter(prefix="/financeiro/dre/canais", tags=["DRE por Canal"])
 
@@ -71,6 +78,7 @@ class LinhaCanal(BaseModel):
     canal_nome: str  # Nome do canal
     nivel: int  # 0=seção, 1=linha normal, 2=total
     tipo: str  # 'receita', 'deducao', 'custo', 'despesa', 'lucro'
+    origem: Optional[str] = None
 
 
 class DREPorCanalResponse(BaseModel):
@@ -168,6 +176,176 @@ CANAL_ALIASES = {
 def _normalizar_canal(canal: Optional[str]) -> str:
     chave = (canal or "loja_fisica").strip().lower()
     return CANAL_ALIASES.get(chave, chave if chave in CANAIS_CONFIG else "loja_fisica")
+
+
+def _normalizar_forma_pagamento(valor: Optional[str]) -> str:
+    return (valor or "").strip().lower()
+
+
+def _load_rentabilidade_snapshot(snapshot_raw: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(snapshot_raw, dict):
+        return snapshot_raw
+    if isinstance(snapshot_raw, str) and snapshot_raw.strip():
+        try:
+            parsed = json.loads(snapshot_raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
+    snapshot = _load_rentabilidade_snapshot(getattr(venda, "rentabilidade_snapshot", None))
+    if not snapshot:
+        return None
+    try:
+        version = int(snapshot.get("snapshot_version") or 0)
+    except (TypeError, ValueError):
+        version = 0
+    return snapshot if version >= SNAPSHOT_VERSION else None
+
+
+def _formas_pagamento_map(db: Session, tenant_id: str) -> Dict[str, FormaPagamento]:
+    formas = db.query(FormaPagamento).filter(
+        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo == True)
+    ).all()
+    return {_normalizar_forma_pagamento(forma.nome): forma for forma in formas}
+
+
+def _impostos_percentual(db: Session, tenant_id: str) -> float:
+    try:
+        config_fiscal = db.query(EmpresaConfigFiscal).filter(
+            EmpresaConfigFiscal.tenant_id == tenant_id
+        ).first()
+        return float(getattr(config_fiscal, "aliquota_simples_vigente", 0) or 0)
+    except Exception:
+        return 0.0
+
+
+def _bulk_comissoes_por_venda(db: Session, tenant_id: str, venda_ids: List[int]) -> Dict[int, float]:
+    if not venda_ids:
+        return {}
+    try:
+        rows = (
+            db.query(
+                ComissaoItem.venda_id,
+                func.coalesce(
+                    func.sum(func.coalesce(ComissaoItem.valor_comissao, ComissaoItem.valor_comissao_gerada, 0)),
+                    0,
+                ),
+            )
+            .filter(and_(ComissaoItem.tenant_id == tenant_id, ComissaoItem.venda_id.in_(venda_ids)))
+            .group_by(ComissaoItem.venda_id)
+            .all()
+        )
+        return {int(venda_id): float(total or 0) for venda_id, total in rows}
+    except Exception:
+        return {}
+
+
+def _bulk_cupons_por_venda(db: Session, tenant_id: str, vendas: List[Venda]) -> Dict[int, float]:
+    resultado = {
+        venda.id: float(_decimal(getattr(venda, "cupom_discount_applied", 0)))
+        for venda in vendas
+        if getattr(venda, "id", None)
+    }
+    ids_sem_valor = [venda.id for venda in vendas if getattr(venda, "id", None) and resultado.get(venda.id, 0) <= 0]
+    if not ids_sem_valor:
+        return resultado
+    try:
+        from app.campaigns.models import CouponRedemption
+
+        rows = (
+            db.query(CouponRedemption.venda_id, func.coalesce(func.sum(CouponRedemption.discount_applied), 0))
+            .filter(
+                CouponRedemption.tenant_id == tenant_id,
+                CouponRedemption.venda_id.in_(ids_sem_valor),
+                CouponRedemption.voided_at.is_(None),
+            )
+            .group_by(CouponRedemption.venda_id)
+            .all()
+        )
+        for venda_id, total in rows:
+            resultado[int(venda_id)] = float(total or 0)
+    except Exception:
+        pass
+    return resultado
+
+
+def _bulk_cashback_por_venda(db: Session, tenant_id: str, venda_ids: List[int]) -> Dict[int, float]:
+    if not venda_ids:
+        return {}
+    try:
+        from app.campaigns.models import CashbackTransaction
+
+        rows = (
+            db.query(CashbackTransaction.source_id, func.coalesce(func.sum(CashbackTransaction.amount), 0))
+            .filter(
+                CashbackTransaction.tenant_id == tenant_id,
+                CashbackTransaction.amount < 0,
+                CashbackTransaction.source_id.in_(venda_ids),
+            )
+            .group_by(CashbackTransaction.source_id)
+            .all()
+        )
+        return {int(venda_id): abs(float(total or 0)) for venda_id, total in rows if venda_id}
+    except Exception:
+        return {}
+
+
+def _bulk_taxa_operacional_por_venda(db: Session, tenant_id: str, vendas: List[Venda]) -> Dict[int, float]:
+    entregador_ids = {
+        venda.entregador_id
+        for venda in vendas
+        if getattr(venda, "tem_entrega", False) and getattr(venda, "entregador_id", None)
+    }
+    if not entregador_ids:
+        return {}
+    try:
+        entregadores = db.query(Cliente.id, Cliente.taxa_fixa_entrega).filter(
+            and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
+        ).all()
+        taxas = {entregador_id: float(taxa or 0) for entregador_id, taxa in entregadores}
+        return {
+            venda.id: taxas.get(venda.entregador_id, 0.0)
+            for venda in vendas
+            if getattr(venda, "tem_entrega", False) and getattr(venda, "entregador_id", None)
+        }
+    except Exception:
+        return {}
+
+
+def _bulk_estoque_custos_por_venda(
+    db: Session,
+    tenant_id: str,
+    venda_ids: List[int],
+) -> Dict[int, Dict[int, Dict[str, float]]]:
+    if not venda_ids:
+        return {}
+    try:
+        movimentos = db.query(EstoqueMovimentacao).filter(
+            and_(
+                EstoqueMovimentacao.tenant_id == tenant_id,
+                EstoqueMovimentacao.referencia_tipo == "venda",
+                EstoqueMovimentacao.referencia_id.in_(venda_ids),
+                EstoqueMovimentacao.tipo == "saida",
+            )
+        ).all()
+    except Exception:
+        return {}
+
+    resultado: Dict[int, Dict[int, Dict[str, float]]] = {}
+    for movimento in movimentos:
+        if not getattr(movimento, "referencia_id", None) or not getattr(movimento, "produto_id", None):
+            continue
+        mapa_venda = resultado.setdefault(int(movimento.referencia_id), {})
+        mapa_produto = mapa_venda.setdefault(
+            int(movimento.produto_id),
+            {"quantidade": 0.0, "valor_total": 0.0},
+        )
+        mapa_produto["quantidade"] += abs(float(getattr(movimento, "quantidade", 0) or 0))
+        mapa_produto["valor_total"] += abs(float(getattr(movimento, "valor_total", 0) or 0))
+    return resultado
 
 
 def _campo_zero() -> Decimal:
@@ -294,16 +472,36 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
         .all()
     )
 
+    venda_ids = [venda.id for venda in vendas if getattr(venda, "id", None)]
+    formas_pagamento = _formas_pagamento_map(db, tenant_id)
+    impostos_percentual = _impostos_percentual(db, tenant_id)
+    comissoes_por_venda = _bulk_comissoes_por_venda(db, tenant_id, venda_ids)
+    cupons_por_venda = _bulk_cupons_por_venda(db, tenant_id, vendas)
+    cashback_por_venda = _bulk_cashback_por_venda(db, tenant_id, venda_ids)
+    taxa_operacional_por_venda = _bulk_taxa_operacional_por_venda(db, tenant_id, vendas)
+    estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
+
     for venda in vendas:
         canal = _normalizar_canal(getattr(venda, "canal", None))
         dados = dados_por_canal.setdefault(canal, _novo_canal())
-        snapshot = get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=False,
-            force_refresh=False,
-        )
+        cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
+        custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
+        snapshot = _snapshot_pronto(venda)
+        if snapshot and custo_campanha > 0 and _decimal(snapshot.get("custo_campanha", 0)) <= 0:
+            snapshot = None
+        if snapshot is None:
+            snapshot = build_venda_rentabilidade_snapshot(
+                venda,
+                db,
+                tenant_id,
+                impostos_percentual=impostos_percentual,
+                formas_pagamento_map=formas_pagamento,
+                custo_campanha=custo_campanha,
+                cupom_desconto=cupom_desconto,
+                comissao_total=comissoes_por_venda.get(venda.id, 0.0),
+                taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
+                estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
+            )
 
         receita_bruta = _decimal(snapshot.get("venda_bruta", 0))
         receita_produtos, receita_servicos = _separar_receita_produto_servico(venda, receita_bruta)
@@ -341,13 +539,26 @@ def agregar_contas_pagar_por_canal(db: Session, mes: int, ano: int, tenant_id: s
         .all()
     )
 
-    for conta in contas:
-        subcategoria = None
-        if getattr(conta, "dre_subcategoria_id", None):
-            subcategoria = db.query(DRESubcategoria).filter(
-                DRESubcategoria.id == conta.dre_subcategoria_id,
+    subcategoria_ids = {
+        conta.dre_subcategoria_id
+        for conta in contas
+        if getattr(conta, "dre_subcategoria_id", None)
+    }
+    subcategorias = {}
+    if subcategoria_ids:
+        subcategorias = {
+            subcategoria.id: subcategoria
+            for subcategoria in db.query(DRESubcategoria)
+            .options(selectinload(DRESubcategoria.categoria))
+            .filter(
                 DRESubcategoria.tenant_id == tenant_id,
-            ).first()
+                DRESubcategoria.id.in_(subcategoria_ids),
+            )
+            .all()
+        }
+
+    for conta in contas:
+        subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
 
         texto = _texto_conta(conta, subcategoria)
         campo = _classificar_conta_dre(texto)
@@ -392,7 +603,46 @@ def _percentual(valor: Decimal, receita_bruta_total: Decimal) -> float:
     return round(float(valor / receita_bruta_total * Decimal("100")), 2)
 
 
-def _linha_total(descricao: str, valor: Decimal, receita_bruta_total: Decimal, tipo: str, cor: str, cor_bg: str) -> LinhaCanal:
+ORIGENS_DRE = {
+    "receita_bruta_total": "Soma de produtos, servicos e frete das vendas do periodo nos canais selecionados. Usa a data da venda no regime de competencia.",
+    "receita_produtos": "Vem dos itens de produto vendidos no periodo. Frete, servicos e descontos ficam em linhas separadas.",
+    "receita_servicos": "Vem dos itens marcados como servico nas vendas do periodo.",
+    "receita_frete": "Frete/taxa de entrega cobrada do cliente na venda, tratado como receita do periodo.",
+    "deducoes_total": "Soma dos descontos comerciais e dos impostos estimados sobre as vendas.",
+    "descontos": "Descontos concedidos na venda. Cupons/cashback identificados como campanha sao reclassificados na linha de campanhas.",
+    "impostos": "Imposto por competencia, calculado pela aliquota fiscal configurada sobre venda bruta e frete.",
+    "receita_liquida_total": "Receita bruta menos deducoes da receita.",
+    "cmv_total": "Soma do CMV e dos fretes sobre compras classificados no periodo.",
+    "cmv": "Custo dos produtos vendidos. Prioriza movimentacao de estoque/FIFO e usa custo do cadastro do produto quando nao houver movimento.",
+    "fretes_compras": "Contas a pagar classificadas como Fretes sobre Compras pela data de emissao.",
+    "lucro_bruto_total": "Receita liquida menos CMV e fretes sobre compras.",
+    "despesas_variaveis_total": "Soma dos custos variaveis ligados a venda: cartao, marketplace, entrega, operacional, comissoes e campanhas.",
+    "taxas_cartao": "Taxas das formas de pagamento configuradas, calculadas sobre os pagamentos das vendas.",
+    "taxas_marketplace": "Contas a pagar classificadas como taxas de marketplace pela data de emissao.",
+    "repasse_entrega": "Valor repassado ao entregador nas vendas com entrega.",
+    "taxa_operacional_entrega": "Custo operacional fixo do entregador configurado no cadastro.",
+    "comissoes": "Comissoes apuradas no modulo de comissoes para as vendas do periodo.",
+    "campanhas": "Cupons, cashback e beneficios de campanha aplicados nas vendas do periodo.",
+    "despesas_fixas_total": "Soma das contas a pagar administrativas, pessoal, comerciais, financeiras e outras no regime de competencia.",
+    "despesas_pessoal": "Contas a pagar de folha, salarios, encargos e beneficios pela data de emissao. Sem canal informado entra em Loja Fisica.",
+    "despesas_administrativas": "Contas a pagar de aluguel, ocupacao, energia, agua, internet, manutencao e administrativo pela data de emissao.",
+    "despesas_comerciais": "Contas a pagar de marketing, anuncios, brindes, eventos e acoes comerciais pela data de emissao.",
+    "despesas_financeiras": "Contas a pagar de tarifas, juros, banco, IOF e despesas financeiras pela data de emissao.",
+    "outras_despesas": "Demais contas a pagar classificadas para a DRE pela data de emissao.",
+    "resultado_operacional_total": "Lucro bruto menos custos variaveis e despesas operacionais.",
+    "lucro_liquido_total": "Resultado operacional do periodo. A DRE caixa sera tratada separadamente depois.",
+}
+
+
+def _linha_total(
+    descricao: str,
+    valor: Decimal,
+    receita_bruta_total: Decimal,
+    tipo: str,
+    cor: str,
+    cor_bg: str,
+    origem: Optional[str] = None,
+) -> LinhaCanal:
     percentual = Decimal("100") if descricao.startswith("(+)") and receita_bruta_total > 0 else Decimal(str(_percentual(valor, receita_bruta_total)))
     return LinhaCanal(
         descricao=descricao,
@@ -404,10 +654,18 @@ def _linha_total(descricao: str, valor: Decimal, receita_bruta_total: Decimal, t
         canal_nome="Total",
         nivel=0,
         tipo=tipo,
+        origem=origem,
     )
 
 
-def _linha_canal(canal: str, descricao: str, valor: Decimal, receita_bruta_total: Decimal, tipo: str) -> LinhaCanal:
+def _linha_canal(
+    canal: str,
+    descricao: str,
+    valor: Decimal,
+    receita_bruta_total: Decimal,
+    tipo: str,
+    origem: Optional[str] = None,
+) -> LinhaCanal:
     config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
     return LinhaCanal(
         descricao=f"{descricao} {config['nome']}",
@@ -419,6 +677,7 @@ def _linha_canal(canal: str, descricao: str, valor: Decimal, receita_bruta_total
         canal_nome=config["nome"],
         nivel=1,
         tipo=tipo,
+        origem=origem,
     )
 
 
@@ -429,9 +688,11 @@ def _adicionar_linhas_campo(
     campo: str,
     descricao: str,
     tipo: str,
+    origem: Optional[str] = None,
 ) -> None:
+    origem_linha = origem or ORIGENS_DRE.get(campo)
     for canal in sorted(dados_canais.keys()):
-        linhas.append(_linha_canal(canal, descricao, _decimal(dados_canais[canal].get(campo, 0)), receita_bruta_total, tipo))
+        linhas.append(_linha_canal(canal, descricao, _decimal(dados_canais[canal].get(campo, 0)), receita_bruta_total, tipo, origem_linha))
 
 
 def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[LinhaCanal], Dict[str, Any]]:
@@ -469,24 +730,24 @@ def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[L
 
     linhas: List[LinhaCanal] = []
 
-    linhas.append(_linha_total("(+) RECEITA BRUTA", receita_bruta_total, receita_bruta_total, "receita", "#111827", "#f3f4f6"))
+    linhas.append(_linha_total("(+) RECEITA BRUTA", receita_bruta_total, receita_bruta_total, "receita", "#111827", "#f3f4f6", ORIGENS_DRE["receita_bruta_total"]))
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_produtos", "Vendas de Produtos", "receita")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_servicos", "Vendas de Servicos", "receita")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_frete", "Receita de Frete", "receita")
 
-    linhas.append(_linha_total("(-) DEDUCOES DA RECEITA", deducoes_total, receita_bruta_total, "deducao", "#dc2626", "#fef2f2"))
+    linhas.append(_linha_total("(-) DEDUCOES DA RECEITA", deducoes_total, receita_bruta_total, "deducao", "#dc2626", "#fef2f2", ORIGENS_DRE["deducoes_total"]))
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "descontos", "Descontos Concedidos", "deducao")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "impostos", "Impostos sobre Vendas", "deducao")
 
-    linhas.append(_linha_total("(=) RECEITA LIQUIDA", receita_liquida_total, receita_bruta_total, "receita", "#059669", "#d1fae5"))
+    linhas.append(_linha_total("(=) RECEITA LIQUIDA", receita_liquida_total, receita_bruta_total, "receita", "#059669", "#d1fae5", ORIGENS_DRE["receita_liquida_total"]))
 
-    linhas.append(_linha_total("(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)", cmv_total, receita_bruta_total, "custo", "#dc2626", "#fef2f2"))
+    linhas.append(_linha_total("(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)", cmv_total, receita_bruta_total, "custo", "#dc2626", "#fef2f2", ORIGENS_DRE["cmv_total"]))
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "cmv", "CMV", "custo")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "fretes_compras", "Fretes sobre Compras", "custo")
 
-    linhas.append(_linha_total("(=) LUCRO BRUTO", lucro_bruto_total, receita_bruta_total, "lucro", "#059669", "#d1fae5"))
+    linhas.append(_linha_total("(=) LUCRO BRUTO", lucro_bruto_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["lucro_bruto_total"]))
 
-    linhas.append(_linha_total("(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA", despesas_variaveis_total, receita_bruta_total, "despesa", "#dc2626", "#fff7ed"))
+    linhas.append(_linha_total("(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA", despesas_variaveis_total, receita_bruta_total, "despesa", "#dc2626", "#fff7ed", ORIGENS_DRE["despesas_variaveis_total"]))
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "taxas_cartao", "Taxas de Cartao/Meios de Pagamento", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "taxas_marketplace", "Taxas de Marketplace", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "repasse_entrega", "Repasse/Custo de Entrega", "despesa")
@@ -494,15 +755,15 @@ def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[L
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "comissoes", "Comissoes de Venda", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "campanhas", "Campanhas, Cupons e Cashback", "despesa")
 
-    linhas.append(_linha_total("(-) DESPESAS OPERACIONAIS FIXAS/ADMINISTRATIVAS", despesas_fixas_total, receita_bruta_total, "despesa", "#dc2626", "#fef2f2"))
+    linhas.append(_linha_total("(-) DESPESAS OPERACIONAIS FIXAS/ADMINISTRATIVAS", despesas_fixas_total, receita_bruta_total, "despesa", "#dc2626", "#fef2f2", ORIGENS_DRE["despesas_fixas_total"]))
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_pessoal", "Folha, Salarios e Encargos", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_administrativas", "Aluguel/Ocupacao e Administrativo", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_comerciais", "Marketing e Comercial", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_financeiras", "Despesas Financeiras", "despesa")
     _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "outras_despesas", "Outras Despesas", "despesa")
 
-    linhas.append(_linha_total("(=) RESULTADO OPERACIONAL", resultado_operacional_total, receita_bruta_total, "lucro", "#059669", "#d1fae5"))
-    linhas.append(_linha_total("(=) LUCRO/PREJUIZO LIQUIDO", lucro_liquido_total, receita_bruta_total, "lucro", "#059669", "#d1fae5"))
+    linhas.append(_linha_total("(=) RESULTADO OPERACIONAL", resultado_operacional_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["resultado_operacional_total"]))
+    linhas.append(_linha_total("(=) LUCRO/PREJUIZO LIQUIDO", lucro_liquido_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["lucro_liquido_total"]))
 
     totais = {
         "receita_bruta": float(receita_bruta_total),
