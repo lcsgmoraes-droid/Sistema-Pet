@@ -2454,18 +2454,20 @@ export default function VendasFinanceiro() {
               </div>
 
               <div className="bg-white rounded-lg shadow p-4">
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">
                       Vendas por dia da semana
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      Melhor dia: {melhorDiaSemana?.nome || "-"} com {formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                      <span>
+                        Melhor dia: {melhorDiaSemana?.nome || "-"} com {formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.
+                      </span>
+                      <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                        {melhorDiaSemana?.quantidade || 0} venda(s)
+                      </span>
                     </p>
                   </div>
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                    {melhorDiaSemana?.quantidade || 0} venda(s)
-                  </span>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={vendasPorDiaSemanaResumo}>
@@ -2493,18 +2495,20 @@ export default function VendasFinanceiro() {
               </div>
 
               <div className="bg-white rounded-lg shadow p-4">
-                <div className="mb-4 flex items-start justify-between gap-3">
+                <div className="mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">
                       Vendas por horario
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      Pico: {melhorHorario?.faixa || "-"} com {formatarMoeda(melhorHorario?.valor_liquido || 0)}.
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                      <span>
+                        Pico: {melhorHorario?.faixa || "-"} com {formatarMoeda(melhorHorario?.valor_liquido || 0)}.
+                      </span>
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                        {melhorHorario?.quantidade || 0} venda(s)
+                      </span>
                     </p>
                   </div>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                    {melhorHorario?.quantidade || 0} venda(s)
-                  </span>
                 </div>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={vendasPorHorarioComMovimento}>
