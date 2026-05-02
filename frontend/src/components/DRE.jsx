@@ -384,9 +384,9 @@ const DRE = () => {
         <>
           {/* Filtros */}
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex flex-wrap items-end gap-3 md:gap-4">
               {/* Botões de período rápido */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handlePeriodoPreset("mes_atual")}
                   className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
@@ -407,15 +407,15 @@ const DRE = () => {
                 </button>
               </div>
 
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="min-w-[260px] flex-1">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
                   Período (Mês/Ano)
                 </label>
                 <input
                   type="month"
                   value={periodo}
                   onChange={(e) => setPeriodo(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  className="h-[38px] w-full rounded-md border border-gray-300 px-3 py-2"
                 />
               </div>
             </div>
