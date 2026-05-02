@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import require_admin
+from app.services.deploy_event_reporter import list_deploy_events, summarize_deploy_events
 from app.services.error_event_reporter import list_error_events, summarize_error_events
 
 
@@ -45,6 +46,34 @@ def resumo_eventos_erro(
 ) -> dict[str, Any]:
     return summarize_error_events(
         tenant_id=tenant_id,
+        since=since,
+        until=until,
+    )
+
+
+@router.get("/deploy-events")
+def listar_eventos_deploy(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    status: str | None = Query(None),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+) -> dict[str, Any]:
+    return list_deploy_events(
+        page=page,
+        page_size=page_size,
+        status=status,
+        since=since,
+        until=until,
+    )
+
+
+@router.get("/deploy-events/summary")
+def resumo_eventos_deploy(
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+) -> dict[str, Any]:
+    return summarize_deploy_events(
         since=since,
         until=until,
     )

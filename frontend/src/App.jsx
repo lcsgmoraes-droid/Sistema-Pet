@@ -153,6 +153,7 @@ const ClienteFinanceiro = lazy(() => import("./pages/ClienteFinanceiro"));
 const DashboardGerencial = lazy(() => import("./pages/DashboardGerencial"));
 const UsuariosPage = lazy(() => import("./pages/UsuariosPage.jsx"));
 const RolesPage = lazy(() => import("./pages/RolesPage.jsx"));
+const OpsDashboard = lazy(() => import("./pages/OpsDashboard.jsx"));
 const Observabilidade = lazy(() => import("./pages/Observabilidade.jsx"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracaoFiscalEmpresa = lazy(
@@ -303,7 +304,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route index element={<Navigate to="/ops/observabilidade" replace />} />
+                  <Route index element={<OpsDashboard />} />
                   <Route path="observabilidade" element={<Observabilidade />} />
                 </Route>
 

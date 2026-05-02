@@ -4,6 +4,7 @@ import {
   FiArrowLeft,
   FiBarChart2,
   FiDatabase,
+  FiHome,
   FiLogOut,
   FiServer,
   FiShield,
@@ -12,6 +13,13 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 
 const navItems = [
+  {
+    to: "/ops",
+    label: "Cockpit",
+    description: "Saude e alertas",
+    icon: FiHome,
+    end: true,
+  },
   {
     to: "/ops/observabilidade",
     label: "Observabilidade",
@@ -75,6 +83,7 @@ export default function OpsLayout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                end={item.end}
                 className={({ isActive }) =>
                   [
                     "flex items-center gap-3 rounded-lg px-3 py-3 transition",

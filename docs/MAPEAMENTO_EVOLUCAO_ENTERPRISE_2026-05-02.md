@@ -30,7 +30,8 @@ Componentes globais criados ou consolidados:
 Separacao operacional iniciada:
 
 - `MLProHub Ops`: central propria em `/ops`, fora do layout de operacao do Pet Shop.
-- A observabilidade saiu do menu normal de Administracao e passou para `/ops/observabilidade`.
+- Cockpit inicial em `/ops`, com health, alertas automaticos, tenants/rotas sensiveis e deploys recentes.
+- A observabilidade detalhada saiu do menu normal de Administracao e passou para `/ops/observabilidade`.
 - A rota antiga `/admin/observabilidade` deve apenas redirecionar, para nao quebrar link salvo.
 
 Tela piloto:

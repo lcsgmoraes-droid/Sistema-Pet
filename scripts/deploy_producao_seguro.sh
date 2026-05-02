@@ -7,6 +7,13 @@ BRANCH="${BRANCH:-main}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 RUNTIME_DIST="${RUNTIME_DIST:-runtime/frontend/dist}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
+DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
+DEPLOY_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+CURRENT_STEP="inicio"
+DEPLOY_EVENT_RECORDED=0
+HEAD_BEFORE=""
+HEAD_AFTER=""
+backup_dir=""
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -14,12 +21,80 @@ log() {
 
 fail() {
   printf '\nERRO: %s\n' "$*" >&2
+  write_deploy_event "failed" "$CURRENT_STEP" "$*" || true
   exit 1
 }
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Comando obrigatorio nao encontrado: $1"
 }
+
+mark_step() {
+  CURRENT_STEP="$1"
+}
+
+write_deploy_event() {
+  local status="$1"
+  local step="${2:-$CURRENT_STEP}"
+  local message="${3:-}"
+  local event_path="$APP_DIR/$DEPLOY_EVENTS_PATH"
+
+  mkdir -p "$(dirname "$event_path")"
+
+  DEPLOY_EVENT_PATH="$event_path" \
+  DEPLOY_STATUS="$status" \
+  DEPLOY_STEP="$step" \
+  DEPLOY_MESSAGE="$message" \
+  DEPLOY_STARTED_AT_VALUE="$DEPLOY_STARTED_AT" \
+  DEPLOY_REMOTE="$REMOTE" \
+  DEPLOY_BRANCH="$BRANCH" \
+  DEPLOY_HEAD_BEFORE="$HEAD_BEFORE" \
+  DEPLOY_HEAD_AFTER="$HEAD_AFTER" \
+  DEPLOY_RUNTIME_DIST="$RUNTIME_DIST" \
+  DEPLOY_PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" \
+  DEPLOY_BACKUP_DIR="$backup_dir" \
+  DEPLOY_USER_VALUE="${USER:-unknown}" \
+  DEPLOY_HOSTNAME_VALUE="$(hostname 2>/dev/null || echo unknown)" \
+  python3 - <<'PY'
+import datetime
+import json
+import os
+
+path = os.environ["DEPLOY_EVENT_PATH"]
+event = {
+    "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+    "started_at": os.environ.get("DEPLOY_STARTED_AT_VALUE"),
+    "status": os.environ.get("DEPLOY_STATUS"),
+    "step": os.environ.get("DEPLOY_STEP"),
+    "message": os.environ.get("DEPLOY_MESSAGE") or None,
+    "remote": os.environ.get("DEPLOY_REMOTE"),
+    "branch": os.environ.get("DEPLOY_BRANCH"),
+    "head_before": os.environ.get("DEPLOY_HEAD_BEFORE") or None,
+    "head_after": os.environ.get("DEPLOY_HEAD_AFTER") or None,
+    "runtime_dist": os.environ.get("DEPLOY_RUNTIME_DIST"),
+    "public_health_url": os.environ.get("DEPLOY_PUBLIC_HEALTH_URL"),
+    "backup_dir": os.environ.get("DEPLOY_BACKUP_DIR") or None,
+    "user": os.environ.get("DEPLOY_USER_VALUE"),
+    "hostname": os.environ.get("DEPLOY_HOSTNAME_VALUE"),
+}
+
+with open(path, "a", encoding="utf-8") as file:
+    file.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+PY
+
+  DEPLOY_EVENT_RECORDED=1
+}
+
+on_error() {
+  local exit_code=$?
+  local line="${1:-unknown}"
+  if [[ "$DEPLOY_EVENT_RECORDED" != "1" ]]; then
+    write_deploy_event "failed" "$CURRENT_STEP" "Falha inesperada na linha ${line}; exit ${exit_code}" || true
+  fi
+  exit "$exit_code"
+}
+
+trap 'on_error $LINENO' ERR
 
 wait_for() {
   local label="$1"
@@ -45,9 +120,11 @@ require_cmd git
 require_cmd docker
 require_cmd npm
 require_cmd curl
+require_cmd python3
 
 cd "$APP_DIR"
 
+mark_step "validar_repositorio"
 log "Validando repositorio limpo"
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
@@ -62,12 +139,15 @@ fi
 
 backup_dir="$APP_DIR/backups/deploy_$(date '+%Y%m%d_%H%M%S')"
 mkdir -p "$backup_dir"
-git rev-parse HEAD >"$backup_dir/head_before.txt"
+HEAD_BEFORE="$(git rev-parse HEAD)"
+printf '%s\n' "$HEAD_BEFORE" >"$backup_dir/head_before.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_before.txt" || true
 
+mark_step "atualizar_codigo"
 log "Atualizando codigo para $REMOTE/$BRANCH"
 git fetch "$REMOTE" "$BRANCH"
 git reset --hard "$REMOTE/$BRANCH"
+HEAD_AFTER="$(git rev-parse HEAD)"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
@@ -80,6 +160,7 @@ if [[ "$tracked_dist_count" != "0" ]]; then
   fail "Artefatos gerados voltaram a aparecer no Git."
 fi
 
+mark_step "build_frontend"
 log "Gerando frontend em $RUNTIME_DIST"
 mkdir -p "$RUNTIME_DIST"
 (
@@ -90,15 +171,19 @@ mkdir -p "$RUNTIME_DIST"
 
 [[ -s "$RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $RUNTIME_DIST"
 
+mark_step "validar_compose"
 log "Validando docker compose"
 docker compose -f "$COMPOSE_FILE" config --quiet
 
+mark_step "build_backend"
 log "Reconstruindo backend"
 docker compose -f "$COMPOSE_FILE" build backend
 
+mark_step "subir_servicos"
 log "Subindo servicos principais"
 docker compose -f "$COMPOSE_FILE" up -d postgres backend nginx
 
+mark_step "validar_watchdog"
 log "Aguardando watchdog interno"
 wait_for \
   "backend watchdog" \
@@ -106,9 +191,11 @@ wait_for \
   30 \
   5
 
+mark_step "validar_health_publico"
 log "Aguardando health publico"
 wait_for "health publico" "curl -fsS --max-time 10 '$PUBLIC_HEALTH_URL'" 12 5
 
+mark_step "checar_estado_final"
 log "Checando estado final"
 docker compose -f "$COMPOSE_FILE" ps
 
@@ -119,6 +206,9 @@ fi
 
 git rev-parse HEAD >"$backup_dir/head_after.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
+
+mark_step "concluido"
+write_deploy_event "success" "$CURRENT_STEP" "Deploy concluido com repositorio limpo"
 
 log "Deploy concluido com repositorio limpo"
 printf 'Backup operacional: %s\n' "$backup_dir"
