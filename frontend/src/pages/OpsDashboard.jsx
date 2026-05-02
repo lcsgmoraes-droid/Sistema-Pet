@@ -9,6 +9,7 @@ import {
   FiGitBranch,
   FiRefreshCw,
   FiServer,
+  FiShield,
   FiZap,
 } from "react-icons/fi";
 
@@ -41,57 +42,6 @@ function shortHash(value) {
   return text ? text.slice(0, 8) : "-";
 }
 
-function buildAlerts({ errorSummary, deploySummary, watchdog }) {
-  const alerts = [];
-  const watchdogHealthy = watchdog?.status === "healthy";
-  const errors5xx = Number(errorSummary?.errors_5xx || 0);
-  const slowRequests = Number(errorSummary?.slow_requests || 0);
-  const lastFailed = deploySummary?.last_failed;
-  const lastSuccess = deploySummary?.last_success;
-
-  if (!watchdogHealthy) {
-    alerts.push({
-      tone: "red",
-      title: "Watchdog degradado",
-      detail: "O health operacional nao retornou saudavel.",
-    });
-  }
-
-  if (errors5xx > 0) {
-    alerts.push({
-      tone: "red",
-      title: `${errors5xx} erro(s) 5xx nas ultimas 24h`,
-      detail: "Priorize rotas e tenants com maior recorrencia.",
-    });
-  }
-
-  if (slowRequests > 0) {
-    alerts.push({
-      tone: "amber",
-      title: `${slowRequests} requisicao(oes) lenta(s)`,
-      detail: `Acima de ${formatMs(errorSummary?.source?.slow_request_ms || 3000)}.`,
-    });
-  }
-
-  if (lastFailed && (!lastSuccess || String(lastFailed.created_at) > String(lastSuccess.created_at))) {
-    alerts.push({
-      tone: "red",
-      title: "Ultimo deploy falhou",
-      detail: lastFailed.message || `Etapa: ${lastFailed.step || "-"}`,
-    });
-  }
-
-  if (alerts.length === 0) {
-    alerts.push({
-      tone: "green",
-      title: "Sem alerta critico no periodo",
-      detail: "Watchdog, erros e deploys recentes nao indicam bloqueio imediato.",
-    });
-  }
-
-  return alerts;
-}
-
 function toneClasses(tone) {
   const tones = {
     blue: "border-blue-200 bg-blue-50 text-blue-900",
@@ -101,6 +51,24 @@ function toneClasses(tone) {
     slate: "border-slate-200 bg-white text-slate-900",
   };
   return tones[tone] || tones.slate;
+}
+
+function statusTone(status) {
+  if (status === "critical" || status === "unhealthy") return "red";
+  if (status === "degraded" || status === "warning") return "amber";
+  if (status === "healthy" || status === "ok") return "green";
+  return "slate";
+}
+
+function statusLabel(status) {
+  const labels = {
+    critical: "critico",
+    degraded: "degradado",
+    healthy: "saudavel",
+    unhealthy: "indisponivel",
+    ok: "ok",
+  };
+  return labels[status] || status || "-";
 }
 
 function MetricCard({ icon: Icon, label, value, detail, tone = "slate" }) {
@@ -121,51 +89,28 @@ function AlertPanel({ alerts }) {
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-bold text-slate-900">Alertas automaticos</h2>
-          <p className="text-sm text-slate-500">Calculados a partir de health, erros e deploys.</p>
+          <h2 className="text-base font-bold text-slate-900">Alertas e resposta</h2>
+          <p className="text-sm text-slate-500">Prioridade calculada no backend operacional.</p>
         </div>
         <FiZap className="h-5 w-5 text-blue-600" />
       </div>
       <div className="mt-4 space-y-3">
-        {alerts.map((alert) => (
-          <div key={`${alert.title}-${alert.detail}`} className={`rounded-lg border px-4 py-3 ${toneClasses(alert.tone)}`}>
+        {(alerts || []).map((alert) => (
+          <div key={`${alert.title}-${alert.source}`} className={`rounded-lg border px-4 py-3 ${toneClasses(alert.tone)}`}>
             <div className="flex items-start gap-3">
               {alert.tone === "green" ? (
                 <FiCheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
               ) : (
                 <FiAlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
               )}
-              <div>
+              <div className="min-w-0">
                 <div className="text-sm font-bold">{alert.title}</div>
                 <div className="mt-0.5 text-xs text-slate-600">{alert.detail}</div>
+                {alert.action ? <div className="mt-2 text-xs font-semibold text-slate-800">{alert.action}</div> : null}
               </div>
             </div>
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-function RankingPanel({ title, items, emptyLabel }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-base font-bold text-slate-900">{title}</h2>
-      <div className="mt-4 space-y-2">
-        {(items || []).length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">{emptyLabel}</div>
-        ) : (
-          items.slice(0, 8).map(([label, total]) => (
-            <div key={label} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
-              <span className="truncate text-sm text-slate-700" title={label}>
-                {label}
-              </span>
-              <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-900 shadow-sm">
-                {total}
-              </span>
-            </div>
-          ))
-        )}
       </div>
     </section>
   );
@@ -185,9 +130,7 @@ function DeployPanel({ deploys }) {
       </div>
       <div className="mt-4 space-y-2">
         {items.length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
-            Nenhum deploy registrado ainda.
-          </div>
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhum deploy registrado.</div>
         ) : (
           items.map((item) => {
             const success = item.status === "success";
@@ -213,40 +156,141 @@ function DeployPanel({ deploys }) {
   );
 }
 
+function TenantIncidentsPanel({ items }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-bold text-slate-900">Tenants sensiveis</h2>
+      <p className="mt-1 text-sm text-slate-500">Quem mais sofreu erro ou lentidao no periodo.</p>
+      <div className="mt-4 space-y-2">
+        {(items || []).length === 0 ? (
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhum tenant com evento.</div>
+        ) : (
+          items.slice(0, 8).map((item) => (
+            <div key={item.tenant_id || item.tenant_name} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate text-sm font-bold text-slate-800" title={item.tenant_name}>
+                  {item.tenant_name}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}>
+                  {item.total}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-600">
+                <span>5xx: <b>{item.errors_5xx}</b></span>
+                <span>Lentas: <b>{item.slow_requests}</b></span>
+                <span>{formatDate(item.latest_at)}</span>
+              </div>
+              <div className="mt-2 truncate text-xs text-slate-500">
+                {(item.top_paths || []).map((path) => `${path.path} (${path.total})`).join(" | ") || "Sem rota dominante"}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RouteIncidentsPanel({ items }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-bold text-slate-900">Rotas sensiveis</h2>
+      <p className="mt-1 text-sm text-slate-500">Onde atacar causa raiz primeiro.</p>
+      <div className="mt-4 space-y-2">
+        {(items || []).length === 0 ? (
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhuma rota com evento.</div>
+        ) : (
+          items.slice(0, 8).map((item) => (
+            <div key={item.path} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate font-mono text-xs text-slate-800" title={item.path}>
+                  {item.path}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}>
+                  {item.total}
+                </span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-4">
+                <span>5xx: <b>{item.errors_5xx}</b></span>
+                <span>Lentas: <b>{item.slow_requests}</b></span>
+                <span>Max: <b>{formatMs(item.max_duration_ms)}</b></span>
+                <span>Tenants: <b>{item.tenant_count}</b></span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SelfHealingPanel({ selfHealing, watchdogEvents }) {
+  const latest = watchdogEvents?.latest_recovery || [];
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Auto-recuperacao</h2>
+          <p className="text-sm text-slate-500">Como o sistema tenta se virar sozinho.</p>
+        </div>
+        <FiShield className="h-5 w-5 text-emerald-600" />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="rounded-lg bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+          <div className="text-xs font-semibold uppercase text-emerald-700">Status</div>
+          <div className="mt-1 font-bold">{selfHealing?.status || "-"}</div>
+        </div>
+        <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-800">
+          <div className="text-xs font-semibold uppercase text-slate-500">Falhas ate reiniciar</div>
+          <div className="mt-1 font-bold">{selfHealing?.failure_threshold ?? "-"}</div>
+        </div>
+        <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-800">
+          <div className="text-xs font-semibold uppercase text-slate-500">Intervalo</div>
+          <div className="mt-1 font-bold">{selfHealing?.interval_seconds ?? "-"}s</div>
+        </div>
+        <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-800">
+          <div className="text-xs font-semibold uppercase text-slate-500">Recuperacoes</div>
+          <div className="mt-1 font-bold">{watchdogEvents?.recoveries ?? 0}</div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <div className="rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-600">
+          {(selfHealing?.capabilities || []).map((item) => (
+            <div key={item} className="py-1">- {item}</div>
+          ))}
+        </div>
+        <div className="rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-600">
+          {latest.length === 0 ? (
+            <div>Nenhuma recuperacao automatica registrada no periodo.</div>
+          ) : (
+            latest.map((item) => (
+              <div key={`${item.created_at}-${item.event_type}`} className="flex justify-between gap-3 py-1">
+                <span className="truncate">{item.event_type}: {item.message}</span>
+                <span className="shrink-0">{formatDate(item.created_at)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function OpsDashboard() {
-  const [errorSummary, setErrorSummary] = useState(null);
-  const [deploySummary, setDeploySummary] = useState(null);
-  const [watchdog, setWatchdog] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const since = useMemo(() => sinceFromHours(RANGE_HOURS), []);
-  const alerts = useMemo(
-    () => buildAlerts({ errorSummary, deploySummary, watchdog }),
-    [deploySummary, errorSummary, watchdog],
-  );
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [errorResult, deployResult, watchdogResult] = await Promise.allSettled([
-        api.get("/admin/observabilidade/error-events/summary", { params: { since } }),
-        api.get("/admin/observabilidade/deploy-events/summary", { params: { since } }),
-        api.get("/health/watchdog", { validateStatus: () => true }),
-      ]);
-
-      if (errorResult.status === "rejected") throw errorResult.reason;
-      if (deployResult.status === "rejected") throw deployResult.reason;
-
-      setErrorSummary(errorResult.value.data);
-      setDeploySummary(deployResult.value.data);
-      setWatchdog(
-        watchdogResult.status === "fulfilled"
-          ? watchdogResult.value.data
-          : { status: "indisponivel", database: "desconhecido" },
-      );
+      const response = await api.get("/admin/observabilidade/ops-summary", { params: { since } });
+      setDashboard(response.data);
     } catch (err) {
       console.error("Erro ao carregar cockpit Ops:", err);
       setError(err?.response?.data?.detail || "Nao foi possivel carregar o cockpit agora.");
@@ -259,8 +303,12 @@ export default function OpsDashboard() {
     loadDashboard();
   }, [loadDashboard]);
 
-  const watchdogHealthy = watchdog?.status === "healthy";
-  const lastDeploy = deploySummary?.latest?.[0];
+  const watchdog = dashboard?.watchdog;
+  const errors = dashboard?.errors;
+  const deploys = dashboard?.deploys;
+  const watchdogEvents = dashboard?.watchdog_events;
+  const selfHealing = dashboard?.self_healing;
+  const lastDeploy = deploys?.latest?.[0];
 
   return (
     <div className="p-6">
@@ -273,7 +321,7 @@ export default function OpsDashboard() {
             </div>
             <h1 className="mt-1 text-2xl font-bold text-slate-950">Saude da plataforma</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Ultimas 24h de erros, lentidao, watchdog e deploys.
+              Ultimas 24h de erros, lentidao, watchdog, deploys e resposta automatica.
             </p>
           </div>
           <div className="flex gap-2">
@@ -304,31 +352,31 @@ export default function OpsDashboard() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard
             icon={FiCheckCircle}
+            label="Estado geral"
+            value={statusLabel(dashboard?.status)}
+            detail={dashboard?.generated_at ? `Gerado em ${formatDate(dashboard.generated_at)}` : "Cockpit operacional"}
+            tone={statusTone(dashboard?.status)}
+          />
+          <MetricCard
+            icon={FiDatabase}
             label="Watchdog"
-            value={watchdog?.status || "-"}
+            value={statusLabel(watchdog?.status)}
             detail={watchdog?.latency_ms ? `${formatMs(watchdog.latency_ms)} no banco` : "Health operacional"}
-            tone={watchdogHealthy ? "green" : "red"}
+            tone={statusTone(watchdog?.status)}
           />
           <MetricCard
             icon={FiAlertTriangle}
             label="Erros 5xx"
-            value={errorSummary?.errors_5xx ?? "-"}
+            value={errors?.errors_5xx ?? "-"}
             detail="Falhas de servidor"
-            tone={Number(errorSummary?.errors_5xx || 0) > 0 ? "red" : "green"}
+            tone={Number(errors?.errors_5xx || 0) > 0 ? "red" : "green"}
           />
           <MetricCard
             icon={FiClock}
             label="Lentidao"
-            value={errorSummary?.slow_requests ?? "-"}
-            detail={`Acima de ${formatMs(errorSummary?.source?.slow_request_ms || 3000)}`}
-            tone={Number(errorSummary?.slow_requests || 0) > 0 ? "amber" : "green"}
-          />
-          <MetricCard
-            icon={FiActivity}
-            label="Eventos"
-            value={errorSummary?.total ?? "-"}
-            detail="Eventos operacionais"
-            tone="blue"
+            value={errors?.slow_requests ?? "-"}
+            detail={`Acima de ${formatMs(errors?.source?.slow_request_ms || 3000)}`}
+            tone={Number(errors?.slow_requests || 0) > 0 ? "amber" : "green"}
           />
           <MetricCard
             icon={FiGitBranch}
@@ -339,22 +387,16 @@ export default function OpsDashboard() {
           />
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.1fr_1fr]">
-          <AlertPanel alerts={alerts} />
-          <DeployPanel deploys={deploySummary} />
+        <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <AlertPanel alerts={dashboard?.alerts || []} />
+          <DeployPanel deploys={deploys} />
         </div>
 
+        <SelfHealingPanel selfHealing={selfHealing} watchdogEvents={watchdogEvents} />
+
         <div className="grid gap-4 xl:grid-cols-2">
-          <RankingPanel
-            title="Tenants com maior incidencia"
-            items={errorSummary?.by_tenant || []}
-            emptyLabel="Nenhum tenant com evento no periodo."
-          />
-          <RankingPanel
-            title="Rotas mais sensiveis"
-            items={errorSummary?.by_path || []}
-            emptyLabel="Nenhuma rota com evento no periodo."
-          />
+          <TenantIncidentsPanel items={dashboard?.tenant_incidents || []} />
+          <RouteIncidentsPanel items={dashboard?.route_incidents || []} />
         </div>
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -363,7 +405,7 @@ export default function OpsDashboard() {
               <h2 className="text-base font-bold text-slate-900">Banco e pool</h2>
               <p className="text-sm text-slate-500">Estado retornado pelo watchdog.</p>
             </div>
-            <FiDatabase className="h-5 w-5 text-slate-500" />
+            <FiActivity className="h-5 w-5 text-slate-500" />
           </div>
           <div className="mt-4 rounded-lg bg-slate-50 px-3 py-3 font-mono text-xs text-slate-700">
             {watchdog?.pool || "Sem dados de pool agora."}

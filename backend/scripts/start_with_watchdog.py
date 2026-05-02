@@ -1,8 +1,10 @@
 import os
+import json
 import signal
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -26,6 +28,30 @@ def _env_int(name: str, default: int) -> int:
 
 def _log(message: str) -> None:
     print(f"[backend-watchdog] {message}", flush=True)
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _record_event(event_type: str, status: str, message: str, **data) -> None:
+    path = os.getenv("WATCHDOG_EVENT_LOG_PATH", os.path.join(os.getcwd(), "logs", "watchdog_events.jsonl"))
+    event = {
+        "created_at": _utcnow_iso(),
+        "event_type": event_type,
+        "status": status,
+        "message": message,
+        "pid": os.getpid(),
+        "hostname": os.getenv("HOSTNAME"),
+        **data,
+    }
+
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as file:
+            file.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+    except Exception:
+        return
 
 
 def _build_uvicorn_command() -> list[str]:
@@ -61,6 +87,7 @@ def _health_ok(url: str, timeout_seconds: int) -> tuple[bool, str]:
 
 def _stop_process(process: subprocess.Popen, reason: str) -> None:
     _log(f"Stopping uvicorn pid={process.pid}. reason={reason}")
+    _record_event("uvicorn_stop", "warning", reason, uvicorn_pid=process.pid)
     try:
         process.terminate()
         process.wait(timeout=20)
@@ -100,6 +127,13 @@ def main() -> int:
     while not should_stop:
         _log("Starting uvicorn: " + " ".join(command))
         process = subprocess.Popen(command)
+        _record_event(
+            "uvicorn_start",
+            "info",
+            "Uvicorn iniciado pelo watchdog",
+            uvicorn_pid=process.pid,
+            workers=os.getenv("UVICORN_WORKERS", "4"),
+        )
         started_at = time.monotonic()
         consecutive_failures = 0
 
@@ -107,6 +141,13 @@ def main() -> int:
             return_code = process.poll()
             if return_code is not None:
                 _log(f"Uvicorn exited with code {return_code}.")
+                _record_event(
+                    "uvicorn_exit",
+                    "warning" if return_code else "info",
+                    "Uvicorn finalizou",
+                    uvicorn_pid=process.pid,
+                    return_code=return_code,
+                )
                 break
 
             if not watchdog_enabled:
@@ -127,8 +168,23 @@ def main() -> int:
                     "Health check failed "
                     f"({consecutive_failures}/{failure_threshold}): {detail}"
                 )
+                _record_event(
+                    "health_failure",
+                    "warning",
+                    detail,
+                    consecutive_failures=consecutive_failures,
+                    failure_threshold=failure_threshold,
+                    uptime_seconds=round(uptime_seconds, 2),
+                )
 
             if consecutive_failures >= failure_threshold:
+                _record_event(
+                    "restart_triggered",
+                    "critical",
+                    "Watchdog vai reiniciar o servidor por falhas consecutivas de health",
+                    consecutive_failures=consecutive_failures,
+                    failure_threshold=failure_threshold,
+                )
                 _stop_process(process, "watchdog health failures")
                 break
 

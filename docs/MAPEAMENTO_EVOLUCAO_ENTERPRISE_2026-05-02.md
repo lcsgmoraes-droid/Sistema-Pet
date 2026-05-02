@@ -30,9 +30,11 @@ Componentes globais criados ou consolidados:
 Separacao operacional iniciada:
 
 - `MLProHub Ops`: central propria em `/ops`, fora do layout de operacao do Pet Shop.
-- Cockpit inicial em `/ops`, com health, alertas automaticos, tenants/rotas sensiveis e deploys recentes.
+- Cockpit inicial em `/ops`, com health, alertas automaticos, tenants/rotas sensiveis, deploys recentes e auto-recuperacao.
 - A observabilidade detalhada saiu do menu normal de Administracao e passou para `/ops/observabilidade`.
 - A rota antiga `/admin/observabilidade` deve apenas redirecionar, para nao quebrar link salvo.
+- Backend consolidado em `/admin/observabilidade/ops-summary`, para a inteligencia operacional ficar centralizada e reutilizavel.
+- Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
 
 Tela piloto:
 

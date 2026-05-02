@@ -15,11 +15,11 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-DEPLOY_EVENT_LOG_PATH = os.getenv(
-    "DEPLOY_EVENT_LOG_PATH",
-    os.path.join(os.getcwd(), "logs", "deploy_events.jsonl"),
+WATCHDOG_EVENT_LOG_PATH = os.getenv(
+    "WATCHDOG_EVENT_LOG_PATH",
+    os.path.join(os.getcwd(), "logs", "watchdog_events.jsonl"),
 )
-DEPLOY_EVENT_MAX_READ_LINES = _env_int("DEPLOY_EVENT_MAX_READ_LINES", 500)
+WATCHDOG_EVENT_MAX_READ_LINES = _env_int("WATCHDOG_EVENT_MAX_READ_LINES", 1000)
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -36,13 +36,13 @@ def _event_created_at(event: dict[str, Any]) -> datetime | None:
     return _parse_dt(str(event.get("created_at") or ""))
 
 
-def _read_recent_deploy_events(max_lines: int = DEPLOY_EVENT_MAX_READ_LINES) -> list[dict[str, Any]]:
-    if not os.path.exists(DEPLOY_EVENT_LOG_PATH):
+def _read_recent_watchdog_events(max_lines: int = WATCHDOG_EVENT_MAX_READ_LINES) -> list[dict[str, Any]]:
+    if not os.path.exists(WATCHDOG_EVENT_LOG_PATH):
         return []
 
     lines: deque[str] = deque(maxlen=max(1, max_lines))
     try:
-        with open(DEPLOY_EVENT_LOG_PATH, "r", encoding="utf-8") as file:
+        with open(WATCHDOG_EVENT_LOG_PATH, "r", encoding="utf-8") as file:
             for line in file:
                 line = line.strip()
                 if line:
@@ -61,17 +61,21 @@ def _read_recent_deploy_events(max_lines: int = DEPLOY_EVENT_MAX_READ_LINES) -> 
     return events
 
 
-def _filter_deploy_events(
+def _filter_watchdog_events(
     events: list[dict[str, Any]],
     *,
+    event_type: str | None = None,
     status: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> list[dict[str, Any]]:
-    filtered: list[dict[str, Any]] = []
+    normalized_event_type = event_type.lower() if event_type else None
     normalized_status = status.lower() if status else None
+    filtered: list[dict[str, Any]] = []
 
     for event in events:
+        if normalized_event_type and str(event.get("event_type") or "").lower() != normalized_event_type:
+            continue
         if normalized_status and str(event.get("status") or "").lower() != normalized_status:
             continue
 
@@ -86,15 +90,33 @@ def _filter_deploy_events(
     return filtered
 
 
-def list_deploy_events(
+def get_watchdog_events(
+    *,
+    event_type: str | None = None,
+    status: str | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> list[dict[str, Any]]:
+    return _filter_watchdog_events(
+        _read_recent_watchdog_events(),
+        event_type=event_type,
+        status=status,
+        since=since,
+        until=until,
+    )
+
+
+def list_watchdog_events(
     *,
     page: int = 1,
     page_size: int = 30,
+    event_type: str | None = None,
     status: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> dict[str, Any]:
-    events = get_deploy_events(
+    events = get_watchdog_events(
+        event_type=event_type,
         status=status,
         since=since,
         until=until,
@@ -112,55 +134,37 @@ def list_deploy_events(
         "page": safe_page,
         "page_size": safe_page_size,
         "source": {
-            "path": DEPLOY_EVENT_LOG_PATH,
-            "max_read_lines": DEPLOY_EVENT_MAX_READ_LINES,
+            "path": WATCHDOG_EVENT_LOG_PATH,
+            "max_read_lines": WATCHDOG_EVENT_MAX_READ_LINES,
         },
     }
 
 
-def summarize_deploy_events(
+def summarize_watchdog_events(
     *,
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> dict[str, Any]:
-    events = get_deploy_events(
-        since=since,
-        until=until,
-    )
+    events = get_watchdog_events(since=since, until=until)
 
+    by_type = Counter(str(event.get("event_type") or "unknown") for event in events)
     by_status = Counter(str(event.get("status") or "unknown") for event in events)
-    latest = list(reversed(events))[:10]
-    last_success = next(
-        (event for event in reversed(events) if str(event.get("status") or "").lower() == "success"),
-        None,
-    )
-    last_failed = next(
-        (event for event in reversed(events) if str(event.get("status") or "").lower() == "failed"),
-        None,
-    )
+    recovery_events = [
+        event
+        for event in events
+        if str(event.get("event_type") or "").lower()
+        in {"restart_triggered", "uvicorn_start", "uvicorn_exit"}
+    ]
 
     return {
         "total": len(events),
+        "by_type": by_type.most_common(),
         "by_status": by_status.most_common(),
-        "latest": latest,
-        "last_success": last_success,
-        "last_failed": last_failed,
+        "recoveries": len([event for event in events if str(event.get("event_type") or "").lower() == "restart_triggered"]),
+        "latest": list(reversed(events))[:10],
+        "latest_recovery": list(reversed(recovery_events))[:5],
         "source": {
-            "path": DEPLOY_EVENT_LOG_PATH,
-            "max_read_lines": DEPLOY_EVENT_MAX_READ_LINES,
+            "path": WATCHDOG_EVENT_LOG_PATH,
+            "max_read_lines": WATCHDOG_EVENT_MAX_READ_LINES,
         },
     }
-
-
-def get_deploy_events(
-    *,
-    status: str | None = None,
-    since: datetime | None = None,
-    until: datetime | None = None,
-) -> list[dict[str, Any]]:
-    return _filter_deploy_events(
-        _read_recent_deploy_events(),
-        status=status,
-        since=since,
-        until=until,
-    )

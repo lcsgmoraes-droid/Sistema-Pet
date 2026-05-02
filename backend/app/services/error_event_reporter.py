@@ -3,7 +3,7 @@ from collections import Counter, deque
 import json
 import os
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Request
@@ -38,6 +38,10 @@ ERROR_EVENT_LOG_PATH = os.getenv(
     os.path.join(os.getcwd(), "logs", "error_events.jsonl"),
 )
 ERROR_EVENT_REPORT_MAX_READ_LINES = _env_int("ERROR_EVENT_REPORT_MAX_READ_LINES", 10000)
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _decode_jwt_payload(token: str) -> dict[str, Any]:
@@ -89,7 +93,7 @@ def record_request_event(
 
     identity = _extract_identity(request)
     event = {
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": _utcnow_iso(),
         "request_id": request_id,
         "tenant_id": identity["tenant_id"],
         "user_id": identity["user_id"],
@@ -199,8 +203,7 @@ def list_error_events(
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> dict[str, Any]:
-    events = _filter_events(
-        _read_recent_events(),
+    events = get_error_events(
         tenant_id=tenant_id,
         path_contains=path_contains,
         status_min=status_min,
@@ -234,8 +237,7 @@ def summarize_error_events(
     since: datetime | None = None,
     until: datetime | None = None,
 ) -> dict[str, Any]:
-    events = _filter_events(
-        _read_recent_events(),
+    events = get_error_events(
         tenant_id=tenant_id,
         since=since,
         until=until,
@@ -265,3 +267,23 @@ def summarize_error_events(
             "slow_request_ms": SLOW_REQUEST_EVENT_MS,
         },
     }
+
+
+def get_error_events(
+    *,
+    tenant_id: str | None = None,
+    path_contains: str | None = None,
+    status_min: int | None = None,
+    slow_only: bool = False,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> list[dict[str, Any]]:
+    return _filter_events(
+        _read_recent_events(),
+        tenant_id=tenant_id,
+        path_contains=path_contains,
+        status_min=status_min,
+        slow_only=slow_only,
+        since=since,
+        until=until,
+    )
