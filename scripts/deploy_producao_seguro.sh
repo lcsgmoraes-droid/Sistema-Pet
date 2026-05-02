@@ -62,7 +62,7 @@ import os
 
 path = os.environ["DEPLOY_EVENT_PATH"]
 event = {
-    "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+    "created_at": datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
     "started_at": os.environ.get("DEPLOY_STARTED_AT_VALUE"),
     "status": os.environ.get("DEPLOY_STATUS"),
     "step": os.environ.get("DEPLOY_STEP"),
