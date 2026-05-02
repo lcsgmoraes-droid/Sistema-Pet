@@ -21,6 +21,7 @@ import AnaliseInteligente from "./AnaliseInteligente";
 import ChatIAModal from "./ChatIAModal";
 import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
+import { actionButtonClasses } from "./ui/actionStyles";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
 
@@ -63,6 +64,13 @@ const DRE = () => {
 
   const [periodo, setPeriodo] = useState(obterDataLocal());
 
+  const normalizarPeriodo = (valor) => {
+    if (typeof valor === "string" && /^\d{4}-\d{2}$/.test(valor)) {
+      return valor;
+    }
+    return periodo || obterDataLocal();
+  };
+
   useEffect(() => {
     carregarDRE();
 
@@ -79,7 +87,7 @@ const DRE = () => {
     dreAbortRef.current = controller;
     setLoading(true);
     try {
-      const [ano, mes] = periodoAlvo.split("-");
+      const [ano, mes] = normalizarPeriodo(periodoAlvo).split("-");
 
       // Enviar os canais selecionados para o backend
       const canaisParam = canaisSelecionados.join(",");
@@ -146,7 +154,7 @@ const DRE = () => {
     setLinhaDetalhe(linha);
     setLoadingDetalhes(true);
     try {
-      const [ano, mes] = periodo.split("-");
+      const [ano, mes] = normalizarPeriodo(periodo).split("-");
       const response = await api.get(`/financeiro/dre/canais/detalhes`, {
         params: {
           ano,
@@ -218,7 +226,7 @@ const DRE = () => {
 
   const exportarPDF = async () => {
     try {
-      const [ano, mes] = periodo.split("-");
+      const [ano, mes] = normalizarPeriodo(periodo).split("-");
       toast.loading("Gerando PDF...", { id: "pdf" });
 
       const response = await api.get(`/financeiro/dre/export/pdf`, {
@@ -244,7 +252,7 @@ const DRE = () => {
 
   const exportarExcel = async () => {
     try {
-      const [ano, mes] = periodo.split("-");
+      const [ano, mes] = normalizarPeriodo(periodo).split("-");
       toast.loading("Gerando Excel...", { id: "excel" });
 
       const response = await api.get(`/financeiro/dre/export/excel`, {
@@ -295,7 +303,7 @@ const DRE = () => {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setModalClassificarOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+            className={actionButtonClasses({ intent: "edit", tone: "solid", size: "sm", className: "shadow-sm" })}
             title="Classificar lançamentos no DRE"
           >
             <span className="text-base">🏷️</span>
@@ -303,7 +311,7 @@ const DRE = () => {
           </button>
           <button
             onClick={() => setChatIAAberto(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm", className: "shadow-sm" })}
             title="Consultar Especialista IA"
           >
             <MessageCircle size={20} />
@@ -312,7 +320,7 @@ const DRE = () => {
           </button>
           <button
             onClick={exportarPDF}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
             title="Exportar para PDF"
           >
             <FileText size={18} />
@@ -320,7 +328,7 @@ const DRE = () => {
           </button>
           <button
             onClick={exportarExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
             title="Exportar para Excel"
           >
             <Download size={18} />
@@ -386,19 +394,19 @@ const DRE = () => {
               <div className="flex gap-2">
                 <button
                   onClick={() => handlePeriodoPreset("mes_atual")}
-                  className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
                 >
                   Mês Atual
                 </button>
                 <button
                   onClick={() => handlePeriodoPreset("mes_anterior")}
-                  className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
                 >
                   Mês Anterior
                 </button>
                 <button
                   onClick={() => handlePeriodoPreset("ano_atual")}
-                  className="px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100"
+                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
                 >
                   Ano Atual
                 </button>
@@ -418,8 +426,8 @@ const DRE = () => {
 
               <div className="flex items-end">
                 <button
-                  onClick={carregarDRE}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                  onClick={() => carregarDRE()}
+                  className={actionButtonClasses({ intent: "edit", tone: "solid", size: "sm", className: "min-w-[128px]" })}
                 >
                   <RefreshCw size={18} />
                   Atualizar
@@ -502,7 +510,7 @@ const DRE = () => {
                   {canaisSelecionados.length > 0 && (
                     <button
                       onClick={limparSelecaoCanais}
-                      className="text-sm text-red-600 hover:text-red-700 font-medium"
+                      className={actionButtonClasses({ intent: "neutral", tone: "ghost", size: "xs" })}
                     >
                       Limpar Seleção
                     </button>

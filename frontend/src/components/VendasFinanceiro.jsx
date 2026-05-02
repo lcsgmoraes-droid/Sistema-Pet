@@ -32,6 +32,7 @@ import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
+import { actionButtonClasses } from "./ui/actionStyles";
 
 const COLUNAS_RELATORIO_VENDAS = [
   { key: "data_venda", label: "Data", value: (v) => v.data_venda || "" },
@@ -1770,6 +1771,139 @@ export default function VendasFinanceiro() {
     aplicarFiltroRapido("este_mes");
   }, []); // Roda apenas uma vez ao montar o componente
 
+  const renderDiasUteisResumo = () => (
+    <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Dias úteis e média operacional
+          </h3>
+          <p className="text-sm text-gray-500">
+            Configure se sábado entra na média. Feriado com faturamento vira dia útil automaticamente.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+            <input
+              type="checkbox"
+              checked={configDiasUteis.considerarSabadoDiaUtil}
+              onChange={(event) =>
+                setConfigDiasUteis((prev) => ({
+                  ...prev,
+                  considerarSabadoDiaUtil: event.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+            />
+            Sábado conta como dia útil
+          </label>
+          <button
+            type="button"
+            onClick={() => setMostrarConfigFeriados((prev) => !prev)}
+            className={actionButtonClasses({ intent: "edit", tone: "soft", size: "sm" })}
+          >
+            <Calendar className="h-4 w-4" />
+            Configurar feriados
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="rounded-xl bg-slate-50 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Dias úteis
+          </div>
+          <div className="mt-1 text-2xl font-bold text-slate-900">
+            {resumoDiasPeriodo.diasUteis}
+          </div>
+          <div className="text-xs text-slate-500">
+            {resumoDiasPeriodo.totalDias} dia(s) no período
+          </div>
+        </div>
+        <div className="rounded-xl bg-emerald-50 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+            Dias trabalhados
+          </div>
+          <div className="mt-1 text-2xl font-bold text-emerald-700">
+            {resumoDiasPeriodo.diasTrabalhados}
+          </div>
+          <div className="text-xs text-emerald-600">
+            Dia útil com venda registrada
+          </div>
+        </div>
+        <div className="rounded-xl bg-amber-50 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+            Dias úteis sem venda
+          </div>
+          <div className="mt-1 text-2xl font-bold text-amber-700">
+            {resumoDiasPeriodo.diasUteisSemVenda}
+          </div>
+          <div className="text-xs text-amber-700">
+            Fora fins de semana/feriados
+          </div>
+        </div>
+        <div className="rounded-xl bg-blue-50 p-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+            Média por dia útil
+          </div>
+          <div className="mt-1 text-2xl font-bold text-blue-700">
+            {formatarMoeda(resumoDiasPeriodo.mediaDiaUtil)}
+          </div>
+          <div className="text-xs text-blue-700">
+            {resumoDiasPeriodo.feriados} feriado(s), {resumoDiasPeriodo.finsDeSemana} fim(ns) de semana
+          </div>
+        </div>
+      </div>
+
+      {mostrarConfigFeriados && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
+            <input
+              type="date"
+              value={novoFeriadoData}
+              onChange={(event) => setNovoFeriadoData(event.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              type="text"
+              value={novoFeriadoNome}
+              onChange={(event) => setNovoFeriadoNome(event.target.value)}
+              placeholder="Nome do feriado local, municipal ou data sem expediente"
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+            <button
+              type="button"
+              onClick={adicionarFeriadoCustomizado}
+              className={actionButtonClasses({ intent: "create", tone: "solid", size: "sm" })}
+            >
+              Salvar feriado
+            </button>
+          </div>
+
+          {feriadosCustomizados.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {feriadosCustomizados.map((feriado) => (
+                <span
+                  key={feriado.data}
+                  className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
+                >
+                  {formatarData(feriado.data)} - {feriado.nome}
+                  <button
+                    type="button"
+                    onClick={() => removerFeriadoCustomizado(feriado.data)}
+                    className="text-rose-600 hover:text-rose-700"
+                  >
+                    remover
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -2197,137 +2331,6 @@ export default function VendasFinanceiro() {
             </div>
           </div>
 
-          <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Dias úteis e média operacional
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Configure se sábado entra na média. Feriado com faturamento vira dia útil automaticamente.
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                  <input
-                    type="checkbox"
-                    checked={configDiasUteis.considerarSabadoDiaUtil}
-                    onChange={(event) =>
-                      setConfigDiasUteis((prev) => ({
-                        ...prev,
-                        considerarSabadoDiaUtil: event.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                  />
-                  Sábado conta como dia útil
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setMostrarConfigFeriados((prev) => !prev)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                >
-                  <Calendar className="h-4 w-4" />
-                  Configurar feriados
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <div className="rounded-xl bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Dias úteis
-                </div>
-                <div className="mt-1 text-2xl font-bold text-slate-900">
-                  {resumoDiasPeriodo.diasUteis}
-                </div>
-                <div className="text-xs text-slate-500">
-                  {resumoDiasPeriodo.totalDias} dia(s) no período
-                </div>
-              </div>
-              <div className="rounded-xl bg-emerald-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
-                  Dias trabalhados
-                </div>
-                <div className="mt-1 text-2xl font-bold text-emerald-700">
-                  {resumoDiasPeriodo.diasTrabalhados}
-                </div>
-                <div className="text-xs text-emerald-600">
-                  Dia útil com venda registrada
-                </div>
-              </div>
-              <div className="rounded-xl bg-amber-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                  Dias úteis sem venda
-                </div>
-                <div className="mt-1 text-2xl font-bold text-amber-700">
-                  {resumoDiasPeriodo.diasUteisSemVenda}
-                </div>
-                <div className="text-xs text-amber-700">
-                  Fora fins de semana/feriados
-                </div>
-              </div>
-              <div className="rounded-xl bg-blue-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                  Média por dia útil
-                </div>
-                <div className="mt-1 text-2xl font-bold text-blue-700">
-                  {formatarMoeda(resumoDiasPeriodo.mediaDiaUtil)}
-                </div>
-                <div className="text-xs text-blue-700">
-                  {resumoDiasPeriodo.feriados} feriado(s), {resumoDiasPeriodo.finsDeSemana} fim(ns) de semana
-                </div>
-              </div>
-            </div>
-
-            {mostrarConfigFeriados && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
-                  <input
-                    type="date"
-                    value={novoFeriadoData}
-                    onChange={(event) => setNovoFeriadoData(event.target.value)}
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <input
-                    type="text"
-                    value={novoFeriadoNome}
-                    onChange={(event) => setNovoFeriadoNome(event.target.value)}
-                    placeholder="Nome do feriado local, municipal ou data sem expediente"
-                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                  <button
-                    type="button"
-                    onClick={adicionarFeriadoCustomizado}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-                  >
-                    Salvar feriado
-                  </button>
-                </div>
-
-                {feriadosCustomizados.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {feriadosCustomizados.map((feriado) => (
-                      <span
-                        key={feriado.data}
-                        className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
-                      >
-                        {formatarData(feriado.data)} - {feriado.nome}
-                        <button
-                          type="button"
-                          onClick={() => removerFeriadoCustomizado(feriado.data)}
-                          className="text-rose-600 hover:text-rose-700"
-                        >
-                          remover
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
           {/* Gráficos */}
           {mostrarGraficos && (
             <div className="grid grid-cols-2 gap-6 mb-6">
@@ -2674,6 +2677,8 @@ export default function VendasFinanceiro() {
               </div>
             </div>
           </div>
+
+          {renderDiasUteisResumo()}
 
           {/* Vendas por Data */}
           <div className="bg-white rounded-lg shadow mb-6">
