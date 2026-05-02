@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../../../services/api";
+import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
@@ -17,6 +19,8 @@ const criarFormularioInicial = () => ({
   observacoes: "",
 });
 export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged }) {
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [dataRef, setDataRef] = useState(todayIso());
   const [agendamentos, setAgendamentos] = useState([]);
   const [capacidade, setCapacidade] = useState(null);
@@ -28,6 +32,20 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   const [petsDoTutor, setPetsDoTutor] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
   const [form, setForm] = useState(criarFormularioInicial);
+  const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
+  const tutorIdQuery = searchParams.get("tutor_id") || "";
+  const tutorNomeQuery = searchParams.get("tutor_nome") || "";
+  const retornoNovoPet = useMemo(
+    () =>
+      buildReturnTo(location.pathname, location.search, {
+        novo_pet_id: null,
+        novo_pet_nome: null,
+        tutor_id: tutorSelecionado?.id || null,
+        tutor_nome: tutorSelecionado?.nome || null,
+      }),
+    [location.pathname, location.search, tutorSelecionado?.id, tutorSelecionado?.nome]
+  );
+
   async function carregarAgenda() {
     setLoadingAgenda(true);
     try {
@@ -58,6 +76,24 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   }, [dataRef, form.servico_id, form.recurso_id, servicos.length]);
 
   useEffect(() => {
+    if (!tutorIdQuery) return;
+    setTutorSelecionado((prev) => {
+      if (prev?.id && String(prev.id) === String(tutorIdQuery)) return prev;
+      return {
+        id: tutorIdQuery,
+        nome: tutorNomeQuery || `Tutor #${tutorIdQuery}`,
+      };
+    });
+    if (novoPetIdQuery) {
+      setForm((prev) => (
+        String(prev.pet_id) === String(novoPetIdQuery)
+          ? prev
+          : { ...prev, pet_id: "" }
+      ));
+    }
+  }, [novoPetIdQuery, tutorIdQuery, tutorNomeQuery]);
+
+  useEffect(() => {
     if (!tutorSelecionado?.id) {
       setPetsDoTutor([]);
       setForm((prev) => ({ ...prev, pet_id: "" }));
@@ -70,6 +106,16 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       active = false;
     };
   }, [tutorSelecionado?.id]);
+
+  useEffect(() => {
+    if (!novoPetIdQuery || !petsDoTutor.length) return;
+    const petCriado = petsDoTutor.find((pet) => String(pet.id) === String(novoPetIdQuery));
+    if (!petCriado) return;
+    setForm((prev) => {
+      if (String(prev.pet_id) === String(petCriado.id)) return prev;
+      return { ...prev, pet_id: String(petCriado.id) };
+    });
+  }, [novoPetIdQuery, petsDoTutor]);
 
   async function carregarPetsTutor(tutorId, isActive) {
     setLoadingPets(true);
@@ -93,6 +139,11 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function selecionarTutorAgenda(tutor) {
+    setTutorSelecionado(tutor);
+    setForm((prev) => ({ ...prev, pet_id: "" }));
   }
 
   function onServicoChange(servicoId) {
@@ -220,6 +271,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         loadingSugestoes={loadingSugestoes}
         petsDoTutor={petsDoTutor}
         recursos={recursos}
+        retornoNovoPet={retornoNovoPet}
         saving={saving}
         servicos={servicos}
         sugestoes={sugestoes}
@@ -227,7 +279,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         onChangeData={setDataRef}
         onChangeField={updateField}
         onChangeServico={onServicoChange}
-        onSelectTutor={setTutorSelecionado}
+        onSelectTutor={selecionarTutorAgenda}
         onSubmit={criarAgendamento}
         onUseSlot={usarSlot}
       />

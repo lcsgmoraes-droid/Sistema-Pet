@@ -1,9 +1,42 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { formatarData } from "../api/produtos";
 import { obterEstoqueVisualProduto } from "../components/produtos/produtosUtils";
 
 const normalizeExpandId = (value) => String(value ?? "");
+const PRODUTOS_COLUNAS_STORAGE_KEY = "produtos_colunas_visiveis";
+const PRODUTOS_COLUNAS_VERSION_KEY = "produtos_colunas_visiveis_version";
+const PRODUTOS_COLUNAS_VERSION = 2;
+const COLUNAS_PADRAO_MIGRACAO = ["margem", "canais"];
+
+function carregarColunasVisiveisSalvas(colunasTabela) {
+  const salvo = localStorage.getItem(PRODUTOS_COLUNAS_STORAGE_KEY);
+  if (!salvo) return null;
+
+  try {
+    const parsed = JSON.parse(salvo);
+    if (!Array.isArray(parsed)) return null;
+
+    const colunasConhecidas = new Set(colunasTabela.map((coluna) => coluna.key));
+    const normalizadas = parsed.filter((key) => colunasConhecidas.has(key));
+    const versaoSalva = Number(
+      localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 1,
+    );
+
+    if (versaoSalva < PRODUTOS_COLUNAS_VERSION) {
+      COLUNAS_PADRAO_MIGRACAO.forEach((key) => {
+        const coluna = colunasTabela.find((item) => item.key === key);
+        if (coluna?.visible === true && !normalizadas.includes(key)) {
+          normalizadas.push(key);
+        }
+      });
+    }
+
+    return normalizadas.length > 0 ? normalizadas : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function useProdutosTabela({
   colunasTabela,
@@ -15,13 +48,31 @@ export default function useProdutosTabela({
   const [kitsExpandidos, setKitsExpandidos] = useState([]);
   const [paisExpandidosInterno, setPaisExpandidosInterno] = useState([]);
   const [colunasVisiveis, setColunasVisiveis] = useState(() => {
-    const salvo = localStorage.getItem("produtos_colunas_visiveis");
-    return salvo ? JSON.parse(salvo) : null;
+    return carregarColunasVisiveisSalvas(colunasTabela);
   });
   const [modalColunas, setModalColunas] = useState(false);
   const [colunasTemporarias, setColunasTemporarias] = useState([]);
   const paisExpandidos = paisExpandidosExterno ?? paisExpandidosInterno;
   const setPaisExpandidos = setPaisExpandidosExterno ?? setPaisExpandidosInterno;
+
+  useEffect(() => {
+    const versaoSalva = Number(
+      localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 0,
+    );
+
+    if (versaoSalva >= PRODUTOS_COLUNAS_VERSION) return;
+
+    if (colunasVisiveis) {
+      localStorage.setItem(
+        PRODUTOS_COLUNAS_STORAGE_KEY,
+        JSON.stringify(colunasVisiveis),
+      );
+    }
+    localStorage.setItem(
+      PRODUTOS_COLUNAS_VERSION_KEY,
+      String(PRODUTOS_COLUNAS_VERSION),
+    );
+  }, [colunasVisiveis]);
 
   const getCorEstoque = (produto) => {
     if (!produto.controlar_estoque) return "text-gray-500";
@@ -138,8 +189,12 @@ export default function useProdutosTabela({
 
   const salvarColunas = () => {
     localStorage.setItem(
-      "produtos_colunas_visiveis",
+      PRODUTOS_COLUNAS_STORAGE_KEY,
       JSON.stringify(colunasTemporarias),
+    );
+    localStorage.setItem(
+      PRODUTOS_COLUNAS_VERSION_KEY,
+      String(PRODUTOS_COLUNAS_VERSION),
     );
     setColunasVisiveis(colunasTemporarias);
     setModalColunas(false);
@@ -147,7 +202,11 @@ export default function useProdutosTabela({
   };
 
   const restaurarColunasPadrao = () => {
-    localStorage.removeItem("produtos_colunas_visiveis");
+    localStorage.removeItem(PRODUTOS_COLUNAS_STORAGE_KEY);
+    localStorage.setItem(
+      PRODUTOS_COLUNAS_VERSION_KEY,
+      String(PRODUTOS_COLUNAS_VERSION),
+    );
     setColunasVisiveis(null);
     setColunasTemporarias(colunasTabela.map((coluna) => coluna.key));
     toast.success("Colunas restauradas para o padrao!");

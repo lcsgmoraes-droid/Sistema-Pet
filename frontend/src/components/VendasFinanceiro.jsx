@@ -512,6 +512,20 @@ export default function VendasFinanceiro() {
     }).format(valor || 0);
   };
 
+  const valorEhZeroVisual = (valor) => {
+    const numero = Number(valor || 0);
+    return Number.isFinite(numero) && Math.abs(numero) < 0.005;
+  };
+
+  const formatarMoedaOuTraco = (valor) =>
+    valorEhZeroVisual(valor) ? "-" : formatarMoeda(valor);
+
+  const formatarMoedaComSinalOuTraco = (valor, sinal) =>
+    valorEhZeroVisual(valor) ? "-" : `${sinal}${formatarMoeda(Math.abs(Number(valor || 0)))}`;
+
+  const formatarPercentualOuTraco = (valor) =>
+    valorEhZeroVisual(valor) ? "-" : `${valor}%`;
+
   // Helper para garantir números válidos
   const sanitizarNumero = (valor) => {
     if (
@@ -1194,13 +1208,13 @@ export default function VendasFinanceiro() {
   }, [listaVendasFiltrada]);
 
   const formatarDeducaoTotalizador = (valor) =>
-    Number(valor || 0) > 0 ? `-${formatarMoeda(valor)}` : formatarMoeda(0);
+    formatarMoedaComSinalOuTraco(valor, "-");
 
   const cardsTotalizadoresLista = [
     { label: "Vendas", value: totalizadoresListaVendas.quantidade.toLocaleString("pt-BR") },
     { label: "Com NF", value: totalizadoresListaVendas.com_nf.toLocaleString("pt-BR") },
-    { label: "Venda Bruta", value: formatarMoeda(totalizadoresListaVendas.venda_bruta) },
-    { label: "Tx Loja", value: `+${formatarMoeda(totalizadoresListaVendas.taxa_loja)}` },
+    { label: "Venda Bruta", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_bruta) },
+    { label: "Tx Loja", value: formatarMoedaComSinalOuTraco(totalizadoresListaVendas.taxa_loja, "+") },
     { label: "Desconto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto) },
     { label: "Tx. Entrega", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega) },
     { label: "Tx. Operac.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional) },
@@ -1208,11 +1222,11 @@ export default function VendasFinanceiro() {
     { label: "Comissao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao) },
     { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto) },
     { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha) },
-    { label: "Liquida", value: formatarMoeda(totalizadoresListaVendas.venda_liquida) },
+    { label: "Liquida", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida) },
     { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos) },
-    { label: "Lucro", value: formatarMoeda(totalizadoresListaVendas.lucro) },
-    { label: "MG Venda", value: `${totalizadoresListaVendas.margem_sobre_venda}%` },
-    { label: "MG Custo", value: `${totalizadoresListaVendas.margem_sobre_custo}%` },
+    { label: "Lucro", value: formatarMoedaOuTraco(totalizadoresListaVendas.lucro) },
+    { label: "MG Venda", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_venda) },
+    { label: "MG Custo", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo) },
   ];
 
   const getTextoComparacao = () => {
@@ -3493,34 +3507,34 @@ export default function VendasFinanceiro() {
                       </td>
                       <td className="px-1 py-2">{venda.cliente_nome}</td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        {formatarMoeda(venda.venda_bruta)}
+                        {formatarMoedaOuTraco(venda.venda_bruta)}
                       </td>
                       <td
                         className="px-1 py-2 text-right text-green-700 whitespace-nowrap"
                         title="Taxa de entrega total cobrada do cliente"
                       >
-                        +{formatarMoeda(venda.taxa_loja || 0)}
+                        {formatarMoedaComSinalOuTraco(venda.taxa_loja || 0, "+")}
                       </td>
                       <td className="px-1 py-2 text-right text-red-600 whitespace-nowrap">
-                        -{formatarMoeda(venda.desconto)}
+                        {formatarMoedaComSinalOuTraco(venda.desconto, "-")}
                       </td>
                       <td
                         className="px-1 py-2 text-right text-blue-600 whitespace-nowrap"
                         title="Comissão repassada ao entregador"
                       >
-                        -{formatarMoeda(venda.taxa_entrega)}
+                        {formatarMoedaComSinalOuTraco(venda.taxa_entrega, "-")}
                       </td>
                       <td
                         className="px-1 py-2 text-right text-orange-500 whitespace-nowrap"
                         title="Custo operacional da entrega (empresa)"
                       >
-                        -{formatarMoeda(venda.taxa_operacional || 0)}
+                        {formatarMoedaComSinalOuTraco(venda.taxa_operacional || 0, "-")}
                       </td>
                       <td className="px-1 py-2 text-right text-purple-600 whitespace-nowrap">
-                        -{formatarMoeda(venda.taxa_cartao)}
+                        {formatarMoedaComSinalOuTraco(venda.taxa_cartao, "-")}
                       </td>
                       <td className="px-1 py-2 text-right text-blue-600 whitespace-nowrap">
-                        -{formatarMoeda(venda.comissao)}
+                        {formatarMoedaComSinalOuTraco(venda.comissao, "-")}
                       </td>
                       <td
                         className="px-1 py-2 text-right text-pink-600 whitespace-nowrap"
@@ -3530,7 +3544,7 @@ export default function VendasFinanceiro() {
                             : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
                         }
                       >
-                        -{formatarMoeda(venda.imposto || 0)}
+                        {formatarMoedaComSinalOuTraco(venda.imposto || 0, "-")}
                       </td>
                       <td
                         className="px-1 py-2 text-right text-teal-600 whitespace-nowrap"
@@ -3538,24 +3552,24 @@ export default function VendasFinanceiro() {
                       >
                         {venda.custo_campanha > 0
                           ? `-${formatarMoeda(venda.custo_campanha)}`
-                          : "—"}
+                          : "-"}
                       </td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        {formatarMoeda(venda.venda_liquida)}
+                        {formatarMoedaOuTraco(venda.venda_liquida)}
                       </td>
                       <td className="px-1 py-2 text-right text-orange-600 whitespace-nowrap">
-                        -{formatarMoeda(venda.custo_produtos)}
+                        {formatarMoedaComSinalOuTraco(venda.custo_produtos, "-")}
                       </td>
                       <td
                         className={`px-1 py-2 text-right font-bold whitespace-nowrap ${venda.lucro >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {formatarMoeda(venda.lucro)}
+                        {formatarMoedaOuTraco(venda.lucro)}
                       </td>
                       <td className="px-1 py-2 text-right whitespace-nowrap">
-                        {venda.margem_sobre_venda}%
+                        {formatarPercentualOuTraco(venda.margem_sobre_venda)}
                       </td>
                       <td className="px-1 py-2 text-right whitespace-nowrap">
-                        {venda.margem_sobre_custo}%
+                        {formatarPercentualOuTraco(venda.margem_sobre_custo)}
                       </td>
                       <td className="px-2 py-2 text-center">
                         <span
@@ -3661,31 +3675,28 @@ export default function VendasFinanceiro() {
                                         {item.quantidade}
                                       </td>
                                       <td className="px-1 py-1 text-right whitespace-nowrap">
-                                        {formatarMoeda(item.preco_unitario)}
+                                        {formatarMoedaOuTraco(item.preco_unitario)}
                                       </td>
                                       <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        {formatarMoeda(item.venda_bruta)}
+                                        {formatarMoedaOuTraco(item.venda_bruta)}
                                       </td>
                                       <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
-                                        +{formatarMoeda(item.taxa_loja || 0)}
+                                        {formatarMoedaComSinalOuTraco(item.taxa_loja || 0, "+")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
-                                        -{formatarMoeda(item.desconto)}
+                                        {formatarMoedaComSinalOuTraco(item.desconto, "-")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        -{formatarMoeda(item.taxa_entrega)}
+                                        {formatarMoedaComSinalOuTraco(item.taxa_entrega, "-")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-500 whitespace-nowrap">
-                                        -
-                                        {formatarMoeda(
-                                          item.taxa_operacional || 0,
-                                        )}
+                                        {formatarMoedaComSinalOuTraco(item.taxa_operacional || 0, "-")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
-                                        -{formatarMoeda(item.taxa_cartao)}
+                                        {formatarMoedaComSinalOuTraco(item.taxa_cartao, "-")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        -{formatarMoeda(item.comissao)}
+                                        {formatarMoedaComSinalOuTraco(item.comissao, "-")}
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
@@ -3695,39 +3706,39 @@ export default function VendasFinanceiro() {
                                             : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
                                         }
                                       >
-                                        -{formatarMoeda(item.imposto || 0)}
+                                        {formatarMoedaComSinalOuTraco(item.imposto || 0, "-")}
                                       </td>
                                       <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">
                                         {(item.campanha || 0) > 0
                                           ? `-${formatarMoeda(item.campanha)}`
-                                          : "—"}
+                                          : "-"}
                                       </td>
                                       <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        {formatarMoeda(item.valor_liquido)}
+                                        {formatarMoedaOuTraco(item.valor_liquido)}
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-600 whitespace-nowrap">
-                                        {formatarMoeda(item.custo_unitario)}
+                                        {formatarMoedaOuTraco(item.custo_unitario)}
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-600 font-medium whitespace-nowrap">
-                                        -{formatarMoeda(item.custo_total)}
+                                        {formatarMoedaComSinalOuTraco(item.custo_total, "-")}
                                       </td>
                                       <td
                                         className={`px-1 py-1 text-right font-bold whitespace-nowrap ${item.lucro >= 0 ? "text-green-600" : "text-red-600"} cursor-help`}
                                         title={`Lucro unitário: ${formatarMoeda(item.lucro_unitario)}`}
                                       >
-                                        {formatarMoeda(item.lucro)}
+                                        {formatarMoedaOuTraco(item.lucro)}
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right whitespace-nowrap cursor-help"
                                         title={`Margem: ${item.margem_sobre_venda}%`}
                                       >
-                                        {item.margem_sobre_venda}%
+                                        {formatarPercentualOuTraco(item.margem_sobre_venda)}
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right whitespace-nowrap cursor-help"
                                         title={`Markup: ${item.margem_sobre_custo}%`}
                                       >
-                                        {item.margem_sobre_custo}%
+                                        {formatarPercentualOuTraco(item.margem_sobre_custo)}
                                       </td>
                                     </tr>
                                   ))}

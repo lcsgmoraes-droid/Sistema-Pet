@@ -1,4 +1,4 @@
-import TutorAutocomplete from "../../../components/TutorAutocomplete";
+import TutorPetSelector from "../../../components/veterinario/TutorPetSelector";
 
 export default function BanhoTosaAgendaForm({
   dataRef,
@@ -9,6 +9,7 @@ export default function BanhoTosaAgendaForm({
   recursos = [],
   servicos,
   tutorSelecionado,
+  retornoNovoPet,
   onChangeData,
   onChangeField,
   onChangeServico,
@@ -28,38 +29,16 @@ export default function BanhoTosaAgendaForm({
       </h2>
 
       <div className="mt-5 space-y-4">
-        <TutorAutocomplete
-          label="Tutor"
-          inputId="bt-agenda-tutor"
-          selectedTutor={tutorSelecionado}
-          onSelect={onSelectTutor}
-          placeholder="Digite nome, CPF ou telefone do tutor..."
+        <TutorPetSelector
+          tutorSelecionado={tutorSelecionado}
+          petId={form.pet_id}
+          pets={petsDoTutor}
+          loadingPets={loadingPets}
+          tutorInputId="bt-agenda-tutor"
+          returnTo={retornoNovoPet}
+          onSelectTutor={onSelectTutor}
+          onSelectPet={(petId) => onChangeField("pet_id", petId)}
         />
-
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-            Pet
-          </span>
-          <select
-            value={form.pet_id}
-            disabled={!tutorSelecionado?.id || loadingPets}
-            onChange={(event) => onChangeField("pet_id", event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:text-slate-400"
-          >
-            <option value="">
-              {!tutorSelecionado?.id
-                ? "Selecione o tutor primeiro"
-                : loadingPets
-                ? "Carregando pets..."
-                : "Selecione o pet"}
-            </option>
-            {petsDoTutor.map((pet) => (
-              <option key={pet.id} value={pet.id}>
-                {pet.nome} {pet.especie ? `(${pet.especie})` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />

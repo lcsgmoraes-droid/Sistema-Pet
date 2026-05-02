@@ -175,7 +175,7 @@ class CashbackHandler:
             expires_at = datetime.now(timezone.utc) + timedelta(days=valid_days)
 
         # Registra transação de cashback (ledger append-only)
-        db.add(CashbackTransaction(
+        cashback_tx = CashbackTransaction(
             tenant_id=campaign.tenant_id,
             customer_id=customer_id,
             amount=amount,
@@ -184,10 +184,11 @@ class CashbackHandler:
             description=f"Cashback {pct_total}% na venda #{venda_id} (rank {rank.value}, {canal_label})",
             expires_at=expires_at,
             tx_type="credit",
-        ))
+        )
+        db.add(cashback_tx)
 
         # Registra execution
-        db.add(CampaignExecution(
+        execution = CampaignExecution(
             tenant_id=campaign.tenant_id,
             campaign_id=campaign.id,
             customer_id=customer_id,
@@ -196,7 +197,10 @@ class CashbackHandler:
             reward_value=amount,
             reward_meta={"percent": float(pct_total), "rank": rank.value, "venda_id": venda_id, "canal": canal, "bonus_percent": float(bonus_pct)},
             source_event_id=source_event_id,
-        ))
+        )
+        db.add(execution)
+        db.flush()
+        cashback_tx.source_id = execution.id
 
         # Notificação
         from app.models import Cliente

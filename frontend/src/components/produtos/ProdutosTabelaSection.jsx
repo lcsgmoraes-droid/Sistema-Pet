@@ -1,6 +1,7 @@
 import React from "react";
 import { formatarData, formatarMoeda } from "../../api/produtos";
-import { obterEstoqueVisualProduto } from "./produtosUtils";
+import { actionButtonClasses } from "../ui/actionStyles";
+import { obterCanaisAtivosProduto, obterEstoqueVisualProduto } from "./produtosUtils";
 import ProdutosPaginationControls from "./ProdutosPaginationControls";
 
 function obterValidadeResumoProduto(produto) {
@@ -151,6 +152,7 @@ export default function ProdutosTabelaSection({
                 const estoqueDisponivel = Number((estoqueAtual - reservado).toFixed(2));
                 const imagem = obterImagemProduto(produto);
                 const codigo = produto.codigo || produto.sku || produto.codigo_barras;
+                const canaisAtivos = obterCanaisAtivosProduto(produto);
 
                 return (
                   <article
@@ -207,6 +209,14 @@ export default function ProdutosTabelaSection({
                                   Inativo
                                 </span>
                               )}
+                              {canaisAtivos.map((canal) => (
+                                <span
+                                  key={canal.key}
+                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
+                                >
+                                  {canal.label}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -255,7 +265,12 @@ export default function ProdutosTabelaSection({
                           event.stopPropagation();
                           navigate(`/produtos/${produto.id}/editar`);
                         }}
-                        className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white"
+                        className={actionButtonClasses({
+                          intent: "edit",
+                          tone: "solid",
+                          size: "sm",
+                          className: "flex-1",
+                        })}
                       >
                         Editar
                       </button>
@@ -266,7 +281,11 @@ export default function ProdutosTabelaSection({
                             event.stopPropagation();
                             copiarTexto(codigo, "Codigo");
                           }}
-                          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+                          className={actionButtonClasses({
+                            intent: "neutral",
+                            tone: "soft",
+                            size: "sm",
+                          })}
                         >
                           Copiar
                         </button>
@@ -277,7 +296,11 @@ export default function ProdutosTabelaSection({
                           event.stopPropagation();
                           handleToggleAtivo(produto);
                         }}
-                        className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+                        className={actionButtonClasses({
+                          intent: produto.ativo === false ? "create" : "warning",
+                          tone: "soft",
+                          size: "sm",
+                        })}
                       >
                         {produto.ativo === false ? "Ativar" : "Inativar"}
                       </button>

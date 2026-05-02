@@ -361,14 +361,25 @@ const GerenciamentoPets = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {pets.map(pet => (
-            <div
-              key={pet.id}
-              className={`bg-white rounded-lg shadow-sm border-2 transition-all hover:shadow-md ${
-                pet.ativo ? 'border-gray-200' : 'border-red-200 bg-gray-50'
-              }`}
-            >
-              <div className="p-5">
+          {pets.map(pet => {
+            const infoRows = [
+              { label: 'Espécie:', value: pet.especie || '' },
+              { label: 'Raça:', value: pet.raca || '' },
+              { label: 'Sexo:', value: pet.sexo || '' },
+              {
+                label: 'Idade:',
+                value: pet.data_nascimento ? calcularIdade(pet.data_nascimento) : '',
+              },
+            ];
+
+            return (
+              <div
+                key={pet.id}
+                className={`bg-white rounded-lg shadow-sm border-2 transition-all hover:shadow-md h-full ${
+                  pet.ativo ? 'border-gray-200' : 'border-red-200 bg-gray-50'
+                }`}
+              >
+                <div className="p-5 h-full flex flex-col">
                 {/* Header do card */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
@@ -395,36 +406,20 @@ const GerenciamentoPets = () => {
 
                 {/* Informações principais */}
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium text-gray-700">Espécie:</span>
-                    <span className="text-gray-900">{pet.especie}</span>
-                  </div>
-                  {pet.raca && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-gray-700">Raça:</span>
-                      <span className="text-gray-900">{pet.raca}</span>
+                  {infoRows.map((row) => (
+                    <div key={row.label} className="flex items-center gap-2 text-sm min-h-[20px]">
+                      <span className="font-medium text-gray-700 min-w-[58px]">{row.label}</span>
+                      <span className="text-gray-900">{row.value}</span>
                     </div>
-                  )}
-                  {pet.sexo && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-gray-700">Sexo:</span>
-                      <span className="text-gray-900">{pet.sexo}</span>
-                    </div>
-                  )}
-                  {pet.data_nascimento && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium text-gray-700">Idade:</span>
-                      <span className="text-gray-900">{calcularIdade(pet.data_nascimento)}</span>
-                    </div>
-                  )}
+                  ))}
                   <div className="flex items-center gap-2 text-sm pt-2 border-t border-gray-100">
                     <span className="font-medium text-gray-700">Tutor:</span>
-                    <span className="text-blue-600">{pet.cliente_nome}</span>
+                    <span className="text-blue-600">{pet.cliente_nome || ''}</span>
                   </div>
                 </div>
 
                 {/* Ações */}
-                <div className="flex gap-2">
+                <div className="flex gap-2 mt-auto">
                   <button
                     onClick={() => navigate(`/pets/${pet.id}`)}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
@@ -451,9 +446,10 @@ const GerenciamentoPets = () => {
                     {pet.ativo ? <FiXCircle size={16} /> : <FiCheckCircle size={16} />}
                   </button>
                 </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -4,6 +4,7 @@ import CampanhasGestorClienteResumo from "./CampanhasGestorClienteResumo";
 import CampanhasGestorCarimbosSection from "./CampanhasGestorCarimbosSection";
 import CampanhasGestorCashbackSection from "./CampanhasGestorCashbackSection";
 import CampanhasGestorCuponsSection from "./CampanhasGestorCuponsSection";
+import CampanhasGestorExtratoSection from "./CampanhasGestorExtratoSection";
 import CampanhasGestorRankingSection from "./CampanhasGestorRankingSection";
 
 export default function CampanhasGestorTab({
@@ -26,6 +27,7 @@ export default function CampanhasGestorTab({
   gestorCliente,
   gestorSaldo,
   gestorCarimbos,
+  gestorExtrato,
   gestorSecao,
   setGestorSecao,
   gestorIncluirEstornados,
@@ -94,6 +96,13 @@ export default function CampanhasGestorTab({
               gestorCliente={gestorCliente}
               gestorSaldo={gestorSaldo}
               rankLabels={RANK_LABELS}
+            />
+
+            <CampanhasGestorExtratoSection
+              gestorExtrato={gestorExtrato}
+              gestorSecao={gestorSecao}
+              setGestorSecao={setGestorSecao}
+              formatBRL={formatBRL}
             />
 
             <CampanhasGestorCarimbosSection

@@ -14,6 +14,7 @@ Rotas implementadas:
   POST /campanhas/cupons/manual                → cria cupom manual
   POST /campanhas/cupons/{code}/resgatar       → valida e resgata cupom no PDV
   GET  /campanhas/clientes/{customer_id}/saldo → saldo cashback + carimbos + rank do cliente
+  GET  /campanhas/clientes/{customer_id}/extrato → extrato auditavel de campanhas
   POST /campanhas/carimbos/manual              → lança carimbo manual para um cliente
   GET  /campanhas/ranking                      → lista clientes com nível de ranking atual
   POST /campanhas/ranking/recalcular           → força recálculo de ranking para todos os clientes
@@ -91,6 +92,7 @@ from app.campaigns.loyalty_service import (
     revoke_loyalty_reward_by_coupon,
     summarize_loyalty_balances_for_customer,
 )
+from app.campaigns.statement_service import build_campaign_customer_statement
 from app.db import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -878,6 +880,50 @@ def saldo_cliente(
 
 
 # ---------------------------------------------------------------------------
+# Extrato unificado de campanhas por cliente
+# ---------------------------------------------------------------------------
+
+@router.get("/clientes/{customer_id}/extrato")
+def extrato_campanhas_cliente(
+    customer_id: int,
+    tipo: Optional[str] = Query(
+        "todos",
+        description="todos | carimbos | cashback | cupons | ranking",
+    ),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
+    limit: int = Query(300, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """
+    Retorna um extrato auditavel de campanhas do cliente.
+
+    O extrato junta as fontes historicas ja existentes:
+    carimbos, cupons, resgates, cashback, estornos e ranking.
+    """
+    _, tenant_id = user_and_tenant
+
+    cliente = (
+        db.query(Cliente.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.id == customer_id)
+        .first()
+    )
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado")
+
+    return build_campaign_customer_statement(
+        db,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        tipo=tipo,
+        limit=limit,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Cashback — extrato do cliente
 # ---------------------------------------------------------------------------
 
@@ -1541,6 +1587,7 @@ def cashback_manual(
         amount=round(body.amount, 2),
         source_type=CashbackSourceTypeEnum.manual,
         description=body.description,
+        tx_type="debit" if body.amount < 0 else "credit",
     )
     db.add(transacao)
     db.commit()
@@ -1603,6 +1650,11 @@ def anular_cupom(
     )
 
     cupom.status = CouponStatusEnum.voided
+    cupom.meta = {
+        **(getattr(cupom, "meta", None) or {}),
+        "voided_reason": "cupom_anulado_manualmente",
+        "voided_at": datetime.now(timezone.utc).isoformat(),
+    }
     db.commit()
     return {
         "ok": True,

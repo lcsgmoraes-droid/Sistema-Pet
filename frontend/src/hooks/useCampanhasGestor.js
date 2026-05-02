@@ -9,6 +9,7 @@ export default function useCampanhasGestor() {
   const [gestorSaldo, setGestorSaldo] = useState(null);
   const [gestorCarimbos, setGestorCarimbos] = useState(null);
   const [gestorCupons, setGestorCupons] = useState(null);
+  const [gestorExtrato, setGestorExtrato] = useState(null);
   const [gestorCarregando, setGestorCarregando] = useState(false);
   const [gestorSecao, setGestorSecao] = useState(null);
   const [gestorIncluirEstornados, setGestorIncluirEstornados] = useState(false);
@@ -50,6 +51,7 @@ export default function useCampanhasGestor() {
     setGestorCliente(cliente);
     setGestorSearch(cliente.nome);
     setGestorSugestoes([]);
+    setGestorExtrato(null);
     setGestorCarregando(true);
     setGestorSecao(null);
 
@@ -64,6 +66,14 @@ export default function useCampanhasGestor() {
       setGestorSaldo(saldoRes.data);
       setGestorCarimbos(carimbosRes.data);
       setGestorCupons(cuponsRes.data);
+      try {
+        const extratoRes = await api.get(
+          `/campanhas/clientes/${cliente.id}/extrato?limit=300`,
+        );
+        setGestorExtrato(extratoRes.data);
+      } catch {
+        setGestorExtrato(null);
+      }
     } catch (e) {
       alert(
         "Erro ao carregar dados: " + (e?.response?.data?.detail || e.message),
@@ -194,6 +204,7 @@ export default function useCampanhasGestor() {
     gestorSaldo,
     gestorCarimbos,
     gestorCupons,
+    gestorExtrato,
     gestorCarregando,
     gestorSecao,
     setGestorSecao,

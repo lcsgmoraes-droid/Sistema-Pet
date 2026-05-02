@@ -1,5 +1,6 @@
 ﻿import React, { useState } from "react";
 import { formatarMoeda } from "../../api/produtos";
+import { actionButtonClasses } from "../ui/actionStyles";
 import { formatPercent } from "../../utils/formatters";
 
 function calcularMargem(preco, custo) {
@@ -15,6 +16,7 @@ import {
   isKitFisicoProduto,
   isKitVirtualProduto,
   isProdutoComComposicao,
+  obterCanaisAtivosProduto,
   obterEstoqueVisualProduto,
 } from "./produtosUtils";
 
@@ -611,36 +613,25 @@ export function createProdutosColunas() {
       </th>
     ),
     renderCell: (produto) => {
-      const ativoLojaFisica = produto.ativo !== false && produto.situacao !== false;
-      const statusEcommerce = ativoLojaFisica && produto.anunciar_ecommerce === true;
-      const statusApp = ativoLojaFisica && produto.anunciar_app === true;
-
-      const badgeClass = (status) =>
-        status
-          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-          : "bg-gray-50 text-gray-500 border-gray-200";
+      const canaisAtivos = obterCanaisAtivosProduto(produto);
 
       return (
         <td className="px-4 py-3 text-center">
           <div className="flex flex-col items-center gap-1.5">
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${badgeClass(statusEcommerce)}`}
-              title={statusEcommerce ? "Ativo no Ecommerce" : "Inativo no Ecommerce"}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${statusEcommerce ? "bg-emerald-500" : "bg-gray-400"}`}
-              />
-              E-commerce
-            </span>
-            <span
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-medium ${badgeClass(statusApp)}`}
-              title={statusApp ? "Ativo no App" : "Inativo no App"}
-            >
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${statusApp ? "bg-emerald-500" : "bg-gray-400"}`}
-              />
-              App
-            </span>
+            {canaisAtivos.length > 0 ? (
+              canaisAtivos.map((canal) => (
+                <span
+                  key={canal.key}
+                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                  title={`Ativo no ${canal.label}`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {canal.label}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-gray-400">-</span>
+            )}
           </div>
         </td>
       );
@@ -670,6 +661,14 @@ export function createProdutosColunas() {
         }
       }
 
+      const iconButtonClass = (intent, tone = "soft") =>
+        actionButtonClasses({
+          intent,
+          tone,
+          size: "xs",
+          className: "h-8 w-8 rounded-lg p-0",
+        });
+
       return (
       <td
         className="px-4 py-3 text-center"
@@ -689,7 +688,7 @@ export function createProdutosColunas() {
               );
               props.navigate(`/produtos/${produto.id}/movimentacoes`);
             }}
-            className={`rounded-lg p-1.5 border transition-all duration-200 ${classeMovimentacao}`}
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${classeMovimentacao}`}
             title="Ver movimentações de estoque"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -701,7 +700,7 @@ export function createProdutosColunas() {
               e.stopPropagation();
               props.navigate(`/produtos/${produto.id}/editar`);
             }}
-            className="rounded-lg p-1.5 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all duration-200"
+            className={iconButtonClass("edit")}
             title="Editar"
           >
             <svg
@@ -724,11 +723,9 @@ export function createProdutosColunas() {
               e.stopPropagation();
               props.handleToggleAtivo(produto);
             }}
-            className={`rounded-lg p-1.5 border transition-all duration-200 ${
-              produto.ativo === false
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
-            }`}
+            className={iconButtonClass(
+              produto.ativo === false ? "create" : "warning",
+            )}
             title={produto.ativo === false ? "Ativar" : "Desativar"}
           >
             <svg

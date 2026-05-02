@@ -1469,9 +1469,10 @@ class VendaService:
                         tenant_id=tenant_id,
                         customer_id=venda.cliente_id,
                         amount=-Decimal(str(pag_data['valor'])),
-                        source_type=CashbackSourceTypeEnum.manual,
+                        source_type=CashbackSourceTypeEnum.redemption,
                         source_id=venda.id,  # FK para rastreamento por venda
                         description=f"Resgate em venda {venda.numero_venda}",
+                        tx_type="debit",
                     )
                     db.add(debit)
 

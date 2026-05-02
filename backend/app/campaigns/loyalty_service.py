@@ -421,7 +421,6 @@ def sync_loyalty_rewards_for_customer(
     removable_cycles: list[CampaignExecution] = []
     max_cycle_index = 0
     current_cycle_count = len(cycle_executions)
-    suppressed_cycle_count = len(suppressed_cycle_executions)
 
     for execution in [*cycle_executions, *suppressed_cycle_executions]:
         max_cycle_index = max(
@@ -434,10 +433,9 @@ def sync_loyalty_rewards_for_customer(
         else:
             removable_cycles.append(execution)
 
-    target_cycle_count = max(
-        max(funded_cycles - suppressed_cycle_count, 0),
-        len(locked_cycles),
-    )
+    # Placeholders suppressed by a reversed used coupon stay for audit/history,
+    # but the business rule remains: every configured full cycle funds one reward.
+    target_cycle_count = max(funded_cycles, len(locked_cycles))
     removable_cycles.sort(
         key=lambda execution: _extract_loyalty_ref_index(execution.reference_period),
         reverse=True,
@@ -857,10 +855,11 @@ def _revoke_loyalty_reward(
             return 0
 
         if force and coupon.status == CouponStatusEnum.used:
+            revoked_at = datetime.now(timezone.utc)
             reward_meta = dict(execution.reward_meta or {})
             reward_meta["revoked_after_use"] = True
             reward_meta["revoked_reason"] = reason or "cupom_revertido"
-            reward_meta["revoked_at"] = datetime.now(timezone.utc).isoformat()
+            reward_meta["revoked_at"] = revoked_at.isoformat()
             reward_meta["original_consumed_stamps"] = reward_meta.get(
                 "original_consumed_stamps",
                 reward_meta.get("consumed_stamps"),
@@ -868,15 +867,20 @@ def _revoke_loyalty_reward(
             reward_meta["consumed_stamps"] = 0
             execution.reward_meta = reward_meta
             coupon.status = CouponStatusEnum.voided
+            coupon.meta = {
+                **(coupon.meta or {}),
+                "voided_reason": reason or "cupom_revertido",
+                "voided_at": revoked_at.isoformat(),
+            }
             return 1
 
         if coupon.status in (CouponStatusEnum.active, CouponStatusEnum.used, CouponStatusEnum.expired) or force:
             coupon.status = CouponStatusEnum.voided
-            if reason:
-                coupon.meta = {
-                    **(coupon.meta or {}),
-                    "voided_reason": reason,
-                }
+            coupon.meta = {
+                **(coupon.meta or {}),
+                "voided_reason": reason,
+                "voided_at": datetime.now(timezone.utc).isoformat(),
+            }
 
         db.delete(execution)
         return 1

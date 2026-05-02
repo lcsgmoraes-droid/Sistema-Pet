@@ -87,3 +87,15 @@ export const obterEstoqueVisualProduto = (produto) => {
 
   return Number(produto?.estoque_atual ?? produto?.estoque ?? 0);
 };
+
+export const obterCanaisAtivosProduto = (produto) => {
+  const ativoLojaFisica = produto?.ativo !== false && produto?.situacao !== false;
+  if (!ativoLojaFisica) return [];
+
+  return [
+    produto?.anunciar_ecommerce === true
+      ? { key: "ecommerce", label: "E-commerce" }
+      : null,
+    produto?.anunciar_app === true ? { key: "app", label: "App" } : null,
+  ].filter(Boolean);
+};

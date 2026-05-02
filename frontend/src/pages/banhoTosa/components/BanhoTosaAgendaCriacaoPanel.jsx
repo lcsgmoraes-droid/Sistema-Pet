@@ -12,6 +12,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
   servicos,
   sugestoes,
   tutorSelecionado,
+  retornoNovoPet,
   onChangeData,
   onChangeField,
   onChangeServico,
@@ -30,6 +31,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
         saving={saving}
         servicos={servicos}
         tutorSelecionado={tutorSelecionado}
+        retornoNovoPet={retornoNovoPet}
         onChangeData={onChangeData}
         onChangeField={onChangeField}
         onChangeServico={onChangeServico}

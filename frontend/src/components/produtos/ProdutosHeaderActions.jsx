@@ -1,5 +1,6 @@
 import React from "react";
 import { FiHelpCircle } from "react-icons/fi";
+import { actionButtonClasses } from "../ui/actionStyles";
 
 export default function ProdutosHeaderActions({
   abrirModalColunas,
@@ -39,13 +40,23 @@ export default function ProdutosHeaderActions({
           <>
             <button
               onClick={onOpenEdicaoLote}
-              className="px-3 py-2 text-sm text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all duration-200 border border-emerald-500 md:px-4"
+              className={actionButtonClasses({
+                intent: "edit",
+                tone: "solid",
+                size: "md",
+                className: "shadow-sm hover:shadow-md",
+              })}
             >
               Editar em Lote ({selecionadosCount})
             </button>
             <button
               onClick={onExcluirSelecionados}
-              className="px-3 py-2 text-sm text-white rounded-xl bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all duration-200 border border-red-500 md:px-4"
+              className={actionButtonClasses({
+                intent: "delete",
+                tone: "solid",
+                size: "md",
+                className: "shadow-sm hover:shadow-md",
+              })}
             >
               Excluir Selecionados ({selecionadosCount})
             </button>
@@ -54,7 +65,12 @@ export default function ProdutosHeaderActions({
         <button
           id="tour-produtos-importar"
           onClick={onOpenImportacao}
-          className="px-3 py-2 text-sm text-white rounded-xl bg-sky-600 hover:bg-sky-700 shadow-sm hover:shadow-md transition-all duration-200 border border-sky-500 font-medium flex items-center gap-2 md:px-4"
+          className={actionButtonClasses({
+            intent: "create",
+            tone: "solid",
+            size: "md",
+            className: "shadow-sm hover:shadow-md",
+          })}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -68,7 +84,12 @@ export default function ProdutosHeaderActions({
         </button>
         <button
           onClick={abrirModalColunas}
-          className="px-3 py-2 text-sm text-slate-700 rounded-xl bg-white hover:bg-slate-50 shadow-sm hover:shadow-md transition-all duration-200 border border-slate-300 font-medium flex items-center gap-2 md:px-4"
+          className={actionButtonClasses({
+            intent: "neutral",
+            tone: "soft",
+            size: "md",
+            className: "bg-white shadow-sm hover:shadow-md",
+          })}
           title="Configurar colunas visiveis"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,7 +111,12 @@ export default function ProdutosHeaderActions({
         <div className="relative" ref={menuRelatoriosRef}>
           <button
             onClick={onToggleMenuRelatorios}
-            className="px-3 py-2 text-sm text-indigo-700 rounded-xl bg-indigo-50 hover:bg-indigo-100 shadow-sm hover:shadow-md transition-all duration-200 border border-indigo-200 font-medium md:px-4"
+            className={actionButtonClasses({
+              intent: "neutral",
+              tone: "soft",
+              size: "md",
+              className: "bg-white shadow-sm hover:shadow-md",
+            })}
           >
             Relatorios
           </button>
@@ -121,7 +147,12 @@ export default function ProdutosHeaderActions({
         <button
           id="tour-produtos-novo"
           onClick={() => navigate("/produtos/novo")}
-          className="px-3 py-2 text-sm text-white rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all duration-200 border border-blue-500 font-medium md:px-4"
+          className={actionButtonClasses({
+            intent: "create",
+            tone: "solid",
+            size: "md",
+            className: "shadow-sm hover:shadow-md",
+          })}
         >
           + Novo Produto
         </button>

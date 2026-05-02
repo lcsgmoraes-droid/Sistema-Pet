@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { buildNovoPetPath } from "../../utils/petReturnFlow";
+import { actionButtonClasses } from "../ui/actionStyles";
 
 export default function NovoPetButton({
   tutorId,
@@ -39,7 +40,12 @@ export default function NovoPetButton({
       onClick={handleClick}
       disabled={disabled}
       title={disabled ? "Selecione o tutor primeiro" : "Cadastrar um novo pet para este tutor"}
-      className={`inline-flex items-center gap-1 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 ${className}`}
+      className={actionButtonClasses({
+        intent: "create",
+        tone: "soft",
+        size: "xs",
+        className,
+      })}
     >
       <Plus size={13} />
       {label}

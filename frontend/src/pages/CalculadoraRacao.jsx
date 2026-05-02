@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import "../styles/CalculadoraRacao.css";
@@ -342,7 +342,35 @@ function RacaoSearchInput({
   warning,
 }) {
   const [aberto, setAberto] = useState(false);
+  const [dropdown, setDropdown] = useState({
+    direction: "down",
+    maxHeight: 320,
+  });
+  const controlRef = useRef(null);
   const termo = normalizarTexto(value);
+
+  const abrirDropdown = () => {
+    if (disabled) return;
+
+    if (typeof window === "undefined" || !controlRef.current) {
+      setAberto(true);
+      return;
+    }
+
+    const rect = controlRef.current.getBoundingClientRect();
+    const margemTela = 16;
+    const espacoAbaixo = window.innerHeight - rect.bottom - margemTela;
+    const espacoAcima = rect.top - margemTela;
+    const direction =
+      espacoAbaixo < 260 && espacoAcima > espacoAbaixo ? "up" : "down";
+    const espacoDisponivel = direction === "up" ? espacoAcima : espacoAbaixo;
+
+    setDropdown({
+      direction,
+      maxHeight: Math.max(140, Math.min(320, Math.floor(espacoDisponivel))),
+    });
+    setAberto(true);
+  };
 
   const opcoes = useMemo(() => {
     const filtradas = produtos
@@ -378,15 +406,16 @@ function RacaoSearchInput({
   return (
     <div className="racao-search-field">
       <label>{label}</label>
-      <div className="racao-search-control">
+      <div className="racao-search-control" ref={controlRef}>
         <input
           type="text"
           value={value || ""}
           onChange={(e) => {
             onChange(e.target.value);
-            setAberto(true);
+            abrirDropdown();
           }}
-          onFocus={() => !disabled && setAberto(true)}
+          onFocus={abrirDropdown}
+          onClick={abrirDropdown}
           onBlur={() => setTimeout(() => setAberto(false), 160)}
           placeholder={placeholder}
           disabled={disabled}
@@ -406,7 +435,13 @@ function RacaoSearchInput({
       </div>
 
       {aberto && !disabled && (
-        <div className="racao-options" role="listbox">
+        <div
+          className={`racao-options open-${dropdown.direction}`}
+          role="listbox"
+          style={{
+            "--racao-options-max-height": `${dropdown.maxHeight}px`,
+          }}
+        >
           {loading && (
             <div className="racao-empty">Buscando no cadastro...</div>
           )}

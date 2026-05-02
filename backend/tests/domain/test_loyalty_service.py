@@ -157,14 +157,14 @@ def test_get_loyalty_balance_ignores_suppressed_cycle_placeholder():
     }
 
 
-def test_sync_loyalty_rewards_does_not_reissue_suppressed_cycle_immediately():
+def test_sync_loyalty_rewards_reissues_after_used_coupon_reversal_using_configured_cycle_size():
     db = MagicMock()
     campaign = SimpleNamespace(
         id=1,
         tenant_id="tenant-1",
         name="Cartao Fidelidade",
         params={
-            "stamps_to_complete": 10,
+            "stamps_to_complete": 7,
             "reward_type": "coupon",
             "reward_value": 25,
             "intermediate_stamp": 0,
@@ -182,7 +182,7 @@ def test_sync_loyalty_rewards_does_not_reissue_suppressed_cycle_immediately():
     with (
         patch(
             "app.campaigns.loyalty_service.count_active_loyalty_stamps",
-            return_value=13,
+            return_value=7,
         ),
         patch(
             "app.campaigns.loyalty_service._load_loyalty_executions",
@@ -191,14 +191,14 @@ def test_sync_loyalty_rewards_does_not_reissue_suppressed_cycle_immediately():
         patch(
             "app.campaigns.loyalty_service.get_loyalty_balance_for_campaign",
             return_value={
-                "total_stamps": 13,
-                "available_stamps": 13,
-                "converted_stamps": 0,
+                "total_stamps": 7,
+                "available_stamps": 0,
+                "converted_stamps": 7,
                 "debt_stamps": 0,
-                "completed_cycles": 0,
+                "completed_cycles": 1,
             },
         ),
-        patch("app.campaigns.loyalty_service._give_loyalty_reward") as give_reward,
+        patch("app.campaigns.loyalty_service._give_loyalty_reward", return_value=1) as give_reward,
         patch("app.campaigns.loyalty_service._revoke_loyalty_reward") as revoke_reward,
     ):
         result = sync_loyalty_rewards_for_customer(
@@ -208,7 +208,11 @@ def test_sync_loyalty_rewards_does_not_reissue_suppressed_cycle_immediately():
             source_event_id=None,
         )
 
-    give_reward.assert_not_called()
+    give_reward.assert_called_once()
+    give_kwargs = give_reward.call_args.kwargs
+    assert give_kwargs["ref_period"] == "cycle-2"
+    assert give_kwargs["consumed_stamps"] == 7
+    assert give_kwargs["stamps_to_complete_snapshot"] == 7
     revoke_reward.assert_not_called()
-    assert result["awarded"] == 0
-    assert result["available_stamps"] == 13
+    assert result["awarded"] == 1
+    assert result["available_stamps"] == 0
