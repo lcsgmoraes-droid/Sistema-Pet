@@ -872,6 +872,11 @@ const Layout = () => {
           label: "Roles & Permissões",
           permission: "usuarios.manage",
         },
+        {
+          path: "/admin/observabilidade",
+          label: "Observabilidade",
+          permission: "usuarios.manage",
+        },
       ],
     },
     {

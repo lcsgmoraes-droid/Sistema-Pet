@@ -152,6 +152,7 @@ const ClienteFinanceiro = lazy(() => import("./pages/ClienteFinanceiro"));
 const DashboardGerencial = lazy(() => import("./pages/DashboardGerencial"));
 const UsuariosPage = lazy(() => import("./pages/UsuariosPage.jsx"));
 const RolesPage = lazy(() => import("./pages/RolesPage.jsx"));
+const Observabilidade = lazy(() => import("./pages/Observabilidade.jsx"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracaoFiscalEmpresa = lazy(
   () => import("./pages/configuracoes/ConfiguracaoFiscalEmpresa"),
@@ -790,6 +791,14 @@ function App() {
                   />
                   <Route path="rh/funcionarios" element={<Funcionarios />} />
                   <Route path="admin/roles" element={<RolesPage />} />
+                  <Route
+                    path="admin/observabilidade"
+                    element={
+                      <ProtectedRoute permission="usuarios.manage">
+                        <Observabilidade />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* Página de ajuda, planos e dúvidas — acessível sem módulo */}
                   <Route path="ajuda" element={<Ajuda />} />

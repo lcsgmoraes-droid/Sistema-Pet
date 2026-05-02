@@ -37,7 +37,7 @@ Use para: validar se esta tudo pronto para subir em producao.
 Regra: **nunca pular este passo**.
 
 ### 4) `FLUXO_UNICO.bat prod-up`
-Use para: subir producao pelo caminho seguro e padronizado.
+Uso legado/local. Para producao real no servidor, prefira `bash scripts/deploy_producao_seguro.sh`.
 
 ### 5) `FLUXO_UNICO.bat status`
 Use para: ver se os servicos estao de pe e saudaveis.
@@ -49,11 +49,11 @@ Use para: ver se os servicos estao de pe e saudaveis.
 1. `FLUXO_UNICO.bat check`
 2. `FLUXO_UNICO.bat dev-up`
 3. `FLUXO_UNICO.bat release-check`
-4. **Se mexeu em qualquer arquivo dentro de `frontend/src`:** rodar `npm run build` na pasta `frontend`
-   - Isso gera a pasta `dist` com o codigo novo empacotado
-   - Incluir o `dist` no commit junto com o restante
-   - Sem esse passo, a producao continua mostrando o codigo antigo
-5. `FLUXO_UNICO.bat prod-up`
+4. **Se mexeu em qualquer arquivo dentro de `frontend/src`:** commitar apenas o codigo-fonte
+   - Nao versionar `frontend/dist`
+   - O build de producao deve gerar os arquivos em `runtime/frontend/dist`
+   - Sem esse passo no deploy, a producao continua mostrando o codigo antigo
+5. No servidor: `bash scripts/deploy_producao_seguro.sh`
 6. `FLUXO_UNICO.bat status`
 
 ---
@@ -98,6 +98,27 @@ docker compose -f docker-compose.prod.yml up -d backend
 ```
 
 So o frontend e diferente: o nginx serve os arquivos estaticos gerados em `runtime/frontend/dist`, fora da arvore versionada. O Git guarda o codigo-fonte; o build de producao deve gerar/copiar os artefatos para `runtime/frontend/dist` e recriar/reiniciar o `nginx`.
+
+---
+
+## Deploy seguro no servidor
+
+No servidor de producao, o caminho padrao agora e:
+
+```
+cd /opt/petshop
+bash scripts/deploy_producao_seguro.sh
+```
+
+Esse script:
+- bloqueia se o Git estiver sujo
+- atualiza o codigo para `origin/main`
+- impede `frontend/dist` e `runtime` versionados
+- gera o frontend em `runtime/frontend/dist`
+- reconstrui o backend
+- sobe `postgres`, `backend` e `nginx`
+- valida `/health/watchdog` e `/api/health`
+- termina falhando se o Git ficar sujo
 
 ---
 
