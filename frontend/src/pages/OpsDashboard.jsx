@@ -326,6 +326,12 @@ export default function OpsDashboard() {
           </div>
           <div className="flex gap-2">
             <Link
+              to="/ops/incidentes"
+              className="inline-flex h-10 items-center rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              Ver incidentes
+            </Link>
+            <Link
               to="/ops/observabilidade"
               className="inline-flex h-10 items-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >

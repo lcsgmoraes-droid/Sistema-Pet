@@ -8,6 +8,7 @@ import {
   FiRefreshCw,
   FiSearch,
   FiUser,
+  FiZap,
 } from "react-icons/fi";
 
 import api from "../api";
@@ -58,6 +59,20 @@ function severityTone(severity) {
   if (severity === "critical") return "border-rose-200 bg-rose-50 text-rose-800";
   if (severity === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
   return "border-slate-200 bg-white text-slate-800";
+}
+
+function alertTone(tone) {
+  if (tone === "red") return "border-rose-200 bg-rose-50 text-rose-900";
+  if (tone === "amber") return "border-amber-200 bg-amber-50 text-amber-900";
+  if (tone === "green") return "border-emerald-200 bg-emerald-50 text-emerald-900";
+  return "border-blue-200 bg-blue-50 text-blue-900";
+}
+
+function severityLabel(severity) {
+  if (severity === "critical") return "critico";
+  if (severity === "warning") return "atencao";
+  if (severity === "ok") return "ok";
+  return severity || "info";
 }
 
 function Badge({ children, className = "" }) {
@@ -130,6 +145,62 @@ function RouteCard({ item, selected, onSelect }) {
         <span>Media: <b>{formatMs(item.avg_duration_ms)}</b></span>
       </div>
     </button>
+  );
+}
+
+function ActionableAlertsPanel({ alerts, onApply }) {
+  const items = alerts || [];
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <FiZap className="h-4 w-4 text-blue-600" />
+            Alertas automaticos
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            O sistema cruza tenant, rota, lentidao e erro repetido para sugerir a proxima acao.
+          </p>
+        </div>
+        <Badge className="border-blue-200 bg-blue-50 text-blue-700">{items.length} alerta(s)</Badge>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Nenhum alerta acionavel no periodo selecionado.
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          {items.slice(0, 6).map((alert) => (
+            <button
+              type="button"
+              key={alert.id || `${alert.scope}-${alert.title}`}
+              onClick={() => onApply(alert)}
+              className={`rounded-lg border px-4 py-3 text-left transition hover:shadow-sm ${alertTone(alert.tone)}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border-white bg-white/80 text-slate-800">{severityLabel(alert.severity)}</Badge>
+                    <span className="text-sm font-bold">{alert.title}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600">{alert.detail}</p>
+                  <p className="mt-2 text-xs font-semibold text-slate-800">{alert.action}</p>
+                </div>
+                <FiFilter className="mt-1 h-4 w-4 shrink-0 opacity-70" />
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                {alert.tenant_name ? <span>{alert.tenant_name}</span> : null}
+                {alert.path ? <span className="font-mono">{alert.path}</span> : null}
+                {alert.request_id ? <span className="font-mono">{alert.request_id}</span> : null}
+                {alert.latest_at ? <span>{formatDate(alert.latest_at)}</span> : null}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -282,6 +353,16 @@ export default function OpsIncidentes() {
     setPage(1);
   }
 
+  function applyAlertFilter(alert) {
+    const tenantFilter = alert?.tenant_filter || alert?.tenant_id || "";
+    setSelectedTenant(tenantFilter);
+    setSelectedPath(alert?.path || "");
+    setStatusMin(Number(alert?.errors_5xx || 0) > 0 ? "500" : "");
+    setSlowOnly(Number(alert?.slow_requests || 0) > 0 && Number(alert?.errors_5xx || 0) === 0);
+    setQuery(alert?.request_id || "");
+    setPage(1);
+  }
+
   return (
     <div className="p-6">
       <div className="mx-auto max-w-[1500px] space-y-5">
@@ -393,6 +474,11 @@ export default function OpsIncidentes() {
             {!selectedTenant && !selectedPath ? <span>Selecione um card abaixo para afunilar a investigacao.</span> : null}
           </div>
         </section>
+
+        <ActionableAlertsPanel
+          alerts={summary?.actionable_alerts || []}
+          onApply={applyAlertFilter}
+        />
 
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

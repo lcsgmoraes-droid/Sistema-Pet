@@ -81,6 +81,24 @@ def _duration(event: dict[str, Any]) -> float:
         return 0
 
 
+def _latest_event(events: list[dict[str, Any]]) -> dict[str, Any] | None:
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return max(events, key=lambda event: _event_dt(event) or epoch, default=None)
+
+
+def _top_path(events: list[dict[str, Any]]) -> str | None:
+    paths = _top_paths(events, limit=1)
+    return paths[0]["path"] if paths else None
+
+
+def _alert_tone(severity: str) -> str:
+    if severity == "critical":
+        return "red"
+    if severity == "warning":
+        return "amber"
+    return "blue"
+
+
 def _tenant_names(db: Session, tenant_ids: set[str]) -> dict[str, str]:
     real_ids = {tenant_id for tenant_id in tenant_ids if tenant_id and tenant_id != "sem_tenant"}
     if not real_ids:
@@ -165,6 +183,154 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
         key=lambda item: (item["errors_5xx"], item["slow_requests"], item["max_duration_ms"]),
         reverse=True,
     )[:20]
+
+
+def _build_actionable_alerts(
+    db: Session,
+    events: list[dict[str, Any]],
+    watchdog: dict[str, Any],
+    watchdog_summary: dict[str, Any],
+    deploy_events: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    alerts: list[dict[str, Any]] = []
+    tenant_error_threshold = _env_int("OPS_ALERT_TENANT_5XX_CRITICAL", 2)
+    tenant_slow_threshold = _env_int("OPS_ALERT_TENANT_SLOW_WARNING", 4)
+    route_error_threshold = _env_int("OPS_ALERT_ROUTE_5XX_CRITICAL", 2)
+    route_slow_threshold = _env_int("OPS_ALERT_ROUTE_SLOW_WARNING", 4)
+    watchdog_recoveries = int(watchdog_summary.get("recoveries") or 0)
+
+    if watchdog.get("status") != "healthy":
+        alerts.append(
+            {
+                "id": "system:watchdog:degraded",
+                "scope": "system",
+                "kind": "watchdog_degraded",
+                "severity": "critical",
+                "tone": "red",
+                "title": "Watchdog degradado agora",
+                "detail": "O health operacional indica problema no banco, pool ou resposta interna.",
+                "action": "Checar pool do banco, rotas lentas recentes e reinicios do backend antes de novas alteracoes.",
+                "score": 1000,
+            }
+        )
+
+    if watchdog_recoveries:
+        alerts.append(
+            {
+                "id": "system:watchdog:recoveries",
+                "scope": "system",
+                "kind": "watchdog_recovery",
+                "severity": "warning",
+                "tone": "amber",
+                "title": f"{watchdog_recoveries} recuperacao(oes) automatica(s)",
+                "detail": "O sistema precisou se recuperar sozinho no periodo selecionado.",
+                "action": "Abrir eventos imediatamente anteriores ao restart e procurar rota ou tenant recorrente.",
+                "score": 700 + watchdog_recoveries,
+            }
+        )
+
+    last_failed = _last_failed_deploy_after_success(deploy_events)
+    if last_failed:
+        alerts.append(
+            {
+                "id": "system:deploy:last_failed",
+                "scope": "system",
+                "kind": "deploy_failed",
+                "severity": "critical",
+                "tone": "red",
+                "title": "Ultimo deploy registrado falhou",
+                "detail": last_failed.get("message") or f"Etapa: {last_failed.get('step') or '-'}",
+                "action": "Investigar a falha de deploy antes de empilhar nova mudanca em producao.",
+                "score": 900,
+            }
+        )
+
+    grouped_by_tenant: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    grouped_by_path: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for event in events:
+        grouped_by_tenant[str(event.get("tenant_id") or "sem_tenant")].append(event)
+        grouped_by_path[str(event.get("path") or "sem_path")].append(event)
+
+    tenant_names = _tenant_names(db, set(grouped_by_tenant.keys()))
+
+    for tenant_id, tenant_events in grouped_by_tenant.items():
+        errors_5xx = sum(1 for event in tenant_events if _status_code(event) >= 500)
+        slow_requests = sum(1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
+        if errors_5xx < tenant_error_threshold and slow_requests < tenant_slow_threshold:
+            continue
+
+        latest = _latest_event(tenant_events)
+        top_path = _top_path(tenant_events)
+        tenant_name = tenant_names.get(tenant_id) or (
+            "Sem tenant identificado" if tenant_id == "sem_tenant" else f"Tenant {tenant_id[:8]}"
+        )
+        severity = "critical" if errors_5xx >= tenant_error_threshold else "warning"
+        kind = "tenant_5xx_recurrent" if severity == "critical" else "tenant_slow_recurrent"
+        metric_detail = (
+            f"{errors_5xx} erro(s) 5xx"
+            if severity == "critical"
+            else f"{slow_requests} requisicao(oes) lenta(s)"
+        )
+        alerts.append(
+            {
+                "id": f"tenant:{tenant_id}:{kind}",
+                "scope": "tenant",
+                "kind": kind,
+                "severity": severity,
+                "tone": _alert_tone(severity),
+                "title": f"{tenant_name}: {metric_detail}",
+                "detail": f"Rota mais recorrente: {top_path or 'sem rota dominante'}.",
+                "action": "Filtrar o tenant, abrir o request_id mais recente e corrigir a causa raiz antes de tratar caso a caso.",
+                "tenant_id": None if tenant_id == "sem_tenant" else tenant_id,
+                "tenant_filter": tenant_id,
+                "tenant_name": tenant_name,
+                "path": top_path,
+                "request_id": latest.get("request_id") if latest else None,
+                "latest_at": _iso(_event_dt(latest) if latest else None),
+                "total": len(tenant_events),
+                "errors_5xx": errors_5xx,
+                "slow_requests": slow_requests,
+                "score": (500 if severity == "critical" else 250) + (errors_5xx * 20) + slow_requests,
+            }
+        )
+
+    for path, path_events in grouped_by_path.items():
+        errors_5xx = sum(1 for event in path_events if _status_code(event) >= 500)
+        slow_requests = sum(1 for event in path_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
+        if errors_5xx < route_error_threshold and slow_requests < route_slow_threshold:
+            continue
+
+        latest = _latest_event(path_events)
+        tenant_count = len({str(event.get("tenant_id") or "sem_tenant") for event in path_events})
+        severity = "critical" if errors_5xx >= route_error_threshold else "warning"
+        kind = "route_5xx_recurrent" if severity == "critical" else "route_slow_recurrent"
+        metric_detail = (
+            f"{errors_5xx} erro(s) 5xx"
+            if severity == "critical"
+            else f"{slow_requests} chamada(s) lenta(s)"
+        )
+        alerts.append(
+            {
+                "id": f"route:{path}:{kind}",
+                "scope": "route",
+                "kind": kind,
+                "severity": severity,
+                "tone": _alert_tone(severity),
+                "title": f"{metric_detail} em rota recorrente",
+                "detail": f"{path} afetou {tenant_count} tenant(s) no periodo.",
+                "action": "Filtrar a rota, comparar tenants afetados e procurar regressao, query lenta ou integracao externa.",
+                "path": path,
+                "request_id": latest.get("request_id") if latest else None,
+                "latest_at": _iso(_event_dt(latest) if latest else None),
+                "total": len(path_events),
+                "errors_5xx": errors_5xx,
+                "slow_requests": slow_requests,
+                "tenant_count": tenant_count,
+                "score": (450 if severity == "critical" else 220) + (errors_5xx * 18) + slow_requests + tenant_count,
+            }
+        )
+
+    return sorted(alerts, key=lambda item: int(item.get("score") or 0), reverse=True)[:20]
 
 
 def _watchdog_now(db: Session) -> dict[str, Any]:
@@ -345,6 +511,13 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     watchdog = _watchdog_now(db)
     tenant_incidents = _build_tenant_incidents(db, error_events)
     route_incidents = _build_route_incidents(error_events)
+    actionable_alerts = _build_actionable_alerts(
+        db,
+        error_events,
+        watchdog,
+        watchdog_summary,
+        deploy_events,
+    )
     alerts = _build_alerts(
         watchdog=watchdog,
         error_summary=error_summary,
@@ -367,6 +540,7 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         "errors": error_summary,
         "deploys": deploy_summary,
         "watchdog_events": watchdog_summary,
+        "actionable_alerts": actionable_alerts,
         "tenant_incidents": tenant_incidents,
         "route_incidents": route_incidents,
         "latest": {

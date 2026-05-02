@@ -36,6 +36,7 @@ Separacao operacional iniciada:
 - Backend consolidado em `/admin/observabilidade/ops-summary`, para a inteligencia operacional ficar centralizada e reutilizavel.
 - Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
 - Painel de suporte em `/ops/incidentes`, com drilldown por tenant, rota e request_id para investigar producao sem depender apenas de relato do cliente.
+- Alertas acionaveis por tenant/rota em `/ops/incidentes`, com severidade, filtro em um clique e sugestao de correcao para erro repetido, lentidao recorrente e recuperacao automatica.
 
 Tela piloto:
 
