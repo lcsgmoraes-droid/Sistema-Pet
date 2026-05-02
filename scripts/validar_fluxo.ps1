@@ -190,54 +190,22 @@ if ($heads.Count -gt 1) {
     Fail 'Multiplas heads de migration detectadas. Unifique antes de subir producao.'
 }
 
-Write-Section '4) Integridade do frontend dist/assets'
-$assetRefs = Get-AllDistAssetReferences
-Write-Host "Assets referenciados (index + imports dinamicos): $($assetRefs.Count)"
-if ($assetRefs.Count -gt 0) {
-    $missingAssets = @()
-
-    foreach ($asset in $assetRefs) {
-        $relativePath = "frontend/dist/assets/$asset"
-        $fullPath = Join-Path $root $relativePath
-
-        $trackedOutput = @(git ls-files -- $relativePath)
-        $tracked = ''
-        if ($trackedOutput.Count -gt 0) {
-            $tracked = ($trackedOutput -join "`n").Trim()
-        }
-
-        if (-not $tracked -or -not (Test-Path $fullPath)) {
-            $missingAssets += $relativePath
-        }
+Write-Section '4) Artefatos frontend fora do Git'
+$trackedDist = @(git ls-files "frontend/dist") | Where-Object { $_ -and $_.Trim().Length -gt 0 }
+Write-Host "Arquivos rastreados em frontend/dist: $($trackedDist.Count)"
+if ($trackedDist.Count -gt 0) {
+    $trackedDist | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    if ($trackedDist.Count -gt 80) {
+        Write-Host "  ... +$($trackedDist.Count - 80) arquivos" -ForegroundColor Yellow
     }
-
-    if ($missingAssets.Count -gt 0) {
-        Write-Host 'Assets faltando/rastreados incorretamente:' -ForegroundColor Yellow
-        $missingAssets | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
-        if ($missingAssets.Count -gt 80) {
-            Write-Host "  ... +$($missingAssets.Count - 80) assets" -ForegroundColor Yellow
-        }
-        Fail 'dist/index.html referencia assets ausentes no Git. Rode build e inclua frontend/dist/assets no commit.'
-    }
+    Fail 'frontend/dist nao deve ser versionado. Gere o build em runtime/frontend/dist no deploy.'
 }
 
-$distAssetsPath = Join-Path $root 'frontend/dist/assets'
-if (Test-Path $distAssetsPath) {
-    $trackedAssets = @(git ls-files "frontend/dist/assets") | Where-Object { $_ -and $_.Trim().Length -gt 0 }
-    $localAssets = @(Get-ChildItem -Path $distAssetsPath -File | ForEach-Object { "frontend/dist/assets/$($_.Name)" })
-
-    $onlyLocalAssets = @($localAssets | Where-Object { $trackedAssets -notcontains $_ } | Sort-Object -Unique)
-    Write-Host "Assets locais nao rastreados: $($onlyLocalAssets.Count)"
-
-    if ($onlyLocalAssets.Count -gt 0) {
-        Write-Host 'Exemplos de assets locais faltando no Git:' -ForegroundColor Yellow
-        $onlyLocalAssets | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
-        if ($onlyLocalAssets.Count -gt 80) {
-            Write-Host "  ... +$($onlyLocalAssets.Count - 80) assets" -ForegroundColor Yellow
-        }
-
-        Fail 'Existem arquivos em frontend/dist/assets que nao estao versionados. Rode build e inclua o dist completo no commit.'
-    }
+$trackedRuntime = @(git ls-files "runtime") | Where-Object { $_ -and $_.Trim().Length -gt 0 }
+Write-Host "Arquivos rastreados em runtime: $($trackedRuntime.Count)"
+if ($trackedRuntime.Count -gt 0) {
+    $trackedRuntime | Select-Object -First 80 | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    Fail 'runtime contem artefatos gerados e nao deve ser versionado.'
 }
 
 Write-Section 'Resultado'
