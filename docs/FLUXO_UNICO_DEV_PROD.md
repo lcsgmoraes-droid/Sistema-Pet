@@ -97,7 +97,7 @@ docker compose -f docker-compose.prod.yml build backend
 docker compose -f docker-compose.prod.yml up -d backend
 ```
 
-So o frontend e diferente: o nginx serve os arquivos estaticos da pasta `frontend/dist` diretamente, entao para o frontend basta copiar os arquivos novos (via `npm run build` + commit) e `docker restart petshop-prod-nginx`.
+So o frontend e diferente: o nginx serve os arquivos estaticos gerados em `runtime/frontend/dist`, fora da arvore versionada. O Git guarda o codigo-fonte; o build de producao deve gerar/copiar os artefatos para `runtime/frontend/dist` e recriar/reiniciar o `nginx`.
 
 ---
 
