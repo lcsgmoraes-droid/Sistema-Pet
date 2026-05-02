@@ -154,6 +154,7 @@ const DashboardGerencial = lazy(() => import("./pages/DashboardGerencial"));
 const UsuariosPage = lazy(() => import("./pages/UsuariosPage.jsx"));
 const RolesPage = lazy(() => import("./pages/RolesPage.jsx"));
 const OpsDashboard = lazy(() => import("./pages/OpsDashboard.jsx"));
+const OpsIncidentes = lazy(() => import("./pages/OpsIncidentes.jsx"));
 const Observabilidade = lazy(() => import("./pages/Observabilidade.jsx"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracaoFiscalEmpresa = lazy(
@@ -305,6 +306,7 @@ function App() {
                   }
                 >
                   <Route index element={<OpsDashboard />} />
+                  <Route path="incidentes" element={<OpsIncidentes />} />
                   <Route path="observabilidade" element={<Observabilidade />} />
                 </Route>
 

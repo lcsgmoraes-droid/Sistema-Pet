@@ -35,6 +35,7 @@ Separacao operacional iniciada:
 - A rota antiga `/admin/observabilidade` deve apenas redirecionar, para nao quebrar link salvo.
 - Backend consolidado em `/admin/observabilidade/ops-summary`, para a inteligencia operacional ficar centralizada e reutilizavel.
 - Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
+- Painel de suporte em `/ops/incidentes`, com drilldown por tenant, rota e request_id para investigar producao sem depender apenas de relato do cliente.
 
 Tela piloto:
 

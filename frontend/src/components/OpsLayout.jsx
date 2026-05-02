@@ -2,6 +2,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   FiActivity,
   FiArrowLeft,
+  FiAlertTriangle,
   FiBarChart2,
   FiDatabase,
   FiHome,
@@ -19,6 +20,12 @@ const navItems = [
     description: "Saude e alertas",
     icon: FiHome,
     end: true,
+  },
+  {
+    to: "/ops/incidentes",
+    label: "Incidentes",
+    description: "Tenant, rota e request",
+    icon: FiAlertTriangle,
   },
   {
     to: "/ops/observabilidade",

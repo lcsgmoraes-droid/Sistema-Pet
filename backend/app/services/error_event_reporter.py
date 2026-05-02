@@ -172,8 +172,13 @@ def _filter_events(
     path_filter = path_contains.lower() if path_contains else None
 
     for event in events:
-        if tenant_id and str(event.get("tenant_id") or "") != tenant_id:
-            continue
+        if tenant_id:
+            event_tenant_id = str(event.get("tenant_id") or "")
+            if tenant_id == "sem_tenant":
+                if event_tenant_id:
+                    continue
+            elif event_tenant_id != tenant_id:
+                continue
         if path_filter and path_filter not in str(event.get("path") or "").lower():
             continue
         if status_min is not None and int(event.get("status_code") or 0) < status_min:
