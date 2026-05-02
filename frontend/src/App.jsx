@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import ModuloBloqueado from "./components/ModuloBloqueado";
+import OpsLayout from "./components/OpsLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./contexts/AuthContext";
 import { useAuth } from "./contexts/AuthContext";
@@ -292,6 +293,19 @@ function App() {
 
                 {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}
                 <Route path="/:tenantId" element={<EcommerceMVP />} />
+
+                {/* Central operacional MLProHub Ops */}
+                <Route
+                  path="/ops"
+                  element={
+                    <ProtectedRoute permission="usuarios.manage">
+                      <OpsLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<Navigate to="/ops/observabilidade" replace />} />
+                  <Route path="observabilidade" element={<Observabilidade />} />
+                </Route>
 
                 {/* Rotas Protegidas */}
                 <Route
@@ -793,11 +807,7 @@ function App() {
                   <Route path="admin/roles" element={<RolesPage />} />
                   <Route
                     path="admin/observabilidade"
-                    element={
-                      <ProtectedRoute permission="usuarios.manage">
-                        <Observabilidade />
-                      </ProtectedRoute>
-                    }
+                    element={<Navigate to="/ops/observabilidade" replace />}
                   />
 
                   {/* Página de ajuda, planos e dúvidas — acessível sem módulo */}

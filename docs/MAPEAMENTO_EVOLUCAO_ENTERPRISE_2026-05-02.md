@@ -27,6 +27,12 @@ Componentes globais criados ou consolidados:
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 
+Separacao operacional iniciada:
+
+- `MLProHub Ops`: central propria em `/ops`, fora do layout de operacao do Pet Shop.
+- A observabilidade saiu do menu normal de Administracao e passou para `/ops/observabilidade`.
+- A rota antiga `/admin/observabilidade` deve apenas redirecionar, para nao quebrar link salvo.
+
 Tela piloto:
 
 - PDV: cabecalho, botoes principais, botoes de modo visualizacao, sidebar de vendas recentes e cards principais comecaram a consumir a fundacao global.
@@ -61,6 +67,7 @@ O trabalho vale para todos os modulos:
 - IA.
 - Administracao, usuarios, roles e configuracoes.
 - Telas publicas como rastreio e e-commerce.
+- Central MLProHub Ops: saude tecnica, erros por tenant, watchdog, deploys, alertas e suporte interno.
 
 ## Principios obrigatorios
 
